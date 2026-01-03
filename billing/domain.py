@@ -523,6 +523,39 @@ def process_payment_webhook(
             # Mark transaction successful
             payment_txn.mark_success(payload)
 
+            # Check if this is an upgrade payment (look for SubscriptionChangeIntent)
+            from .models import SubscriptionChangeIntent
+            
+            upgrade_intent = SubscriptionChangeIntent.objects.filter(
+                tx_ref=tx_ref,
+                status__in=[
+                    SubscriptionChangeIntent.Status.PENDING,
+                    SubscriptionChangeIntent.Status.PAID,
+                ],
+            ).first()
+
+            if upgrade_intent:
+                # Process upgrade flow
+                invoice = _process_upgrade_payment(upgrade_intent, payment_txn)
+                
+                event.mark_processed()
+                
+                logger.info(
+                    f"Event {idempotency_key[:16]}... UPGRADE PROCESSED, "
+                    f"tx_ref={tx_ref}, intent={upgrade_intent.id}, "
+                    f"{upgrade_intent.from_plan_code} → {upgrade_intent.to_plan_code}"
+                )
+                
+                return {
+                    "status": "processed",
+                    "message": "Upgrade processed successfully",
+                    "event": event,
+                    "transaction": payment_txn,
+                    "invoice": invoice,
+                    "upgrade_intent": upgrade_intent,
+                }
+            
+            # Regular subscription payment flow
             # Find or create invoice
             invoice = _find_or_create_invoice_for_transaction(payment_txn)
 
@@ -585,6 +618,120 @@ def process_payment_webhook(
             "message": error_msg,
             "event": event,
         }
+
+
+def _process_upgrade_payment(
+    upgrade_intent: "SubscriptionChangeIntent",
+    payment_txn: PaymentTransaction,
+) -> Invoice:
+    """
+    Process subscription upgrade after payment confirmed.
+    
+    1. Mark intent as PAID
+    2. Create invoice for upgrade top-up
+    3. Update subscription plan_code immediately
+    4. Do NOT change current_period_end (upgrade applies for remainder of cycle)
+    5. Mark intent as APPLIED
+    
+    Args:
+        upgrade_intent: SubscriptionChangeIntent instance
+        payment_txn: PaymentTransaction instance
+        
+    Returns:
+        Invoice for the upgrade payment
+    """
+    from .models import Invoice, InvoiceItem, SubscriptionPlan
+    
+    # Idempotency check: if already applied, return existing invoice
+    if upgrade_intent.status == upgrade_intent.Status.APPLIED:
+        logger.info(
+            f"Upgrade intent {upgrade_intent.id} already APPLIED (idempotent), "
+            f"returning existing invoice"
+        )
+        # Find existing invoice
+        invoice = Invoice.objects.filter(
+            business=upgrade_intent.business,
+            provider_reference=payment_txn.tx_ref,
+        ).first()
+        if invoice:
+            return invoice
+    
+    # Mark intent as PAID
+    if upgrade_intent.status == upgrade_intent.Status.PENDING:
+        upgrade_intent.mark_paid()
+    
+    # Create invoice for upgrade top-up
+    now = timezone.now()
+    subscription = upgrade_intent.subscription
+    
+    invoice = Invoice.objects.create(
+        business=upgrade_intent.business,
+        created_by=None,  # System-generated
+        to_name=getattr(upgrade_intent.business, "name", "") or "",
+        to_email=getattr(upgrade_intent.business, "manager_email", "") or getattr(upgrade_intent.business, "email", ""),
+        to_phone=getattr(upgrade_intent.business, "whatsapp_number", "") or getattr(upgrade_intent.business, "phone", ""),
+        period_start=subscription.current_period_start.date() if subscription.current_period_start else now.date(),
+        period_end=subscription.current_period_end.date() if subscription.current_period_end else now.date(),
+        notes=f"Subscription upgrade: {upgrade_intent.from_plan_code} → {upgrade_intent.to_plan_code}",
+        currency=upgrade_intent.currency,
+        status=Invoice.Status.PAID,  # Already paid
+        paid_at=now,
+        provider_reference=payment_txn.tx_ref,
+    )
+    
+    # Add invoice line item
+    InvoiceItem.objects.create(
+        invoice=invoice,
+        description=(
+            f"Upgrade top-up: {upgrade_intent.from_plan_code.title()} → "
+            f"{upgrade_intent.to_plan_code.title()} (remainder of current cycle)"
+        ),
+        qty=Decimal("1"),
+        unit="upgrade",
+        unit_price=upgrade_intent.amount_due,
+    )
+    
+    invoice.recalc_totals(save=True)
+    
+    logger.info(
+        f"Created upgrade invoice {invoice.number} for intent {upgrade_intent.id}, "
+        f"amount={upgrade_intent.amount_due}"
+    )
+    
+    # Update subscription plan immediately
+    # Get the new plan object
+    try:
+        new_plan = SubscriptionPlan.objects.get(code=upgrade_intent.to_plan_code, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        logger.error(
+            f"Target plan {upgrade_intent.to_plan_code} not found for upgrade intent {upgrade_intent.id}, "
+            f"cannot apply upgrade"
+        )
+        raise
+    
+    # Apply upgrade to subscription
+    subscription.plan = new_plan
+    subscription.last_payment_at = now
+    
+    # Do NOT change current_period_end (upgrade applies for remainder of cycle)
+    # Next renewal will charge full new plan price
+    
+    subscription.save(update_fields=["plan", "last_payment_at", "updated_at"])
+    
+    logger.info(
+        f"Subscription {subscription.id} upgraded from {upgrade_intent.from_plan_code} to "
+        f"{upgrade_intent.to_plan_code}, period_end unchanged"
+    )
+    
+    # Mark intent as APPLIED
+    upgrade_intent.mark_applied()
+    
+    logger.info(
+        f"Upgrade intent {upgrade_intent.id} marked APPLIED, "
+        f"business={upgrade_intent.business.id}"
+    )
+    
+    return invoice
 
 
 def _find_or_create_invoice_for_transaction(payment_txn: PaymentTransaction) -> Optional[Invoice]:

@@ -26,6 +26,8 @@ urlpatterns = [
     # NEW: one-click plan selection + per-plan page
     path("select-plan/", v.select_plan, name="select_plan"),
     path("plan/<slug:slug>/", v.plan_detail, name="plan_detail"),
+    # Subscription upgrade flow
+    path("upgrade/start/<slug:to_plan_code>/", v.upgrade_start, name="upgrade_start"),
     # ------------------------------------------------------------------
     # Stripe checkout & webhooks
     # ------------------------------------------------------------------

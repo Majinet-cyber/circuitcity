@@ -407,10 +407,13 @@
         {% if sub.plan and sub.plan.id == p.id %}
           <button class="btn btn-disabled" disabled>Current Plan</button>
         {% elif sub.plan and p.amount > sub.plan.amount %}
-          {# Upgrade available - will implement in Phase 3 #}
-          <button class="btn btn-upgrade" disabled title="Upgrade coming soon">
-            Upgrade (Coming Soon)
-          </button>
+          {# Upgrade available #}
+          <form method="post" action="{% url 'billing:upgrade_start' p.code %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-upgrade">
+              Upgrade — Pay MWK {{ p.amount|add:"-"|add:sub.plan.amount|floatformat:0|intcomma }}
+            </button>
+          </form>
         {% else %}
           {# Lower or equal tier - show checkout #}
           <form method="post" action="{% url 'billing:select_plan' %}">

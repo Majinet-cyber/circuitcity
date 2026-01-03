@@ -1017,6 +1017,111 @@ class PaymentTransaction(models.Model):
 
 
 # ======================================================================
+# Subscription Change Intent (Upgrade/Downgrade)
+# ======================================================================
+class SubscriptionChangeIntent(models.Model):
+    """
+    Tracks a pending subscription upgrade or downgrade.
+    Created when user initiates an upgrade, applied by webhook after payment confirmed.
+    Prevents duplicate upgrades on webhook retries via idempotency_key.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PAID = "paid", "Paid"
+        APPLIED = "applied", "Applied"
+        CANCELED = "canceled", "Canceled"
+        FAILED = "failed", "Failed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="subscription_change_intents",
+    )
+    subscription = models.ForeignKey(
+        BusinessSubscription,
+        on_delete=models.CASCADE,
+        related_name="change_intents",
+    )
+
+    # Plan change details
+    from_plan_code = models.CharField(max_length=50)
+    to_plan_code = models.CharField(max_length=50)
+    from_plan_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    to_plan_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # Payment details
+    amount_due = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        help_text="Amount to pay for upgrade (difference between plans)",
+    )
+    currency = models.CharField(max_length=8, default=CURRENCY_DEFAULT)
+
+    # Status tracking
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+
+    # Payment provider references
+    paychangu_reference = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    tx_ref = models.CharField(max_length=255, blank=True, default="", db_index=True)
+
+    # Idempotency: prevents duplicate application on webhook retries
+    # Format: "{business_id}:{from_plan}:{to_plan}:{period_start_timestamp}"
+    idempotency_key = models.CharField(max_length=255, unique=True, db_index=True)
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+    canceled_at = models.DateTimeField(null=True, blank=True)
+
+    # Metadata
+    meta = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "status"]),
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["paychangu_reference"]),
+            models.Index(fields=["tx_ref"]),
+        ]
+
+    def __str__(self):
+        return f"{self.from_plan_code} → {self.to_plan_code} ({self.get_status_display()})"
+
+    def mark_paid(self):
+        """Mark intent as paid (payment confirmed)."""
+        if self.status == self.Status.APPLIED:
+            return  # Already applied, no-op
+        self.status = self.Status.PAID
+        self.paid_at = timezone.now()
+        self.save(update_fields=["status", "paid_at", "updated_at"])
+
+    def mark_applied(self):
+        """Mark intent as applied (plan upgraded in subscription)."""
+        if self.status == self.Status.APPLIED:
+            return  # Already applied, idempotent
+        self.status = self.Status.APPLIED
+        self.applied_at = timezone.now()
+        self.save(update_fields=["status", "applied_at", "updated_at"])
+
+    def mark_canceled(self):
+        """Mark intent as canceled."""
+        self.status = self.Status.CANCELED
+        self.canceled_at = timezone.now()
+        self.save(update_fields=["status", "canceled_at", "updated_at"])
+
+    def mark_failed(self):
+        """Mark intent as failed."""
+        self.status = self.Status.FAILED
+        self.save(update_fields=["status", "updated_at"])
+
+
+# ======================================================================
 # Backwards-compatibility aliases so existing imports keep working
 # ======================================================================
 Plan = SubscriptionPlan

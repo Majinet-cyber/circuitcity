@@ -24,7 +24,15 @@ from tenants.models import Business
 from tenants.utils import require_business
 
 from . import paychangu_service
-from .models import BusinessSubscription, Invoice, InvoiceItem, Payment, PaymentTransaction, SubscriptionPlan
+from .models import (
+    BusinessSubscription,
+    Invoice,
+    InvoiceItem,
+    Payment,
+    PaymentTransaction,
+    SubscriptionChangeIntent,
+    SubscriptionPlan,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -933,6 +941,193 @@ def manage(request: HttpRequest) -> HttpResponse:
             "sub_badge": _sub_badge(sub),
         },
     )
+
+
+# ------------------------------------------------------------------------------
+# Subscription Upgrade Flow
+# ------------------------------------------------------------------------------
+@login_required
+@require_business
+@require_POST
+def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
+    """
+    Start subscription upgrade flow.
+    
+    1. Validate upgrade is to a higher-tier plan
+    2. Calculate amount due (difference between plans)
+    3. Create SubscriptionChangeIntent
+    4. Initiate PayChangu checkout for the difference
+    5. Redirect to PayChangu or show error
+    
+    Webhook will apply the upgrade after payment confirmed.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+    
+    # Validate current plan exists
+    if not sub.plan:
+        messages.error(request, "No current plan found. Please subscribe first.")
+        return redirect("billing:subscribe")
+    
+    # Get target plan
+    try:
+        to_plan = SubscriptionPlan.objects.get(code=to_plan_code, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        messages.error(request, f"Plan '{to_plan_code}' not found.")
+        return redirect("billing:manage")
+    
+    from_plan = sub.plan
+    
+    # Validate upgrade direction (must be to higher-priced plan)
+    if to_plan.amount <= from_plan.amount:
+        messages.error(request, "You can only upgrade to a higher-tier plan.")
+        return redirect("billing:manage")
+    
+    # Calculate amount due (simple difference, no proration yet)
+    amount_due = max(Decimal("0"), to_plan.amount - from_plan.amount)
+    
+    if amount_due == 0:
+        messages.info(request, "No payment required for this plan change.")
+        return redirect("billing:manage")
+    
+    # Generate idempotency key (prevents duplicate intents)
+    # Format: business_id:from_plan:to_plan:period_start_timestamp
+    period_start_ts = int(sub.current_period_start.timestamp()) if sub.current_period_start else 0
+    idempotency_key = f"{biz.id}:{from_plan.code}:{to_plan.code}:{period_start_ts}"
+    
+    # Check if intent already exists (prevent duplicates)
+    existing_intent = SubscriptionChangeIntent.objects.filter(
+        idempotency_key=idempotency_key,
+        status__in=[
+            SubscriptionChangeIntent.Status.PENDING,
+            SubscriptionChangeIntent.Status.PAID,
+        ],
+    ).first()
+    
+    if existing_intent:
+        messages.info(request, "An upgrade is already in progress. Please complete the payment.")
+        # Redirect to checkout or status page
+        return redirect("billing:manage")
+    
+    # Create SubscriptionChangeIntent
+    try:
+        intent = SubscriptionChangeIntent.objects.create(
+            business=biz,
+            subscription=sub,
+            from_plan_code=from_plan.code,
+            to_plan_code=to_plan.code,
+            from_plan_amount=from_plan.amount,
+            to_plan_amount=to_plan.amount,
+            amount_due=amount_due,
+            currency=to_plan.currency,
+            status=SubscriptionChangeIntent.Status.PENDING,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create upgrade intent: business={biz.id}, error={e}", exc_info=True)
+        messages.error(request, "Failed to initiate upgrade. Please try again.")
+        return redirect("billing:manage")
+    
+    # Generate unique transaction reference
+    tx_ref = f"upgrade-{biz.id}-{uuid.uuid4().hex[:12]}"
+    charge_id = f"charge-{uuid.uuid4().hex[:16]}"
+    
+    # Store tx_ref in intent for webhook lookup
+    intent.tx_ref = tx_ref
+    intent.save(update_fields=["tx_ref", "updated_at"])
+    
+    # Get location (first location if available)
+    location = None
+    if hasattr(biz, "locations"):
+        location = biz.locations.first()
+    
+    # Create PaymentTransaction record (PENDING)
+    transaction = PaymentTransaction.objects.create(
+        business=biz,
+        location=location,
+        created_by=request.user,
+        provider="paychangu",
+        tx_ref=tx_ref,
+        charge_id=charge_id,
+        payment_method="card",  # Default to card, can be changed later
+        amount=amount_due,
+        currency=intent.currency,
+        status=PaymentTransaction.Status.PENDING,
+    )
+    
+    # Build callback URLs
+    callback_url = request.build_absolute_uri(reverse("billing:paychangu_webhook"))
+    return_url = request.build_absolute_uri(reverse("billing:paychangu_return"))
+    
+    # Prepare metadata for PayChangu
+    meta = {
+        "purpose": "subscription_upgrade",
+        "intent_id": str(intent.id),
+        "business_id": str(biz.id),
+        "from_plan": from_plan.code,
+        "to_plan": to_plan.code,
+        "amount_due": str(amount_due),
+        "currency": intent.currency,
+        "user_id": str(request.user.id),
+        "user_email": request.user.email,
+    }
+    
+    # Initiate PayChangu hosted checkout
+    try:
+        result = paychangu_service.create_checkout(
+            business=biz,
+            location=location,
+            amount=amount_due,
+            currency=intent.currency,
+            tx_ref=tx_ref,
+            return_url=return_url,
+            callback_url=callback_url,
+            meta=meta,
+            user_email=request.user.email,
+            user_phone=getattr(request.user, "phone", None),
+            description=f"Upgrade: {from_plan.name} → {to_plan.name}",
+        )
+        
+        if result.get("status") != "success":
+            error_msg = result.get("message", "Failed to initiate payment")
+            logger.error(f"PayChangu checkout failed: business={biz.id}, tx_ref={tx_ref}, error={error_msg}")
+            transaction.mark_failed(result.get("raw_response", {}))
+            intent.mark_failed()
+            messages.error(request, f"Payment initiation failed: {error_msg}. Please try again.")
+            return redirect("billing:manage")
+        
+        # Update transaction with checkout details
+        transaction.checkout_url = result.get("checkout_url", "")
+        transaction.raw_init_payload = result.get("raw_response", {})
+        transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
+        
+        # Store intent reference in PayChangu metadata
+        intent.paychangu_reference = result.get("checkout_id", "")
+        intent.save(update_fields=["paychangu_reference", "updated_at"])
+        
+        logger.info(
+            f"Upgrade checkout created: business={biz.id}, intent={intent.id}, "
+            f"tx_ref={tx_ref}, amount_due={amount_due}"
+        )
+        
+        # Store tx_ref in session for return page
+        request.session["billing_tx_ref"] = tx_ref
+        request.session["upgrade_intent_id"] = str(intent.id)
+        
+        # Redirect to PayChangu checkout page
+        checkout_url = result.get("checkout_url")
+        if checkout_url:
+            return redirect(checkout_url)
+        else:
+            messages.error(request, "Failed to get checkout URL. Please try again.")
+            return redirect("billing:manage")
+            
+    except Exception as e:
+        logger.error(f"Upgrade checkout error: business={biz.id}, error={e}", exc_info=True)
+        transaction.mark_failed({"error": str(e)})
+        intent.mark_failed()
+        messages.error(request, f"An error occurred: {str(e)}. Please try again.")
+        return redirect("billing:manage")
 
 
 # ------------------------------------------------------------------------------
