@@ -7,6 +7,7 @@ from . import views_admin as va  # Keep import in case you still use parts of it
 from . import views_invoice as vi  # Invoice management
 from . import views_paychangu as vpc  # PayChangu
 from . import views_providers as vp  # Stripe + Pesapal
+from . import views_reconciliation as vr  # Reconciliation (staff-only)
 
 app_name = "billing"
 
@@ -134,4 +135,6 @@ urlpatterns = [
         RedirectView.as_view(pattern_name="hq:sub_revoke_trial", permanent=False),
         name="admin_revoke_trial_int",
     ),
+    # Reconciliation dashboard (staff-only)
+    path("admin/reconciliation/", vr.reconciliation_dashboard, name="reconciliation_dashboard"),
 ]

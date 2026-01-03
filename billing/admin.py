@@ -9,6 +9,8 @@ from .models import (
     InvoiceItem,
     Payment,
     PaymentMethod,
+    PaymentTransaction,
+    PaymentEvent,
     WebhookEvent,
 )
 
@@ -85,3 +87,43 @@ class WebhookEventAdmin(admin.ModelAdmin):
     list_display = ("provider", "event_type", "external_id", "received_at", "processed")
     list_filter = ("provider", "processed")
     search_fields = ("external_id", "event_type")
+
+
+@admin.register(PaymentTransaction)
+class PaymentTransactionAdmin(admin.ModelAdmin):
+    list_display = ("tx_ref", "business", "provider", "amount", "currency", "status", "created_at")
+    list_filter = ("provider", "status", "payment_method")
+    search_fields = ("tx_ref", "business__name", "charge_id")
+    readonly_fields = ("created_at", "updated_at", "raw_webhook_payload")
+    
+    def has_add_permission(self, request):
+        # Transactions should only be created via webhooks
+        return False
+
+
+@admin.register(PaymentEvent)
+class PaymentEventAdmin(admin.ModelAdmin):
+    list_display = ("idempotency_key", "provider", "reference", "status", "signature_valid", "received_at", "processed_at")
+    list_filter = ("provider", "status", "signature_valid")
+    search_fields = ("idempotency_key", "event_id", "reference")
+    readonly_fields = ("received_at", "processed_at", "payload_json")
+    
+    fieldsets = (
+        ("Event Info", {
+            "fields": ("provider", "event_id", "idempotency_key", "reference")
+        }),
+        ("Status", {
+            "fields": ("status", "signature_valid", "error_message")
+        }),
+        ("Timestamps", {
+            "fields": ("received_at", "processed_at")
+        }),
+        ("Raw Data", {
+            "fields": ("payload_json",),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def has_add_permission(self, request):
+        # Events should only be created via webhooks
+        return False
