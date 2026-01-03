@@ -914,12 +914,25 @@ def invoice_list(request: HttpRequest) -> HttpResponse:
 @require_business
 def manage(request: HttpRequest) -> HttpResponse:
     """
-    Basic "manage subscription" page (stub). You can add upgrade/downgrade actions here later.
+    Manage subscription page with current plan details, available plans, and invoice history.
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
-    return render(request, "billing/manage.html", {"sub": sub, "plans": plans, "sub_badge": _sub_badge(sub)})
+    
+    # Get recent invoices (last 3)
+    invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:3]
+    
+    return render(
+        request,
+        "billing/manage.html",
+        {
+            "sub": sub,
+            "plans": plans,
+            "invoices": invoices,
+            "sub_badge": _sub_badge(sub),
+        },
+    )
 
 
 # ------------------------------------------------------------------------------
