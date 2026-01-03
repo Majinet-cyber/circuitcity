@@ -1,7 +1,9 @@
 ﻿# billing/utils_send.py
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Iterable
+
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -41,6 +43,10 @@ def send_invoice_whatsapp(*, to_number: str, text: str) -> SendResult:
         send_whatsapp(to_number, text)
         return SendResult(True, "whatsapp", f"Sent to {to_number}")
 
-    # Minimal console fallback
-    print(f"[WhatsApp:FALLBACK] -> {to_number}\n{text}")
+    # Minimal console fallback - use logger instead of print
+    import logging
+
+    logger = logging.getLogger(__name__)
+    if settings.DEBUG:
+        logger.debug("[WhatsApp:FALLBACK] -> %s", to_number[:4] + "***")
     return SendResult(True, "whatsapp", "Console fallback")

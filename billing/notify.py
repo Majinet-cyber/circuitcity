@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -37,9 +37,14 @@ def _notify_in_app(*, title: str, body: str, ntype: str = "billing", business=No
 # ---- WhatsApp dispatchers (console / Twilio / Meta) --------------------
 def _send_whatsapp_console(to: str, body: str) -> None:
     try:
-        from django.utils import timezone
+        # Console logging removed - use Django logging if needed
+        import logging
 
-        print(f"[WA/console {timezone.now()}] -> {to}: {body}")
+        logger = logging.getLogger(__name__)
+        from django.conf import settings
+
+        if settings.DEBUG:
+            logger.debug("[WA/console] -> %s", to[:4] + "***")
     except Exception:
         pass
 
@@ -60,7 +65,8 @@ def _send_whatsapp_meta(to: str, body: str) -> None:
     Meta (WhatsApp Cloud API) simple text message.
     Expects WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID; `to` must be MSISDN (e.g., +265...).
     """
-    import json, urllib.request
+    import json
+    import urllib.request
 
     token = settings.WHATSAPP_TOKEN
     phone_id = settings.WHATSAPP_PHONE_NUMBER_ID
@@ -78,7 +84,10 @@ def _send_whatsapp_meta(to: str, body: str) -> None:
         urllib.request.urlopen(req, data=json.dumps(payload).encode("utf-8"), timeout=10)
     except Exception as e:
         # Don't crash app flow due to WA fanout
-        print(f"[WA/meta] send error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[WA/meta] send error: %s", str(e))
 
 
 def send_whatsapp(to: Optional[str], body: str) -> None:
@@ -93,7 +102,10 @@ def send_whatsapp(to: Optional[str], body: str) -> None:
         else:
             _send_whatsapp_console(to, body)
     except Exception as e:
-        print(f"[WA] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[WA] error: %s", str(e))
 
 
 # ---- Email helpers ------------------------------------------------------
@@ -160,16 +172,25 @@ def fanout(
     try:
         send_email(subject=title, body=body, to_email=email)
     except Exception as e:
-        print(f"[billing.email] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.email] error: %s", str(e))
 
     # WhatsApp
     try:
         send_whatsapp(wa, body)
     except Exception as e:
-        print(f"[billing.wa] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.wa] error: %s", str(e))
 
     # In-app bell
     try:
         _notify_in_app(title=title, body=body, ntype=ntype, business=business, url=url)
     except Exception as e:
-        print(f"[billing.inapp] error: {e}")
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning("[billing.inapp] error: %s", str(e))

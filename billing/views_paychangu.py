@@ -18,20 +18,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 
 from tenants.models import Business
-from tenants.utils import require_business, get_active_business
+from tenants.utils import get_active_business, require_business
 
-from .models import (
-    SubscriptionPlan,
-    BusinessSubscription,
-    Payment,
-    PaymentTransaction,
-    WebhookEvent,
-    Invoice,
-)
 from . import paychangu_service
+from .models import BusinessSubscription, Invoice, Payment, PaymentTransaction, SubscriptionPlan, WebhookEvent
 
 logger = logging.getLogger(__name__)
 
@@ -175,12 +168,13 @@ def paychangu_webhook(request: HttpRequest) -> HttpResponse:
 
     Verifies signature, extracts tx_ref, calls verify API, updates transaction.
     Must return 200 quickly to acknowledge receipt.
+
+    Uses domain.process_payment_webhook for idempotent + atomic processing.
     """
     # Get raw request body BEFORE any parsing
     payload = request.body
 
     # Read signature from header (try multiple names)
-    # Prefer request.headers.get() first, then fall back to META
     signature = (
         request.headers.get("Signature", "")
         or request.META.get("HTTP_SIGNATURE", "")
@@ -207,17 +201,6 @@ def paychangu_webhook(request: HttpRequest) -> HttpResponse:
         logger.error(f"PayChangu webhook: failed to parse JSON: {e}")
         return HttpResponseBadRequest("Invalid JSON")
 
-    # Log webhook event
-    try:
-        WebhookEvent.objects.create(
-            provider="paychangu",
-            event_type=data.get("event", "webhook"),
-            external_id=data.get("tx_ref", ""),
-            payload=data,
-        )
-    except Exception as e:
-        logger.error(f"Failed to log PayChangu webhook: {e}")
-
     # Extract transaction reference - try various field names
     tx_ref = (
         data.get("tx_ref")
@@ -231,139 +214,75 @@ def paychangu_webhook(request: HttpRequest) -> HttpResponse:
         logger.warning(f"PayChangu webhook missing tx_ref in payload: {list(data.keys())}")
         return HttpResponse("OK", status=200)  # Return 200 to avoid retries
 
-    logger.info(f"PayChangu webhook received for tx_ref={tx_ref}")
+    # Extract event type and amount
+    event_type = data.get("event", "payment.webhook")
+    amount_str = data.get("amount", "0")
+    currency = data.get("currency", "MWK")
+    event_id = data.get("event_id", "")
 
-    # Find transaction
     try:
+        amount = Decimal(str(amount_str))
+    except Exception:
+        amount = Decimal("0")
+
+    logger.info(f"PayChangu webhook received: tx_ref={tx_ref}, event={event_type}")
+
+    # Verify transaction with PayChangu API first (only if not already successful)
+    # This ensures we have the latest status before processing
+    try:
+        # Find transaction to determine verification method
         transaction = PaymentTransaction.objects.get(tx_ref=tx_ref, provider="paychangu")
+
+        # Skip verification if already SUCCESS (idempotency)
+        if transaction.status != PaymentTransaction.Status.SUCCESS:
+            # Use appropriate verify method based on payment type
+            if transaction.charge_id:
+                verify_result = paychangu_service.momo_verify_payment(transaction.charge_id)
+            else:
+                verify_result = paychangu_service.verify_payment(tx_ref)
+
+            verified_status = verify_result.get("status")
+
+            # Map verified status to event type
+            if verified_status == "SUCCESS":
+                event_type = "payment.success"
+            elif verified_status == "FAILED":
+                event_type = "payment.failed"
+            else:
+                event_type = "payment.pending"
+
+            # Use verified amount if available
+            if verify_result.get("amount"):
+                try:
+                    amount = Decimal(str(verify_result.get("amount")))
+                except Exception:
+                    pass
+
     except PaymentTransaction.DoesNotExist:
         logger.warning(f"PayChangu webhook: transaction not found for tx_ref {tx_ref}")
-        return HttpResponse("OK", status=200)  # Return 200 to avoid retries
-
-    # Idempotency: skip if already SUCCESS
-    if transaction.status == PaymentTransaction.Status.SUCCESS:
-        logger.info(f"PayChangu webhook: transaction {tx_ref} already SUCCESS, skipping")
         return HttpResponse("OK", status=200)
+    except Exception as e:
+        logger.error(f"PayChangu verify API failed for {tx_ref}: {e}")
+        # Continue with webhook data even if verify fails
+        pass
 
-    # Store webhook payload
-    transaction.raw_webhook_payload = data
-    transaction.save(update_fields=["raw_webhook_payload", "updated_at"])
+    # Process webhook using domain service (idempotent + atomic)
+    from . import domain
 
-    # Verify transaction with PayChangu API
-    verify_result = paychangu_service.verify_payment(tx_ref)
-
-    if verify_result.get("status") == "ERROR":
-        logger.error(f"PayChangu verify API failed for {tx_ref}: {verify_result.get('message')}")
-        return HttpResponse("OK", status=200)  # Return 200 to avoid retries
-
-    # Update transaction based on verification result
-    # Accept various success status strings
-    verified_status = verify_result.get("status")
-
-    # Also check webhook payload status for immediate feedback
-    webhook_status = (
-        data.get("status", "").lower()
-        or data.get("payment_status", "").lower()
-        or data.get("transaction_status", "").lower()
+    result = domain.process_payment_webhook(
+        provider="paychangu",
+        tx_ref=tx_ref,
+        event_type=event_type,
+        amount=amount,
+        currency=currency,
+        payload=data,
+        signature_valid=is_valid,
+        event_id=event_id,
     )
 
-    # Map common success indicators
-    success_indicators = ["success", "successful", "completed", "complete"]
-    if webhook_status in success_indicators and verified_status == "SUCCESS":
-        logger.info(f"Webhook status '{webhook_status}' confirmed by verify API")
-    elif webhook_status in success_indicators:
-        logger.info(f"Webhook indicates success ('{webhook_status}'), but verify API returned: {verified_status}")
-
-    if verified_status == "SUCCESS":
-        # Mark transaction as successful (idempotent)
-        transaction.mark_success(verify_result.get("raw_response", {}))
-        logger.info(f"PayChangu transaction {tx_ref} marked SUCCESS")
-
-        # Find and process associated invoice
-        try:
-            # Look for invoice in transaction metadata or find by business
-            from .models import Invoice
-
-            # Try to find invoice from session data or business context
-            invoice = None
-            if transaction.business:
-                # Find the most recent unpaid invoice for this business
-                invoice = (
-                    Invoice.objects.filter(
-                        business=transaction.business,
-                        status__in=[Invoice.Status.DRAFT, Invoice.Status.SENT],
-                        total=transaction.amount,
-                        currency=transaction.currency,
-                    )
-                    .order_by("-created_at")
-                    .first()
-                )
-
-            if invoice:
-                # Mark invoice as paid (idempotent)
-                if invoice.status != Invoice.Status.PAID:
-                    invoice.mark_paid()
-                    logger.info(f"Invoice {invoice.number} marked PAID for tx_ref {tx_ref}")
-
-                # Activate subscription
-                try:
-                    sub = getattr(transaction.business, "subscription", None)
-                    if sub and sub.status != BusinessSubscription.Status.ACTIVE:
-                        sub.status = BusinessSubscription.Status.ACTIVE
-                        sub.last_payment_at = timezone.now()
-                        sub.payment_method = BusinessSubscription.Method.AIRTEL  # Default
-
-                        # Set payment method based on transaction metadata
-                        meta = transaction.raw_init_payload.get("meta", {})
-                        payment_method = meta.get("payment_method", "")
-                        if payment_method == "AIRTEL_MONEY":
-                            sub.payment_method = BusinessSubscription.Method.AIRTEL
-                        elif payment_method == "BANK":
-                            sub.payment_method = BusinessSubscription.Method.STANDARD_BANK
-                        elif payment_method == "CARD":
-                            sub.payment_method = BusinessSubscription.Method.CARD
-
-                        # Advance billing period
-                        sub.advance_period()
-                        sub.save(
-                            update_fields=[
-                                "status",
-                                "last_payment_at",
-                                "payment_method",
-                                "current_period_start",
-                                "current_period_end",
-                                "next_billing_date",
-                                "updated_at",
-                            ]
-                        )
-                        logger.info(
-                            f"Subscription activated for business {transaction.business.id}, " f"tx_ref {tx_ref}"
-                        )
-                    elif sub and sub.status == BusinessSubscription.Status.ACTIVE:
-                        logger.info(
-                            f"Subscription already ACTIVE for business {transaction.business.id}, "
-                            f"tx_ref {tx_ref} - skipping activation (idempotent)"
-                        )
-                except Exception as e:
-                    logger.error(f"Failed to activate subscription for tx_ref {tx_ref}: {e}", exc_info=True)
-            else:
-                logger.warning(
-                    f"No matching invoice found for tx_ref {tx_ref}, "
-                    f"business={transaction.business.id}, amount={transaction.amount}"
-                )
-
-        except Exception as e:
-            logger.error(f"Failed to process invoice/subscription for tx_ref {tx_ref}: {e}", exc_info=True)
-
-        logger.info(f"Webhook confirmed: tx_ref={tx_ref}, status=SUCCESS, invoice marked PAID")
-
-    elif verified_status == "FAILED":
-        transaction.mark_failed(verify_result.get("raw_response", {}))
-        logger.info(f"PayChangu transaction {tx_ref} marked FAILED")
-
-    else:
-        # PENDING or other status - keep as pending
-        logger.info(f"PayChangu transaction {tx_ref} still {verified_status}")
+    logger.info(
+        f"Webhook processing result: status={result['status']}, " f"message={result['message']}, tx_ref={tx_ref}"
+    )
 
     return HttpResponse("OK", status=200)
 

@@ -43,3 +43,30 @@ def remind_trials_ending_soon():
         fanout(business=biz, title=title, body=body, ntype="trial_notice")
         count += 1
     return {"reminded": count}
+
+
+@shared_task
+def process_subscription_renewals():
+    """
+    Process all subscription renewals and status transitions.
+    Should be run daily via Celery Beat.
+
+    Transitions:
+    - TRIAL → PAST_DUE (trial expired)
+    - ACTIVE → PAST_DUE (period expired)
+    - PAST_DUE → SUSPENDED (grace expired)
+
+    Returns:
+        Dict with processing statistics
+    """
+    from . import domain
+
+    stats = domain.process_subscription_renewals()
+
+    return {
+        "total_checked": stats["total_checked"],
+        "expired_trials": stats["expired_trials"],
+        "expired_periods": stats["expired_periods"],
+        "suspended": stats["suspended"],
+        "errors": stats["errors"],
+    }

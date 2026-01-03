@@ -2,11 +2,11 @@
 """
 Tests for PayChangu webhook signature verification and transaction processing.
 """
-import json
-import hmac
 import hashlib
+import hmac
+import json
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.conf import settings
@@ -14,14 +14,9 @@ from django.test import Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from tests.helpers.tenant_setup import (
-    make_user,
-    make_business,
-    make_location,
-    make_membership,
-)
-from billing.models import PaymentTransaction, WebhookEvent
 from billing import paychangu_service
+from billing.models import PaymentTransaction, WebhookEvent
+from tests.helpers.tenant_setup import make_business, make_location, make_membership, make_user
 
 
 @pytest.mark.django_db
@@ -159,8 +154,14 @@ class TestPayChanguWebhookSignature:
         # Transaction should be marked as SUCCESS
         transaction.refresh_from_db()
         assert transaction.status == PaymentTransaction.Status.SUCCESS
-        assert transaction.raw_webhook_payload["tx_ref"] == transaction.tx_ref
-        assert transaction.raw_verify_payload["data"]["status"] == "successful"
+
+        # Webhook payload is now stored in PaymentEvent, not transaction
+        from billing.models import PaymentEvent
+
+        event = PaymentEvent.objects.filter(reference=transaction.tx_ref).first()
+        assert event is not None
+        assert event.status == PaymentEvent.Status.PROCESSED
+        assert event.signature_valid is True
 
     @override_settings(PAYCHANGU_WEBHOOK_SECRET="test-webhook-secret-12345")
     @patch("billing.paychangu_service.verify_payment")

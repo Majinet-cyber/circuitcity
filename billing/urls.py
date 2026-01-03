@@ -4,8 +4,9 @@ from django.views.generic import RedirectView
 
 from . import views as v
 from . import views_admin as va  # Keep import in case you still use parts of it.
-from . import views_providers as vp  # Stripe + Pesapal
+from . import views_invoice as vi  # Invoice management
 from . import views_paychangu as vpc  # PayChangu
+from . import views_providers as vp  # Stripe + Pesapal
 
 app_name = "billing"
 
@@ -15,11 +16,12 @@ urlpatterns = [
     # ------------------------------------------------------------------
     path("plans/", v.subscribe, name="plans"),  # Alias for sidebar navigation
     path("subscribe/", v.subscribe, name="subscribe"),
+    path("manage/", v.manage, name="manage"),  # Manage subscription
     path("checkout/", v.checkout, name="checkout"),
     path("success/", v.success, name="success"),
     path("webhook/", v.webhook, name="webhook"),
     path("trial-expired/", v.trial_expired, name="trial_expired"),
-    path("invoices/", v.invoice_list, name="invoices"),
+    path("invoices/", vi.invoice_list, name="invoices"),
     # NEW: one-click plan selection + per-plan page
     path("select-plan/", v.select_plan, name="select_plan"),
     path("plan/<slug:slug>/", v.plan_detail, name="plan_detail"),
@@ -42,13 +44,13 @@ urlpatterns = [
     path("paychangu/webhook/", vpc.paychangu_webhook, name="paychangu_webhook"),
     path("paychangu/return/", vpc.paychangu_return, name="paychangu_return"),
     path("paychangu/callback/", vpc.paychangu_callback, name="paychangu_callback"),
-    path("api/payment-status/", vpc.paychangu_payment_status, name="paychangu_payment_status"),
+    path("api/payment-status/", v.payment_status_api, name="payment_status_api"),
     # Invoice utilities (inline preview/actions)
-    path("invoice/<uuid:pk>/send/", v.invoice_send, name="invoice_send"),
-    path("invoice/<uuid:pk>/download/", v.invoice_download, name="invoice_download"),
+    path("invoice/<uuid:pk>/send/", vi.invoice_send, name="invoice_send"),
+    path("invoice/<uuid:pk>/download/", vi.invoice_download, name="invoice_download"),
     # Compatibility for projects that used INT primary keys on invoices
-    path("invoice/<int:pk>/send/", v.invoice_send, name="invoice_send_int"),
-    path("invoice/<int:pk>/download/", v.invoice_download, name="invoice_download_int"),
+    path("invoice/<int:pk>/send/", vi.invoice_send, name="invoice_send_int"),
+    path("invoice/<int:pk>/download/", vi.invoice_download, name="invoice_download_int"),
     # ------------------------------------------------------------------
     # HQ subscriptions (shortcuts / backward compatibility)
     # We now rely on the canonical views under the `hq` app.

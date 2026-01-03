@@ -4,20 +4,19 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
+from django.db.models import Count, DecimalField, Sum, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import render
 from django.utils import timezone
 
+from inventory.authz import require_business_kind
+from inventory.business_kinds import BusinessKind
+from inventory.models_attendance import TimeLog
+from inventory.models_verticals import GymMember, GymPayment, GymWalletEntry
 from tenants.models import Membership
 from tenants.utils import require_business
 
-from inventory.authz import require_business_kind
-from inventory.business_kinds import BusinessKind
-from inventory.models_verticals import GymMember, GymPayment, GymWalletEntry
-from inventory.models_attendance import TimeLog
-
 from . import base
-
 
 # Note: fast_sell() removed - gym is membership-based (members + payments),
 # not product-based (inventory + sales). Gym does NOT support Fast Sell.
@@ -69,24 +68,42 @@ def dashboard(request):
     members_active_count = active_members  # Alias for template compatibility
     members_in_arrears = in_arrears
 
-    # Monthly Recurring Revenue (current month)
+    # ============================================================================
+    # FINANCIAL KPIs: Revenue, Costs, Profit, MRR
+    # Use consistent date filtering and Coalesce for safe aggregation
+    # ============================================================================
     now = timezone.now()
-    today = now.date()
+    today = timezone.localdate()  # Use localdate for date-only comparisons
     yesterday = today - timedelta(days=1)
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
 
-    # Date ranges for metrics
+    # Calculate month start/end using year+month (avoids timezone edge cases)
+    month_start_date = today.replace(day=1)
+    if today.month == 12:
+        month_end_date = today.replace(day=31)
+    else:
+        month_end_date = today.replace(day=1, month=today.month + 1) - timedelta(days=1)
+
+    # Date ranges for metrics (datetime-aware for paid_at filtering)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
 
+    # Use a single canonical queryset for this month's payments
+    # CRITICAL: Filter by is_active=True to exclude cancelled/refunded payments
     current_month_payments = GymPayment.objects.filter(
-        member__business=business, paid_at__gte=month_start, paid_at__lte=month_end
+        member__business=business,
+        is_active=True,
+        paid_at__year=today.year,
+        paid_at__month=today.month,
     )
 
-    mrr = current_month_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    # Use Coalesce to ensure we get Decimal("0.00") instead of None
+    mrr = current_month_payments.aggregate(
+        total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
+    )["total"]
     payment_count = current_month_payments.count()
 
     # Payment mix (handle cases where payment_method might be NULL)
@@ -97,7 +114,9 @@ def dashboard(request):
         for method_code, method_label in PaymentMethod.choices:
             method_payments = current_month_payments.filter(payment_method=method_code)
             count = method_payments.count()
-            amount = method_payments.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+            amount = method_payments.aggregate(
+                total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
+            )["total"]
             if count > 0:
                 payment_mix.append(
                     {
@@ -123,18 +142,28 @@ def dashboard(request):
 
     # ============================================================================
     # REVENUE: Calculate from GymPayment for today, yesterday, this month
+    # Use Coalesce for safe aggregation (avoids None)
     # ============================================================================
     revenue_today = GymPayment.objects.filter(
-        member__business=business, is_active=True, paid_at__gte=today_start, paid_at__lte=today_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        member__business=business,
+        is_active=True,
+        paid_at__gte=today_start,
+        paid_at__lte=today_end,
+    ).aggregate(total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2)))[
+        "total"
+    ]
 
     revenue_yesterday = GymPayment.objects.filter(
-        member__business=business, is_active=True, paid_at__gte=yesterday_start, paid_at__lte=yesterday_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        member__business=business,
+        is_active=True,
+        paid_at__gte=yesterday_start,
+        paid_at__lte=yesterday_end,
+    ).aggregate(total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2)))[
+        "total"
+    ]
 
-    revenue_this_month = GymPayment.objects.filter(
-        member__business=business, is_active=True, paid_at__gte=month_start, paid_at__lte=month_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    # Use the same queryset for consistency (year+month filtering)
+    revenue_this_month = mrr  # Same as MRR for gym (all active payments this month)
 
     # ============================================================================
     # PROFIT: Calculate profit = revenue - costs for each period
@@ -154,7 +183,11 @@ def dashboard(request):
     try:
         trainer_earnings = TrainerFee.objects.filter(
             business=business, created_at__gte=month_start, created_at__lte=month_end
-        ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+        ).aggregate(
+            total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2))
+        )[
+            "total"
+        ]
     except Exception:
         # TrainerFee table may not exist yet
         trainer_earnings = Decimal("0.00")
@@ -176,9 +209,10 @@ def dashboard(request):
     # ===== NEW: Personalized dashboard enhancements (quotes & greetings) =====
     ctx_enhancements = {}
     try:
+        import json as json_lib
+
         from dashboard.helpers_greetings import get_personalized_greeting
         from dashboard.helpers_quotes import get_todays_quotes
-        import json as json_lib
 
         # Personalized greeting (changes 3x daily: morning, afternoon, evening)
         greeting_ctx = get_personalized_greeting(request.user, business)

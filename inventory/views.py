@@ -1,18 +1,19 @@
 ﻿# --- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
 
 from __future__ import annotations
-from django.contrib import messages
-from .models import BusinessKind
-from django.shortcuts import render, redirect
-from django.urls import reverse
-from .utils import get_invite_token, invite_join_url
-from .forms import MerchProductForm, MerchUnitPriceFormSet
-import logging
 
 import csv
 import json
 import logging
 import math
+
+from django.contrib import messages
+from django.shortcuts import redirect, render
+from django.urls import reverse
+
+from .forms import MerchProductForm, MerchUnitPriceFormSet
+from .models import BusinessKind
+from .utils import get_invite_token, invite_join_url
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +28,18 @@ def _wants_json(request):
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
 
 
-from django.urls import reverse
-from .forms import MerchProductForm, MerchUnitPriceFormSet
-from .forms import MerchProductForm, MerchUnitPriceFormSet
+from datetime import date, datetime, time, timedelta  # NOTE: keep 'time' for wallet calc in Part 2
+from decimal import Decimal
 from functools import wraps
 from urllib.parse import urlencode
-from .api import predictions_summary as api_predictions
-from django.utils.translation import gettext as _
-from decimal import Decimal
-from datetime import datetime, timedelta, date, time  # NOTE: keep 'time' for wallet calc in Part 2
 
 # ORM bits for subqueries/annotations
-from django.db.models import Q, OuterRef, Subquery, Exists, Value, BooleanField
+from django.db.models import BooleanField, Exists, OuterRef, Q, Subquery, Value
+from django.urls import reverse
+from django.utils.translation import gettext as _
+
+from .api import predictions_summary as api_predictions
+from .forms import MerchProductForm, MerchUnitPriceFormSet
 
 # --- Safe, module-level binding so functions can read Sale without shadowing
 try:
@@ -52,35 +53,9 @@ except Exception:
         Order = None  # type: ignore[assignment]
         OrderItem = None  # type: ignore[assignment]
 
-# add near top of file
-from django.db import transaction
-from django.utils import timezone
-from .utils_status import mark_item_sold  # <— use your canonical updater
-from sales.models import Sale  # if not already imported
-
-
-from datetime import datetime, timedelta, time as dtime
-from django.utils import timezone
-from tenants.utils import require_business, require_role
-from django.conf import settings
-from django.contrib import messages
-from django.shortcuts import render
-from django.contrib.auth import get_user_model
-from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db import IntegrityError, transaction, connection
-from django.db.models import Sum, Q
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
-from django.template.exceptions import TemplateDoesNotExist
-from django.urls import reverse
-from django.utils import timezone
-from django.http import JsonResponse
-from .models import InventoryItem
-from django.views.decorators.cache import never_cache
-from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from datetime import datetime
+from datetime import time as dtime
+from datetime import timedelta
 
 # === HOTFIX: active business + default location helpers (non-breaking) ========
 # (Additive only; does not replace your existing helpers. Double-underscore
@@ -88,9 +63,33 @@ from django.views.decorators.http import require_GET, require_POST, require_http
 #  before it is used further down in the file.)
 from functools import wraps as _wraps_hotfix
 
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+
+# add near top of file
+from django.db import IntegrityError, connection, transaction
+from django.db.models import Q, Sum
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.exceptions import TemplateDoesNotExist
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
+
+from sales.models import Sale  # if not already imported
+from tenants.utils import require_business, require_role
+
+from .models import InventoryItem
+from .utils_status import mark_item_sold  # <— use your canonical updater
+
 # --- add near the top of inventory/views.py (after imports) ---
 
-from django.views.decorators.http import require_http_methods
 
 try:
     # Prefer your existing helpers if present
@@ -106,11 +105,12 @@ except Exception:
 
 # --- Header counters computed from the single source of truth ---
 from decimal import Decimal
+
 from django.db.models import Sum
 from django.db.models.functions import Coalesce
 
 # if not already imported:
-from .scope import stock_queryset_for_request, active_scope, get_inventory_model
+from .scope import active_scope, get_inventory_model, stock_queryset_for_request
 
 
 def _inventory_header_stats(request):
@@ -253,7 +253,7 @@ def _ensure_active_business_and_location(request):
     # Fallback: single membership auto-select (mirrors your cc.urls logic)
     if not biz:
         try:
-            from tenants.models import BusinessMembership, Business  # noqa
+            from tenants.models import Business, BusinessMembership  # noqa
 
             qs = BusinessMembership.objects.filter(user=request.user)
             for f in ("is_active", "active", "accepted"):
@@ -385,7 +385,8 @@ def _get_active_business(request):
 
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
+
 from .models import BusinessKind
 
 
@@ -416,8 +417,8 @@ def merch_add_router(request):
     }
     template = template_map.get(kind) or "inventory/add_product_clothing.html"
 
-    # DEBUG breadcrumb so you can confirm the router is actually hit in your runserver console
-    print("ðŸ§­ merch_add_router â†’ business:", getattr(biz, "name", None), "kind:", kind, "template:", template)
+    # Router logging removed to avoid console spam
+    # Use DEBUG logging if needed: logger.debug("merch_add_router: kind=%s", kind)
 
     ctx = {
         "page_title": "Add Products",
@@ -439,7 +440,7 @@ def _require_active_business(request):
         messages.error(request, "No active business selected. Switch business and try again.")
         # Redirect to choose-business to avoid loops (dashboard:home also needs a business)
         try:
-            from django.urls import reverse, NoReverseMatch
+            from django.urls import NoReverseMatch, reverse
 
             try:
                 return redirect(reverse("tenants:choose_business"))
@@ -473,6 +474,7 @@ def __active_business_id(request):
 
 # Ensure Django views return HttpResponse, not tuples
 from functools import wraps
+
 from django.http import HttpResponseBase
 
 
@@ -564,6 +566,7 @@ except NameError:
 # === END HOTFIX ===============================================================
 # inventory/views.py
 from decimal import Decimal
+
 from django.db import transaction
 from django.http import JsonResponse
 from django.utils import timezone
@@ -625,30 +628,21 @@ except Exception:  # pragma: no cover
     from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
 # Forms
-from .forms import ScanInForm, ScanSoldForm, InventoryItemForm
+from .forms import InventoryItemForm, ScanInForm, ScanSoldForm
 
 # Inventory models
-from .models import (
-    InventoryItem,
-    Product,
-    InventoryAudit,
-    WarrantyCheckLog,
-    TimeLog,
-    Location,
-)
+from .models import InventoryAudit, InventoryItem, Location, Product, TimeLog, WarrantyCheckLog
 
 # ---- Safe model imports (no booleans!) ----
 InventoryItem = Stock = Product = AuditLog = Location = Sale = None
 
 try:
     # adjust import paths to match your project
-    from .models import (
-        InventoryItem as _InventoryItem,
-        Stock as _Stock,
-        Product as _Product,
-        AuditLog as _AuditLog,
-        Location as _Location,
-    )
+    from .models import AuditLog as _AuditLog
+    from .models import InventoryItem as _InventoryItem
+    from .models import Location as _Location
+    from .models import Product as _Product
+    from .models import Stock as _Stock
 
     InventoryItem, Stock, Product, AuditLog, Location = _InventoryItem, _Stock, _Product, _AuditLog, _Location
 except Exception:
@@ -713,11 +707,9 @@ def is_manager_like(user) -> bool:
 
 # ---- safe imports used by helpers ----
 try:
-    from tenants.utils import (
-        default_location_for_request,
-        user_is_manager as _utils_is_manager,
-        user_is_admin as _utils_is_admin,
-    )
+    from tenants.utils import default_location_for_request
+    from tenants.utils import user_is_admin as _utils_is_admin
+    from tenants.utils import user_is_manager as _utils_is_manager
 except Exception:
 
     def default_location_for_request(_request):
@@ -886,11 +878,7 @@ def _in_groups(user, names):
 
 try:
     # optional centralization if you created tenants/roles.py earlier
-    from circuitcity.tenants.roles import (
-        is_auditor,
-        is_manager_or_admin,
-        is_store_clerk,
-    )
+    from circuitcity.tenants.roles import is_auditor, is_manager_or_admin, is_store_clerk
 except Exception:
     is_auditor = lambda u: _in_groups(u, ["Auditor", "Finance", "Admin"])
     is_manager_or_admin = lambda u: _in_groups(u, ["Manager", "Admin"])
@@ -925,7 +913,10 @@ def json_ok(payload=None, **extra):
 
 
 # ---- SAFE calendar window helper (no WSGIRequest usage) ----
-from datetime import datetime, timedelta, date, time as dtime
+from datetime import date, datetime
+from datetime import time as dtime
+from datetime import timedelta
+
 from django.utils import timezone
 
 
@@ -970,7 +961,10 @@ def _get_preset_window_safe(request, default_preset: str = "month"):
 
 
 # ---- SAFE calendar window helper (no WSGIRequest usage) ----
-from datetime import datetime, timedelta, date, time as dtime
+from datetime import date, datetime
+from datetime import time as dtime
+from datetime import timedelta
+
 from django.utils import timezone
 
 
@@ -1052,11 +1046,9 @@ def _in_groups(user, names: list[str]) -> bool:
 try:
     # If you have a central roles module, greatâ€”use it.
     # Adjust the import path to wherever your project keeps role predicates.
-    from circuitcity.tenants.roles import (
-        is_auditor as _pred_is_auditor,
-        is_manager_or_admin as _pred_is_manager_or_admin,
-        is_store_clerk as _pred_is_store_clerk,
-    )
+    from circuitcity.tenants.roles import is_auditor as _pred_is_auditor
+    from circuitcity.tenants.roles import is_manager_or_admin as _pred_is_manager_or_admin
+    from circuitcity.tenants.roles import is_store_clerk as _pred_is_store_clerk
 except Exception:
     # Fallbacks so the app never breaks if the roles module is missing
     def _pred_is_auditor(user):
@@ -1105,14 +1097,14 @@ except Exception:
         return None
 
 
+# ---- Guard: ensure Django views return HttpResponse, not tuples ----------
+from functools import wraps
+
 # If you have a Location model, we don't need to import it here for this helper.
 # The view already falls back to default_location_for_request(request).
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.cache import never_cache
-
-# ---- Guard: ensure Django views return HttpResponse, not tuples ----------
-from functools import wraps
 from django.http import HttpResponseBase
+from django.views.decorators.cache import never_cache
 
 
 def _enforce_http_response(viewfunc):
@@ -1130,35 +1122,21 @@ def _enforce_http_response(viewfunc):
     return _inner
 
 
-from typing import Dict, Any
 import logging
-from django.shortcuts import render, redirect
+import re
+from decimal import Decimal
+from typing import Any, Dict, Optional, Tuple
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpRequest, HttpResponse
+from django.db.models import Q, Sum
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.template.loader import get_template
 from django.views.decorators.cache import never_cache
-
 
 # circuitcity/inventory/views.py
 
-
-from typing import Optional, Tuple, Any
-from decimal import Decimal
-import logging
-import re
-
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import (
-    HttpRequest,
-    HttpResponse,
-    JsonResponse,
-)
-from django.shortcuts import render, redirect
-from django.views.decorators.cache import never_cache
-from django.db.models import Q, Sum
-from django.template.loader import get_template
 
 # ---------------------------------------------------------------------------
 # Safe/lazy imports (never hard-crash at import time)
@@ -1172,7 +1150,7 @@ except Exception:  # pragma: no cover
 
 
 try:
-    from .models import InventoryItem, Product, Location  # type: ignore
+    from .models import InventoryItem, Location, Product  # type: ignore
 except Exception:  # pragma: no cover
     InventoryItem = None  # type: ignore
     Product = None  # type: ignore
@@ -1294,15 +1272,15 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
             return redirect("/tenants/activate-mine/")
 
     # ---------- VERTICAL GATE: Prevent liquor businesses from accessing phone stock list ----------
-    from .helpers_core import business_vertical, LIQUOR
+    from .helpers_core import LIQUOR, business_vertical
 
     vertical = business_vertical(request)
 
     if vertical == LIQUOR:
         # Liquor businesses MUST use their own stock list
         # Redirect to liquor stock list with same query params
-        from django.urls import reverse
         from django.http import QueryDict
+        from django.urls import reverse
 
         try:
             liquor_url = reverse("liquor:stock_list")
@@ -1642,8 +1620,9 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     manager_agents = []
     transfer_agents_by_location = []
     try:
-        from tenants.models import Membership
         from collections import defaultdict
+
+        from tenants.models import Membership
 
         if request.user.is_staff or getattr(request.user, "is_manager", False) or hasattr(request, "membership"):
             # Get active agent AND manager memberships for current business
@@ -1711,9 +1690,11 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
     suspicious_count = 0
     if user_is_manager:
         try:
-            from inventory.business_kinds import BusinessKind
-            from django.conf import settings
             from decimal import Decimal
+
+            from django.conf import settings
+
+            from inventory.business_kinds import BusinessKind
 
             if getattr(biz, "business_kind", None) == BusinessKind.PHONES:
                 min_price = Decimal(str(getattr(settings, "MIN_PHONE_SELLING_PRICE_MK", 10000)))
@@ -1865,7 +1846,10 @@ def api_stock_status(request: HttpRequest) -> HttpResponse:
 
 
 # ---- REPLACE the whole get_preset_window with this safe version ----
-from datetime import datetime, timedelta, time as dtime
+from datetime import datetime
+from datetime import time as dtime
+from datetime import timedelta
+
 from django.utils import timezone
 
 
@@ -1913,10 +1897,11 @@ def get_preset_window(request, default_preset: str = "month"):
 
 # --- inventory/views.py (snippet) ---
 
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.cache import never_cache
-from django.shortcuts import render
 from typing import Optional, Tuple
+
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render
+from django.views.decorators.cache import never_cache
 
 from .models import InventoryItem  # used by _inv_location_model()
 from .utils import ensure_default_location  # new helper we added earlier
@@ -2325,7 +2310,7 @@ def default_location_for_request(request):
 
 
 # A tiny paginator many views use
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger  # noqa: E402 (after Django import)
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator  # noqa: E402 (after Django import)
 
 
 def _paginate_qs(request, qs, per_page=25, page_param="page"):
@@ -2469,24 +2454,19 @@ def _limit_form_querysets(form, request):
         pass
 
 
+from decimal import Decimal
+
+# ---------- Active business helpers (tuple-safe) ----------
+# -------- Canonical location resolver (single source of truth) --------
+from functools import wraps
+
 # -----------------------
 # Scan pages (tenant-scoped)
 # -----------------------
 from django.apps import apps
-from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
-from decimal import Decimal
-
-# -------- Canonical location resolver (single source of truth) --------
-from functools import wraps
-
-from django.apps import apps
-
-# ---------- Active business helpers (tuple-safe) ----------
-from functools import wraps
-
-from django.apps import apps
 
 
 def _get_model(app_label, model):
@@ -2581,6 +2561,7 @@ def require_active_business(view):
     If user has one business, auto-selects it; otherwise redirects to join/select.
     """
     from functools import wraps
+
     from django.shortcuts import redirect
 
     @wraps(view)
@@ -2695,27 +2676,17 @@ def filter_by_location_and_business(qs, request):
 
 # stdlib
 import csv
+import datetime
 import json
 import logging
-import datetime
 from decimal import Decimal
 
-# django
-from .forms import MerchProductForm, MerchUnitPriceFormSet
-from .models import BusinessKind, MerchProduct
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
-from django.db.models import (
-    Q,
-    Sum,
-    Value,
-    Exists,
-    OuterRef,
-    DecimalField,
-)
+from django.db.models import DecimalField, Exists, OuterRef, Q, Sum, Value
 from django.db.models.functions import Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -2723,7 +2694,11 @@ from django.template import TemplateDoesNotExist
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
+
+# django
+from .forms import MerchProductForm, MerchUnitPriceFormSet
+from .models import BusinessKind, MerchProduct
 
 # optional OTP decorator (be forgiving if the package name differs or is missing)
 try:
@@ -2769,14 +2744,15 @@ except Exception:
 # SCAN SOLD
 # ---------------------------------------------------------------------------
 
+from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
+from django.db.models import Sum
+
 # --- add this tiny helper once near the top of views.py (outside any view) ---
 # -----------------------------------------------------------------------------
 # --- Wallet page (agent) ------------------------------------------------------
-from django.shortcuts import get_object_or_404, render, redirect
-from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.db.models import Sum
-from django.contrib.auth import get_user_model
 
 from .models import WalletTxn  # make sure this import exists
 
@@ -2928,14 +2904,15 @@ def scan_web(request):
 # SCAN IN  (single, consolidated version)
 # ---------------------------------------------------------------------------
 
-from django.views.decorators.cache import never_cache
-from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods
-from django.db import transaction
-from django.shortcuts import render, redirect
-from django.core.exceptions import ValidationError
-from decimal import Decimal
 import logging
+from decimal import Decimal
+
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods
 
 # --- Inventory Â· Scan IN (paste over your current function) ---
 # put this tiny helper once near the top of views.py (outside the function)
@@ -2959,15 +2936,16 @@ def scan_in(request):
     # --- local imports ---
     import logging
     from decimal import Decimal
+
+    from django.apps import apps
     from django.conf import settings
-    from django.utils import timezone
+    from django.contrib import messages
     from django.core.exceptions import ValidationError
     from django.db import IntegrityError
     from django.forms import ModelChoiceField
-    from django.contrib import messages
-    from django.shortcuts import redirect, render
     from django.http import JsonResponse
-    from django.apps import apps
+    from django.shortcuts import redirect, render
+    from django.utils import timezone
 
     log = logging.getLogger(__name__)
     template_name = "inventory/scan_in.html"
@@ -3050,9 +3028,9 @@ def scan_in(request):
 
     # single-source-of-truth helpers
     from inventory.helpers.request_ctx import (
-        ensure_request_defaults,
         _get_active_business,
         default_location_for_request,
+        ensure_request_defaults,
     )
 
     # Wants-JSON detection
@@ -3454,15 +3432,15 @@ def scan_in(request):
 
 # inventory/views.py  (append)
 
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import JsonResponse, HttpRequest, HttpResponseBadRequest
-from django.utils import timezone
-from django.shortcuts import get_object_or_404, redirect
-from django.db.models import Sum
-from .models import Location as Store
-
 # --- put near the top of inventory/views.py (with other helpers) ---
 from django.apps import apps
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Sum
+from django.http import HttpRequest, HttpResponseBadRequest, JsonResponse
+from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
+
+from .models import Location as Store
 
 
 def _get_inventory_model(*names):
@@ -3805,13 +3783,13 @@ def po_invoice(request: HttpRequest, po_id: int) -> HttpResponse:
 
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
-from django.urls import reverse, NoReverseMatch
+from django.template.exceptions import TemplateDoesNotExist
+from django.urls import NoReverseMatch, reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
-from django.contrib.auth.decorators import login_required
-from django.template.exceptions import TemplateDoesNotExist
-from django.http import HttpResponse, HttpResponseBase
 
 
 def _normalize_response(request, resp):
@@ -3839,13 +3817,13 @@ def _normalize_response(request, resp):
 
 
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, HttpResponseBase
 from django.shortcuts import redirect, render
-from django.urls import reverse, NoReverseMatch
+from django.template.exceptions import TemplateDoesNotExist
+from django.urls import NoReverseMatch, reverse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
-from django.contrib.auth.decorators import login_required
-from django.template.exceptions import TemplateDoesNotExist
-from django.http import HttpResponse, HttpResponseBase
 
 
 def _as_http_response(resp):
@@ -3930,14 +3908,15 @@ def place_order_page(request):
 
 # inventory/views_api.py  (or wherever api_mark_sold lives)
 
+import json
+
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
-from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.db.models import Q
-import json
 
 # assumes these helpers / models already exist in your codebase
 # _require_active_business, _is_auditor, _model_has_field,
@@ -3970,20 +3949,14 @@ def _sold_choice_for(model):
     return "SOLD"
 
 
-from django.http import JsonResponse
-from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_POST
-from django.db import transaction
-from django.utils import timezone
-from django.db.models import Q
 import json
 
-
+from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
-from django.db import transaction
-from django.utils import timezone
 
 # ---------------------------
 # tiny local helpers (single source of truth)
@@ -4096,13 +4069,14 @@ def _get_item_for_probe_or_update(InventoryItem, biz_id, code):
 # SELL (mark as SOLD)
 # ---------------------------
 
-from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.http import require_POST, require_GET
-from django.views.decorators.cache import never_cache
-from django.db import transaction
 import json
 from datetime import datetime
+
+from django.db import transaction
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET, require_POST
 
 # ---------- tiny helpers (kept local so these views are self-contained) ----------
 
@@ -4522,6 +4496,7 @@ def api_mark_sold(request):
 # ---------------------------------------------------------------------------
 # --- Safe renderer used by inventory_dashboard -----------------------------
 import json
+
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.template.exceptions import TemplateDoesNotExist
@@ -4578,8 +4553,8 @@ def _render_dashboard_safe(request, context, today=None, mtd_count=0, all_time_c
         return HttpResponse(html)
 
 
-from django.db.models import QuerySet
 from django.apps import apps
+from django.db.models import QuerySet
 
 
 def _inv_base(qs: QuerySet, start_dt=None, end_dt=None, time_fields=("created_at",)):
@@ -4796,8 +4771,8 @@ def _is_agent_user(user):
 
     # Check if user is a manager (managers can hold stock without AgentProfile)
     try:
-        from tenants.utils_roles import is_manager
         from tenants.utils import get_active_business
+        from tenants.utils_roles import is_manager
 
         # Try to get business context
         business = None
@@ -4921,7 +4896,7 @@ def time_checkin_page(request):
 def _gravatar(email: str, size: int = 160) -> str:
     if not email:
         email = "user@example.com"
-    h = md5(email.strip().lower().encode("utf-8")).hexdigest()
+    h = md5(email.strip().lower().encode("utf-8")).hexdigest()  # nosec B324 - MD5 required by Gravatar API
     return f"https://www.gravatar.com/avatar/{h}?s={size}&d=identicon"
 
 
@@ -5102,7 +5077,7 @@ def api_time_checkin(request):
 from typing import Any, Iterable, Optional
 
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
@@ -5690,11 +5665,12 @@ def delete_stock(request, pk):
 # (continueâ€¦)
 # -----------------------
 
-from django.http import JsonResponse
-from django.views.decorators.http import require_GET
-from django.views.decorators.cache import never_cache
-from django.contrib.auth.decorators import login_required
 import importlib
+
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 
 
 def _try_call(module_path: str, attr: str, request):
@@ -5742,26 +5718,27 @@ def restock_heatmap_api(request):
 
 # stdlib
 
+from datetime import date, datetime
+from datetime import time as dtime
+from datetime import timedelta
 from decimal import Decimal
 from hashlib import md5
-from datetime import datetime, timedelta, date, time as dtime
-
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.mail import mail_admins
 from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q, Sum, Value, Exists, OuterRef, F, Count, Case, When, DecimalField, ExpressionWrapper
-from django.db.models.functions import Coalesce, Cast, TruncMonth
+from django.db.models import Case, Count, DecimalField, Exists, ExpressionWrapper, F, OuterRef, Q, Sum, Value, When
 from django.db.models.deletion import ProtectedError
+from django.db.models.functions import Cast, Coalesce, TruncMonth
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
-from django.views.decorators.http import require_GET, require_POST, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 # optional OTP decorator (be forgiving if package is absent)
 try:
@@ -6038,7 +6015,7 @@ def time_checkin_page(request):
 def _gravatar(email: str, size: int = 160) -> str:
     if not email:
         email = "user@example.com"
-    h = md5(email.strip().lower().encode("utf-8")).hexdigest()
+    h = md5(email.strip().lower().encode("utf-8")).hexdigest()  # nosec B324 - MD5 required by Gravatar API
     return f"https://www.gravatar.com/avatar/{h}?s={size}&d=identicon"
 
 
@@ -6217,7 +6194,7 @@ from django.views.decorators.cache import never_cache
 
 # --- Optional imports (fail-safe) ---
 try:
-    from .models import TimeLog, Location  # type: ignore
+    from .models import Location, TimeLog  # type: ignore
 except Exception:
     TimeLog = None  # type: ignore
     Location = None  # type: ignore
@@ -6502,11 +6479,11 @@ def wallet_page(request):
 
 
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_http_methods, require_POST
-from django.views.decorators.cache import never_cache
-from django.http import JsonResponse, HttpRequest
 from django.db import transaction
+from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_POST
 
 # Reuse the single source of truth helpers
 from inventory.utils import _normalize_code, get_instock_item_for_business
@@ -6536,23 +6513,6 @@ def _current_business_from_request(request: HttpRequest):
     )
 
 
-# ====================================================================
-# 1) Business-wide status check for Scan SOLD (location never blocks)
-# ====================================================================
-from django.views.decorators.http import require_GET
-
-
-# ====================================================================
-# 2) Sell endpoint: auto-move (if needed) + mark SOLD atomically
-# ====================================================================
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.utils import timezone
-import json
-from datetime import datetime
-
-
 import json
 from datetime import datetime
 
@@ -6560,7 +6520,14 @@ from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import HttpRequest
 from django.utils import timezone
-from django.views.decorators.http import require_http_methods
+
+# ====================================================================
+# 2) Sell endpoint: auto-move (if needed) + mark SOLD atomically
+# ====================================================================
+# ====================================================================
+# 1) Business-wide status check for Scan SOLD (location never blocks)
+# ====================================================================
+from django.views.decorators.http import require_GET, require_http_methods
 
 # Uses your existing helpers if present:
 #   _ok, _err, _normalize_code, _current_business_from_request, get_instock_item_for_business
@@ -6951,10 +6918,10 @@ def update_stock(request, pk):
     - HTML by default; JSON only when explicitly requested.
     """
     from django.contrib import messages
-    from django.http import JsonResponse
-    from django.shortcuts import redirect, render, get_object_or_404
-    from django.utils import timezone
     from django.core.mail import mail_admins
+    from django.http import JsonResponse
+    from django.shortcuts import get_object_or_404, redirect, render
+    from django.utils import timezone
 
     # Guards for missing models/forms (assumes these references exist elsewhere)
     try:
@@ -6967,14 +6934,14 @@ def update_stock(request, pk):
         InventoryItemForm = None
 
     # External helpers expected in your codebase
-    from .views_helpers import (
-        _wants_json,
-        _scoped,
-        _can_edit_inventory,
+    from .views_helpers import (  # adjust path if needed
         _audit,
-        _is_agent_user,
+        _can_edit_inventory,
         _is_admin,
-    )  # adjust path if needed
+        _is_agent_user,
+        _scoped,
+        _wants_json,
+    )
 
     # Guards for missing models/forms
     if InventoryItem is None or InventoryItemForm is None:
@@ -7133,17 +7100,17 @@ def update_stock(request, pk):
 def delete_stock(request, pk):
     # Local imports to make this function self-contained
     from django.contrib import messages
-    from django.shortcuts import redirect, get_object_or_404
-    from django.utils import timezone
     from django.core.mail import mail_admins
     from django.db.models.deletion import ProtectedError
+    from django.shortcuts import get_object_or_404, redirect
+    from django.utils import timezone
 
     # Expected helpers/models in your codebase
     try:
         from inventory.models import InventoryItem
     except Exception:
         InventoryItem = None
-    from .views_helpers import _scoped, _is_admin, _audit  # adjust path if needed
+    from .views_helpers import _audit, _is_admin, _scoped  # adjust path if needed
 
     if InventoryItem is None:
         messages.error(request, "Inventory model not available.")
@@ -7248,7 +7215,7 @@ def inventory_dashboard(request):
     # ============================================================================
     # This is the PHONES inventory dashboard - only phone businesses should see it
     try:
-        from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url
+        from inventory.utils_verticals import get_vertical_dashboard_url, get_vertical_kind
 
         # Try request.business first (set by middleware), then fall back to biz from gate
         active_business = getattr(request, "business", None) or biz
@@ -7258,7 +7225,7 @@ def inventory_dashboard(request):
         if vertical_kind and vertical_kind != "phones":
             vertical_url_name = get_vertical_dashboard_url(vertical_kind)
             if vertical_url_name:
-                from django.urls import reverse, NoReverseMatch
+                from django.urls import NoReverseMatch, reverse
 
                 try:
                     return redirect(reverse(vertical_url_name))
