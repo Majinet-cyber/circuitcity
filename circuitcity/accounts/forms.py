@@ -9,13 +9,10 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
-from .validators import (
-    validate_file_size,
-    validate_mime,
-    validate_strong_password,  # <-- strong password policy
-)
-from .utils.images import process_avatar
 from .models import Profile
+from .utils.images import process_avatar
+from .validators import validate_strong_password  # <-- strong password policy
+from .validators import validate_file_size, validate_mime
 
 try:
     from inventory.business_kinds import BusinessKind
@@ -83,6 +80,7 @@ def _validate_passwords(p1: str | None, p2: str | None, *, user: object | None =
 DEFAULT_COUNTRY = "MW"  # Malawi
 DEFAULT_LANGUAGE = "en-us"  # English (United States)
 DEFAULT_TIMEZONE = "Africa/Blantyre"
+DEFAULT_CITY = "Lilongwe"  # Malawi capital
 
 # ---- Countries (use django-countries if available; else pycountry; else tiny list) ----
 try:
@@ -183,9 +181,10 @@ class ProfileForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ["display_name", "country", "language", "timezone", "display_currency", "avatar"]
+        fields = ["display_name", "country", "language", "timezone", "city", "display_currency", "avatar"]
         widgets = {
             "display_name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Display name"}),
+            "city": forms.TextInput(attrs={"class": "form-control", "placeholder": "City"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -195,6 +194,8 @@ class ProfileForm(forms.ModelForm):
         self.fields["country"].initial = getattr(self.instance, "country", None) or DEFAULT_COUNTRY
         self.fields["language"].initial = getattr(self.instance, "language", None) or DEFAULT_LANGUAGE
         self.fields["timezone"].initial = getattr(self.instance, "timezone", None) or DEFAULT_TIMEZONE
+        if "city" in self.fields:
+            self.fields["city"].initial = getattr(self.instance, "city", None) or DEFAULT_CITY
 
         # Bootstrap styles
         self.fields["country"].widget.attrs.update({"class": "form-select"})
@@ -621,7 +622,21 @@ class WizardStep2Form(forms.Form):
         label="Main vertical / business type",
         choices=[("", "Select your business type...")] + list(BusinessKind.choices),
         widget=forms.Select(attrs={"class": "wizard-select"}),
+        required=True,
     )
+
+    def clean_business_kind(self):
+        """Validate business_kind is a valid choice and not empty."""
+        kind = self.cleaned_data.get("business_kind", "").strip()
+        if not kind:
+            raise forms.ValidationError("Please select your business type.")
+
+        # Verify it's a valid BusinessKind choice
+        valid_kinds = [choice[0] for choice in BusinessKind.choices]
+        if kind not in valid_kinds:
+            raise forms.ValidationError(f"Invalid business type: {kind}. Please select a valid option.")
+
+        return kind
 
     def clean_business_name(self):
         name = (self.cleaned_data.get("business_name") or "").strip()
@@ -629,8 +644,8 @@ class WizardStep2Form(forms.Form):
             raise forms.ValidationError("Enter your business name.")
 
         # Import validators
-        from tenants.validators import validate_business_name_not_numeric, validate_business_name
         from tenants.models import Business
+        from tenants.validators import validate_business_name, validate_business_name_not_numeric
 
         # Check not numeric-only
         try:
@@ -821,8 +836,8 @@ class ManagerWizardStep2Form(forms.Form):
             raise forms.ValidationError("Enter your store name.")
 
         # Import validators
-        from tenants.validators import validate_business_name_not_numeric, validate_business_name
         from tenants.models import Business
+        from tenants.validators import validate_business_name, validate_business_name_not_numeric
 
         # Check not numeric-only
         try:

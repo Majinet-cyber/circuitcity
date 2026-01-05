@@ -29,9 +29,10 @@ class Profile(models.Model):
 
     # Settings shown on the Settings Â· Profile page
     display_name = models.CharField(max_length=120, blank=True, default="")
-    country = models.CharField(max_length=80, blank=True, default="")
-    language = models.CharField(max_length=80, blank=True, default="English - United States")
-    timezone = models.CharField(max_length=80, blank=True, default=settings.TIME_ZONE)
+    country = models.CharField(max_length=80, blank=True, default="Malawi")
+    language = models.CharField(max_length=80, blank=True, default="English")
+    timezone = models.CharField(max_length=80, blank=True, default="Africa/Blantyre")
+    city = models.CharField(max_length=100, blank=True, default="Lilongwe")
 
     # Currency display preference
     display_currency = models.CharField(

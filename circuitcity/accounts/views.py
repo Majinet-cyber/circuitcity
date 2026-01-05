@@ -12,48 +12,42 @@ from urllib.parse import quote_plus, urlencode
 from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import (
-    get_user_model,
-    update_session_auth_hash,
-    authenticate,
-    login,
-    logout,
-)
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
-from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.middleware.csrf import get_token
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import (
     AvatarForm,
     ForgotPasswordRequestForm,
-    VerifyCodeResetForm,
     IdentifierLoginForm,
-    ProfileForm,
-    PasswordChangeSimpleForm,
     ManagerSignUpForm,
-    WizardStep1Form,
-    WizardStep2Form,
-    WizardStep3Form,
-    WizardStep4Form,
     ManagerWizardStep1Form,
     ManagerWizardStep2Form,
     ManagerWizardStep3Form,
     ManagerWizardStep4Form,
+    PasswordChangeSimpleForm,
+    ProfileForm,
+    VerifyCodeResetForm,
+    WizardStep1Form,
+    WizardStep2Form,
+    WizardStep3Form,
+    WizardStep4Form,
 )
-from .models import EmailOTP, LoginSecurity, Profile, OnboardingProfile
+from .models import EmailOTP, LoginSecurity, OnboardingProfile, Profile
 from .services.email_otp import request_email_otp, verify_email_otp
 
 # Optional tenants (graceful fallbacks if app not installed)
@@ -219,6 +213,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None =
     Uses transaction.on_commit to ensure email is sent after DB commit.
     """
     from django.db import transaction
+
     from notifications.services import emit_event
 
     subject = {
@@ -384,6 +379,8 @@ def _post_login_url(request=None) -> str:
                     BusinessKind.GROCERY: "groceries:dashboard",
                     "grocery": "groceries:dashboard",
                     "groceries": "groceries:dashboard",
+                    BusinessKind.CEMENT: "verticals:cement_dashboard",
+                    "cement": "verticals:cement_dashboard",
                 }
 
                 route = vertical_routes.get(business_kind)
@@ -827,6 +824,7 @@ def forgot_password_request_view(request):
     Transaction-safe: OTP creation and email sending happen after DB commit.
     """
     from django.db import transaction
+
     from notifications.services import emit_event
 
     form = ForgotPasswordRequestForm(request.POST or None)
@@ -1028,9 +1026,18 @@ def settings_home(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def settings_profile(request):
+    from .services.settings_defaults import ensure_all_settings_defaults
+
+    # Ensure profile exists and has defaults
     profile = getattr(request.user, "profile", None)
     if profile is None:
         profile, _ = Profile.objects.get_or_create(user=request.user)
+
+    # Apply defaults for new users or users with blank fields
+    ensure_all_settings_defaults(request.user)
+
+    # Refresh profile from DB after defaults are applied
+    profile.refresh_from_db()
 
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=profile)
@@ -1090,6 +1097,7 @@ def _inject_sms_twofa_context(request, context):
     """
     try:
         from django.conf import settings as dj_settings
+
         from .models import UserTwoFactor
 
         # Try to import mask_phone from templatetags, fallback to models
@@ -1143,8 +1151,9 @@ def settings_security(request):
     Security settings page: password change and 2FA management.
     Password change requires recent 2FA if enabled.
     """
-    from .models import get_or_create_twofactor, is_twofa_enabled
     from django.conf import settings as django_settings
+
+    from .models import get_or_create_twofactor, is_twofa_enabled
 
     # Get user's 2FA settings
     tf = get_or_create_twofactor(request.user)
@@ -1415,8 +1424,10 @@ def _seed_defaults_for_business(biz) -> None:
             wh_kwargs["is_default"] = True
         Warehouse.objects.create(**wh_kwargs)
 
-    # Seed phone products and accessories for phone businesses
+    # Seed vertical-specific defaults
     business_kind = getattr(biz, "business_kind", "").lower()
+
+    # Seed phone products and accessories for phone businesses
     if business_kind in ("phones", "phone", "electronics", "mobile", "mobiles"):
         try:
             from django.core.management import call_command
@@ -1432,6 +1443,17 @@ def _seed_defaults_for_business(biz) -> None:
             call_command("seed_accessories", business=biz.id, verbosity=0)
         except Exception as e:
             log.warning(f"Failed to seed accessories for {biz.name}: {e}")
+
+    # Seed cement products for cement businesses
+    elif business_kind in ("cement", "hardware"):
+        try:
+            from inventory.cement_seed import seed_cement_defaults
+
+            result = seed_cement_defaults(biz)
+            if result.get("created", 0) > 0:
+                log.info(f"Seeded {result['created']} cement products for {biz.name}")
+        except Exception as e:
+            log.warning(f"Failed to seed cement products for {biz.name}: {e}")
 
 
 # =========================================
@@ -1645,9 +1667,10 @@ def _complete_manager_wizard_signup(request, wizard_data):
     Complete the manager wizard signup by creating all entities.
     This keeps all the existing business logic intact.
     """
-    from django.db import transaction
-    from django.core.files.base import ContentFile
     import base64
+
+    from django.core.files.base import ContentFile
+    from django.db import transaction
 
     step1 = wizard_data.get("step1", {})
     step2 = wizard_data.get("step2", {})
@@ -1746,6 +1769,7 @@ def _complete_manager_wizard_signup(request, wizard_data):
             if logo_data and hasattr(biz, "logo"):
                 try:
                     import base64
+
                     from django.core.files.base import ContentFile
 
                     logo_bytes = base64.b64decode(logo_data)
@@ -1794,6 +1818,7 @@ def _complete_manager_wizard_signup(request, wizard_data):
 
         # Send welcome email after transaction commit
         from django.db import transaction
+
         from notifications.services import emit_event
 
         transaction.on_commit(
@@ -2412,8 +2437,9 @@ def _check_2fa_rate_limit(user, action: str) -> tuple[bool, str | None]:
     Returns:
         (allowed: bool, error_message: str | None)
     """
-    from django.core.cache import cache
     import time
+
+    from django.core.cache import cache
 
     user_id = user.id
     now = time.time()
@@ -2466,9 +2492,10 @@ def twofa_sms_enable_start(request):
     Stores pending_phone in session for verification.
     Supports resend: if phone not provided, uses session phone.
     """
+    from django.conf import settings
+
     from .models import get_or_create_twofactor
     from .services.twilio_verify import send_otp
-    from django.conf import settings
 
     # Check if Twilio is configured
     if not getattr(settings, "TWILIO_VERIFY_ENABLED", False):
@@ -2520,9 +2547,10 @@ def twofa_sms_enable_verify(request):
     """
     Step 2 of enabling SMS 2FA: verify OTP and enable 2FA.
     """
+    from django.utils import timezone
+
     from .models import get_or_create_twofactor
     from .services.twilio_verify import check_otp
-    from django.utils import timezone
 
     code = request.POST.get("code", "").strip()
     pending_phone = request.session.get("twofa_pending_phone")
@@ -2656,10 +2684,12 @@ def twofa_challenge(request):
     2FA challenge screen after password login.
     User must enter OTP sent to their phone to complete login.
     """
-    from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
-    from .services.twilio_verify import send_otp, check_otp
-    from django.utils import timezone
     import time
+
+    from django.utils import timezone
+
+    from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
+    from .services.twilio_verify import check_otp, send_otp
 
     # Must be authenticated to see this page
     if not request.user.is_authenticated:

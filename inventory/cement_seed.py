@@ -14,26 +14,44 @@ from inventory.business_kinds import BusinessKind
 from inventory.models import MerchProduct
 from tenants.models import Business
 
-# Malawian cement brands with display names and aliases
+# Malawian cement brands - ONLY 50KG bags (HARD CONSTRAINT)
+# This list is FIXED and COMPLETE - do not add or remove brands
 CEMENT_BRANDS = [
     {"name": "Dangote", "aliases": ["dangote"], "icon": "🏭"},
-    {"name": "Akshar", "aliases": ["akshar", "aksher"], "icon": "🏗️"},
-    {"name": "Nthanthwe", "aliases": ["nthanthwe"], "icon": "🏗️"},
+    {"name": "Aksher", "aliases": ["akshar", "aksher"], "icon": "🏗️"},
+    {"name": "Duracrete", "aliases": ["duracrete"], "icon": "🏗️"},
     {"name": "Njati", "aliases": ["njati"], "icon": "🏗️"},
     {"name": "Njati Extra", "aliases": ["njati extra", "njatiextra"], "icon": "🏗️"},
     {"name": "Khoma", "aliases": ["khoma"], "icon": "🏗️"},
     {"name": "Nkope", "aliases": ["nkope"], "icon": "🏗️"},
     {"name": "Lime", "aliases": ["lime"], "icon": "🧱"},
-    {"name": "Duracrete", "aliases": ["duracrete"], "icon": "🏗️"},
+    {"name": "Nthanthwe", "aliases": ["nthanthwe"], "icon": "🏗️"},
+]
+
+# CEMENT CATALOG - ONLY 50KG BAGS (HARD CONSTRAINT)
+# NO 25KG, NO sand, NO stones, NO aggregates, NO other items
+# This vertical sells ONLY 50KG cement bags from the brands above
+CEMENT_CATALOG = [
+    {"category": "cement", "name": "Dangote Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏭"},
+    {"category": "cement", "name": "Aksher Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Duracrete Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Njati Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Njati Extra Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Khoma Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Nkope Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
+    {"category": "cement", "name": "Lime Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🧱"},
+    {"category": "cement", "name": "Nthanthwe Cement", "unit": "Bag (50KG)", "pack_size": 50, "icon": "🏗️"},
 ]
 
 
 def seed_cement_defaults(business: Business) -> Dict[str, int]:
     """
     Seed default cement products for a cement business.
-    Creates products with zero stock (managers will stock in as needed).
+    Creates ONLY 50KG cement bags for the 9 approved brands (NO 25KG, NO sand, NO stones).
+    Products start with zero stock (managers will stock in as needed).
 
     This function is idempotent - safe to call multiple times.
+    If a brand already exists, it will be skipped (not recreated).
 
     Args:
         business: Business instance (must have business_kind='cement')
@@ -53,20 +71,19 @@ def seed_cement_defaults(business: Business) -> Dict[str, int]:
     skipped = 0
 
     with transaction.atomic():
-        for brand_spec in CEMENT_BRANDS:
-            brand_name = brand_spec["name"]
+        # Seed ONLY 50KG cement bags (9 brands)
+        for item_spec in CEMENT_CATALOG:
+            item_name = item_spec["name"]
+            category = item_spec["category"]
+            unit = item_spec.get("unit", "piece")
+            pack_size = item_spec.get("pack_size", 1)
 
             # Check if product already exists (case-insensitive)
-            # Check all possible aliases
-            existing = None
-            for alias in [brand_name] + brand_spec.get("aliases", []):
-                existing = MerchProduct.objects.filter(
-                    business=business,
-                    name__iexact=alias,
-                    kind=BusinessKind.CEMENT,
-                ).first()
-                if existing:
-                    break
+            existing = MerchProduct.objects.filter(
+                business=business,
+                name__iexact=item_name,
+                kind=BusinessKind.CEMENT,
+            ).first()
 
             if existing:
                 skipped += 1
@@ -75,10 +92,12 @@ def seed_cement_defaults(business: Business) -> Dict[str, int]:
             # Create new cement product (zero stock, managers will stock in)
             MerchProduct.objects.create(
                 business=business,
-                name=brand_name,
+                name=item_name,
                 kind=BusinessKind.CEMENT,
-                category="cement",
-                base_unit="bag",  # Standard cement unit (50kg bags)
+                category=category,
+                spec_label="",  # Prevent NULL constraint
+                base_unit=unit,
+                pack_size=pack_size,
                 cost_price=Decimal("0.00"),  # Will be set during first stock-in
                 selling_price=Decimal("0.00"),  # Will be set during first stock-in
                 quantity_in_stock=0,  # Start with zero stock

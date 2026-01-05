@@ -1872,7 +1872,7 @@ class CementSale(models.Model):
     # Sale details
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
-    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
 
     # Cost tracking (for profit calculation)
     unit_cost = models.DecimalField(
@@ -1901,28 +1901,75 @@ class CementSale(models.Model):
     sold_at = models.DateTimeField(default=timezone.now, db_index=True)
     notes = models.TextField(blank=True, default="")
 
+    # Void/undo tracking
+    is_void = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True if this sale was undone/voided (do not include in reports)",
+    )
+
     class Meta:
         ordering = ["-sold_at"]
         indexes = [
             models.Index(fields=["business", "-sold_at"]),
             models.Index(fields=["business", "payment_method", "-sold_at"]),
+            models.Index(fields=["business", "is_void", "-sold_at"]),
         ]
 
     def __str__(self):
         return f"{self.product.name} x {self.quantity} - {self.total_price}"
 
     def save(self, *args, **kwargs):
-        # Auto-calculate totals if not set
-        if not self.total_price:
-            self.total_price = Decimal(self.quantity) * self.unit_price
-        if not self.total_cost:
-            self.total_cost = Decimal(self.quantity) * self.unit_cost
+        # Always auto-calculate totals to ensure consistency
+        self.total_price = Decimal(self.quantity) * self.unit_price
+        self.total_cost = Decimal(self.quantity) * self.unit_cost
         super().save(*args, **kwargs)
 
     @property
     def profit(self):
         """Calculate profit for this sale"""
         return self.total_price - self.total_cost
+
+
+class CementSaleUndo(models.Model):
+    """
+    Records an undo/rollback of a cement sale.
+    Used to fix data entry errors - restores stock and reverses transactions.
+    """
+
+    sale = models.OneToOneField(
+        CementSale,
+        on_delete=models.CASCADE,
+        related_name="undo_record",
+        help_text="The sale that was undone",
+    )
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="cement_sale_undos", db_index=True)
+
+    # Undo metadata
+    undone_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cement_sales_undone",
+        help_text="Manager who undid the sale",
+    )
+    undone_at = models.DateTimeField(default=timezone.now, db_index=True)
+    reason = models.TextField(blank=True, default="", help_text="Reason for undoing the sale")
+
+    # Audit trail (snapshot of original sale data)
+    original_quantity = models.PositiveIntegerField(help_text="Original quantity sold")
+    original_total_price = models.DecimalField(max_digits=12, decimal_places=2, help_text="Original sale amount")
+    original_product_name = models.CharField(max_length=255, help_text="Product name at time of undo")
+
+    class Meta:
+        ordering = ["-undone_at"]
+        indexes = [
+            models.Index(fields=["business", "-undone_at"]),
+        ]
+
+    def __str__(self):
+        return f"Undo: {self.original_product_name} x {self.original_quantity} (MK {self.original_total_price})"
 
 
 class GrocerySale(models.Model):

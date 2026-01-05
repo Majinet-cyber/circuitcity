@@ -44,6 +44,12 @@
 
 {% block content %}
 <div class="vertical-page">
+  {% comment %}Premium: Branded header with greeting{% endcomment %}
+  {% include "partials/dashboard_brand_header.html" %}
+
+  {% comment %}Premium: Hourly wisdom quotes{% endcomment %}
+  {% include "partials/dashboard_quotes.html" %}
+
   <header class="vertical-hero">
     <div>
       <p class="eyebrow">{{ business.name }}</p>

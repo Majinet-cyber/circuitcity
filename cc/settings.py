@@ -268,6 +268,8 @@ MIDDLEWARE = [
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # ✅ FIX: Normalize double slashes (must be after CommonMiddleware)
+    "core.middleware.NormalizeDoubleSlashMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # HQ admins stay in HQ

@@ -128,6 +128,12 @@ urlpatterns = [
     re_path(r"^login/?$", login_view_alias),
     path("password/forgot/", forgot_request_view),
     path("password/reset/", forgot_verify_view),
+    # Settings root alias (used by sidebar/nav templates)
+    path(
+        "settings/",
+        RedirectView.as_view(pattern_name="accounts:settings_unified", permanent=False),
+        name="settings_root",
+    ),
     # Insights app
     path("", include("insights.urls")),
     # Business-aware router endpoints (prevent vertical leakage)

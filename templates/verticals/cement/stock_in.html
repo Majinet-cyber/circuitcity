@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
-{% block title %}Stock In · Cement · {{ business.name }}{% endblock %}
+{% block title %}Stock In · Hardware & General Dealers · {{ business.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -188,6 +188,33 @@
     color: var(--cement-muted);
   }
 
+  .variation-picker {
+    grid-column: 1 / -1;
+    padding: 1.5rem;
+    background: rgba(241, 245, 249, 0.5);
+    border-radius: 12px;
+    margin-top: 1rem;
+  }
+
+  .variation-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  .variation-card {
+    min-height: 100px;
+    padding: 1rem;
+  }
+
+  .variation-label {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--cement-accent);
+    margin-bottom: 0.5rem;
+  }
+
   .form-section {
     background: var(--cement-panel);
     border: 1px solid var(--cement-border);
@@ -307,18 +334,65 @@
   </div>
   {% endif %}
 
-  <!-- Step 2: Product Selection -->
+  <!-- Step 2: Product Selection (with variation grouping) -->
   {% if step == '2' %}
   <div class="form-section">
     <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 2: Select Product</h2>
     <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong></p>
     
-    <form method="post">
+    <form method="post" id="productForm">
       {% csrf_token %}
       <input type="hidden" name="step" value="2">
       <input type="hidden" name="brand" value="{{ selected_brand }}">
       
-      {% if products %}
+      {% if grouped_products %}
+      <!-- Show grouped products (one card per base product) -->
+      <div class="product-grid">
+        {% for base_name, product_list in grouped_products.items %}
+          {% if product_list|length == 1 %}
+            <!-- Single product, no variations -->
+            {% with product=product_list.0 %}
+            <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
+              <div class="product-name">{{ product.name }}</div>
+              <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }} {{ product.base_unit|default:"bags" }}</div>
+              <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
+            </div>
+            {% endwith %}
+          {% else %}
+            <!-- Multiple variations - show base product with variation picker -->
+            <div class="premium-card product-card" onclick="showVariations('{{ base_name|slugify }}')">
+              <div class="product-name">{{ base_name }}</div>
+              <div class="product-stock">
+                <span class="badge bg-primary">{{ product_list|length }} sizes</span>
+              </div>
+              <small class="text-muted">Click to choose size</small>
+            </div>
+            
+            <!-- Hidden variation picker (shown when base product clicked) -->
+            <div id="variations_{{ base_name|slugify }}" class="variation-picker" style="display: none;">
+              <h5 class="mb-3">Choose {{ base_name }} Size:</h5>
+              <div class="variation-grid">
+                {% for product in product_list %}
+                <div class="premium-card variation-card" onclick="selectProduct({{ product.id }})">
+                  <div class="variation-label">
+                    {% if product.spec_label %}
+                      {{ product.spec_label }}
+                    {% else %}
+                      {{ product.name|slice:"20:" }}
+                    {% endif %}
+                  </div>
+                  <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }}</div>
+                  <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
+                </div>
+                {% endfor %}
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="hideVariations('{{ base_name|slugify }}')">← Back</button>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% elif products %}
+      <!-- Fallback: show all products (if grouping failed) -->
       <div class="product-grid">
         {% for product in products %}
         <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
@@ -410,11 +484,30 @@
   }
 
   function selectProduct(productId) {
-    document.querySelectorAll('.product-card').forEach(card => {
+    document.querySelectorAll('.product-card, .variation-card').forEach(card => {
       card.classList.remove('selected');
     });
     event.currentTarget.classList.add('selected');
     document.getElementById('product_' + productId).checked = true;
+  }
+
+  function showVariations(baseNameSlug) {
+    // Hide all other variation pickers
+    document.querySelectorAll('.variation-picker').forEach(picker => {
+      picker.style.display = 'none';
+    });
+    // Show the selected variation picker
+    const picker = document.getElementById('variations_' + baseNameSlug);
+    if (picker) {
+      picker.style.display = 'block';
+    }
+  }
+
+  function hideVariations(baseNameSlug) {
+    const picker = document.getElementById('variations_' + baseNameSlug);
+    if (picker) {
+      picker.style.display = 'none';
+    }
   }
 
   // Pricing Intelligence (if cost price available)

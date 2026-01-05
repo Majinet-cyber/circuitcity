@@ -163,20 +163,17 @@
 
       <div class="grid">
         <!-- Store name (posted as business_name) -->
-        {% with has_err=form.errors.business_name %}
         <div class="field">
           <div class="label">Store name</div>
           <span class="addon">🏬</span>
-          <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+          <input class="input{% if form.business_name.errors %} is-error{% endif %}" aria-invalid="{% if form.business_name.errors %}true{% else %}false{% endif %}"
                  type="text" name="business_name" required placeholder="e.g. Circuitly"
                  value="{{ form.business_name.value|default:'' }}">
           <div class="hint">This becomes your business name in the app.</div>
-          {% if has_err %}<div class="err">{{ form.errors.business_name|striptags }}</div>{% endif %}
+          {% if form.business_name.errors %}<div class="err">{{ form.business_name.errors|striptags }}</div>{% endif %}
         </div>
-        {% endwith %}
 
         <!-- Business type (custom icon dropdown + hidden real select) -->
-        {% with has_err=form.errors.business_kind %}
         <div class="field">
           <div class="label">Business type</div>
 
@@ -187,12 +184,12 @@
             <option value="liquor" {% if form.business_kind.value == 'liquor' %}selected{% endif %}>Liquor / Bar</option>
             <option value="pharmacy" {% if form.business_kind.value == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
             <option value="grocery" {% if form.business_kind.value == 'grocery' %}selected{% endif %}>Grocery / General</option>
-            <option value="cement" {% if form.business_kind.value == 'cement' %}selected{% endif %}>Cement Store</option>
+            <option value="cement" {% if form.business_kind.value == 'cement' %}selected{% endif %}>Hardware & General Dealers</option>
             <option value="gym" {% if form.business_kind.value == 'gym' %}selected{% endif %}>Gym & Fitness</option>
           </select>
 
           <div class="cc-select" id="ccBizSelect">
-            <button type="button" class="cc-select-btn{% if has_err %} is-error{% endif %}" aria-haspopup="listbox" aria-expanded="false">
+            <button type="button" class="cc-select-btn{% if form.business_kind.errors %} is-error{% endif %}" aria-haspopup="listbox" aria-expanded="false">
               <span class="cc-value">
                 <span class="cc-icon" id="bizIcon"></span>
                 <span id="bizLabel" style="font-weight:800;color:#1c2b55">Choose business type…</span>
@@ -235,7 +232,7 @@
                 <span class="cc-icon">
                   <svg viewBox="0 0 24 24"><path d="M3 3h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
                 </span>
-                Cement Store
+                Hardware &amp; General Dealers
               </div>
               <div class="cc-option" data-value="gym">
                 <span class="cc-icon">
@@ -245,9 +242,8 @@
               </div>
             </div>
           </div>
-          {% if has_err %}<div class="err">{{ form.errors.business_kind|striptags }}</div>{% endif %}
+          {% if form.business_kind.errors %}<div class="err">{{ form.business_kind.errors|striptags }}</div>{% endif %}
         </div>
-        {% endwith %}
 
         <!-- Subdomain -->
         <div class="field">
@@ -301,7 +297,7 @@
       liquor:'Liquor / Bar',
       pharmacy:'Pharmacy',
       grocery:'Grocery / General',
-      cement:'Cement Store',
+      cement:'Hardware & General Dealers',
       gym:'Gym & Fitness'
     };
     function setValue(v){

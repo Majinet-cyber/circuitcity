@@ -4,7 +4,8 @@ Vertical-specific routing and configuration utilities.
 Ensures business-kind-aware dashboards, navigation, and onboarding flows.
 """
 from __future__ import annotations
-from typing import Optional, Dict, List, Tuple
+
+from typing import Dict, List, Optional, Tuple
 
 try:
     from inventory.business_kinds import BusinessKind
@@ -34,7 +35,7 @@ def get_vertical_kind(business) -> str:
 
     kind = getattr(business, "business_kind", None)
     if not kind:
-        return "phones"  # Default to phones for legacy businesses
+        return "generic"  # No business_kind set = generic minimal nav
 
     # Normalize to lowercase string
     if hasattr(kind, "value"):
@@ -42,11 +43,11 @@ def get_vertical_kind(business) -> str:
     kind = str(kind).strip().lower()
 
     # Map to known verticals
-    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery"]
+    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "cement"]
     if kind in valid_kinds:
         return kind
 
-    return "phones"  # Fallback
+    return "generic"  # Unknown vertical = generic minimal nav
 
 
 def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
@@ -65,6 +66,7 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
         "grocery": "groceries:dashboard",
+        "cement": "verticals:cement_dashboard",
         # "phones" uses the default dashboard at /inventory/dashboard/
     }
     return vertical_dashboard_map.get(vertical_kind)
@@ -205,7 +207,12 @@ def get_onboarding_steps(vertical_kind: str, request=None) -> List[Dict[str, str
 
 
 def get_vertical_display_name(vertical_kind: str) -> str:
-    """Returns human-friendly display name for a vertical."""
+    """
+    Returns human-friendly display name for a vertical.
+
+    SINGLE SOURCE OF TRUTH for vertical display names across the entire app.
+    Use this function everywhere instead of hardcoding labels.
+    """
     display_names = {
         "phones": "Phones & Electronics",
         "gym": "Gym & Fitness",
@@ -213,6 +220,7 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "liquor": "Liquor Store",
         "pharmacy": "Pharmacy & Cosmetics",
         "grocery": "Grocery Store",
+        "cement": "Hardware & General Dealers",  # RENAMED: Was "Cement Store"
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
@@ -236,11 +244,41 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         - group: str (optional, "more" for items in collapsible More section)
 
     Args:
-        business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy")
+        business_kind: Vertical code (e.g., "phones", "gym", "clothing", "liquor", "pharmacy", "cement", "generic")
 
     Returns:
         List of nav items organized by section
     """
+    # CRITICAL: Handle None/unknown business_kind FIRST (before any vertical-specific nav)
+    if business_kind in (None, "", "generic", "none"):
+        return [
+            # Minimal nav for businesses without a vertical set
+            {
+                "section": "MAIN",
+                "key": "home",
+                "url": "verticals:no_business",
+                "label": "Home",
+                "icon": "bi-house",
+                "active_prefix": "/verticals/none",
+                "active_pattern": "/verticals/none",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Business Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+            },
+        ]
+
     if business_kind == "gym":
         return [
             # MAIN section - gym-specific operations (membership-based, NOT inventory)
@@ -1312,42 +1350,31 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
 
     elif business_kind == "cement":
         return [
-            # MAIN section - Cement vertical
+            # MAIN section - Hardware & General Dealers vertical (Premium Experience)
             {
                 "section": "MAIN",
                 "key": "dashboard",
-                "url": "cement:dashboard",
+                "url": "verticals:cement_dashboard",
                 "label": "Dashboard",
                 "icon": "bi-speedometer2",
-                "active_prefix": "/cement/dashboard",
-                "active_pattern": "/cement/dashboard",
+                "active_prefix": "/verticals/cement/dashboard",
+                "active_pattern": "/verticals/cement/dashboard",
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
             },
             {
                 "section": "MAIN",
-                "key": "analytics",
-                "url": "cement:analytics",
-                "label": "Analytics",
-                "icon": "bi-graph-up",
-                "active_prefix": "/cement/analytics",
-                "active_pattern": "/cement/analytics",
+                "key": "products",
+                "url": "cement:products_catalog",
+                "label": "Products",
+                "icon": "bi-grid-3x3-gap",
+                "active_prefix": "/cement/products",
+                "active_pattern": "/cement/products",
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
-            },
-            {
-                "section": "MAIN",
-                "key": "stock",
-                "url": "cement:stock_list",
-                "label": "Stock",
-                "icon": "bi-box-seam",
-                "active_prefix": "/cement/stock",
-                "active_pattern": "/cement/stock",
-                "require_manager": False,
-                "is_menu": False,
-                "is_header": False,
+                "testid": "nav-hardware-products",
             },
             {
                 "section": "MAIN",
@@ -1375,6 +1402,18 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             },
             {
                 "section": "MAIN",
+                "key": "stock",
+                "url": "cement:stock_list",
+                "label": "Stock",
+                "icon": "bi-box-seam",
+                "active_prefix": "/cement/stock",
+                "active_pattern": "/cement/stock",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
                 "key": "costs",
                 "url": "cement:costs",
                 "label": "Costs",
@@ -1382,6 +1421,42 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "active_prefix": "/cement/costs",
                 "active_pattern": "/cement/costs",
                 "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "admin_wallet",
+                "url": "wallet:admin_home",
+                "label": "Admin Wallet",
+                "icon": "bi-wallet2",
+                "active_prefix": "/wallet/admin/",
+                "active_pattern": "/wallet/admin/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "analytics",
+                "url": "cement:analytics",
+                "label": "Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/cement/analytics",
+                "active_pattern": "/cement/analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+            },
+            {
+                "section": "MAIN",
+                "key": "locations",
+                "url": "tenants:manager_locations_list",
+                "label": "Locations",
+                "icon": "bi-geo-alt",
+                "active_prefix": "/tenants/manager/locations/",
+                "active_pattern": "/tenants/manager/locations/",
+                "require_manager": True,
                 "is_menu": False,
                 "is_header": False,
             },

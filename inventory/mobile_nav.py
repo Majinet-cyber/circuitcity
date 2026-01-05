@@ -5,11 +5,12 @@ Provides a single source of truth for mobile nav items per business vertical.
 """
 from __future__ import annotations
 
-from typing import List, Dict, Optional, Any
-from django.urls import reverse, NoReverseMatch
-from django.http import HttpRequest
+from typing import Any, Dict, List, Optional
 
-from .helpers_core import PHONES, CLOTHING, PHARMACY, LIQUOR, GYM, business_vertical
+from django.http import HttpRequest
+from django.urls import NoReverseMatch, reverse
+
+from .helpers_core import CEMENT, CLOTHING, GYM, LIQUOR, PHARMACY, PHONES, business_vertical
 
 
 def _safe_reverse(url_name: str, fallback: str = "#") -> str:
@@ -59,6 +60,35 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
         List of nav item dicts, empty list if vertical unknown
     """
     vertical = business_vertical(request)
+
+    # CRITICAL: Handle None/unknown/generic business_kind FIRST
+    if vertical in (None, "", "generic", "none"):
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-house",
+                "url": _safe_reverse_any(["verticals:no_business"], "/verticals/none/"),
+                "active_prefix": "/verticals/none",
+                "is_menu": False,
+            },
+            {
+                "key": "settings",
+                "label": "Settings",
+                "icon_class": "bi-gear",
+                "url": _safe_reverse_any(["settings_root"], "/settings/"),
+                "active_prefix": "/settings",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "Menu",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
 
     if vertical == PHONES:
         return [
@@ -273,6 +303,50 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
             {
                 "key": "menu",
                 "label": "Menu",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == CEMENT:
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["verticals:cement_dashboard"], "/verticals/cement/dashboard/"),
+                "active_prefix": "/verticals/cement/dashboard",
+                "is_menu": False,
+            },
+            {
+                "key": "stock_in",
+                "label": "Stock In",
+                "icon_class": "bi-box-arrow-in-down",
+                "url": _safe_reverse_any(["cement:stock_in"], "/cement/stock-in/"),
+                "active_prefix": "/cement/stock-in",
+                "is_menu": False,
+            },
+            {
+                "key": "sell",
+                "label": "Sell",
+                "icon_class": "bi-bag-check",
+                "url": _safe_reverse_any(["cement:sell"], "/cement/sell/"),
+                "active_prefix": "/cement/sell",
+                "is_menu": False,
+            },
+            {
+                "key": "products",
+                "label": "Products",
+                "icon_class": "bi-box-seam",
+                "url": _safe_reverse_any(["cement:stock_list"], "/cement/stock/"),
+                "active_prefix": "/cement/stock",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "More",
                 "icon_class": "bi-list",
                 "url": "#",
                 "active_prefix": None,

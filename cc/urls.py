@@ -427,6 +427,12 @@ urlpatterns += [
     path("password/forgot/", _safe_redirect_to("accounts:forgot_password_request"), name="password_forgot"),
     path("password/reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset_flow"),
     path("password_reset/", _safe_redirect_to("accounts:forgot_password_reset"), name="password_reset"),
+    # Settings root alias (used by sidebar/nav templates)
+    path(
+        "settings/",
+        RedirectView.as_view(pattern_name="accounts:settings_unified", permanent=False),
+        name="settings_root",
+    ),
 ]
 
 # Session probes
