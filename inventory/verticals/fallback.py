@@ -29,9 +29,20 @@ def no_business(request):
     business = getattr(request, "business", None)
     business_kind = getattr(business, "business_kind", None) if business else None
 
+    # CRITICAL: Skip adding warnings for non-HTML requests (sw.js, static files, etc.)
+    path = request.path_info or request.path or "/"
+    accept = request.META.get("HTTP_ACCEPT", "")
+    is_html_request = "text/html" in accept or not accept
+    is_settings_page = path.startswith("/accounts/")
+
     # Case 1: business_kind is NULL/blank - redirect to settings
     if not business_kind:
-        messages.warning(request, "Please set your business type in settings to access your dashboard.")
+        # Only add message once per session for HTML requests not on settings pages
+        if is_html_request and not is_settings_page:
+            session_key = f"warned_no_business_kind_{business.pk if business else 'none'}"
+            if not request.session.get(session_key):
+                messages.warning(request, "Please set your business type in settings to access your dashboard.")
+                request.session[session_key] = True
 
         # Try to redirect to settings
         try:
@@ -57,11 +68,16 @@ def no_business(request):
         f"Routing to generic dashboard. Please update vertical registry or business_kind."
     )
 
-    messages.warning(
-        request,
-        f"Your business type ('{business_kind}') is not fully configured yet. "
-        "Showing generic dashboard. Contact support for assistance.",
-    )
+    # Only add warning once per session for HTML requests not on settings pages
+    if is_html_request and not is_settings_page:
+        session_key = f"warned_vertical_{business.pk if business else 'none'}_{business_kind}"
+        if not request.session.get(session_key):
+            messages.warning(
+                request,
+                f"Your business type ('{business_kind}') is not fully configured yet. "
+                "Showing generic dashboard. Contact support for assistance.",
+            )
+            request.session[session_key] = True
 
     # Route to generic inventory dashboard (safe fallback)
     try:
