@@ -1,6 +1,7 @@
 ﻿# hq/urls.py
 from django.urls import path
 from django.views.generic import RedirectView
+
 from . import views
 from . import views_business_directory as v
 
@@ -58,6 +59,9 @@ urlpatterns = [
     path("api/wallet/income/", views.api_wallet_income, name="hq_wallet_income_api"),
     path("api/analytics/data.json", views.api_analytics_data, name="hq_analytics_data"),
     path("analytics/", views.hq_analytics, name="hq_analytics"),
+    # Notifications API (support both slash and no-slash)
+    path("api/notifications", views.hq_notifications_api, name="hq_notifications_api_noslash"),
+    path("api/notifications/", views.hq_notifications_api, name="hq_notifications_api"),
     # =========================
     # Wallet (HQ shell)
     # =========================

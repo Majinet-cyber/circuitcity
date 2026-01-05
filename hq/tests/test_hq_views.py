@@ -1,15 +1,16 @@
 # hq/tests/test_hq_views.py
 """Tests for HQ views - dashboard, business directory, subscriptions."""
-from decimal import Decimal
 from datetime import date, timedelta
-from django.test import TestCase, Client
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from billing.models import BusinessSubscription as Subscription
+from billing.models import Invoice
 from tenants.models import Business, Membership
-from billing.models import BusinessSubscription as Subscription, Invoice
-
 
 User = get_user_model()
 
@@ -202,8 +203,8 @@ class HQViewsTest(TestCase):
     def test_hq_dashboard_sqlite_compatible(self):
         """HQ dashboard should work with SQLite (no custom functions)."""
         # Create some test sales data
-        from sales.models import Sale
         from inventory.models import InventoryItem
+        from sales.models import Sale
 
         # This test ensures the dashboard doesn't crash on SQLite
         url = reverse("hq:dashboard")
@@ -340,3 +341,148 @@ class HQDashboardChartsTest(TestCase):
         # Check for key summary elements
         self.assertContains(response, "YTD TOTAL")
         self.assertContains(response, "PEAK MONTH")
+
+
+class HQPaginationTest(TestCase):
+    """Test HQ pagination handles edge cases safely."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.admin_user = User.objects.create_superuser(
+            username="hqadmin", email="admin@hq.com", password="adminpass123"
+        )
+        self.client = Client()
+        self.client.login(username="hqadmin", password="adminpass123")
+
+        # Create multiple businesses for pagination testing
+        for i in range(35):
+            Business.objects.create(
+                name=f"Test Business {i}",
+                slug=f"test-business-{i}",
+                created_by=self.admin_user,
+                status="ACTIVE",
+            )
+
+        # Create multiple agents for pagination testing
+        first_business = Business.objects.first()
+        for i in range(35):
+            user = User.objects.create_user(
+                username=f"agent{i}",
+                email=f"agent{i}@test.com",
+                password="testpass123",
+            )
+            Membership.objects.create(
+                user=user,
+                business=first_business,
+                role="AGENT",
+            )
+
+    def test_agents_list_no_page_param(self):
+        """GET /hq/agents/ without page param should return 200."""
+        url = reverse("hq:agents")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_page_1(self):
+        """GET /hq/agents/?page=1 should return 200."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"page": 1})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_page_0(self):
+        """GET /hq/agents/?page=0 should return 200 (no crash)."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"page": 0})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_page_negative(self):
+        """GET /hq/agents/?page=-1 should return 200 (no crash)."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"page": -1})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_page_invalid_string(self):
+        """GET /hq/agents/?page=abc should return 200 (no crash)."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"page": "abc"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_page_very_large(self):
+        """GET /hq/agents/?page=999999 should return 200 (should return last page, not crash)."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"page": 999999})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Agents")
+
+    def test_agents_list_pagination_preserves_search(self):
+        """Pagination should preserve search query params."""
+        url = reverse("hq:agents")
+        response = self.client.get(url, {"q": "agent1", "page": 2})
+
+        self.assertEqual(response.status_code, 200)
+        # Search query should be preserved in pagination links
+        self.assertContains(response, "agent1")
+
+    def test_businesses_list_no_page_param(self):
+        """GET /hq/businesses/ without page param should return 200."""
+        url = reverse("hq:business_directory")
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Business")
+
+    def test_businesses_list_page_0(self):
+        """GET /hq/businesses/?page=0 should return 200 (no crash)."""
+        url = reverse("hq:business_directory")
+        response = self.client.get(url, {"page": 0})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Business")
+
+    def test_businesses_list_page_invalid_string(self):
+        """GET /hq/businesses/?page=abc should return 200 (no crash)."""
+        url = reverse("hq:business_directory")
+        response = self.client.get(url, {"page": "abc"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Business")
+
+    def test_businesses_list_page_very_large(self):
+        """GET /hq/businesses/?page=999999 should return 200 (should return last page, not crash)."""
+        url = reverse("hq:business_directory")
+        response = self.client.get(url, {"page": 999999})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Business")
+
+    def test_businesses_list_pagination_preserves_filters(self):
+        """Pagination should preserve filter query params."""
+        url = reverse("hq:business_directory")
+        response = self.client.get(url, {"q": "Test", "page": 2})
+
+        self.assertEqual(response.status_code, 200)
+        # Search query should be preserved in pagination links
+        self.assertContains(response, "Test")
+
+    def test_hq_notifications_api_returns_200(self):
+        """HQ notifications API should return 200 JSON, never 404."""
+        # Test both slash and no-slash
+        for url in ["/hq/api/notifications", "/hq/api/notifications/"]:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, f"Failed for {url}")
+            data = response.json()
+            self.assertIn("items", data)
+            self.assertIn("unread_count", data)
+            self.assertIsInstance(data["items"], list)
+            self.assertIsInstance(data["unread_count"], int)

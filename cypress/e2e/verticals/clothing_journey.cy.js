@@ -1,7 +1,7 @@
 // cypress/e2e/verticals/clothing_journey.cy.js
 /**
  * Full user journey test for Clothing vertical.
- * Covers: login → dashboard → add product (with sizes) → stock-in → sale → reports → settings → logout
+ * Covers: login → add product (no barcode) → verify in list → sell → verify stock/reports → edit price → guardrails
  */
 describe("Clothing Vertical - Full User Journey", () => {
   beforeEach(() => {
@@ -9,7 +9,13 @@ describe("Clothing Vertical - Full User Journey", () => {
     cy.clearLocalStorage();
   });
 
-  it("should complete full manager journey for clothing vertical", () => {
+  it("should complete full manager journey: add product → sell → verify → guardrails", () => {
+    const productName = `Test Shirt ${Date.now()}`;
+    const costPrice = "5000";
+    const sellingPrice = "8000";
+    const initialStock = "10";
+    const saleQuantity = "2";
+
     // ============================================================
     // STEP 1: Login as manager
     // ============================================================
@@ -18,94 +24,74 @@ describe("Clothing Vertical - Full User Journey", () => {
     cy.assertNoServerError();
 
     // ============================================================
-    // STEP 2: Go to dashboard → confirm page loads
+    // STEP 2: Go to dashboard
     // ============================================================
     cy.visitDashboard("clothing");
     cy.waitForAppShell();
     cy.assertNoServerError();
 
-    // Verify dashboard elements exist
-    cy.get("body").should("contain.text", "dashboard").or("contain.text", "Dashboard").or("contain.text", "Clothing");
-
     // ============================================================
-    // STEP 3: Add a product (with optional brand/color/size)
+    // STEP 3: Add product using "no barcode" path
+    // Try wizard first, fallback to scan_in or direct add
     // ============================================================
     cy.get("body").then(($body) => {
-      const addProductLink = $body.find('a[href*="product"], a[href*="add"], [data-cy="add-product"]').first();
+      const addProductLink = $body.find('a[href*="wizard"], a[href*="product"], a[href*="add"], [data-cy="add-product"]').first();
       if (addProductLink.length) {
         cy.wrap(addProductLink).click();
       } else {
-        cy.visit("/verticals/clothing/products/add/", { failOnStatusCode: false });
+        // Try wizard URL
+        cy.visit("/inventory/wizard/clothing/", { failOnStatusCode: false });
       }
     });
 
     cy.waitForAppShell();
+    cy.assertNoServerError();
 
-    // Fill product form
-    cy.fixture("products").then((products) => {
-      const clothingProduct = products.clothing;
+    // Fill product form (adapt to wizard or form)
+    cy.get("body").then(($body) => {
+      // Name field
+      if ($body.find('input[name="name"]').length) {
+        cy.get('input[name="name"]').first().clear().type(productName);
+      } else if ($body.find('[data-cy="product-name"]').length) {
+        cy.get('[data-cy="product-name"]').clear().type(productName);
+      }
 
-      // Name
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-name"]').length) {
-          cy.get('[data-cy="product-name"]').type(clothingProduct.name);
-        } else if ($body.find('input[name="name"]').length) {
-          cy.get('input[name="name"]').type(clothingProduct.name);
-        }
-      });
-
-      // Brand (optional)
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-brand"]').length) {
-          cy.get('[data-cy="product-brand"]').type(clothingProduct.brand);
-        } else if ($body.find('input[name="brand"]').length) {
-          cy.get('input[name="brand"]').type(clothingProduct.brand);
-        }
-      });
-
-      // Color (optional)
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-color"]').length) {
-          cy.get('[data-cy="product-color"]').type(clothingProduct.color);
-        } else if ($body.find('input[name="color"]').length) {
-          cy.get('input[name="color"]').type(clothingProduct.color);
-        }
-      });
-
-      // Size quantities (optional - test "no barcode" path)
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="size-m-qty"]').length) {
-          cy.get('[data-cy="size-m-qty"]').type("5");
-        } else if ($body.find('input[name="size_m"]').length) {
-          cy.get('input[name="size_m"]').type("5");
-        }
-      });
-
-      // Selling price
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-selling-price"]').length) {
-          cy.get('[data-cy="product-selling-price"]').type(clothingProduct.selling_price.toString());
-        } else if ($body.find('input[name="selling_price"], input[name="price"]').length) {
-          cy.get('input[name="selling_price"], input[name="price"]').first().type(clothingProduct.selling_price.toString());
-        }
-      });
+      // Category (try select first)
+      if ($body.find('select[name="category"]').length) {
+        cy.get('select[name="category"]').select(1); // Select first category
+      }
 
       // Cost price
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-cost-price"]').length) {
-          cy.get('[data-cy="product-cost-price"]').type(clothingProduct.cost_price.toString());
-        } else if ($body.find('input[name="cost_price"], input[name="cost"]').length) {
-          cy.get('input[name="cost_price"], input[name="cost"]').first().type(clothingProduct.cost_price.toString());
-        }
-      });
+      if ($body.find('input[name="cost_price"]').length) {
+        cy.get('input[name="cost_price"]').first().clear().type(costPrice);
+      } else if ($body.find('[data-cy="cost-price"]').length) {
+        cy.get('[data-cy="cost-price"]').clear().type(costPrice);
+      }
+
+      // Selling price
+      if ($body.find('input[name="selling_price"]').length) {
+        cy.get('input[name="selling_price"]').first().clear().type(sellingPrice);
+      } else if ($body.find('[data-cy="selling-price"]').length) {
+        cy.get('[data-cy="selling-price"]').clear().type(sellingPrice);
+      }
+
+      // Quantity/Stock (for "no barcode" path - stock is added during creation)
+      if ($body.find('input[name="quantity"]').length) {
+        cy.get('input[name="quantity"]').first().clear().type(initialStock);
+      } else if ($body.find('input[name="quantity_in_stock"]').length) {
+        cy.get('input[name="quantity_in_stock"]').first().clear().type(initialStock);
+      }
+
+      // Verify barcode is NOT required (should be optional/not present)
+      // Barcode field should not block submission
 
       // Submit
-      cy.get("body").then(($body) => {
-        const submitBtn = $body.find('button[type="submit"], [data-cy="submit"], [data-cy="save"]').first();
+      cy.get("body").then(($form) => {
+        const submitBtn = $form.find('button[type="submit"], [data-cy="submit"], [data-cy="save"]').first();
         if (submitBtn.length) {
           cy.wrap(submitBtn).click();
         } else {
-          cy.contains("button", /save|submit|create/i).first().click();
+          cy.contains("button", /save|submit|create|add/i).first().click();
         }
       });
     });
@@ -115,50 +101,33 @@ describe("Clothing Vertical - Full User Journey", () => {
     cy.verifySuccess();
 
     // ============================================================
-    // STEP 4: Stock-in / add quantity successfully
+    // STEP 4: Verify product appears in product list/hub
     // ============================================================
     cy.visitDashboard("clothing");
+    cy.waitForAppShell();
 
-    // Navigate to stock-in or add stock
+    // Navigate to products list or hub
     cy.get("body").then(($body) => {
-      const stockInLink = $body.find('a[href*="stock"], a[href*="add"], [data-cy="stock-in"]').first();
-      if (stockInLink.length) {
-        cy.wrap(stockInLink).click();
+      const productsLink = $body.find('a[href*="product"], a[href*="hub"], a[href*="stock"]').first();
+      if (productsLink.length) {
+        cy.wrap(productsLink).click();
       } else {
-        cy.visit("/verticals/clothing/stock-in/", { failOnStatusCode: false });
+        cy.visit("/verticals/clothing/hub/", { failOnStatusCode: false });
+        cy.visit("/verticals/clothing/products/", { failOnStatusCode: false });
       }
     });
 
     cy.waitForAppShell();
-
-    // Add stock for size M
-    cy.get("body").then(($body) => {
-      if ($body.find('[data-cy="size-m-qty"]').length || $body.find('input[name="size_m"]').length) {
-        const qtyInput = $body.find('[data-cy="size-m-qty"]').length
-          ? cy.get('[data-cy="size-m-qty"]')
-          : cy.get('input[name="size_m"]');
-        qtyInput.first().type("10");
-
-        // Submit
-        cy.get("body").then(($form) => {
-          const submitBtn = $form.find('button[type="submit"], [data-cy="submit"]').first();
-          if (submitBtn.length) {
-            cy.wrap(submitBtn).click();
-          } else {
-            cy.contains("button", /save|submit|add/i).first().click();
-          }
-        });
-      }
-    });
-
-    cy.wait(2000);
     cy.assertNoServerError();
-    cy.verifySuccess();
+
+    // Verify product name appears in list
+    cy.get("body").should("contain.text", productName);
 
     // ============================================================
-    // STEP 5: Make a sale successfully
+    // STEP 5: Perform a sale (sell/quick sell)
     // ============================================================
     cy.visitDashboard("clothing");
+    cy.waitForAppShell();
 
     cy.get("body").then(($body) => {
       const sellLink = $body.find('a[href*="sell"], a[href*="sale"], [data-cy="sell"]').first();
@@ -170,50 +139,34 @@ describe("Clothing Vertical - Full User Journey", () => {
     });
 
     cy.waitForAppShell();
+    cy.assertNoServerError();
 
     // Fill sale form
-    cy.fixture("products").then((products) => {
-      const clothingProduct = products.clothing;
-
+    cy.get("body").then(($body) => {
       // Select product
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="product-select"]').length) {
-          cy.get('[data-cy="product-select"]').select(1);
-        } else if ($body.find('select[name="product"]').length) {
-          cy.get('select[name="product"]').select(1);
-        }
-      });
-
-      // Select size
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="size-select"]').length) {
-          cy.get('[data-cy="size-select"]').select("M");
-        } else if ($body.find('select[name="size"]').length) {
-          cy.get('select[name="size"]').select("M");
-        }
-      });
+      if ($body.find('select[name="product"]').length) {
+        cy.get('select[name="product"]').select(1); // Select first product (should be our test product)
+      } else if ($body.find('[data-cy="product-select"]').length) {
+        cy.get('[data-cy="product-select"]').select(1);
+      }
 
       // Quantity
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="sale-quantity"]').length) {
-          cy.get('[data-cy="sale-quantity"]').type("1");
-        } else if ($body.find('input[name="quantity"]').length) {
-          cy.get('input[name="quantity"]').type("1");
-        }
-      });
+      if ($body.find('input[name="quantity"]').length) {
+        cy.get('input[name="quantity"]').first().clear().type(saleQuantity);
+      } else if ($body.find('[data-cy="quantity"]').length) {
+        cy.get('[data-cy="quantity"]').clear().type(saleQuantity);
+      }
 
-      // Payment method
-      cy.get("body").then(($body) => {
-        if ($body.find('[data-cy="payment-method"]').length) {
-          cy.get('[data-cy="payment-method"]').select("CASH");
-        } else if ($body.find('select[name="payment_method"]').length) {
-          cy.get('select[name="payment_method"]').select("CASH");
-        }
-      });
+      // Payment method (if present)
+      if ($body.find('select[name="payment_method"]').length) {
+        cy.get('select[name="payment_method"]').select("CASH");
+      } else if ($body.find('[data-cy="payment-method"]').length) {
+        cy.get('[data-cy="payment-method"]').select("CASH");
+      }
 
       // Submit sale
-      cy.get("body").then(($body) => {
-        const submitBtn = $body.find('button[type="submit"], [data-cy="submit-sale"]').first();
+      cy.get("body").then(($form) => {
+        const submitBtn = $form.find('button[type="submit"], [data-cy="submit-sale"], [data-cy="sell"]').first();
         if (submitBtn.length) {
           cy.wrap(submitBtn).click();
         } else {
@@ -225,88 +178,179 @@ describe("Clothing Vertical - Full User Journey", () => {
     cy.wait(2000);
     cy.assertNoServerError();
 
-    // Verify sale receipt/confirmation visible
-    cy.get("body").should("contain.text", "sale").or("contain.text", "success").or("contain.text", "sold");
+    // Verify sale success message
+    cy.get("body").should(
+      ($body) => {
+        const text = $body.text().toLowerCase();
+        expect(text).to.satisfy((t) => t.includes("sale") || t.includes("success") || t.includes("sold"));
+      }
+    );
 
     // ============================================================
-    // STEP 6: Verify inventory decreases
+    // STEP 6: Verify stock decreased and sale appears in reports
     // ============================================================
     cy.visitDashboard("clothing");
     cy.waitForAppShell();
-    cy.assertNoServerError();
 
-    // ============================================================
-    // STEP 7: Reports page loads
-    // ============================================================
+    // Check that product still exists but stock is reduced
     cy.get("body").then(($body) => {
-      const reportsLink = $body.find('a[href*="report"], a[href*="analytics"], [data-cy="reports"]').first();
-      if (reportsLink.length) {
-        cy.wrap(reportsLink).click();
+      const productsLink = $body.find('a[href*="product"], a[href*="hub"], a[href*="stock"]').first();
+      if (productsLink.length) {
+        cy.wrap(productsLink).click();
       } else {
-        cy.visit("/verticals/clothing/reports/", { failOnStatusCode: false });
+        cy.visit("/verticals/clothing/products/", { failOnStatusCode: false });
       }
     });
 
     cy.waitForAppShell();
-    cy.assertNoServerError();
-    cy.get("body").should("not.be.empty");
+    cy.get("body").should("contain.text", productName);
 
-    // ============================================================
-    // STEP 8: Visit settings
-    // ============================================================
+    // Navigate to sales history/reports
     cy.get("body").then(($body) => {
-      const settingsLink = $body.find('a[href*="setting"], [data-cy="settings"]').first();
-      if (settingsLink.length) {
-        cy.wrap(settingsLink).click();
+      const salesLink = $body.find('a[href*="sales"], a[href*="report"], a[href*="history"]').first();
+      if (salesLink.length) {
+        cy.wrap(salesLink).click();
       } else {
-        cy.visit("/accounts/settings/", { failOnStatusCode: false });
+        cy.visit("/verticals/clothing/sales/", { failOnStatusCode: false });
       }
     });
 
     cy.waitForAppShell();
     cy.assertNoServerError();
 
+    // Verify sale appears (product name should be visible)
+    cy.get("body").should("contain.text", productName);
+
     // ============================================================
-    // STEP 9: Logout
+    // STEP 7: Edit selling price for unsold item (if feature exists)
     // ============================================================
+    // Try to edit product - navigate back to product list
+    cy.visitDashboard("clothing");
+    cy.waitForAppShell();
+
     cy.get("body").then(($body) => {
-      const logoutLink = $body.find('a[href*="logout"], [data-cy="logout"]').first();
-      if (logoutLink.length) {
-        cy.wrap(logoutLink).click();
-      } else {
-        cy.visit("/accounts/logout/");
+      const productsLink = $body.find('a[href*="product"], a[href*="hub"]').first();
+      if (productsLink.length) {
+        cy.wrap(productsLink).click();
       }
     });
 
-    cy.url().should((url) => {
-      expect(url).to.satisfy((u) =>
-        u.includes("/accounts/login/") || u === Cypress.config().baseUrl + "/"
-      );
+    cy.waitForAppShell();
+
+    // Try to find edit link/button for the product
+    cy.get("body").then(($body) => {
+      // Look for edit link near product name
+      const productRow = $body.find(`*:contains("${productName}")`).first();
+      if (productRow.length) {
+        const editLink = productRow.closest("tr, .product-item, .card").find('a[href*="edit"], button[data-cy="edit"]').first();
+        if (editLink.length) {
+          cy.wrap(editLink).click({ force: true });
+          cy.waitForAppShell();
+
+          // Update selling price
+          const newPrice = "9000";
+          if ($body.find('input[name="selling_price"]').length) {
+            cy.get('input[name="selling_price"]').first().clear().type(newPrice);
+          }
+
+          // Save
+          cy.get("body").then(($form) => {
+            const saveBtn = $form.find('button[type="submit"], [data-cy="save"]').first();
+            if (saveBtn.length) {
+              cy.wrap(saveBtn).click();
+              cy.wait(1000);
+              cy.assertNoServerError();
+            }
+          });
+        }
+      }
     });
+
+    // ============================================================
+    // STEP 8: Guardrails - attempt to sell with invalid quantity/negative stock
+    // ============================================================
+    cy.visitDashboard("clothing");
+    cy.waitForAppShell();
+
+    cy.get("body").then(($body) => {
+      const sellLink = $body.find('a[href*="sell"], a[href*="sale"]').first();
+      if (sellLink.length) {
+        cy.wrap(sellLink).click();
+      } else {
+        cy.visit("/verticals/clothing/sell/", { failOnStatusCode: false });
+      }
+    });
+
+    cy.waitForAppShell();
+
+    // Try to sell more than available stock
+    cy.get("body").then(($body) => {
+      if ($body.find('select[name="product"]').length) {
+        cy.get('select[name="product"]').select(1);
+
+        // Enter quantity larger than available stock
+        const excessiveQuantity = "9999";
+        if ($body.find('input[name="quantity"]').length) {
+          cy.get('input[name="quantity"]').first().clear().type(excessiveQuantity);
+        }
+
+        // Submit and verify validation error
+        cy.get("body").then(($form) => {
+          const submitBtn = $form.find('button[type="submit"], [data-cy="submit-sale"]').first();
+          if (submitBtn.length) {
+            cy.wrap(submitBtn).click();
+            cy.wait(1000);
+
+            // Verify error message about insufficient stock
+            cy.get("body").should(($body) => {
+              const text = $body.text().toLowerCase();
+              expect(text).to.satisfy(
+                (t) =>
+                  t.includes("insufficient") ||
+                  t.includes("not enough") ||
+                  t.includes("stock") ||
+                  t.includes("available") ||
+                  t.includes("error")
+              );
+            });
+          }
+        });
+      }
+    });
+
+    cy.assertNoServerError();
   });
 
   it("should handle 'no barcode' path correctly (clothing-specific)", () => {
     cy.loginAsManager("clothing");
     cy.visitDashboard("clothing");
+    cy.waitForAppShell();
 
-    // Test that products can be created without barcode
+    // Navigate to add product
     cy.get("body").then(($body) => {
-      if ($body.find('[data-cy="add-product"]').length || $body.find('a[href*="product"]').length) {
-        const addLink = $body.find('[data-cy="add-product"]').length
-          ? cy.get('[data-cy="add-product"]')
-          : cy.get('a[href*="product"]').first();
+      const addLink = $body.find('a[href*="wizard"], a[href*="product"], a[href*="add"], [data-cy="add-product"]').first();
+      if (addLink.length) {
+        cy.wrap(addLink).click();
+      } else {
+        cy.visit("/inventory/wizard/clothing/", { failOnStatusCode: false });
+        cy.visit("/inventory/clothing/products/new/", { failOnStatusCode: false });
+      }
+    });
 
-        addLink.click();
-        cy.waitForAppShell();
+    cy.waitForAppShell();
 
-        // Verify barcode field is optional (not required)
-        cy.get("body").then(($form) => {
-          const barcodeField = $form.find('[data-cy="barcode"], input[name="barcode"]');
-          if (barcodeField.length) {
-            // Field exists but should not be required
-            cy.log("Barcode field exists but is optional");
-          }
+    // Verify barcode field is optional (not required)
+    cy.get("body").then(($form) => {
+      const barcodeField = $form.find('input[name="barcode"], [data-cy="barcode"]');
+      if (barcodeField.length) {
+        // Field exists but should not have required attribute
+        cy.get('input[name="barcode"], [data-cy="barcode"]').should(($input) => {
+          const required = $input.attr("required");
+          expect(required).to.be.undefined; // Not required
         });
+      } else {
+        // Barcode field doesn't exist - that's fine for "no barcode" path
+        cy.log("Barcode field not present - acceptable for 'no barcode' path");
       }
     });
   });

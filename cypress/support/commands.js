@@ -1,45 +1,48 @@
 // ***********************************************
 // Custom Cypress commands for CircuitCity / Emajinet
-// - Managers have fixed creds per vertical
+// - Managers have fixed creds per vertical from cypress/fixtures/users.json (source of truth)
 // - Agents are CREATED in tests and MUST be passed explicitly (or stored via setAgentCreds)
 // ***********************************************
 
-const DEFAULT_MANAGER_PASSWORD = "@Lincoln1863?";
-
-// Managers only (per your message)
-const DEFAULT_MANAGER_EMAILS = {
-  phones: "empire@gmai.com",
-  pharmacy: "samantha@gmail.com",
-  liquor: "nimue@gmail.com",
-  gym: "yuji@gmail.com",
-  clothing: "motouch@gmail.com",
-};
-
 /**
- * Optional overrides via cypress.env.json:
- * {
- *   "MANAGER_CREDS": {
- *     "clothing": { "email": "motouch@gmail.com", "password": "@Lincoln1863?" },
- *     "phones":   { "email": "empire@gmail.com",  "password": "@Lincoln1863?" }
- *   }
- * }
+ * Get manager credentials for a given kind.
+ * Priority: explicit env vars > fixtures/users.json (source of truth)
+ * 
+ * @param {string} kind - phones|pharmacy|liquor|gym|clothing
+ * @returns {Cypress.Chainable<{email: string, password: string}>}
  */
-function getManagerCreds(kind = "phones") {
-  const env = Cypress.env("MANAGER_CREDS") || {};
-  const k = String(kind || "phones").toLowerCase();
+function getManagerCreds(kind) {
+  const k = (kind || "phones").toLowerCase();
+  const keyUpper = k.toUpperCase();
 
-  const email =
-    env?.[k]?.email ||
-    DEFAULT_MANAGER_EMAILS[k] ||
-    DEFAULT_MANAGER_EMAILS.phones;
+  // Explicit env overrides (highest priority)
+  const envEmail =
+    Cypress.env(`MANAGER_EMAIL_${keyUpper}`) ||
+    Cypress.env(`CYPRESS_MANAGER_EMAIL_${keyUpper}`) ||
+    Cypress.env("MANAGER_EMAIL") ||
+    Cypress.env("CYPRESS_MANAGER_EMAIL");
 
-  const password =
-    env?.[k]?.password ||
+  const envPassword =
+    Cypress.env(`MANAGER_PASSWORD_${keyUpper}`) ||
+    Cypress.env(`CYPRESS_MANAGER_PASSWORD_${keyUpper}`) ||
     Cypress.env("MANAGER_PASSWORD") ||
-    Cypress.env("TEST_PASSWORD") ||
-    DEFAULT_MANAGER_PASSWORD;
+    Cypress.env("CYPRESS_MANAGER_PASSWORD");
 
-  return { email, password };
+  if (envEmail && envPassword) {
+    return cy.wrap({ email: String(envEmail).trim(), password: String(envPassword) });
+  }
+
+  // FIXTURE DEFAULTS (source of truth)
+  return cy.fixture("users").then((u) => {
+    const mgr = u?.managers?.[k];
+    if (!mgr?.email || !mgr?.password) {
+      throw new Error(
+        `[loginAsManager] Missing users.json credentials for kind="${k}". ` +
+        `Expected cypress/fixtures/users.json managers.${k}.email/password`
+      );
+    }
+    return { email: String(mgr.email).trim(), password: String(mgr.password) };
+  });
 }
 
 /**
@@ -102,28 +105,129 @@ Cypress.Commands.add("waitForAppShell", () => {
 /**
  * Test-only login via API endpoint (faster, bypasses 2FA in test mode).
  * Only works when ALLOW_TEST_LOGIN=true is set in Django environment.
- * @param {string} email
- * @param {string} password
+ * 
+ * @param {string|object} kindOrEmail - If string, treated as kind; if object with email/password, uses those
+ * @param {string} password - Password (optional if kindOrEmail is an object)
+ * @param {object} opts - { kind: "clothing", email: "...", password: "..." } - optional overrides
  */
-Cypress.Commands.add("testLogin", (email, password) => {
+Cypress.Commands.add("testLogin", (kindOrEmail, password, opts = {}) => {
+  // Handle different call signatures
+  let email, pass, kind;
+  
+  if (typeof kindOrEmail === "object" && kindOrEmail.email) {
+    // Called as testLogin({email, password}, opts)
+    email = kindOrEmail.email;
+    pass = kindOrEmail.password;
+    kind = opts.kind || kindOrEmail.kind;
+  } else if (typeof kindOrEmail === "string" && password) {
+    // Called as testLogin(email, password, opts)
+    email = kindOrEmail;
+    pass = password;
+    kind = opts.kind;
+  } else {
+    // Called as testLogin(kind, undefined, opts) - use fixtures
+    kind = kindOrEmail || opts.kind || "phones";
+    email = opts.email;
+    pass = opts.password;
+  }
+  
+  // If email/password not explicitly provided, use getManagerCreds
+  if (!email || !pass) {
+    if (!kind) {
+      throw new Error("[testLogin] Either provide email/password explicitly, or provide kind to load from fixtures/users.json");
+    }
+    return getManagerCreds(kind).then((creds) => {
+      return cy.testLogin(creds.email, creds.password, { kind });
+    });
+  }
+  
+  const body = { email, password: pass };
+  if (kind) {
+    body.kind = kind;
+  }
+  
   cy.request({
     method: "POST",
     url: "/accounts/__e2e__/test-login/",
-    body: { email, password },
+    body,
     failOnStatusCode: false,
   }).then((response) => {
-    if (response.status === 403) {
-      // Test login not enabled, fall back to UI login
-      cy.log("Test login endpoint not available, using UI login");
-      return cy.login(email, password);
+    // Check for 404 (endpoint disabled)
+    if (response.status === 404) {
+      throw new Error(
+        `[e2e_test_login] 404 - Test login endpoint not found. ` +
+        `On localhost this should work automatically. Check ENV is not 'prod' or 'production'.`
+      );
+    }
+    // Check for 409 (manager business lock)
+    if (response.status === 409 && response.body.error === "MANAGER_BUSINESS_LOCK") {
+      const hint = response.body.hint || "";
+      const existingBiz = response.body.existing_business_name || response.body.existing_business_id || "unknown";
+      const detail = response.body.detail || response.body.message || "User is already a manager on a different business.";
+      throw new Error(
+        `[e2e_test_login] 409 - Manager business lock: ${detail} ${hint} Existing business: ${existingBiz}`
+      );
+    }
+    // Check for other error statuses
+    if (response.status !== 200) {
+      throw new Error(
+        `[e2e_test_login] ${response.status} ${JSON.stringify(response.body)}`
+      );
     }
     if (!response.body.ok) {
-      throw new Error(`Test login failed: ${response.body.error || "Unknown error"}`);
+      throw new Error(`[e2e_test_login] Response not ok: ${response.body.error || "Unknown error"}`);
     }
-    // Session cookie is set automatically by cy.request
-    // Visit a page to establish session
-    cy.visit("/", { failOnStatusCode: false });
-    cy.waitForAppShell();
+    
+    // Assert session cookie exists (try sessionid first, fallback to all cookies)
+    cy.getCookie("sessionid").then((cookie) => {
+      if (!cookie) {
+        // Try alternative cookie name (cc_sessionid)
+        cy.getCookie("cc_sessionid").then((altCookie) => {
+          if (!altCookie) {
+            // Dump all cookies for debugging
+            cy.getAllCookies().then((cookies) => {
+              throw new Error(
+                `[e2e_test_login] No session cookie found after login. Cookies: ${JSON.stringify(cookies.map(c => c.name))}`
+              );
+            });
+          }
+        });
+      }
+    });
+    
+    // Validate identity via __whoami__ - try both slash and no-slash
+    const tryWhoami = (url) => {
+      return cy.request({
+        url,
+        failOnStatusCode: false,
+      }).then((whoamiResponse) => {
+        if (whoamiResponse.status === 200 && whoamiResponse.body.ok) {
+          // Success - verify email matches
+          const whoamiEmail = (whoamiResponse.body.email || whoamiResponse.body.username || "").toLowerCase();
+          const expectedEmail = email.toLowerCase();
+          if (whoamiEmail !== expectedEmail) {
+            throw new Error(
+              `[e2e_test_login] Email mismatch: expected "${expectedEmail}", got "${whoamiEmail}"`
+            );
+          }
+          return true;
+        }
+        return false;
+      });
+    };
+    
+    // Try /__whoami__/ first, then /__whoami__ if that fails
+    tryWhoami("/__whoami__/").then((success) => {
+      if (!success) {
+        return tryWhoami("/__whoami__").then((success2) => {
+          if (!success2) {
+            throw new Error(
+              `[e2e_test_login] __whoami__ validation failed: both /__whoami__/ and /__whoami__ returned non-200`
+            );
+          }
+        });
+      }
+    });
   });
 });
 
@@ -173,44 +277,52 @@ Cypress.Commands.add("login", (email, password) => {
 
 /**
  * ✅ Backwards compatibility (your existing phones specs likely call this)
- * Uses TEST_EMAIL/TEST_PASSWORD if present, else defaults to PHONES manager creds.
+ * Uses TEST_EMAIL/TEST_PASSWORD if present, else defaults to PHONES manager creds from fixtures.
  */
 Cypress.Commands.add("loginAsOwner", () => {
-  const email = Cypress.env("TEST_EMAIL") || DEFAULT_MANAGER_EMAILS.phones;
-  const password =
-    Cypress.env("TEST_PASSWORD") ||
-    Cypress.env("MANAGER_PASSWORD") ||
-    DEFAULT_MANAGER_PASSWORD;
-
-  cy.login(email, password);
+  const email = Cypress.env("TEST_EMAIL");
+  const password = Cypress.env("TEST_PASSWORD") || Cypress.env("MANAGER_PASSWORD");
+  
+  if (email && password) {
+    cy.login(email, password);
+  } else {
+    // Use fixtures for phones manager
+    getManagerCreds("phones").then((creds) => {
+      cy.login(creds.email, creds.password);
+    });
+  }
 });
 
 /**
  * Manager login per vertical (ONLY managers use these fixed creds).
  * Uses cy.session() to cache login and speed up tests.
+ * Credentials come from cypress/fixtures/users.json by default (source of truth).
  * @param {string} kind - phones|pharmacy|liquor|gym|clothing
  */
 Cypress.Commands.add("loginAsManager", (kind = "phones") => {
-  const { email, password } = getManagerCreds(kind);
-
+  const k = String(kind || "phones").toLowerCase();
+  
   cy.session(
-    `manager-${kind}`,
+    `manager-${k}`,
     () => {
-      cy.testLogin(email, password).catch(() => {
-        // Fall back to UI login if test login fails
-        cy.login(email, password);
-      });
+      // Use backend login only (no UI fallback)
+      // testLogin will use getManagerCreds(k) to load from fixtures/users.json
+      cy.testLogin(k, undefined, { kind: k });
     },
     {
       validate: () => {
-        // Validate session is still valid
+        // Validate session using whoami endpoint
+        // We can't easily check email here since it comes from fixtures async
         cy.request({
-          url: "/",
+          url: "/__whoami__/",
           failOnStatusCode: false,
         }).then((response) => {
-          expect(response.status).to.be.oneOf([200, 302]);
+          expect(response.status).to.eq(200);
+          expect(response.body.is_authenticated).to.eq(true);
+          expect(response.body.email || response.body.username).to.exist;
         });
       },
+      cacheAcrossSpecs: true,
     }
   );
 

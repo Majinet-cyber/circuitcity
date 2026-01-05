@@ -16,6 +16,8 @@
   <!-- HQ Mobile-First Responsive CSS -->
   <link href="{% static 'css/hq-mobile.css' %}" rel="stylesheet">
   <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
+  <!-- HQ Admin Layout CSS (Full Width) -->
+  <link href="{% static 'css/hq_admin.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
 </head>
@@ -44,7 +46,7 @@
     <!-- Main Content -->
     <main class="hq-content hq-page">
       {% if messages %}
-      <div class="container-fluid mb-3">
+      <div class="mb-3">
         {% for message in messages %}
         <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
           {{ message }}
@@ -96,6 +98,9 @@
       return response.json();
     });
   };
+
+  // Notifications API URL (set by backend)
+  window.HQ_NOTIFICATIONS_URL = "{% url 'hq:hq_notifications_api' %}";
 </script>
 
 {% block extra_js %}{% endblock %}

@@ -7,16 +7,16 @@ from importlib import import_module
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.http import HttpResponse, JsonResponse, HttpResponseBase
+from django.http import HttpResponse, HttpResponseBase, JsonResponse
 from django.shortcuts import redirect, render
 from django.template.loader import get_template
-from django.urls import include, path, re_path, reverse, NoReverseMatch
-from django.views.generic import RedirectView
 from django.templatetags.static import static as static_build  # may raise with Manifest storage
+from django.urls import NoReverseMatch, include, path, re_path, reverse
+from django.views.generic import RedirectView
 
+from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 from cc import views as core_views
 from cc import views_health
-from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 
 
 # ======================================================================================
@@ -213,38 +213,35 @@ def session_get(request):
 
 
 def __whoami__(request):
-    data = {
-        "DEBUG": settings.DEBUG,
-        "BASE_DIR": str(settings.BASE_DIR),
-        "TEMPLATE_DIRS": [str(p) for p in settings.TEMPLATES[0].get("DIRS", [])],
-        "APP_DIRS": settings.TEMPLATES[0].get("APP_DIRS", False),
-        "INSTALLED_APPS_contains_accounts": any(a.endswith("accounts") for a in settings.INSTALLED_APPS),
-        "INSTALLED_APPS_contains_ccreports": any(a.endswith("ccreports") for a in settings.INSTALLED_APPS),
-        "LOGIN_URL": settings.LOGIN_URL,
-        "LOGIN_REDIRECT_URL": getattr(settings, "LOGIN_REDIRECT_URL", "/"),
-        "LOGIN_TEMPLATE_PROBED": "registration/login_v11_fix.html",
-        "LOGIN_TEMPLATE_ORIGIN": None,
-        "REPORTS_TEMPLATES_CHECKED": ["reports/home.html", "ccreports/home.html", "reports/index.html"],
-        "REPORTS_TEMPLATE_FOUND": None,
-    }
-    try:
-        t = get_template("registration/login_v11_fix.html")
-        data["LOGIN_TEMPLATE_ORIGIN"] = getattr(getattr(t, "origin", None), "name", None)
-    except Exception as e:
-        data["LOGIN_TEMPLATE_ORIGIN"] = f"(not found) {e.__class__.__name__}: {e}"
-
-    for cand in data["REPORTS_TEMPLATES_CHECKED"]:
+    """
+    Return authenticated user info (for Cypress session validation).
+    Never raises exceptions; returns 401 if not authenticated.
+    """
+    # If user is authenticated, return user info (for Cypress session validation)
+    if request.user.is_authenticated:
+        data = {
+            "ok": True,
+            "email": request.user.email or request.user.username,
+            "username": request.user.username,
+            "user_id": request.user.id,
+            "is_authenticated": True,
+        }
+        # Optionally include business info if available (never raise exceptions)
         try:
-            rt = get_template(cand)
-            data["REPORTS_TEMPLATE_FOUND"] = {
-                "template": cand,
-                "origin": getattr(getattr(rt, "origin", None), "name", None),
-            }
-            break
-        except Exception:
-            continue
+            from tenants.utils import get_active_business
 
-    return JsonResponse(data, json_dumps_params={"indent": 2})
+            biz = get_active_business(request)
+            if biz:
+                data["business_id"] = biz.id
+                data["business_name"] = getattr(biz, "name", None)
+                data["business_kind"] = getattr(biz, "business_kind", None)
+        except Exception:
+            # If business lookup fails, just omit business fields (never crash)
+            pass
+        return JsonResponse(data)
+
+    # Not authenticated - return 401
+    return JsonResponse({"ok": False, "error": "not_authenticated", "is_authenticated": False}, status=401)
 
 
 def __render_login__(request):
@@ -365,8 +362,7 @@ if admin_path != "admin/":
     urlpatterns += [path("admin/", admin.site.urls)]
 
 # Basics / health / robots / favicon / temporary
-from core import views_debug
-from core import views_well_known
+from core import views_debug, views_well_known
 
 # Import sitemap view
 _sitemap_view = _try_from("staticpages.views", "sitemap_xml")

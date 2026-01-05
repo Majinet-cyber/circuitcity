@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
+
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
-from django.utils import timezone
-from django.contrib.auth.hashers import make_password, check_password
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 # -----------------------------
@@ -394,8 +395,46 @@ class UserTwoFactor(models.Model):
             models.Index(fields=["sms_enabled"]),
         ]
 
+    @property
+    def is_enabled(self) -> bool:
+        """
+        Check if any 2FA method is enabled.
+        Safely checks for multiple field names to support different model variants.
+        Returns True if ANY of these fields exist and are True:
+        sms_enabled, email_enabled, totp_enabled, app_enabled, enabled
+        """
+        # List of possible 2FA enabled field names (in order of preference)
+        enabled_fields = ["sms_enabled", "email_enabled", "totp_enabled", "app_enabled", "enabled"]
+
+        for field_name in enabled_fields:
+            if hasattr(self, field_name):
+                if getattr(self, field_name, False):
+                    return True
+        return False
+
+    def disable_all_2fa(self):
+        """
+        Disable all 2FA methods safely.
+        Only updates fields that exist on the model (no migration required).
+        Returns the list of fields that were updated.
+        """
+        enabled_fields = ["sms_enabled", "email_enabled", "totp_enabled", "app_enabled", "enabled"]
+        update_fields = []
+
+        for field_name in enabled_fields:
+            if hasattr(self, field_name):
+                current_value = getattr(self, field_name, False)
+                if current_value:
+                    setattr(self, field_name, False)
+                    update_fields.append(field_name)
+
+        if update_fields:
+            self.save(update_fields=update_fields)
+
+        return update_fields
+
     def __str__(self) -> str:
-        status = "enabled" if self.sms_enabled else "disabled"
+        status = "enabled" if self.is_enabled else "disabled"
         return f"2FA<{self.user.get_username()}:{status}>"
 
 
@@ -465,8 +504,9 @@ def is_twofa_recent(request, max_age_seconds: int = 1800) -> bool:
         return False
 
     try:
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
 
         # Convert to datetime if it's a timestamp
         if isinstance(passed_at, (int, float)):

@@ -1,4 +1,4 @@
-{% load static %}{% load humanize %}
+{% load static %}{% load humanize %}{% load hq_extras %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,7 +14,7 @@
       --accent:#2563eb;--success:#16a34a;--warning:#f59e0b;
     }
     body{font:500 15px/1.45 system-ui;background:var(--bg);color:var(--ink);margin:0}
-    .shell{max-width:1400px;margin:20px auto;padding:0 14px}
+    .shell{max-width:none;width:100%;margin:0;padding:0 14px}
     h1{margin:0 0 12px;font-size:26px;font-weight:800}
     .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:16px 0}
     .kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
@@ -134,11 +134,11 @@
     {% if page_obj.has_other_pages %}
     <div style="margin-top:16px;display:flex;justify-content:center;gap:8px">
       {% if page_obj.has_previous %}
-      <a href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&plan={{ plan_filter }}&status={{ status_filter }}" class="btn">Prev</a>
+      <a href="?{% querystring request page=page_obj.previous_page_number %}" class="btn">Prev</a>
       {% endif %}
       <span style="padding:8px 12px">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
       {% if page_obj.has_next %}
-      <a href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&plan={{ plan_filter }}&status={{ status_filter }}" class="btn">Next</a>
+      <a href="?{% querystring request page=page_obj.next_page_number %}" class="btn">Next</a>
       {% endif %}
     </div>
     {% endif %}
