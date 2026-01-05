@@ -379,6 +379,8 @@ def _post_login_url(request=None) -> str:
                     BusinessKind.GROCERY: "groceries:dashboard",
                     "grocery": "groceries:dashboard",
                     "groceries": "groceries:dashboard",
+                    BusinessKind.HARDWARE: "inventory:inventory_dashboard",
+                    "hardware": "inventory:inventory_dashboard",
                     BusinessKind.CEMENT: "verticals:cement_dashboard",
                     "cement": "verticals:cement_dashboard",
                 }
@@ -1709,8 +1711,20 @@ def _complete_manager_wizard_signup(request, wizard_data):
         biz = None
         if Business is not None:
             biz_name = step2["business_name"].strip()
-            business_kind = step2["business_kind"]
+            business_kind_raw = step2["business_kind"]
             subdomain = (step2.get("subdomain") or "").strip().lower()
+
+            # CRITICAL: Normalize business_kind to ensure canonical value
+            try:
+                from tenants.services.business_kind import normalize_business_kind
+
+                business_kind = normalize_business_kind(business_kind_raw)
+                if not business_kind:
+                    # Fallback to raw value if normalization returns None
+                    business_kind = business_kind_raw
+            except Exception:
+                # If normalization fails, use raw value
+                business_kind = business_kind_raw
 
             # Validate subdomain
             if subdomain:
@@ -2064,7 +2078,19 @@ def _complete_wizard_signup(request, wizard_data):
         biz = None
         if Business is not None:
             biz_name = step2["business_name"].strip()
-            business_kind = step2["business_kind"]
+            business_kind_raw = step2["business_kind"]
+
+            # CRITICAL: Normalize business_kind to ensure canonical value
+            try:
+                from tenants.services.business_kind import normalize_business_kind
+
+                business_kind = normalize_business_kind(business_kind_raw)
+                if not business_kind:
+                    # Fallback to raw value if normalization returns None
+                    business_kind = business_kind_raw
+            except Exception:
+                # If normalization fails, use raw value
+                business_kind = business_kind_raw
 
             # Unique slug
             base = slugify(biz_name)[:40] or "store"

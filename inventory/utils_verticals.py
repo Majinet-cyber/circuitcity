@@ -28,7 +28,7 @@ def get_vertical_kind(business) -> str:
         business: Business model instance (or None)
 
     Returns:
-        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", or "generic"
+        str: One of "phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement", or "generic"
     """
     if business is None:
         return "generic"
@@ -43,7 +43,7 @@ def get_vertical_kind(business) -> str:
     kind = str(kind).strip().lower()
 
     # Map to known verticals
-    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "cement"]
+    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement"]
     if kind in valid_kinds:
         return kind
 
@@ -66,6 +66,7 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
         "grocery": "groceries:dashboard",
+        "hardware": "inventory:inventory_dashboard",  # Hardware uses generic retail dashboard
         "cement": "verticals:cement_dashboard",
         # "phones" uses the default dashboard at /inventory/dashboard/
     }
@@ -220,7 +221,8 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "liquor": "Liquor Store",
         "pharmacy": "Pharmacy & Cosmetics",
         "grocery": "Grocery Store",
-        "cement": "Hardware & General Dealers",  # RENAMED: Was "Cement Store"
+        "hardware": "Hardware & General Dealers",  # NEW: Hardware vertical
+        "cement": "Cement / Building Materials",  # Legacy: Cement vertical
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
