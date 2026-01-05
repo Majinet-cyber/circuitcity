@@ -16,12 +16,14 @@ def no_business(request):
     """
     Fallback for businesses without a vertical set OR with unrecognized vertical.
 
-    CRITICAL ROUTING LOGIC:
+    CRITICAL ROUTING LOGIC (to prevent infinite redirect loops):
     - If business_kind is NULL/blank: redirect to settings to configure
-    - If business_kind is set but unrecognized: show error + route to generic dashboard
+    - If business_kind is set but unrecognized: RENDER 200 page with instructions
+      (DO NOT redirect to avoid loops)
 
-    This prevents /verticals/none/ from being a valid landing page while still
-    providing a graceful fallback for misconfigured verticals.
+    This page returns HTTP 200 and provides links to:
+    - Generic dashboard (inventory:generic_dashboard)
+    - Business settings (to change business type)
     """
     import logging
 
@@ -57,15 +59,16 @@ def no_business(request):
                     {
                         "hero_title": "Set up your business",
                         "hero_blurb": "Configure your business type in settings to get started.",
+                        "business_kind": business_kind,
                     }
                 )
                 return render(request, "verticals/no_business.html", ctx)
 
     # Case 2: business_kind is set but vertical not found (misconfiguration)
-    # Log the error and route to a safe fallback dashboard
+    # CRITICAL: DO NOT redirect - render a 200 page to prevent infinite loops
     log.error(
         f"Unrecognized business_kind '{business_kind}' for business {business.name if business else 'Unknown'}. "
-        f"Routing to generic dashboard. Please update vertical registry or business_kind."
+        f"Showing /verticals/none/ page. Please update vertical registry or business_kind."
     )
 
     # Only add warning once per session for HTML requests not on settings pages
@@ -79,19 +82,15 @@ def no_business(request):
             )
             request.session[session_key] = True
 
-    # Route to generic inventory dashboard (safe fallback)
-    try:
-        return redirect(reverse("inventory:inventory_dashboard"))
-    except NoReverseMatch:
-        try:
-            return redirect(reverse("dashboard:home"))
-        except NoReverseMatch:
-            # Last resort: show minimal page
-            ctx = base.base_context(request)
-            ctx.update(
-                {
-                    "hero_title": "Dashboard",
-                    "hero_blurb": "Your business dashboard.",
-                }
-            )
-            return render(request, "verticals/no_business.html", ctx)
+    # RENDER a 200 page (DO NOT redirect to prevent loops)
+    ctx = base.base_context(request)
+    ctx.update(
+        {
+            "hero_title": "Business Type Not Configured",
+            "hero_blurb": f"Your business type ('{business_kind}') is not fully configured yet.",
+            "business_kind": business_kind,
+            "show_generic_dashboard_link": True,
+            "show_settings_link": True,
+        }
+    )
+    return render(request, "verticals/no_business.html", ctx)

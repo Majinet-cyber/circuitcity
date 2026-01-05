@@ -66,8 +66,9 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
         "grocery": "groceries:dashboard",
-        "hardware": "inventory:inventory_dashboard",  # Hardware uses generic retail dashboard
-        "cement": "verticals:cement_dashboard",
+        "hardware": "inventory:generic_dashboard",  # Hardware uses generic retail dashboard
+        "cement": "verticals:cement_dashboard",  # Cement has its own dashboard
+        "generic": "inventory:generic_dashboard",  # Fallback for unrecognized verticals
         # "phones" uses the default dashboard at /inventory/dashboard/
     }
     return vertical_dashboard_map.get(vertical_kind)

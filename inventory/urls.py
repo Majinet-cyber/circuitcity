@@ -1042,6 +1042,8 @@ urlpatterns = [
     path("stock/", _need_biz(_stock_list_wrapper(_stock_list))),
     path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
+    # Generic dashboard (safe fallback for unrecognized verticals - NO redirects)
+    path("generic-dashboard/", _need_biz(views.generic_dashboard), name="generic_dashboard"),
     # Legacy inventory dashboard (not vertical-specific)
     path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
     path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
@@ -1793,5 +1795,10 @@ urlpatterns += [
         "wizard/clothing/submit/",
         manager_required(_need_biz(_wizard_views.clothing_wizard_submit)),
         name="clothing_wizard_submit",
+    ),
+    path(
+        "check-barcode-duplicate/",
+        _need_biz(_wizard_views.check_barcode_duplicate),
+        name="check_barcode_duplicate",
     ),
 ]

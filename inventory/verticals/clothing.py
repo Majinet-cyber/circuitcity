@@ -45,6 +45,13 @@ def dashboard(request):
     # ===== INVENTORY VALUE METRICS (Current Stock) =====
     inventory_data = base.clothing_inventory_metrics(business, location=location)
 
+    # ===== RECENT SALES (Last 10 sales for display) =====
+    recent_sales = (
+        ClothingSale.objects.filter(business=business)
+        .select_related("product", "sold_by")
+        .order_by("-sold_at")[:10]
+    )
+
     # Extract metrics from sales_data
     revenue_mtd = sales_data["revenue"]
     cost_mtd = sales_data["cost_of_goods"]
@@ -150,6 +157,8 @@ def dashboard(request):
             "scan_required_count": metrics["scan_required"],
             "inventory_tracked_count": metrics["inventory_tracked"],
             "recent_products": metrics["recent"],
+            # Recent Sales List (Last 10 transactions)
+            "recent_sales": recent_sales,
             # KPI Panels (Sales Metrics)
             "revenue_mtd": revenue_mtd,
             "cost_mtd": cost_mtd,
