@@ -927,10 +927,10 @@ def manage(request: HttpRequest) -> HttpResponse:
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
-    
+
     # Get recent invoices (last 3)
     invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:3]
-    
+
     return render(
         request,
         "billing/manage.html",
@@ -944,6 +944,144 @@ def manage(request: HttpRequest) -> HttpResponse:
 
 
 # ------------------------------------------------------------------------------
+# Subscription Cancellation & Billing Phone Management
+# ------------------------------------------------------------------------------
+@login_required
+@require_business
+@require_POST
+def cancel_subscription(request: HttpRequest) -> HttpResponse:
+    """
+    Cancel subscription at period end (SaaS best practice).
+    User continues to have access until current_period_end.
+    """
+    import re
+
+    from billing.services import notify_hq
+
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # Confirmation check
+    confirm = request.POST.get("confirm", "").strip().lower()
+    if confirm != "yes":
+        messages.error(request, "Cancellation confirmation required.")
+        return redirect("billing:manage")
+
+    # Set cancel_at_period_end
+    sub.cancel_at_period_end = True
+    sub.cancel_requested_at = timezone.now()
+    if not sub.canceled_at:
+        sub.canceled_at = timezone.now()
+    sub.save(update_fields=["cancel_at_period_end", "cancel_requested_at", "canceled_at", "updated_at"])
+
+    # Notify HQ of cancellation request (idempotent)
+    try:
+        notify_hq.notify_cancellation_requested(sub)
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send HQ cancellation notification: {e}")
+
+    # Success message
+    period_end_str = (
+        sub.current_period_end.strftime("%B %d, %Y") if sub.current_period_end else "the end of your billing period"
+    )
+    messages.success(
+        request,
+        f"Subscription will be canceled on {period_end_str}. You'll keep access until then.",
+    )
+
+    return redirect("billing:manage")
+
+
+@login_required
+@require_business
+@require_POST
+def undo_cancellation(request: HttpRequest) -> HttpResponse:
+    """
+    Undo cancellation (reactivate subscription).
+    Only works if still before period end.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # Check if we can still undo
+    if not sub.cancel_at_period_end:
+        messages.info(request, "Subscription is not scheduled for cancellation.")
+        return redirect("billing:manage")
+
+    if sub.current_period_end and timezone.now() >= sub.current_period_end:
+        messages.error(request, "Cannot undo cancellation after period has ended.")
+        return redirect("billing:manage")
+
+    # Undo cancellation
+    sub.cancel_at_period_end = False
+    sub.cancel_requested_at = None  # Clear cancellation request timestamp
+    # Don't clear canceled_at (keep audit trail)
+    sub.save(update_fields=["cancel_at_period_end", "updated_at"])
+
+    messages.success(request, "Cancellation undone! Your subscription will continue automatically.")
+
+    return redirect("billing:manage")
+
+
+@login_required
+@require_business
+@require_POST
+def update_billing_phone(request: HttpRequest) -> HttpResponse:
+    """
+    Update billing phone number for automated billing prompts.
+    Validates and normalizes Malawi phone numbers.
+    """
+    import re
+
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    phone = request.POST.get("billing_phone", "").strip()
+
+    if not phone:
+        messages.error(request, "Please enter a phone number.")
+        return redirect("billing:manage")
+
+    # Malawi phone number validation and normalization
+    # Accept formats: +265991234567, 265991234567, 0991234567, 991234567
+    # Valid prefixes: 099, 088, 077, 085, 084
+
+    # Remove spaces, dashes, parentheses
+    phone_clean = re.sub(r"[\s\-\(\)]", "", phone)
+
+    # Normalize to +265 format
+    if phone_clean.startswith("+265"):
+        normalized = phone_clean
+    elif phone_clean.startswith("265"):
+        normalized = "+" + phone_clean
+    elif phone_clean.startswith("0"):
+        normalized = "+265" + phone_clean[1:]
+    else:
+        # Assume it's missing country code and leading zero
+        normalized = "+265" + phone_clean
+
+    # Validate format: +265 followed by 9 digits starting with valid prefixes
+    valid_pattern = r"^\+265(99|88|77|85|84|86|89)\d{7}$"
+    if not re.match(valid_pattern, normalized):
+        messages.error(
+            request,
+            "Invalid Malawi phone number. Please enter a valid number (e.g., +265991234567, 0991234567).",
+        )
+        return redirect("billing:manage")
+
+    # Save normalized phone
+    sub.billing_phone = normalized
+    sub.save(update_fields=["billing_phone", "updated_at"])
+
+    messages.success(request, f"Billing phone number updated: {normalized}")
+
+    return redirect("billing:manage")
+
+
+# ------------------------------------------------------------------------------
 # Subscription Upgrade Flow
 # ------------------------------------------------------------------------------
 @login_required
@@ -952,49 +1090,49 @@ def manage(request: HttpRequest) -> HttpResponse:
 def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
     """
     Start subscription upgrade flow.
-    
+
     1. Validate upgrade is to a higher-tier plan
     2. Calculate amount due (difference between plans)
     3. Create SubscriptionChangeIntent
     4. Initiate PayChangu checkout for the difference
     5. Redirect to PayChangu or show error
-    
+
     Webhook will apply the upgrade after payment confirmed.
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
-    
+
     # Validate current plan exists
     if not sub.plan:
         messages.error(request, "No current plan found. Please subscribe first.")
         return redirect("billing:subscribe")
-    
+
     # Get target plan
     try:
         to_plan = SubscriptionPlan.objects.get(code=to_plan_code, is_active=True)
     except SubscriptionPlan.DoesNotExist:
         messages.error(request, f"Plan '{to_plan_code}' not found.")
         return redirect("billing:manage")
-    
+
     from_plan = sub.plan
-    
+
     # Validate upgrade direction (must be to higher-priced plan)
     if to_plan.amount <= from_plan.amount:
         messages.error(request, "You can only upgrade to a higher-tier plan.")
         return redirect("billing:manage")
-    
+
     # Calculate amount due (simple difference, no proration yet)
     amount_due = max(Decimal("0"), to_plan.amount - from_plan.amount)
-    
+
     if amount_due == 0:
         messages.info(request, "No payment required for this plan change.")
         return redirect("billing:manage")
-    
+
     # Generate idempotency key (prevents duplicate intents)
     # Format: business_id:from_plan:to_plan:period_start_timestamp
     period_start_ts = int(sub.current_period_start.timestamp()) if sub.current_period_start else 0
     idempotency_key = f"{biz.id}:{from_plan.code}:{to_plan.code}:{period_start_ts}"
-    
+
     # Check if intent already exists (prevent duplicates)
     existing_intent = SubscriptionChangeIntent.objects.filter(
         idempotency_key=idempotency_key,
@@ -1003,12 +1141,12 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
             SubscriptionChangeIntent.Status.PAID,
         ],
     ).first()
-    
+
     if existing_intent:
         messages.info(request, "An upgrade is already in progress. Please complete the payment.")
         # Redirect to checkout or status page
         return redirect("billing:manage")
-    
+
     # Create SubscriptionChangeIntent
     try:
         intent = SubscriptionChangeIntent.objects.create(
@@ -1027,20 +1165,20 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
         logger.error(f"Failed to create upgrade intent: business={biz.id}, error={e}", exc_info=True)
         messages.error(request, "Failed to initiate upgrade. Please try again.")
         return redirect("billing:manage")
-    
+
     # Generate unique transaction reference
     tx_ref = f"upgrade-{biz.id}-{uuid.uuid4().hex[:12]}"
     charge_id = f"charge-{uuid.uuid4().hex[:16]}"
-    
+
     # Store tx_ref in intent for webhook lookup
     intent.tx_ref = tx_ref
     intent.save(update_fields=["tx_ref", "updated_at"])
-    
+
     # Get location (first location if available)
     location = None
     if hasattr(biz, "locations"):
         location = biz.locations.first()
-    
+
     # Create PaymentTransaction record (PENDING)
     transaction = PaymentTransaction.objects.create(
         business=biz,
@@ -1054,11 +1192,11 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
         currency=intent.currency,
         status=PaymentTransaction.Status.PENDING,
     )
-    
+
     # Build callback URLs
     callback_url = request.build_absolute_uri(reverse("billing:paychangu_webhook"))
     return_url = request.build_absolute_uri(reverse("billing:paychangu_return"))
-    
+
     # Prepare metadata for PayChangu
     meta = {
         "purpose": "subscription_upgrade",
@@ -1071,7 +1209,7 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
         "user_id": str(request.user.id),
         "user_email": request.user.email,
     }
-    
+
     # Initiate PayChangu hosted checkout
     try:
         result = paychangu_service.create_checkout(
@@ -1087,7 +1225,7 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
             user_phone=getattr(request.user, "phone", None),
             description=f"Upgrade: {from_plan.name} → {to_plan.name}",
         )
-        
+
         if result.get("status") != "success":
             error_msg = result.get("message", "Failed to initiate payment")
             logger.error(f"PayChangu checkout failed: business={biz.id}, tx_ref={tx_ref}, error={error_msg}")
@@ -1095,25 +1233,25 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
             intent.mark_failed()
             messages.error(request, f"Payment initiation failed: {error_msg}. Please try again.")
             return redirect("billing:manage")
-        
+
         # Update transaction with checkout details
         transaction.checkout_url = result.get("checkout_url", "")
         transaction.raw_init_payload = result.get("raw_response", {})
         transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
-        
+
         # Store intent reference in PayChangu metadata
         intent.paychangu_reference = result.get("checkout_id", "")
         intent.save(update_fields=["paychangu_reference", "updated_at"])
-        
+
         logger.info(
             f"Upgrade checkout created: business={biz.id}, intent={intent.id}, "
             f"tx_ref={tx_ref}, amount_due={amount_due}"
         )
-        
+
         # Store tx_ref in session for return page
         request.session["billing_tx_ref"] = tx_ref
         request.session["upgrade_intent_id"] = str(intent.id)
-        
+
         # Redirect to PayChangu checkout page
         checkout_url = result.get("checkout_url")
         if checkout_url:
@@ -1121,7 +1259,7 @@ def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
         else:
             messages.error(request, "Failed to get checkout URL. Please try again.")
             return redirect("billing:manage")
-            
+
     except Exception as e:
         logger.error(f"Upgrade checkout error: business={biz.id}, error={e}", exc_info=True)
         transaction.mark_failed({"error": str(e)})

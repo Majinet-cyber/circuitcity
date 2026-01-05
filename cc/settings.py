@@ -603,6 +603,9 @@ try:
     from celery.schedules import crontab
 
     CELERY_BEAT_SCHEDULE = {
+        # ======================================================================
+        # GYM EMAILS
+        # ======================================================================
         # Daily inactivity reminders at 3:00 PM Malawi time
         "gym-daily-inactivity-reminders": {
             "task": "inventory.tasks_gym_emails.send_gym_inactivity_reminders",
@@ -613,6 +616,39 @@ try:
         "gym-weekly-manager-summary": {
             "task": "inventory.tasks_gym_emails.send_gym_weekly_manager_summary",
             "schedule": crontab(hour=15, minute=0, day_of_week="monday"),
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # ======================================================================
+        # BILLING & SUBSCRIPTION MANAGEMENT
+        # ======================================================================
+        # Create renewal invoices at period end (runs hourly, safe/idempotent)
+        "billing-create-renewal-invoices": {
+            "task": "billing.tasks.create_renewal_invoices",
+            "schedule": crontab(minute=0),  # Every hour at :00
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Process dunning attempts (3x/day = every 8 hours)
+        "billing-process-dunning": {
+            "task": "billing.tasks.process_dunning_attempts",
+            "schedule": crontab(hour="*/8", minute=15),  # Every 8 hours at :15
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Suspend subscriptions after grace period expires (runs hourly)
+        "billing-suspend-expired-grace": {
+            "task": "billing.tasks.suspend_expired_grace_periods",
+            "schedule": crontab(minute=30),  # Every hour at :30
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Process cancellations at period end (runs hourly)
+        "billing-process-cancellations": {
+            "task": "billing.tasks.process_cancellations",
+            "schedule": crontab(minute=45),  # Every hour at :45
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Remind trials ending soon (daily at 10 AM)
+        "billing-remind-trials-ending": {
+            "task": "billing.tasks.remind_trials_ending_soon",
+            "schedule": crontab(hour=10, minute=0),
             "options": {"timezone": "Africa/Blantyre"},
         },
     }

@@ -1,21 +1,21 @@
 ﻿# tenants/models.py
 from __future__ import annotations
 
-from typing import Optional
 import threading
-from contextlib import contextmanager
 import uuid
+from contextlib import contextmanager
+from typing import Optional
 from urllib.parse import quote
 
 from django.apps import apps
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.db import models, transaction
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
-from django.core.exceptions import ValidationError
-from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
-from django.urls import reverse, NoReverseMatch
 
 try:
     from tenants.constants import BusinessKind
@@ -24,6 +24,7 @@ except Exception:  # pragma: no cover
     try:
         from inventory.business_kinds import BusinessKind
     except Exception:
+
         class BusinessKind(models.TextChoices):  # type: ignore
             PHONES = "phones", "Phones & Electronics"
             LIQUOR = "liquor", "Liquor / Bar"
@@ -31,6 +32,7 @@ except Exception:  # pragma: no cover
             PHARMACY = "pharmacy", "Pharmacy"
             CLOTHING = "clothing", "Clothing"
             GYM = "gym", "Gym / Fitness"
+
 
 User = settings.AUTH_USER_MODEL
 
@@ -75,10 +77,12 @@ def using_business(business: Optional["Business"] | int):
 # Business / Membership
 # ===============================
 
+
 class Business(models.Model):
     """
     A tenant. Created by a 'manager' (pending approval by staff).
     """
+
     STATUS_CHOICES = [
         ("PENDING", "Pending staff approval"),
         ("ACTIVE", "Active"),
@@ -110,7 +114,7 @@ class Business(models.Model):
         on_delete=models.SET_NULL,
         related_name="businesses_created",
     )
-    
+
     # Logo (optional branding)
     logo = models.ImageField(
         upload_to="business_logos/",
@@ -118,7 +122,14 @@ class Business(models.Model):
         blank=True,
         help_text="Business logo. Best fit: square or 3:1 ratio (e.g., 300x300 or 600x200). PNG with transparent background recommended.",
     )
-    
+
+    # HQ notification tracking (idempotency)
+    hq_notified_signup_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of this business signup (idempotency)",
+    )
+
     # Section flags (feature toggles per vertical)
     # All default to False to prevent NOT NULL constraint errors
     has_cosmetics_section = models.BooleanField(
@@ -215,25 +226,21 @@ class Business(models.Model):
                 if hasattr(Warehouse, "is_default"):
                     wkwargs["is_default"] = True
                 getattr(Warehouse, "all_objects", Warehouse.objects).create(**wkwargs)
-        
+
         # Gym-specific: seed default trainers
         vertical = getattr(self, "business_kind", None) or getattr(self, "vertical", None) or ""
         if vertical.lower() == "gym":
             try:
                 GymTrainer = apps.get_model("inventory", "GymTrainer")
                 GymSettings = apps.get_model("inventory", "GymSettings")
-                
+
                 # Create default trainers if none exist
                 existing_count = GymTrainer.objects.filter(business=self).count()
                 if existing_count == 0:
                     default_trainers = ["Steve", "Lesta", "Philip"]
                     for trainer_name in default_trainers:
-                        GymTrainer.objects.get_or_create(
-                            business=self,
-                            name=trainer_name,
-                            defaults={"is_active": True}
-                        )
-                
+                        GymTrainer.objects.get_or_create(business=self, name=trainer_name, defaults={"is_active": True})
+
                 # Create gym settings if not exists
                 GymSettings.objects.get_or_create(business=self)
             except Exception:
@@ -273,6 +280,7 @@ class Membership(models.Model):
     - A user may have *multiple* agent memberships under the same business
       (one per location). This is enabled by the unique_together rule below.
     """
+
     ROLE_CHOICES = [
         ("MANAGER", "Manager"),
         ("AGENT", "Agent"),
@@ -298,7 +306,7 @@ class Membership(models.Model):
         related_name="memberships",
         help_text="Default store/location for this member. Agents must have this set; managers may leave it blank.",
     )
-    
+
     # Geolocation tracking for agents (for time-log bonuses/penalties)
     location_tracking_enabled = models.BooleanField(
         default=False,
@@ -372,41 +380,37 @@ class Membership(models.Model):
                 .exclude(business_id=self.business_id)
             )
             if conflict.exists():
-                raise ValidationError(
-                    {"business": "Managers are permanently bound to their first business."}
-                )
+                raise ValidationError({"business": "Managers are permanently bound to their first business."})
 
         # Managers cannot gain memberships (even as agents) in other businesses.
         if role != "MANAGER" and self.user_id and self.business_id:
-            manager_conflict = (
-                Membership.objects.filter(user_id=self.user_id, role__iexact="MANAGER")
-                .exclude(business_id=self.business_id)
+            manager_conflict = Membership.objects.filter(user_id=self.user_id, role__iexact="MANAGER").exclude(
+                business_id=self.business_id
             )
             if manager_conflict.exists():
-                raise ValidationError(
-                    {"business": "Managers cannot join or view other businesses."}
-                )
+                raise ValidationError({"business": "Managers cannot join or view other businesses."})
 
     def save(self, *args, **kwargs):
         self.full_clean()
         return super().save(*args, **kwargs)
-    
+
     def transfer_location(self, new_location, changed_by):
         """
         Transfer this membership to a new location and create history record.
-        
+
         Args:
             new_location: New Location instance
             changed_by: User performing the transfer
-        
+
         Returns:
             MembershipLocationHistory instance
         """
         if not new_location or new_location == self.location:
             return None
-        
+
         # Create history record
         from django.db import transaction
+
         with transaction.atomic():
             history = MembershipLocationHistory.objects.create(
                 membership=self,
@@ -414,17 +418,18 @@ class Membership(models.Model):
                 to_location=new_location,
                 changed_by=changed_by,
             )
-            
+
             # Update membership
             self.location = new_location
             self.save(update_fields=["location"])
-            
+
             return history
 
 
 # ===============================
 # Tenancy base + auto-scoping manager
 # ===============================
+
 
 class TenantQuerySet(models.QuerySet):
     def for_business(self, business: Optional[Business]):
@@ -439,6 +444,7 @@ class TenantManager(models.Manager):
     Default manager that auto-filters by the current tenant id stored in
     thread-local (set by middleware that reads session.active_business_id).
     """
+
     def get_queryset(self):
         qs = super().get_queryset()
         bid = get_current_business_id()
@@ -461,6 +467,7 @@ class UnscopedManager(models.Manager):
     Global manager for admin or maintenance scripts where cross-tenant access is intended.
     Use Model.all_objects.* explicitly; never in tenant views.
     """
+
     pass
 
 
@@ -472,6 +479,7 @@ class BaseTenantModel(models.Model):
     - .objects      -> auto-scoped to current tenant (via TenantManager)
     - .all_objects  -> unscoped/global (admin/scripts only)
     """
+
     business = models.ForeignKey(
         Business,
         on_delete=models.CASCADE,
@@ -500,18 +508,20 @@ class BaseTenantModel(models.Model):
 # Agent Invites (with Location assignment)
 # ===============================
 
+
 class AgentInvite(BaseTenantModel):
     """
     Manager-generated invite that lets an agent create their own account
     and auto-join this Business.
     """
+
     STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("SENT", "Sent"),
-        ("JOINED", "Joined"),   # treated as "Accepted" in UI
+        ("JOINED", "Joined"),  # treated as "Accepted" in UI
         ("EXPIRED", "Expired"),
     ]
-    
+
     ROLE_CHOICES = [
         ("AGENT", "Sales Agent"),
         ("BAR_MANAGER", "Bar Manager"),  # Liquor-specific: team lead / supervisor
@@ -543,14 +553,14 @@ class AgentInvite(BaseTenantModel):
 
     token = models.CharField(max_length=140, unique=True, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
-    
+
     # Role for the invite (default: AGENT for backward compatibility)
     role = models.CharField(
         max_length=20,
         choices=ROLE_CHOICES,
         default="AGENT",
         db_index=True,
-        help_text="Role the user will receive upon accepting this invite"
+        help_text="Role the user will receive upon accepting this invite",
     )
 
     joined_user = models.ForeignKey(
@@ -564,7 +574,7 @@ class AgentInvite(BaseTenantModel):
 
     message = models.CharField(max_length=240, blank=True, default="")
     expires_at = models.DateTimeField(null=True, blank=True)
-    
+
     # Temporary password fields (Task 3)
     temp_password_hash = models.CharField(
         max_length=128,
@@ -629,31 +639,34 @@ class AgentInvite(BaseTenantModel):
         super().save(*args, **kwargs)
 
     # ---- Temp password helpers ----
-    
+
     @staticmethod
     def generate_temp_password(length: int = 8) -> str:
         """Generate a human-readable temporary password."""
         import secrets
         import string
+
         # Use a mix that's easy to type and read
         alphabet = string.ascii_letters + string.digits
         # Avoid confusing characters like 0/O, 1/l/I
         alphabet = alphabet.replace("0", "").replace("O", "").replace("1", "").replace("l", "").replace("I", "")
         return "".join(secrets.choice(alphabet) for _ in range(length))
-    
+
     def set_temp_password(self, raw_password: str) -> None:
         """Hash and store a temporary password."""
         from django.contrib.auth.hashers import make_password
+
         self.temp_password_hash = make_password(raw_password)
         self.temp_password_used = False
-    
+
     def check_temp_password(self, raw_password: str) -> bool:
         """Verify a temporary password."""
         from django.contrib.auth.hashers import check_password
+
         if not self.temp_password_hash:
             return False
         return check_password(raw_password, self.temp_password_hash)
-    
+
     def create_and_set_temp_password(self) -> str:
         """Generate, set, and return a new temp password (plaintext for emailing)."""
         raw = self.generate_temp_password()
@@ -727,7 +740,7 @@ class AgentInvite(BaseTenantModel):
         html = (
             f"<p>Hi {(name or 'there')},</p>"
             f"<p>You have been invited to join <strong>{tenant_name}</strong> as an <strong>Agent</strong>.</p>"
-            f"<p>Please click <a href=\"{url}\">here</a> to set your password and join.</p>"
+            f'<p>Please click <a href="{url}">here</a> to set your password and join.</p>'
             + (f"<p>This link expires on {self.expires_at:%b %d, %Y %H:%M}.</p>" if self.expires_at else "")
         )
 
@@ -751,17 +764,18 @@ class AgentInvite(BaseTenantModel):
         """
         Idempotently attach `user` to this invite's business as an ACTIVE AGENT,
         scoped to the invite's location (required for agents).
-        
+
         Always ensures the agent has a valid location by using the business's
         default location if the invite doesn't specify one.
         """
         MembershipModel = apps.get_model("tenants", "Membership")
-        
+
         # Ensure we have a location for agents - use default if not set
         location_for_membership = self.location
         if not location_for_membership:
             # Import the helper from services to avoid duplication
             from tenants.services.invites import get_default_location_for_business
+
             location_for_membership = get_default_location_for_business(self.business)
             # Update the invite's location for consistency
             self.location = location_for_membership
@@ -773,7 +787,7 @@ class AgentInvite(BaseTenantModel):
             location=location_for_membership,
             defaults={"role": "AGENT", "status": "ACTIVE"},
         )
-        
+
         # Ensure the role/status/location are correct in case it existed differently
         updates = []
         if membership.role != "AGENT":
@@ -805,11 +819,13 @@ class AgentInvite(BaseTenantModel):
 # Membership Location History
 # ===============================
 
+
 class MembershipLocationHistory(models.Model):
     """
     Tracks agent location transfers with timestamp and responsible user.
     Maintains an audit trail of all location changes.
     """
+
     membership = models.ForeignKey(
         Membership,
         on_delete=models.CASCADE,

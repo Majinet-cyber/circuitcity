@@ -31,6 +31,10 @@ urlpatterns = [
     path("plan/<slug:slug>/", v.plan_detail, name="plan_detail"),
     # Subscription upgrade flow
     path("upgrade/start/<slug:to_plan_code>/", v.upgrade_start, name="upgrade_start"),
+    # Subscription cancellation & billing phone
+    path("cancel/", v.cancel_subscription, name="cancel_subscription"),
+    path("undo-cancel/", v.undo_cancellation, name="undo_cancellation"),
+    path("update-billing-phone/", v.update_billing_phone, name="update_billing_phone"),
     # ------------------------------------------------------------------
     # Stripe checkout & webhooks
     # ------------------------------------------------------------------

@@ -145,6 +145,43 @@ class BusinessSubscription(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
 
+    # Dunning & auto-billing fields
+    billing_phone = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Phone number (MSISDN) for automated billing prompts. Format: +265991234567",
+    )
+    grace_until = models.DateTimeField(
+        null=True, blank=True, help_text="Grace period end (period_end + 2 days when renewal unpaid)"
+    )
+    past_due_since = models.DateTimeField(null=True, blank=True, help_text="When subscription became past_due")
+    suspended_at = models.DateTimeField(null=True, blank=True, help_text="When subscription was suspended")
+
+    # Cancellation tracking
+    cancel_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When cancel_at_period_end was set (user requested cancellation)",
+    )
+
+    # HQ notification tracking (idempotency)
+    hq_notified_cancel_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of cancellation request (idempotency)",
+    )
+    hq_notified_canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of effective cancellation (idempotency)",
+    )
+    hq_notified_suspended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of suspension (idempotency)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -540,6 +577,20 @@ class Invoice(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
 
+    # Dunning / Auto-billing retry fields
+    next_attempt_at = models.DateTimeField(
+        null=True, blank=True, help_text="When to attempt next billing retry (dunning)"
+    )
+    attempt_count = models.PositiveIntegerField(default=0, help_text="Number of billing attempts made")
+    locked_for_dunning = models.BooleanField(default=False, help_text="Lock to prevent concurrent dunning processing")
+
+    # HQ notification tracking (idempotency)
+    hq_notified_paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of payment (idempotency)",
+    )
+
     # Money
     currency = models.CharField(max_length=8, default=CURRENCY_DEFAULT)
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -682,6 +733,72 @@ class InvoiceItem(models.Model):
     @property
     def line_total(self) -> Decimal:
         return (self.qty * self.unit_price).quantize(Decimal("0.01"))
+
+
+# ======================================================================
+# Billing Attempts (Dunning Audit Trail)
+# ======================================================================
+class BillingAttempt(models.Model):
+    """
+    Records each attempt to bill a subscription renewal invoice.
+    Used for dunning retries and audit trail (idempotent + auditable).
+    """
+
+    class Status(models.TextChoices):
+        INITIATED = "initiated", "Initiated"
+        FAILED = "failed", "Failed"
+        SUCCEEDED = "succeeded", "Succeeded"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="billing_attempts")
+    subscription = models.ForeignKey(
+        BusinessSubscription, on_delete=models.CASCADE, related_name="billing_attempts", null=True, blank=True
+    )
+
+    attempt_no = models.PositiveIntegerField(default=1, help_text="Attempt number (1-6 for dunning retries)")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INITIATED)
+
+    # Payment session details
+    provider_ref = models.CharField(
+        max_length=255, blank=True, default="", help_text="Payment provider reference (tx_ref, etc.)"
+    )
+    payment_session_id = models.CharField(
+        max_length=255, blank=True, default="", help_text="Payment session/checkout ID"
+    )
+    error_message = models.TextField(blank=True, default="", help_text="Error message if failed")
+
+    # Metadata
+    meta = models.JSONField(default=dict, blank=True, help_text="Additional metadata (method, amount, etc.)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["invoice", "attempt_no"]),
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Attempt #{self.attempt_no} for {self.invoice} - {self.get_status_display()}"
+
+    def mark_succeeded(self, provider_ref: str = "", save: bool = True):
+        """Mark this attempt as succeeded."""
+        self.status = self.Status.SUCCEEDED
+        if provider_ref:
+            self.provider_ref = provider_ref
+        if save:
+            self.save(update_fields=["status", "provider_ref", "updated_at"])
+
+    def mark_failed(self, error_message: str = "", save: bool = True):
+        """Mark this attempt as failed."""
+        self.status = self.Status.FAILED
+        if error_message:
+            self.error_message = error_message
+        if save:
+            self.save(update_fields=["status", "error_message", "updated_at"])
 
 
 # ======================================================================

@@ -11,8 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from tenants.models import Business  # type: ignore
-from .models import BusinessSubscription, SubscriptionPlan
 
+from .models import BusinessSubscription, SubscriptionPlan
 
 # Paths we never block (prefix match). Keep short, stable prefixes only.
 SAFE_PREFIXES: tuple[str, ...] = (
@@ -70,6 +70,60 @@ class SubscriptionGateMiddleware:
         self._grace_days = int(getattr(settings, "BILLING_GRACE_DAYS", 30))
 
     # --------------- helpers ----------------
+    def _subscription_allows_access(self, sub: BusinessSubscription) -> bool:
+        """
+        Comprehensive subscription access check following SaaS best practices.
+
+        Allow full access if:
+        - status in (trialing, active)
+        - OR status == past_due AND now <= grace_until (within grace period)
+        - OR cancel_at_period_end == True AND now < current_period_end (canceling but still in period)
+
+        Deny (lock out) if:
+        - status == suspended
+        - OR status == canceled (after period end)
+        - OR status == past_due AND now > grace_until (grace expired)
+        """
+        now = timezone.now()
+        status = sub.status
+
+        # Explicitly blocked statuses
+        if status in [BusinessSubscription.Status.SUSPENDED, BusinessSubscription.Status.CANCELED]:
+            # Exception: if canceled but cancel_at_period_end and still before period end, allow
+            if status == BusinessSubscription.Status.CANCELED:
+                if sub.cancel_at_period_end and sub.current_period_end and now < sub.current_period_end:
+                    return True
+            return False
+
+        # Allow active and trialing subscriptions
+        if status in [
+            BusinessSubscription.Status.ACTIVE,
+            BusinessSubscription.Status.TRIALING,
+            BusinessSubscription.Status.TRIAL,
+        ]:
+            # If cancel_at_period_end is set, still allow until period end
+            if sub.cancel_at_period_end and sub.current_period_end:
+                return now < sub.current_period_end
+            return True
+
+        # Past due with grace period
+        if status == BusinessSubscription.Status.PAST_DUE:
+            if sub.grace_until:
+                return now <= sub.grace_until
+            # Fallback to old grace logic if grace_until not set
+            return sub.in_grace()
+
+        # Grace status (legacy)
+        if status == BusinessSubscription.Status.GRACE:
+            return sub.in_grace()
+
+        # Expired - deny access
+        if status == BusinessSubscription.Status.EXPIRED:
+            return False
+
+        # Default: allow (safe fallback)
+        return True
+
     def _bootstrap_subscription(self, biz: Business) -> BusinessSubscription:
         """
         Create a trial subscription for a new Business.
@@ -124,14 +178,9 @@ class SubscriptionGateMiddleware:
         if not self._enforce:
             return self.get_response(request)
 
-        # Live enforcement
-        # Allow while subscription considers itself active (ACTIVE/TRIAL/GRACE)
-        if sub.is_active_now():
-            return self.get_response(request)
-
-        # If not active but still within our computed grace window, allow
-        # (BusinessSubscription.in_grace already computes based on next_billing_date/trial_end)
-        if sub.in_grace():
+        # Live enforcement - Updated for SaaS best practices
+        # Check if subscription allows access based on comprehensive rules
+        if self._subscription_allows_access(sub):
             return self.get_response(request)
 
         # Past grace â†’ expired
