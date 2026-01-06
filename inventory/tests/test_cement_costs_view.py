@@ -51,6 +51,7 @@ class CementCostsViewTest(TestCase):
         # Create some existing costs
         cost1 = CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("5000.00"),
             category="transport",
             description="Truck hire",
@@ -59,6 +60,7 @@ class CementCostsViewTest(TestCase):
         )
         cost2 = CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("2500.00"),
             category="labor",
             description="Daily wages",
@@ -67,7 +69,7 @@ class CementCostsViewTest(TestCase):
         )
 
         # Try to load the costs page
-        response = self.client.get("/cement/costs/")
+        response = self.client.get(reverse("verticals:cement_costs"))
 
         # Should return 200 OK, not crash with OperationalError
         self.assertEqual(response.status_code, 200)
@@ -85,17 +87,18 @@ class CementCostsViewTest(TestCase):
 
     def test_costs_page_with_no_data(self):
         """Test that GET /cement/costs/ works even with no costs"""
-        response = self.client.get("/cement/costs/")
+        response = self.client.get(reverse("verticals:cement_costs"))
         self.assertEqual(response.status_code, 200)
 
     def test_create_cost_via_post(self):
-        """Test that POST creates a new cost entry with created_by"""
+        """Test that POST creates a new cost entry with created_by and cost_type"""
         initial_count = CementCost.objects.count()
 
-        # POST a new cost
+        # POST a new cost with explicit cost_type
         response = self.client.post(
-            "/cement/costs/",
+            reverse("verticals:cement_costs"),
             {
+                "cost_type": "operating",
                 "amount": "3500.50",
                 "category": "utilities",
                 "description": "Electricity bill",
@@ -104,7 +107,11 @@ class CementCostsViewTest(TestCase):
             },
         )
 
-        # Should redirect after successful creation
+        # Should redirect after successful creation (or 200 if error)
+        if response.status_code != 302:
+            print(f"Response status: {response.status_code}")
+            print(f"Response content: {response.content[:500]}")
+
         self.assertEqual(response.status_code, 302)
 
         # Verify cost was created
@@ -112,6 +119,7 @@ class CementCostsViewTest(TestCase):
 
         # Verify cost fields
         cost = CementCost.objects.latest("created_at")
+        self.assertEqual(cost.cost_type, "operating")
         self.assertEqual(cost.amount, Decimal("3500.50"))
         self.assertEqual(cost.category, "utilities")
         self.assertEqual(cost.description, "Electricity bill")
@@ -124,8 +132,9 @@ class CementCostsViewTest(TestCase):
     def test_create_cost_without_optional_fields(self):
         """Test that POST works with minimal fields (notes is optional)"""
         response = self.client.post(
-            "/cement/costs/",
+            reverse("verticals:cement_costs"),
             {
+                "cost_type": "other",
                 "amount": "1500.00",
                 "category": "other",
                 "description": "Miscellaneous",
@@ -138,15 +147,59 @@ class CementCostsViewTest(TestCase):
 
         # Verify cost was created with empty notes
         cost = CementCost.objects.latest("created_at")
+        self.assertEqual(cost.cost_type, "other")
         self.assertEqual(cost.description, "Miscellaneous")
         self.assertEqual(cost.notes, "")
         self.assertEqual(cost.created_by, self.user)
+
+    def test_post_cost_without_cost_type_defaults_operating(self):
+        """Test that POST without cost_type defaults to 'operating'"""
+        response = self.client.post(
+            reverse("verticals:cement_costs"),
+            {
+                # No cost_type provided
+                "amount": "2000.00",
+                "category": "transport",
+                "description": "Fuel",
+                "cost_date": "2026-01-06",
+                "notes": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        # Verify cost was created with default cost_type
+        cost = CementCost.objects.latest("created_at")
+        self.assertEqual(cost.cost_type, "operating")  # Should default to operating
+        self.assertEqual(cost.description, "Fuel")
+
+    def test_post_cost_with_cogs_type(self):
+        """Test that POST with cost_type='cogs' is saved correctly"""
+        response = self.client.post(
+            reverse("verticals:cement_costs"),
+            {
+                "cost_type": "cogs",
+                "amount": "5000.00",
+                "category": "other",
+                "description": "Inventory purchase",
+                "cost_date": "2026-01-06",
+                "notes": "Stock replenishment",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+        # Verify cost was created with cogs type
+        cost = CementCost.objects.latest("created_at")
+        self.assertEqual(cost.cost_type, "cogs")
+        self.assertEqual(cost.description, "Inventory purchase")
 
     def test_costs_page_shows_category_totals(self):
         """Test that costs page calculates category totals correctly"""
         # Create costs in different categories
         CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("1000.00"),
             category="transport",
             description="Trip 1",
@@ -154,6 +207,7 @@ class CementCostsViewTest(TestCase):
         )
         CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("2000.00"),
             category="transport",
             description="Trip 2",
@@ -161,13 +215,14 @@ class CementCostsViewTest(TestCase):
         )
         CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("500.00"),
             category="labor",
             description="Helper",
             created_by=self.user,
         )
 
-        response = self.client.get("/cement/costs/")
+        response = self.client.get(reverse("verticals:cement_costs"))
 
         self.assertEqual(response.status_code, 200)
 
@@ -190,6 +245,7 @@ class CementCostsViewTest(TestCase):
         # Create costs with different dates
         old_cost = CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("1000.00"),
             category="transport",
             description="Old cost",
@@ -198,6 +254,7 @@ class CementCostsViewTest(TestCase):
         )
         new_cost = CementCost.objects.create(
             business=self.business,
+            cost_type="operating",
             amount=Decimal("2000.00"),
             category="transport",
             description="New cost",
@@ -205,7 +262,7 @@ class CementCostsViewTest(TestCase):
             created_by=self.user,
         )
 
-        response = self.client.get("/cement/costs/")
+        response = self.client.get(reverse("verticals:cement_costs"))
 
         # New cost should appear first
         costs = list(response.context["costs"])

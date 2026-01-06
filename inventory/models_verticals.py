@@ -2061,6 +2061,17 @@ class CementCost(models.Model):
     )
 
     # Cost details
+    cost_type = models.CharField(
+        max_length=20,
+        choices=[
+            ("operating", "Operating Expense"),
+            ("cogs", "Stock/COGS"),
+            ("other", "Other"),
+        ],
+        default="operating",
+        db_index=True,
+        help_text="Type of cost: operating expenses, inventory/COGS, or other",
+    )
     amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
     category = models.CharField(
         max_length=50,

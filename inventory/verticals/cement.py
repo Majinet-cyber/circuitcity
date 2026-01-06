@@ -593,6 +593,7 @@ def costs(request):
     if request.method == "POST":
         try:
             amount = Decimal(request.POST.get("amount", "0"))
+            cost_type = request.POST.get("cost_type", "").strip() or "operating"  # Default to operating
             category = request.POST.get("category", "other").strip()
             description = request.POST.get("description", "").strip()
             cost_date = request.POST.get("cost_date", "")
@@ -614,6 +615,7 @@ def costs(request):
                 CementCost.objects.create(
                     business=business,
                     location=location,
+                    cost_type=cost_type,
                     amount=amount,
                     category=category,
                     description=description,
@@ -651,12 +653,19 @@ def costs(request):
         ("other", "Other"),
     ]
 
+    cost_types = [
+        ("operating", "Operating Expense"),
+        ("cogs", "Stock/COGS"),
+        ("other", "Other"),
+    ]
+
     context = {
         "business": business,
         "costs": costs_list,
         "category_totals": category_totals,
         "total_costs": total_costs,
         "categories": categories,
+        "cost_types": cost_types,
         "active_tab": "costs",
     }
 

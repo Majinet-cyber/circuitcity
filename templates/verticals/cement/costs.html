@@ -22,7 +22,17 @@
         <div class="card-body">
           <form method="post">
             {% csrf_token %}
-            
+
+            <div class="mb-3">
+              <label class="form-label">Cost Type *</label>
+              <select class="form-select" name="cost_type" required>
+                {% for value, label in cost_types %}
+                <option value="{{ value }}" {% if value == 'operating' %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <small class="form-text text-muted">Operating expenses, inventory/COGS, or other</small>
+            </div>
+
             <div class="mb-3">
               <label class="form-label">Category *</label>
               <select class="form-select" name="category" required>
@@ -31,12 +41,12 @@
                 {% endfor %}
               </select>
             </div>
-            
+
             <div class="mb-3">
               <label class="form-label">Description *</label>
               <input type="text" class="form-control" name="description" required placeholder="e.g., Fuel for delivery truck">
             </div>
-            
+
             <div class="mb-3">
               <label class="form-label">Amount (MK) *</label>
               <input type="number" class="form-control" name="amount" required step="0.01" min="0" placeholder="0.00">
