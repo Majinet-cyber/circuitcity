@@ -1,7 +1,7 @@
 // ---- Emajinet Service Worker (PWA) ----
 // Network-first for HTML, Stale-While-Revalidate for static assets
-// Bump VERSION on every deploy to force a refresh for all users.
-const VERSION = 'emajinet-v1-2025-12-06';
+// VERSION is dynamically injected from BUILD_ID/STATIC_VERSION to ensure cache busting
+const VERSION = 'emajinet-v1-BUILD_ID_PLACEHOLDER';
 const STATIC_CACHE = `${VERSION}-static`;
 const PAGE_CACHE   = `${VERSION}-pages`;
 const CDN_CACHE    = `${VERSION}-cdn`;

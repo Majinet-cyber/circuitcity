@@ -382,8 +382,35 @@
   </div>
   {% endif %}
 
-  {# Current Plan Card #}
-  {% if sub and sub.plan %}
+  {# Trial Info Card (for trial users who haven't paid yet) #}
+  {% if not is_paid_active and sub.status in 'trial,trialing' %}
+  <div class="card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 197, 253, 0.08)); border-color: rgba(59, 130, 246, 0.2);">
+    <h2 style="margin: 0 0 16px; font-size: 1.2rem; font-weight: 700; opacity: 0.9;">🎯 Free Trial</h2>
+    <p style="margin: 0 0 12px; font-size: 1rem; opacity: 0.9;">
+      You're currently on a free trial. Choose a plan below to continue access after your trial ends.
+    </p>
+    {% if sub.trial_end %}
+    <div class="plan-details">
+      <div class="detail-row">
+        <span class="detail-label">Trial ends</span>
+        <span class="detail-value">{{ sub.trial_end|date:"F j, Y" }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Days remaining</span>
+        <span class="detail-value">{{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }}</span>
+      </div>
+    </div>
+    {% endif %}
+    <div style="margin-top: 16px;">
+      <a href="{% url 'billing:plans' %}" class="btn btn-primary" style="width: 100%;">
+        Choose a Plan & Pay
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Current Plan Card (only for paid/active subscriptions) #}
+  {% if is_paid_active and sub and sub.plan %}
   <div class="card current-plan">
     <h2 style="margin: 0 0 16px; font-size: 1.2rem; font-weight: 700; opacity: 0.9;">Current Plan</h2>
     <div class="plan-name">{{ sub.plan.name }}</div>
@@ -392,18 +419,7 @@
     </div>
 
     <div class="plan-details">
-      {% if sub.status == 'trial' or sub.status == 'trialing' %}
-        {% if sub.trial_end %}
-        <div class="detail-row">
-          <span class="detail-label">Trial ends</span>
-          <span class="detail-value">{{ sub.trial_end|date:"F j, Y" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Days remaining</span>
-          <span class="detail-value">{{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }}</span>
-        </div>
-        {% endif %}
-      {% elif sub.status == 'active' %}
+      {% if sub.status == 'active' %}
         {% if sub.current_period_end %}
         <div class="detail-row">
           <span class="detail-label">{% if sub.cancel_at_period_end %}Cancels on{% else %}Next billing date{% endif %}</span>
@@ -480,8 +496,8 @@
 
     <div class="plans-grid">
       {% for p in plans %}
-      <div class="plan-card {% if sub.plan and sub.plan.id == p.id %}current-highlight{% endif %}">
-        {% if sub.plan and sub.plan.id == p.id %}
+      <div class="plan-card {% if paid_plan_id and paid_plan_id == p.id %}current-highlight{% endif %}">
+        {% if paid_plan_id and paid_plan_id == p.id %}
         <span class="current-badge">Current</span>
         {% endif %}
 
@@ -504,9 +520,9 @@
         </div>
 
         {# Action button #}
-        {% if sub.plan and sub.plan.id == p.id %}
+        {% if paid_plan_id and paid_plan_id == p.id %}
           <button class="btn btn-disabled" disabled>Current Plan</button>
-        {% elif sub.plan and p.amount > sub.plan.amount %}
+        {% elif paid_plan_id and p.amount > sub.plan.amount %}
           {# Upgrade available #}
           <form method="post" action="{% url 'billing:upgrade_start' p.code %}">
             {% csrf_token %}

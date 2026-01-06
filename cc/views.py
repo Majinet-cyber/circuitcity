@@ -502,6 +502,10 @@ def sw_js(request: HttpRequest) -> HttpResponse:
         try:
             with open(sw_path, "r", encoding="utf-8") as f:
                 content = f.read()
+            
+            # Inject BUILD_ID for cache busting (fixes "warped until hard refresh")
+            build_id = getattr(settings, 'BUILD_ID', getattr(settings, 'STATIC_VERSION', '1'))
+            content = content.replace('BUILD_ID_PLACEHOLDER', build_id)
         except (IOError, OSError):
             # Return minimal service worker if file read fails
             content = "// Service worker file not found\nself.skipWaiting();"

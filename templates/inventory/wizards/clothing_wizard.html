@@ -109,7 +109,7 @@
     { value: 'XXXL', label: 'XXXL', icon: '📏' }
   ];
 
-  // Numeric sizes
+  // Numeric sizes (for trousers/jeans)
   const numericSizes = [
     { value: '28', label: '28', icon: '📐' },
     { value: '30', label: '30', icon: '📐' },
@@ -120,6 +120,24 @@
     { value: '40', label: '40', icon: '📐' },
     { value: '42', label: '42', icon: '📐' },
     { value: '44', label: '44', icon: '📐' }
+  ];
+
+  // Shoe sizes (MUST be numeric only, 30-50)
+  const shoeSizes = [
+    { value: '30', label: '30', icon: '👟' },
+    { value: '32', label: '32', icon: '👟' },
+    { value: '34', label: '34', icon: '👟' },
+    { value: '36', label: '36', icon: '👟' },
+    { value: '38', label: '38', icon: '👟' },
+    { value: '40', label: '40', icon: '👟', featured: true },
+    { value: '41', label: '41', icon: '👟' },
+    { value: '42', label: '42', icon: '👟', featured: true },
+    { value: '43', label: '43', icon: '👟' },
+    { value: '44', label: '44', icon: '👟' },
+    { value: '45', label: '45', icon: '👟' },
+    { value: '46', label: '46', icon: '👟' },
+    { value: '48', label: '48', icon: '👟' },
+    { value: '50', label: '50', icon: '👟' }
   ];
 
   // Genders
@@ -248,14 +266,28 @@
       title: 'Size',
       subtitle: 'Select the size or enter custom (required)',
       options: (data) => {
-        // Use numeric sizes for trousers/jeans, letter sizes for others
+        // CRITICAL: Shoes MUST use numeric sizes only (30-50)
+        if (data.category === 'shoes') {
+          return shoeSizes;
+        }
+        // Use numeric sizes for trousers/jeans
         if (['trousers', 'jeans'].includes(data.category)) {
           return numericSizes;
         }
+        // Use letter sizes for other apparel
         return sizes;
       },
       allowCustom: true,
-      customPlaceholder: 'Enter custom size (e.g., "34", "41", "45", "XXXL")',
+      customPlaceholder: (data) => {
+        // Different placeholder based on category
+        if (data.category === 'shoes') {
+          return 'Enter shoe size (numeric only: 30-50)';
+        }
+        if (['trousers', 'jeans'].includes(data.category)) {
+          return 'Enter waist size (e.g., "34", "36")';
+        }
+        return 'Enter custom size (e.g., "M", "XL", "XXXL")';
+      },
       skipable: false,
       columns: 'auto'
     },
@@ -306,10 +338,10 @@
         const scannedCount = (data.scanned_barcodes || []).length;
         const scannedBarcodes = data.scanned_barcodes || [];
         const isComplete = scannedCount >= qty;
-        
+
         // Show inline pricing form if pricing not complete
         const pricingComplete = price > 0 && qty > 0;
-        
+
         if (!pricingComplete) {
           return `
             <div class="wizard-pricing-form" style="background: linear-gradient(135deg, #f0f9ff, #e0f2fe); padding: 24px; border-radius: 16px; border: 2px solid #0ea5e9; margin-bottom: 20px;">
@@ -319,57 +351,57 @@
               <p style="margin: 0 0 20px; color: #0c4a6e; font-size: 0.9rem;">
                 First, enter the product details below. Then you'll scan barcodes.
               </p>
-              
+
               <div style="display: grid; gap: 16px;">
                 <div>
                   <label class="wizard-label" for="pricing-quantity">Initial Stock Quantity <span style="color: #dc2626;">*</span></label>
-                  <input 
-                    type="number" 
-                    id="pricing-quantity" 
-                    class="form-control" 
-                    min="1" 
-                    step="1" 
+                  <input
+                    type="number"
+                    id="pricing-quantity"
+                    class="form-control"
+                    min="1"
+                    step="1"
                     value="${qty || 1}"
                     placeholder="e.g., 5"
                     required
                   >
                   <small class="text-muted">Number of items to add to stock</small>
                 </div>
-                
+
                 <div>
                   <label class="wizard-label" for="pricing-selling-price">Selling Price (MWK) <span style="color: #dc2626;">*</span></label>
-                  <input 
-                    type="number" 
-                    id="pricing-selling-price" 
-                    class="form-control" 
-                    min="0" 
-                    step="0.01" 
+                  <input
+                    type="number"
+                    id="pricing-selling-price"
+                    class="form-control"
+                    min="0"
+                    step="0.01"
                     value="${price || ''}"
                     placeholder="e.g., 15000.00"
                     required
                   >
                   <small class="text-muted">Price per unit</small>
                 </div>
-                
+
                 <div>
                   <label class="wizard-label" for="pricing-cost-price">Cost/Order Price (MWK)</label>
-                  <input 
-                    type="number" 
-                    id="pricing-cost-price" 
-                    class="form-control" 
-                    min="0" 
-                    step="0.01" 
+                  <input
+                    type="number"
+                    id="pricing-cost-price"
+                    class="form-control"
+                    min="0"
+                    step="0.01"
                     value="${cost || ''}"
                     placeholder="e.g., 10000.00"
                   >
                   <small class="text-muted">Optional: Your cost per unit</small>
                 </div>
-                
+
                 <div id="pricing-error" class="alert d-none"></div>
-                
-                <button 
-                  type="button" 
-                  class="btn btn-primary btn-lg w-100" 
+
+                <button
+                  type="button"
+                  class="btn btn-primary btn-lg w-100"
                   onclick="savePricingAndContinue()"
                   style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none; font-weight: 600;"
                 >
@@ -379,7 +411,7 @@
             </div>
           `;
         }
-        
+
         return `
           <div class="wizard-barcode-collection" id="wizard-barcode-collection">
             <!-- Progress Indicator -->
@@ -391,16 +423,16 @@
                 </span>
               </div>
               <div class="progress" style="height: 8px;">
-                <div class="progress-bar ${isComplete ? 'bg-success' : 'bg-primary'}" 
-                     role="progressbar" 
+                <div class="progress-bar ${isComplete ? 'bg-success' : 'bg-primary'}"
+                     role="progressbar"
                      style="width: ${Math.min(100, (scannedCount / qty) * 100)}%"
-                     aria-valuenow="${scannedCount}" 
-                     aria-valuemin="0" 
+                     aria-valuenow="${scannedCount}"
+                     aria-valuemin="0"
                      aria-valuemax="${qty}">
                 </div>
               </div>
             </div>
-            
+
             <!-- Scanned Barcodes List -->
             <div class="wizard-barcode-list mb-3" id="scanned-barcodes-list">
               ${scannedBarcodes.length > 0 ? `
@@ -409,8 +441,8 @@
                   ${scannedBarcodes.map((code, idx) => `
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                       <code>${code}</code>
-                      <button type="button" 
-                              class="btn btn-sm btn-outline-danger" 
+                      <button type="button"
+                              class="btn btn-sm btn-outline-danger"
                               onclick="removeBarcode(${idx})"
                               title="Remove this barcode">
                         <i class="bi bi-x-lg"></i>
@@ -425,38 +457,38 @@
                 </div>
               `}
             </div>
-            
+
             <!-- Scanner Controls -->
             <div class="wizard-barcode-controls">
-              <button type="button" 
-                      class="wizard-btn wizard-btn-primary w-100 mb-2" 
+              <button type="button"
+                      class="wizard-btn wizard-btn-primary w-100 mb-2"
                       id="btn-scan-barcode"
                       onclick="openSmartBarcodeScanner()">
                 <i class="bi bi-upc-scan me-2"></i>Scan Barcode
               </button>
-              
+
               <!-- Manual Entry -->
               <div class="input-group mb-2">
-                <input type="text" 
-                       class="form-control" 
+                <input type="text"
+                       class="form-control"
                        id="manual-barcode-input"
                        placeholder="Or type barcode manually..."
                        autocomplete="off">
-                <button class="btn btn-outline-primary" 
+                <button class="btn btn-outline-primary"
                         type="button"
                         id="btn-add-manual-barcode"
                         onclick="addManualBarcode()">
                   <i class="bi bi-plus-lg"></i> Add
                 </button>
               </div>
-              
+
               <!-- Error Message -->
               <div class="alert alert-danger d-none" id="barcode-error" role="alert"></div>
-              
+
               <!-- Continue Button (only enabled when complete) -->
-              <button type="button" 
-                      class="wizard-btn wizard-btn-success w-100 mt-3" 
-                      id="barcode-continue-btn" 
+              <button type="button"
+                      class="wizard-btn wizard-btn-success w-100 mt-3"
+                      id="barcode-continue-btn"
                       onclick="wizard.next()"
                       ${isComplete ? '' : 'disabled'}>
                 ${isComplete ? 'Continue <i class="bi bi-arrow-right ms-1"></i>' : `Scan ${qty - scannedCount} more barcode${qty - scannedCount > 1 ? 's' : ''} to continue`}
@@ -492,7 +524,7 @@
         alert('Camera access not available. Please type the barcode manually.');
         return;
       }
-      
+
       // Simple camera modal (basic fallback)
       const modalHtml = `
         <div id="scanner-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;">
@@ -502,7 +534,7 @@
         </div>
       `;
       document.body.insertAdjacentHTML('beforeend', modalHtml);
-      
+
       const video = document.getElementById('scanner-video');
       navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(stream => {
@@ -540,21 +572,21 @@
 
   wizard = new WizardEngine('wizard-container', {
     steps: wizardSteps,
-    
+
     onComplete: async (data) => {
       console.log('Clothing wizard complete:', data);
-      
+
       // Show loading
       const loading = document.createElement('div');
       loading.className = 'wizard-loading';
       loading.innerHTML = '<div class="wizard-loading-spinner"></div><p style="color: #fff; margin-top: 12px;">Saving product...</p>';
       document.body.appendChild(loading);
-      
+
       try {
         // Submit to server
-        const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+        const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
                           document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-        
+
         const response = await fetch('{% url "inventory:clothing_wizard_submit" %}', {
           method: 'POST',
           headers: {
@@ -563,15 +595,15 @@
           },
           body: JSON.stringify(data)
         });
-        
+
         const result = await response.json();
-        
+
         if (result.success) {
           // Success! Show success message
           loading.remove();
           const message = result.message || 'Product saved successfully!';
           showSuccessBanner(message + ' Redirecting...');
-          
+
           // Redirect after brief delay
           setTimeout(() => {
             window.location.href = result.redirect || '{% url "verticals:clothing_dashboard" %}';
@@ -586,7 +618,7 @@
         showErrorBanner('Failed to create product. Please try again.');
       }
     },
-    
+
     onCancel: () => {
       if (confirm('Cancel adding clothing?')) {
         window.location.href = '{% url "verticals:clothing_dashboard" %}';
@@ -605,17 +637,17 @@
       </div>
     `;
     document.body.appendChild(banner);
-    
+
     setTimeout(() => {
       banner.classList.add('show');
     }, 100);
-    
+
     setTimeout(() => {
       banner.classList.remove('show');
       setTimeout(() => banner.remove(), 300);
     }, 3000);
   }
-  
+
   function showErrorBanner(message) {
     const banner = document.createElement('div');
     banner.className = 'wizard-banner wizard-banner-error';
@@ -626,7 +658,7 @@
       </div>
     `;
     document.body.appendChild(banner);
-    
+
     setTimeout(() => {
       banner.classList.add('show');
     }, 100);
@@ -642,7 +674,7 @@
     }
     originalNext();
   };
-  
+
   // Override selectCard to enforce single selection and auto-open scanner when needed
   const originalSelectCard = wizard.selectCard.bind(wizard);
   wizard.selectCard = function(key, value, index) {
@@ -652,10 +684,10 @@
       // Clear the previous selection to enforce single selection
       delete this.data[key];
     }
-    
+
     // Call original selectCard which sets the new value
     originalSelectCard(key, value, index);
-    
+
     // Visual enforcement: remove 'selected' class from all sibling cards
     const allCards = document.querySelectorAll(`[data-key="${key}"]`);
     allCards.forEach(card => {
@@ -663,7 +695,7 @@
         card.classList.remove('wizard-card-selected');
       }
     });
-    
+
     // If user selects "No" for barcode, skip barcode input step entirely
     if (key === 'has_barcode' && value === 'no') {
       // Clear any barcode data
@@ -675,7 +707,7 @@
         this.next();
       }, 300);
     }
-    
+
     // If user selects "Yes" for barcode, auto-open scanner on next step
     if (key === 'has_barcode' && value === 'yes') {
       setTimeout(() => {
@@ -695,7 +727,7 @@
       }, 300);
     }
   };
-  
+
   // Add submitBarcodeInput method to wizard (legacy, for single barcode)
   wizard.submitBarcodeInput = function() {
     const barcodeInput = document.getElementById('input-barcode');
@@ -706,16 +738,16 @@
       alert('Please enter or scan a barcode to continue.');
     }
   };
-  
+
   // =====================================================
   // SMART BARCODE COLLECTION (Quantity-based)
   // =====================================================
-  
+
   // Initialize scanned barcodes array if not exists
   if (!wizard.data.scanned_barcodes) {
     wizard.data.scanned_barcodes = [];
   }
-  
+
   // Open smart barcode scanner
   function openSmartBarcodeScanner() {
     // Check if RearCameraBarcodeScanner is available
@@ -738,43 +770,30 @@
       }
     }
   }
-  
+
   // Add barcode (from scanner or manual input)
   async function addBarcode(barcode) {
     if (!barcode || !barcode.trim()) {
       showBarcodeError('Barcode cannot be empty');
       return;
     }
-    
+
     barcode = barcode.trim();
-    const scannedBarcodes = wizard.data.scanned_barcodes || [];
     const qty = parseInt(wizard.data.quantity || wizard.data.initial_stock || 1);
-    
-    // Check if already scanned in current list
-    if (scannedBarcodes.includes(barcode)) {
-      showBarcodeError(`Barcode ${barcode} has already been scanned. Please scan a different barcode.`);
-      return;
-    }
-    
-    // Check if we've reached the limit
-    if (scannedBarcodes.length >= qty) {
-      showBarcodeError(`You have already scanned ${qty} barcodes. Remove one to add another.`);
-      return;
-    }
-    
+
     // Validate barcode format (basic check)
     if (barcode.length < 3) {
       showBarcodeError('Barcode must be at least 3 characters long');
       return;
     }
-    
-    // Check for duplicate in database (async)
-    showBarcodeError('Checking barcode...'); // Show loading message
+
+    // Call backend API to scan barcode
+    showBarcodeError('⏳ Scanning barcode...'); // Show loading message
     try {
-      const csrfToken = document.querySelector('[name=csrf-token]')?.content || 
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
                         document.querySelector('[name=csrfmiddlewaretoken]')?.value;
-      
-      const response = await fetch('{% url "inventory:check_barcode_duplicate" %}', {
+
+      const response = await fetch('/clothing/api/barcode-batch/scan/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -782,43 +801,52 @@
         },
         body: JSON.stringify({ barcode: barcode })
       });
-      
-      if (response.ok) {
-        const result = await response.json();
-        if (result.exists) {
-          showBarcodeError(`Barcode ${barcode} is already used by another product: ${result.product_name}. Please use a unique barcode.`);
-          return;
+
+      const result = await response.json();
+
+      if (result.ok) {
+        clearBarcodeError(); // Clear loading message
+
+        // Update wizard data with new scanned barcodes from server
+        wizard.data.scanned_barcodes = result.scanned_barcodes;
+
+        // Clear manual input
+        const manualInput = document.getElementById('manual-barcode-input');
+        if (manualInput) {
+          manualInput.value = '';
         }
+
+        // Re-render the step to update UI
+        wizard.render();
+
+        // Show success feedback
+        const successMsg = document.createElement('div');
+        successMsg.className = 'alert alert-success';
+        successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; animation: fadeIn 0.3s;';
+        successMsg.textContent = `✓ Barcode ${barcode} added (${result.scanned_count} / ${qty})`;
+        document.body.appendChild(successMsg);
+        setTimeout(() => successMsg.remove(), 2000);
+
+        // If complete, show completion message
+        if (result.complete) {
+          showBarcodeError('✅ All barcodes scanned! You can now save the product.');
+          setTimeout(() => clearBarcodeError(), 3000);
+        } else {
+          // Auto-reopen scanner for next barcode
+          setTimeout(() => {
+            openSmartBarcodeScanner();
+          }, 500);
+        }
+      } else {
+        // Show inline error from backend (non-blocking)
+        showBarcodeError('❌ ' + (result.error || 'Failed to scan barcode'));
       }
     } catch (error) {
-      console.warn('Could not check barcode duplicate:', error);
-      // Continue anyway - backend will validate again on submit
+      console.error('Barcode scan error:', error);
+      showBarcodeError('❌ Failed to scan barcode. Please try again.');
     }
-    
-    clearBarcodeError(); // Clear "Checking..." message
-    
-    // Add to array
-    scannedBarcodes.push(barcode);
-    wizard.data.scanned_barcodes = scannedBarcodes;
-    
-    // Clear manual input
-    const manualInput = document.getElementById('manual-barcode-input');
-    if (manualInput) {
-      manualInput.value = '';
-    }
-    
-    // Re-render the step to update UI
-    wizard.render();
-    
-    // Show success feedback
-    const successMsg = document.createElement('div');
-    successMsg.className = 'alert alert-success';
-    successMsg.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; animation: fadeIn 0.3s;';
-    successMsg.textContent = `✓ Barcode ${barcode} added`;
-    document.body.appendChild(successMsg);
-    setTimeout(() => successMsg.remove(), 2000);
   }
-  
+
   // Add manual barcode
   function addManualBarcode() {
     const input = document.getElementById('manual-barcode-input');
@@ -828,7 +856,7 @@
       showBarcodeError('Please enter a barcode');
     }
   }
-  
+
   // Remove barcode
   function removeBarcode(index) {
     const scannedBarcodes = wizard.data.scanned_barcodes || [];
@@ -839,7 +867,7 @@
       clearBarcodeError();
     }
   }
-  
+
   // Show barcode error
   function showBarcodeError(message) {
     const errorDiv = document.getElementById('barcode-error');
@@ -852,7 +880,7 @@
       }, 5000);
     }
   }
-  
+
   // Clear barcode error
   function clearBarcodeError() {
     const errorDiv = document.getElementById('barcode-error');
@@ -861,7 +889,7 @@
       errorDiv.textContent = '';
     }
   }
-  
+
   // Override wizard.onComplete to include barcodes in submission
   const originalOnComplete = wizard.config.onComplete;
   wizard.config.onComplete = async function(data) {
@@ -876,25 +904,25 @@
         data.barcode = data.scanned_barcodes[0]; // Also set first for backward compatibility
       }
     }
-    
+
     // Call original onComplete
     if (originalOnComplete) {
       return originalOnComplete(data);
     }
   };
-  
+
   // Save pricing and continue to scanning
-  window.savePricingAndContinue = function() {
+  window.savePricingAndContinue = async function() {
     const qtyInput = document.getElementById('pricing-quantity');
     const priceInput = document.getElementById('pricing-selling-price');
     const costInput = document.getElementById('pricing-cost-price');
     const errorDiv = document.getElementById('pricing-error');
-    
+
     // Get values
     const qty = parseInt(qtyInput?.value || 0);
     const price = parseFloat(priceInput?.value || 0);
     const cost = parseFloat(costInput?.value || 0);
-    
+
     // Validate (BLOCKING errors only)
     if (!qty || qty <= 0) {
       errorDiv.textContent = '❌ Please enter a valid quantity (must be greater than 0)';
@@ -904,7 +932,7 @@
       qtyInput?.focus();
       return;
     }
-    
+
     if (!price || price <= 0) {
       errorDiv.textContent = '❌ Please enter a valid selling price (must be greater than 0)';
       errorDiv.classList.remove('d-none');
@@ -913,7 +941,7 @@
       priceInput?.focus();
       return;
     }
-    
+
     if (cost < 0) {
       errorDiv.textContent = '❌ Cost price cannot be negative';
       errorDiv.classList.remove('d-none');
@@ -922,7 +950,7 @@
       costInput?.focus();
       return;
     }
-    
+
     // NON-BLOCKING: Smart pricing warnings
     let hasWarning = false;
     if (cost > 0 && price < cost) {
@@ -938,19 +966,66 @@
       errorDiv.classList.add('d-none');
       errorDiv.textContent = '';
     }
-    
-    // Save to wizard data
-    wizard.data.initial_stock = qty;
-    wizard.data.quantity = qty;
-    wizard.data.selling_price = price.toFixed(2);
-    if (cost > 0) {
-      wizard.data.cost_price = cost.toFixed(2);
+
+    // Call backend API to validate and store batch session
+    try {
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      errorDiv.textContent = '⏳ Validating...';
+      errorDiv.classList.remove('d-none');
+      errorDiv.classList.remove('alert-danger', 'alert-warning');
+      errorDiv.classList.add('alert-info');
+
+      const response = await fetch('/clothing/api/barcode-batch/step1/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({
+          category: wizard.data.category || '',
+          subcategory: wizard.data.shoe_subtype || wizard.data.suit_subtype || '',
+          size: wizard.data.size || '',
+          quantity: qty,
+          cost_price: cost.toFixed(2),
+          selling_price: price.toFixed(2),
+          brand: wizard.data.brand || '',
+          color: wizard.data.color || '',
+          product_name: wizard.data.product_name || ''
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        // Save to wizard data
+        wizard.data.initial_stock = qty;
+        wizard.data.quantity = qty;
+        wizard.data.selling_price = price.toFixed(2);
+        if (cost > 0) {
+          wizard.data.cost_price = cost.toFixed(2);
+        }
+
+        // Clear error
+        errorDiv.classList.add('d-none');
+
+        // Re-render to show scanning UI
+        wizard.render();
+      } else {
+        // Show validation error from backend
+        errorDiv.textContent = '❌ ' + (result.error || 'Validation failed');
+        errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+        errorDiv.classList.add('alert-danger');
+      }
+    } catch (error) {
+      console.error('Batch step 1 error:', error);
+      errorDiv.textContent = '❌ Failed to validate. Please try again.';
+      errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+      errorDiv.classList.add('alert-danger');
     }
-    
-    // Re-render to show scanning UI
-    wizard.render();
   };
-  
+
   // Allow Enter key in manual input
   document.addEventListener('DOMContentLoaded', function() {
     // This will be called when the barcode step is rendered
@@ -969,4 +1044,3 @@
 })();
 </script>
 {% endblock %}
-

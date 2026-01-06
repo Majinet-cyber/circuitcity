@@ -104,7 +104,7 @@ def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
 
 
 def _sub_badge(sub: BusinessSubscription) -> str:
-    if sub.status == BusinessSubscription.Status.TRIAL:
+    if sub.status in (BusinessSubscription.Status.TRIAL, BusinessSubscription.Status.TRIALING):
         return f"Trial – {sub.days_left_in_trial()} days left"
     if sub.status == BusinessSubscription.Status.ACTIVE:
         return "Active"
@@ -203,6 +203,12 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
 
+    # Determine paid plan ID: only show as "current" if subscription is truly paid/active
+    # Trial users should NOT see any plan as current even if plan is assigned for limit purposes
+    paid_plan_id = None
+    if sub.status == BusinessSubscription.Status.ACTIVE and sub.plan_id:
+        paid_plan_id = sub.plan_id
+
     return render(
         request,
         "billing/subscribe.html",
@@ -210,6 +216,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             "plans": plans,
             "form": form,
             "sub": sub,
+            "paid_plan_id": paid_plan_id,
             "days_left": sub.days_left_in_trial(),
             "sub_badge": _sub_badge(sub),
         },
@@ -222,9 +229,11 @@ def subscribe(request: HttpRequest) -> HttpResponse:
 @require_POST
 def select_plan(request: HttpRequest) -> HttpResponse:
     """
-    Receives POST from a plan card. Sets plan, creates draft invoice, and routes
-    to the plan-specific page. That page may immediately link/redirect to checkout.
+    Receives POST from a plan card. Creates a PendingCheckout (NO invoice yet),
+    and routes to checkout. Invoice is only created after payment confirmation.
     """
+    from billing.models import PendingCheckout
+    
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
 
@@ -238,13 +247,23 @@ def select_plan(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Unknown or inactive plan.")
         return redirect("billing:subscribe")
 
-    # Update subscription plan
-    sub.plan = plan
-    sub.save(update_fields=["plan", "updated_at"])
-
-    # Create a fresh draft invoice
-    inv = _create_draft_invoice_for_plan(biz, plan, created_by=request.user)
-    request.session["billing_invoice_id"] = str(inv.id)
+    # Create PendingCheckout to track selection (NO invoice, NO subscription activation yet)
+    # Invoice will be created only after payment webhook confirms success
+    pending = PendingCheckout.objects.create(
+        business=biz,
+        created_by=request.user,
+        selected_plan=plan,
+        selected_plan_code=plan.code,
+        amount=plan.amount,
+        currency=plan.currency,
+        status=PendingCheckout.Status.PENDING,
+        expires_at=timezone.now() + timedelta(hours=2),  # Expire after 2 hours
+    )
+    
+    # Store pending checkout ID in session
+    request.session["pending_checkout_id"] = str(pending.id)
+    # Clear any old invoice session data
+    request.session.pop("billing_invoice_id", None)
 
     # Go directly to checkout (production behavior)
     return redirect("billing:checkout")
@@ -294,15 +313,37 @@ def checkout(request: HttpRequest) -> HttpResponse:
 
     Mobile Money uses direct charge API (push prompt to phone).
     Card uses hosted checkout (redirect to PayChangu).
-    Shows invoice preview on the side.
+    Shows plan/amount preview (NO invoice created yet - that happens on payment success).
     """
+    from billing.models import PendingCheckout
+    
     biz: Business = request.business
-    inv_id = request.session.get("billing_invoice_id")
-    if not inv_id:
-        messages.info(request, "No pending invoice. Please pick a plan first.")
-        return redirect("billing:subscribe")
-
-    invoice = get_object_or_404(Invoice, id=inv_id, business=biz)
+    
+    # Check for PendingCheckout (new flow - no invoice until payment confirmed)
+    pending_id = request.session.get("pending_checkout_id")
+    if pending_id:
+        try:
+            pending = PendingCheckout.objects.get(id=pending_id, business=biz, status=PendingCheckout.Status.PENDING)
+            # Create a temporary invoice-like object for template compatibility
+            class CheckoutPreview:
+                def __init__(self, pending):
+                    self.id = pending.id
+                    self.total = pending.amount
+                    self.currency = pending.currency
+                    self.plan_name = pending.selected_plan.name if pending.selected_plan else pending.selected_plan_code
+                    self.business = pending.business
+                    self.is_pending_checkout = True
+            invoice = CheckoutPreview(pending)
+        except PendingCheckout.DoesNotExist:
+            messages.info(request, "Checkout session expired. Please select a plan again.")
+            return redirect("billing:subscribe")
+    else:
+        # Fallback: check for old invoice-based flow (for backward compatibility during transition)
+        inv_id = request.session.get("billing_invoice_id")
+        if not inv_id:
+            messages.info(request, "No pending checkout. Please pick a plan first.")
+            return redirect("billing:subscribe")
+        invoice = get_object_or_404(Invoice, id=inv_id, business=biz)
 
     # Pass PayChangu mode to template for test mode hints
     paychangu_mode = getattr(settings, "PAYCHANGU_MODE", "test")
@@ -379,14 +420,23 @@ def checkout(request: HttpRequest) -> HttpResponse:
             if hasattr(biz, "locations"):
                 location = biz.locations.first()
 
-            # Get subscription plan for metadata
-            sub = _ensure_trial_subscription(biz)
-            plan_code = sub.plan.code if sub.plan else "unknown"
+            # Get plan information from PendingCheckout or subscription
+            if hasattr(invoice, 'is_pending_checkout') and invoice.is_pending_checkout:
+                plan_code = pending.selected_plan_code
+                amount = pending.amount
+                currency = pending.currency
+                # Store pending checkout reference for webhook processing
+                pending.tx_ref = tx_ref
+                pending.save(update_fields=["tx_ref", "updated_at"])
+            else:
+                sub = _ensure_trial_subscription(biz)
+                plan_code = sub.plan.code if sub.plan else "unknown"
+                amount = invoice.total
+                currency = invoice.currency
 
             logger.info(
                 f"Initiating PayChangu payment: business={biz.id}, "
-                f"invoice={invoice.id}, tx_ref={tx_ref}, method={method}, "
-                f"amount={invoice.total}"
+                f"tx_ref={tx_ref}, method={method}, amount={amount}, plan={plan_code}"
             )
 
             # Create PaymentTransaction record (PENDING)
@@ -398,8 +448,8 @@ def checkout(request: HttpRequest) -> HttpResponse:
                 tx_ref=tx_ref,
                 charge_id=charge_id if method in ("airtel", "tnm") else "",
                 payment_method=method,
-                amount=invoice.total,
-                currency=invoice.currency,
+                amount=amount,
+                currency=currency,
                 status=PaymentTransaction.Status.PENDING,
             )
 
@@ -928,8 +978,18 @@ def manage(request: HttpRequest) -> HttpResponse:
     sub = _ensure_trial_subscription(biz)
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
 
-    # Get recent invoices (last 3)
-    invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:3]
+    # Determine if subscription is truly paid/active (not just trial with plan assigned)
+    is_paid_active = sub.status == BusinessSubscription.Status.ACTIVE
+
+    # Get recent invoices - only show PAID invoices for trial users, all for active users
+    if is_paid_active:
+        invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:3]
+    else:
+        # For trial users, only show paid invoices (hide drafts)
+        invoices = Invoice.objects.filter(business=biz, status=Invoice.Status.PAID).order_by("-created_at")[:3]
+
+    # Determine paid plan ID for UI display
+    paid_plan_id = sub.plan_id if is_paid_active else None
 
     return render(
         request,
@@ -939,6 +999,8 @@ def manage(request: HttpRequest) -> HttpResponse:
             "plans": plans,
             "invoices": invoices,
             "sub_badge": _sub_badge(sub),
+            "is_paid_active": is_paid_active,
+            "paid_plan_id": paid_plan_id,
         },
     )
 

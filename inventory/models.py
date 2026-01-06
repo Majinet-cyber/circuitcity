@@ -1,25 +1,26 @@
 ﻿# circuitcity/inventory/models.py
 from __future__ import annotations
 
+import json
+import re
+import secrets
+import string
 from datetime import timedelta
 from decimal import Decimal
 from typing import Optional
-import json
-import secrets
-import string
-import re
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
-from django.db.models import Q, Sum, Count
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 # --- Tenancy imports (explicit) ---
 from tenants.models import Business, TenantManager, UnscopedManager
+
 from .business_kinds import BusinessKind
 
 User = get_user_model()
@@ -48,29 +49,23 @@ except Exception:
 
 # Re-export StockActivityLog for audit trail
 try:
-    from .models_audit import StockActivityLog, StockAction  # noqa: F401
+    from .models_audit import StockAction, StockActivityLog  # noqa: F401
 except Exception:
     StockActivityLog = None  # safe fallback
     StockAction = None
 
 # Re-export gamification models (Phase 5)
 try:
-    from .models_gamification import (  # noqa: F401
-        AgentStreak,
-        AgentXP,
-        Badge,
-        AgentBadge,
-        DailyLeaderboard,
-    )
+    from .models_gamification import AgentBadge, AgentStreak, AgentXP, Badge, DailyLeaderboard  # noqa: F401
 except Exception:
     AgentStreak = AgentXP = Badge = AgentBadge = DailyLeaderboard = None  # safe fallback
 
 # Re-export liquor assignment models (Phase 6)
 try:
     from .models_liquor_assignment import (  # noqa: F401
-        LiquorStockAssignment,
-        LiquorDailyReconciliation,
         LiquorAgentTarget,
+        LiquorDailyReconciliation,
+        LiquorStockAssignment,
     )
 except Exception:
     LiquorStockAssignment = LiquorDailyReconciliation = LiquorAgentTarget = None  # safe fallback
@@ -89,7 +84,7 @@ except Exception:
 
 # Re-export Accessory models for phone accessories system
 try:
-    from .models_accessories import AccessoryProduct, AccessoryStock, AccessoryStockLog, AccessoryCategory  # noqa: F401
+    from .models_accessories import AccessoryCategory, AccessoryProduct, AccessoryStock, AccessoryStockLog  # noqa: F401
 except Exception:
     AccessoryProduct = None  # safe fallback
     AccessoryStock = None
@@ -98,14 +93,14 @@ except Exception:
 
 # Re-export InventoryBarcode and ArchiveBatch for stock barcode tracking
 try:
-    from .models_stock_barcodes import InventoryBarcode, ArchiveBatch  # noqa: F401
+    from .models_stock_barcodes import ArchiveBatch, InventoryBarcode  # noqa: F401
 except Exception:
     InventoryBarcode = None  # safe fallback
     ArchiveBatch = None
 
 # Re-export Laptop models for laptop/electronics vertical
 try:
-    from .models_laptops import LaptopProduct, LaptopSerial, LaptopBrand  # noqa: F401
+    from .models_laptops import LaptopBrand, LaptopProduct, LaptopSerial  # noqa: F401
 except Exception:
     LaptopProduct = None  # safe fallback
     LaptopSerial = None
@@ -1568,24 +1563,23 @@ class PhoneProduct(Product):
 # ==============================================================================
 # Import after all base models are defined to avoid circular imports
 try:
-    from .models_verticals import (
-        # Liquor
-        LiquorSale,
-        LiquorCredit,
-        LiquorCreditPayment,
-        LiquorStockEditRequest,
-        LiquorExpense,
-        LiquorWalletEntry,
-        # Gym
+    # Import clothing barcode unit model
+    from .models_clothing_barcode import ClothingBarcodeUnit
+    from .models_verticals import (  # Liquor; Gym; Clothing
+        ClothingProductLog,
+        ClothingSale,
         GymMember,
-        GymPayment,
         GymMemberLog,
+        GymPayment,
         GymSettings,
         GymWalletEntry,
+        LiquorCredit,
+        LiquorCreditPayment,
+        LiquorExpense,
+        LiquorSale,
+        LiquorStockEditRequest,
+        LiquorWalletEntry,
         TrainerFee,
-        # Clothing
-        ClothingSale,
-        ClothingProductLog,
     )
 
     __all__ = [
@@ -1606,6 +1600,7 @@ try:
         # Clothing
         "ClothingSale",
         "ClothingProductLog",
+        "ClothingBarcodeUnit",
     ]
 except ImportError:
     # Not yet migrated

@@ -338,6 +338,7 @@ TEMPLATES = [
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "cc.context_processors.currency_config",
+                "core.context_processor.static_versioning",
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
@@ -691,7 +692,9 @@ STORAGES = {
 
 # WhiteNoise tuning
 WHITENOISE_AUTOREFRESH = DEBUG
-WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
+# In DEBUG mode, disable caching to prevent stale assets causing "warped" layouts
+# In production, cache for 1 year for performance
+WHITENOISE_MAX_AGE = 0 if DEBUG else (60 * 60 * 24 * 365)
 WHITENOISE_INDEX_FILE = False
 # DO NOT hard-fail on manifest mismatches during rolling deploys.
 WHITENOISE_MANIFEST_STRICT = False

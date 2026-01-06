@@ -21,6 +21,104 @@ GRACE_DAYS_DEFAULT = getattr(settings, "BILLING_GRACE_DAYS", 30)  # default 30-d
 
 
 # ======================================================================
+# Pending Checkout (tracks plan selection before payment confirmation)
+# ======================================================================
+class PendingCheckout(models.Model):
+    """
+    Tracks plan selection and checkout attempts BEFORE payment is confirmed.
+    This avoids creating invoices or locking in plans until payment succeeds.
+    """
+    
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="pending_checkouts",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    
+    selected_plan = models.ForeignKey(
+        "SubscriptionPlan",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pending_checkouts",
+    )
+    selected_plan_code = models.CharField(
+        max_length=50,
+        help_text="Plan code user selected",
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        help_text="Plan amount at time of selection",
+    )
+    currency = models.CharField(max_length=10, default="MWK")
+    
+    tx_ref = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Payment provider transaction reference",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata (payment method, provider, etc.)",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this pending checkout expires",
+    )
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "status"]),
+            models.Index(fields=["tx_ref"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.business.name} - {self.selected_plan_code} - {self.status}"
+    
+    def mark_succeeded(self):
+        """Mark this checkout as succeeded."""
+        self.status = self.Status.SUCCEEDED
+        self.save(update_fields=["status", "updated_at"])
+    
+    def mark_failed(self, reason: str = ""):
+        """Mark this checkout as failed."""
+        self.status = self.Status.FAILED
+        if reason:
+            self.metadata["failure_reason"] = reason
+        self.save(update_fields=["status", "metadata", "updated_at"])
+
+
+# ======================================================================
 # Plans
 # ======================================================================
 class SubscriptionPlan(models.Model):

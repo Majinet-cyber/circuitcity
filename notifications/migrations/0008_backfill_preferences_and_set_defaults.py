@@ -65,7 +65,7 @@ def reverse_backfill(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("notifications", "0007_add_sale_emails_enabled_field"),
-        ("tenants", "__latest__"),
+        ("tenants", "0022_business_hq_notified_signup_at"),
     ]
 
     operations = [

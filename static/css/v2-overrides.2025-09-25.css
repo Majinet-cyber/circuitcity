@@ -722,11 +722,13 @@ button[data-action="scan-web"],
 button[data-action="feedback"],
 button[data-action="place-order"] { display:none !important; }
 
+/* REMOVED: tenant-pill hiding was causing layout issues
 a[href*="/tenants/choose_business"],
 a[href*="/tenants/switch"],
 a[href*="/locations/choose"],
 a[href*="/locations/switch"],
-.tenant-pill,.tenant-chip,.business-chip,.location-chip { display:none !important; }
+.tenant-chip,.business-chip,.location-chip { display:none !important; }
+*/
 
 /* Keep hamburger/mobile toggles visible on phones (already reinforced above) */
 
@@ -809,7 +811,7 @@ a[href*="/locations/switch"],
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  
+
   /* Ensure proper spacing on mobile */
   .gym-table-responsive table {
     min-width: 800px; /* Force horizontal scroll on narrow screens */
