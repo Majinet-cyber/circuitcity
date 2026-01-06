@@ -38,7 +38,7 @@ def archive_flow_start(request: HttpRequest) -> HttpResponse:
         return redirect("dashboard:home")
 
     # Get locations for this business
-    locations = Location.objects.filter(business=business, is_active=True).order_by("name")
+    locations = Location.objects.filter(business=business).order_by("name")
 
     if request.method == "POST":
         scope = request.POST.get("scope", "").strip()

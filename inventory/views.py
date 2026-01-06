@@ -275,7 +275,11 @@ def _ensure_active_business_and_location(request):
     # Choose a location automatically if missing
     if biz and not loc and Location:
         try:
-            loc = Location.objects.filter(business=biz, is_active=True).order_by("name").first()
+            # Prefer default location, fallback to any location
+            loc = (
+                Location.objects.filter(business=biz, is_default=True).first()
+                or Location.objects.filter(business=biz).order_by("name").first()
+            )
             if loc:
                 request.active_location = loc
                 request.active_location_id = getattr(loc, "id", None)

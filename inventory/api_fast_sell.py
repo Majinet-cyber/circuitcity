@@ -194,8 +194,11 @@ def fast_sell_sell(request):
             # Get active location
             location = getattr(request, "active_location", None)
             if not location:
-                # Try to get first active location for business
-                location = Location.objects.filter(business=business, is_active=True).first()
+                # Try to get default location, or any location for business
+                location = (
+                    Location.objects.filter(business=business, is_default=True).first()
+                    or Location.objects.filter(business=business).first()
+                )
 
                 if not location:
                     return JsonResponse(

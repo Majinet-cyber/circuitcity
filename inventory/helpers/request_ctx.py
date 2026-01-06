@@ -95,8 +95,11 @@ def default_location_for_request(request):
             loc = Location.objects.filter(id=home_loc_id, business_id=biz_id).first()
             if loc:
                 return loc
-        # otherwise first active location in the business
-        return Location.objects.filter(business_id=biz_id, is_active=True).order_by("id").first()
+        # otherwise default location, or any location in the business
+        return (
+            Location.objects.filter(business_id=biz_id, is_default=True).first()
+            or Location.objects.filter(business_id=biz_id).order_by("id").first()
+        )
     except Exception:
         return None
 
