@@ -1,8 +1,9 @@
 ﻿# cc/views.py
 from __future__ import annotations
-from decimal import Decimal
+
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from decimal import Decimal
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,11 +11,11 @@ from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import connection
 from django.db.models import Sum
-from django.http import JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import redirect, render, get_object_or_404
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from inventory.models import InventoryItem, TimeLog, WalletTxn
 from sales.models import Sale
@@ -473,10 +474,15 @@ def sw_js(request: HttpRequest) -> HttpResponse:
     """
     Serve service worker from root path /sw.js with proper headers.
     This allows the service worker to control the entire site scope (/).
+
+    CRITICAL: This view MUST be public (no @login_required) and always return 200.
+    Service workers must be accessible without authentication for PWA functionality.
+    All gating middleware bypass /sw.js via BYPASS_PREFIXES constant.
     """
-    from django.contrib.staticfiles import finders
     import os
     from pathlib import Path
+
+    from django.contrib.staticfiles import finders
 
     # Try to find the service worker file using Django's static file finder
     sw_path = finders.find("sw.js")
