@@ -16,6 +16,19 @@ except Exception:  # pragma: no cover
 
     settings = _S()  # type: ignore
 
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES
+except Exception:  # pragma: no cover
+    # Fallback if import fails
+    BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
+
 try:
     from tenants.models import Business, Membership, set_current_business_id  # thread-local setter
 except Exception:  # pragma: no cover
@@ -383,8 +396,15 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         return Business is not None
 
     def __call__(self, request):
-        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        # CRITICAL: Bypass critical paths at the very top to prevent redirect loops
         path = request.path_info or request.path or "/"
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                return self.get_response(request)
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
         if path.startswith("/hq/"):
             return self.get_response(request)
         # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
@@ -410,8 +430,16 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         except Exception:
             pass
 
-        # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
+        # CRITICAL: Bypass critical paths entirely to prevent redirect loops
         path = getattr(request, "path", "")
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                _set_product_mode_on_request(request, None)
+                return
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
         if path.startswith("/hq/"):
             _set_product_mode_on_request(request, None)
             return
