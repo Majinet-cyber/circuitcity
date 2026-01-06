@@ -6,12 +6,14 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 
-from circuitcity.accounts.models import User
 from inventory.models_verticals import GymCheckIn, GymMember, GymMemberStatus, GymPayment, GymTrainer, PaymentMethod
+
+User = get_user_model()
 from inventory.tasks_gym_emails import (
     notify_gym_payment_to_managers,
     send_gym_inactivity_reminders,
