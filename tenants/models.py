@@ -162,8 +162,27 @@ class Business(models.Model):
             ),
         ]
 
+    def __init__(self, *args, **kwargs):
+        """
+        Custom __init__ to support legacy 'kind' parameter.
+        Maps 'kind' → 'business_kind' for backwards compatibility with tests.
+        """
+        if "kind" in kwargs:
+            kwargs["business_kind"] = kwargs.pop("kind")
+        super().__init__(*args, **kwargs)
+
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def kind(self):
+        """Alias for business_kind (legacy compatibility)."""
+        return self.business_kind
+
+    @kind.setter
+    def kind(self, value):
+        """Setter for kind alias."""
+        self.business_kind = value
 
     @property
     def is_active(self) -> bool:
