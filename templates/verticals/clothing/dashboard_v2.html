@@ -275,21 +275,31 @@
     <div class="hero-content">
       <h1 class="hero-title">👕 Clothing & Fashion</h1>
       <p class="hero-subtitle">Track outfits, manage inventory, and grow your fashion business</p>
-      
+
       <div class="action-cards">
         <a href="{% url 'verticals:clothing_quick_add_step1' %}" class="action-card">
           <div class="action-card-icon">➕</div>
           <div class="action-card-title">Add Product</div>
         </a>
-        
+
+        <a href="{% url 'verticals:clothing_barcode_add_step1' %}" class="action-card">
+          <div class="action-card-icon">🏷️</div>
+          <div class="action-card-title">Add Barcoded</div>
+        </a>
+
         <a href="{% url 'verticals:clothing_fast_stock_in' %}" class="action-card">
           <div class="action-card-icon">📦</div>
           <div class="action-card-title">Stock In</div>
         </a>
-        
-        <a href="{% url 'verticals:clothing_fast_sell' %}" class="action-card">
+
+        <a href="{% url 'verticals:clothing_fast_sell_barcode' %}" class="action-card">
+          <div class="action-card-icon">⚡</div>
+          <div class="action-card-title">Fast Sell (Barcode)</div>
+        </a>
+
+        <a href="{% url 'verticals:clothing_fast_sell_v2' %}" class="action-card">
           <div class="action-card-icon">🛒</div>
-          <div class="action-card-title">Sell</div>
+          <div class="action-card-title">Sell (Manual)</div>
         </a>
       </div>
     </div>
@@ -299,13 +309,13 @@
   {% if streak_days > 0 or badges_earned %}
   <div class="gamification-section">
     <h2 style="margin: 0 0 16px 0; font-size: 1.5rem;">🏆 Your Progress</h2>
-    
+
     {% if streak_days > 0 %}
     <div class="streak-badge">
       ⚡ {{ streak_days }}-Day Sales Streak!
     </div>
     {% endif %}
-    
+
     <!-- Daily Targets -->
     <div class="progress-bar-container">
       <div class="progress-label">
@@ -316,7 +326,7 @@
         <div class="progress-fill" style="width: {{ sales_target_pct }}%"></div>
       </div>
     </div>
-    
+
     <div class="progress-bar-container">
       <div class="progress-label">
         <span>Revenue Target: K {{ today_revenue|floatformat:0|intcomma }} / K {{ daily_revenue_target|floatformat:0|intcomma }}</span>
@@ -326,7 +336,7 @@
         <div class="progress-fill" style="width: {{ revenue_target_pct }}%"></div>
       </div>
     </div>
-    
+
     <!-- Badges -->
     {% if badges_earned %}
     <div class="badges-earned">
@@ -348,19 +358,19 @@
       <div class="kpi-value">{{ today_items_sold|intcomma }}</div>
       <div class="kpi-subtitle">items sold</div>
     </div>
-    
+
     <div class="kpi-card">
       <div class="kpi-label">Today's Revenue</div>
       <div class="kpi-value">K {{ today_revenue|floatformat:2|intcomma }}</div>
       <div class="kpi-subtitle">total revenue</div>
     </div>
-    
+
     <div class="kpi-card">
       <div class="kpi-label">Today's Profit</div>
       <div class="kpi-value">K {{ today_profit|floatformat:2|intcomma }}</div>
       <div class="kpi-subtitle">net profit</div>
     </div>
-    
+
     <div class="kpi-card">
       <div class="kpi-label">Products</div>
       <div class="kpi-value">{{ total_products|intcomma }}</div>
@@ -376,7 +386,7 @@
       <strong>⚠️ {{ out_of_stock_count }} product{{ out_of_stock_count|pluralize }} out of stock</strong> - Restock needed!
     </div>
     {% endif %}
-    
+
     {% if low_stock_count > 0 %}
     <div class="alert-card">
       <strong>📊 {{ low_stock_count }} product{{ low_stock_count|pluralize }} running low</strong> - Consider restocking soon
@@ -404,7 +414,7 @@
         <p style="color: #94a3b8; text-align: center; padding: 20px 0;">No sales yet. Start selling!</p>
       {% endif %}
     </div>
-    
+
     <!-- Slow Movers -->
     <div class="smart-list-card">
       <h3 class="smart-list-header">🐌 Slow Movers (30 days)</h3>
@@ -431,12 +441,12 @@
         <div class="kpi-label">Revenue</div>
         <div class="kpi-value" style="font-size: 1.5rem;">K {{ period_revenue|floatformat:0|intcomma }}</div>
       </div>
-      
+
       <div class="kpi-card">
         <div class="kpi-label">Profit</div>
         <div class="kpi-value" style="font-size: 1.5rem;">K {{ period_profit|floatformat:0|intcomma }}</div>
       </div>
-      
+
       <div class="kpi-card">
         <div class="kpi-label">Items Sold</div>
         <div class="kpi-value" style="font-size: 1.5rem;">{{ period_items_sold|intcomma }}</div>
@@ -447,4 +457,3 @@
 </div>
 
 {% endblock %}
-

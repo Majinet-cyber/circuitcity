@@ -26,7 +26,7 @@ from inventory.catalog.hardware import (
     get_products_by_category,
     search_products,
 )
-from inventory.cement_seed import get_cement_brands_list, seed_cement_defaults
+from inventory.cement_seed import ensure_hardware_seeded, get_cement_brands_list, seed_cement_defaults
 from inventory.date_ranges import get_date_range_label, get_preset_options, parse_date_range
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
@@ -206,14 +206,51 @@ def dashboard(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def stock_list(request):
-    """List all cement/hardware products"""
+    """
+    List all cement/hardware products with trend indicators.
+
+    Shows:
+    - Current stock quantity
+    - Stock value (qty * cost_price)
+    - 7-day trend (stocked_in - sold)
+    """
     business = get_active_business(request)
 
     products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True).order_by("name")
 
+    # Calculate 7-day trends for each product
+    seven_days_ago = timezone.now() - timezone.timedelta(days=7)
+
+    products_with_trends = []
+    for product in products:
+        # Get sales in last 7 days
+        sold_qty_7d = (
+            CementSale.objects.filter(
+                business=business, product=product, is_void=False, sold_at__gte=seven_days_ago
+            ).aggregate(total=Sum("quantity"))["total"]
+            or 0
+        )
+
+        # For stock-in, we don't have a separate movement table, so we estimate from current stock
+        # Trend = negative if sold, positive if stocked (simplified)
+        # In a full system, you'd track stock movements separately
+        trend = -sold_qty_7d  # Negative = stock going down
+
+        # Calculate stock value
+        stock_value = (product.quantity_in_stock or 0) * (product.cost_price or Decimal("0"))
+
+        products_with_trends.append(
+            {
+                "product": product,
+                "trend": trend,
+                "trend_abs": abs(trend),
+                "stock_value": stock_value,
+            }
+        )
+
     context = {
         "business": business,
-        "products": products,
+        "products_with_trends": products_with_trends,
         "active_tab": "stock",
     }
 
@@ -224,103 +261,100 @@ def stock_list(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def stock_in(request):
-    """Gamified stock-in flow for cement: Brand → Product → Quantity → Pricing"""
+    """
+    Premium stock-in flow for cement: Tap brand card → Auto-resolve product → Pricing
+
+    - Brand cards are clickable (tap to continue, no Continue button)
+    - Auto-creates "{Brand} Cement" product with "Bag (50KG)" unit
+    - If product exists, skips to pricing with last-used prices prefilled
+    - Live margin calculator on pricing step
+    """
     business = get_active_business(request)
 
-    # Seed default cement brands if not already seeded (idempotent)
-    seed_cement_defaults(business)
+    # Seed cement + hardware catalog if not already seeded (idempotent)
+    ensure_hardware_seeded(business)
 
     # Step tracking
     step = request.GET.get("step", "1")
 
     if request.method == "POST":
         try:
-            # Step 1: Brand selection
+            # Step 1: Brand selection (auto-advance to pricing)
             if step == "1":
                 brand = request.POST.get("brand", "").strip()
                 if not brand:
                     messages.error(request, "Please select a brand")
                     return redirect(f"{reverse('cement:stock_in')}?step=1")
-                # Store brand in session for next step
-                request.session["cement_stock_in_brand"] = brand
-                return redirect(f"{reverse('cement:stock_in')}?step=2")
 
-            # Step 2: Product selection/creation
-            elif step == "2":
-                brand = request.session.get("cement_stock_in_brand", "")
-                product_name = request.POST.get("product_name", "").strip()
-                product_id = request.POST.get("product_id", "").strip()
+                # Auto-resolve product: "{Brand} Cement" with "Bag (50KG)"
+                product_name = f"{brand} Cement"
+                product, created = MerchProduct.objects.get_or_create(
+                    business=business,
+                    name=product_name,
+                    kind=BusinessKind.CEMENT,
+                    defaults={
+                        "category": "cement",
+                        "spec_label": "",
+                        "base_unit": "Bag (50KG)",
+                        "pack_size": 50,
+                        "cost_price": Decimal("0.00"),
+                        "selling_price": Decimal("0.00"),
+                        "quantity_in_stock": 0,
+                        "is_active": True,
+                        "track_inventory": True,
+                    },
+                )
 
-                if product_id:
-                    # Existing product selected
-                    request.session["cement_stock_in_product_id"] = int(product_id)
-                elif product_name:
-                    # New product name entered
-                    request.session["cement_stock_in_product_name"] = product_name
-                else:
-                    messages.error(request, "Please select or enter a product")
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
-
+                # Store in session and jump directly to pricing step
+                request.session["cement_stock_in_product_id"] = product.id
                 request.session["cement_stock_in_brand"] = brand
                 return redirect(f"{reverse('cement:stock_in')}?step=3")
 
-            # Step 3: Quantity and pricing
+            # Step 3: Quantity and pricing (with smart validation)
             elif step == "3":
-                brand = request.session.get("cement_stock_in_brand", "")
                 product_id = request.session.get("cement_stock_in_product_id")
-                product_name = request.session.get("cement_stock_in_product_name", "")
+
+                if not product_id:
+                    messages.error(request, "Please start from Step 1")
+                    return redirect("cement:stock_in")
 
                 quantity = int(request.POST.get("quantity", 0))
                 cost_price = Decimal(request.POST.get("cost_price", "0"))
                 selling_price = Decimal(request.POST.get("selling_price", "0"))
-                unit = request.POST.get("unit", "bag").strip()
 
+                # Validation
                 if quantity <= 0:
                     messages.error(request, "Quantity must be greater than 0")
                     return redirect(f"{reverse('cement:stock_in')}?step=3")
 
-                if cost_price <= 0 or selling_price <= 0:
-                    messages.error(request, "Cost and selling prices must be greater than 0")
+                if cost_price < 0:
+                    messages.error(request, "Cost price cannot be negative")
+                    return redirect(f"{reverse('cement:stock_in')}?step=3")
+
+                if selling_price < cost_price:
+                    messages.error(request, "⚠️ Selling price cannot be less than cost price (would lose money)")
                     return redirect(f"{reverse('cement:stock_in')}?step=3")
 
                 with transaction.atomic():
-                    if product_id:
-                        # Update existing product
-                        product = MerchProduct.objects.get(pk=product_id, business=business, kind=BusinessKind.CEMENT)
-                        product.quantity_in_stock += quantity
-                        product.cost_price = cost_price
-                        product.selling_price = selling_price
-                        product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
-                        final_name = product.name
-                    else:
-                        # Create new product
-                        final_name = f"{brand} - {product_name}" if brand else product_name
-                        product, created = MerchProduct.objects.get_or_create(
-                            business=business,
-                            name=final_name,
-                            kind=BusinessKind.CEMENT,
-                            defaults={
-                                "category": "cement",
-                                "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
-                                "cost_price": cost_price,
-                                "selling_price": selling_price,
-                                "quantity_in_stock": quantity,
-                                "base_unit": unit,
-                                "is_active": True,
-                                "track_inventory": True,
-                            },
-                        )
+                    # Update existing product
+                    product = MerchProduct.objects.get(pk=product_id, business=business, kind=BusinessKind.CEMENT)
+                    product.quantity_in_stock += quantity
+                    product.cost_price = cost_price
+                    product.selling_price = selling_price
+                    product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
 
-                        if not created:
-                            product.quantity_in_stock += quantity
-                            product.cost_price = cost_price
-                            product.selling_price = selling_price
-                            product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
+                    # Calculate metrics for success message
+                    margin = ((selling_price - cost_price) / cost_price * 100) if cost_price > 0 else Decimal("0")
+                    profit_per_bag = selling_price - cost_price
 
-                    messages.success(request, f"✅ Added {quantity} {unit} of {final_name} to stock")
+                    messages.success(
+                        request,
+                        f"✅ Added {quantity} {product.base_unit} of {product.name} to stock. "
+                        f"Margin: {margin:.1f}%, Profit per bag: MK {profit_per_bag:,.2f}",
+                    )
 
                     # Clear session
-                    for key in ["cement_stock_in_brand", "cement_stock_in_product_id", "cement_stock_in_product_name"]:
+                    for key in ["cement_stock_in_brand", "cement_stock_in_product_id"]:
                         if key in request.session:
                             del request.session[key]
 
@@ -334,25 +368,8 @@ def stock_in(request):
             return redirect(f"{reverse('cement:stock_in')}?step={step}")
 
     # GET: Show appropriate step
-    # Get all cement brands (seeded + custom)
-    all_products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True).values_list(
-        "name", flat=True
-    )
-
     # Use seeded brands list
-    seed_brands = get_cement_brands_list()
-
-    # Extract custom brands from products (not in seed list)
-    seed_names_lower = [b["name"].lower() for b in seed_brands]
-    custom_brands = set()
-    for name in all_products:
-        # Extract brand from "Brand - Product" format or use full name
-        brand_name = name.split(" - ")[0] if " - " in name else name
-        if brand_name.lower() not in seed_names_lower:
-            custom_brands.add(brand_name)
-
-    # Combine seeded + custom brands
-    all_brands = seed_brands + [{"key": b.lower().replace(" ", "_"), "name": b, "icon": "📦"} for b in custom_brands]
+    all_brands = get_cement_brands_list()
 
     context = {
         "business": business,
@@ -361,45 +378,22 @@ def stock_in(request):
         "active_tab": "stock_in",
     }
 
-    # Step 2: Show products for selected brand (with variation grouping)
-    if step == "2":
-        brand = request.session.get("cement_stock_in_brand", "")
-        if brand:
-            # Get existing products for this brand
-            products = MerchProduct.objects.filter(
-                business=business, kind=BusinessKind.CEMENT, is_active=True, name__istartswith=brand
-            ).order_by("name")
-
-            # Group products by base name (e.g., "Paint" instead of "Paint 1L", "Paint 4L")
-            grouped_products = group_products_by_base_name(products)
-
-            context["selected_brand"] = brand
-            context["products"] = products
-            context["grouped_products"] = grouped_products
-
-    # Step 3: Show quantity/pricing form
-    elif step == "3":
+    # Step 3: Show quantity/pricing form (Step 2 is auto-skipped)
+    if step == "3":
         brand = request.session.get("cement_stock_in_brand", "")
         product_id = request.session.get("cement_stock_in_product_id")
-        product_name = request.session.get("cement_stock_in_product_name", "")
 
         context["selected_brand"] = brand
         if product_id:
             try:
                 product = MerchProduct.objects.get(pk=product_id, business=business)
                 context["selected_product"] = product
+                # Prefill with last used prices if available
+                context["prefill_cost"] = product.cost_price if product.cost_price > 0 else None
+                context["prefill_selling"] = product.selling_price if product.selling_price > 0 else None
             except MerchProduct.DoesNotExist:
                 messages.error(request, "Product not found")
-                return redirect(f"{reverse('cement:stock_in')}?step=2")
-        else:
-            context["new_product_name"] = product_name
-
-        units = [
-            ("bag", "Bag (50kg)"),
-            ("ton", "Ton"),
-            ("kg", "Kilograms"),
-        ]
-        context["units"] = units
+                return redirect("cement:stock_in")
 
     return render(request, "verticals/cement/stock_in.html", context)
 
@@ -408,14 +402,23 @@ def stock_in(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def sell(request):
-    """Gamified sell flow for cement: Brand → Product → Quantity → Payment"""
+    """
+    Premium sell flow for cement: Tap brand → Tap product → Quantity & Payment
+
+    - Brand cards are clickable (tap to continue, no Continue button)
+    - Product cards are clickable (tap to continue, no Continue button)
+    - ONLY shows brands/products with stock > 0
+    """
     business = get_active_business(request)
+
+    # Ensure catalog is seeded so Sell Step 1 is never empty (idempotent)
+    ensure_hardware_seeded(business)
 
     step = request.GET.get("step", "1")
 
     if request.method == "POST":
         try:
-            # Step 1: Brand selection
+            # Step 1: Brand selection (tap to continue)
             if step == "1":
                 brand = request.POST.get("brand", "").strip()
                 if not brand:
@@ -424,7 +427,7 @@ def sell(request):
                 request.session["cement_sell_brand"] = brand
                 return redirect(f"{reverse('cement:sell')}?step=2")
 
-            # Step 2: Product selection
+            # Step 2: Product selection (tap to continue)
             elif step == "2":
                 product_id = int(request.POST.get("product_id", 0))
                 if not product_id:
@@ -664,7 +667,10 @@ def costs(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def analytics(request):
-    """Comprehensive analytics for cement/hardware with date filters"""
+    """Comprehensive analytics for cement/hardware with date filters and working charts"""
+    import json
+    from datetime import timedelta
+
     business = get_active_business(request)
 
     # Get date range filters
@@ -772,6 +778,60 @@ def analytics(request):
             .order_by("day")
         )
 
+    # ===== CHART DATA PREPARATION =====
+    # Generate all dates in range for consistent x-axis
+    if start_dt and end_dt:
+        date_range_start = start_dt.date()
+        date_range_end = end_dt.date()
+    else:
+        date_range_start = (timezone.now() - timedelta(days=30)).date()
+        date_range_end = timezone.now().date()
+
+    # Create a dictionary for daily data
+    daily_data = {}
+    current_date = date_range_start
+    while current_date <= date_range_end:
+        daily_data[current_date.isoformat()] = {"revenue": 0, "profit": 0}
+        current_date += timedelta(days=1)
+
+    # Fill in actual sales data
+    for sale in trend_sales:
+        day_str = sale["day"]
+        daily_data[day_str] = {
+            "revenue": float(sale["daily_revenue"]) if sale["daily_revenue"] else 0,
+            "profit": float(sale["daily_profit"]) if sale["daily_profit"] else 0,
+        }
+
+    # Prepare chart arrays
+    chart_labels = sorted(daily_data.keys())
+    chart_revenue = [daily_data[day]["revenue"] for day in chart_labels]
+    chart_profit = [daily_data[day]["profit"] for day in chart_labels]
+
+    # Format labels for display (e.g., "Jan 5" instead of "2024-01-05")
+    from datetime import datetime
+
+    chart_labels_formatted = []
+    for date_str in chart_labels:
+        date_obj = datetime.fromisoformat(date_str)
+        chart_labels_formatted.append(date_obj.strftime("%b %d"))
+
+    # Payment method mix data
+    payment_labels = []
+    payment_totals = []
+    for payment in sales_by_payment:
+        payment_labels.append(payment["payment_method"])
+        payment_totals.append(float(payment["total"]))
+
+    # Insights: Best selling product
+    best_selling_product = None
+    if top_products:
+        best_selling_product = top_products[0]["product__name"]
+
+    # Top payment method
+    top_payment_method = None
+    if sales_by_payment:
+        top_payment_method = sales_by_payment[0]["payment_method"]
+
     context = {
         "business": business,
         "total_products": total_products,
@@ -795,6 +855,15 @@ def analytics(request):
         "end_date": end_date,
         "date_label": date_label,
         "preset_options": get_preset_options(),
+        # Chart data (JSON-safe)
+        "chart_labels": json.dumps(chart_labels_formatted),
+        "chart_revenue": json.dumps(chart_revenue),
+        "chart_profit": json.dumps(chart_profit),
+        "payment_labels": json.dumps(payment_labels),
+        "payment_totals": json.dumps(payment_totals),
+        # Insights
+        "best_selling_product": best_selling_product,
+        "top_payment_method": top_payment_method,
     }
 
     return render(request, "verticals/cement/analytics.html", context)
@@ -901,6 +970,9 @@ def products_catalog(request):
     - List results grouped by category (collapsible)
     """
     business = get_active_business(request)
+
+    # Ensure hardware catalog is seeded (idempotent)
+    ensure_hardware_seeded(business)
 
     # Get search query and category filter
     search_query = request.GET.get("q", "").strip()

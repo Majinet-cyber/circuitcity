@@ -1,0 +1,59 @@
+{% comment %}
+Price Edit Entry Point Buttons - Manager-only
+Can be included in product lists, stock pages, and sale detail views
+
+Usage for product price:
+  {% if request.cc_is_manager or request.is_manager_plus %}
+    {% include "partials/price_edit_buttons.html" with item_type="product" item=product %}
+  {% endif %}
+
+Usage for sale price:
+  {% if request.cc_is_manager or request.is_manager_plus %}
+    {% include "partials/price_edit_buttons.html" with item_type="sale" item=sale vertical="cement" %}
+  {% endif %}
+{% endcomment %}
+
+{% if item_type == "product" %}
+  <!-- Product Price Edit Button -->
+  <button
+    type="button"
+    class="btn btn-sm btn-outline-warning"
+    data-bs-toggle="modal"
+    data-bs-target="#editProductPriceModal{{ item.id }}"
+    title="Edit selling price (Manager only)"
+  >
+    <i class="bi bi-pencil-square"></i>
+    <span class="d-none d-md-inline ms-1">Edit Price</span>
+  </button>
+
+{% elif item_type == "sale" %}
+  <!-- Sale Price Edit Button -->
+  {% load humanize %}
+  {% comment %}Check if sale is within edit window (7 days){% endcomment %}
+  {% now "U" as current_timestamp %}
+  {% with days_since_sale=item.sold_at|timesince|slice:":1"|add:"0" %}
+    {% if days_since_sale|add:"0" <= 7 and not item.is_void %}
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-danger"
+        data-bs-toggle="modal"
+        data-bs-target="#editSalePriceModal{{ item.id }}"
+        title="Edit sale price (Manager only - within 7 days)"
+      >
+        <i class="bi bi-exclamation-triangle"></i>
+        <span class="d-none d-md-inline ms-1">Edit Sale Price</span>
+      </button>
+    {% else %}
+      {% comment %}Show disabled button if outside edit window{% endcomment %}
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        disabled
+        title="Cannot edit: Sale is {% if item.is_void %}voided{% else %}older than 7 days{% endif %}"
+      >
+        <i class="bi bi-lock"></i>
+        <span class="d-none d-md-inline ms-1">Price Locked</span>
+      </button>
+    {% endif %}
+  {% endwith %}
+{% endif %}

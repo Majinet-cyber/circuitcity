@@ -240,67 +240,69 @@
     </div>
   </div>
 
-  <!-- Step 1: Brand Selection -->
+  <!-- Step 1: Brand Selection (Tap to Continue) -->
   {% if step == '1' %}
   <div class="form-section">
-    <h2 class="mb-4" style="font-weight: 800;">Step 1: Select Brand</h2>
-    <p class="text-muted mb-4">Choose a cement brand</p>
-    
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="step" value="1">
-      
-      <div class="brand-grid">
-        {% for brand in brands %}
-        <div class="premium-card brand-card" onclick="selectBrand('{{ brand.key }}')">
+    <h2 class="mb-4" style="font-weight: 800;">Select Brand</h2>
+    <p class="text-muted mb-4">👆 Tap any brand card to continue</p>
+
+    {% if brands %}
+    <div class="brand-grid">
+      {% for brand in brands %}
+      <form method="post" style="display: inline;">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="1">
+        <input type="hidden" name="brand" value="{{ brand.name }}">
+        <button type="submit" class="premium-card brand-card" style="border: none; background: transparent; width: 100%; text-align: center;">
           <div class="brand-icon">{{ brand.icon }}</div>
           <div class="brand-name">{{ brand.name }}</div>
-          <input type="radio" name="brand" value="{{ brand.key }}" id="brand_{{ brand.key }}" style="display: none;">
-        </div>
-        {% endfor %}
-      </div>
-      
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary" id="continue-btn" disabled>Continue →</button>
-        <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
-      </div>
-    </form>
+          <div class="brand-hint" style="font-size: 0.9rem; color: var(--cement-muted); margin-top: 0.5rem;">👆 Tap to continue</div>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+      <strong>No products in stock.</strong> Please <a href="{% url 'cement:stock_in' %}">add stock</a> first.
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mt-4">
+      <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
   </div>
   {% endif %}
 
-  <!-- Step 2: Product Selection -->
+  <!-- Step 2: Product Selection (Tap to Continue) -->
   {% if step == '2' %}
   <div class="form-section">
-    <h2 class="mb-4" style="font-weight: 800;">Step 2: Select Product</h2>
-    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong></p>
-    
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="step" value="2">
-      <input type="hidden" name="brand" value="{{ selected_brand }}">
-      
-      {% if products %}
-      <div class="product-grid">
-        {% for product in products %}
-        <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
+    <h2 class="mb-4" style="font-weight: 800;">Select Product</h2>
+    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong> | 👆 Tap any product card to continue</p>
+
+    {% if products %}
+    <div class="product-grid">
+      {% for product in products %}
+      <form method="post" style="display: inline;">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="2">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <button type="submit" class="premium-card product-card" style="border: none; background: transparent; width: 100%; text-align: left;">
           <div class="product-name">{{ product.name }}</div>
           <div class="product-info">Stock: {{ product.quantity_in_stock }} {{ product.base_unit|default:"bags" }}</div>
           <div class="product-price">MK {{ product.selling_price|floatformat:0|intcomma }}</div>
-          <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="alert alert-info">
-        No products in stock for this brand. <a href="{% url 'cement:stock_in' %}">Add stock</a> first.
-      </div>
-      {% endif %}
-      
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary" id="continue-btn" {% if not products %}disabled{% endif %}>Continue →</button>
-        <a href="{% url 'cement:sell' %}?step=1" class="btn btn-outline-secondary">← Back</a>
-      </div>
-    </form>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+      No products in stock for this brand. <a href="{% url 'cement:stock_in' %}">Add stock</a> first.
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mt-4">
+      <a href="{% url 'cement:sell' %}?step=1" class="btn btn-outline-secondary">← Back</a>
+    </div>
   </div>
   {% endif %}
 
@@ -308,7 +310,7 @@
   {% if step == '3' %}
   <div class="form-section">
     <h2 class="mb-4" style="font-weight: 800;">Step 3: Quantity & Payment</h2>
-    
+
     {% if selected_product %}
     <div class="mb-4 p-3" style="background: #f8fafc; border-radius: 12px;">
       <div><strong>Product:</strong> {{ selected_product.name }}</div>
@@ -316,17 +318,17 @@
       <div><strong>Available Stock:</strong> {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</div>
     </div>
     {% endif %}
-    
+
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="step" value="3">
-      
+
       <div class="mb-3">
         <label class="form-label">Quantity *</label>
         <input type="number" class="form-control" name="quantity" required min="1" max="{{ selected_product.quantity_in_stock }}" value="1">
         <small class="text-muted">Max: {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</small>
       </div>
-      
+
       <div class="mb-3">
         <label class="form-label">Payment Method *</label>
         <select class="form-control" name="payment_method" required>
@@ -335,12 +337,12 @@
           <option value="BANK">Bank Transfer</option>
         </select>
       </div>
-      
+
       <div class="mb-3">
         <label class="form-label">Notes (optional)</label>
         <textarea class="form-control" name="notes" rows="2"></textarea>
       </div>
-      
+
       <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-success">✅ Complete Sale</button>
         <a href="{% url 'cement:sell' %}?step=2" class="btn btn-outline-secondary">← Back</a>
@@ -351,22 +353,6 @@
 </div>
 
 <script>
-  function selectBrand(brandKey) {
-    document.querySelectorAll('.brand-card').forEach(card => {
-      card.classList.remove('selected');
-    });
-    event.currentTarget.classList.add('selected');
-    document.getElementById('brand_' + brandKey).checked = true;
-    document.getElementById('continue-btn').disabled = false;
-  }
-
-  function selectProduct(productId) {
-    document.querySelectorAll('.product-card').forEach(card => {
-      card.classList.remove('selected');
-    });
-    event.currentTarget.classList.add('selected');
-    document.getElementById('product_' + productId).checked = true;
-    document.getElementById('continue-btn').disabled = false;
-  }
+  // No JavaScript needed - cards submit forms directly
 </script>
 {% endblock %}

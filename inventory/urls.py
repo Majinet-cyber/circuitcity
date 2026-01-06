@@ -5,13 +5,13 @@ import importlib
 from types import SimpleNamespace
 from typing import Iterable, Optional
 
+from django.contrib.auth.decorators import login_required
+from django.core.handlers.wsgi import WSGIRequest  # type checks
 from django.http import HttpResponse, JsonResponse
+from django.http.response import HttpResponseBase  # type checks
 from django.shortcuts import redirect, render
 from django.urls import NoReverseMatch, include, path, re_path, reverse
-from django.views.generic import TemplateView, RedirectView
-from django.contrib.auth.decorators import login_required
-from django.http.response import HttpResponseBase  # type checks
-from django.core.handlers.wsgi import WSGIRequest  # type checks
+from django.views.generic import RedirectView, TemplateView
 
 # ---------------------------------------------------------------------
 # Import page views (your real templates live here)
@@ -33,11 +33,17 @@ try:
 except Exception:
     _sell_quick_page = TemplateView.as_view(template_name="inventory/sell_quick.html")
 
-# PHASE 4: Price editing views (manager-only)
+# PHASE 4: Price editing views (manager-only) - Legacy (InventoryItem only)
 try:
     from . import views_price_edit
 except Exception:
     views_price_edit = SimpleNamespace()
+
+# Global price editing views (manager-only) - Works across all verticals
+try:
+    from . import views_price_edit_global as _price_edit_global
+except Exception:
+    _price_edit_global = SimpleNamespace()
 
 
 # ---------------------------------------------------------------------
@@ -121,7 +127,8 @@ try:
 except Exception:
     _laptop_views = SimpleNamespace()
 
-from .views_dispatch import product_new_entry as product_new_entry_view, vertical_dispatcher
+from .views_dispatch import product_new_entry as product_new_entry_view
+from .views_dispatch import vertical_dispatcher
 
 # ---------------------------------------------------------------------
 # Guards (role / tenant)
@@ -424,14 +431,12 @@ _restore_stock = _get_any(("restore_stock",), views, msg="restore_stock view mis
 
 # ---- Time pages: import raw, then realize CBVs ONLY ----
 try:
-    from .views_time import (
-        _time_checkin_page as __time_checkin_page_raw,
-        _time_logs_page as __time_logs_page_raw,
-        _time_logs_api,
-        _mgr_time_overview_page as __mgr_time_overview_page_raw,
-        _mgr_time_overview_api,
-        my_time_logs_page as __my_time_logs_page_raw,
-    )
+    from .views_time import _mgr_time_overview_api
+    from .views_time import _mgr_time_overview_page as __mgr_time_overview_page_raw
+    from .views_time import _time_checkin_page as __time_checkin_page_raw
+    from .views_time import _time_logs_api
+    from .views_time import _time_logs_page as __time_logs_page_raw
+    from .views_time import my_time_logs_page as __my_time_logs_page_raw
 
     _time_checkin_page = _realize_view(__time_checkin_page_raw)
     _time_logs_page = _realize_view(__time_logs_page_raw)
@@ -651,7 +656,7 @@ _api_stock_delete = _get_any(
 
 # NEW: Phone catalog API endpoints (from views_scan.py)
 try:
-    from .views_scan import api_phone_brands, api_phone_models, api_phone_cost_by_imei
+    from .views_scan import api_phone_brands, api_phone_cost_by_imei, api_phone_models
 
     _phone_brands_api = api_phone_brands
     _phone_models_api = api_phone_models
@@ -1075,6 +1080,40 @@ urlpatterns = [
             )
         ),
         name="api_business_agents",
+    ),
+    # === MANAGER-ONLY: Global Price Editing (All Verticals) ===
+    path(
+        "pricing/edit/product/<int:product_id>/",
+        _need_biz(
+            getattr(
+                _price_edit_global,
+                "edit_product_price",
+                lambda r, product_id: JsonResponse({"error": "Feature not available"}, status=501),
+            )
+        ),
+        name="edit_product_price",
+    ),
+    path(
+        "pricing/edit/sale/<str:vertical>/<int:sale_id>/",
+        _need_biz(
+            getattr(
+                _price_edit_global,
+                "edit_sale_price",
+                lambda r, vertical, sale_id: JsonResponse({"error": "Feature not available"}, status=501),
+            )
+        ),
+        name="edit_sale_price",
+    ),
+    path(
+        "pricing/history/",
+        _need_biz(
+            getattr(
+                _price_edit_global,
+                "view_price_change_history",
+                lambda r: JsonResponse({"error": "Feature not available"}, status=501),
+            )
+        ),
+        name="price_change_history",
     ),
     # Stock controls (manager-only: transfer, edit IMEI, archive, restore)
     path(
@@ -1669,10 +1708,10 @@ urlpatterns += [
 # Analytics async JSON endpoints (optimized with caching)
 try:
     from .views_analytics_async import (
-        analytics_kpis_json,
         analytics_charts_json,
-        analytics_stock_overview_json,
         analytics_health_check,
+        analytics_kpis_json,
+        analytics_stock_overview_json,
     )
 
     _analytics_kpis_json = analytics_kpis_json
@@ -1722,13 +1761,7 @@ urlpatterns += [
 
 # Alerts/Notifications system
 try:
-    from .views_alerts import (
-        alerts_list_json,
-        alert_mark_read,
-        alert_dismiss,
-        alerts_mark_all_read,
-        alerts_page,
-    )
+    from .views_alerts import alert_dismiss, alert_mark_read, alerts_list_json, alerts_mark_all_read, alerts_page
 
     _alerts_list = alerts_list_json
     _alert_mark_read = alert_mark_read

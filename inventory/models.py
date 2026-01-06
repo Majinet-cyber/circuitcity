@@ -98,6 +98,12 @@ except Exception:
     InventoryBarcode = None  # safe fallback
     ArchiveBatch = None
 
+# Re-export PriceChangeLog for price audit trail (global feature)
+try:
+    from .models_price_audit import PriceChangeLog  # noqa: F401
+except Exception:
+    PriceChangeLog = None  # safe fallback
+
 # Re-export Laptop models for laptop/electronics vertical
 try:
     from .models_laptops import LaptopBrand, LaptopProduct, LaptopSerial  # noqa: F401

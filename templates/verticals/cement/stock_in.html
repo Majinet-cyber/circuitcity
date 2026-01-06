@@ -267,7 +267,7 @@
     .product-grid {
       grid-template-columns: 1fr;
     }
-    
+
     .cement-container {
       padding: 1rem;
     }
@@ -293,176 +293,70 @@
     </div>
   </div>
 
-  <!-- Step 1: Brand Selection -->
+  <!-- Step 1: Brand Selection (Tap to Continue) -->
   {% if step == '1' %}
   <div class="form-section">
-    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 1: Select Brand</h2>
-    <p class="text-muted mb-4">Choose a cement brand or add a new one</p>
-    
-    <form method="post">
-      {% csrf_token %}
-      <input type="hidden" name="step" value="1">
-      
-      <div class="brand-grid">
-        {% for brand in brands %}
-        <div class="premium-card brand-card" onclick="selectBrand('{{ brand.key }}')">
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Select Cement Brand</h2>
+    <p class="text-muted mb-4">👆 Tap any brand card to continue</p>
+
+    <div class="brand-grid">
+      {% for brand in brands %}
+      <form method="post" style="display: inline;">
+        {% csrf_token %}
+        <input type="hidden" name="step" value="1">
+        <input type="hidden" name="brand" value="{{ brand.name }}">
+        <button type="submit" class="premium-card brand-card" style="border: none; background: transparent; width: 100%; text-align: center;">
           <div class="brand-icon">{{ brand.icon }}</div>
           <div class="brand-name">{{ brand.name }}</div>
-          <div class="brand-hint">👆 Tap to select</div>
-          <input type="radio" name="brand" value="{{ brand.key }}" id="brand_{{ brand.key }}" style="display: none;">
-        </div>
-        {% endfor %}
-        
-        <!-- Add New Brand Card -->
-        <div class="premium-card brand-card" onclick="showAddBrand()">
-          <div class="brand-icon">➕</div>
-          <div class="brand-name">Add Brand</div>
-          <div class="brand-hint">Create new brand</div>
-        </div>
-      </div>
-      
-      <div id="add-brand-form" style="display: none; margin-top: 2rem; padding: 1.5rem; background: #f8fafc; border-radius: 12px;">
-        <label class="form-label">New Brand Name</label>
-        <input type="text" class="form-control mb-3" name="new_brand" placeholder="Enter brand name">
-      </div>
-      
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary" id="continue-btn" disabled>Continue →</button>
-        <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
-      </div>
-    </form>
+          <div class="brand-hint">👆 Tap to continue</div>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+      <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
   </div>
   {% endif %}
 
-  <!-- Step 2: Product Selection (with variation grouping) -->
-  {% if step == '2' %}
-  <div class="form-section">
-    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 2: Select Product</h2>
-    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong></p>
-    
-    <form method="post" id="productForm">
-      {% csrf_token %}
-      <input type="hidden" name="step" value="2">
-      <input type="hidden" name="brand" value="{{ selected_brand }}">
-      
-      {% if grouped_products %}
-      <!-- Show grouped products (one card per base product) -->
-      <div class="product-grid">
-        {% for base_name, product_list in grouped_products.items %}
-          {% if product_list|length == 1 %}
-            <!-- Single product, no variations -->
-            {% with product=product_list.0 %}
-            <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
-              <div class="product-name">{{ product.name }}</div>
-              <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }} {{ product.base_unit|default:"bags" }}</div>
-              <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
-            </div>
-            {% endwith %}
-          {% else %}
-            <!-- Multiple variations - show base product with variation picker -->
-            <div class="premium-card product-card" onclick="showVariations('{{ base_name|slugify }}')">
-              <div class="product-name">{{ base_name }}</div>
-              <div class="product-stock">
-                <span class="badge bg-primary">{{ product_list|length }} sizes</span>
-              </div>
-              <small class="text-muted">Click to choose size</small>
-            </div>
-            
-            <!-- Hidden variation picker (shown when base product clicked) -->
-            <div id="variations_{{ base_name|slugify }}" class="variation-picker" style="display: none;">
-              <h5 class="mb-3">Choose {{ base_name }} Size:</h5>
-              <div class="variation-grid">
-                {% for product in product_list %}
-                <div class="premium-card variation-card" onclick="selectProduct({{ product.id }})">
-                  <div class="variation-label">
-                    {% if product.spec_label %}
-                      {{ product.spec_label }}
-                    {% else %}
-                      {{ product.name|slice:"20:" }}
-                    {% endif %}
-                  </div>
-                  <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }}</div>
-                  <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
-                </div>
-                {% endfor %}
-              </div>
-              <button type="button" class="btn btn-sm btn-outline-secondary mt-2" onclick="hideVariations('{{ base_name|slugify }}')">← Back</button>
-            </div>
-          {% endif %}
-        {% endfor %}
-      </div>
-      {% elif products %}
-      <!-- Fallback: show all products (if grouping failed) -->
-      <div class="product-grid">
-        {% for product in products %}
-        <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
-          <div class="product-name">{{ product.name }}</div>
-          <div class="product-stock">Stock: {{ product.quantity_in_stock|default:0 }} {{ product.base_unit|default:"bags" }}</div>
-          <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      
-      <div class="mt-4">
-        <label class="form-label">Or enter new product name</label>
-        <input type="text" class="form-control" name="product_name" placeholder="e.g., Cement Bag 50kg">
-      </div>
-      
-      <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary">Continue →</button>
-        <a href="{% url 'cement:stock_in' %}?step=1" class="btn btn-outline-secondary">← Back</a>
-      </div>
-    </form>
-  </div>
-  {% endif %}
+  <!-- Step 2 is auto-skipped (product auto-created from brand) -->
 
-  <!-- Step 3: Quantity & Pricing -->
+  <!-- Step 3: Quantity & Pricing (with Live Calculator) -->
   {% if step == '3' %}
   <div class="form-section">
-    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 3: Quantity & Pricing</h2>
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Quantity & Pricing</h2>
     <p class="text-muted mb-4">
-      Brand: <strong>{{ selected_brand }}</strong>
       {% if selected_product %}
-      <br>Product: <strong>{{ selected_product.name }}</strong>
-      {% elif new_product_name %}
-      <br>New Product: <strong>{{ new_product_name }}</strong>
+      Product: <strong>{{ selected_product.name }}</strong>
       {% endif %}
     </p>
-    
-    <form method="post">
+
+    <form method="post" id="pricingForm">
       {% csrf_token %}
       <input type="hidden" name="step" value="3">
-      
+
       <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Quantity *</label>
-          <input type="number" class="form-control" name="quantity" required min="1" placeholder="Enter quantity">
+        <div class="col-md-12">
+          <label class="form-label">Quantity (bags) *</label>
+          <input type="number" class="form-control" name="quantity" id="quantity-input" required min="1" value="1" placeholder="Enter quantity">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Unit *</label>
-          <select class="form-control" name="unit" required>
-            {% for value, label in units %}
-            <option value="{{ value }}">{{ label }}</option>
-            {% endfor %}
-          </select>
+          <label class="form-label">Cost Price per bag (MK) *</label>
+          <input type="number" class="form-control" name="cost_price" id="cost-price-input" required step="0.01" min="0" placeholder="0.00" value="{{ prefill_cost|default:'' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Cost Price per {{ selected_product.base_unit|default:"bag" }} (MK) *</label>
-          <input type="number" class="form-control" name="cost_price" required step="0.01" min="0" placeholder="0.00">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Selling Price per {{ selected_product.base_unit|default:"bag" }} (MK) *</label>
-          <input type="number" class="form-control" name="selling_price" id="selling-price-input" required step="0.01" min="0" placeholder="0.00">
+          <label class="form-label">Selling Price per bag (MK) *</label>
+          <input type="number" class="form-control" name="selling_price" id="selling-price-input" required step="0.01" min="0" placeholder="0.00" value="{{ prefill_selling|default:'' }}">
         </div>
       </div>
-      
-      <!-- Pricing Intelligence Feedback -->
-      <div id="price-feedback" class="pricing-feedback" style="display:none; margin-top: 1rem;"></div>
-      
+
+      <!-- Live Pricing Intelligence Feedback -->
+      <div id="price-feedback" style="margin-top: 1.5rem; padding: 1rem; border-radius: 8px; display: none;"></div>
+
       <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-primary">✅ Save Stock</button>
-        <a href="{% url 'cement:stock_in' %}?step=2" class="btn btn-outline-secondary">← Back</a>
+        <button type="submit" class="btn btn-primary" id="save-btn">✅ Save Stock</button>
+        <a href="{% url 'cement:stock_in' %}" class="btn btn-outline-secondary">Cancel</a>
       </div>
     </form>
   </div>
@@ -470,76 +364,89 @@
 </div>
 
 <script>
-  function selectBrand(brandKey) {
-    document.querySelectorAll('.brand-card').forEach(card => {
-      card.classList.remove('selected');
-    });
-    event.currentTarget.classList.add('selected');
-    document.getElementById('brand_' + brandKey).checked = true;
-    document.getElementById('continue-btn').disabled = false;
-  }
+  // Live Pricing Calculator for Step 3
+  {% if step == '3' %}
+  (function() {
+    const costInput = document.getElementById('cost-price-input');
+    const sellingInput = document.getElementById('selling-price-input');
+    const quantityInput = document.getElementById('quantity-input');
+    const feedback = document.getElementById('price-feedback');
+    const saveBtn = document.getElementById('save-btn');
 
-  function showAddBrand() {
-    document.getElementById('add-brand-form').style.display = 'block';
-  }
+    function updatePricingFeedback() {
+      const cost = parseFloat(costInput.value) || 0;
+      const selling = parseFloat(sellingInput.value) || 0;
+      const quantity = parseInt(quantityInput.value) || 1;
 
-  function selectProduct(productId) {
-    document.querySelectorAll('.product-card, .variation-card').forEach(card => {
-      card.classList.remove('selected');
-    });
-    event.currentTarget.classList.add('selected');
-    document.getElementById('product_' + productId).checked = true;
-  }
-
-  function showVariations(baseNameSlug) {
-    // Hide all other variation pickers
-    document.querySelectorAll('.variation-picker').forEach(picker => {
-      picker.style.display = 'none';
-    });
-    // Show the selected variation picker
-    const picker = document.getElementById('variations_' + baseNameSlug);
-    if (picker) {
-      picker.style.display = 'block';
-    }
-  }
-
-  function hideVariations(baseNameSlug) {
-    const picker = document.getElementById('variations_' + baseNameSlug);
-    if (picker) {
-      picker.style.display = 'none';
-    }
-  }
-
-  // Pricing Intelligence (if cost price available)
-  {% if selected_product and selected_product.cost_price %}
-  const costPrice = {{ selected_product.cost_price }};
-  const sellingPriceInput = document.getElementById('selling-price-input');
-  if (sellingPriceInput) {
-    sellingPriceInput.addEventListener('input', function() {
-      const sellingPrice = parseFloat(this.value) || 0;
-      const feedback = document.getElementById('price-feedback');
-      
-      if (sellingPrice > 0) {
-        if (sellingPrice < costPrice) {
-          feedback.style.display = 'block';
-          feedback.className = 'pricing-feedback below-cost';
-          feedback.innerHTML = `⚠️ Warning: Selling price (MK ${sellingPrice.toFixed(2)}) is below cost price (MK ${costPrice.toFixed(2)})`;
-        } else {
-          const profit = sellingPrice - costPrice;
-          const margin = ((profit / costPrice) * 100).toFixed(1);
-          feedback.style.display = 'block';
-          feedback.className = 'pricing-feedback above-cost';
-          feedback.innerHTML = `✅ Good profit margin: ${margin}% (Profit: MK ${profit.toFixed(2)})`;
-        }
-      } else {
+      if (cost === 0 || selling === 0) {
         feedback.style.display = 'none';
+        saveBtn.disabled = false;
+        return;
       }
-    });
-  }
+
+      feedback.style.display = 'block';
+
+      if (selling < cost) {
+        // Red warning: selling below cost
+        feedback.style.background = '#fee2e2';
+        feedback.style.border = '2px solid #ef4444';
+        feedback.style.color = '#991b1b';
+
+        const loss = cost - selling;
+        const lossTotal = loss * quantity;
+        feedback.innerHTML = `
+          <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;">⚠️ WARNING: Selling Below Cost!</div>
+          <div>Loss per bag: <strong>MK ${loss.toFixed(2)}</strong></div>
+          <div>Total loss on ${quantity} bags: <strong>MK ${lossTotal.toFixed(2)}</strong></div>
+        `;
+        saveBtn.disabled = true;
+        return;
+      }
+
+      // Calculate metrics
+      const profit = selling - cost;
+      const margin = ((profit / selling) * 100);
+      const markup = ((profit / cost) * 100);
+      const totalProfit = profit * quantity;
+
+      if (margin < 10) {
+        // Yellow warning: low margin
+        feedback.style.background = '#fef3c7';
+        feedback.style.border = '2px solid #f59e0b';
+        feedback.style.color = '#92400e';
+        feedback.innerHTML = `
+          <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;">⚠️ Low Margin (${margin.toFixed(1)}%)</div>
+          <div>Profit per bag: <strong>MK ${profit.toFixed(2)}</strong></div>
+          <div>Total profit on ${quantity} bags: <strong>MK ${totalProfit.toFixed(2)}</strong></div>
+          <div style="margin-top: 0.5rem; font-size: 0.9rem;">Consider increasing selling price for better margins</div>
+        `;
+      } else {
+        // Green: good margin
+        feedback.style.background = '#d1fae5';
+        feedback.style.border = '2px solid #10b981';
+        feedback.style.color = '#065f46';
+        feedback.innerHTML = `
+          <div style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.5rem;">✅ Good Pricing</div>
+          <div><strong>Margin:</strong> ${margin.toFixed(1)}% | <strong>Markup:</strong> ${markup.toFixed(1)}%</div>
+          <div><strong>Profit per bag:</strong> MK ${profit.toFixed(2)}</div>
+          <div><strong>Total profit on ${quantity} bags:</strong> MK ${totalProfit.toFixed(2)}</div>
+        `;
+      }
+
+      saveBtn.disabled = false;
+    }
+
+    if (costInput && sellingInput && quantityInput) {
+      costInput.addEventListener('input', updatePricingFeedback);
+      sellingInput.addEventListener('input', updatePricingFeedback);
+      quantityInput.addEventListener('input', updatePricingFeedback);
+
+      // Trigger on page load if values are prefilled
+      if (costInput.value || sellingInput.value) {
+        updatePricingFeedback();
+      }
+    }
+  })();
   {% endif %}
 </script>
-
-{% if step == '3' %}
-<link rel="stylesheet" href="{% static 'css/pricing-intelligence.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
-{% endif %}
 {% endblock %}

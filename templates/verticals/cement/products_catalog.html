@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load cc_filters %}
 
 {% block title %}Products Catalog · Hardware & General Dealers · {{ business.name }}{% endblock %}
 
@@ -168,15 +169,15 @@
     <p class="text-center mb-4 opacity-90">
       Browse our curated catalog of hardware products. Select a product to add it to your inventory.
     </p>
-    
+
     <!-- Search Bar -->
     <div class="hw-search-bar">
       <form method="get" action="">
         <div class="input-group">
-          <input 
-            type="text" 
-            name="q" 
-            class="form-control hw-search-input" 
+          <input
+            type="text"
+            name="q"
+            class="form-control hw-search-input"
             placeholder="Search products by name or keyword..."
             value="{{ search_query }}"
             autofocus
@@ -290,4 +291,3 @@
   });
 </script>
 {% endblock %}
-

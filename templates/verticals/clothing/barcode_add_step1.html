@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Barcoded Items - Step 1 · Clothing{% endblock %}
+
+{% block content %}
+
+<style>
+.add-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: white;
+  padding: 28px;
+  border-radius: 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.25);
+}
+
+.page-header h1 {
+  margin: 0 0 8px 0;
+  font-size: clamp(1.8rem, 4vw, 2.3rem);
+  font-weight: 800;
+}
+
+.page-header p {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1.05rem;
+}
+
+.form-card {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.form-group input.is-invalid,
+.form-group select.is-invalid {
+  border-color: #ef4444;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #ef4444;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.field-help {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: #8b5cf6;
+}
+
+.alert {
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+.alert-info {
+  background: #dbeafe;
+  color: #1e40af;
+  border: 2px solid #93c5fd;
+}
+
+.alert-warning {
+  background: #fef3c7;
+  color: #92400e;
+  border: 2px solid #fcd34d;
+}
+
+.manager-override-box {
+  background: #fef3c7;
+  border: 2px solid #fbbf24;
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 16px;
+  display: none;
+}
+
+.manager-override-box.show {
+  display: block;
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.size-hint {
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: #475569;
+  display: none;
+}
+
+.size-hint.show {
+  display: block;
+}
+</style>
+
+<div class="add-container">
+  <a href="{% url 'verticals:clothing_dashboard_v2' %}" class="back-link">
+    ← Back to Dashboard
+  </a>
+
+  <div class="page-header">
+    <h1>➕ Add Barcoded Items</h1>
+    <p>Step 1 of 2: Enter prices, quantity, and size details</p>
+  </div>
+
+  <div class="alert alert-info">
+    <strong>🔍 Barcode Flow:</strong> First enter product details and prices, then scan barcodes one by one.
+  </div>
+
+  {% if form.non_field_errors %}
+  <div class="alert alert-warning">
+    {% for error in form.non_field_errors %}
+      {{ error }}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="form-card">
+    <form method="post" id="barcodeForm">
+      {% csrf_token %}
+
+      <!-- Category -->
+      <div class="form-group">
+        <label for="{{ form.category.id_for_label }}">Category *</label>
+        {{ form.category }}
+        {% if form.category.errors %}
+          <div class="invalid-feedback">{{ form.category.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Subcategory -->
+      <div class="form-group">
+        <label for="{{ form.subcategory.id_for_label }}">Subcategory (optional)</label>
+        {{ form.subcategory }}
+        <div class="field-help">e.g., sneaker, boot, casual</div>
+        {% if form.subcategory.errors %}
+          <div class="invalid-feedback">{{ form.subcategory.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Size -->
+      <div class="form-group">
+        <label for="{{ form.size.id_for_label }}">Size *</label>
+        {{ form.size }}
+        <div class="field-help">{{ form.size.help_text }}</div>
+        <div class="size-hint" id="sizeHint"></div>
+        {% if form.size.errors %}
+          <div class="invalid-feedback">{{ form.size.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Quantity -->
+      <div class="form-group">
+        <label for="{{ form.quantity.id_for_label }}">Quantity (How many units to scan) *</label>
+        {{ form.quantity }}
+        <div class="field-help">{{ form.quantity.help_text }}</div>
+        {% if form.quantity.errors %}
+          <div class="invalid-feedback">{{ form.quantity.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Prices -->
+      <div class="form-row">
+        <div class="form-group">
+          <label for="{{ form.cost_price.id_for_label }}">Cost Price (K) *</label>
+          {{ form.cost_price }}
+          {% if form.cost_price.errors %}
+            <div class="invalid-feedback">{{ form.cost_price.errors.0 }}</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label for="{{ form.selling_price.id_for_label }}">Selling Price (K)</label>
+          {{ form.selling_price }}
+          <div class="field-help">{{ form.selling_price.help_text }}</div>
+          {% if form.selling_price.errors %}
+            <div class="invalid-feedback">{{ form.selling_price.errors.0 }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Manager override box (shown if selling < cost) -->
+      <div class="manager-override-box" id="managerOverrideBox">
+        <div class="checkbox-group">
+          {{ form.allow_below_cost }}
+          <label for="{{ form.allow_below_cost.id_for_label }}">
+            {{ form.allow_below_cost.label }}
+          </label>
+        </div>
+        {% if form.allow_below_cost.errors %}
+          <div class="invalid-feedback">{{ form.allow_below_cost.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Brand -->
+      <div class="form-group">
+        <label for="{{ form.brand.id_for_label }}">Brand (optional)</label>
+        {{ form.brand }}
+        {% if form.brand.errors %}
+          <div class="invalid-feedback">{{ form.brand.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Color -->
+      <div class="form-group">
+        <label for="{{ form.color.id_for_label }}">Color (optional)</label>
+        {{ form.color }}
+        {% if form.color.errors %}
+          <div class="invalid-feedback">{{ form.color.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Product Name -->
+      <div class="form-group">
+        <label for="{{ form.product_name.id_for_label }}">Product Name (optional)</label>
+        {{ form.product_name }}
+        <div class="field-help">{{ form.product_name.help_text }}</div>
+        {% if form.product_name.errors %}
+          <div class="invalid-feedback">{{ form.product_name.errors.0 }}</div>
+        {% endif %}
+      </div>
+
+      <button type="submit" class="submit-btn">
+        Next: Scan Barcodes →
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+// Category change -> show size hint for shoes
+const categorySelect = document.getElementById('id_category');
+const sizeInput = document.getElementById('id_size');
+const sizeHint = document.getElementById('sizeHint');
+
+if (categorySelect) {
+  categorySelect.addEventListener('change', function() {
+    const category = this.value.toLowerCase();
+    const isFootwear = category.includes('shoe') || category.includes('sneaker') || category.includes('boot');
+
+    if (isFootwear) {
+      sizeHint.textContent = '⚠️ Shoes must use NUMERIC sizes only (30-50). Do NOT use XL, XXL, S, M, L.';
+      sizeHint.classList.add('show');
+      sizeInput.placeholder = '40';
+    } else {
+      sizeHint.classList.remove('show');
+      sizeInput.placeholder = 'e.g., 42, M, L';
+    }
+  });
+}
+
+// Price validation -> show manager override if selling < cost
+const costInput = document.getElementById('id_selling_price').closest('.form-group').previousElementSibling.querySelector('input');
+const sellingInput = document.getElementById('id_selling_price');
+const managerOverrideBox = document.getElementById('managerOverrideBox');
+
+function checkPrices() {
+  const cost = parseFloat(costInput.value) || 0;
+  const selling = parseFloat(sellingInput.value) || 0;
+
+  if (selling > 0 && selling < cost) {
+    managerOverrideBox.classList.add('show');
+  } else {
+    managerOverrideBox.classList.remove('show');
+  }
+}
+
+if (costInput && sellingInput) {
+  costInput.addEventListener('input', checkPrices);
+  sellingInput.addEventListener('input', checkPrices);
+
+  // Check on page load
+  checkPrices();
+}
+
+// Auto-suggest selling price if blank
+sellingInput.addEventListener('blur', function() {
+  if (!this.value && costInput.value) {
+    const cost = parseFloat(costInput.value);
+    if (cost > 0) {
+      // Suggest: cost × 1.35, rounded to nearest 100
+      const suggested = cost * 1.35;
+      const rounded = Math.round(suggested / 100) * 100;
+      this.value = rounded.toFixed(2);
+      checkPrices();
+    }
+  }
+});
+</script>
+
+{% endblock %}

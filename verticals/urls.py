@@ -60,6 +60,11 @@ urlpatterns = [
     path("clothing/add/", clothing_v2.quick_add_step1, name="clothing_quick_add_step1"),
     path("clothing/add/<str:category>/", clothing_v2.quick_add_step2, name="clothing_quick_add_step2"),
     path("clothing/add/success/", clothing_v2.quick_add_success, name="clothing_quick_add_success"),
+    # Barcode Wizard (Add Barcoded Items)
+    path("clothing/barcode/add/step1/", clothing_v2.barcode_add_step1, name="clothing_barcode_add_step1"),
+    path("clothing/barcode/add/step2/", clothing_v2.barcode_add_step2, name="clothing_barcode_add_step2"),
+    # Fast Sell (Barcode Scanner for barcoded items)
+    path("clothing/sell/barcode/", clothing_v2.fast_sell_barcode_scanner, name="clothing_fast_sell_barcode"),
     path("clothing/stock-in/fast/", clothing_v2.fast_stock_in, name="clothing_fast_stock_in"),
     path("clothing/sell/fast/", clothing_v2.fast_sell, name="clothing_fast_sell_v2"),
     path("clothing/products/", clothing_v2.products_list, name="clothing_products_list"),

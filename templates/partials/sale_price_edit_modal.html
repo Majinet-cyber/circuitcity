@@ -1,0 +1,206 @@
+{% comment %}
+Global Sale Price Edit Modal - Works across all verticals
+Manager-only feature with audit trail for correcting historical sale prices
+
+Usage:
+  {% include "partials/sale_price_edit_modal.html" with sale=sale vertical="cement" %}
+
+  vertical should be one of: cement, liquor, grocery, pharmacy, clothing
+{% endcomment %}
+
+<!-- Sale Price Edit Modal -->
+<div class="modal fade" id="editSalePriceModal{{ sale.id }}" tabindex="-1" aria-labelledby="editSalePriceModalLabel{{ sale.id }}" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger bg-opacity-10">
+        <h5 class="modal-title" id="editSalePriceModalLabel{{ sale.id }}">
+          <i class="bi bi-exclamation-triangle text-danger me-2"></i>
+          Edit Sale Price (Historical)
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="editSalePriceForm{{ sale.id }}" method="post" action="{% url 'inventory:edit_sale_price' vertical sale.id %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <!-- Sale Info -->
+          <div class="alert alert-info mb-3">
+            <strong>{{ sale.product.name }}</strong>
+            <br>
+            <small class="text-muted">
+              Sold: {{ sale.sold_at|date:"M d, Y H:i" }}
+              {% if sale.sold_by %}
+                by {{ sale.sold_by.username }}
+              {% endif %}
+            </small>
+            <br>
+            <small class="text-muted">
+              Quantity: {{ sale.quantity }}
+              {% if vertical == "grocery" %}
+                {{ sale.product.base_unit }}
+              {% else %}
+                {{ sale.product.base_unit }}
+              {% endif %}
+            </small>
+          </div>
+
+          <!-- Current Unit Price -->
+          <div class="mb-3">
+            <label class="form-label text-muted small">Current Unit Selling Price</label>
+            <div class="input-group">
+              <span class="input-group-text">MK</span>
+              <input type="text" class="form-control bg-light"
+                     value="{% if vertical == 'grocery' %}{{ sale.unit_price_sold|floatformat:2 }}{% else %}{{ sale.unit_price|floatformat:2 }}{% endif %}"
+                     readonly>
+            </div>
+            <div class="form-text text-muted">
+              Current Total: MK
+              {% if vertical == "grocery" %}
+                {{ sale.total_amount|floatformat:2 }}
+              {% elif vertical == "cement" or vertical == "liquor" or vertical == "clothing" %}
+                {{ sale.total_price|floatformat:2 }}
+              {% else %}
+                {{ sale.total_amount|floatformat:2 }}
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- New Unit Price -->
+          <div class="mb-3">
+            <label for="newSalePrice{{ sale.id }}" class="form-label">
+              Corrected Unit Selling Price <span class="text-danger">*</span>
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">MK</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                class="form-control"
+                id="newSalePrice{{ sale.id }}"
+                name="new_unit_price"
+                required
+                placeholder="Enter corrected unit price"
+                autofocus
+              >
+            </div>
+            <div class="form-text" id="newTotalPreview{{ sale.id }}">
+              <!-- Will show new total via JavaScript -->
+            </div>
+          </div>
+
+          <!-- Reason (Required) -->
+          <div class="mb-3">
+            <label for="saleReason{{ sale.id }}" class="form-label">
+              Reason for Correction <span class="text-danger">*</span>
+            </label>
+            <textarea
+              class="form-control"
+              id="saleReason{{ sale.id }}"
+              name="reason"
+              rows="3"
+              required
+              placeholder="E.g., 'Wrong price charged, customer should have received discount'"
+              minlength="10"
+            ></textarea>
+            <div class="form-text">
+              Required: Explain why you're correcting this historical sale price
+            </div>
+          </div>
+
+          <!-- Critical Warning -->
+          <div class="alert alert-danger mb-0">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            <strong>Warning:</strong> This will change historical data and affect reports!
+            <ul class="mb-0 mt-2">
+              <li>Revenue metrics will be updated</li>
+              <li>Profit calculations will change</li>
+              <li>Dashboard totals will reflect the change</li>
+              <li>All changes are logged for audit</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">
+            <i class="bi bi-check-circle me-1"></i>
+            Update Sale Price
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Preview new total as user types
+document.getElementById('newSalePrice{{ sale.id }}').addEventListener('input', function(e) {
+  const newPrice = parseFloat(e.target.value) || 0;
+  const quantity = {{ sale.quantity|default:"1" }};
+  const newTotal = (newPrice * quantity).toFixed(2);
+  const preview = document.getElementById('newTotalPreview{{ sale.id }}');
+
+  if (newPrice > 0) {
+    preview.innerHTML = `New Total: <strong>MK ${newTotal}</strong>`;
+    preview.className = 'form-text text-success fw-bold';
+  } else {
+    preview.innerHTML = '';
+  }
+});
+
+// Auto-submit with loading state for sale price edit
+document.getElementById('editSalePriceForm{{ sale.id }}').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const form = e.target;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.innerHTML;
+
+  // Show loading state
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Updating...';
+
+  // Submit via fetch
+  fetch(form.action, {
+    method: 'POST',
+    body: new FormData(form),
+    headers: {
+      'X-CSRFToken': form.querySelector('[name="csrfmiddlewaretoken"]').value
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Show success message
+      const successMsg = document.createElement('div');
+      successMsg.className = 'alert alert-success alert-dismissible fade show';
+      successMsg.innerHTML = `
+        <i class="bi bi-check-circle me-2"></i>
+        ${data.message || 'Sale price updated successfully'}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      form.closest('.modal-content').querySelector('.modal-body').insertBefore(successMsg, form.closest('.modal-content').querySelector('.modal-body').firstChild);
+
+      // Reload page after 1.5 seconds to show updated totals
+      setTimeout(() => {
+        location.reload();
+      }, 1500);
+    } else {
+      throw new Error(data.error || 'Failed to update sale price');
+    }
+  })
+  .catch(error => {
+    // Show error message
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'alert alert-danger alert-dismissible fade show';
+    errorMsg.innerHTML = `
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      ${error.message}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    form.closest('.modal-content').querySelector('.modal-body').insertBefore(errorMsg, form.closest('.modal-content').querySelector('.modal-body').firstChild);
+
+    // Restore button
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = originalText;
+  });
+});
+</script>

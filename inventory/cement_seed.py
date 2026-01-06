@@ -176,3 +176,103 @@ def normalize_cement_brand_name(name: str) -> str:
 
     # Return original if not found (custom brand)
     return name
+
+
+# ============================================================
+# HARDWARE CATALOG SEEDING (for vertical usability)
+# ============================================================
+HARDWARE_SEED_ITEMS = [
+    # Paint products (popular items)
+    {"name": "Rainbow Paint - 1L White Emulsion", "category": "paint", "unit": "tin", "brand": "Rainbow"},
+    {"name": "Rainbow Paint - 4L White Emulsion", "category": "paint", "unit": "tin", "brand": "Rainbow"},
+    {"name": "Crown Paint - 1L White Gloss", "category": "paint", "unit": "tin", "brand": "Crown"},
+    {"name": "Plascon Paint - 4L White Matt", "category": "paint", "unit": "tin", "brand": "Plascon"},
+    # Iron sheets (roofing)
+    {"name": "Galvanized Iron Sheet - 2.4m", "category": "iron_sheets", "unit": "sheet", "brand": "Standard"},
+    {"name": "Galvanized Iron Sheet - 3.0m", "category": "iron_sheets", "unit": "sheet", "brand": "Standard"},
+    {"name": "Colored Iron Sheet - 2.4m Green", "category": "iron_sheets", "unit": "sheet", "brand": "Premium"},
+    # Roofing timber
+    {"name": "Roofing Timber - 2x4 3m", "category": "timber", "unit": "piece", "brand": "Generic"},
+    {"name": "Roofing Timber - 2x6 3m", "category": "timber", "unit": "piece", "brand": "Generic"},
+    # Nails
+    {"name": "Roofing Nails - 2 inch", "category": "nails", "unit": "kg", "brand": "Generic"},
+    {"name": "Wire Nails - 3 inch", "category": "nails", "unit": "kg", "brand": "Generic"},
+    # Welding materials
+    {"name": "Welding Electrodes - 2.5mm", "category": "welding", "unit": "kg", "brand": "Generic"},
+    {"name": "Welding Rods - 3.2mm", "category": "welding", "unit": "kg", "brand": "Generic"},
+    # Car spares (basic)
+    {"name": "Engine Oil - 5W30 1L", "category": "car_spares", "unit": "bottle", "brand": "Generic"},
+    {"name": "Brake Fluid - DOT 3 500ml", "category": "car_spares", "unit": "bottle", "brand": "Generic"},
+]
+
+
+def ensure_hardware_seeded(business: Business, location=None, user=None) -> Dict[str, int]:
+    """
+    Idempotent seeding function for cement/hardware vertical.
+    Creates a usable catalog of cement + hardware products if none exist.
+
+    This ensures the Sell page (Step 1: Select Brand) is never empty.
+
+    Args:
+        business: Business instance (must be cement vertical)
+        location: Optional location (for audit trail)
+        user: Optional user (for audit trail)
+
+    Returns:
+        Dict with 'cement_created', 'cement_skipped', 'hardware_created', 'hardware_skipped' counts
+    """
+    if not business:
+        return {"error": "No business provided"}
+
+    # Only seed for cement businesses
+    business_kind = getattr(business, "business_kind", None)
+    if business_kind != BusinessKind.CEMENT:
+        return {"error": f"Wrong business kind: {business_kind}"}
+
+    cement_result = seed_cement_defaults(business)
+
+    hardware_created = 0
+    hardware_skipped = 0
+
+    with transaction.atomic():
+        # Seed hardware products
+        for item_spec in HARDWARE_SEED_ITEMS:
+            item_name = item_spec["name"]
+            category = item_spec["category"]
+            unit = item_spec.get("unit", "piece")
+            brand = item_spec.get("brand", "Generic")
+
+            # Check if product already exists (case-insensitive)
+            existing = MerchProduct.objects.filter(
+                business=business,
+                name__iexact=item_name,
+                kind=BusinessKind.CEMENT,
+            ).first()
+
+            if existing:
+                hardware_skipped += 1
+                continue
+
+            # Create new hardware product (zero stock, managers will stock in)
+            MerchProduct.objects.create(
+                business=business,
+                name=item_name,
+                kind=BusinessKind.CEMENT,
+                category=category,
+                spec_label="",  # Prevent NULL constraint
+                base_unit=unit,
+                pack_size=1,
+                cost_price=Decimal("0.00"),  # Will be set during first stock-in
+                selling_price=Decimal("0.00"),  # Will be set during first stock-in
+                quantity_in_stock=0,  # Start with zero stock
+                is_active=True,
+                track_inventory=True,
+            )
+            hardware_created += 1
+
+    return {
+        "cement_created": cement_result.get("created", 0),
+        "cement_skipped": cement_result.get("skipped", 0),
+        "hardware_created": hardware_created,
+        "hardware_skipped": hardware_skipped,
+    }
