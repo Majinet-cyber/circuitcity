@@ -1385,6 +1385,15 @@
   if (!('serviceWorker' in navigator)) return;
   if (window.location.pathname.startsWith('/admin/')) return;
 
+  // CRITICAL: Disable service worker on local dev to prevent cache poisoning
+  // Service workers can cache bad responses (302 redirects, 500 errors) during development,
+  // causing "blank page" or "warped dashboard" issues that persist even after fixes.
+  var hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('[DEV] Service worker disabled on localhost to prevent cache issues');
+    return;
+  }
+
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(function(registration) {
@@ -1405,7 +1414,7 @@
       })
       .catch(function(error) {
         // Fail silently in production, log in dev
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
           console.warn('ServiceWorker registration failed: ', error);
         }
       });
