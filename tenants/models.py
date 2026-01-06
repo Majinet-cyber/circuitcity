@@ -103,6 +103,13 @@ class Business(models.Model):
         help_text="Business vertical (drives tailored dashboards and flows).",
     )
 
+    # Currency for this business (defaults to MWK - Malawian Kwacha)
+    currency = models.CharField(
+        max_length=3,
+        default="MWK",
+        help_text="Currency code (ISO 4217, e.g., MWK, USD, GBP).",
+    )
+
     # Optional for subdomain routing later (e.g., acme.circuit.city)
     subdomain = models.CharField(max_length=63, blank=True, default="", db_index=True)
 
