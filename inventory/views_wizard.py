@@ -69,7 +69,35 @@ def pharmacy_wizard(request):
 @require_business
 def clothing_wizard(request):
     """Render the clothing add-product wizard"""
-    return render(request, "inventory/wizards/clothing_wizard.html")
+    business = get_active_business(request)
+    
+    # Auto-select location if not set
+    location = getattr(request, "active_location", None)
+    if not location and business:
+        # Try to get default location or first active location
+        from tenants.models import Location
+        
+        # Check if business has a default location
+        try:
+            location = Location.objects.filter(
+                business=business,
+                is_active=True
+            ).order_by('-is_default', 'id').first()
+            
+            if location:
+                # Store in session for subsequent API calls
+                request.session['active_location_id'] = location.id
+                request.active_location = location
+        except Exception:
+            pass
+    
+    context = {
+        'business': business,
+        'active_location': location,
+        'location_id': location.id if location else None
+    }
+    
+    return render(request, "inventory/wizards/clothing_wizard.html", context)
 
 
 # =============================================================================

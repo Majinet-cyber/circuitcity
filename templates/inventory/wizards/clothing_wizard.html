@@ -1088,7 +1088,8 @@
           selling_price: price.toFixed(2),
           brand: wizard.data.brand || '',
           color: wizard.data.color || '',
-          product_name: wizard.data.product_name || ''
+          product_name: wizard.data.product_name || '',
+          location_id: {{ location_id|default:'null' }}
         })
       });
 
@@ -1109,8 +1110,20 @@
         // Re-render to show scanning UI
         wizard.render();
       } else {
-        // Show validation error from backend
-        errorDiv.textContent = '❌ ' + (result.error || 'Validation failed');
+        // Handle structured errors
+        if (result.code === 'no_active_location' && result.action_url) {
+          errorDiv.innerHTML = '❌ ' + (result.error || 'No active location') + 
+            ' <a href="' + result.action_url + '" class="alert-link">Create Location</a>';
+        } else if (result.field_errors) {
+          // Show field-specific errors
+          const errors = [];
+          for (const [field, msg] of Object.entries(result.field_errors)) {
+            errors.push(`${field}: ${msg}`);
+          }
+          errorDiv.textContent = '❌ ' + errors.join(', ');
+        } else {
+          errorDiv.textContent = '❌ ' + (result.error || 'Validation failed');
+        }
         errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
         errorDiv.classList.add('alert-danger');
       }
