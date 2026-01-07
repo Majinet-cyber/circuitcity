@@ -333,6 +333,40 @@ def checkout(request: HttpRequest) -> HttpResponse:
                     self.plan_name = pending.selected_plan.name if pending.selected_plan else pending.selected_plan_code
                     self.business = pending.business
                     self.is_pending_checkout = True
+                    # Add number attribute for template/payment compatibility
+                    self.number = f"PREVIEW-{pending.id}"
+                    self.invoice_number = self.number  # Alias for compatibility
+                
+                # Add invoice-like properties for template compatibility
+                @property
+                def subtotal(self):
+                    return self.total
+                
+                @property
+                def tax_total(self):
+                    return Decimal("0")
+                
+                @property
+                def items(self):
+                    """Return a queryset-like object with a single item."""
+                    class FakeItem:
+                        def __init__(self, plan_name, amount):
+                            self.description = plan_name
+                            self.qty = Decimal("1")
+                            self.unit_price = amount
+                            self.total = amount
+                    
+                    class FakeQuerySet:
+                        def __init__(self, item):
+                            self._item = item
+                        
+                        def all(self):
+                            return [self._item]
+                        
+                        def __iter__(self):
+                            return iter([self._item])
+                    
+                    return FakeQuerySet(FakeItem(self.plan_name, self.total))
             invoice = CheckoutPreview(pending)
         except PendingCheckout.DoesNotExist:
             messages.info(request, "Checkout session expired. Please select a plan again.")
@@ -420,17 +454,21 @@ def checkout(request: HttpRequest) -> HttpResponse:
             if hasattr(biz, "locations"):
                 location = biz.locations.first()
 
+            # Get subscription (needed for both flows)
+            sub = _ensure_trial_subscription(biz)
+            
             # Get plan information from PendingCheckout or subscription
             if hasattr(invoice, 'is_pending_checkout') and invoice.is_pending_checkout:
                 plan_code = pending.selected_plan_code
+                plan_name = pending.selected_plan.name if pending.selected_plan else pending.selected_plan_code
                 amount = pending.amount
                 currency = pending.currency
                 # Store pending checkout reference for webhook processing
                 pending.tx_ref = tx_ref
                 pending.save(update_fields=["tx_ref", "updated_at"])
             else:
-                sub = _ensure_trial_subscription(biz)
                 plan_code = sub.plan.code if sub.plan else "unknown"
+                plan_name = sub.plan.name if sub.plan else "Subscription"
                 amount = invoice.total
                 currency = invoice.currency
 
@@ -507,7 +545,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                     charge_id=charge_id,
                     callback_url=callback_url,
                     meta=meta,
-                    description=f"{invoice.number} - {sub.plan.name if sub.plan else 'Subscription'}",
+                    description=f"{invoice.number} - {plan_name}",
                 )
 
                 if result.get("status") != "success":
@@ -564,7 +602,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                     meta=meta,
                     user_email=request.user.email,
                     user_phone=getattr(request.user, "phone", None),
-                    description=f"{invoice.number} - {sub.plan.name if sub.plan else 'Subscription'}",
+                    description=f"{invoice.number} - {plan_name}",
                 )
 
                 if result.get("status") != "success":
