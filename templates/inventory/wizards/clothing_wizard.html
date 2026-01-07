@@ -911,6 +911,102 @@
     }
   };
 
+  // =====================================================
+  // LIVE VALIDATION (as user types)
+  // =====================================================
+  function setupLiveValidation() {
+    // Guard against double binding
+    if (window.__pricingValidationBound) return;
+    window.__pricingValidationBound = true;
+
+    setTimeout(() => {
+      const qtyInput = document.getElementById('pricing-quantity');
+      const priceInput = document.getElementById('pricing-selling-price');
+      const costInput = document.getElementById('pricing-cost-price');
+      const continueBtn = document.querySelector('[onclick="savePricingAndContinue()"]');
+      
+      if (!qtyInput || !priceInput) return;
+
+      // Track if fields have been touched
+      const touched = { qty: false, price: false, cost: false };
+
+      function validateField(field) {
+        const fieldId = field.id;
+        const value = (field.value || '').trim().replace(/,/g, '');
+        const num = Number(value);
+        let errorId = fieldId + '-error';
+        let errorSpan = document.getElementById(errorId);
+        
+        // Create error span if it doesn't exist
+        if (!errorSpan) {
+          errorSpan = document.createElement('small');
+          errorSpan.id = errorId;
+          errorSpan.className = 'text-danger d-block mt-1';
+          field.parentNode.appendChild(errorSpan);
+        }
+
+        // Only show errors if field has been touched
+        const key = fieldId.includes('quantity') ? 'qty' : fieldId.includes('selling') ? 'price' : 'cost';
+        if (!touched[key]) {
+          errorSpan.textContent = '';
+          return true;
+        }
+
+        // Validate based on field
+        if (fieldId.includes('quantity')) {
+          if (!value || isNaN(num) || num <= 0 || !Number.isInteger(num)) {
+            errorSpan.textContent = '❌ Must be a whole number greater than 0';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        } else if (fieldId.includes('selling')) {
+          if (!value || isNaN(num) || num <= 0) {
+            errorSpan.textContent = '❌ Must be greater than 0';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        } else if (fieldId.includes('cost')) {
+          if (value && (isNaN(num) || num < 0)) {
+            errorSpan.textContent = '❌ Must be 0 or greater';
+            field.classList.add('is-invalid');
+            return false;
+          }
+        }
+
+        // Clear error if valid
+        errorSpan.textContent = '';
+        field.classList.remove('is-invalid');
+        return true;
+      }
+
+      function updateContinueButton() {
+        if (!continueBtn) return;
+        
+        const qtyValid = validateField(qtyInput);
+        const priceValid = validateField(priceInput);
+        const costValid = costInput ? validateField(costInput) : true;
+        
+        const allValid = qtyValid && priceValid && costValid;
+        continueBtn.disabled = !allValid;
+        continueBtn.style.opacity = allValid ? '1' : '0.5';
+        continueBtn.style.cursor = allValid ? 'pointer' : 'not-allowed';
+      }
+
+      // Mark as touched on blur
+      qtyInput.addEventListener('blur', () => { touched.qty = true; updateContinueButton(); });
+      priceInput.addEventListener('blur', () => { touched.price = true; updateContinueButton(); });
+      if (costInput) costInput.addEventListener('blur', () => { touched.cost = true; updateContinueButton(); });
+
+      // Validate on input (but only show errors if touched)
+      qtyInput.addEventListener('input', updateContinueButton);
+      priceInput.addEventListener('input', updateContinueButton);
+      if (costInput) costInput.addEventListener('input', updateContinueButton);
+
+      // Initial check (without showing errors)
+      updateContinueButton();
+    }, 100);
+  }
+
   // Save pricing and continue to scanning
   window.savePricingAndContinue = async function() {
     const qtyInput = document.getElementById('pricing-quantity');
@@ -1026,12 +1122,30 @@
     }
   };
 
+  // Setup live validation when pricing form is rendered
+  const originalRender = wizard.render.bind(wizard);
+  wizard.render = function() {
+    originalRender();
+    // Check if pricing form is visible and setup validation
+    setTimeout(() => {
+      const pricingForm = document.querySelector('.wizard-pricing-form');
+      if (pricingForm) {
+        setupLiveValidation();
+      }
+    }, 50);
+  };
+
   // Allow Enter key in manual input
   document.addEventListener('DOMContentLoaded', function() {
+    // Guard against double binding
+    if (window.__clothingWizardBound) return;
+    window.__clothingWizardBound = true;
+
     // This will be called when the barcode step is rendered
     setTimeout(() => {
       const manualInput = document.getElementById('manual-barcode-input');
-      if (manualInput) {
+      if (manualInput && !manualInput.__enterBound) {
+        manualInput.__enterBound = true;
         manualInput.addEventListener('keypress', function(e) {
           if (e.key === 'Enter') {
             e.preventDefault();
