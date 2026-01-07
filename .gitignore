@@ -76,7 +76,7 @@ single_error.txt
 # Duplicate backup directories
 _dup_backup/
 
-# Corrupted backup folders (temp analysis)
+# Corrupted backup folders and temporary analysis scripts
 corrupted_backup*/
 analyze_corruption.py
 restore_all.ps1
