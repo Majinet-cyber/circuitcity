@@ -41,8 +41,8 @@ class ClothingWizardLocationSizeTests(TestCase):
         self.membership = Membership.objects.create(
             user=self.user,
             business=self.business,
-            role='manager',
-            is_active=True
+            role='MANAGER',
+            status='ACTIVE'
         )
         
         # Create client and login
@@ -59,11 +59,10 @@ class ClothingWizardLocationSizeTests(TestCase):
         Test that POST to step1 succeeds when business has exactly one active location
         and no location_id is provided in the request.
         """
-        # Create one active location
+        # Create one location
         location = Location.objects.create(
             name='LA CASSA',
             business=self.business,
-            is_active=True,
             is_default=True
         )
         
@@ -129,8 +128,7 @@ class ClothingWizardLocationSizeTests(TestCase):
         # Create location
         location = Location.objects.create(
             name='Main Store',
-            business=self.business,
-            is_active=True
+            business=self.business
         )
         
         # POST to step1 with blank size
@@ -163,8 +161,7 @@ class ClothingWizardLocationSizeTests(TestCase):
         # Create location
         location = Location.objects.create(
             name='Warehouse',
-            business=self.business,
-            is_active=True
+            business=self.business
         )
         
         # POST to step1 WITHOUT size field
@@ -195,8 +192,7 @@ class ClothingWizardLocationSizeTests(TestCase):
         # Create location
         location = Location.objects.create(
             name='Store',
-            business=self.business,
-            is_active=True
+            business=self.business
         )
         
         # POST with selling_price = 0 (invalid)
@@ -261,8 +257,7 @@ class ClothingWizardLocationSizeTests(TestCase):
         # Create location
         location = Location.objects.create(
             name='Store',
-            business=self.business,
-            is_active=True
+            business=self.business
         )
         
         # POST with comma-formatted prices
@@ -293,13 +288,11 @@ class ClothingWizardLocationSizeTests(TestCase):
         location1 = Location.objects.create(
             name='Store A',
             business=self.business,
-            is_active=True,
             is_default=False
         )
         location2 = Location.objects.create(
             name='Store B (Default)',
             business=self.business,
-            is_active=True,
             is_default=True  # Default location
         )
         

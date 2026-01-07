@@ -117,24 +117,24 @@ def barcode_batch_step1_api(request):
         # Location explicitly provided
         try:
             from tenants.models import Location
-            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            location = Location.objects.get(id=location_id, business=business)
         except Location.DoesNotExist:
             return JsonResponse({
                 "ok": False,
                 "code": "invalid_location",
-                "error": f"Location {location_id} not found or inactive",
+                "error": f"Location {location_id} not found",
                 "field_errors": {"location": "Invalid location"}
             }, status=200)
     else:
         # Auto-resolve location (same logic as view)
         location = getattr(request, "active_location", None)
-        if not location or not getattr(location, "is_active", False):
+        if not location:
             # Try session
             location_id = request.session.get('active_location_id')
             if location_id:
                 try:
                     from tenants.models import Location
-                    location = Location.objects.get(id=location_id, business=business, is_active=True)
+                    location = Location.objects.get(id=location_id, business=business)
                 except Location.DoesNotExist:
                     location = None
             
@@ -143,8 +143,7 @@ def barcode_batch_step1_api(request):
                 try:
                     from tenants.models import Location
                     location = Location.objects.filter(
-                        business=business,
-                        is_active=True
+                        business=business
                     ).order_by('-is_default', 'id').first()
                     
                     if location:
@@ -158,7 +157,7 @@ def barcode_batch_step1_api(request):
         return JsonResponse({
             "ok": False,
             "code": "no_active_location",
-            "error": "No active location found. Please create a location first.",
+            "error": "No location found. Please create a location first.",
             "action_url": "/tenants/manage/locations/"
         }, status=200)
 
@@ -422,12 +421,12 @@ def fast_sell_create_api(request):
         # Location explicitly provided in POST
         try:
             from tenants.models import Location
-            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            location = Location.objects.get(id=location_id, business=business)
         except Location.DoesNotExist:
             return JsonResponse({
                 "ok": False,
                 "code": "invalid_location",
-                "error": f"Location {location_id} not found or inactive"
+                "error": f"Location {location_id} not found"
             }, status=400)
     else:
         # Fallback to request attribute or session
@@ -437,17 +436,16 @@ def fast_sell_create_api(request):
             if location_id:
                 try:
                     from tenants.models import Location
-                    location = Location.objects.get(id=location_id, business=business, is_active=True)
+                    location = Location.objects.get(id=location_id, business=business)
                 except Location.DoesNotExist:
                     pass
         
-        # Last resort: auto-select first active location
+        # Last resort: auto-select first location
         if not location:
             try:
                 from tenants.models import Location
                 location = Location.objects.filter(
-                    business=business,
-                    is_active=True
+                    business=business
                 ).order_by('-is_default', 'id').first()
                 
                 if location:
@@ -459,7 +457,7 @@ def fast_sell_create_api(request):
         return JsonResponse({
             "ok": False,
             "code": "no_active_location",
-            "error": "No active location found. Please create a location first.",
+            "error": "No location found. Please create a location first.",
             "action_url": "/tenants/manage/locations/"
         }, status=400)
 
