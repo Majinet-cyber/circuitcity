@@ -80,27 +80,25 @@ def barcode_batch_step1_api(request):
     Body: {
         "category": "shoes",
         "subcategory": "sneaker",
-        "size": "42",
+        "size": "42",  // OPTIONAL
         "quantity": 5,
         "cost_price": "10000.00",
         "selling_price": "15000.00",
         "brand": "Nike",
         "color": "Black",
-        "product_name": "Nike Air Max"
+        "product_name": "Nike Air Max",
+        "location_id": 1  // OPTIONAL - will auto-resolve if missing
     }
 
     Returns:
         {"ok": true, "message": "Batch details saved. Ready to scan."}
         {"ok": true, "warning": "Selling price is below cost (loss).", ...}
-        {"ok": false, "error": "Validation error message"}
+        {"ok": false, "code": "no_active_location", "error": "...", "action_url": "..."}
+        {"ok": false, "code": "invalid_quantity", "error": "...", "field_errors": {...}}
     """
     business = get_active_business(request)
     if not business:
-        return JsonResponse({"ok": False, "error": "No active business"}, status=400)
-
-    location = getattr(request, "active_location", None)
-    if not location:
-        return JsonResponse({"ok": False, "error": "No active location"}, status=400)
+        return JsonResponse({"ok": False, "code": "no_business", "error": "No active business"}, status=200)
 
     # Support both JSON and form-encoded data
     try:
@@ -109,48 +107,123 @@ def barcode_batch_step1_api(request):
         else:
             data = request.POST.dict()
     except (json.JSONDecodeError, ValueError):
-        return JsonResponse({"ok": False, "error": "Invalid request data"}, status=400)
+        return JsonResponse({"ok": False, "code": "invalid_request", "error": "Invalid request data"}, status=200)
+
+    # LOCATION RESOLUTION with fallback
+    location = None
+    location_id = data.get("location_id")
+    
+    if location_id:
+        # Location explicitly provided
+        try:
+            from tenants.models import Location
+            location = Location.objects.get(id=location_id, business=business, is_active=True)
+        except Location.DoesNotExist:
+            return JsonResponse({
+                "ok": False,
+                "code": "invalid_location",
+                "error": f"Location {location_id} not found or inactive",
+                "field_errors": {"location": "Invalid location"}
+            }, status=200)
+    else:
+        # Auto-resolve location (same logic as view)
+        location = getattr(request, "active_location", None)
+        if not location or not getattr(location, "is_active", False):
+            # Try session
+            location_id = request.session.get('active_location_id')
+            if location_id:
+                try:
+                    from tenants.models import Location
+                    location = Location.objects.get(id=location_id, business=business, is_active=True)
+                except Location.DoesNotExist:
+                    location = None
+            
+            # Last resort: auto-select
+            if not location:
+                try:
+                    from tenants.models import Location
+                    location = Location.objects.filter(
+                        business=business,
+                        is_active=True
+                    ).order_by('-is_default', 'id').first()
+                    
+                    if location:
+                        request.session['active_location_id'] = location.id
+                        request.session.modified = True
+                except Exception:
+                    pass
+    
+    # If still no location, return structured error
+    if not location:
+        return JsonResponse({
+            "ok": False,
+            "code": "no_active_location",
+            "error": "No active location found. Please create a location first.",
+            "action_url": "/tenants/manage/locations/"
+        }, status=200)
 
     # Extract fields with safe defaults
     category = str(data.get("category", "")).strip()
     subcategory = str(data.get("subcategory", "")).strip()
-    size = str(data.get("size", "")).strip()
+    size = str(data.get("size", "")).strip()  # OPTIONAL - can be blank
     brand = str(data.get("brand", "")).strip()
     color = str(data.get("color", "")).strip()
     product_name = str(data.get("product_name", "")).strip()
+
+    field_errors = {}
 
     # Validate quantity (must be >= 1)
     try:
         quantity = int(data.get("quantity", 0))
         if quantity < 1:
-            return JsonResponse({"ok": False, "error": "Quantity must be at least 1"}, status=400)
+            field_errors["quantity"] = "Must be at least 1"
     except (ValueError, TypeError):
-        return JsonResponse({"ok": False, "error": "Quantity must be a valid number"}, status=400)
+        field_errors["quantity"] = "Must be a valid number"
 
     # Validate selling price (must be > 0) - BLOCKING ERROR
     try:
         selling_price_raw = str(data.get("selling_price", "0")).strip().replace(",", "")
         selling_price = Decimal(selling_price_raw) if selling_price_raw else Decimal("0")
         if selling_price <= 0:
-            return JsonResponse({"ok": False, "error": "Selling price must be greater than zero."}, status=400)
+            field_errors["selling_price"] = "Must be greater than zero"
     except (ValueError, TypeError, decimal.InvalidOperation):
-        return JsonResponse({"ok": False, "error": "Selling price must be a valid number"}, status=400)
+        field_errors["selling_price"] = "Must be a valid number"
 
     # Validate cost price (optional, must be >= 0 if provided)
     try:
         cost_price_raw = str(data.get("cost_price", "0")).strip().replace(",", "")
         cost_price = Decimal(cost_price_raw) if cost_price_raw else Decimal("0")
         if cost_price < 0:
-            return JsonResponse({"ok": False, "error": "Cost price cannot be negative"}, status=400)
+            field_errors["cost_price"] = "Cannot be negative"
     except (ValueError, TypeError, decimal.InvalidOperation):
-        return JsonResponse({"ok": False, "error": "Cost price must be a valid number"}, status=400)
+        field_errors["cost_price"] = "Must be a valid number"
 
     # Validate required fields
     if not category:
-        return JsonResponse({"ok": False, "error": "Category is required"}, status=400)
+        field_errors["category"] = "Required"
 
-    if not size:
-        return JsonResponse({"ok": False, "error": "Size is required"}, status=400)
+    # SIZE IS NOW OPTIONAL - no validation
+    # if not size:
+    #     field_errors["size"] = "Required"
+
+    # If any field errors, return them
+    if field_errors:
+        # Determine primary error code
+        if "selling_price" in field_errors:
+            code = "invalid_selling_price"
+        elif "quantity" in field_errors:
+            code = "invalid_quantity"
+        elif "cost_price" in field_errors:
+            code = "invalid_cost_price"
+        else:
+            code = "validation_error"
+        
+        return JsonResponse({
+            "ok": False,
+            "code": code,
+            "error": "Validation failed. Please check your input.",
+            "field_errors": field_errors
+        }, status=200)
 
     # NON-BLOCKING WARNING: Check if pricing at a loss
     warning = None
@@ -165,7 +238,7 @@ def barcode_batch_step1_api(request):
             user=request.user,
             category=category,
             subcategory=subcategory,
-            size=size,
+            size=size or "",  # Pass empty string if blank
             quantity=quantity,
             cost_price=cost_price,
             selling_price=selling_price,
@@ -186,10 +259,14 @@ def barcode_batch_step1_api(request):
         if warning:
             response_data["warning"] = warning
 
-        return JsonResponse(response_data)
+        return JsonResponse(response_data, status=200)
 
     except ValidationError as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+        return JsonResponse({
+            "ok": False,
+            "code": "validation_error",
+            "error": str(e)
+        }, status=200)
 
 
 @login_required

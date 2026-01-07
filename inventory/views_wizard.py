@@ -22,6 +22,64 @@ from inventory.business_kinds import BusinessKind as BK
 
 
 # =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def resolve_active_location(request, business):
+    """
+    Resolve active location with fallback logic.
+    
+    Priority:
+    1. request.active_location (if exists and is active)
+    2. session['active_location_id'] (if exists and is active)
+    3. business default location (is_default=True)
+    4. first active location
+    
+    Returns:
+        Location object or None if no active locations exist
+    """
+    from tenants.models import Location
+    
+    # 1. Check request.active_location
+    location = getattr(request, "active_location", None)
+    if location and getattr(location, "is_active", False):
+        # Store in session for subsequent calls
+        request.session['active_location_id'] = location.id
+        return location
+    
+    # 2. Try session active_location_id
+    location_id = request.session.get('active_location_id')
+    if location_id:
+        try:
+            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            request.active_location = location  # Set on request for consistency
+            return location
+        except Location.DoesNotExist:
+            # Stale session, clear it
+            request.session.pop('active_location_id', None)
+    
+    # 3. Auto-select: prefer default, else first active
+    try:
+        location = Location.objects.filter(
+            business=business,
+            is_active=True
+        ).order_by('-is_default', 'id').first()
+        
+        if location:
+            # Store in session
+            request.session['active_location_id'] = location.id
+            request.session.modified = True
+            request.active_location = location
+            return location
+    except Exception:
+        pass
+    
+    # No active location found
+    return None
+
+
+# =============================================================================
 # Wizard Page Views
 # =============================================================================
 
@@ -71,25 +129,8 @@ def clothing_wizard(request):
     """Render the clothing add-product wizard"""
     business = get_active_business(request)
     
-    # Auto-select location if not set
-    location = getattr(request, "active_location", None)
-    if not location and business:
-        # Try to get default location or first active location
-        from tenants.models import Location
-        
-        # Check if business has a default location
-        try:
-            location = Location.objects.filter(
-                business=business,
-                is_active=True
-            ).order_by('-is_default', 'id').first()
-            
-            if location:
-                # Store in session for subsequent API calls
-                request.session['active_location_id'] = location.id
-                request.active_location = location
-        except Exception:
-            pass
+    # Resolve active location (auto-select if needed)
+    location = resolve_active_location(request, business)
     
     context = {
         'business': business,
