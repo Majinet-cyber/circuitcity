@@ -31,19 +31,19 @@ def resolve_active_location(request, business):
     Resolve active location with fallback logic.
     
     Priority:
-    1. request.active_location (if exists and is active)
-    2. session['active_location_id'] (if exists and is active)
+    1. request.active_location (if exists)
+    2. session['active_location_id'] (if exists and valid)
     3. business default location (is_default=True)
-    4. first active location
+    4. first location for business
     
     Returns:
-        Location object or None if no active locations exist
+        Location object or None if no locations exist
     """
     from tenants.models import Location
     
     # 1. Check request.active_location
     location = getattr(request, "active_location", None)
-    if location and getattr(location, "is_active", False):
+    if location:
         # Store in session for subsequent calls
         request.session['active_location_id'] = location.id
         return location
@@ -52,18 +52,17 @@ def resolve_active_location(request, business):
     location_id = request.session.get('active_location_id')
     if location_id:
         try:
-            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            location = Location.objects.get(id=location_id, business=business)
             request.active_location = location  # Set on request for consistency
             return location
         except Location.DoesNotExist:
             # Stale session, clear it
             request.session.pop('active_location_id', None)
     
-    # 3. Auto-select: prefer default, else first active
+    # 3. Auto-select: prefer default, else first
     try:
         location = Location.objects.filter(
-            business=business,
-            is_active=True
+            business=business
         ).order_by('-is_default', 'id').first()
         
         if location:
@@ -75,7 +74,7 @@ def resolve_active_location(request, business):
     except Exception:
         pass
     
-    # No active location found
+    # No location found
     return None
 
 

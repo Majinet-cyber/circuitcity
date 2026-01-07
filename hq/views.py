@@ -1935,7 +1935,7 @@ def hq_analytics(request):
         all_locations = []
         if business_id:
             try:
-                all_locations = Location.objects.filter(business_id=business_id, is_active=True).order_by("name")[:100]
+                all_locations = Location.objects.filter(business_id=business_id).order_by("name")[:100]
             except Exception:
                 all_locations = []
 
