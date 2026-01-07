@@ -639,6 +639,7 @@ urlpatterns += [
     path("inventory/verticals/", include_or_raise("inventory.urls_verticals", "inventory_verticals")),
     # Vertical-specific operation URLs (members, sales, shifts, etc.)
     path("gym/", include_or_raise("inventory.urls_gym", "gym")),
+    path("clothing/", include("inventory.urls_clothing")),
     path("liquor/", include_or_raise("inventory.urls_liquor", "liquor")),
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
     path("groceries/", include_or_raise("inventory.urls_groceries", "groceries")),
@@ -936,10 +937,10 @@ try:
     has_heatmap = has_stock_status = False
     has_prod_create = has_prod_update = False
     if inv_urls_mod and hasattr(inv_urls_mod, "urlpatterns"):
-        has_heatmap = _patterns_have_name(inv_urls_mod.url_patterns, "restock_heatmap_api")
-        has_stock_status = _patterns_have_name(inv_urls_mod.url_patterns, "api_stock_status")
-        has_prod_create = _patterns_have_name(inv_urls_mod.url_patterns, "api_product_create")
-        has_prod_update = _patterns_have_name(inv_urls_mod.url_patterns, "api_product_update_price")
+        has_heatmap = _patterns_have_name(inv_urls_mod.urlpatterns, "restock_heatmap_api")
+        has_stock_status = _patterns_have_name(inv_urls_mod.urlpatterns, "api_stock_status")
+        has_prod_create = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_create")
+        has_prod_update = _patterns_have_name(inv_urls_mod.urlpatterns, "api_product_update_price")
 
     if not has_heatmap:
         urlpatterns += [
