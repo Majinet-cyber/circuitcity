@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0013_backfill_product_codes'),
+        ("inventory", "0013_backfill_product_codes"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='product',
-            name='code',
-            field=models.CharField(db_index=True, help_text='SKU/code used in CSV import', max_length=64, unique=True),
+            model_name="product",
+            name="code",
+            field=models.CharField(db_index=True, help_text="SKU/code used in CSV import", max_length=64, unique=True),
         ),
     ]

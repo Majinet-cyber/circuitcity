@@ -1,0 +1,439 @@
+{% comment %}
+Quantity Selection Modal for Stock In / Sell
+Usage: This modal is triggered by JS when clicking product cards/rows
+{% endcomment %}
+
+<!-- Qty Modal -->
+<div class="modal fade" id="qtyModal" tabindex="-1" aria-labelledby="qtyModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content pharmacy-qty-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="qtyModalLabel">Loading...</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body">
+        <form id="qtyForm" method="post" action="">
+          {% csrf_token %}
+          <input type="hidden" name="product_id" id="modal-product-id">
+          
+          <!-- Quantity Controls -->
+          <div class="qty-section">
+            <label class="qty-label">Quantity</label>
+            <div class="qty-quick-btns">
+              <button type="button" class="qty-btn" onclick="setQty(1)">+1</button>
+              <button type="button" class="qty-btn" onclick="setQty(2)">+2</button>
+              <button type="button" class="qty-btn" onclick="setQty(5)">+5</button>
+              <button type="button" class="qty-btn" onclick="setQty(10)">+10</button>
+              <button type="button" class="qty-btn" onclick="setQty(20)">+20</button>
+            </div>
+            <input 
+              type="number" 
+              class="qty-input" 
+              name="quantity" 
+              id="modal-quantity" 
+              min="1" 
+              value="1"
+              required
+            >
+          </div>
+          
+          <!-- Unit Selector -->
+          <div class="unit-section">
+            <label class="unit-label">Unit</label>
+            <select class="unit-select" name="unit" id="modal-unit" required>
+              <!-- Options populated by JS -->
+            </select>
+            <small class="unit-hint" id="modal-unit-hint"></small>
+          </div>
+          
+          <!-- Optional: Expiry & Batch (collapsed by default for stock-in) -->
+          <div class="optional-section" id="optional-fields" style="display:none;">
+            <button type="button" class="toggle-optional-btn" onclick="toggleOptionalFields()">
+              <i class="fas fa-plus-circle"></i> Add Expiry / Batch
+            </button>
+            <div class="optional-fields-content" id="optional-fields-content" style="display:none;">
+              <div class="form-group">
+                <label>Expiry Date <small>(optional)</small></label>
+                <input type="date" class="form-control" name="expiry_date" id="modal-expiry">
+              </div>
+              <div class="form-group">
+                <label>Batch/Lot <small>(optional)</small></label>
+                <input type="text" class="form-control" name="batch_number" id="modal-batch" placeholder="e.g., LOT123">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Error Display -->
+          <div class="alert alert-danger" id="modal-error" style="display:none;"></div>
+          
+          <!-- Submit Button -->
+          <button type="submit" class="submit-btn" id="modal-submit-btn">
+            <span id="modal-submit-text">Stock In</span>
+            <span class="spinner-border spinner-border-sm" id="modal-spinner" style="display:none;"></span>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.pharmacy-qty-modal .modal-content {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.2);
+}
+
+.pharmacy-qty-modal .modal-header {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 24px;
+  border: none;
+}
+
+.pharmacy-qty-modal .modal-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.pharmacy-qty-modal .btn-close {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+}
+
+.pharmacy-qty-modal .modal-body {
+  padding: 24px;
+}
+
+.qty-section, .unit-section {
+  margin-bottom: 24px;
+}
+
+.qty-label, .unit-label {
+  display: block;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.qty-quick-btns {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.qty-btn {
+  flex: 1;
+  min-width: 60px;
+  padding: 12px 16px;
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.qty-btn:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+.qty-btn:active,
+.qty-btn.active {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.qty-input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.qty-input:focus {
+  outline: none;
+  border-color: #10b981;
+}
+
+.unit-select {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: border-color 0.2s;
+  background: #fff;
+  cursor: pointer;
+}
+
+.unit-select:focus {
+  outline: none;
+  border-color: #10b981;
+}
+
+.unit-hint {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.optional-section {
+  margin-bottom: 24px;
+}
+
+.toggle-optional-btn {
+  width: 100%;
+  padding: 12px;
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  color: #475569;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.toggle-optional-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.optional-fields-content {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px dashed #e2e8f0;
+}
+
+.optional-fields-content .form-group {
+  margin-bottom: 16px;
+}
+
+.optional-fields-content label {
+  display: block;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.optional-fields-content .form-control {
+  width: 100%;
+  padding: 10px 14px;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.optional-fields-content .form-control:focus {
+  outline: none;
+  border-color: #10b981;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.3);
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(16, 185, 129, 0.4);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 480px) {
+  .qty-quick-btns {
+    gap: 6px;
+  }
+  
+  .qty-btn {
+    min-width: 50px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+  }
+}
+</style>
+
+<script>
+// Qty Modal JavaScript
+let currentAction = 'stock'; // 'stock' or 'sell'
+let currentProductData = null;
+
+function setQty(amount) {
+  const qtyInput = document.getElementById('modal-quantity');
+  const currentQty = parseInt(qtyInput.value) || 0;
+  qtyInput.value = currentQty + amount;
+  
+  // Visual feedback
+  const allBtns = document.querySelectorAll('.qty-btn');
+  allBtns.forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  setTimeout(() => event.target.classList.remove('active'), 200);
+}
+
+function toggleOptionalFields() {
+  const content = document.getElementById('optional-fields-content');
+  const btn = event.target.closest('.toggle-optional-btn');
+  
+  if (content.style.display === 'none') {
+    content.style.display = 'block';
+    btn.innerHTML = '<i class="fas fa-minus-circle"></i> Hide Optional Fields';
+  } else {
+    content.style.display = 'none';
+    btn.innerHTML = '<i class="fas fa-plus-circle"></i> Add Expiry / Batch';
+  }
+}
+
+function handleTopItemClick(element, action) {
+  openQtyModal(element.dataset, action);
+}
+
+function handleProductRowClick(button, action) {
+  const row = button.closest('.product-row');
+  openQtyModal(row.dataset, action);
+}
+
+function openQtyModal(productData, action) {
+  currentAction = action;
+  currentProductData = productData;
+  
+  // Set modal title
+  document.getElementById('qtyModalLabel').textContent = productData.productName;
+  
+  // Set product ID
+  document.getElementById('modal-product-id').value = productData.productId;
+  
+  // Reset quantity
+  document.getElementById('modal-quantity').value = 1;
+  
+  // Populate unit selector
+  const unitSelect = document.getElementById('modal-unit');
+  unitSelect.innerHTML = '';
+  
+  const baseUnit = productData.baseUnit || 'piece';
+  unitSelect.innerHTML += `<option value="${baseUnit}">${baseUnit}</option>`;
+  
+  if (productData.hasStrip === 'true' && productData.stripSize) {
+    unitSelect.innerHTML += `<option value="strip">strip (${productData.stripSize} ${baseUnit}s)</option>`;
+  }
+  
+  if (productData.hasBox === 'true' && productData.boxSize) {
+    unitSelect.innerHTML += `<option value="box">box (${productData.boxSize} ${baseUnit}s)</option>`;
+  }
+  
+  // Update unit hint
+  updateUnitHint();
+  unitSelect.addEventListener('change', updateUnitHint);
+  
+  // Show/hide optional fields based on action
+  const optionalSection = document.getElementById('optional-fields');
+  if (action === 'stock') {
+    optionalSection.style.display = 'block';
+  } else {
+    optionalSection.style.display = 'none';
+  }
+  
+  // Update submit button text
+  const submitText = document.getElementById('modal-submit-text');
+  submitText.textContent = action === 'sell' ? 'Add to Cart' : 'Stock In';
+  
+  // Hide error
+  document.getElementById('modal-error').style.display = 'none';
+  
+  // Show modal
+  const modal = new bootstrap.Modal(document.getElementById('qtyModal'));
+  modal.show();
+}
+
+function updateUnitHint() {
+  const unitSelect = document.getElementById('modal-unit');
+  const qtyInput = document.getElementById('modal-quantity');
+  const hint = document.getElementById('modal-unit-hint');
+  
+  const selectedUnit = unitSelect.value;
+  const qty = parseInt(qtyInput.value) || 1;
+  const baseUnit = currentProductData.baseUnit || 'piece';
+  
+  let baseQty = qty;
+  
+  if (selectedUnit === 'strip' && currentProductData.stripSize) {
+    baseQty = qty * parseInt(currentProductData.stripSize);
+    hint.textContent = `= ${baseQty} ${baseUnit}s`;
+  } else if (selectedUnit === 'box' && currentProductData.boxSize) {
+    baseQty = qty * parseInt(currentProductData.boxSize);
+    hint.textContent = `= ${baseQty} ${baseUnit}s`;
+  } else {
+    hint.textContent = '';
+  }
+}
+
+// Form submission (can be enhanced with AJAX)
+document.addEventListener('DOMContentLoaded', function() {
+  const qtyForm = document.getElementById('qtyForm');
+  if (qtyForm) {
+    qtyForm.addEventListener('submit', function(e) {
+      // Add loading state
+      const submitBtn = document.getElementById('modal-submit-btn');
+      const submitText = document.getElementById('modal-submit-text');
+      const spinner = document.getElementById('modal-spinner');
+      
+      submitBtn.disabled = true;
+      submitText.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      
+      // Form will submit normally via POST
+      // For AJAX implementation, prevent default and use fetch here
+    });
+  }
+  
+  // Also listen for quantity input changes to update hint
+  const qtyInput = document.getElementById('modal-quantity');
+  if (qtyInput) {
+    qtyInput.addEventListener('input', updateUnitHint);
+  }
+});
+</script>
+

@@ -1,2 +1,1 @@
 # staticpages app
-

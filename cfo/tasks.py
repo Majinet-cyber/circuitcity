@@ -5,6 +5,7 @@ from .services.forecast import compute_forecast
 from .services.rules import run_rules
 from .services.recommend import recommend_affordability
 
+
 @shared_task
 def nightly_cfo_cycle():
     # opening balance: you may compute from last ledger balance; start simple:
@@ -12,5 +13,3 @@ def nightly_cfo_cycle():
     compute_forecast(horizon_days=30, opening_balance=opening)
     run_rules()
     recommend_affordability()
-
-

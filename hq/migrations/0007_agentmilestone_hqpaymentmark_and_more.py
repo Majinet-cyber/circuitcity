@@ -9,7 +9,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("hq", "0006_merchantcontract"),
         ("tenants", "0016_add_unique_active_membership_constraint"),
@@ -42,9 +41,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "metadata",
-                    models.JSONField(
-                        blank=True, default=dict, help_text="Additional milestone data"
-                    ),
+                    models.JSONField(blank=True, default=dict, help_text="Additional milestone data"),
                 ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
@@ -235,9 +232,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="merchantcontract",
             name="title",
-            field=models.CharField(
-                default="Merchant Services Agreement", max_length=255
-            ),
+            field=models.CharField(default="Merchant Services Agreement", max_length=255),
         ),
         migrations.AddField(
             model_name="supportactionlog",
@@ -332,9 +327,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="supportactionlog",
             name="id",
-            field=models.UUIDField(
-                primary_key=True, default=uuid.uuid4, editable=False, serialize=False
-            ),
+            field=models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, serialize=False),
         ),
         migrations.AlterField(
             model_name="supportticket",
@@ -360,9 +353,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="supportticket",
             name="id",
-            field=models.UUIDField(
-                primary_key=True, default=uuid.uuid4, editable=False, serialize=False
-            ),
+            field=models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, serialize=False),
         ),
         migrations.AlterField(
             model_name="supportticket",
@@ -397,27 +388,19 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="supportactionlog",
-            index=models.Index(
-                fields=["business", "created_at"], name="hq_supporta_busines_3e6a2a_idx"
-            ),
+            index=models.Index(fields=["business", "created_at"], name="hq_supporta_busines_3e6a2a_idx"),
         ),
         migrations.AddIndex(
             model_name="supportactionlog",
-            index=models.Index(
-                fields=["ticket", "created_at"], name="hq_supporta_ticket__246d80_idx"
-            ),
+            index=models.Index(fields=["ticket", "created_at"], name="hq_supporta_ticket__246d80_idx"),
         ),
         migrations.AddIndex(
             model_name="supportticket",
-            index=models.Index(
-                fields=["business", "status"], name="hq_supportt_busines_e10157_idx"
-            ),
+            index=models.Index(fields=["business", "status"], name="hq_supportt_busines_e10157_idx"),
         ),
         migrations.AddIndex(
             model_name="supportticket",
-            index=models.Index(
-                fields=["status", "created_at"], name="hq_supportt_status_52f457_idx"
-            ),
+            index=models.Index(fields=["status", "created_at"], name="hq_supportt_status_52f457_idx"),
         ),
         migrations.AddField(
             model_name="agentmilestone",
@@ -465,9 +448,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="agentmilestone",
-            index=models.Index(
-                fields=["user", "milestone_type"], name="hq_agentmil_user_id_6bf178_idx"
-            ),
+            index=models.Index(fields=["user", "milestone_type"], name="hq_agentmil_user_id_6bf178_idx"),
         ),
         migrations.AddIndex(
             model_name="agentmilestone",
@@ -485,9 +466,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="hqpaymentmark",
-            index=models.Index(
-                fields=["marked_at"], name="hq_hqpaymen_marked__382bde_idx"
-            ),
+            index=models.Index(fields=["marked_at"], name="hq_hqpaymen_marked__382bde_idx"),
         ),
         migrations.AddConstraint(
             model_name="hqpaymentmark",

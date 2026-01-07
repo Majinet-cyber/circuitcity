@@ -6,7 +6,6 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,20 +14,40 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Notification',
+            name="Notification",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('audience', models.CharField(choices=[('ADMIN', 'Admin'), ('AGENT', 'Agent')], max_length=10)),
-                ('message', models.TextField()),
-                ('level', models.CharField(choices=[('info', 'Info'), ('success', 'Success'), ('warning', 'Warning'), ('error', 'Error')], default='info', max_length=10)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('read_at', models.DateTimeField(blank=True, null=True)),
-                ('meta', models.JSONField(blank=True, default=dict)),
-                ('user', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='notifications', to=settings.AUTH_USER_MODEL)),
+                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                ("audience", models.CharField(choices=[("ADMIN", "Admin"), ("AGENT", "Agent")], max_length=10)),
+                ("message", models.TextField()),
+                (
+                    "level",
+                    models.CharField(
+                        choices=[("info", "Info"), ("success", "Success"), ("warning", "Warning"), ("error", "Error")],
+                        default="info",
+                        max_length=10,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("read_at", models.DateTimeField(blank=True, null=True)),
+                ("meta", models.JSONField(blank=True, default=dict)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="notifications",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['audience', 'created_at'], name='notificatio_audienc_45e30d_idx'), models.Index(fields=['user', 'created_at'], name='notificatio_user_id_c62b26_idx'), models.Index(fields=['read_at'], name='notificatio_read_at_6329f9_idx')],
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(fields=["audience", "created_at"], name="notificatio_audienc_45e30d_idx"),
+                    models.Index(fields=["user", "created_at"], name="notificatio_user_id_c62b26_idx"),
+                    models.Index(fields=["read_at"], name="notificatio_read_at_6329f9_idx"),
+                ],
             },
         ),
     ]

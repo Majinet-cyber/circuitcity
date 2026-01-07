@@ -41,10 +41,10 @@ def _seed_plans() -> None:
     except ImportError:
         # Fallback if pricing module not yet available
         PLANS = {}
-    
+
     if not PLANS:
         return
-    
+
     with transaction.atomic():
         for plan_config in PLANS.values():
             SubscriptionPlan.objects.update_or_create(
@@ -170,5 +170,3 @@ def _ensure_trial_window(sender, instance: BusinessSubscription, created: bool, 
             "next_billing_date",
         ]
     )
-
-

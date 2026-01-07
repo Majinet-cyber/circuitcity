@@ -1,13 +1,10 @@
 name: Tests
 
 on:
-  pull_request:
-    branches:
-      - "*"
   push:
-    branches:
-      - main
-      - master
+    branches: ["mobile-layout-v1"]
+  pull_request:
+    branches: ["mobile-layout-v1"]
 
 jobs:
   Tests:
@@ -32,7 +29,7 @@ jobs:
       DJANGO_SETTINGS_MODULE: cc.settings
       SECRET_KEY: test-secret-key
       DEBUG: "0"
-      DATABASE_URL: postgres://test_user:test_pass@localhost:5432/test_db
+      DATABASE_URL: postgresql://test_user:test_pass@127.0.0.1:5432/test_db?sslmode=disable
       SENDGRID_API_KEY: dummy
       DEFAULT_FROM_EMAIL: test@emajinet.africa
       CI: "true"
@@ -100,7 +97,7 @@ jobs:
       DJANGO_SETTINGS_MODULE: cc.settings
       SECRET_KEY: test-secret-key
       DEBUG: "0"
-      DATABASE_URL: postgres://test_user:test_pass@localhost:5432/test_db
+      DATABASE_URL: postgresql://test_user:test_pass@127.0.0.1:5432/test_db?sslmode=disable
       SENDGRID_API_KEY: dummy
       DEFAULT_FROM_EMAIL: test@emajinet.africa
       CI: "true"
@@ -132,7 +129,7 @@ jobs:
           DJANGO_SETTINGS_MODULE: cc.settings
           SECRET_KEY: test-secret-key
           DEBUG: "0"
-          DATABASE_URL: postgres://test_user:test_pass@localhost:5432/test_db
+          DATABASE_URL: postgresql://test_user:test_pass@127.0.0.1:5432/test_db?sslmode=disable
           SENDGRID_API_KEY: dummy
           DEFAULT_FROM_EMAIL: test@emajinet.africa
           CI: "true"

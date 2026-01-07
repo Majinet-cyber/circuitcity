@@ -9,7 +9,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0051_add_gym_trainers"),
         ("tenants", "0013_add_location_tracking"),
@@ -35,9 +34,7 @@ class Migration(migrations.Migration):
                         decimal_places=2,
                         help_text="Trainer fee amount for this period",
                         max_digits=10,
-                        validators=[
-                            django.core.validators.MinValueValidator(Decimal("0.01"))
-                        ],
+                        validators=[django.core.validators.MinValueValidator(Decimal("0.01"))],
                     ),
                 ),
                 (
@@ -50,9 +47,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now),
                 ),
                 ("notes", models.TextField(blank=True, default="")),
             ],
@@ -112,9 +107,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="trainerfee",
-            index=models.Index(
-                fields=["trainer", "-created_at"], name="inventory_t_trainer_e25dbb_idx"
-            ),
+            index=models.Index(fields=["trainer", "-created_at"], name="inventory_t_trainer_e25dbb_idx"),
         ),
         migrations.AddIndex(
             model_name="trainerfee",

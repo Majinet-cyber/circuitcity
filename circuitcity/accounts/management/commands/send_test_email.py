@@ -19,7 +19,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         email = options["email"].strip()
-        
+
         if not email or "@" not in email:
             raise CommandError("Please provide a valid email address")
 
@@ -32,9 +32,6 @@ class Command(BaseCommand):
 
         try:
             send_mail(subject, message, from_email, [email], fail_silently=False)
-            self.stdout.write(
-                self.style.SUCCESS(f"✓ Test email sent successfully to {email}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"✓ Test email sent successfully to {email}"))
         except Exception as e:
             raise CommandError(f"Failed to send email: {e}")
-

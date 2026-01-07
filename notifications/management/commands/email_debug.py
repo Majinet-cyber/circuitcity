@@ -10,26 +10,26 @@ import os
 
 
 class Command(BaseCommand):
-    help = 'Debug email configuration (backend, SendGrid, environment variables)'
+    help = "Debug email configuration (backend, SendGrid, environment variables)"
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.SUCCESS("=" * 60))
         self.stdout.write(self.style.SUCCESS("Email Configuration Debug"))
         self.stdout.write(self.style.SUCCESS("=" * 60))
         self.stdout.write("")
-        
+
         # Email backend
         email_backend = getattr(settings, "EMAIL_BACKEND", "Not set")
         self.stdout.write(f"EMAIL_BACKEND: {email_backend}")
         self.stdout.write("")
-        
+
         # USE_CONSOLE_EMAIL
         use_console_email = getattr(settings, "USE_CONSOLE_EMAIL", None)
         env_use_console = os.environ.get("USE_CONSOLE_EMAIL", "Not set")
         self.stdout.write(f"settings.USE_CONSOLE_EMAIL: {use_console_email}")
         self.stdout.write(f"env USE_CONSOLE_EMAIL: {env_use_console}")
         self.stdout.write("")
-        
+
         # SendGrid API Key
         sendgrid_key = os.environ.get("SENDGRID_API_KEY", "")
         has_sendgrid = bool(sendgrid_key)
@@ -41,7 +41,7 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.WARNING("  ⚠ SENDGRID_API_KEY not set"))
         self.stdout.write("")
-        
+
         # ANYMAIL config
         anymail_config = getattr(settings, "ANYMAIL", None)
         has_anymail = bool(anymail_config)
@@ -50,12 +50,12 @@ class Command(BaseCommand):
             anymail_keys = list(anymail_config.keys()) if isinstance(anymail_config, dict) else []
             self.stdout.write(f"  ANYMAIL keys: {', '.join(anymail_keys)}")
         self.stdout.write("")
-        
+
         # DEFAULT_FROM_EMAIL
         default_from = getattr(settings, "DEFAULT_FROM_EMAIL", "Not set")
         self.stdout.write(f"DEFAULT_FROM_EMAIL: {default_from}")
         self.stdout.write("")
-        
+
         # Summary
         self.stdout.write(self.style.SUCCESS("=" * 60))
         if use_console_email:
@@ -65,4 +65,3 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.ERROR("✗ SendGrid not configured - email sending may fail"))
         self.stdout.write(self.style.SUCCESS("=" * 60))
-

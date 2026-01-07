@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("hq", "0003_add_merchant_contract"),
         ("tenants", "0013_add_location_tracking"),
@@ -31,9 +30,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "title",
-                    models.CharField(
-                        help_text="Short title for quick reference", max_length=255
-                    ),
+                    models.CharField(help_text="Short title for quick reference", max_length=255),
                 ),
                 ("content", models.TextField(help_text="Detailed note content")),
                 (
@@ -123,9 +120,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "reason",
-                    models.TextField(
-                        help_text="Required explanation/justification for this action"
-                    ),
+                    models.TextField(help_text="Required explanation/justification for this action"),
                 ),
                 (
                     "payload_before",
@@ -137,9 +132,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "payload_after",
-                    models.JSONField(
-                        blank=True, default=dict, help_text="State after the action"
-                    ),
+                    models.JSONField(blank=True, default=dict, help_text="State after the action"),
                 ),
                 (
                     "entity_type",
@@ -151,15 +144,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "entity_id",
-                    models.CharField(
-                        blank=True, help_text="ID of the affected entity", max_length=64
-                    ),
+                    models.CharField(blank=True, help_text="ID of the affected entity", max_length=64),
                 ),
                 (
                     "ip_address",
-                    models.GenericIPAddressField(
-                        blank=True, help_text="IP address of the actor", null=True
-                    ),
+                    models.GenericIPAddressField(blank=True, help_text="IP address of the actor", null=True),
                 ),
                 (
                     "user_agent",
@@ -167,9 +156,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "created_at",
-                    models.DateTimeField(
-                        db_index=True, default=django.utils.timezone.now, editable=False
-                    ),
+                    models.DateTimeField(db_index=True, default=django.utils.timezone.now, editable=False),
                 ),
                 (
                     "actor",
@@ -273,9 +260,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "title",
-                    models.CharField(
-                        help_text="Short description of the issue", max_length=255
-                    ),
+                    models.CharField(help_text="Short description of the issue", max_length=255),
                 ),
                 (
                     "description",
@@ -358,9 +343,7 @@ class Migration(migrations.Migration):
                 ("content", models.TextField(help_text="Note content")),
                 (
                     "is_internal",
-                    models.BooleanField(
-                        default=False, help_text="If True, only visible to HQ staff"
-                    ),
+                    models.BooleanField(default=False, help_text="If True, only visible to HQ staff"),
                 ),
                 ("meta", models.JSONField(blank=True, default=dict)),
                 ("created_at", models.DateTimeField(auto_now_add=True, db_index=True)),
@@ -406,9 +389,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="supportactionlog",
-            index=models.Index(
-                fields=["actor", "-created_at"], name="hq_supporta_actor_i_b8e39c_idx"
-            ),
+            index=models.Index(fields=["actor", "-created_at"], name="hq_supporta_actor_i_b8e39c_idx"),
         ),
         migrations.AddIndex(
             model_name="supportactionlog",
@@ -454,9 +435,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="supportnote",
-            index=models.Index(
-                fields=["ticket", "created_at"], name="hq_supportn_ticket__5c6000_idx"
-            ),
+            index=models.Index(fields=["ticket", "created_at"], name="hq_supportn_ticket__5c6000_idx"),
         ),
     ]
-

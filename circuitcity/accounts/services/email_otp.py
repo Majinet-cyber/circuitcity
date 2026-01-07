@@ -44,11 +44,11 @@ def _check_rate_limit(email: str, purpose: str) -> bool:
     """
     key = _get_rate_limit_key(email, purpose)
     count = cache.get(key, 0)
-    
+
     if count >= OTP_RATE_LIMIT_PER_MINUTE:
         log.warning(f"Rate limit exceeded for {email} purpose={purpose}")
         return False
-    
+
     # Increment counter with 60 second expiry
     cache.set(key, count + 1, timeout=60)
     return True
@@ -64,8 +64,9 @@ def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
     from notifications.services import emit_event
     from django.contrib.auth import get_user_model
     from django.db import transaction
+
     User = get_user_model()
-    
+
     try:
         # Get user if exists
         user = None
@@ -73,7 +74,7 @@ def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
             user = User.objects.get(email__iexact=email)
         except User.DoesNotExist:
             pass
-        
+
         # Map purpose to event type
         event_type_map = {
             "reset": "OTP_RESET",
@@ -83,7 +84,7 @@ def _send_otp_email(email: str, code: str, purpose: str, otp_id: int) -> None:
             "2fa": "OTP_CODE",
         }
         event_type = event_type_map.get(purpose, "OTP_CODE")
-        
+
         # Send email via notification system with transaction.on_commit
         # This ensures email is sent after DB commit (OTP record is already saved)
         transaction.on_commit(
@@ -114,32 +115,32 @@ def request_email_otp(
 ) -> None:
     """
     Request an email OTP for the given email and purpose.
-    
+
     Args:
         email: Email address to send OTP to
         purpose: One of 'signup', 'login', 'reset', '2fa'
         user: Optional user instance (for signup, user may not exist yet)
         request: Optional request object (for IP/user_agent extraction)
-    
+
     Raises:
         ValueError: If rate-limited or invalid purpose
     """
     if purpose not in ["signup", "login", "reset", "2fa"]:
         raise ValueError(f"Invalid purpose: {purpose}")
-    
+
     normalized_email = _normalize_email(email)
     if not normalized_email:
         raise ValueError("Email is required")
-    
+
     # Check rate limit
     if not _check_rate_limit(normalized_email, purpose):
         raise ValueError("Too many requests. Please try again later.")
-    
+
     # Generate OTP
     code = _generate_otp_code()
     now = timezone.now()
     expires_at = now + timedelta(minutes=OTP_TTL_MINUTES)
-    
+
     # Extract IP and user agent from request if available
     requester_ip = None
     user_agent = None
@@ -150,7 +151,7 @@ def request_email_otp(
         else:
             requester_ip = request.META.get("REMOTE_ADDR")
         user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]  # Limit length
-    
+
     # Create OTP record
     otp = EmailOTP(
         email=normalized_email,
@@ -162,7 +163,7 @@ def request_email_otp(
     )
     otp.set_raw_code(code)
     otp.save()
-    
+
     # Send email via notification system
     _send_otp_email(normalized_email, code, purpose, otp.id)
 
@@ -170,21 +171,21 @@ def request_email_otp(
 def verify_email_otp(email: str, purpose: str, code: str) -> bool:
     """
     Verify an OTP code for the given email and purpose.
-    
+
     In E2E_TESTING mode, accepts a fixed test code (default "000000") for bypass.
-    
+
     Args:
         email: Email address
         purpose: Purpose of the OTP
         code: The 6-digit code to verify
-    
+
     Returns:
         True if valid and consumed, False otherwise
     """
     normalized_email = _normalize_email(email)
     if not normalized_email or not code:
         return False
-    
+
     # E2E Testing bypass: accept fixed test code if E2E_TESTING is enabled
     if getattr(settings, "E2E_TESTING", False) or getattr(settings, "DEBUG", False):
         test_code = getattr(settings, "E2E_OTP_CODE", "000000")
@@ -206,7 +207,7 @@ def verify_email_otp(email: str, purpose: str, code: str) -> bool:
                 otp.save(update_fields=["consumed_at"])
                 log.info(f"E2E OTP bypass verified for {normalized_email} purpose={purpose}")
                 return True
-    
+
     # Find latest unconsumed, non-expired OTP for this email/purpose
     now = timezone.now()
     otp = (
@@ -219,23 +220,22 @@ def verify_email_otp(email: str, purpose: str, code: str) -> bool:
         .order_by("-created_at")
         .first()
     )
-    
+
     if not otp:
         log.warning(f"No valid OTP found for {normalized_email} purpose={purpose}")
         return False
-    
+
     # Check attempt limit
     if otp.attempts >= OTP_MAX_ATTEMPTS:
         log.warning(
-            f"OTP attempt limit exceeded for {normalized_email} purpose={purpose} "
-            f"(attempts={otp.attempts})"
+            f"OTP attempt limit exceeded for {normalized_email} purpose={purpose} " f"(attempts={otp.attempts})"
         )
         return False
-    
+
     # Increment attempts
     otp.attempts += 1
     otp.save(update_fields=["attempts"])
-    
+
     # Verify code
     if otp.matches(code):
         # Mark as consumed
@@ -243,7 +243,7 @@ def verify_email_otp(email: str, purpose: str, code: str) -> bool:
         otp.save(update_fields=["consumed_at"])
         log.info(f"OTP verified successfully for {normalized_email} purpose={purpose}")
         return True
-    
+
     log.warning(f"Invalid OTP code for {normalized_email} purpose={purpose}")
     return False
 
@@ -257,4 +257,3 @@ def purge_expired_otps() -> int:
     deleted, _ = EmailOTP.objects.filter(expires_at__lt=cutoff).delete()
     log.info(f"Purged {deleted} expired OTP records")
     return deleted
-

@@ -12,9 +12,21 @@ try:
     from circuitcity.hq.views import PLAN_CATALOG  # type: ignore
 except Exception:  # pragma: no cover
     PLAN_CATALOG = {
-        "starter": {"code": "starter", "name": "Starter", "amount": Decimal("20000.00"), "max_agents": 0, "max_stores": 1},
-        "pro":     {"code": "pro",     "name": "Pro",     "amount": Decimal("35000.00"), "max_agents": 5, "max_stores": None},
-        "promax":  {"code": "promax",  "name": "Pro Max", "amount": Decimal("50000.00"), "max_agents": None, "max_stores": None},
+        "starter": {
+            "code": "starter",
+            "name": "Starter",
+            "amount": Decimal("20000.00"),
+            "max_agents": 0,
+            "max_stores": 1,
+        },
+        "pro": {"code": "pro", "name": "Pro", "amount": Decimal("35000.00"), "max_agents": 5, "max_stores": None},
+        "promax": {
+            "code": "promax",
+            "name": "Pro Max",
+            "amount": Decimal("50000.00"),
+            "max_agents": None,
+            "max_stores": None,
+        },
     }
 
 from tenants.utils import get_active_business  # your helper
@@ -33,9 +45,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
         return redirect(reverse("tenants:activate_mine"))
 
     # current sub (if any)
-    current = (
-        Subscription.objects.filter(business=biz).order_by("-id").first()
-    )
+    current = Subscription.objects.filter(business=biz).order_by("-id").first()
 
     if request.method == "POST":
         code = (request.POST.get("plan_code") or "").lower().strip()
@@ -47,13 +57,17 @@ def subscribe(request: HttpRequest) -> HttpResponse:
         plan = PLAN_CATALOG[code]
         sub = current or Subscription(business=biz)
         # keep a shadow code if your model has it; otherwise store amount
-        if hasattr(sub, "plan_code"): sub.plan_code = plan["code"]
-        if hasattr(sub, "amount"):    sub.amount = plan["amount"]
+        if hasattr(sub, "plan_code"):
+            sub.plan_code = plan["code"]
+        if hasattr(sub, "amount"):
+            sub.amount = plan["amount"]
         sub.status = "ACTIVE" if provider == "manual" else "PENDING"
         # align periods in a simple way (start now, next bill +30d)
         now = timezone.now()
-        if hasattr(sub, "current_period_start"): sub.current_period_start = now
-        if hasattr(sub, "current_period_end"):   sub.current_period_end = now + timezone.timedelta(days=30)
+        if hasattr(sub, "current_period_start"):
+            sub.current_period_start = now
+        if hasattr(sub, "current_period_end"):
+            sub.current_period_end = now + timezone.timedelta(days=30)
         sub.save()
 
         # generate an OPEN invoice (you can swap to PENDING when provider != manual)
@@ -64,17 +78,21 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             currency=getattr(current, "currency", "MWK"),
             number=f"INV-{timezone.now().strftime('%Y%m%d-%H%M%S')}",
             issue_date=timezone.localdate(),
-            notes=f"{plan['name']} monthly subscription"
+            notes=f"{plan['name']} monthly subscription",
         )
 
         # Redirect to payment. For now:
         return redirect(reverse("billing_checkout", kwargs={"provider": provider}) + f"?plan={code}")
 
-    return render(request, "billing/subscribe.html", {
-        "biz": biz,
-        "catalog": PLAN_CATALOG,
-        "current": current,
-    })
+    return render(
+        request,
+        "billing/subscribe.html",
+        {
+            "biz": biz,
+            "catalog": PLAN_CATALOG,
+            "current": current,
+        },
+    )
 
 
 @login_required
@@ -94,11 +112,15 @@ def checkout(request: HttpRequest, provider: str) -> HttpResponse:
         return redirect(reverse("billing_return", kwargs={"provider": provider}) + f"?plan={plan_code}&ok=1")
 
     # Stubs for future providers
-    return render(request, "billing/checkout_stub.html", {
-        "provider": provider,
-        "plan": plan,
-        "return_url": reverse("billing_return", kwargs={"provider": provider}),
-    })
+    return render(
+        request,
+        "billing/checkout_stub.html",
+        {
+            "provider": provider,
+            "plan": plan,
+            "return_url": reverse("billing_return", kwargs={"provider": provider}),
+        },
+    )
 
 
 @login_required
@@ -116,5 +138,3 @@ def return_view(request: HttpRequest, provider: str) -> HttpResponse:
         return redirect(reverse("hq:dashboard"))
     except Exception:
         return redirect("/")
-
-

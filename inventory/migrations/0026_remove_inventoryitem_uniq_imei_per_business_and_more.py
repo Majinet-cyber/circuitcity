@@ -27,6 +27,7 @@ class SafeRemoveConstraint(RemoveConstraint):
     """
     Prevents ValueError if constraint is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -38,6 +39,7 @@ class SafeRemoveIndex(RemoveIndex):
     """
     Prevents ValueError if index is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -51,24 +53,26 @@ def drop_constraint_and_indexes_database(apps, schema_editor):
     Safe to run even if they don't exist (handles state drift).
     """
     vendor = schema_editor.connection.vendor
-    
-    InventoryItem = apps.get_model('inventory', 'InventoryItem')
-    OrderPrice = apps.get_model('inventory', 'OrderPrice')
-    
+
+    InventoryItem = apps.get_model("inventory", "InventoryItem")
+    OrderPrice = apps.get_model("inventory", "OrderPrice")
+
     inventory_table = InventoryItem._meta.db_table
     orderprice_table = OrderPrice._meta.db_table
-    
+
     with schema_editor.connection.cursor() as cursor:
-        if vendor == 'postgresql':
+        if vendor == "postgresql":
             # Drop constraint if exists (PostgreSQL)
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 ALTER TABLE {inventory_table} 
                 DROP CONSTRAINT IF EXISTS uniq_imei_per_business
-            """)
+            """
+            )
             # Drop indexes if exist
             cursor.execute("DROP INDEX IF EXISTS ordprice_prod_active_idx")
             cursor.execute("DROP INDEX IF EXISTS ordprice_effective_idx")
-        elif vendor == 'sqlite':
+        elif vendor == "sqlite":
             # SQLite: Drop indexes (SQLite doesn't support DROP CONSTRAINT the same way)
             cursor.execute("DROP INDEX IF EXISTS uniq_imei_per_business")
             cursor.execute("DROP INDEX IF EXISTS ordprice_prod_active_idx")
@@ -85,7 +89,6 @@ def reverse_drop_constraint_and_indexes_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     # Make sure this matches your previous migration
     dependencies = [
         ("inventory", "0025_backfill_location_non_null"),
@@ -105,7 +108,6 @@ class Migration(migrations.Migration):
             "DROP INDEX IF EXISTS inventory_inventoryitem_status_59404d58_like;",
             reverse_sql=migrations.RunSQL.noop,
         ),
-
         # --- Remove constraint and indexes using SeparateDatabaseAndState ---
         # This prevents state drift errors when constraint/index doesn't exist in Django's state
         migrations.SeparateDatabaseAndState(

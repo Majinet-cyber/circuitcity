@@ -6,6 +6,7 @@ from django.utils import timezone
 
 ARR, DEP = "ARRIVAL", "DEPARTURE"
 
+
 def summarize_day(logs: Iterable) -> Dict[str, Any]:
     """
     logs: iterable of TimeLog-like rows for ONE user/day ordered by time.
@@ -49,5 +50,3 @@ def summarize_day(logs: Iterable) -> Dict[str, Any]:
         "arrival_at": arrival_at,
         "departure_at": departure_at,
     }
-
-

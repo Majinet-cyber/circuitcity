@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Assignments · Liquor · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .liquor-list-page{max-width:1200px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:20px}
+  
+  /* Header */
+  .ll-header{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(135deg,#7c3aed,#6d28d9);padding:24px;border-radius:20px;color:#fff;box-shadow:0 8px 24px rgba(124,58,237,0.2);flex-wrap:wrap;gap:12px}
+  .ll-header-left h1{margin:0 0 4px;font-size:clamp(20px,4vw,28px);font-weight:800}
+  .ll-header-left p{margin:0;opacity:0.9;font-size:13px}
+  .ll-btn-new{background:#fff;color:#7c3aed;padding:12px 24px;border-radius:12px;font-weight:700;text-decoration:none;white-space:nowrap;box-shadow:0 4px 12px rgba(255,255,255,0.2)}
+  .ll-btn-new:hover{transform:translateY(-2px)}
+  
+  /* Filters */
+  .ll-filters{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);display:flex;gap:12px;flex-wrap:wrap}
+  .ll-filters select{padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px}
+  .ll-filters button{padding:10px 20px;background:#7c3aed;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer}
+  
+  /* Stats */
+  .ll-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+  .ll-stat{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0}
+  .ll-stat .label{font-size:11px;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:6px}
+  .ll-stat .value{font-size:24px;font-weight:800;color:#0f172a}
+  
+  /* Assignments Table */
+  .ll-table{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);overflow:hidden}
+  .ll-table-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:12px;padding:16px;border-bottom:1px solid #e2e8f0;align-items:center}
+  .ll-table-row:last-child{border-bottom:0}
+  .ll-table-header{background:linear-gradient(135deg,#f8fafc,#f1f5f9);font-weight:700;font-size:12px;text-transform:uppercase;color:#64748b;letter-spacing:0.05em}
+  .ll-table-row:not(.ll-table-header):hover{background:#f8fafc}
+  
+  .ll-product{font-weight:700;color:#0f172a;font-size:15px}
+  .ll-agent{font-size:14px;color:#64748b}
+  .ll-bottles{font-weight:800;font-size:16px}
+  .ll-status{padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap}
+  .ll-status-active{background:#dcfce7;color:#166534}
+  .ll-status-soldout{background:#fef3c7;color:#92400e}
+  .ll-status-returned{background:#e0e7ff;color:#3730a3}
+  .ll-status-reconciled{background:#e5e7eb;color:#4b5563}
+  
+  @media (max-width:768px){
+    .ll-table-row{grid-template-columns:1fr;gap:8px}
+    .ll-table-header{display:none}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="liquor-list-page">
+  <!-- Header -->
+  <header class="ll-header">
+    <div class="ll-header-left">
+      <h1>📋 Stock Assignments</h1>
+      <p>Manage agent stock assignments</p>
+    </div>
+    <a href="{% url 'verticals:liquor_assignment_create' %}" class="ll-btn-new">+ New Assignment</a>
+  </header>
+  
+  <!-- Filters -->
+  <form method="get" class="ll-filters">
+    <select name="agent">
+      <option value="">All Agents</option>
+      {% for agent in agents %}
+      <option value="{{ agent.id }}" {% if selected_agent == agent.id|stringformat:"s" %}selected{% endif %}>
+        {{ agent.username }}
+      </option>
+      {% endfor %}
+    </select>
+    
+    <select name="status">
+      <option value="">All Status</option>
+      {% for code, label in status_choices %}
+      <option value="{{ code }}" {% if selected_status == code %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    
+    <button type="submit">Filter</button>
+  </form>
+  
+  <!-- Stats -->
+  <div class="ll-stats">
+    <div class="ll-stat">
+      <div class="label">Active Bottles</div>
+      <div class="value">{{ total_bottles_active }}</div>
+    </div>
+    <div class="ll-stat">
+      <div class="label">Bottles Sold</div>
+      <div class="value" style="color:#10b981">{{ total_bottles_sold }}</div>
+    </div>
+    <div class="ll-stat">
+      <div class="label">Total Assignments</div>
+      <div class="value">{{ assignments|length }}</div>
+    </div>
+  </div>
+  
+  <!-- Assignments Table -->
+  <div class="ll-table">
+    <div class="ll-table-row ll-table-header">
+      <div>Product & Agent</div>
+      <div>Assigned</div>
+      <div>Sold</div>
+      <div>Remaining</div>
+      <div>Status</div>
+    </div>
+    
+    {% for assignment in assignments %}
+    <div class="ll-table-row">
+      <div>
+        <div class="ll-product">{{ assignment.product.name }}</div>
+        <div class="ll-agent">{{ assignment.agent.username }} • {{ assignment.assigned_at|timesince }} ago</div>
+      </div>
+      <div class="ll-bottles">{{ assignment.bottles_assigned }}</div>
+      <div class="ll-bottles" style="color:#10b981">{{ assignment.bottles_sold }}</div>
+      <div class="ll-bottles" style="color:#f59e0b">{{ assignment.bottles_remaining }}</div>
+      <div>
+        <span class="ll-status ll-status-{{ assignment.status|lower }}">
+          {{ assignment.get_status_display }}
+        </span>
+      </div>
+    </div>
+    {% empty %}
+    <div style="text-align:center;padding:48px;color:#94a3b8">
+      <div style="font-size:48px;margin-bottom:12px">📦</div>
+      <p style="margin:0;font-weight:600">No assignments found</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+

@@ -1,5 +1,6 @@
 ﻿from billing.models import Subscription  # adjust to your model
 
+
 def subscription_context(request):
     if not request.user.is_authenticated:
         return {}
@@ -9,5 +10,3 @@ def subscription_context(request):
         return {}
     sub = Subscription.objects.filter(business=business).order_by("-id").first()
     return {"subscription": sub}
-
-

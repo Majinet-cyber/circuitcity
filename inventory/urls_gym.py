@@ -4,22 +4,20 @@ URL patterns for gym operations.
 """
 from django.urls import path, reverse_lazy
 from django.views.generic import RedirectView
-from . import views_gym
-from . import views_gym_wizard
+
+from . import views_gym, views_gym_qr, views_gym_wizard
 
 app_name = "gym"
 
 urlpatterns = [
     # Dashboard
     path("", views_gym.gym_dashboard, name="dashboard"),
-    
     # Alias for compatibility: /gym/dashboard/ -> /gym/
     path(
         "dashboard/",
         RedirectView.as_view(url=reverse_lazy("gym:dashboard"), permanent=False),
         name="dashboard_alias",
     ),
-    
     # Members
     path("members/", views_gym.members_list, name="members_list"),
     path("member/add/", views_gym_wizard.member_add_wizard, name="member_add"),
@@ -30,24 +28,25 @@ urlpatterns = [
     path("member/<int:member_id>/restore/", views_gym.member_restore, name="member_restore"),
     path("member/<int:member_id>/set-paid/", views_gym.member_set_paid, name="member_set_paid"),
     path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
-    
+    # QR Code routes (public, no auth required)
+    path("qr/<uuid:qr_uuid>/", views_gym_qr.member_qr_status_public, name="member_qr_status_public"),
+    path("qr/<uuid:qr_uuid>/image.png", views_gym_qr.member_qr_png, name="member_qr_png"),
+    path("qr/<uuid:qr_uuid>/card.pdf", views_gym_qr.member_qr_card_pdf, name="member_qr_card_pdf"),
+    path("qr/<uuid:qr_uuid>/print/", views_gym_qr.member_qr_print, name="member_qr_print"),
     # Check-in
     path("checkin/", views_gym.checkin_page, name="checkin_page"),
-    
+    # Leaderboard
+    path("leaderboard/", views_gym.gym_leaderboard, name="leaderboard"),
     # Payments
     path("payment/add/", views_gym.add_payment, name="add_payment"),
-    
     # Settings
     path("settings/", views_gym.gym_settings_view, name="settings"),
-    
     # Trainers
     path("trainers/", views_gym.trainers_list, name="trainers_list"),
     path("trainer/add/", views_gym.trainer_add, name="trainer_add"),
     path("trainer/<int:trainer_id>/edit/", views_gym.trainer_edit, name="trainer_edit"),
     path("trainer/<int:trainer_id>/deactivate/", views_gym.trainer_deactivate, name="trainer_deactivate"),
-    
     # Member Scanning
     path("scan/", views_gym.gym_scan_page, name="scan_member"),
     path("scan/lookup/", views_gym.gym_scan_lookup, name="scan_lookup"),
 ]
-

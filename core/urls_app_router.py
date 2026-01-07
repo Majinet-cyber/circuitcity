@@ -24,4 +24,3 @@ urlpatterns = [
     path("analytics/api/alerts/", views_analytics.api_alerts, name="analytics_api_alerts"),
     path("analytics/api/export_csv/", views_analytics.api_export_csv, name="analytics_api_export_csv"),
 ]
-

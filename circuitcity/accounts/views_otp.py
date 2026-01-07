@@ -16,9 +16,18 @@ TTL = int(os.getenv("ACCOUNTS_RESET_CODE_TTL_SECONDS", "300"))
 WINDOW_MIN = int(os.getenv("ACCOUNTS_RESET_SEND_WINDOW_MINUTES", "45"))
 MAX_SENDS = int(os.getenv("ACCOUNTS_RESET_MAX_SENDS_PER_WINDOW", "3"))
 
-def _code_key(email):   return f"otp:reset:{email.lower()}"
-def _count_key(email):  return f"otp:reset:{email.lower()}:win"
-def _window_seconds():  return WINDOW_MIN * 60
+
+def _code_key(email):
+    return f"otp:reset:{email.lower()}"
+
+
+def _count_key(email):
+    return f"otp:reset:{email.lower()}:win"
+
+
+def _window_seconds():
+    return WINDOW_MIN * 60
+
 
 def request_reset_code(request):
     if request.method == "POST":
@@ -52,10 +61,11 @@ def request_reset_code(request):
         return redirect("accounts:password_reset_verify")
     return render(request, "accounts/password_reset_code.html")
 
+
 def verify_reset_code(request):
     if request.method == "POST":
         email = request.POST.get("email", "").strip().lower()
-        code  = request.POST.get("code", "").strip()
+        code = request.POST.get("code", "").strip()
         newpw = request.POST.get("new_password", "").strip()
 
         cached = cache.get(_code_key(email))
@@ -80,5 +90,3 @@ def verify_reset_code(request):
         messages.success(request, "Password reset. You can now sign in.")
         return redirect("login")
     return render(request, "accounts/password_reset_verify.html")
-
-

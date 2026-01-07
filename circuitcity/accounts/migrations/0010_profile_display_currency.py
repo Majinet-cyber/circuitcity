@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0009_add_email_verified_to_profile"),
     ]
@@ -22,4 +21,3 @@ class Migration(migrations.Migration):
             ),
         ),
     ]
-

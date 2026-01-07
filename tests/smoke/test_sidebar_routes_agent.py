@@ -17,8 +17,10 @@ from inventory.business_kinds import BusinessKind
 from tests.smoke.fixtures import SmokeTestFixtures
 from tests.smoke.helpers import SidebarLinkExtractor, SessionHelper
 
+# Mark all tests in this module as smoke tests
+pytestmark = [pytest.mark.django_db, pytest.mark.smoke]
 
-@pytest.mark.django_db
+
 class TestSidebarRoutesAgentPhones(TestCase):
     """Test agent sidebar routes for Phones vertical."""
     
@@ -93,7 +95,6 @@ class TestSidebarRoutesAgentPhones(TestCase):
                 f"Agent should not access {label} ({url}), got HTTP {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAgentPharmacy(TestCase):
     """Test agent sidebar routes for Pharmacy vertical."""
     
@@ -149,7 +150,6 @@ class TestSidebarRoutesAgentPharmacy(TestCase):
         assert len(errors) == 0, f"URL loading errors for Pharmacy agent:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAgentClothing(TestCase):
     """Test agent sidebar routes for Clothing vertical."""
     
@@ -205,7 +205,6 @@ class TestSidebarRoutesAgentClothing(TestCase):
         assert len(errors) == 0, f"URL loading errors for Clothing agent:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAgentLiquor(TestCase):
     """Test agent sidebar routes for Liquor vertical."""
     
@@ -261,7 +260,6 @@ class TestSidebarRoutesAgentLiquor(TestCase):
         assert len(errors) == 0, f"URL loading errors for Liquor agent:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAgentGym(TestCase):
     """Test agent sidebar routes for Gym vertical."""
     

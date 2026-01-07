@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Leaderboard · Groceries V2 · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .gv2-leaderboard-page{max-width:800px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:20px}
+  
+  /* Header */
+  .gv2-lb-header{background:linear-gradient(135deg,#8b5cf6,#7c3aed);padding:24px;border-radius:20px;color:#fff;box-shadow:0 8px 24px rgba(139,92,246,0.2);text-align:center}
+  .gv2-lb-header h1{margin:0 0 8px;font-size:clamp(24px,5vw,32px);font-weight:800}
+  .gv2-lb-header p{margin:0;opacity:0.95;font-size:14px}
+  
+  /* My Stats Card */
+  .gv2-lb-mystats{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0}
+  .gv2-lb-mystats h2{margin:0 0 16px;font-size:18px;font-weight:700;color:#0f172a}
+  .gv2-lb-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+  .gv2-lb-stat{background:#f8fafc;padding:12px;border-radius:12px;text-align:center}
+  .gv2-lb-stat .label{font-size:11px;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:6px}
+  .gv2-lb-stat .value{font-size:24px;font-weight:800;color:#0f172a}
+  .gv2-lb-stat .value.highlight{color:#8b5cf6}
+  
+  /* Podium (Top 3) */
+  .gv2-lb-podium{display:flex;justify-content:center;align-items:flex-end;gap:12px;margin-bottom:20px}
+  .gv2-lb-podium-place{flex:1;max-width:150px;text-align:center}
+  .gv2-lb-podium-place.first{order:2}
+  .gv2-lb-podium-place.second{order:1}
+  .gv2-lb-podium-place.third{order:3}
+  .gv2-lb-podium-avatar{width:60px;height:60px;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 8px;border:3px solid #fff;box-shadow:0 4px 12px rgba(15,23,42,0.1)}
+  .gv2-lb-podium-place.first .gv2-lb-podium-avatar{width:80px;height:80px;font-size:36px;background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#fff;box-shadow:0 8px 24px rgba(245,158,11,0.3)}
+  .gv2-lb-podium-place.second .gv2-lb-podium-avatar{background:linear-gradient(135deg,#94a3b8,#64748b)}
+  .gv2-lb-podium-place.third .gv2-lb-podium-avatar{background:linear-gradient(135deg,#d97706,#b45309)}
+  .gv2-lb-podium-medal{font-size:32px;margin-bottom:8px}
+  .gv2-lb-podium-place.first .gv2-lb-podium-medal{font-size:48px}
+  .gv2-lb-podium-name{font-weight:700;color:#0f172a;font-size:14px;margin-bottom:4px}
+  .gv2-lb-podium-revenue{color:#10b981;font-weight:800;font-size:16px}
+  .gv2-lb-podium-place.first .gv2-lb-podium-revenue{font-size:18px}
+  
+  /* Leaderboard List */
+  .gv2-lb-list{background:#fff;border-radius:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:1px solid #e2e8f0;overflow:hidden}
+  .gv2-lb-item{display:flex;align-items:center;gap:16px;padding:16px;border-bottom:1px solid #e2e8f0;transition:background 0.2s}
+  .gv2-lb-item:last-child{border-bottom:0}
+  .gv2-lb-item:hover{background:#f8fafc}
+  .gv2-lb-item.me{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-left:4px solid #10b981}
+  .gv2-lb-rank{font-size:24px;font-weight:900;color:#cbd5e1;min-width:40px;text-align:center}
+  .gv2-lb-item.me .gv2-lb-rank{color:#10b981}
+  .gv2-lb-avatar{width:48px;height:48px;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .gv2-lb-info{flex:1;min-width:0}
+  .gv2-lb-name{font-weight:700;color:#0f172a;font-size:15px;margin-bottom:4px}
+  .gv2-lb-meta{font-size:12px;color:#64748b}
+  .gv2-lb-stats{text-align:right}
+  .gv2-lb-revenue{font-size:16px;font-weight:800;color:#10b981;margin-bottom:4px}
+  .gv2-lb-sales{font-size:12px;color:#64748b}
+  
+  /* Empty state */
+  .gv2-lb-empty{text-align:center;padding:48px 20px;color:#94a3b8}
+  .gv2-lb-empty .icon{font-size:64px;margin-bottom:16px;opacity:0.5}
+  .gv2-lb-empty p{margin:0;font-size:16px;font-weight:600}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gv2-leaderboard-page">
+  <!-- Header -->
+  <header class="gv2-lb-header">
+    <h1>🏆 Leaderboard</h1>
+    <p>Today's Top Performers · {{ today|date:"F j, Y" }}</p>
+  </header>
+  
+  <!-- My Stats -->
+  <section class="gv2-lb-mystats">
+    <h2>Your Stats</h2>
+    <div class="gv2-lb-stat-grid">
+      <div class="gv2-lb-stat">
+        <div class="label">Level</div>
+        <div class="value highlight">{{ user_stats.xp.level }}</div>
+      </div>
+      <div class="gv2-lb-stat">
+        <div class="label">XP Today</div>
+        <div class="value">{{ user_stats.xp.xp_today }}</div>
+      </div>
+      <div class="gv2-lb-stat">
+        <div class="label">Streak</div>
+        <div class="value">{{ user_stats.streak.current }}🔥</div>
+      </div>
+      <div class="gv2-lb-stat">
+        <div class="label">Revenue (30d)</div>
+        <div class="value">K{{ user_stats.revenue_30d|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Podium (Top 3) -->
+  {% if leaderboard|length >= 3 %}
+  <section class="gv2-lb-podium">
+    <!-- 1st Place -->
+    <div class="gv2-lb-podium-place first">
+      <div class="gv2-lb-podium-medal">🥇</div>
+      <div class="gv2-lb-podium-avatar">{{ leaderboard.0.agent.username.0|upper }}</div>
+      <div class="gv2-lb-podium-name">{{ leaderboard.0.agent.username }}</div>
+      <div class="gv2-lb-podium-revenue">K {{ leaderboard.0.revenue|floatformat:0|intcomma }}</div>
+      <small style="color:#64748b;font-size:12px">{{ leaderboard.0.sales_count }} sales</small>
+    </div>
+    
+    <!-- 2nd Place -->
+    {% if leaderboard|length >= 2 %}
+    <div class="gv2-lb-podium-place second">
+      <div class="gv2-lb-podium-medal">🥈</div>
+      <div class="gv2-lb-podium-avatar">{{ leaderboard.1.agent.username.0|upper }}</div>
+      <div class="gv2-lb-podium-name">{{ leaderboard.1.agent.username }}</div>
+      <div class="gv2-lb-podium-revenue">K {{ leaderboard.1.revenue|floatformat:0|intcomma }}</div>
+      <small style="color:#64748b;font-size:12px">{{ leaderboard.1.sales_count }} sales</small>
+    </div>
+    {% endif %}
+    
+    <!-- 3rd Place -->
+    {% if leaderboard|length >= 3 %}
+    <div class="gv2-lb-podium-place third">
+      <div class="gv2-lb-podium-medal">🥉</div>
+      <div class="gv2-lb-podium-avatar">{{ leaderboard.2.agent.username.0|upper }}</div>
+      <div class="gv2-lb-podium-name">{{ leaderboard.2.agent.username }}</div>
+      <div class="gv2-lb-podium-revenue">K {{ leaderboard.2.revenue|floatformat:0|intcomma }}</div>
+      <small style="color:#64748b;font-size:12px">{{ leaderboard.2.sales_count }} sales</small>
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+  
+  <!-- Full Leaderboard -->
+  {% if leaderboard %}
+  <section class="gv2-lb-list">
+    {% for entry in leaderboard %}
+    <div class="gv2-lb-item {% if entry.agent_id == request.user.id %}me{% endif %}">
+      <div class="gv2-lb-rank">
+        {% if entry.rank == 1 %}🥇
+        {% elif entry.rank == 2 %}🥈
+        {% elif entry.rank == 3 %}🥉
+        {% else %}{{ entry.rank }}{% endif %}
+      </div>
+      <div class="gv2-lb-avatar">{{ entry.agent.username.0|upper }}</div>
+      <div class="gv2-lb-info">
+        <div class="gv2-lb-name">
+          {{ entry.agent.username }}
+          {% if entry.agent_id == request.user.id %}<span style="color:#10b981;font-weight:600">(You)</span>{% endif %}
+        </div>
+        <div class="gv2-lb-meta">+{{ entry.xp_earned_today }} XP today · {{ entry.items_sold }} items</div>
+      </div>
+      <div class="gv2-lb-stats">
+        <div class="gv2-lb-revenue">K {{ entry.revenue|floatformat:0|intcomma }}</div>
+        <div class="gv2-lb-sales">{{ entry.sales_count }} sale{{ entry.sales_count|pluralize }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% else %}
+  <div class="gv2-lb-empty">
+    <div class="icon">🏆</div>
+    <p>No sales recorded today yet. Be the first!</p>
+  </div>
+  {% endif %}
+  
+  <!-- Back Link -->
+  <div style="text-align:center">
+    <a href="{% url 'verticals:groceries_dashboard_v2' %}" style="padding:12px 24px;background:#fff;color:#8b5cf6;border-radius:12px;font-weight:600;text-decoration:none;display:inline-block;border:2px solid #e2e8f0">← Back to Dashboard</a>
+  </div>
+</div>
+{% endblock %}
+

@@ -1,6 +1,8 @@
 ﻿# billing/views.py
 from __future__ import annotations
 
+import logging
+import uuid
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -9,7 +11,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.http import FileResponse, JsonResponse, HttpRequest, HttpResponse, HttpResponseBadRequest
+from django.http import FileResponse, HttpRequest, HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template import TemplateDoesNotExist
 from django.urls import reverse
@@ -21,13 +23,18 @@ from django.views.decorators.http import require_POST
 from tenants.models import Business
 from tenants.utils import require_business
 
+from . import paychangu_service
 from .models import (
-    SubscriptionPlan,
     BusinessSubscription,
     Invoice,
     InvoiceItem,
     Payment,
+    PaymentTransaction,
+    SubscriptionChangeIntent,
+    SubscriptionPlan,
 )
+
+logger = logging.getLogger(__name__)
 
 # Optional (guarded) import to avoid hard dependency during bootstrap
 try:
@@ -37,7 +44,7 @@ except Exception:
 
 # Forms (UI tabs: Airtel / Standard Bank / Card)
 try:
-    from .forms import ChoosePlanForm, AirtelForm, BankProofForm, CardForm
+    from .forms import AirtelForm, BankProofForm, CardForm, ChoosePlanForm
 except Exception:
     # Safe fallbacks if forms aren't wired yet
     from django import forms  # type: ignore
@@ -76,9 +83,7 @@ def _compute_period_end(plan: SubscriptionPlan, start_dt: timezone.datetime) -> 
     if plan.interval == SubscriptionPlan.Interval.YEAR:
         return start_dt + timedelta(days=365)
     next_month = _first_of_next_month(start_dt.date())
-    return timezone.make_aware(
-        timezone.datetime.combine(next_month, timezone.datetime.min.time())
-    )
+    return timezone.make_aware(timezone.datetime.combine(next_month, timezone.datetime.min.time()))
 
 
 def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
@@ -99,7 +104,7 @@ def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
 
 
 def _sub_badge(sub: BusinessSubscription) -> str:
-    if sub.status == BusinessSubscription.Status.TRIAL:
+    if sub.status in (BusinessSubscription.Status.TRIAL, BusinessSubscription.Status.TRIALING):
         return f"Trial – {sub.days_left_in_trial()} days left"
     if sub.status == BusinessSubscription.Status.ACTIVE:
         return "Active"
@@ -150,6 +155,7 @@ def _send_invoice_email(inv: Invoice) -> None:
     """
     try:
         from billing.notifications import send_invoice_email  # our convenience wrapper
+
         send_invoice_email(inv)
     except Exception:
         # best-effort: no crash if email layer isn't ready
@@ -159,6 +165,7 @@ def _send_invoice_email(inv: Invoice) -> None:
 def _send_invoice_whatsapp(inv: Invoice) -> None:
     try:
         from billing.notifications import send_invoice_whatsapp
+
         send_invoice_whatsapp(inv)
     except Exception:
         pass
@@ -173,7 +180,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     """
     Pick a plan (or show current); seed trial if missing; create the first invoice draft.
     This page now primarily serves GET (the one-click flow posts to select_plan).
-    
+
     NO payment provider errors are shown here - only on checkout page.
     """
     biz: Business = request.business
@@ -195,7 +202,13 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             messages.error(request, "Please choose a valid plan.")
     else:
         form = ChoosePlanForm(initial={"plan": sub.plan_id} if sub.plan_id else None)
-    
+
+    # Determine paid plan ID: only show as "current" if subscription is truly paid/active
+    # Trial users should NOT see any plan as current even if plan is assigned for limit purposes
+    paid_plan_id = None
+    if sub.status == BusinessSubscription.Status.ACTIVE and sub.plan_id:
+        paid_plan_id = sub.plan_id
+
     return render(
         request,
         "billing/subscribe.html",
@@ -203,6 +216,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
             "plans": plans,
             "form": form,
             "sub": sub,
+            "paid_plan_id": paid_plan_id,
             "days_left": sub.days_left_in_trial(),
             "sub_badge": _sub_badge(sub),
         },
@@ -215,9 +229,11 @@ def subscribe(request: HttpRequest) -> HttpResponse:
 @require_POST
 def select_plan(request: HttpRequest) -> HttpResponse:
     """
-    Receives POST from a plan card. Sets plan, creates draft invoice, and routes
-    to the plan-specific page. That page may immediately link/redirect to checkout.
+    Receives POST from a plan card. Creates a PendingCheckout (NO invoice yet),
+    and routes to checkout. Invoice is only created after payment confirmation.
     """
+    from billing.models import PendingCheckout
+    
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
 
@@ -231,13 +247,23 @@ def select_plan(request: HttpRequest) -> HttpResponse:
         messages.error(request, "Unknown or inactive plan.")
         return redirect("billing:subscribe")
 
-    # Update subscription plan
-    sub.plan = plan
-    sub.save(update_fields=["plan", "updated_at"])
-
-    # Create a fresh draft invoice
-    inv = _create_draft_invoice_for_plan(biz, plan, created_by=request.user)
-    request.session["billing_invoice_id"] = str(inv.id)
+    # Create PendingCheckout to track selection (NO invoice, NO subscription activation yet)
+    # Invoice will be created only after payment webhook confirms success
+    pending = PendingCheckout.objects.create(
+        business=biz,
+        created_by=request.user,
+        selected_plan=plan,
+        selected_plan_code=plan.code,
+        amount=plan.amount,
+        currency=plan.currency,
+        status=PendingCheckout.Status.PENDING,
+        expires_at=timezone.now() + timedelta(hours=2),  # Expire after 2 hours
+    )
+    
+    # Store pending checkout ID in session
+    request.session["pending_checkout_id"] = str(pending.id)
+    # Clear any old invoice session data
+    request.session.pop("billing_invoice_id", None)
 
     # Go directly to checkout (production behavior)
     return redirect("billing:checkout")
@@ -281,126 +307,525 @@ def plan_detail(request: HttpRequest, slug: str) -> HttpResponse:
 def checkout(request: HttpRequest) -> HttpResponse:
     """
     Interactive checkout with tabs:
-    - Airtel Money (prompt)
-    - Standard Bank (proof/reference)
-    - Card (number/exp/cvv) – stubbed tokenization for now
-    Shows invoice preview on the side.
-    
-    Payment provider errors are handled here with friendly messages.
+    - Airtel Money (PayChangu Mobile Money Direct Charge - push to phone)
+    - TNM Mpamba (PayChangu Mobile Money Direct Charge - push to phone)
+    - Card (PayChangu Hosted Checkout)
+
+    Mobile Money uses direct charge API (push prompt to phone).
+    Card uses hosted checkout (redirect to PayChangu).
+    Shows plan/amount preview (NO invoice created yet - that happens on payment success).
     """
+    from billing.models import PendingCheckout
+    
     biz: Business = request.business
-    inv_id = request.session.get("billing_invoice_id")
-    if not inv_id:
-        messages.info(request, "No pending invoice. Please pick a plan first.")
-        return redirect("billing:subscribe")
+    
+    # Check for PendingCheckout (new flow - no invoice until payment confirmed)
+    pending_id = request.session.get("pending_checkout_id")
+    if pending_id:
+        try:
+            pending = PendingCheckout.objects.get(id=pending_id, business=biz, status=PendingCheckout.Status.PENDING)
+            # Create a temporary invoice-like object for template compatibility
+            class CheckoutPreview:
+                def __init__(self, pending):
+                    self.id = pending.id
+                    self.total = pending.amount
+                    self.currency = pending.currency
+                    self.plan_name = pending.selected_plan.name if pending.selected_plan else pending.selected_plan_code
+                    self.business = pending.business
+                    self.is_pending_checkout = True
+                    # Add number attribute for template/payment compatibility
+                    self.number = f"PREVIEW-{pending.id}"
+                    self.invoice_number = self.number  # Alias for compatibility
+                
+                # Add invoice-like properties for template compatibility
+                @property
+                def subtotal(self):
+                    return self.total
+                
+                @property
+                def tax_total(self):
+                    return Decimal("0")
+                
+                @property
+                def items(self):
+                    """Return a queryset-like object with a single item."""
+                    class FakeItem:
+                        def __init__(self, plan_name, amount):
+                            self.description = plan_name
+                            self.qty = Decimal("1")
+                            self.unit_price = amount
+                            self.total = amount
+                    
+                    class FakeQuerySet:
+                        def __init__(self, item):
+                            self._item = item
+                        
+                        def all(self):
+                            return [self._item]
+                        
+                        def __iter__(self):
+                            return iter([self._item])
+                    
+                    return FakeQuerySet(FakeItem(self.plan_name, self.total))
+            invoice = CheckoutPreview(pending)
+        except PendingCheckout.DoesNotExist:
+            messages.info(request, "Checkout session expired. Please select a plan again.")
+            return redirect("billing:subscribe")
+    else:
+        # Fallback: check for old invoice-based flow (for backward compatibility during transition)
+        inv_id = request.session.get("billing_invoice_id")
+        if not inv_id:
+            messages.info(request, "No pending checkout. Please pick a plan first.")
+            return redirect("billing:subscribe")
+        invoice = get_object_or_404(Invoice, id=inv_id, business=biz)
 
-    invoice = get_object_or_404(Invoice, id=inv_id, business=biz)
-
-    airtel_form = AirtelForm(prefix="airtel")
-    bank_form = BankProofForm(prefix="bank")
-    card_form = CardForm(prefix="card")
+    # Pass PayChangu mode to template for test mode hints
+    paychangu_mode = getattr(settings, "PAYCHANGU_MODE", "test")
 
     if request.method == "POST":
         method = (request.POST.get("method") or "").lower()
+        phone = (request.POST.get("phone") or "").strip()
 
-        # Wrap payment processing in try/except for friendly error handling
-        try:
-            # ---------------- Airtel Money ----------------
-            if method == "airtel":
-                airtel_form = AirtelForm(request.POST, prefix="airtel")
-                if airtel_form.is_valid():
-                    msisdn = airtel_form.cleaned_data["msisdn"]
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.AIRTEL,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.PENDING,
-                        raw_payload={"msisdn": msisdn},
-                    )
-                    messages.success(
-                        request,
-                        "Airtel Money prompt initiated. Please approve on your phone. We'll activate once confirmed.",
-                    )
-                    return redirect("billing:success")
-
-            # ---------------- Standard Bank (manual) -----
-            elif method == "standard_bank":
-                bank_form = BankProofForm(request.POST, prefix="bank")
-                if bank_form.is_valid():
-                    ref = bank_form.cleaned_data["reference"]
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.STANDARD_BANK,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.PENDING,
-                        reference=ref,
-                    )
-                    messages.info(request, "Payment proof submitted. We'll verify and activate shortly.")
-                    return redirect("billing:success")
-
-            # ---------------- Card (stub success) --------
-            elif method == "card":
-                card_form = CardForm(request.POST, prefix="card")
-                if card_form.is_valid():
-                    # In real flow: tokenize card→charge→webhook. For now, mark success.
-                    Payment.objects.create(
-                        business=biz,
-                        invoice=invoice,
-                        provider=Payment.Provider.CARD,
-                        amount=invoice.total,
-                        currency=invoice.currency,
-                        status=Payment.Status.SUCCEEDED,
-                        external_id="TEST-OK",
-                    )
-                    invoice.mark_paid()
-
-                    sub = _ensure_trial_subscription(biz)
-                    if not sub.plan_id:
-                        sub.plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
-                    sub.status = BusinessSubscription.Status.ACTIVE
-                    sub.last_payment_at = timezone.now()
-                    sub.advance_period()
-                    sub.save(update_fields=["plan", "status", "last_payment_at", "updated_at"])
-
-                    # Notify & mark sent
-                    _send_invoice_email(invoice)
-                    _send_invoice_whatsapp(invoice)
-                    invoice.mark_sent()
-
-                    messages.success(request, "Payment successful and subscription activated!")
-                    return redirect("billing:success")
-
-            messages.error(request, "Please check your payment details and try again.")
-            
-        except Exception as e:
-            # Log the real error for debugging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"Payment processing error: {e}", exc_info=True)
-            
-            # Show friendly error to user
-            messages.error(
+        # Check if PayChangu is configured
+        if not paychangu_service.is_paychangu_configured():
+            logger.error("PayChangu not configured, cannot process payment")
+            messages.error(request, "Payment system is not configured. Please contact support.")
+            return render(
                 request,
-                "Payment processing is temporarily unavailable. Please try another payment method or contact support."
+                "billing/checkout.html",
+                {
+                    "invoice": invoice,
+                    "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                    "PAYCHANGU_MODE": paychangu_mode,
+                },
             )
 
-    # Sidebar badge
+        # Validate phone number for mobile money methods
+        if method in ("airtel", "tnm"):
+            if not phone:
+                messages.error(request, "Please provide a valid phone number.")
+                return render(
+                    request,
+                    "billing/checkout.html",
+                    {
+                        "invoice": invoice,
+                        "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        "PAYCHANGU_MODE": paychangu_mode,
+                    },
+                )
+
+            # Normalize phone number
+            try:
+                normalized_phone = paychangu_service.normalize_malawi_phone(phone)
+            except ValueError as e:
+                messages.error(request, f"Invalid phone number: {e}")
+                return render(
+                    request,
+                    "billing/checkout.html",
+                    {
+                        "invoice": invoice,
+                        "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        "PAYCHANGU_MODE": paychangu_mode,
+                    },
+                )
+
+            # Test mode validation: only allow sandbox numbers
+            if paychangu_mode == "test":
+                validation_result = paychangu_service.validate_test_mode_phone(phone, method)
+                if not validation_result.get("valid"):
+                    messages.warning(request, validation_result.get("message"))
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                            "PAYCHANGU_MODE": paychangu_mode,
+                        },
+                    )
+
+        try:
+            # Generate unique transaction reference and charge ID
+            tx_ref = f"billing-{biz.id}-{uuid.uuid4().hex[:12]}"
+            charge_id = f"charge-{uuid.uuid4().hex[:16]}"
+
+            # Get location (first location if available, otherwise None)
+            location = None
+            if hasattr(biz, "locations"):
+                location = biz.locations.first()
+
+            # Get subscription (needed for both flows)
+            sub = _ensure_trial_subscription(biz)
+            
+            # Get plan information from PendingCheckout or subscription
+            if hasattr(invoice, 'is_pending_checkout') and invoice.is_pending_checkout:
+                plan_code = pending.selected_plan_code
+                plan_name = pending.selected_plan.name if pending.selected_plan else pending.selected_plan_code
+                amount = pending.amount
+                currency = pending.currency
+                # Store pending checkout reference for webhook processing
+                pending.tx_ref = tx_ref
+                pending.save(update_fields=["tx_ref", "updated_at"])
+            else:
+                plan_code = sub.plan.code if sub.plan else "unknown"
+                plan_name = sub.plan.name if sub.plan else "Subscription"
+                amount = invoice.total
+                currency = invoice.currency
+
+            logger.info(
+                f"Initiating PayChangu payment: business={biz.id}, "
+                f"tx_ref={tx_ref}, method={method}, amount={amount}, plan={plan_code}"
+            )
+
+            # Create PaymentTransaction record (PENDING)
+            transaction = PaymentTransaction.objects.create(
+                business=biz,
+                location=location,
+                created_by=request.user,
+                provider="paychangu",
+                tx_ref=tx_ref,
+                charge_id=charge_id if method in ("airtel", "tnm") else "",
+                payment_method=method,
+                amount=amount,
+                currency=currency,
+                status=PaymentTransaction.Status.PENDING,
+            )
+
+            # Store invoice reference in session for webhook processing
+            request.session[f"paychangu_tx_{tx_ref}"] = {
+                "invoice_id": str(invoice.id),
+                "method": method,
+            }
+
+            # Build callback URLs
+            callback_url = request.build_absolute_uri(reverse("billing:paychangu_webhook"))
+
+            # Prepare metadata
+            meta = {
+                "plan_code": plan_code,
+                "invoice_id": str(invoice.id),
+                "payment_method": method,
+                "user_id": str(request.user.id),
+                "user_email": request.user.email,
+            }
+
+            # MOBILE MONEY: Direct Charge (push to phone)
+            if method in ("airtel", "tnm"):
+                # Resolve operator ref_id dynamically (with caching + env override support)
+                operator_result = paychangu_service.get_operator_ref_id(method)
+
+                if operator_result.get("status") != "success":
+                    error_msg = operator_result.get("message", "Failed to resolve mobile money operator")
+                    logger.error(f"Operator resolution failed: business={biz.id}, method={method}, error={error_msg}")
+                    transaction.mark_failed({"error": error_msg})
+                    messages.error(request, f"Payment setup error: {error_msg}. Please contact support.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "sub_badge": _sub_badge(sub),
+                            "PAYCHANGU_MODE": paychangu_mode,
+                        },
+                    )
+
+                operator_ref_id = operator_result.get("ref_id")
+                operator_name = operator_result.get("operator_name", method.upper())
+
+                logger.info(
+                    f"Resolved operator: method={method}, name={operator_name}, ref_id={operator_ref_id[:8]}..."
+                )
+
+                result = paychangu_service.momo_initialize_payment(
+                    operator_ref_id=operator_ref_id,
+                    mobile=phone,
+                    amount=invoice.total,
+                    currency=invoice.currency,
+                    tx_ref=tx_ref,
+                    charge_id=charge_id,
+                    callback_url=callback_url,
+                    meta=meta,
+                    description=f"{invoice.number} - {plan_name}",
+                )
+
+                if result.get("status") != "success":
+                    error_msg = result.get("message", "Failed to initiate payment")
+                    logger.error(f"PayChangu MoMo init failed: business={biz.id}, tx_ref={tx_ref}, error={error_msg}")
+                    transaction.mark_failed(result.get("raw_response", {}))
+                    messages.error(request, f"Payment initiation failed: {error_msg}. Please try again.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "sub_badge": _sub_badge(sub),
+                            "PAYCHANGU_MODE": paychangu_mode,
+                        },
+                    )
+
+                # Update transaction with init payload
+                transaction.raw_init_payload = result.get("raw_response", {})
+                transaction.save(update_fields=["raw_init_payload", "updated_at"])
+
+                logger.info(f"PayChangu MoMo initialized: tx_ref={tx_ref}, charge_id={charge_id}")
+
+                # Store tx_ref in session for polling
+                request.session["billing_tx_ref"] = tx_ref
+                request.session["billing_charge_id"] = charge_id
+
+                # Render waiting page with polling
+                return render(
+                    request,
+                    "billing/payment_waiting.html",
+                    {
+                        "tx_ref": tx_ref,
+                        "charge_id": charge_id,
+                        "method": method.upper(),
+                        "phone_masked": phone[:3] + "***" + phone[-2:] if len(phone) > 5 else "***",
+                        "amount": invoice.total,
+                        "currency": invoice.currency,
+                    },
+                )
+
+            # CARD: Hosted Checkout (redirect to PayChangu)
+            elif method == "card":
+                return_url = request.build_absolute_uri(reverse("billing:paychangu_return"))
+
+                result = paychangu_service.create_checkout(
+                    business=biz,
+                    location=location,
+                    amount=invoice.total,
+                    currency=invoice.currency,
+                    tx_ref=tx_ref,
+                    return_url=return_url,
+                    callback_url=callback_url,
+                    meta=meta,
+                    user_email=request.user.email,
+                    user_phone=getattr(request.user, "phone", None),
+                    description=f"{invoice.number} - {plan_name}",
+                )
+
+                if result.get("status") != "success":
+                    error_msg = result.get("message", "Failed to initiate payment")
+                    logger.error(f"PayChangu checkout failed: business={biz.id}, tx_ref={tx_ref}, error={error_msg}")
+                    transaction.mark_failed(result.get("raw_response", {}))
+                    messages.error(request, f"Payment initiation failed: {error_msg}. Please try again.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "sub_badge": _sub_badge(sub),
+                            "PAYCHANGU_MODE": paychangu_mode,
+                        },
+                    )
+
+                # Update transaction with checkout details
+                transaction.checkout_url = result.get("checkout_url", "")
+                transaction.raw_init_payload = result.get("raw_response", {})
+                transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
+
+                logger.info(f"PayChangu checkout created: tx_ref={tx_ref}, checkout_url={transaction.checkout_url}")
+
+                # Store tx_ref in session for return page
+                request.session["billing_tx_ref"] = tx_ref
+
+                # Redirect to PayChangu checkout page
+                checkout_url = result.get("checkout_url")
+                if checkout_url:
+                    return redirect(checkout_url)
+                else:
+                    messages.error(request, "Failed to get checkout URL. Please try again.")
+                    return render(
+                        request,
+                        "billing/checkout.html",
+                        {
+                            "invoice": invoice,
+                            "sub_badge": _sub_badge(sub),
+                            "PAYCHANGU_MODE": paychangu_mode,
+                        },
+                    )
+
+            else:
+                messages.error(request, "Invalid payment method selected.")
+                return render(
+                    request,
+                    "billing/checkout.html",
+                    {
+                        "invoice": invoice,
+                        "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                        "PAYCHANGU_MODE": paychangu_mode,
+                    },
+                )
+
+        except Exception as e:
+            logger.error(f"Checkout error: business={biz.id}, error={e}", exc_info=True)
+            messages.error(request, f"An error occurred: {str(e)}. Please try again.")
+            return render(
+                request,
+                "billing/checkout.html",
+                {
+                    "invoice": invoice,
+                    "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
+                    "PAYCHANGU_MODE": paychangu_mode,
+                },
+            )
+
+    # GET request: show checkout form
     sub = _ensure_trial_subscription(biz)
     return render(
         request,
         "billing/checkout.html",
         {
             "invoice": invoice,
-            "airtel_form": airtel_form,
-            "bank_form": bank_form,
-            "card_form": card_form,
             "sub_badge": _sub_badge(sub),
+            "PAYCHANGU_MODE": paychangu_mode,
         },
     )
+
+
+@login_required
+@require_business
+def payment_status_api(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint to check payment status (for polling from payment_waiting.html).
+
+    Query params:
+        - charge_id: PayChangu charge ID (for mobile money)
+        - tx_ref: Transaction reference (fallback)
+
+    Returns:
+        {
+            "status": "pending" | "success" | "failed",
+            "message": "...",
+            "redirect_url": "/billing/success/" (when success)
+        }
+    """
+    biz = request.business
+    charge_id = request.GET.get("charge_id", "").strip()
+    tx_ref = request.GET.get("tx_ref", "").strip()
+
+    if not charge_id and not tx_ref:
+        return JsonResponse({"status": "error", "message": "Missing charge_id or tx_ref"}, status=400)
+
+    # Find transaction - scoped to current business (multi-tenant safe)
+    try:
+        if charge_id:
+            transaction = PaymentTransaction.objects.get(charge_id=charge_id, business=biz, provider="paychangu")
+        else:
+            transaction = PaymentTransaction.objects.get(tx_ref=tx_ref, business=biz, provider="paychangu")
+    except PaymentTransaction.DoesNotExist:
+        logger.warning(f"Payment status check: charge_id={charge_id} tx_ref={tx_ref} not found for business {biz.id}")
+        return JsonResponse({"status": "error", "message": "Payment not found"}, status=404)
+
+    # If already SUCCESS or FAILED, return immediately
+    if transaction.status == PaymentTransaction.Status.SUCCESS:
+        return JsonResponse(
+            {
+                "status": "success",
+                "message": "Payment confirmed! Your subscription is now active.",
+                "redirect_url": reverse("billing:success"),
+            }
+        )
+
+    if transaction.status == PaymentTransaction.Status.FAILED:
+        return JsonResponse(
+            {
+                "status": "failed",
+                "message": "Payment failed. Please try again.",
+            }
+        )
+
+    # Still PENDING - verify with PayChangu API
+    if transaction.charge_id:
+        # Mobile Money: use momo_verify_payment
+        verify_result = paychangu_service.momo_verify_payment(transaction.charge_id)
+    else:
+        # Hosted checkout: use verify_payment
+        verify_result = paychangu_service.verify_payment(transaction.tx_ref)
+
+    if verify_result.get("status") == "ERROR":
+        logger.error(f"PayChangu verify API failed for {transaction.tx_ref}: {verify_result.get('message')}")
+        return JsonResponse(
+            {
+                "status": "pending",
+                "message": "Checking payment status...",
+            }
+        )
+
+    verified_status = verify_result.get("status")
+
+    if verified_status == "SUCCESS":
+        # Mark transaction as successful
+        transaction.mark_success(verify_result.get("raw_response", {}))
+
+        # Find and mark invoice as paid
+        try:
+            invoice = (
+                Invoice.objects.filter(
+                    business=biz,
+                    total=transaction.amount,
+                    currency=transaction.currency,
+                    status__in=[Invoice.Status.DRAFT, Invoice.Status.SENT],
+                )
+                .order_by("-created_at")
+                .first()
+            )
+
+            if invoice and invoice.status != Invoice.Status.PAID:
+                invoice.status = Invoice.Status.PAID
+                invoice.paid_at = timezone.now()
+                invoice.save(update_fields=["status", "paid_at", "updated_at"])
+                logger.info(f"Invoice {invoice.number} marked PAID for charge_id {transaction.charge_id}")
+        except Exception as e:
+            logger.error(f"Failed to mark invoice paid: {e}", exc_info=True)
+
+        # Activate subscription
+        try:
+            sub = getattr(biz, "subscription", None)
+            if sub and sub.status != BusinessSubscription.Status.ACTIVE:
+                sub.status = BusinessSubscription.Status.ACTIVE
+                sub.last_payment_at = timezone.now()
+
+                # Set payment method
+                if transaction.payment_method == "airtel":
+                    sub.payment_method = BusinessSubscription.Method.AIRTEL
+                elif transaction.payment_method == "tnm":
+                    sub.payment_method = BusinessSubscription.Method.AIRTEL  # Use same enum for now
+                elif transaction.payment_method == "card":
+                    sub.payment_method = BusinessSubscription.Method.CARD
+
+                sub.advance_period()
+                sub.save()
+                logger.info(f"Subscription activated for business {biz.id}, charge_id {transaction.charge_id}")
+        except Exception as e:
+            logger.error(f"Failed to activate subscription: {e}", exc_info=True)
+
+        return JsonResponse(
+            {
+                "status": "success",
+                "message": "Payment confirmed! Your subscription is now active.",
+                "redirect_url": reverse("billing:success"),
+            }
+        )
+
+    elif verified_status == "FAILED":
+        transaction.mark_failed(verify_result.get("raw_response", {}))
+        return JsonResponse(
+            {
+                "status": "failed",
+                "message": "Payment failed. Please try again.",
+            }
+        )
+
+    else:
+        # Still PENDING
+        return JsonResponse(
+            {
+                "status": "pending",
+                "message": "Payment is being processed...",
+            }
+        )
 
 
 @login_required
@@ -462,13 +887,25 @@ def _plain_text_to_minimal_pdf(text: str) -> bytes:
 
     xref = []
     out = BytesIO()
-    def w(s): out.write(s if isinstance(s, bytes) else s.encode("latin-1"))
+
+    def w(s):
+        out.write(s if isinstance(s, bytes) else s.encode("latin-1"))
+
     w("%PDF-1.4\n")
-    xref.append(out.tell()); w("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n")
-    xref.append(out.tell()); w("2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n")
-    xref.append(out.tell()); w("3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj\n")
-    xref.append(out.tell()); w(f"4 0 obj <</Length {len(content_body)}>> stream\n"); out.write(content_body); w("\nendstream endobj\n")
-    xref.append(out.tell()); w("5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Courier>> endobj\n")
+    xref.append(out.tell())
+    w("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n")
+    xref.append(out.tell())
+    w("2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj\n")
+    xref.append(out.tell())
+    w(
+        "3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources <</Font <</F1 5 0 R>>>>>> endobj\n"
+    )
+    xref.append(out.tell())
+    w(f"4 0 obj <</Length {len(content_body)}>> stream\n")
+    out.write(content_body)
+    w("\nendstream endobj\n")
+    xref.append(out.tell())
+    w("5 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Courier>> endobj\n")
     xref_pos = out.tell()
     w("xref\n0 6\n0000000000 65535 f \n")
     for pos in xref:
@@ -494,7 +931,7 @@ def webhook(request: HttpRequest) -> JsonResponse:
             # Store headers inside payload for auditing; model has no separate headers field
             payload = {
                 "raw": raw,
-                "headers": {k: v for k, v in request.headers.items() },
+                "headers": {k: v for k, v in request.headers.items()},
                 "query": dict(request.GET),
             }
 
@@ -521,12 +958,12 @@ def trial_expired(request: HttpRequest) -> HttpResponse:
     """
     biz = getattr(request, "business", None)
     sub = None
-    
+
     if biz:
         sub = getattr(biz, "subscription", None)
-    
+
     reason = request.GET.get("reason", "expired")
-    
+
     return render(
         request,
         "billing/trial_expired.html",
@@ -558,7 +995,7 @@ def invoice_list(request: HttpRequest) -> HttpResponse:
     Minimal placeholder view that returns 200.
     """
     biz: Business = request.business
-    invoices = Invoice.objects.filter(business=biz).order_by('-created_at')[:50]
+    invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:50]
     return render(
         request,
         "billing/invoices_list.html",
@@ -573,12 +1010,362 @@ def invoice_list(request: HttpRequest) -> HttpResponse:
 @require_business
 def manage(request: HttpRequest) -> HttpResponse:
     """
-    Basic "manage subscription" page (stub). You can add upgrade/downgrade actions here later.
+    Manage subscription page with current plan details, available plans, and invoice history.
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
     plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
-    return render(request, "billing/manage.html", {"sub": sub, "plans": plans, "sub_badge": _sub_badge(sub)})
+
+    # Determine if subscription is truly paid/active (not just trial with plan assigned)
+    is_paid_active = sub.status == BusinessSubscription.Status.ACTIVE
+
+    # Get recent invoices - only show PAID invoices for trial users, all for active users
+    if is_paid_active:
+        invoices = Invoice.objects.filter(business=biz).order_by("-created_at")[:3]
+    else:
+        # For trial users, only show paid invoices (hide drafts)
+        invoices = Invoice.objects.filter(business=biz, status=Invoice.Status.PAID).order_by("-created_at")[:3]
+
+    # Determine paid plan ID for UI display
+    paid_plan_id = sub.plan_id if is_paid_active else None
+
+    return render(
+        request,
+        "billing/manage.html",
+        {
+            "sub": sub,
+            "plans": plans,
+            "invoices": invoices,
+            "sub_badge": _sub_badge(sub),
+            "is_paid_active": is_paid_active,
+            "paid_plan_id": paid_plan_id,
+        },
+    )
+
+
+# ------------------------------------------------------------------------------
+# Subscription Cancellation & Billing Phone Management
+# ------------------------------------------------------------------------------
+@login_required
+@require_business
+@require_POST
+def cancel_subscription(request: HttpRequest) -> HttpResponse:
+    """
+    Cancel subscription at period end (SaaS best practice).
+    User continues to have access until current_period_end.
+    """
+    import re
+
+    from billing.services import notify_hq
+
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # Confirmation check
+    confirm = request.POST.get("confirm", "").strip().lower()
+    if confirm != "yes":
+        messages.error(request, "Cancellation confirmation required.")
+        return redirect("billing:manage")
+
+    # Set cancel_at_period_end
+    sub.cancel_at_period_end = True
+    sub.cancel_requested_at = timezone.now()
+    if not sub.canceled_at:
+        sub.canceled_at = timezone.now()
+    sub.save(update_fields=["cancel_at_period_end", "cancel_requested_at", "canceled_at", "updated_at"])
+
+    # Notify HQ of cancellation request (idempotent)
+    try:
+        notify_hq.notify_cancellation_requested(sub)
+    except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send HQ cancellation notification: {e}")
+
+    # Success message
+    period_end_str = (
+        sub.current_period_end.strftime("%B %d, %Y") if sub.current_period_end else "the end of your billing period"
+    )
+    messages.success(
+        request,
+        f"Subscription will be canceled on {period_end_str}. You'll keep access until then.",
+    )
+
+    return redirect("billing:manage")
+
+
+@login_required
+@require_business
+@require_POST
+def undo_cancellation(request: HttpRequest) -> HttpResponse:
+    """
+    Undo cancellation (reactivate subscription).
+    Only works if still before period end.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # Check if we can still undo
+    if not sub.cancel_at_period_end:
+        messages.info(request, "Subscription is not scheduled for cancellation.")
+        return redirect("billing:manage")
+
+    if sub.current_period_end and timezone.now() >= sub.current_period_end:
+        messages.error(request, "Cannot undo cancellation after period has ended.")
+        return redirect("billing:manage")
+
+    # Undo cancellation
+    sub.cancel_at_period_end = False
+    sub.cancel_requested_at = None  # Clear cancellation request timestamp
+    # Don't clear canceled_at (keep audit trail)
+    sub.save(update_fields=["cancel_at_period_end", "updated_at"])
+
+    messages.success(request, "Cancellation undone! Your subscription will continue automatically.")
+
+    return redirect("billing:manage")
+
+
+@login_required
+@require_business
+@require_POST
+def update_billing_phone(request: HttpRequest) -> HttpResponse:
+    """
+    Update billing phone number for automated billing prompts.
+    Validates and normalizes Malawi phone numbers.
+    """
+    import re
+
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    phone = request.POST.get("billing_phone", "").strip()
+
+    if not phone:
+        messages.error(request, "Please enter a phone number.")
+        return redirect("billing:manage")
+
+    # Malawi phone number validation and normalization
+    # Accept formats: +265991234567, 265991234567, 0991234567, 991234567
+    # Valid prefixes: 099, 088, 077, 085, 084
+
+    # Remove spaces, dashes, parentheses
+    phone_clean = re.sub(r"[\s\-\(\)]", "", phone)
+
+    # Normalize to +265 format
+    if phone_clean.startswith("+265"):
+        normalized = phone_clean
+    elif phone_clean.startswith("265"):
+        normalized = "+" + phone_clean
+    elif phone_clean.startswith("0"):
+        normalized = "+265" + phone_clean[1:]
+    else:
+        # Assume it's missing country code and leading zero
+        normalized = "+265" + phone_clean
+
+    # Validate format: +265 followed by 9 digits starting with valid prefixes
+    valid_pattern = r"^\+265(99|88|77|85|84|86|89)\d{7}$"
+    if not re.match(valid_pattern, normalized):
+        messages.error(
+            request,
+            "Invalid Malawi phone number. Please enter a valid number (e.g., +265991234567, 0991234567).",
+        )
+        return redirect("billing:manage")
+
+    # Save normalized phone
+    sub.billing_phone = normalized
+    sub.save(update_fields=["billing_phone", "updated_at"])
+
+    messages.success(request, f"Billing phone number updated: {normalized}")
+
+    return redirect("billing:manage")
+
+
+# ------------------------------------------------------------------------------
+# Subscription Upgrade Flow
+# ------------------------------------------------------------------------------
+@login_required
+@require_business
+@require_POST
+def upgrade_start(request: HttpRequest, to_plan_code: str) -> HttpResponse:
+    """
+    Start subscription upgrade flow.
+
+    1. Validate upgrade is to a higher-tier plan
+    2. Calculate amount due (difference between plans)
+    3. Create SubscriptionChangeIntent
+    4. Initiate PayChangu checkout for the difference
+    5. Redirect to PayChangu or show error
+
+    Webhook will apply the upgrade after payment confirmed.
+    """
+    biz: Business = request.business
+    sub = _ensure_trial_subscription(biz)
+
+    # Validate current plan exists
+    if not sub.plan:
+        messages.error(request, "No current plan found. Please subscribe first.")
+        return redirect("billing:subscribe")
+
+    # Get target plan
+    try:
+        to_plan = SubscriptionPlan.objects.get(code=to_plan_code, is_active=True)
+    except SubscriptionPlan.DoesNotExist:
+        messages.error(request, f"Plan '{to_plan_code}' not found.")
+        return redirect("billing:manage")
+
+    from_plan = sub.plan
+
+    # Validate upgrade direction (must be to higher-priced plan)
+    if to_plan.amount <= from_plan.amount:
+        messages.error(request, "You can only upgrade to a higher-tier plan.")
+        return redirect("billing:manage")
+
+    # Calculate amount due (simple difference, no proration yet)
+    amount_due = max(Decimal("0"), to_plan.amount - from_plan.amount)
+
+    if amount_due == 0:
+        messages.info(request, "No payment required for this plan change.")
+        return redirect("billing:manage")
+
+    # Generate idempotency key (prevents duplicate intents)
+    # Format: business_id:from_plan:to_plan:period_start_timestamp
+    period_start_ts = int(sub.current_period_start.timestamp()) if sub.current_period_start else 0
+    idempotency_key = f"{biz.id}:{from_plan.code}:{to_plan.code}:{period_start_ts}"
+
+    # Check if intent already exists (prevent duplicates)
+    existing_intent = SubscriptionChangeIntent.objects.filter(
+        idempotency_key=idempotency_key,
+        status__in=[
+            SubscriptionChangeIntent.Status.PENDING,
+            SubscriptionChangeIntent.Status.PAID,
+        ],
+    ).first()
+
+    if existing_intent:
+        messages.info(request, "An upgrade is already in progress. Please complete the payment.")
+        # Redirect to checkout or status page
+        return redirect("billing:manage")
+
+    # Create SubscriptionChangeIntent
+    try:
+        intent = SubscriptionChangeIntent.objects.create(
+            business=biz,
+            subscription=sub,
+            from_plan_code=from_plan.code,
+            to_plan_code=to_plan.code,
+            from_plan_amount=from_plan.amount,
+            to_plan_amount=to_plan.amount,
+            amount_due=amount_due,
+            currency=to_plan.currency,
+            status=SubscriptionChangeIntent.Status.PENDING,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as e:
+        logger.error(f"Failed to create upgrade intent: business={biz.id}, error={e}", exc_info=True)
+        messages.error(request, "Failed to initiate upgrade. Please try again.")
+        return redirect("billing:manage")
+
+    # Generate unique transaction reference
+    tx_ref = f"upgrade-{biz.id}-{uuid.uuid4().hex[:12]}"
+    charge_id = f"charge-{uuid.uuid4().hex[:16]}"
+
+    # Store tx_ref in intent for webhook lookup
+    intent.tx_ref = tx_ref
+    intent.save(update_fields=["tx_ref", "updated_at"])
+
+    # Get location (first location if available)
+    location = None
+    if hasattr(biz, "locations"):
+        location = biz.locations.first()
+
+    # Create PaymentTransaction record (PENDING)
+    transaction = PaymentTransaction.objects.create(
+        business=biz,
+        location=location,
+        created_by=request.user,
+        provider="paychangu",
+        tx_ref=tx_ref,
+        charge_id=charge_id,
+        payment_method="card",  # Default to card, can be changed later
+        amount=amount_due,
+        currency=intent.currency,
+        status=PaymentTransaction.Status.PENDING,
+    )
+
+    # Build callback URLs
+    callback_url = request.build_absolute_uri(reverse("billing:paychangu_webhook"))
+    return_url = request.build_absolute_uri(reverse("billing:paychangu_return"))
+
+    # Prepare metadata for PayChangu
+    meta = {
+        "purpose": "subscription_upgrade",
+        "intent_id": str(intent.id),
+        "business_id": str(biz.id),
+        "from_plan": from_plan.code,
+        "to_plan": to_plan.code,
+        "amount_due": str(amount_due),
+        "currency": intent.currency,
+        "user_id": str(request.user.id),
+        "user_email": request.user.email,
+    }
+
+    # Initiate PayChangu hosted checkout
+    try:
+        result = paychangu_service.create_checkout(
+            business=biz,
+            location=location,
+            amount=amount_due,
+            currency=intent.currency,
+            tx_ref=tx_ref,
+            return_url=return_url,
+            callback_url=callback_url,
+            meta=meta,
+            user_email=request.user.email,
+            user_phone=getattr(request.user, "phone", None),
+            description=f"Upgrade: {from_plan.name} → {to_plan.name}",
+        )
+
+        if result.get("status") != "success":
+            error_msg = result.get("message", "Failed to initiate payment")
+            logger.error(f"PayChangu checkout failed: business={biz.id}, tx_ref={tx_ref}, error={error_msg}")
+            transaction.mark_failed(result.get("raw_response", {}))
+            intent.mark_failed()
+            messages.error(request, f"Payment initiation failed: {error_msg}. Please try again.")
+            return redirect("billing:manage")
+
+        # Update transaction with checkout details
+        transaction.checkout_url = result.get("checkout_url", "")
+        transaction.raw_init_payload = result.get("raw_response", {})
+        transaction.save(update_fields=["checkout_url", "raw_init_payload", "updated_at"])
+
+        # Store intent reference in PayChangu metadata
+        intent.paychangu_reference = result.get("checkout_id", "")
+        intent.save(update_fields=["paychangu_reference", "updated_at"])
+
+        logger.info(
+            f"Upgrade checkout created: business={biz.id}, intent={intent.id}, "
+            f"tx_ref={tx_ref}, amount_due={amount_due}"
+        )
+
+        # Store tx_ref in session for return page
+        request.session["billing_tx_ref"] = tx_ref
+        request.session["upgrade_intent_id"] = str(intent.id)
+
+        # Redirect to PayChangu checkout page
+        checkout_url = result.get("checkout_url")
+        if checkout_url:
+            return redirect(checkout_url)
+        else:
+            messages.error(request, "Failed to get checkout URL. Please try again.")
+            return redirect("billing:manage")
+
+    except Exception as e:
+        logger.error(f"Upgrade checkout error: business={biz.id}, error={e}", exc_info=True)
+        transaction.mark_failed({"error": str(e)})
+        intent.mark_failed()
+        messages.error(request, f"An error occurred: {str(e)}. Please try again.")
+        return redirect("billing:manage")
 
 
 # ------------------------------------------------------------------------------
@@ -589,10 +1376,7 @@ def hq_subscriptions(request: HttpRequest) -> HttpResponse:
     """
     Admin list to view/enforce. Reachable at /hq/subscriptions (see urls.py).
     """
-    items = (
-        BusinessSubscription.objects.select_related("business", "plan")
-        .order_by("-started_at")
-    )
+    items = BusinessSubscription.objects.select_related("business", "plan").order_by("-started_at")
     return render(request, "billing/hq_subscriptions.html", {"items": items})
 
 
@@ -629,23 +1413,23 @@ def trial_expired(request: HttpRequest) -> HttpResponse:
     User can only access billing pages, logout, or contact admin.
     """
     # Get business from request (set by TenantResolutionMiddleware)
-    business = getattr(request, 'business', None)
-    
+    business = getattr(request, "business", None)
+
     # If no business, redirect to tenant chooser
     if not business:
-        return redirect('/accounts/login/')
-    
+        return redirect("/accounts/login/")
+
     # Check subscription status
-    sub = getattr(business, 'subscription', None)
-    
+    sub = getattr(business, "subscription", None)
+
     # If subscription is actually active, redirect to dashboard
     if sub and sub.is_active_now():
-        return redirect('/app/home/')
-    
+        return redirect("/app/home/")
+
     context = {
-        'business': business,
-        'subscription': sub,
-        'reason': request.GET.get('reason', 'expired'),
+        "business": business,
+        "subscription": sub,
+        "reason": request.GET.get("reason", "expired"),
     }
-    
-    return render(request, 'billing/trial_expired.html', context)
+
+    return render(request, "billing/trial_expired.html", context)

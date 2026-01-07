@@ -48,35 +48,35 @@ PAYMENT_METHOD_DISPLAY = {
 def normalize_payment_method(raw_method: str) -> str:
     """
     Normalize payment method to canonical form.
-    
+
     Args:
         raw_method: Raw payment method string
-    
+
     Returns:
         str: Normalized method code (CASH, BANK, MOBILE_MONEY, etc.)
     """
     if not raw_method:
         return "CASH"
-    
+
     method = str(raw_method).strip().upper()
-    
+
     # Normalize variants
     if method in ("MOBILE", "MPAMBA", "AIRTEL_MONEY", "TNM_MPAMBA"):
         return "MOBILE_MONEY"
-    
+
     if method in ("CARD", "DEBIT", "CREDIT"):
         return "BANK"
-    
+
     return method
 
 
 def get_display_name(method_code: str) -> str:
     """
     Get human-readable display name for payment method.
-    
+
     Args:
         method_code: Payment method code
-    
+
     Returns:
         str: Display name
     """
@@ -91,13 +91,13 @@ def build_payment_mix(
 ) -> List[Dict]:
     """
     Build standardized payment mix data structure.
-    
+
     Args:
         business: Business instance (for context, not used currently)
         sales_qs: QuerySet of sales to analyze
         payment_field: Name of payment method field (default: "payment_method")
         amount_field: Name of amount field (default: "total_amount")
-    
+
     Returns:
         List of dicts with keys:
             - method: str (display name)
@@ -105,7 +105,7 @@ def build_payment_mix(
             - amount: Decimal (total for this method)
             - count: int (number of transactions)
             - percentage: float (0-100)
-    
+
     Example return:
         [
             {
@@ -120,22 +120,19 @@ def build_payment_mix(
     """
     from django.db.models import Sum, Count, Q
     from collections import defaultdict
-    
+
     # Initialize result structure
     payment_data = defaultdict(lambda: {"amount": Decimal("0.00"), "count": 0})
-    
+
     # Group by payment method
     try:
         # Get aggregated data per payment method
-        aggregates = sales_qs.values(payment_field).annotate(
-            total=Sum(amount_field),
-            count=Count("id")
-        )
-        
+        aggregates = sales_qs.values(payment_field).annotate(total=Sum(amount_field), count=Count("id"))
+
         for agg in aggregates:
             method_raw = agg.get(payment_field, "CASH")
             method_code = normalize_payment_method(method_raw)
-            
+
             payment_data[method_code]["amount"] += Decimal(str(agg.get("total") or 0))
             payment_data[method_code]["count"] += int(agg.get("count") or 0)
     except Exception as e:
@@ -145,45 +142,47 @@ def build_payment_mix(
                 method_raw = getattr(sale, payment_field, "CASH")
                 method_code = normalize_payment_method(method_raw)
                 amount = getattr(sale, amount_field, Decimal("0.00"))
-                
+
                 payment_data[method_code]["amount"] += Decimal(str(amount or 0))
                 payment_data[method_code]["count"] += 1
         except Exception:
             pass
-    
+
     # Calculate total revenue
     total_revenue = sum(data["amount"] for data in payment_data.values())
-    
+
     # Build result list
     result = []
     for method_code, data in payment_data.items():
         percentage = 0.0
         if total_revenue > 0:
             percentage = float((data["amount"] / total_revenue) * 100)
-        
-        result.append({
-            "method": get_display_name(method_code),
-            "method_code": method_code,
-            "amount": float(data["amount"]),  # Convert to float for JSON/template compatibility
-            "count": data["count"],
-            "percentage": round(percentage, 1),
-        })
-    
+
+        result.append(
+            {
+                "method": get_display_name(method_code),
+                "method_code": method_code,
+                "amount": float(data["amount"]),  # Convert to float for JSON/template compatibility
+                "count": data["count"],
+                "percentage": round(percentage, 1),
+            }
+        )
+
     # Sort by amount descending
     result.sort(key=lambda x: x["amount"], reverse=True)
-    
+
     return result
 
 
 def build_payment_mix_for_pharmacy(business, start_date=None, end_date=None) -> List[Dict]:
     """
     Build payment mix specifically for pharmacy sales.
-    
+
     Args:
         business: Business instance
         start_date: Optional start date filter
         end_date: Optional end date filter
-    
+
     Returns:
         List of payment mix dicts
     """
@@ -191,15 +190,15 @@ def build_payment_mix_for_pharmacy(business, start_date=None, end_date=None) -> 
         from inventory.models_pharmacy import PharmacySale
     except Exception:
         return []
-    
+
     qs = PharmacySale.objects.filter(business=business)
-    
+
     if start_date:
         qs = qs.filter(sold_at__date__gte=start_date)
-    
+
     if end_date:
         qs = qs.filter(sold_at__date__lte=end_date)
-    
+
     return build_payment_mix(
         business=business,
         sales_qs=qs,
@@ -211,12 +210,12 @@ def build_payment_mix_for_pharmacy(business, start_date=None, end_date=None) -> 
 def build_payment_mix_for_phones(business, start_date=None, end_date=None) -> List[Dict]:
     """
     Build payment mix specifically for phones sales.
-    
+
     Args:
         business: Business instance
         start_date: Optional start date filter
         end_date: Optional end date filter
-    
+
     Returns:
         List of payment mix dicts
     """
@@ -224,15 +223,15 @@ def build_payment_mix_for_phones(business, start_date=None, end_date=None) -> Li
         from sales.models import Sale
     except Exception:
         return []
-    
+
     qs = Sale.objects.filter(business=business)
-    
+
     if start_date:
         qs = qs.filter(created_at__date__gte=start_date)
-    
+
     if end_date:
         qs = qs.filter(created_at__date__lte=end_date)
-    
+
     return build_payment_mix(
         business=business,
         sales_qs=qs,
@@ -244,12 +243,12 @@ def build_payment_mix_for_phones(business, start_date=None, end_date=None) -> Li
 def build_payment_mix_for_clothing(business, start_date=None, end_date=None) -> List[Dict]:
     """
     Build payment mix specifically for clothing sales.
-    
+
     Args:
         business: Business instance
         start_date: Optional start date filter
         end_date: Optional end date filter
-    
+
     Returns:
         List of payment mix dicts
     """
@@ -260,12 +259,12 @@ def build_payment_mix_for_clothing(business, start_date=None, end_date=None) -> 
 def build_payment_mix_for_gym(business, start_date=None, end_date=None) -> List[Dict]:
     """
     Build payment mix specifically for gym payments.
-    
+
     Args:
         business: Business instance
         start_date: Optional start date filter
         end_date: Optional end date filter
-    
+
     Returns:
         List of payment mix dicts
     """
@@ -273,15 +272,15 @@ def build_payment_mix_for_gym(business, start_date=None, end_date=None) -> List[
         from inventory.models_verticals import GymPayment
     except Exception:
         return []
-    
+
     qs = GymPayment.objects.filter(member__business=business)
-    
+
     if start_date:
         qs = qs.filter(payment_date__gte=start_date)
-    
+
     if end_date:
         qs = qs.filter(payment_date__lte=end_date)
-    
+
     return build_payment_mix(
         business=business,
         sales_qs=qs,
@@ -293,12 +292,12 @@ def build_payment_mix_for_gym(business, start_date=None, end_date=None) -> List[
 def build_payment_mix_for_liquor(business, start_date=None, end_date=None) -> List[Dict]:
     """
     Build payment mix specifically for liquor sales.
-    
+
     Args:
         business: Business instance
         start_date: Optional start date filter
         end_date: Optional end date filter
-    
+
     Returns:
         List of payment mix dicts
     """
@@ -307,15 +306,15 @@ def build_payment_mix_for_liquor(business, start_date=None, end_date=None) -> Li
         from sales.models import Sale
     except Exception:
         return []
-    
+
     qs = Sale.objects.filter(business=business)
-    
+
     if start_date:
         qs = qs.filter(created_at__date__gte=start_date)
-    
+
     if end_date:
         qs = qs.filter(created_at__date__lte=end_date)
-    
+
     return build_payment_mix(
         business=business,
         sales_qs=qs,
@@ -334,4 +333,3 @@ __all__ = [
     "normalize_payment_method",
     "get_display_name",
 ]
-

@@ -1,6 +1,7 @@
 ﻿from django.test import TestCase
 from django.urls import reverse, NoReverseMatch
 
+
 class InventoryExportCsvTests(TestCase):
     def test_export_csv_endpoint_exists_or_is_skipped(self):
         try:

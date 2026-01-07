@@ -39,24 +39,48 @@ def home(request):
     """
     Public home page with hero section and marketing copy.
     """
-    # Get live platform metrics for display
+    # Get live platform metrics for display with safe threshold check
+    METRICS_THRESHOLD = 1  # Minimum credible value to show numbers
+    
     try:
         from tenants.models import Business, Membership
-        # Count all businesses (no is_active field exists)
-        total_merchants = Business.objects.count()
-        # Count distinct users with agent role (case-insensitive)
-        total_agents = Membership.objects.filter(role__icontains='agent').values('user').distinct().count()
+        from django.core.cache import cache
+        
+        # Try cache first (5 minute TTL)
+        cache_key = 'platform_stats_home'
+        cached_stats = cache.get(cache_key)
+        
+        if cached_stats:
+            total_merchants = cached_stats.get('total_merchants', 0)
+            total_agents = cached_stats.get('total_agents', 0)
+        else:
+            # Count all businesses (no is_active field exists)
+            total_merchants = Business.objects.count()
+            # Count distinct users with agent role (case-insensitive)
+            total_agents = Membership.objects.filter(role__icontains='agent').values('user').distinct().count()
+            
+            # Cache for 5 minutes
+            cache.set(cache_key, {
+                'total_merchants': total_merchants,
+                'total_agents': total_agents,
+            }, 300)
+        
+        # Check if metrics meet credibility threshold
+        show_metrics = (total_merchants >= METRICS_THRESHOLD) or (total_agents >= METRICS_THRESHOLD)
+        
     except Exception as e:
         # Graceful degradation if models not available
         import logging
         logging.error(f"Error fetching platform stats: {e}")
         total_merchants = 0
         total_agents = 0
+        show_metrics = False
     
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
         'total_merchants': total_merchants,
         'total_agents': total_agents,
+        'show_metrics': show_metrics,
     })
 
 
@@ -539,12 +563,14 @@ def platform_stats_api(request):
     Returns JSON with total merchants and agents.
     
     Used by homepage to display real-time growth numbers.
-    Cached for 60 seconds to prevent database overload.
+    Cached for 5 minutes to prevent database overload.
     """
     from django.core.cache import cache
     from django.http import JsonResponse
     
-    # Try to get from cache first (60 second TTL)
+    METRICS_THRESHOLD = 1  # Minimum credible value to show numbers
+    
+    # Try to get from cache first (5 minute TTL)
     cache_key = 'platform_stats_public'
     cached_stats = cache.get(cache_key)
     
@@ -563,14 +589,18 @@ def platform_stats_api(request):
             role__icontains='agent'
         ).values('user').distinct().count()
         
+        # Check if metrics meet credibility threshold
+        show_metrics = (total_merchants >= METRICS_THRESHOLD) or (total_agents >= METRICS_THRESHOLD)
+        
         stats = {
             'total_merchants': total_merchants,
             'total_agents': total_agents,
+            'show_metrics': show_metrics,
             'status': 'success',
         }
         
-        # Cache for 60 seconds
-        cache.set(cache_key, stats, 60)
+        # Cache for 5 minutes
+        cache.set(cache_key, stats, 300)
         
         return JsonResponse(stats)
     
@@ -583,6 +613,7 @@ def platform_stats_api(request):
         return JsonResponse({
             'total_merchants': 0,
             'total_agents': 0,
+            'show_metrics': False,
             'status': 'error',
             'message': 'Unable to fetch stats at this time'
         })

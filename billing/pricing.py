@@ -4,14 +4,15 @@ Billing pricing configuration - SINGLE SOURCE OF TRUTH
 All plan prices and limits must be defined here and imported elsewhere.
 This prevents pricing drift between homepage, checkout, and internal systems.
 """
-from decimal import Decimal
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Optional
 
 
 @dataclass(frozen=True)
 class PlanConfig:
     """Plan configuration with pricing and limits."""
+
     code: str
     name: str
     amount: Decimal  # Monthly price in MWK
@@ -42,7 +43,7 @@ PLANS = {
             "Sales reports & analytics",
             "Mobile app access",
             "Email support",
-        ]
+        ],
     ),
     "growth": PlanConfig(
         code="growth",
@@ -62,7 +63,7 @@ PLANS = {
             "Layby / installment payments",
             "Priority email support",
             "WhatsApp notifications",
-        ]
+        ],
     ),
     "pro": PlanConfig(
         code="pro",
@@ -83,12 +84,36 @@ PLANS = {
             "Custom integrations",
             "Dedicated account manager",
             "24/7 priority support",
-        ]
+        ],
     ),
 }
 
-# Legacy alias for backward compatibility
-PLAN_CATALOG = PLANS
+# Legacy alias for backward compatibility (dict-style access for HQ views)
+# HQ views expect dict with keys like "starter", "pro", "promax"
+# Each value is a dict with: code, name, amount, max_agents, max_stores
+PLAN_CATALOG = {
+    "starter": {
+        "code": "starter",
+        "name": "Starter",
+        "amount": Decimal("20000.00"),
+        "max_agents": 3,  # Up to 3 agents
+        "max_stores": 1,  # 1 store
+    },
+    "growth": {
+        "code": "growth",
+        "name": "Growth",
+        "amount": Decimal("60000.00"),
+        "max_agents": 15,  # Up to 15 agents
+        "max_stores": 5,  # Up to 5 stores
+    },
+    "pro": {
+        "code": "pro",
+        "name": "Pro",
+        "amount": Decimal("120000.00"),
+        "max_agents": None,  # Unlimited
+        "max_stores": None,  # Unlimited
+    },
+}
 
 # Trial configuration
 TRIAL_DAYS = 30
@@ -109,4 +134,3 @@ def format_price(amount: Decimal, currency: str = "MWK") -> str:
     if currency == "MWK":
         return f"MWK {amount:,.0f}"
     return f"{currency} {amount:,.2f}"
-

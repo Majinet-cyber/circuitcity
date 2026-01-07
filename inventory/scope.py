@@ -23,9 +23,7 @@ def _try_import(modpath: str, attr: str | None = None):
 # Tenant helpers (optional; no-ops if missing)
 # ------------------------------
 scoped: Callable[[QuerySet, HttpRequest], QuerySet] = (
-    _try_import("circuitcity.tenants.utils", "scoped")
-    or _try_import("tenants.utils", "scoped")
-    or (lambda qs, _r: qs)
+    _try_import("circuitcity.tenants.utils", "scoped") or _try_import("tenants.utils", "scoped") or (lambda qs, _r: qs)
 )
 
 get_active_business = (
@@ -72,10 +70,7 @@ def get_inventory_model():
     Resolve the concrete inventory model without importing a specific class
     at module-import time. We try common names in order.
     """
-    models_mod = (
-        _try_import("inventory.models")
-        or _try_import("circuitcity.inventory.models")
-    )
+    models_mod = _try_import("inventory.models") or _try_import("circuitcity.inventory.models")
     if not models_mod:
         return None
 

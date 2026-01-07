@@ -11,4 +11,3 @@ app_name = "debug"
 urlpatterns = [
     path("whatsapp-test/", views_debug.whatsapp_test, name="whatsapp_test"),
 ]
-

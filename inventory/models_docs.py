@@ -15,6 +15,7 @@ class Doc(models.Model):
     - type:   'INVOICE' | 'QUOTE' | 'CREDIT' ...
     - status: 'DRAFT' | 'SENT' | 'PAID' | 'VOID'
     """
+
     TYPE_CHOICES = (
         ("INVOICE", "Invoice"),
         ("QUOTE", "Quotation"),
@@ -40,8 +41,8 @@ class Doc(models.Model):
     # dates
     created_at = models.DateTimeField(default=timezone.now)
     issued_at = models.DateTimeField(blank=True, null=True)
-    due_date = models.DateField(blank=True, null=True)        # invoices
-    valid_until = models.DateField(blank=True, null=True)     # quotes
+    due_date = models.DateField(blank=True, null=True)  # invoices
+    valid_until = models.DateField(blank=True, null=True)  # quotes
 
     # money
     currency = models.CharField(max_length=8, default="USD")
@@ -99,6 +100,7 @@ class DocItem(models.Model):
     Line item for a Doc. Keep product optional & allow free-text description
     for full flexibility (quotes, misc services, etc.)
     """
+
     doc = models.ForeignKey(Doc, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey("inventory.Product", on_delete=models.SET_NULL, null=True, blank=True)
 
@@ -127,5 +129,3 @@ class DocItem(models.Model):
             self.doc.save(recompute=True)
         except Exception:
             pass
-
-

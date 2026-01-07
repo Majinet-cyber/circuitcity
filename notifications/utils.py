@@ -133,13 +133,12 @@ def _admin_emails() -> list[str]:
     explicit = getattr(settings, "NOTIFY_ADMIN_EMAILS", None)
     if explicit:
         return [e for e in explicit if e]
-    return list(
-        User.objects.filter(is_staff=True, email__isnull=False)
-        .values_list("email", flat=True)
-    )
+    return list(User.objects.filter(is_staff=True, email__isnull=False).values_list("email", flat=True))
+
 
 def _admin_whatsapp_number() -> Optional[str]:
     return getattr(settings, "ADMIN_WHATSAPP_NUMBER", None)
+
 
 def _agent_whatsapp_number(user) -> Optional[str]:
     # Try common places for phone
@@ -157,10 +156,10 @@ def _agent_whatsapp_number(user) -> Optional[str]:
 # ---------------------------
 def create_notification(
     *,
-    audience: str,                 # 'ADMIN' or 'AGENT'
+    audience: str,  # 'ADMIN' or 'AGENT'
     message: str,
     level: str = "info",
-    user=None,                     # required for AGENT
+    user=None,  # required for AGENT
     meta: Optional[dict] = None,
     email: bool = True,
     whatsapp: bool = True,
@@ -241,5 +240,3 @@ def notify_invoice_sent(invoice_no: str, amount: float, to_email: Optional[str] 
     create_notification(audience="ADMIN", message=msg, level="info")
     if to_email:
         _send_email(f"Invoice {invoice_no}", msg, [to_email])
-
-

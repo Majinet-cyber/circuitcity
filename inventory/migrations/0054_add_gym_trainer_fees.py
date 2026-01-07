@@ -11,7 +11,7 @@ def copy_amount_to_membership_amount(apps, schema_editor):
     """Copy existing amount values to membership_amount for backward compatibility"""
     GymPayment = apps.get_model("inventory", "GymPayment")
     # Update all existing payments to have membership_amount = amount (no trainer fee in old data)
-    GymPayment.objects.all().update(membership_amount=models.F('amount'))
+    GymPayment.objects.all().update(membership_amount=models.F("amount"))
 
 
 def reverse_copy_amount(apps, schema_editor):
@@ -20,7 +20,6 @@ def reverse_copy_amount(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0053_add_archive_tracking"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -87,8 +86,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="gympayment",
-            index=models.Index(
-                fields=["trainer", "-paid_at"], name="inventory_g_trainer_1cc495_idx"
-            ),
+            index=models.Index(fields=["trainer", "-paid_at"], name="inventory_g_trainer_1cc495_idx"),
         ),
     ]

@@ -27,12 +27,12 @@ def compute_agent_ranking(
 ) -> Dict:
     """
     Compute agent ranking by NUMBER OF SALES (not revenue) within a business.
-    
+
     Args:
         business: Business instance to scope the ranking
         days: Number of days to look back (None = all-time)
         agent_user: If provided, returns ranking info for this specific agent
-        
+
     Returns:
         {
             "rankings": [{"agent_id": int, "name": str, "total_sales": Decimal, "rank": int, "sales_count": int}],
@@ -45,14 +45,14 @@ def compute_agent_ranking(
     """
     # Build the queryset
     sales_qs = Sale.objects.filter(location__business=business).select_related("agent")
-    
+
     if days:
         cutoff = timezone.now() - timedelta(days=days)
         sales_qs = sales_qs.filter(sold_at__gte=cutoff.date())
         period = f"last {days} days"
     else:
         period = "all-time"
-    
+
     # Aggregate by agent
     # Rank by sales count (primary), then total_sales as tie-breaker (secondary)
     agent_totals = (
@@ -63,18 +63,15 @@ def compute_agent_ranking(
         )
         .order_by("-sales_count", "-total_sales")
     )
-    
+
     rankings = []
     agent_rank = None
     agent_total = None
     agent_above = None
     agent_below = None
-    
+
     for idx, row in enumerate(agent_totals, start=1):
-        name = (
-            f"{row['agent__first_name']} {row['agent__last_name']}".strip()
-            or row["agent__username"]
-        )
+        name = f"{row['agent__first_name']} {row['agent__last_name']}".strip() or row["agent__username"]
         entry = {
             "agent_id": row["agent_id"],
             "name": name,
@@ -83,23 +80,23 @@ def compute_agent_ranking(
             "rank": idx,
         }
         rankings.append(entry)
-        
+
         # Track agent position if specified
         if agent_user and row["agent_id"] == agent_user.id:
             agent_rank = idx
             agent_total = row["total_sales"] or Decimal("0")
-            
+
             # Find neighbors
             if idx > 1:
                 agent_above = rankings[idx - 2]  # previous entry
             if idx < len(list(agent_totals)):
                 # Will be filled in next iteration or we fetch explicitly
                 pass
-    
+
     # Fill agent_below if needed
     if agent_rank and agent_rank < len(rankings):
         agent_below = rankings[agent_rank]  # next entry (0-indexed)
-    
+
     return {
         "rankings": rankings,
         "agent_rank": agent_rank,
@@ -117,4 +114,3 @@ def format_rank(rank: int) -> str:
     else:
         suffix = {1: "st", 2: "nd", 3: "rd"}.get(rank % 10, "th")
     return f"{rank}{suffix}"
-

@@ -2,7 +2,5 @@
 
 
 class SimulatorConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'simulator'
-
-
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "simulator"

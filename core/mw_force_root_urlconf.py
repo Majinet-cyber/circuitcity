@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.urls import set_urlconf
 
+
 class ForceRootURLConf:
     def __init__(self, get_response):
         self.get_response = get_response
@@ -21,5 +22,3 @@ class ForceRootURLConf:
         # clean up after response
         set_urlconf(None)
         return response
-
-

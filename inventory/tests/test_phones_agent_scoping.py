@@ -88,38 +88,38 @@ def factory():
 @pytest.mark.django_db
 class TestVisibilityScoping:
     """Test get_visible_actor function."""
-    
+
     def test_manager_visibility(self, factory, manager_user):
         """Managers should be identified correctly."""
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = manager_user
-        
+
         is_manager, is_agent, actor = get_visible_actor(request)
-        
+
         assert is_manager is True
         assert is_agent is False
         assert actor == manager_user
-    
+
     def test_agent_visibility(self, factory, agent_user1):
         """Agents should be identified correctly."""
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = agent_user1
-        
+
         is_manager, is_agent, actor = get_visible_actor(request)
-        
+
         assert is_manager is False
         assert is_agent is True
         assert actor == agent_user1
-    
+
     def test_unauthenticated_visibility(self, factory):
         """Unauthenticated users should have no visibility."""
         from django.contrib.auth.models import AnonymousUser
-        
-        request = factory.get('/')
+
+        request = factory.get("/")
         request.user = AnonymousUser()
-        
+
         is_manager, is_agent, actor = get_visible_actor(request)
-        
+
         assert is_manager is False
         assert is_agent is False
         assert actor is None
@@ -128,11 +128,8 @@ class TestVisibilityScoping:
 @pytest.mark.django_db
 class TestStockScoping:
     """Test stock queryset scoping by role."""
-    
-    def test_manager_sees_all_stock(
-        self, factory, manager_user, agent_user1, agent_user2,
-        business, location, product
-    ):
+
+    def test_manager_sees_all_stock(self, factory, manager_user, agent_user1, agent_user2, business, location, product):
         """Managers should see stock from all agents."""
         # Create stock for agent1
         InventoryItem.objects.create(
@@ -144,7 +141,7 @@ class TestStockScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create stock for agent2
         InventoryItem.objects.create(
             business=business,
@@ -155,7 +152,7 @@ class TestStockScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create unassigned stock
         InventoryItem.objects.create(
             business=business,
@@ -166,21 +163,18 @@ class TestStockScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Manager request
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = manager_user
-        
+
         base_qs = InventoryItem.objects.filter(business=business, status="IN_STOCK")
         scoped_qs = scope_stock_qs(base_qs, request)
-        
+
         # Manager should see all 3 items
         assert scoped_qs.count() == 3
-    
-    def test_agent_sees_only_own_stock(
-        self, factory, agent_user1, agent_user2,
-        business, location, product
-    ):
+
+    def test_agent_sees_only_own_stock(self, factory, agent_user1, agent_user2, business, location, product):
         """Agents should see only their assigned stock."""
         # Create stock for agent1
         InventoryItem.objects.create(
@@ -192,7 +186,7 @@ class TestStockScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create stock for agent2
         InventoryItem.objects.create(
             business=business,
@@ -203,14 +197,14 @@ class TestStockScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Agent1 request
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = agent_user1
-        
+
         base_qs = InventoryItem.objects.filter(business=business, status="IN_STOCK")
         scoped_qs = scope_stock_qs(base_qs, request)
-        
+
         # Agent1 should see only their 1 item
         assert scoped_qs.count() == 1
         assert scoped_qs.first().assigned_agent == agent_user1
@@ -219,11 +213,8 @@ class TestStockScoping:
 @pytest.mark.django_db
 class TestSalesScoping:
     """Test sales queryset scoping by role."""
-    
-    def test_manager_sees_all_sales(
-        self, factory, manager_user, agent_user1, agent_user2,
-        business, location, product
-    ):
+
+    def test_manager_sees_all_sales(self, factory, manager_user, agent_user1, agent_user2, business, location, product):
         """Managers should see sales from all agents."""
         # Create sales for agent1
         InventoryItem.objects.create(
@@ -236,7 +227,7 @@ class TestSalesScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create sales for agent2
         InventoryItem.objects.create(
             business=business,
@@ -248,21 +239,18 @@ class TestSalesScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Manager request
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = manager_user
-        
+
         base_qs = InventoryItem.objects.filter(business=business, status="SOLD")
         scoped_qs = scope_sales_qs(base_qs, request)
-        
+
         # Manager should see all 2 sales
         assert scoped_qs.count() == 2
-    
-    def test_agent_sees_only_own_sales(
-        self, factory, agent_user1, agent_user2,
-        business, location, product
-    ):
+
+    def test_agent_sees_only_own_sales(self, factory, agent_user1, agent_user2, business, location, product):
         """Agents should see only their own sales."""
         # Create sales for agent1
         InventoryItem.objects.create(
@@ -275,7 +263,7 @@ class TestSalesScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create sales for agent2
         InventoryItem.objects.create(
             business=business,
@@ -287,14 +275,14 @@ class TestSalesScoping:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Agent1 request
-        request = factory.get('/')
+        request = factory.get("/")
         request.user = agent_user1
-        
+
         base_qs = InventoryItem.objects.filter(business=business, status="SOLD")
         scoped_qs = scope_sales_qs(base_qs, request)
-        
+
         # Agent1 should see only their 1 sale
         assert scoped_qs.count() == 1
         assert scoped_qs.first().assigned_agent == agent_user1
@@ -303,82 +291,71 @@ class TestSalesScoping:
 @pytest.mark.django_db
 class TestPhonesDashboardIntegration:
     """Integration tests for Phones dashboard with agent scoping."""
-    
-    def test_dashboard_loads_for_manager(
-        self, client, manager_user, business, location
-    ):
+
+    def test_dashboard_loads_for_manager(self, client, manager_user, business, location):
         """Dashboard should load successfully for managers."""
         client.force_login(manager_user)
-        
+
         # Set business in session
         session = client.session
-        session['active_business_id'] = business.id
+        session["active_business_id"] = business.id
         session.save()
-        
-        response = client.get('/inventory/verticals/phones/')
-        
+
+        response = client.get("/inventory/verticals/phones/")
+
         assert response.status_code == 200
-        assert 'dashboard_kpis' in response.context
-    
-    def test_dashboard_loads_for_agent(
-        self, client, agent_user1, business, location
-    ):
+        assert "dashboard_kpis" in response.context
+
+    def test_dashboard_loads_for_agent(self, client, agent_user1, business, location):
         """Dashboard should load successfully for agents."""
         client.force_login(agent_user1)
-        
+
         # Set business in session
         session = client.session
-        session['active_business_id'] = business.id
+        session["active_business_id"] = business.id
         session.save()
-        
-        response = client.get('/inventory/verticals/phones/')
-        
+
+        response = client.get("/inventory/verticals/phones/")
+
         assert response.status_code == 200
-        assert 'dashboard_kpis' in response.context
-    
-    def test_custom_date_filter_with_valid_dates(
-        self, client, manager_user, business, location
-    ):
+        assert "dashboard_kpis" in response.context
+
+    def test_custom_date_filter_with_valid_dates(self, client, manager_user, business, location):
         """Custom date filter should work with valid dates."""
         client.force_login(manager_user)
-        
+
         # Set business in session
         session = client.session
-        session['active_business_id'] = business.id
+        session["active_business_id"] = business.id
         session.save()
-        
+
         start = (date.today() - timedelta(days=7)).isoformat()
         end = date.today().isoformat()
-        
-        response = client.get(f'/inventory/verticals/phones/?range=custom&start={start}&end={end}')
-        
+
+        response = client.get(f"/inventory/verticals/phones/?range=custom&start={start}&end={end}")
+
         assert response.status_code == 200
-        assert 'dashboard_kpis' in response.context
-        assert response.context['dashboard_kpis']['range_key'] == 'custom'
-    
-    def test_custom_date_filter_with_invalid_dates(
-        self, client, manager_user, business, location
-    ):
+        assert "dashboard_kpis" in response.context
+        assert response.context["dashboard_kpis"]["range_key"] == "custom"
+
+    def test_custom_date_filter_with_invalid_dates(self, client, manager_user, business, location):
         """Custom date filter should fall back to MTD with invalid dates."""
         client.force_login(manager_user)
-        
+
         # Set business in session
         session = client.session
-        session['active_business_id'] = business.id
+        session["active_business_id"] = business.id
         session.save()
-        
-        response = client.get('/inventory/verticals/phones/?range=custom&start=invalid&end=invalid')
-        
+
+        response = client.get("/inventory/verticals/phones/?range=custom&start=invalid&end=invalid")
+
         # Should not crash, should fall back to MTD
         assert response.status_code == 200
-        assert 'dashboard_kpis' in response.context
+        assert "dashboard_kpis" in response.context
         # Falls back to MTD when custom dates are invalid
-        assert response.context['dashboard_kpis']['range_key'] == 'mtd'
-    
-    def test_agent_kpis_show_only_own_data(
-        self, client, agent_user1, agent_user2,
-        business, location, product
-    ):
+        assert response.context["dashboard_kpis"]["range_key"] == "mtd"
+
+    def test_agent_kpis_show_only_own_data(self, client, agent_user1, agent_user2, business, location, product):
         """Agent dashboard should show only their own data."""
         # Create sales for agent1
         InventoryItem.objects.create(
@@ -391,7 +368,7 @@ class TestPhonesDashboardIntegration:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Create sales for agent2 (should NOT be visible to agent1)
         InventoryItem.objects.create(
             business=business,
@@ -403,21 +380,20 @@ class TestPhonesDashboardIntegration:
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
         )
-        
+
         # Agent1 logs in
         client.force_login(agent_user1)
-        
+
         # Set business in session
         session = client.session
-        session['active_business_id'] = business.id
+        session["active_business_id"] = business.id
         session.save()
-        
-        response = client.get('/inventory/verticals/phones/')
-        
-        assert response.status_code == 200
-        kpis = response.context['dashboard_kpis']
-        
-        # Agent1 should see only their 1 sale
-        assert kpis['units_sold'] == 1
-        assert kpis['revenue'] == Decimal('60000')
 
+        response = client.get("/inventory/verticals/phones/")
+
+        assert response.status_code == 200
+        kpis = response.context["dashboard_kpis"]
+
+        # Agent1 should see only their 1 sale
+        assert kpis["units_sold"] == 1
+        assert kpis["revenue"] == Decimal("60000")

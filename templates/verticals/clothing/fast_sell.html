@@ -1,944 +1,366 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}⚡ Fast Sell - Clothing{% endblock %}
+{% block title %}Fast Sell · Clothing{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}">
-<link rel="stylesheet" href="{% static 'css/instant_scan_sell.css' %}">
+{% block content %}
+
 <style>
-.fast-sell-container {
-    max-width: 1000px;
-    margin: 2rem auto;
-    padding: 1rem;
+.sell-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 140px;
 }
 
 .page-header {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    color: white;
-    padding: 2rem;
-    border-radius: 20px;
-    margin-bottom: 2rem;
-    text-align: center;
-    box-shadow: 0 8px 32px rgba(245, 158, 11, 0.3);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 24px 28px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 40px rgba(16, 185, 129, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .page-header h1 {
-    margin: 0 0 0.5rem 0;
-    font-size: clamp(1.8rem, 4vw, 2.5rem);
-    font-weight: 800;
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
 }
 
-.page-header p {
-    margin: 0;
-    opacity: 0.95;
-    font-size: 1.1rem;
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s;
 }
 
-.scanner-trigger-btn {
-    width: 100%;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border: none;
-    border-radius: 16px;
-    font-size: 1.25rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
-    margin-bottom: 2rem;
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
 }
 
-.scanner-trigger-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.4);
+/* Search */
+.search-box {
+  margin-bottom: 24px;
 }
 
-.scanner-trigger-btn i {
-    font-size: 1.5rem;
+.search-input {
+  width: 100%;
+  padding: 16px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  font-size: 1.1rem;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* Product Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
 }
 
 .product-card {
-    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    border-radius: 20px;
-    padding: 2rem;
-    color: white;
-    margin-bottom: 2rem;
-    box-shadow: 0 10px 40px rgba(245, 158, 11, 0.3);
-    animation: slideIn 0.4s ease-out;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
 }
 
-@keyframes slideIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+.product-card:hover {
+  border-color: #10b981;
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
 }
 
-.product-card h3 {
-    margin: 0 0 1.5rem 0;
-    font-size: clamp(1.3rem, 3vw, 1.8rem);
-    font-weight: 800;
+.product-card.top-seller::before {
+  content: '🔥';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 1.2rem;
 }
 
-.product-info {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+.product-name {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 8px;
+  font-size: 1rem;
 }
 
-.info-item {
-    background: rgba(255, 255, 255, 0.15);
-    padding: 1rem;
-    border-radius: 12px;
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+.product-meta {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 8px;
 }
 
-.info-label {
-    font-size: 0.875rem;
-    opacity: 0.9;
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.product-price {
+  font-weight: 700;
+  color: #10b981;
+  font-size: 1.1rem;
 }
 
-.info-value {
-    font-size: clamp(1.2rem, 3vw, 1.5rem);
-    font-weight: 700;
+.product-stock {
+  font-size: 0.8rem;
+  color: #94a3b8;
 }
 
-.qty-controls {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1.5rem;
-    margin: 2rem 0;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+/* Sticky Cart Bar */
+.cart-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  padding: 16px 20px;
+  box-shadow: 0 -8px 32px rgba(16, 185, 129, 0.3);
+  z-index: 1000;
+  display: none;
 }
 
-.qty-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.25);
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    color: white;
-    font-size: 1.8rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.cart-bar.active {
+  display: block;
 }
 
-.qty-btn:hover {
-    background: rgba(255, 255, 255, 0.35);
-    transform: scale(1.15);
+.cart-bar-content {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.qty-btn:active {
-    transform: scale(1.05);
+.cart-info {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
-.qty-display {
-    font-size: 2.5rem;
-    font-weight: 800;
-    min-width: 80px;
-    text-align: center;
+.cart-stat {
+  font-weight: 700;
+  font-size: 1.1rem;
 }
 
-.sell-btn {
-    width: 100%;
-    padding: 1.5rem;
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
-    border: none;
-    border-radius: 16px;
-    font-size: 1.3rem;
-    font-weight: 800;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+.checkout-btn {
+  background: white;
+  color: #059669;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.sell-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(16, 185, 129, 0.5);
+.checkout-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
-.sell-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
 }
 
-.kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1.5rem;
-    margin-top: 2rem;
-}
-
-.kpi-card {
-    background: white;
-    padding: 1.75rem;
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-}
-
-.kpi-card:hover {
-    border-color: #f59e0b;
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
-}
-
-.kpi-label {
-    font-size: 0.9rem;
-    color: #64748b;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.kpi-value {
-    font-size: clamp(1.8rem, 4vw, 2.2rem);
-    font-weight: 800;
-    color: #1e293b;
-}
-
-.recent-sales-panel {
-    background: white;
-    padding: 2rem;
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    margin-top: 2rem;
-}
-
-.recent-sales-panel h3 {
-    margin: 0 0 1.5rem 0;
-    font-size: 1.3rem;
-    color: #1e293b;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sales-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.sale-item {
-    padding: 1rem;
-    background: #f8fafc;
-    border-radius: 12px;
-    border-left: 4px solid #10b981;
-    animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateX(-10px); }
-    to { opacity: 1; transform: translateX(0); }
-}
-
-.sale-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.sale-item-product {
-    font-weight: 700;
-    color: #1e293b;
-    font-size: 1.05rem;
-}
-
-.sale-item-price {
-    font-weight: 800;
-    color: #f59e0b;
-    font-size: 1.1rem;
-}
-
-.sale-item-meta {
-    font-size: 0.85rem;
-    color: #64748b;
-}
-
-.toast {
-    position: fixed;
-    top: 2rem;
-    right: 2rem;
-    background: #10b981;
-    color: white;
-    padding: 1rem 1.5rem;
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    animation: slideInRight 0.3s ease-out;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-}
-
-@keyframes slideInRight {
-    from { transform: translateX(400px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-.toast.error-toast {
-    background: #ef4444;
-}
-
-.toast i {
-    font-size: 1.3rem;
-}
-
-.hidden {
-    display: none !important;
-}
-
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-}
-
-.modal-content {
-    max-width: 600px;
-    width: 100%;
-    background: white;
-    border-radius: 20px;
-    padding: 2rem;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-/* Mobile Optimizations */
-@media (max-width: 640px) {
-    .fast-sell-container {
-        padding: 0.75rem;
-    }
-    
-    .page-header {
-        padding: 1.5rem 1rem;
-    }
-    
-    .product-card {
-        padding: 1.5rem;
-    }
-    
-    .product-info {
-        grid-template-columns: 1fr 1fr;
-    }
-    
-    .qty-controls {
-        gap: 1rem;
-    }
-    
-    .qty-btn {
-        width: 46px;
-        height: 46px;
-        font-size: 1.5rem;
-    }
-    
-    .qty-display {
-        font-size: 2rem;
-        min-width: 60px;
-    }
-    
-    .kpi-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-    
-    .toast {
-        top: 1rem;
-        right: 1rem;
-        left: 1rem;
-        max-width: none;
-    }
-    
-    .sale-item-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
 }
 </style>
-{% endblock %}
 
-{% block content %}
-<div class="fast-sell-container">
-    <!-- Page Header -->
-    <div class="page-header">
-        <h1>⚡ Fast Sell</h1>
-        <p>Instant scan-to-sell. Faster than writing in a book.</p>
+<div class="sell-container">
+  <div class="page-header">
+    <div>
+      <h1>🛒 Fast Sell</h1>
+      <p style="margin: 4px 0 0; opacity: 0.95;">Tap products to add to cart</p>
     </div>
-    
-    <!-- Instant Scan Container -->
-    <div class="instant-scan-container">
-        <!-- Scanner Video -->
-        <div class="scanner-video-wrapper">
-            <video id="scannerVideo" playsinline></video>
-            <div class="scanner-overlay">
-                <div class="scanner-target"></div>
-            </div>
-        </div>
-        
-        <!-- Scanner Status -->
-        <div class="scanner-status" id="scannerStatus">
-            Ready to scan. Click "Start Scanner" below.
-        </div>
-        
-        <!-- Scanner Controls -->
-        <div class="scanner-controls">
-            <button class="btn btn-primary" id="btnStartScan">
-                <i class="bi bi-camera-fill"></i> Start Scanner
-            </button>
-            <button class="btn btn-secondary" id="btnStopScan" disabled>
-                <i class="bi bi-stop-circle"></i> Stop
-            </button>
-        </div>
-        
-        <!-- Manual Entry (Last Resort) -->
-        <button class="btn-manual" id="btnManualEntry">
-            📝 Manual Entry (last resort)
-        </button>
+    <a href="{% url 'verticals:clothing_dashboard_v2' %}" class="back-btn">← Dashboard</a>
+  </div>
+
+  <!-- Search Box -->
+  <div class="search-box">
+    <input 
+      type="text" 
+      class="search-input" 
+      id="searchInput" 
+      placeholder="🔍 Search by name, brand, SKU, or barcode..." 
+      autofocus
+    >
+  </div>
+
+  <!-- Products Grid -->
+  <div id="productsContainer">
+    {% if available_products %}
+    <div class="products-grid" id="productsGrid">
+      {% for product in available_products %}
+      <div class="product-card{% if product.id in top_seller_ids %} top-seller{% endif %}" 
+           data-product-id="{{ product.id }}"
+           data-product-name="{{ product.name }}"
+           data-product-price="{{ product.selling_price }}"
+           data-product-stock="{{ product.quantity_in_stock }}"
+           onclick="addToCart(this)">
+        <div class="product-name">{{ product.name }}</div>
+        {% if product.brand %}
+        <div class="product-meta">{{ product.brand }}</div>
+        {% endif %}
+        <div class="product-price">K {{ product.selling_price }}</div>
+        <div class="product-stock">{{ product.quantity_in_stock }} in stock</div>
+      </div>
+      {% endfor %}
     </div>
-    
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
-    
-    <!-- Product Creation Modal (shown when barcode not found) -->
-    <div class="modal" id="createProductModal" style="display: none;">
-        <div class="modal-content" style="max-width: 600px; margin: 2rem auto; background: white; border-radius: 20px; padding: 2rem; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <h2 style="margin: 0; font-size: 1.5rem; font-weight: 700; color: #0f172a;">➕ Create New Product</h2>
-                <button onclick="closeCreateProductModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #64748b;">&times;</button>
-            </div>
-            
-            <p style="color: #64748b; margin-bottom: 1.5rem;">Product with this barcode not found. Create it now:</p>
-            
-            <form id="createProductForm" onsubmit="handleCreateProduct(event)">
-                <input type="hidden" id="createProductBarcode" name="barcode">
-                
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Product Name <span style="color: #ef4444;">*</span></label>
-                    <input type="text" id="createProductName" name="name" required 
-                           style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                           placeholder="e.g., T-Shirt - M - Blue">
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Category</label>
-                        <input type="text" id="createProductCategory" name="category" 
-                               style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                               placeholder="e.g., shirt">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Size</label>
-                        <input type="text" id="createProductSize" name="size" 
-                               style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                               placeholder="e.g., M">
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 1rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Color</label>
-                    <input type="text" id="createProductColor" name="color" 
-                           style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                           placeholder="e.g., Blue">
-                </div>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Selling Price (MWK) <span style="color: #ef4444;">*</span></label>
-                        <input type="number" id="createProductSellingPrice" name="selling_price" required step="0.01" min="0.01"
-                               style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                               placeholder="0.00">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Cost Price (MWK)</label>
-                        <input type="number" id="createProductCostPrice" name="cost_price" step="0.01" min="0"
-                               style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;"
-                               placeholder="0.00">
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 1.5rem;">
-                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #0f172a;">Initial Stock Quantity</label>
-                    <input type="number" id="createProductQuantity" name="quantity" value="1" min="0"
-                           style="width: 100%; padding: 0.75rem; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 1rem;">
-                </div>
-                
-                <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-                    <button type="button" onclick="closeCreateProductModal()" 
-                            style="padding: 0.75rem 1.5rem; background: #f1f5f9; color: #64748b; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                        Cancel
-                    </button>
-                    <button type="submit" 
-                            style="padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer;">
-                        Create & Continue
-                    </button>
-                </div>
-            </form>
-        </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">📦</div>
+      <p>No products with stock available</p>
+      <a href="{% url 'verticals:clothing_fast_stock_in' %}" style="color: #10b981; font-weight: 700;">Stock in products</a>
     </div>
-    
-    <!-- Modal Overlay -->
-    <div class="modal-overlay" id="createProductModalOverlay" onclick="closeCreateProductModal()" 
-         style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9998;"></div>
-    
-    <!-- KPI Dashboard -->
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-label">Sold Today</div>
-            <div class="kpi-value" id="kpiSoldToday">0</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Revenue Today</div>
-            <div class="kpi-value" id="kpiRevenueToday">MK 0.00</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Profit Today</div>
-            <div class="kpi-value" id="kpiProfitToday">MK 0.00</div>
-        </div>
-    </div>
-    
-    <!-- Instructions -->
-    <div class="recent-sales-panel" id="instructionsPanel">
-        <h3>
-            <i class="bi bi-receipt"></i>
-            Recent Fast Sales
-        </h3>
-        <div class="sales-list" id="salesList"></div>
-    </div>
-    
-    <!-- KPI Cards -->
-    <div class="kpi-grid">
-        <div class="kpi-card">
-            <div class="kpi-label">Sold Today</div>
-            <div class="kpi-value" id="kpiSold">0</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Revenue Today</div>
-            <div class="kpi-value">MWK <span id="kpiRevenue">0</span></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">Profit Today</div>
-            <div class="kpi-value">MWK <span id="kpiProfit">0</span></div>
-        </div>
-    </div>
+    {% endif %}
+  </div>
 </div>
 
-<script src="{% static 'js/unified-scanner.js' %}"></script>
-<script src="{% static 'js/instant_scan_sell.js' %}"></script>
+<!-- Sticky Cart Bar -->
+<div class="cart-bar" id="cartBar">
+  <div class="cart-bar-content">
+    <div class="cart-info">
+      <div class="cart-stat">
+        <span id="cartItemCount">0</span> items
+      </div>
+      <div class="cart-stat">
+        K <span id="cartTotal">0.00</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 12px;">
+      <button onclick="clearCart()" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer;">
+        Clear
+      </button>
+      <button class="checkout-btn" onclick="checkout()">
+        Checkout →
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
-// Instant Scan-to-Sell for Clothing
-(() => {
-    'use strict';
-    
-    // Initialize instant scan engine
-    document.addEventListener('DOMContentLoaded', () => {
-        InstantScanSell.init({
-            vertical: 'clothing',
-            business: {{ business.id }},
-            videoId: 'scannerVideo',
-            statusId: 'scannerStatus',
-            startBtnId: 'btnStartScan',
-            stopBtnId: 'btnStopScan',
-            manualBtnId: 'btnManualEntry',
-            toastContainerId: 'toastContainer'
-        });
-        
-        // Load KPIs on page load
-        refreshKPIs();
+let cart = [];
+
+function addToCart(element) {
+  const productId = element.dataset.productId;
+  const productName = element.dataset.productName;
+  const productPrice = parseFloat(element.dataset.productPrice);
+  const productStock = parseInt(element.dataset.productStock);
+  
+  // Check if already in cart
+  const existingItem = cart.find(item => item.id === productId);
+  
+  if (existingItem) {
+    if (existingItem.quantity < productStock) {
+      existingItem.quantity++;
+    } else {
+      alert(`Maximum stock reached (${productStock} available)`);
+      return;
+    }
+  } else {
+    cart.push({
+      id: productId,
+      name: productName,
+      price: productPrice,
+      quantity: 1,
+      maxStock: productStock
     });
-    
-    // KPI refresh function
-    async function refreshKPIs() {
-        try {
-            const resp = await fetch('/verticals/clothing/api/fast-sell/kpis/?range=today');
-            const data = await resp.json();
-            
-            if (data.ok) {
-                document.getElementById('kpiSoldToday').textContent = data.sold_today || 0;
-                document.getElementById('kpiRevenueToday').textContent = `MK ${(data.revenue_today || 0).toFixed(2)}`;
-                document.getElementById('kpiProfitToday').textContent = `MK ${(data.profit_today || 0).toFixed(2)}`;
-            }
-        } catch (err) {
-            console.error('KPI refresh error:', err);
-        }
+  }
+  
+  updateCartDisplay();
+  
+  // Visual feedback
+  element.style.transform = 'scale(0.95)';
+  setTimeout(() => {
+    element.style.transform = '';
+  }, 200);
+}
+
+function updateCartDisplay() {
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  
+  document.getElementById('cartItemCount').textContent = totalItems;
+  document.getElementById('cartTotal').textContent = totalPrice.toFixed(2);
+  
+  const cartBar = document.getElementById('cartBar');
+  if (cart.length > 0) {
+    cartBar.classList.add('active');
+  } else {
+    cartBar.classList.remove('active');
+  }
+}
+
+function clearCart() {
+  if (confirm('Clear all items from cart?')) {
+    cart = [];
+    updateCartDisplay();
+  }
+}
+
+function checkout() {
+  if (cart.length === 0) {
+    alert('Cart is empty');
+    return;
+  }
+  
+  // TODO: Implement checkout flow
+  // For now, show summary
+  let summary = 'Checkout Summary:\n\n';
+  cart.forEach(item => {
+    summary += `${item.name} x ${item.quantity} = K ${(item.price * item.quantity).toFixed(2)}\n`;
+  });
+  summary += `\nTotal: K ${cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}`;
+  
+  alert(summary);
+  
+  // TODO: Call API to process sale
+  // After successful sale, clear cart
+  // cart = [];
+  // updateCartDisplay();
+}
+
+// Search functionality
+document.getElementById('searchInput').addEventListener('input', function(e) {
+  const searchTerm = e.target.value.toLowerCase();
+  const products = document.querySelectorAll('.product-card');
+  
+  products.forEach(product => {
+    const name = product.dataset.productName.toLowerCase();
+    if (name.includes(searchTerm)) {
+      product.style.display = 'block';
+    } else {
+      product.style.display = 'none';
     }
-    
-    // Make refresh function available globally for instant_scan_sell.js
-    window.updateFastSellKPIs = refreshKPIs;
-    
-})();
-
-// Handle barcode scan
-async function handleBarcodeScan(barcode) {
-    showToast(`🔍 Looking up: ${barcode}`, 'info');
-    await lookupProduct(barcode);
-}
-
-// Lookup product by barcode
-async function lookupProduct(barcode) {
-    try {
-        const resp = await fetch(`/verticals/clothing/api/fast-sell/lookup/?barcode=${encodeURIComponent(barcode)}`);
-        const data = await resp.json();
-        
-        if (data.ok && data.found) {
-            currentProduct = data;
-            currentQty = 1;
-            displayProduct(data);
-            showToast(`✅ Found: ${data.product.name}`, 'success');
-        } else {
-            // Product not found - show create product modal
-            showCreateProductModal(barcode);
-        }
-    } catch (err) {
-        console.error('Lookup error:', err);
-        showToast('❌ Lookup failed', 'error');
-    }
-}
-
-// Show create product modal
-function showCreateProductModal(barcode) {
-    document.getElementById('createProductBarcode').value = barcode || '';
-    document.getElementById('createProductModal').style.display = 'flex';
-    document.getElementById('createProductModalOverlay').style.display = 'block';
-    document.getElementById('createProductName').focus();
-}
-
-// Close create product modal
-function closeCreateProductModal() {
-    document.getElementById('createProductModal').style.display = 'none';
-    document.getElementById('createProductModalOverlay').style.display = 'none';
-    document.getElementById('createProductForm').reset();
-}
-
-// Handle create product form submission
-async function handleCreateProduct(event) {
-    event.preventDefault();
-    
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    // Build request payload
-    const payload = {
-        name: formData.get('name'),
-        barcode: formData.get('barcode') || null,
-        category: formData.get('category') || null,
-        size: formData.get('size') || null,
-        color: formData.get('color') || null,
-        selling_price: formData.get('selling_price'),
-        cost_price: formData.get('cost_price') || null,
-        quantity: parseInt(formData.get('quantity')) || 1,
-    };
-    
-    // Validate required fields
-    if (!payload.name || !payload.selling_price) {
-        showToast('❌ Product name and selling price are required', 'error');
-        return;
-    }
-    
-    // Show loading state
-    const submitBtn = form.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Creating...';
-    
-    try {
-        const resp = await fetch('/verticals/clothing/api/fast-sell/create-product/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        const data = await resp.json();
-        
-        if (data.ok) {
-            showToast(`✅ ${data.message}`, 'success');
-            closeCreateProductModal();
-            
-            // Lookup the newly created product
-            if (payload.barcode) {
-                await lookupProduct(payload.barcode);
-            } else {
-                // If no barcode, can't lookup - show success message
-                showToast('✅ Product created! You can now scan it if it has a barcode.', 'success');
-            }
-        } else {
-            showToast(`❌ ${data.error || 'Failed to create product'}`, 'error');
-        }
-    } catch (err) {
-        console.error('Create product error:', err);
-        showToast('❌ Failed to create product', 'error');
-    } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-    }
-}
-
-// Get CSRF token from cookies
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
-}
-
-// Display product info
-function displayProduct(product) {
-    document.getElementById('productName').textContent = product.product.name;
-    document.getElementById('stockQty').textContent = product.stock_qty;
-    document.getElementById('sellingPrice').textContent = parseFloat(product.selling_price).toFixed(2);
-    document.getElementById('category').textContent = product.product.category || '-';
-    document.getElementById('qtyDisplay').textContent = currentQty;
-    document.getElementById('productCard').classList.remove('hidden');
-    
-    // Update payment mix bar total
-    const totalPrice = parseFloat(product.selling_price) * currentQty;
-    if (window.updatePaymentTotal) {
-        window.updatePaymentTotal(totalPrice);
-    }
-    
-    // Scroll to product card
-    document.getElementById('productCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-}
-
-// Quantity controls
-document.getElementById('qtyDecrease').addEventListener('click', () => {
-    if (!currentProduct) return;
-    currentQty = Math.max(1, currentQty - 1);
-    updateQtyDisplay();
-});
-
-document.getElementById('qtyIncrease').addEventListener('click', () => {
-    if (!currentProduct) return;
-    const maxQty = currentProduct.stock_qty || 999;
-    currentQty = Math.min(currentQty + 1, maxQty);
-    updateQtyDisplay();
-});
-
-function updateQtyDisplay() {
-    document.getElementById('qtyDisplay').textContent = currentQty;
-    
-    // Update payment total
-    if (currentProduct && window.updatePaymentTotal) {
-        const totalPrice = parseFloat(currentProduct.selling_price) * currentQty;
-        window.updatePaymentTotal(totalPrice);
-    }
-}
-
-// Complete sale
-document.getElementById('completeSaleBtn').addEventListener('click', async () => {
-    if (!currentProduct) return;
-    
-    // Validate payment
-    if (!window.validatePaymentMix || !window.validatePaymentMix()) {
-        return;
-    }
-    
-    const btn = document.getElementById('completeSaleBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
-    
-    try {
-        // Gather payment data
-        const paymentMode = document.getElementById('paymentMode')?.value || 'single';
-        const paymentMethod = document.getElementById('paymentMethod')?.value || 'CASH';
-        
-        const payload = {
-            product_id: currentProduct.product.id,
-            quantity: currentQty,
-            payment_mode: paymentMode,
-            payment_method: paymentMethod
-        };
-        
-        // Add multi-method amounts if applicable
-        if (paymentMode === 'multi') {
-            payload.cash_amount = parseFloat(document.getElementById('cashAmount')?.value || 0);
-            payload.bank_amount = parseFloat(document.getElementById('bankAmount')?.value || 0);
-            payload.mobile_money_amount = parseFloat(document.getElementById('mobileMoneyAmount')?.value || 0);
-        }
-        
-        const resp = await fetch('/verticals/clothing/api/fast-sell/sell/', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        const data = await resp.json();
-        
-        if (data.ok) {
-            showToast(`✅ ${data.message}`, 'success');
-            
-            // Add to recent sales
-            addRecentSale({
-                product: currentProduct.product.name,
-                quantity: currentQty,
-                price: currentProduct.selling_price,
-                payment_method: paymentMethod,
-                timestamp: new Date().toLocaleTimeString()
-            });
-            
-            // Refresh KPIs
-            await refreshKPIs();
-            
-            // Reset for next sale
-            resetForNextSale();
-        } else {
-            showToast(`❌ ${data.error || 'Sale failed'}`, 'error');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
-        }
-    } catch (err) {
-        console.error('Sale error:', err);
-        showToast('❌ Sale failed', 'error');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
-    }
-});
-
-// Add recent sale to list
-function addRecentSale(sale) {
-    recentSales.unshift(sale);
-    
-    // Keep only last 10
-    if (recentSales.length > 10) {
-        recentSales.pop();
-    }
-    
-    renderRecentSales();
-}
-
-// Render recent sales
-function renderRecentSales() {
-    const panel = document.getElementById('recentSalesPanel');
-    const list = document.getElementById('salesList');
-    
-    if (recentSales.length === 0) {
-        panel.classList.add('hidden');
-        return;
-    }
-    
-    panel.classList.remove('hidden');
-    
-    list.innerHTML = recentSales.map(sale => `
-        <div class="sale-item">
-            <div class="sale-item-header">
-                <span class="sale-item-product">${sale.product}</span>
-                <span class="sale-item-price">MWK ${(parseFloat(sale.price) * sale.quantity).toFixed(2)}</span>
-            </div>
-            <div class="sale-item-meta">
-                Qty: ${sale.quantity} • ${sale.payment_method} • ${sale.timestamp}
-            </div>
-        </div>
-    `).join('');
-}
-
-// Reset for next sale
-function resetForNextSale() {
-    currentProduct = null;
-    currentQty = 1;
-    document.getElementById('productCard').classList.add('hidden');
-    
-    // Reset payment mix bar
-    document.querySelectorAll('.payment-amount-input').forEach(input => {
-        input.value = '';
-    });
-    document.querySelector('input[name="payment_method_single"][value="CASH"]').checked = true;
-    document.getElementById('paymentMode').value = 'single';
-    document.getElementById('paymentMethod').value = 'CASH';
-    
-    const btn = document.getElementById('completeSaleBtn');
-    btn.disabled = false;
-    btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Complete Sale</span>';
-}
-
-// Refresh KPIs
-async function refreshKPIs() {
-    try {
-        const resp = await fetch('/verticals/clothing/api/fast-sell/kpis/?range=today');
-        const data = await resp.json();
-        
-        if (data.ok) {
-            document.getElementById('kpiSold').textContent = data.sold_today || 0;
-            document.getElementById('kpiRevenue').textContent = parseFloat(data.revenue_today || 0).toFixed(2);
-            document.getElementById('kpiProfit').textContent = parseFloat(data.profit_today || 0).toFixed(2);
-        }
-    } catch (err) {
-        console.error('KPI refresh failed:', err);
-    }
-}
-
-// Show toast notification
-function showToast(message, type = 'success') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type === 'error' ? 'error-toast' : ''}`;
-    
-    const icon = type === 'error' ? '<i class="bi bi-x-circle-fill"></i>' :
-                 type === 'info' ? '<i class="bi bi-info-circle-fill"></i>' :
-                 '<i class="bi bi-check-circle-fill"></i>';
-    
-    toast.innerHTML = `${icon}<span>${message}</span>`;
-    document.body.appendChild(toast);
-    
-    setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    refreshKPIs();
+  });
 });
 </script>
-{% endblock %}
 
+{% endblock %}

@@ -9,4 +9,3 @@ legacy 2k-line inventory views do not need to grow further.
 __all__ = [
     "base",
 ]
-

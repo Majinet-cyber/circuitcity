@@ -10,6 +10,7 @@ src = p.read_text(encoding="utf-8")
 bak = p.with_suffix(".py.bak")
 bak.write_text(src, encoding="utf-8")
 
+
 def strip_f_on_script_blocks(text: str) -> str:
     """
     Remove the 'f' from triple-quoted strings that contain <script ...> so braces
@@ -30,7 +31,7 @@ def strip_f_on_script_blocks(text: str) -> str:
         out.append(text[pos:start])
 
         prefix = m.group(1)  # e.g., f, rf, fr, r, '', etc.
-        q = m.group(2)       # ''' or """
+        q = m.group(2)  # ''' or """
 
         body_start = m.end()
         body_end = text.find(q, body_start)
@@ -50,6 +51,7 @@ def strip_f_on_script_blocks(text: str) -> str:
         pos = body_end + len(q)
 
     return "".join(out)
+
 
 def comment_top_level_js(text: str) -> str:
     """
@@ -92,6 +94,7 @@ def comment_top_level_js(text: str) -> str:
 
     return "".join(res)
 
+
 # Apply fixes
 step1 = strip_f_on_script_blocks(src)
 step2 = comment_top_level_js(step1)
@@ -99,5 +102,3 @@ step2 = comment_top_level_js(step1)
 p.write_text(step2, encoding="utf-8")
 
 print(f"Patched {p} (backup at {bak})")
-
-

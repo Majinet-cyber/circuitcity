@@ -27,6 +27,7 @@ except Exception:  # pragma: no cover
 try:
     from tenants.utils import get_active_business  # type: ignore
 except Exception:  # pragma: no cover
+
     def get_active_business(_request):  # type: ignore
         return None
 
@@ -145,11 +146,7 @@ def build_inventory_queryset(
             else:
                 imei_criteria = Q(imei__icontains=d)
 
-        text_criteria = (
-            Q(product__name__icontains=q)
-            | Q(product__brand__icontains=q)
-            | Q(product__model__icontains=q)
-        )
+        text_criteria = Q(product__name__icontains=q) | Q(product__brand__icontains=q) | Q(product__model__icontains=q)
 
         # If the normalized form is not all digits (e.g., typed code), also attempt exact imei match
         if norm and not norm.isdigit():
@@ -180,21 +177,15 @@ def dashboard_counts(request):
     now = timezone.now()
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    items_in_stock = (
-        inv.filter(status="IN_STOCK", is_active=True).count()
-    )
+    items_in_stock = inv.filter(status="IN_STOCK", is_active=True).count()
 
-    products = (
-        inv.filter(is_active=True)
-           .values("product_id")
-           .distinct()
-           .count()
-    )
+    products = inv.filter(is_active=True).values("product_id").distinct().count()
 
     if biz and Sale is not None:
         sales_mtd = (
-            Sale.objects.filter(business_id=getattr(biz, "pk", None), sold_at__gte=month_start)
-            .aggregate(total=Coalesce(Sum("final_amount"), 0))["total"]
+            Sale.objects.filter(business_id=getattr(biz, "pk", None), sold_at__gte=month_start).aggregate(
+                total=Coalesce(Sum("final_amount"), 0)
+            )["total"]
             or 0
         )
     else:
@@ -217,8 +208,9 @@ def sales_in_range(request, *, days: int = 7):
         return 0
     since = timezone.now() - timedelta(days=days)
     return (
-        Sale.objects.filter(business_id=getattr(biz, "pk", None), sold_at__gte=since)
-        .aggregate(total=Coalesce(Sum("final_amount"), 0))["total"]
+        Sale.objects.filter(business_id=getattr(biz, "pk", None), sold_at__gte=since).aggregate(
+            total=Coalesce(Sum("final_amount"), 0)
+        )["total"]
         or 0
     )
 

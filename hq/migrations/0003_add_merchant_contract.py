@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         (
             "hq",
@@ -31,17 +30,13 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "file",
-                    models.FileField(
-                        help_text="Signed contract PDF file", upload_to="contracts/"
-                    ),
+                    models.FileField(help_text="Signed contract PDF file", upload_to="contracts/"),
                 ),
                 ("uploaded_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),
                 (
                     "notes",
-                    models.TextField(
-                        blank=True, help_text="Internal notes about this contract"
-                    ),
+                    models.TextField(blank=True, help_text="Internal notes about this contract"),
                 ),
                 (
                     "business",
@@ -67,12 +62,8 @@ class Migration(migrations.Migration):
             options={
                 "ordering": ["-uploaded_at"],
                 "indexes": [
-                    models.Index(
-                        fields=["business"], name="hq_merchant_busines_fadd16_idx"
-                    ),
-                    models.Index(
-                        fields=["uploaded_at"], name="hq_merchant_uploade_34b1f5_idx"
-                    ),
+                    models.Index(fields=["business"], name="hq_merchant_busines_fadd16_idx"),
+                    models.Index(fields=["uploaded_at"], name="hq_merchant_uploade_34b1f5_idx"),
                 ],
             },
         ),

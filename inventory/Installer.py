@@ -20,13 +20,15 @@ INDUSTRY_TO_KEY = {
     "liquor": "liquor",
 }
 
-DEFAULT_KEY = "phones"   # preserves current behaviour for everyone else
+DEFAULT_KEY = "phones"  # preserves current behaviour for everyone else
+
 
 def _coerce_key(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     v = str(value).strip().lower()
     return ALLOWED_KEYS.get(v)  # returns None if not in allowed list
+
 
 def _guess_from_name(name: str) -> Optional[str]:
     n = name.lower()
@@ -39,6 +41,7 @@ def _guess_from_name(name: str) -> Optional[str]:
     if any(w in n for w in ("phone", "mobile", "electronics", "imei")):
         return "phones"
     return None
+
 
 def resolve_template_key(request) -> str:
     """
@@ -76,6 +79,7 @@ def resolve_template_key(request) -> str:
     # 6) Total fallback
     return DEFAULT_KEY
 
+
 def tpl(page: str, key: str) -> str:
     """
     Build the template path for a page.
@@ -84,5 +88,3 @@ def tpl(page: str, key: str) -> str:
     Your filenames already follow this style: add_product_clothing.html etc.
     """
     return f"inventory/{page}_{key}.html"
-
-

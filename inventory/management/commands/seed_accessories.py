@@ -39,7 +39,6 @@ ACCESSORIES_CATALOG: List[Tuple[str, str, str, Decimal, Decimal]] = [
     ("BL-5C Battery", "battery", "Generic", Decimal("3900.00"), Decimal("5000.00")),
     ("TECNO 5C Battery", "battery", "Tecno", Decimal("5950.00"), Decimal("7500.00")),
     ("BL-25BI Battery", "battery", "Generic", Decimal("9900.00"), Decimal("12000.00")),
-    
     # ==========================================================================
     # CHARGERS & CAR CHARGERS
     # ==========================================================================
@@ -52,7 +51,6 @@ ACCESSORIES_CATALOG: List[Tuple[str, str, str, Decimal, Decimal]] = [
     ("OCW-5183U+C53 Charger", "charger", "Oraimo", Decimal("14500.00"), Decimal("18000.00")),
     ("OCC-32D Car Charger", "charger", "Oraimo", Decimal("28500.00"), Decimal("35000.00")),
     ("OCC-1152D Car Charger", "charger", "Oraimo", Decimal("10000.00"), Decimal("12500.00")),
-    
     # ==========================================================================
     # DATA CABLES
     # ==========================================================================
@@ -66,7 +64,6 @@ ACCESSORIES_CATALOG: List[Tuple[str, str, str, Decimal, Decimal]] = [
     ("OCD-C32 Data Cable", "cable", "Oraimo", Decimal("6800.00"), Decimal("8500.00")),
     ("OCD-114C2 Data Cable", "cable", "Oraimo", Decimal("6000.00"), Decimal("7500.00")),
     ("OCD-C22P Data Cable", "cable", "Oraimo", Decimal("4000.00"), Decimal("5500.00")),
-    
     # ==========================================================================
     # POWERBANKS
     # ==========================================================================
@@ -75,7 +72,6 @@ ACCESSORIES_CATALOG: List[Tuple[str, str, str, Decimal, Decimal]] = [
     ("OPB-P5101 Powerbank", "powerbank", "Oraimo", Decimal("37000.00"), Decimal("45000.00")),
     ("OPB-P7204Q Powerbank", "powerbank", "Oraimo", Decimal("59000.00"), Decimal("70000.00")),
     ("OPB-P204D Powerbank", "powerbank", "Oraimo", Decimal("43500.00"), Decimal("52000.00")),
-    
     # ==========================================================================
     # AUDIO & WEARABLES
     # ==========================================================================
@@ -127,23 +123,17 @@ class Command(BaseCommand):
         elif seed_all:
             businesses = Business.objects.filter(business_kind=BusinessKind.PHONES)
             if not businesses.exists():
-                self.stdout.write(
-                    self.style.WARNING("No businesses with business_kind='phones' found")
-                )
+                self.stdout.write(self.style.WARNING("No businesses with business_kind='phones' found"))
                 return
         else:
-            raise CommandError(
-                "Please specify --business=ID or --all to seed accessories"
-            )
+            raise CommandError("Please specify --business=ID or --all to seed accessories")
 
         # Seed accessories for each business
         for business in businesses:
             self.stdout.write(f"\n{'='*60}")
-            self.stdout.write(
-                self.style.SUCCESS(f"Seeding accessories for: {business.name} (ID: {business.id})")
-            )
+            self.stdout.write(self.style.SUCCESS(f"Seeding accessories for: {business.name} (ID: {business.id})"))
             self.stdout.write(f"{'='*60}\n")
-            
+
             created_count = 0
             updated_count = 0
             skipped_count = 0
@@ -151,10 +141,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 for name, category, brand, order_price, selling_price in ACCESSORIES_CATALOG:
                     # Check if product already exists
-                    existing = AccessoryProduct.objects.filter(
-                        business=business,
-                        name=name
-                    ).first()
+                    existing = AccessoryProduct.objects.filter(business=business, name=name).first()
 
                     if existing:
                         if overwrite:
@@ -165,15 +152,11 @@ class Command(BaseCommand):
                             existing.category = category
                             existing.save()
                             updated_count += 1
-                            self.stdout.write(
-                                self.style.WARNING(f"  ✓ Updated: {name} (MK {order_price})")
-                            )
+                            self.stdout.write(self.style.WARNING(f"  ✓ Updated: {name} (MK {order_price})"))
                         else:
                             # Skip existing
                             skipped_count += 1
-                            self.stdout.write(
-                                self.style.WARNING(f"  ⊘ Skipped: {name} (already exists)")
-                            )
+                            self.stdout.write(self.style.WARNING(f"  ⊘ Skipped: {name} (already exists)"))
                     else:
                         # Create new product
                         AccessoryProduct.objects.create(
@@ -185,9 +168,7 @@ class Command(BaseCommand):
                             default_selling_price=selling_price,
                         )
                         created_count += 1
-                        self.stdout.write(
-                            self.style.SUCCESS(f"  ✓ Created: {name} (MK {order_price})")
-                        )
+                        self.stdout.write(self.style.SUCCESS(f"  ✓ Created: {name} (MK {order_price})"))
 
             # Summary
             self.stdout.write(f"\n{'-'*60}")
@@ -201,10 +182,5 @@ class Command(BaseCommand):
 
         # Final summary
         self.stdout.write(f"\n{'='*60}")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"✓ Accessories seeded successfully for {len(businesses)} business(es)"
-            )
-        )
+        self.stdout.write(self.style.SUCCESS(f"✓ Accessories seeded successfully for {len(businesses)} business(es)"))
         self.stdout.write(f"{'='*60}\n")
-

@@ -5,39 +5,38 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('accounts', '0003_alter_loginsecurity_table_and_more'),
+        ("accounts", "0003_alter_loginsecurity_table_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='profile',
-            name='country',
-            field=models.CharField(blank=True, default='', max_length=80),
+            model_name="profile",
+            name="country",
+            field=models.CharField(blank=True, default="", max_length=80),
         ),
         migrations.AddField(
-            model_name='profile',
-            name='display_name',
-            field=models.CharField(blank=True, default='', max_length=120),
+            model_name="profile",
+            name="display_name",
+            field=models.CharField(blank=True, default="", max_length=120),
         ),
         migrations.AddField(
-            model_name='profile',
-            name='language',
-            field=models.CharField(blank=True, default='English - United States', max_length=80),
+            model_name="profile",
+            name="language",
+            field=models.CharField(blank=True, default="English - United States", max_length=80),
         ),
         migrations.AddField(
-            model_name='profile',
-            name='timezone',
-            field=models.CharField(blank=True, default='Africa/Blantyre', max_length=80),
+            model_name="profile",
+            name="timezone",
+            field=models.CharField(blank=True, default="Africa/Blantyre", max_length=80),
         ),
         migrations.AddIndex(
-            model_name='profile',
-            index=models.Index(fields=['user'], name='accounts_pr_user_id_97e401_idx'),
+            model_name="profile",
+            index=models.Index(fields=["user"], name="accounts_pr_user_id_97e401_idx"),
         ),
         migrations.AlterModelTable(
-            name='profile',
-            table='accounts_profile',
+            name="profile",
+            table="accounts_profile",
         ),
     ]

@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0042_add_assigned_role_to_inventoryitem"),
     ]

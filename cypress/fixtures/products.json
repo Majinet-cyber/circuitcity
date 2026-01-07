@@ -1,0 +1,37 @@
+{
+  "phones": {
+    "brand": "Samsung",
+    "model": "Galaxy A14",
+    "imei": "123456789012345",
+    "order_price": 80000,
+    "selling_price": 100000
+  },
+  "clothing": {
+    "name": "Test Dress",
+    "brand": "Test Brand",
+    "color": "Blue",
+    "size": "M",
+    "cost_price": 5000,
+    "selling_price": 10000
+  },
+  "liquor": {
+    "name": "Test Beer",
+    "category": "beer",
+    "price_per_bottle": 2000,
+    "cost_price": 1500
+  },
+  "pharmacy": {
+    "name": "Test Medicine",
+    "category": "medicine",
+    "unit": "tablet",
+    "cost_price": 500,
+    "selling_price": 1000
+  },
+  "groceries": {
+    "name": "Test Grocery",
+    "category": "food",
+    "unit": "kg",
+    "cost_price": 2000,
+    "selling_price": 3000
+  }
+}

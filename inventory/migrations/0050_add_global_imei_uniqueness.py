@@ -10,6 +10,7 @@ class SafeRemoveConstraint(RemoveConstraint):
     """
     Prevents ValueError if constraint is missing from migration state.
     """
+
     def state_forwards(self, app_label, state):
         try:
             super().state_forwards(app_label, state)
@@ -23,18 +24,20 @@ def drop_imei_per_business_constraint_database(apps, schema_editor):
     Safe to run even if constraint doesn't exist (handles state drift).
     """
     vendor = schema_editor.connection.vendor
-    
-    InventoryItem = apps.get_model('inventory', 'InventoryItem')
+
+    InventoryItem = apps.get_model("inventory", "InventoryItem")
     table_name = InventoryItem._meta.db_table
-    
+
     with schema_editor.connection.cursor() as cursor:
-        if vendor == 'postgresql':
+        if vendor == "postgresql":
             # Drop constraint if exists (PostgreSQL)
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 ALTER TABLE {table_name} 
                 DROP CONSTRAINT IF EXISTS uniq_imei_per_business
-            """)
-        elif vendor == 'sqlite':
+            """
+            )
+        elif vendor == "sqlite":
             # SQLite: Drop index if exists (SQLite may have created it as an index)
             cursor.execute("DROP INDEX IF EXISTS uniq_imei_per_business")
         # Other databases: skip (should not happen in production)
@@ -48,7 +51,6 @@ def reverse_drop_imei_per_business_constraint_database(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0049_remove_merchproduct_merchprod_biz_kind_type_idx_and_more"),
         ("tenants", "0013_add_location_tracking"),
@@ -79,11 +81,7 @@ class Migration(migrations.Migration):
                 help_text="15-digit IMEI. GLOBALLY UNIQUE across all tenants when provided.",
                 max_length=30,
                 null=True,
-                validators=[
-                    django.core.validators.RegexValidator(
-                        "^\\d{15}$", "IMEI must be exactly 15 digits."
-                    )
-                ],
+                validators=[django.core.validators.RegexValidator("^\\d{15}$", "IMEI must be exactly 15 digits.")],
             ),
         ),
         migrations.AddIndex(
@@ -93,9 +91,7 @@ class Migration(migrations.Migration):
         migrations.AddConstraint(
             model_name="inventoryitem",
             constraint=models.UniqueConstraint(
-                condition=models.Q(
-                    ("imei__isnull", False), models.Q(("imei", ""), _negated=True)
-                ),
+                condition=models.Q(("imei__isnull", False), models.Q(("imei", ""), _negated=True)),
                 fields=("imei",),
                 name="uniq_imei_globally",
             ),

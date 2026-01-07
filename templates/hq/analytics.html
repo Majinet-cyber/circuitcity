@@ -1,18 +1,16 @@
-{% extends "base.html" %}
+{% extends "hq/base_hq.html" %}
 {% load static %}
 {% load money %}
 
 {% block title %}HQ Analytics{% endblock %}
 
-{% block main %}
-<div class="cc-page">
-  <div class="cc-header">
-    <div class="topbar">
-      <h1>HQ Analytics</h1>
-    </div>
+{% block content %}
+<div>
+  <div style="margin-bottom: 1.5rem;">
+    <h1>HQ Analytics</h1>
   </div>
 
-  <main>
+  <div>
     <!-- Single Filter Button -->
     <div class="card mb-4">
       <div class="card-body" style="padding: 16px;">
@@ -160,7 +158,7 @@
         </div>
       </div>
     </div>
-  </main>
+  </div>
 </div>
 
 <style>

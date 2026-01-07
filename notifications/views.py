@@ -13,22 +13,26 @@ from .models import Notification
 def notification_list(request):
     """Full page listing all notifications for the current user."""
     notifications = Notification.objects.filter(user=request.user)
-    
+
     # Filter by read/unread
-    filter_type = request.GET.get('filter', 'all')
-    if filter_type == 'unread':
+    filter_type = request.GET.get("filter", "all")
+    if filter_type == "unread":
         notifications = notifications.filter(read_at__isnull=True)
-    elif filter_type == 'read':
+    elif filter_type == "read":
         notifications = notifications.filter(read_at__isnull=False)
-    
+
     paginator = Paginator(notifications, 20)
-    page = request.GET.get('page', 1)
+    page = request.GET.get("page", 1)
     notifications_page = paginator.get_page(page)
-    
-    return render(request, 'notifications/notification_list.html', {
-        'notifications': notifications_page,
-        'filter_type': filter_type,
-    })
+
+    return render(
+        request,
+        "notifications/notification_list.html",
+        {
+            "notifications": notifications_page,
+            "filter_type": filter_type,
+        },
+    )
 
 
 @login_required
@@ -36,22 +40,22 @@ def notification_dropdown(request):
     """API endpoint for the notification dropdown (latest 10)."""
     notifications = Notification.objects.filter(user=request.user)[:10]
     unread_count = Notification.objects.filter(user=request.user, read_at__isnull=True).count()
-    
+
     data = {
-        'unread_count': unread_count,
-        'notifications': [
+        "unread_count": unread_count,
+        "notifications": [
             {
-                'id': n.id,
-                'message': n.message,
-                'level': n.level,
-                'is_read': n.is_read,
-                'created_at': n.created_at.isoformat(),
-                'meta': n.meta,
+                "id": n.id,
+                "message": n.message,
+                "level": n.level,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat(),
+                "meta": n.meta,
             }
             for n in notifications
-        ]
+        ],
     }
-    
+
     return JsonResponse(data)
 
 
@@ -63,22 +67,21 @@ def mark_as_read(request, pk):
         notification.mark_read()
     except Notification.DoesNotExist:
         pass
-    
-    return redirect(request.META.get('HTTP_REFERER', 'notifications:list'))
+
+    return redirect(request.META.get("HTTP_REFERER", "notifications:list"))
 
 
 @login_required
 def mark_all_as_read(request):
     """Mark all user's notifications as read."""
     from django.utils import timezone
-    Notification.objects.filter(user=request.user, read_at__isnull=True).update(
-        read_at=timezone.now()
-    )
-    
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return JsonResponse({'success': True})
-    
-    return redirect('notifications:list')
+
+    Notification.objects.filter(user=request.user, read_at__isnull=True).update(read_at=timezone.now())
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"success": True})
+
+    return redirect("notifications:list")
 
 
 @login_required
@@ -90,17 +93,18 @@ def mark_read_and_redirect(request, pk):
     try:
         notification = Notification.objects.get(pk=pk, user=request.user)
         notification.mark_read()
-        
+
         # Check if notification has a deep link in meta
-        deep_link = notification.meta.get('link') if notification.meta else None
+        deep_link = notification.meta.get("link") if notification.meta else None
         if deep_link:
             return redirect(deep_link)
     except Notification.DoesNotExist:
         pass
-    
+
     # Default: redirect to dashboard
     try:
         from django.urls import reverse
-        return redirect(reverse('dashboard:home'))
+
+        return redirect(reverse("dashboard:home"))
     except Exception:
-        return redirect('/')
+        return redirect("/")

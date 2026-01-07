@@ -55,6 +55,16 @@ htmlcov/
 pytest_cache/
 .mypy_cache/
 .ruff_cache/
+test_output.txt
+test_output*.txt
+pytest_full_output.txt
+pytest_output.txt
+pytest_summary.txt
+django_test_output.txt
+step1_results.txt
+step2_results.txt
+final_analysis.txt
+single_error.txt
 
 # ----------------------------
 # Editor backups
@@ -65,3 +75,12 @@ pytest_cache/
 
 # Duplicate backup directories
 _dup_backup/
+
+# Corrupted backup folders and temporary analysis scripts
+corrupted_backup*/
+analyze_corruption.py
+restore_all.ps1
+restore_all.py
+restore_remaining.ps1
+test_import.py
+verify_compile.py

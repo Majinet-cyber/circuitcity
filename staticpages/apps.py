@@ -2,6 +2,5 @@ from django.apps import AppConfig
 
 
 class StaticpagesConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'staticpages'
-
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "staticpages"

@@ -23,9 +23,17 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
 from inventory.models_verticals import (
-    LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
-    LiquorWalletEntry, LiquorUnitType, LiquorSaleType, LiquorCreditStatus,
-    LiquorCreditPaymentStatus, LiquorStockEditRequestStatus, MonthlySalesTarget
+    LiquorSale,
+    LiquorCredit,
+    LiquorCreditPayment,
+    LiquorStockEditRequest,
+    LiquorWalletEntry,
+    LiquorUnitType,
+    LiquorSaleType,
+    LiquorCreditStatus,
+    LiquorCreditPaymentStatus,
+    LiquorStockEditRequestStatus,
+    MonthlySalesTarget,
 )
 from tenants.utils import require_business
 
@@ -34,71 +42,65 @@ from tenants.utils import require_business
 # LIQUOR SALES
 # ==============================================================================
 
+
 class LiquorSellForm(forms.Form):
     """Form for selling liquor (bottle or shot)"""
+
     product = forms.ModelChoiceField(
-        queryset=MerchProduct.objects.none(),
-        widget=forms.Select(attrs={"class": "form-control", "id": "id_product"})
+        queryset=MerchProduct.objects.none(), widget=forms.Select(attrs={"class": "form-control", "id": "id_product"})
     )
     unit = forms.ChoiceField(
         choices=LiquorUnitType.choices,
         initial=LiquorUnitType.BOTTLE,
-        widget=forms.Select(attrs={"class": "form-control", "id": "id_unit"})
+        widget=forms.Select(attrs={"class": "form-control", "id": "id_unit"}),
     )
     quantity = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_quantity"})
+        min_value=1, initial=1, widget=forms.NumberInput(attrs={"class": "form-control", "id": "id_quantity"})
     )
     unit_price = forms.DecimalField(
         max_digits=10,
         decimal_places=2,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "id": "id_unit_price"})
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01", "id": "id_unit_price"}),
     )
     sale_type = forms.ChoiceField(
         choices=LiquorSaleType.choices,
         initial=LiquorSaleType.SALE,
-        widget=forms.Select(attrs={"class": "form-control", "id": "id_sale_type"})
+        widget=forms.Select(attrs={"class": "form-control", "id": "id_sale_type"}),
     )
     customer_name = forms.CharField(
         max_length=120,
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Required for credit sales"})
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Required for credit sales"}),
     )
     customer_phone = forms.CharField(
         max_length=20,
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional"})
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Optional"}),
     )
-    notes = forms.CharField(
-        required=False,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2})
-    )
-    
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"class": "form-control", "rows": 2}))
+
     def __init__(self, business=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if business:
             self.fields["product"].queryset = MerchProduct.objects.filter(
-                business=business,
-                kind=BusinessKind.LIQUOR,
-                is_active=True
+                business=business, kind=BusinessKind.LIQUOR, is_active=True
             ).order_by("name")
-    
+
     def clean(self):
         cleaned_data = super().clean()
         sale_type = cleaned_data.get("sale_type")
         customer_name = cleaned_data.get("customer_name")
         product = cleaned_data.get("product")
         unit = cleaned_data.get("unit")
-        
+
         # If credit sale, require customer name
         if sale_type == LiquorSaleType.CREDIT and not customer_name:
             raise forms.ValidationError("Customer name is required for credit sales.")
-        
+
         # If shot is selected but product doesn't have shots
         if unit == LiquorUnitType.SHOT and product and not product.has_shots:
             raise forms.ValidationError(f"{product.name} does not support shot sales.")
-        
+
         return cleaned_data
 
 
@@ -108,7 +110,7 @@ class LiquorSellForm(forms.Form):
 def sell_liquor(request):
     """Sell liquor (bottle or shot) - Gamified flow"""
     business = get_active_business(request)
-    
+
     # Safely get membership and subscription
     membership = getattr(request, "membership", None)
     subscription = None
@@ -117,13 +119,13 @@ def sell_liquor(request):
     except Exception:
         # Business has no subscription yet (trial or free tier)
         subscription = None
-    
+
     # Get or auto-start active shift (prevents "no active shift" blocking)
     location = getattr(request, "location", None)
     active_shift = get_or_start_active_shift(request.user, business, location)
-    
+
     # No warning needed - shift is always available now
-    
+
     if request.method == "POST":
         # POST logic remains intact - handle sale recording
         # Extract POST data directly (no form validation for speed)
@@ -133,68 +135,65 @@ def sell_liquor(request):
             if not product_id_str:
                 messages.error(request, "❌ Please select a product.")
                 return redirect("liquor:sell")
-            
+
             try:
                 product_id = int(product_id_str)
             except (ValueError, TypeError):
                 messages.error(request, "❌ Invalid product selected.")
                 return redirect("liquor:sell")
-            
+
             if product_id <= 0:
                 messages.error(request, "❌ Please select a valid product.")
                 return redirect("liquor:sell")
-            
+
             # Validate and extract quantity
             quantity_str = request.POST.get("quantity", "1").strip()
             try:
                 quantity = int(quantity_str)
             except (ValueError, TypeError):
                 quantity = 1
-            
+
             if quantity <= 0:
                 messages.error(request, "❌ Quantity must be at least 1.")
                 return redirect("liquor:sell")
-            
+
             # CRITICAL: Default mode is "bottle" (NOT crate) - bottle-first selling
             mode = request.POST.get("mode", "bottle")  # "bottle", "shot", or "glass"
             sale_type = request.POST.get("sale_type", "cash")  # "cash" or "credit"
             customer_name = request.POST.get("customer_name", "").strip()
             customer_phone = request.POST.get("customer_phone", "").strip()
             notes = request.POST.get("notes", "").strip()
-            
+
             # Payment mix amounts (if provided) - safe Decimal conversion
             try:
                 cash_amount = Decimal(str(request.POST.get("cash_amount", "0") or "0"))
             except (ValueError, TypeError, InvalidOperation):
                 cash_amount = Decimal("0.00")
-            
+
             try:
                 bank_amount = Decimal(str(request.POST.get("bank_amount", "0") or "0"))
             except (ValueError, TypeError, InvalidOperation):
                 bank_amount = Decimal("0.00")
-            
+
             try:
                 mobile_money_amount = Decimal(str(request.POST.get("mobile_money_amount", "0") or "0"))
             except (ValueError, TypeError, InvalidOperation):
                 mobile_money_amount = Decimal("0.00")
-            
+
             # Get price based on mode - validate product exists first (no locking yet)
             try:
                 product = MerchProduct.objects.get(
-                    pk=product_id,
-                    business=business,
-                    kind=BusinessKind.LIQUOR,
-                    is_active=True
+                    pk=product_id, business=business, kind=BusinessKind.LIQUOR, is_active=True
                 )
             except MerchProduct.DoesNotExist:
                 messages.error(request, "❌ Product not found or not available.")
                 return redirect("liquor:sell")
-            
+
             # Validate credit sale requires customer name
             if sale_type == "credit" and not customer_name:
                 messages.error(request, "❌ Customer name is required for credit sales.")
                 return redirect("liquor:sell")
-            
+
             # Map mode to unit
             if mode == "shot":
                 unit = "shot"
@@ -202,7 +201,7 @@ def sell_liquor(request):
                 unit = "glass"
             else:
                 unit = "bottle"
-            
+
             # Get price based on mode - handle None values safely
             if mode == "shot":
                 unit_price = product.price_per_shot or Decimal("0.00")
@@ -219,10 +218,10 @@ def sell_liquor(request):
                 if unit_price == Decimal("0.00"):
                     messages.error(request, f"❌ {product.name} does not have a price per bottle set.")
                     return redirect("liquor:sell")
-            
+
             # Use the centralized liquor sale service (handles all transaction logic)
             from inventory.services.liquor_sale import create_liquor_sale, OutOfStockError
-            
+
             try:
                 result = create_liquor_sale(
                     business=business,
@@ -240,12 +239,12 @@ def sell_liquor(request):
                     mobile_money_amount=mobile_money_amount,
                     shift=active_shift,
                 )
-                
+
                 if result["ok"]:
                     messages.success(request, f"✅ {result['message']}")
                 else:
                     messages.error(request, f"❌ {result.get('error', 'Sale failed')}")
-                    
+
             except OutOfStockError as e:
                 messages.error(request, f"❌ {str(e)}")
             except ValidationError as e:
@@ -253,6 +252,7 @@ def sell_liquor(request):
             except Exception as e:
                 # Catch any unexpected errors including TransactionManagementError
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.error(
                     f"Unexpected error in liquor sell: {e}",
@@ -262,22 +262,23 @@ def sell_liquor(request):
                         "product_id": product_id,
                         "quantity": quantity,
                         "user_id": request.user.id if request.user.is_authenticated else None,
-                    }
+                    },
                 )
                 # Never show raw DB errors to users
                 if "select_for_update" in str(e).lower() or "transaction" in str(e).lower():
                     messages.error(request, "❌ Sale failed: Database error. Please try again.")
                 else:
                     messages.error(request, f"❌ Sale failed: {str(e)}")
-            
+
             return redirect("liquor:sell")
-            
+
         except (ValueError, KeyError) as e:
             messages.error(request, f"❌ Sale failed: Invalid input. {str(e)}")
             return redirect("liquor:sell")
         except Exception as e:
             # Catch any unexpected errors to prevent 500
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(
                 f"Unexpected error in liquor sell: {e}",
@@ -285,7 +286,7 @@ def sell_liquor(request):
                 extra={
                     "business_id": getattr(business, "id", None) if business else None,
                     "user_id": request.user.id if request.user.is_authenticated else None,
-                }
+                },
             )
             # Never show raw DB errors to users
             if "select_for_update" in str(e).lower() or "transaction" in str(e).lower():
@@ -293,17 +294,14 @@ def sell_liquor(request):
             else:
                 messages.error(request, "❌ Sale failed: An unexpected error occurred. Please try again.")
             return redirect("liquor:sell")
-    
+
     # GET: Build category-grouped products
     from collections import defaultdict
-    
+
     products = MerchProduct.objects.filter(
-        business=business,
-        kind=BusinessKind.LIQUOR,
-        is_archived=False,
-        is_active=True
+        business=business, kind=BusinessKind.LIQUOR, is_archived=False, is_active=True
     ).order_by("category", "name")
-    
+
     products_by_category = defaultdict(list)
     for p in products:
         cat = (p.category or "").lower()
@@ -313,23 +311,27 @@ def sell_liquor(request):
             p.is_in_stock = p.current_stock > 0
             p.is_low_stock = 0 < p.current_stock <= 5
             products_by_category[cat].append(p)
-    
+
     # Build categories list in order, but include only those that have products
     category_order = ["beer", "cider", "wine", "spirits", "whiskey"]
     categories = [cat for cat in category_order if cat in products_by_category]
-    
+
     recent_sales = LiquorSale.objects.filter(business=business).select_related("product", "sold_by", "shift")[:10]
-    
-    return render(request, "inventory/liquor/sell.html", {
-        "categories": categories,
-        "products_by_category": dict(products_by_category),
-        "recent_sales": recent_sales,
-        "business": business,
-        "membership": membership,
-        "subscription": subscription,
-        "active_shift": active_shift,
-        "active_tab": "sell",
-    })
+
+    return render(
+        request,
+        "inventory/liquor/sell.html",
+        {
+            "categories": categories,
+            "products_by_category": dict(products_by_category),
+            "recent_sales": recent_sales,
+            "business": business,
+            "membership": membership,
+            "subscription": subscription,
+            "active_shift": active_shift,
+            "active_tab": "sell",
+        },
+    )
 
 
 @login_required
@@ -338,17 +340,25 @@ def sell_liquor(request):
 def sales_list(request):
     """List all liquor sales"""
     business = get_active_business(request)
-    sales = LiquorSale.objects.filter(business=business).select_related("product", "sold_by", "linked_credit").order_by("-sold_at")
-    
+    sales = (
+        LiquorSale.objects.filter(business=business)
+        .select_related("product", "sold_by", "linked_credit")
+        .order_by("-sold_at")
+    )
+
     # Filter by type
     sale_type = request.GET.get("type")
     if sale_type:
         sales = sales.filter(sale_type=sale_type)
-    
-    return render(request, "inventory/liquor/sales_list.html", {
-        "sales": sales,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/sales_list.html",
+        {
+            "sales": sales,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -359,13 +369,15 @@ def get_product_pricing(request, product_id):
     business = get_active_business(request)
     try:
         product = MerchProduct.objects.get(pk=product_id, business=business, kind=BusinessKind.LIQUOR)
-        return JsonResponse({
-            "success": True,
-            "has_shots": product.has_shots,
-            "price_per_bottle": str(product.price_per_bottle or "0.00"),
-            "price_per_shot": str(product.price_per_shot or "0.00"),
-            "sellable_shots": product.sellable_shots_per_bottle,
-        })
+        return JsonResponse(
+            {
+                "success": True,
+                "has_shots": product.has_shots,
+                "price_per_bottle": str(product.price_per_bottle or "0.00"),
+                "price_per_shot": str(product.price_per_shot or "0.00"),
+                "sellable_shots": product.sellable_shots_per_bottle,
+            }
+        )
     except MerchProduct.DoesNotExist:
         return JsonResponse({"success": False, "error": "Product not found"})
 
@@ -374,23 +386,20 @@ def get_product_pricing(request, product_id):
 # CREDIT MANAGEMENT
 # ==============================================================================
 
+
 class ConvertToCreditForm(forms.Form):
     """Form for converting a sale to credit"""
-    customer_name = forms.CharField(
-        max_length=120,
-        widget=forms.TextInput(attrs={"class": "form-control"})
-    )
+
+    customer_name = forms.CharField(max_length=120, widget=forms.TextInput(attrs={"class": "form-control"}))
     customer_phone = forms.CharField(
-        max_length=20,
-        required=False,
-        widget=forms.TextInput(attrs={"class": "form-control"})
+        max_length=20, required=False, widget=forms.TextInput(attrs={"class": "form-control"})
     )
     claim_from_sale = forms.BooleanField(
         required=False,
         initial=True,
         label="Convert existing cash sale to credit?",
         help_text="If checked, this will convert the selected sale. If unchecked, creates fresh credit.",
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"})
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
     )
 
 
@@ -402,23 +411,23 @@ def convert_sale_to_credit(request, sale_id):
     """Convert a cash sale to credit"""
     business = get_active_business(request)
     sale = get_object_or_404(LiquorSale, pk=sale_id, business=business)
-    
+
     if sale.is_credit:
         messages.warning(request, "This sale is already marked as credit.")
         return redirect("liquor:sales_list")
-    
+
     if request.method == "POST":
         form = ConvertToCreditForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             with transaction.atomic():
                 if data["claim_from_sale"]:
                     # Convert sale to credit
                     sale.sale_type = LiquorSaleType.CREDIT
                     sale.is_credit = True
                     sale.save(update_fields=["sale_type", "is_credit"])
-                    
+
                     # Create credit record
                     credit = LiquorCredit.objects.create(
                         business=business,
@@ -427,12 +436,12 @@ def convert_sale_to_credit(request, sale_id):
                         amount=sale.total_price,
                         related_sale=sale,
                         created_by=request.user,
-                        notes=f"Converted from sale #{sale.id}"
+                        notes=f"Converted from sale #{sale.id}",
                     )
-                    
+
                     sale.linked_credit = credit
                     sale.save(update_fields=["linked_credit"])
-                    
+
                     messages.success(request, f"Sale #{sale.id} converted to credit for {data['customer_name']}")
                 else:
                     # Create fresh credit (don't touch the sale)
@@ -442,19 +451,23 @@ def convert_sale_to_credit(request, sale_id):
                         customer_phone=data.get("customer_phone", ""),
                         amount=sale.total_price,
                         created_by=request.user,
-                        notes=f"Fresh credit based on sale #{sale.id}"
+                        notes=f"Fresh credit based on sale #{sale.id}",
                     )
                     messages.success(request, f"New credit created for {data['customer_name']}")
-            
+
             return redirect("liquor:credits_list")
     else:
         form = ConvertToCreditForm()
-    
-    return render(request, "inventory/liquor/convert_to_credit.html", {
-        "form": form,
-        "sale": sale,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/convert_to_credit.html",
+        {
+            "form": form,
+            "sale": sale,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -464,16 +477,20 @@ def credits_list(request):
     """List all credits"""
     business = get_active_business(request)
     credits = LiquorCredit.objects.filter(business=business).select_related("created_by").order_by("-created_at")
-    
+
     # Filter by status
     status = request.GET.get("status")
     if status:
         credits = credits.filter(status=status)
-    
-    return render(request, "inventory/liquor/credits_list.html", {
-        "credits": credits,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/credits_list.html",
+        {
+            "credits": credits,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -484,12 +501,16 @@ def credit_detail(request, credit_id):
     business = get_active_business(request)
     credit = get_object_or_404(LiquorCredit, pk=credit_id, business=business)
     payments = credit.payments.select_related("paid_by", "reviewed_by").order_by("-created_at")
-    
-    return render(request, "inventory/liquor/credit_detail.html", {
-        "credit": credit,
-        "payments": payments,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/credit_detail.html",
+        {
+            "credit": credit,
+            "payments": payments,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -504,12 +525,12 @@ def clear_credit(request, credit_id):
     """
     business = get_active_business(request)
     credit = get_object_or_404(LiquorCredit, pk=credit_id, business=business)
-    
+
     # Check if already settled
     if credit.status == LiquorCreditStatus.SETTLED:
         messages.warning(request, f"Credit for {credit.customer_name} is already settled.")
         return redirect("liquor:credits_list")
-    
+
     with transaction.atomic():
         # Mark credit as settled
         credit.status = LiquorCreditStatus.SETTLED
@@ -517,21 +538,20 @@ def clear_credit(request, credit_id):
         credit.settled_at = timezone.now()
         credit.settled_by = request.user
         credit.save(update_fields=["status", "amount_paid", "settled_at", "settled_by"])
-        
+
         # Create wallet entry for the cleared credit (now it's real income)
         LiquorWalletEntry.objects.create(
             business=business,
             amount=credit.amount,
             description=f"Credit cleared: {credit.customer_name} - {credit.notes or 'No notes'}",
             entry_type="income",
-            created_by=request.user
+            created_by=request.user,
         )
-        
+
         messages.success(
-            request, 
-            f"✅ Credit cleared for {credit.customer_name}! MK {credit.amount:,.2f} now included in revenue."
+            request, f"✅ Credit cleared for {credit.customer_name}! MK {credit.amount:,.2f} now included in revenue."
         )
-    
+
     return redirect("liquor:credits_list")
 
 
@@ -539,33 +559,32 @@ def clear_credit(request, credit_id):
 # CREDIT PAYMENT SUBMISSION (Bartenders)
 # ==============================================================================
 
+
 class CreditPaymentForm(forms.Form):
     """Form for submitting credit payment (bartender)"""
+
     amount = forms.DecimalField(
         max_digits=12,
         decimal_places=2,
         min_value=Decimal("0.01"),
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"})
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
     )
     transaction_id = forms.CharField(
         max_length=100,
         required=False,
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. TXN123456"})
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "e.g. TXN123456"}),
     )
-    proof_file = forms.FileField(
-        required=False,
-        widget=forms.FileInput(attrs={"class": "form-control"})
-    )
-    
+    proof_file = forms.FileField(required=False, widget=forms.FileInput(attrs={"class": "form-control"}))
+
     def clean(self):
         cleaned_data = super().clean()
         transaction_id = cleaned_data.get("transaction_id")
         proof_file = cleaned_data.get("proof_file")
-        
+
         # Require at least one: transaction ID or proof file
         if not transaction_id and not proof_file:
             raise forms.ValidationError("Please provide either a transaction ID or upload proof of payment.")
-        
+
         return cleaned_data
 
 
@@ -576,40 +595,45 @@ def submit_credit_payment(request, credit_id):
     """Bartender submits payment for credit (requires proof)"""
     business = get_active_business(request)
     credit = get_object_or_404(LiquorCredit, pk=credit_id, business=business)
-    
+
     if credit.status == LiquorCreditStatus.SETTLED:
         messages.warning(request, "This credit is already settled.")
         return redirect("liquor:credit_detail", credit_id=credit.id)
-    
+
     if request.method == "POST":
         form = CreditPaymentForm(request.POST, request.FILES)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             payment = LiquorCreditPayment.objects.create(
                 credit=credit,
                 amount=data["amount"],
                 transaction_id=data.get("transaction_id", ""),
                 proof_file=data.get("proof_file"),
                 paid_by=request.user,
-                status=LiquorCreditPaymentStatus.PENDING
+                status=LiquorCreditPaymentStatus.PENDING,
             )
-            
+
             messages.success(request, "Payment submitted for approval.")
             return redirect("liquor:credit_detail", credit_id=credit.id)
     else:
         form = CreditPaymentForm(initial={"amount": credit.balance})
-    
-    return render(request, "inventory/liquor/submit_payment.html", {
-        "form": form,
-        "credit": credit,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/submit_payment.html",
+        {
+            "form": form,
+            "credit": credit,
+            "business": business,
+        },
+    )
 
 
 # ==============================================================================
 # CREDIT PAYMENT APPROVAL (Managers)
 # ==============================================================================
+
 
 @login_required
 @require_business
@@ -618,15 +642,20 @@ def submit_credit_payment(request, credit_id):
 def pending_payments(request):
     """Manager view of pending credit payments"""
     business = get_active_business(request)
-    payments = LiquorCreditPayment.objects.filter(
-        credit__business=business,
-        status=LiquorCreditPaymentStatus.PENDING
-    ).select_related("credit", "paid_by").order_by("-created_at")
-    
-    return render(request, "inventory/liquor/pending_payments.html", {
-        "payments": payments,
-        "business": business,
-    })
+    payments = (
+        LiquorCreditPayment.objects.filter(credit__business=business, status=LiquorCreditPaymentStatus.PENDING)
+        .select_related("credit", "paid_by")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "inventory/liquor/pending_payments.html",
+        {
+            "payments": payments,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -638,15 +667,12 @@ def approve_payment(request, payment_id):
     """Manager approves a credit payment"""
     business = get_active_business(request)
     payment = get_object_or_404(
-        LiquorCreditPayment,
-        pk=payment_id,
-        credit__business=business,
-        status=LiquorCreditPaymentStatus.PENDING
+        LiquorCreditPayment, pk=payment_id, credit__business=business, status=LiquorCreditPaymentStatus.PENDING
     )
-    
+
     with transaction.atomic():
         payment.approve(request.user)
-        
+
         # Create wallet entry
         LiquorWalletEntry.objects.create(
             business=business,
@@ -654,9 +680,9 @@ def approve_payment(request, payment_id):
             description=f"Credit payment from {payment.credit.customer_name}",
             entry_type="income",
             related_payment=payment,
-            created_by=request.user
+            created_by=request.user,
         )
-    
+
     messages.success(request, f"Payment of {payment.amount} approved and credit updated.")
     return redirect("liquor:pending_payments")
 
@@ -670,15 +696,12 @@ def reject_payment(request, payment_id):
     """Manager rejects a credit payment"""
     business = get_active_business(request)
     payment = get_object_or_404(
-        LiquorCreditPayment,
-        pk=payment_id,
-        credit__business=business,
-        status=LiquorCreditPaymentStatus.PENDING
+        LiquorCreditPayment, pk=payment_id, credit__business=business, status=LiquorCreditPaymentStatus.PENDING
     )
-    
+
     reason = request.POST.get("reason", "No reason provided")
     payment.reject(request.user, reason)
-    
+
     messages.warning(request, f"Payment rejected. Reason: {reason}")
     return redirect("liquor:pending_payments")
 
@@ -687,15 +710,16 @@ def reject_payment(request, payment_id):
 # STOCK EDIT REQUESTS (Bartenders)
 # ==============================================================================
 
+
 class StockEditRequestForm(forms.Form):
     """Form for bartenders to request stock edits"""
+
     requested_changes = forms.CharField(
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 4}),
-        help_text="Describe the changes you want to make (e.g., 'Change quantity from 10 to 15')"
+        help_text="Describe the changes you want to make (e.g., 'Change quantity from 10 to 15')",
     )
     reason = forms.CharField(
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}),
-        help_text="Explain why this change is needed"
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 3}), help_text="Explain why this change is needed"
     )
 
 
@@ -706,30 +730,34 @@ def request_stock_edit(request, product_id):
     """Bartender requests permission to edit stock"""
     business = get_active_business(request)
     product = get_object_or_404(MerchProduct, pk=product_id, business=business, kind=BusinessKind.LIQUOR)
-    
+
     if request.method == "POST":
         form = StockEditRequestForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             stock_request = LiquorStockEditRequest.objects.create(
                 business=business,
                 product=product,
                 requested_changes={"description": data["requested_changes"]},
                 reason=data["reason"],
-                requested_by=request.user
+                requested_by=request.user,
             )
-            
+
             messages.success(request, "Stock edit request submitted for manager approval.")
             return redirect("verticals:liquor_dashboard")
     else:
         form = StockEditRequestForm()
-    
-    return render(request, "inventory/liquor/request_stock_edit.html", {
-        "form": form,
-        "product": product,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/request_stock_edit.html",
+        {
+            "form": form,
+            "product": product,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -739,58 +767,63 @@ def request_stock_edit(request, product_id):
 def stock_edit_requests(request):
     """Manager view of stock edit requests"""
     business = get_active_business(request)
-    requests_qs = LiquorStockEditRequest.objects.filter(
-        business=business,
-        status=LiquorStockEditRequestStatus.PENDING
-    ).select_related("product", "requested_by").order_by("-created_at")
-    
-    return render(request, "inventory/liquor/stock_edit_requests.html", {
-        "requests": requests_qs,
-        "business": business,
-    })
+    requests_qs = (
+        LiquorStockEditRequest.objects.filter(business=business, status=LiquorStockEditRequestStatus.PENDING)
+        .select_related("product", "requested_by")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "inventory/liquor/stock_edit_requests.html",
+        {
+            "requests": requests_qs,
+            "business": business,
+        },
+    )
 
 
 # ==============================================================================
 # STOCK SETTINGS (Managers)
 # ==============================================================================
 
+
 class LiquorStockSettingsForm(forms.Form):
     """Form for editing business-level liquor stock settings"""
+
     beer_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     cider_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     spirits_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     whiskey_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     wine_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     other_target = forms.IntegerField(
-        min_value=0, initial=600,
-        widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
+        min_value=0, initial=600, widget=forms.NumberInput(attrs={"class": "form-control", "min": "0"})
     )
     default_auto_adjust_pct = forms.IntegerField(
-        min_value=0, max_value=200, initial=20,
+        min_value=0,
+        max_value=200,
+        initial=20,
         widget=forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "200"}),
         label="Default Auto-Adjust Percentage",
-        help_text="Default percentage to increase targets over peak demand (typically 20%)"
+        help_text="Default percentage to increase targets over peak demand (typically 20%)",
     )
     auto_adjust_lookback_days = forms.IntegerField(
-        min_value=1, max_value=90, initial=30,
+        min_value=1,
+        max_value=90,
+        initial=30,
         widget=forms.NumberInput(attrs={"class": "form-control", "min": "1", "max": "90"}),
         label="Auto-Adjust Lookback Period (Days)",
-        help_text="Number of days to analyze when calculating peak demand (typically 30)"
+        help_text="Number of days to analyze when calculating peak demand (typically 30)",
     )
 
 
@@ -801,9 +834,9 @@ class LiquorStockSettingsForm(forms.Form):
 def stock_settings(request):
     """Edit business-level stock settings"""
     from inventory.models_verticals import LiquorStockSettings
-    
+
     business = get_active_business(request)
-    
+
     # Get or create settings
     settings, created = LiquorStockSettings.objects.get_or_create(
         business=business,
@@ -816,14 +849,14 @@ def stock_settings(request):
             "other_target": 600,
             "default_auto_adjust_pct": 20,
             "auto_adjust_lookback_days": 30,
-        }
+        },
     )
-    
+
     if request.method == "POST":
         form = LiquorStockSettingsForm(request.POST)
         if form.is_valid():
             data = form.cleaned_data
-            
+
             settings.beer_target = data["beer_target"]
             settings.cider_target = data["cider_target"]
             settings.spirits_target = data["spirits_target"]
@@ -833,7 +866,7 @@ def stock_settings(request):
             settings.default_auto_adjust_pct = data["default_auto_adjust_pct"]
             settings.auto_adjust_lookback_days = data["auto_adjust_lookback_days"]
             settings.save()
-            
+
             messages.success(request, "Stock settings updated successfully.")
             return redirect("liquor:stock_overview")
     else:
@@ -848,12 +881,16 @@ def stock_settings(request):
             "auto_adjust_lookback_days": settings.auto_adjust_lookback_days,
         }
         form = LiquorStockSettingsForm(initial=initial)
-    
-    return render(request, "inventory/liquor/stock_settings.html", {
-        "form": form,
-        "settings": settings,
-        "business": business,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/stock_settings.html",
+        {
+            "form": form,
+            "settings": settings,
+            "business": business,
+        },
+    )
 
 
 @login_required
@@ -865,14 +902,14 @@ def update_category_target(request, category):
     """Update target for a specific category (AJAX endpoint)"""
     from inventory.models_verticals import LiquorStockSettings
     from decimal import Decimal
-    
+
     business = get_active_business(request)
-    
+
     # Validate category
     valid_categories = ["beer", "cider", "spirits", "whiskey", "wine", "other"]
     if category not in valid_categories:
         return JsonResponse({"success": False, "error": "Invalid category"}, status=400)
-    
+
     # Get or create settings
     settings, created = LiquorStockSettings.objects.get_or_create(
         business=business,
@@ -885,9 +922,9 @@ def update_category_target(request, category):
             "other_target": 600,
             "default_auto_adjust_pct": 20,
             "auto_adjust_lookback_days": 30,
-        }
+        },
     )
-    
+
     # Get new target from POST
     try:
         new_target = int(request.POST.get("target", 0))
@@ -895,49 +932,53 @@ def update_category_target(request, category):
             return JsonResponse({"success": False, "error": "Target must be non-negative"}, status=400)
     except (ValueError, TypeError):
         return JsonResponse({"success": False, "error": "Invalid target value"}, status=400)
-    
+
     # Update the appropriate field
     field_name = f"{category}_target"
     setattr(settings, field_name, new_target)
     settings.save(update_fields=[field_name])
-    
+
     messages.success(request, f"Updated {category.title()} target to {new_target} bottles.")
-    
-    return JsonResponse({
-        "success": True,
-        "category": category,
-        "new_target": new_target,
-        "message": f"Updated {category.title()} target to {new_target} bottles."
-    })
+
+    return JsonResponse(
+        {
+            "success": True,
+            "category": category,
+            "new_target": new_target,
+            "message": f"Updated {category.title()} target to {new_target} bottles.",
+        }
+    )
 
 
 # ==============================================================================
 # SHIFT MANAGEMENT
 # ==============================================================================
 
+
 def get_active_shift(request) -> Optional[Any]:
     """Get the currently active shift for the logged-in user"""
     from inventory.models_verticals import LiquorShift, LiquorShiftStatus
+
     business = get_active_business(request)
-    return LiquorShift.objects.filter(
-        business=business,
-        barman=request.user,
-        status=LiquorShiftStatus.OPEN
-    ).order_by("-started_at").first()
+    return (
+        LiquorShift.objects.filter(business=business, barman=request.user, status=LiquorShiftStatus.OPEN)
+        .order_by("-started_at")
+        .first()
+    )
 
 
 def get_or_start_active_shift(user, business, location=None):
     """
     Get the currently active shift for the user, or create one automatically if missing.
-    
+
     This prevents "no active shift" errors from blocking liquor flows.
     Idempotent: won't create duplicates if a shift already exists.
-    
+
     Args:
         user: The user/barman
         business: The business instance
         location: Optional location (defaults to business default location if None)
-    
+
     Returns:
         LiquorShift instance (existing or newly created)
     """
@@ -945,37 +986,35 @@ def get_or_start_active_shift(user, business, location=None):
     from inventory.models import Location, MerchProduct
     from tenants.models import BusinessKind
     from django.db import transaction
-    
+
     # Check if user already has an active shift
-    existing_shift = LiquorShift.objects.filter(
-        business=business,
-        barman=user,
-        status=LiquorShiftStatus.OPEN
-    ).order_by("-started_at").first()
-    
+    existing_shift = (
+        LiquorShift.objects.filter(business=business, barman=user, status=LiquorShiftStatus.OPEN)
+        .order_by("-started_at")
+        .first()
+    )
+
     if existing_shift:
         return existing_shift
-    
+
     # No active shift - create one automatically
     if location is None:
         location = Location.default_for(business)
-    
+
     with transaction.atomic():
         shift = LiquorShift.objects.create(
             business=business,
             location=location,
             barman=user,
             created_by=user,
-            opening_notes="Auto-started shift (no manual count)"
+            opening_notes="Auto-started shift (no manual count)",
         )
-        
+
         # Create opening stock snapshots with zero counts for all active liquor products
-        products = MerchProduct.objects.filter(
-            business=business,
-            kind=BusinessKind.LIQUOR,
-            is_active=True
-        ).order_by("category", "name")
-        
+        products = MerchProduct.objects.filter(business=business, kind=BusinessKind.LIQUOR, is_active=True).order_by(
+            "category", "name"
+        )
+
         for product in products:
             LiquorShiftStock.objects.create(
                 shift=shift,
@@ -983,9 +1022,9 @@ def get_or_start_active_shift(user, business, location=None):
                 bottles_count=0,  # Default to 0 since we don't have actual counts
                 shots_count=0,
                 snapshot_type="opening",
-                recorded_by=user
+                recorded_by=user,
             )
-    
+
     return shift
 
 
@@ -996,31 +1035,35 @@ def active_shift_status(request):
     """API endpoint to check if user has an active shift"""
     shift = get_active_shift(request)
     if shift:
-        return JsonResponse({
-            "has_active_shift": True,
-            "shift_id": shift.id,
-            "started_at": shift.started_at.isoformat(),
-            "is_stale": shift.is_stale(),
-        })
+        return JsonResponse(
+            {
+                "has_active_shift": True,
+                "shift_id": shift.id,
+                "started_at": shift.started_at.isoformat(),
+                "is_stale": shift.is_stale(),
+            }
+        )
     return JsonResponse({"has_active_shift": False})
 
 
 class StartShiftForm(forms.Form):
     """Form for starting a new shift"""
+
     location = forms.ModelChoiceField(
-        queryset=None,
-        required=False,
-        widget=forms.Select(attrs={"class": "form-control"})
+        queryset=None, required=False, widget=forms.Select(attrs={"class": "form-control"})
     )
     opening_notes = forms.CharField(
         required=False,
-        widget=forms.Textarea(attrs={"class": "form-control", "rows": 2, "placeholder": "Any notes about the opening stock..."})
+        widget=forms.Textarea(
+            attrs={"class": "form-control", "rows": 2, "placeholder": "Any notes about the opening stock..."}
+        ),
     )
-    
+
     def __init__(self, business=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if business:
             from inventory.models import Location
+
             self.fields["location"].queryset = Location.objects.filter(business=business)
 
 
@@ -1031,78 +1074,82 @@ def start_shift(request):
     """Start a new shift with opening stock count"""
     from inventory.models_verticals import LiquorShift, LiquorShiftStock
     from inventory.models import Location
-    
+
     business = get_active_business(request)
-    
+
     # Check if user already has an active shift
     existing_shift = get_active_shift(request)
     if existing_shift:
-        messages.warning(request, f"You already have an active shift (started {existing_shift.started_at.strftime('%H:%M %d/%m/%Y')}). Close it before starting a new one.")
+        messages.warning(
+            request,
+            f"You already have an active shift (started {existing_shift.started_at.strftime('%H:%M %d/%m/%Y')}). Close it before starting a new one.",
+        )
         return redirect("liquor:close_shift", shift_id=existing_shift.id)
-    
+
     if request.method == "POST":
         form = StartShiftForm(business, request.POST)
         if form.is_valid():
             with transaction.atomic():
                 location = form.cleaned_data.get("location") or Location.default_for(business)
-                
+
                 # Create the shift
                 shift = LiquorShift.objects.create(
                     business=business,
                     location=location,
                     barman=request.user,
                     created_by=request.user,
-                    opening_notes=form.cleaned_data.get("opening_notes", "")
+                    opening_notes=form.cleaned_data.get("opening_notes", ""),
                 )
-                
+
                 # Get all active liquor products
                 products = MerchProduct.objects.filter(
-                    business=business,
-                    kind=BusinessKind.LIQUOR,
-                    is_active=True
+                    business=business, kind=BusinessKind.LIQUOR, is_active=True
                 ).order_by("category", "name")
-                
+
                 # Create opening stock snapshots for each product
                 for product in products:
                     # Get current stock counts from POST data
                     bottles_key = f"bottles_{product.id}"
                     shots_key = f"shots_{product.id}"
-                    
+
                     bottles_count = int(request.POST.get(bottles_key, 0))
                     shots_count = int(request.POST.get(shots_key, 0)) if product.has_shots else 0
-                    
+
                     LiquorShiftStock.objects.create(
                         shift=shift,
                         product=product,
                         bottles_count=bottles_count,
                         shots_count=shots_count,
                         snapshot_type="opening",
-                        recorded_by=request.user
+                        recorded_by=request.user,
                     )
-                
+
                 messages.success(request, f"Shift started successfully! Record all sales during your shift.")
                 return redirect("liquor:sell")
     else:
         form = StartShiftForm(business)
-    
+
     # Get all active liquor products grouped by category
-    products = MerchProduct.objects.filter(
-        business=business,
-        kind=BusinessKind.LIQUOR,
-        is_active=True
-    ).order_by("category", "name")
-    
+    products = MerchProduct.objects.filter(business=business, kind=BusinessKind.LIQUOR, is_active=True).order_by(
+        "category", "name"
+    )
+
     # Group products by category
     from itertools import groupby
+
     products_by_category = {}
     for category, items in groupby(products, key=lambda p: p.category or "other"):
         products_by_category[category] = list(items)
-    
-    return render(request, "inventory/liquor/start_shift.html", {
-        "form": form,
-        "business": business,
-        "products_by_category": products_by_category,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/start_shift.html",
+        {
+            "form": form,
+            "business": business,
+            "products_by_category": products_by_category,
+        },
+    )
 
 
 @login_required
@@ -1111,44 +1158,32 @@ def start_shift(request):
 def close_shift(request, shift_id):
     """Close a shift with closing stock count and variance calculation"""
     from inventory.models_verticals import LiquorShift, LiquorShiftStock, LiquorShiftStatus
-    
+
     business = get_active_business(request)
-    shift = get_object_or_404(
-        LiquorShift,
-        pk=shift_id,
-        business=business,
-        status=LiquorShiftStatus.OPEN
-    )
-    
+    shift = get_object_or_404(LiquorShift, pk=shift_id, business=business, status=LiquorShiftStatus.OPEN)
+
     # Only the barman or a manager can close the shift
     if not (shift.barman == request.user or _is_manager(request.user)):
         messages.error(request, "You can only close your own shifts.")
         return redirect("verticals:liquor_dashboard")
-    
+
     if request.method == "POST":
         with transaction.atomic():
             # Get opening stock
-            opening_stock = {
-                stock.product_id: stock 
-                for stock in shift.stock_snapshots.filter(snapshot_type="opening")
-            }
-            
+            opening_stock = {stock.product_id: stock for stock in shift.stock_snapshots.filter(snapshot_type="opening")}
+
             # Record closing stock
-            products = MerchProduct.objects.filter(
-                business=business,
-                kind=BusinessKind.LIQUOR,
-                is_active=True
-            )
-            
+            products = MerchProduct.objects.filter(business=business, kind=BusinessKind.LIQUOR, is_active=True)
+
             total_variance_value = Decimal("0.00")
-            
+
             for product in products:
                 bottles_key = f"bottles_{product.id}"
                 shots_key = f"shots_{product.id}"
-                
+
                 bottles_count = int(request.POST.get(bottles_key, 0))
                 shots_count = int(request.POST.get(shots_key, 0)) if product.has_shots else 0
-                
+
                 # Create closing stock snapshot
                 LiquorShiftStock.objects.create(
                     shift=shift,
@@ -1156,49 +1191,53 @@ def close_shift(request, shift_id):
                     bottles_count=bottles_count,
                     shots_count=shots_count,
                     snapshot_type="closing",
-                    recorded_by=request.user
+                    recorded_by=request.user,
                 )
-                
+
                 # Calculate variance
                 opening = opening_stock.get(product.id)
                 if opening:
                     # Expected: opening + purchases - sales
                     # For now, assume no purchases during shift (can enhance later)
-                    
+
                     # Calculate sold from shift sales
                     shift_sales = shift.sales.filter(product=product)
                     sold_bottles = shift_sales.filter(unit="bottle").aggregate(total=Sum("quantity"))["total"] or 0
                     sold_shots = shift_sales.filter(unit="shot").aggregate(total=Sum("quantity"))["total"] or 0
-                    
+
                     # Expected closing
                     expected_bottles = opening.bottles_count - sold_bottles
                     expected_shots = opening.shots_count - sold_shots
-                    
+
                     # Handle shot/bottle conversion if needed
                     if product.has_shots and expected_shots < 0:
                         # Convert bottles to shots
                         bottles_needed = abs(expected_shots) // product.sellable_shots_per_bottle + 1
                         expected_bottles -= bottles_needed
                         expected_shots += bottles_needed * product.sellable_shots_per_bottle
-                    
+
                     # Variance (negative = missing stock)
                     variance_bottles = bottles_count - expected_bottles
                     variance_shots = shots_count - expected_shots
-                    
+
                     # Calculate monetary value of variance
                     if product.cost_per_bottle and variance_bottles != 0:
                         total_variance_value += variance_bottles * product.cost_per_bottle
                     if product.cost_per_shot and variance_shots != 0:
                         total_variance_value += variance_shots * product.cost_per_shot
-            
+
             # Calculate shift totals
             shift_sales = shift.sales.all()
-            
+
             total_sales = shift_sales.aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
             total_cost = shift_sales.aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
-            total_credit = shift_sales.filter(is_credit=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
-            total_free = shift_sales.filter(is_free=True).aggregate(total=Sum("total_price"))["total"] or Decimal("0.00")
-            
+            total_credit = shift_sales.filter(is_credit=True).aggregate(total=Sum("total_price"))["total"] or Decimal(
+                "0.00"
+            )
+            total_free = shift_sales.filter(is_free=True).aggregate(total=Sum("total_price"))["total"] or Decimal(
+                "0.00"
+            )
+
             # Update shift
             shift.ended_at = timezone.now()
             shift.status = LiquorShiftStatus.CLOSED
@@ -1210,30 +1249,39 @@ def close_shift(request, shift_id):
             shift.missing_stock_value = abs(total_variance_value) if total_variance_value < 0 else Decimal("0.00")
             shift.closing_notes = request.POST.get("closing_notes", "")
             shift.save()
-            
-            messages.success(request, f"Shift closed successfully! Total sales: MK {total_sales:,.2f}, Profit: MK {shift.total_profit_amount:,.2f}")
+
+            messages.success(
+                request,
+                f"Shift closed successfully! Total sales: MK {total_sales:,.2f}, Profit: MK {shift.total_profit_amount:,.2f}",
+            )
             return redirect("liquor:shift_report", shift_id=shift.id)
-    
+
     # Get opening stock to display
     opening_stock = shift.stock_snapshots.filter(snapshot_type="opening").select_related("product")
-    
+
     # Group by category
     from itertools import groupby
+
     stock_by_category = {}
     for category, items in groupby(opening_stock, key=lambda s: s.product.category or "other"):
         stock_by_category[category] = list(items)
-    
-    return render(request, "inventory/liquor/close_shift.html", {
-        "shift": shift,
-        "business": business,
-        "stock_by_category": stock_by_category,
-    })
+
+    return render(
+        request,
+        "inventory/liquor/close_shift.html",
+        {
+            "shift": shift,
+            "business": business,
+            "stock_by_category": stock_by_category,
+        },
+    )
 
 
 def _is_manager(user):
     """Check if user is a manager"""
     try:
         from core.decorators import _is_manager as core_is_manager
+
         return core_is_manager(user)
     except ImportError:
         # Fallback
@@ -1247,85 +1295,94 @@ def shift_report(request, shift_id):
     """View detailed shift report with variance analysis"""
     from inventory.models_verticals import LiquorShift
     from django.db.models import Sum, F
-    
+
     business = get_active_business(request)
     shift = get_object_or_404(LiquorShift, pk=shift_id, business=business)
-    
+
     # Get opening and closing stock
     opening_stock = {
-        stock.product_id: stock 
+        stock.product_id: stock
         for stock in shift.stock_snapshots.filter(snapshot_type="opening").select_related("product")
     }
     closing_stock = {
-        stock.product_id: stock 
+        stock.product_id: stock
         for stock in shift.stock_snapshots.filter(snapshot_type="closing").select_related("product")
     }
-    
+
     # Calculate variance for each product
     variance_data = []
     for product_id, opening in opening_stock.items():
         closing = closing_stock.get(product_id)
         if not closing:
             continue
-        
+
         product = opening.product
-        
+
         # Calculate sales
         sales = shift.sales.filter(product=product)
         sold_bottles = sales.filter(unit="bottle").aggregate(total=Sum("quantity"))["total"] or 0
         sold_shots = sales.filter(unit="shot").aggregate(total=Sum("quantity"))["total"] or 0
-        
+
         # Expected closing
         expected_bottles = opening.bottles_count - sold_bottles
         expected_shots = opening.shots_count - sold_shots
-        
+
         # Variance
         variance_bottles = closing.bottles_count - expected_bottles
         variance_shots = closing.shots_count - expected_shots if product.has_shots else 0
-        
+
         # Monetary value
         variance_value = Decimal("0.00")
         if variance_bottles != 0 and product.cost_per_bottle:
             variance_value += variance_bottles * product.cost_per_bottle
         if variance_shots != 0 and product.cost_per_shot:
             variance_value += variance_shots * product.cost_per_shot
-        
+
         if variance_bottles != 0 or variance_shots != 0:
-            variance_data.append({
-                "product": product,
-                "opening_bottles": opening.bottles_count,
-                "opening_shots": opening.shots_count,
-                "sold_bottles": sold_bottles,
-                "sold_shots": sold_shots,
-                "expected_bottles": expected_bottles,
-                "expected_shots": expected_shots,
-                "closing_bottles": closing.bottles_count,
-                "closing_shots": closing.shots_count,
-                "variance_bottles": variance_bottles,
-                "variance_shots": variance_shots,
-                "variance_value": variance_value,
-            })
-    
+            variance_data.append(
+                {
+                    "product": product,
+                    "opening_bottles": opening.bottles_count,
+                    "opening_shots": opening.shots_count,
+                    "sold_bottles": sold_bottles,
+                    "sold_shots": sold_shots,
+                    "expected_bottles": expected_bottles,
+                    "expected_shots": expected_shots,
+                    "closing_bottles": closing.bottles_count,
+                    "closing_shots": closing.shots_count,
+                    "variance_bottles": variance_bottles,
+                    "variance_shots": variance_shots,
+                    "variance_value": variance_value,
+                }
+            )
+
     # Top products by profit
-    top_products = shift.sales.values(
-        "product__name"
-    ).annotate(
-        total_profit=Sum(F("total_price") - F("total_cost")),
-        total_sales=Sum("total_price"),
-        quantity_sold=Sum("quantity")
-    ).order_by("-total_profit")[:5]
-    
-    return render(request, "inventory/liquor/shift_report.html", {
-        "shift": shift,
-        "business": business,
-        "variance_data": variance_data,
-        "top_products": top_products,
-    })
+    top_products = (
+        shift.sales.values("product__name")
+        .annotate(
+            total_profit=Sum(F("total_price") - F("total_cost")),
+            total_sales=Sum("total_price"),
+            quantity_sold=Sum("quantity"),
+        )
+        .order_by("-total_profit")[:5]
+    )
+
+    return render(
+        request,
+        "inventory/liquor/shift_report.html",
+        {
+            "shift": shift,
+            "business": business,
+            "variance_data": variance_data,
+            "top_products": top_products,
+        },
+    )
 
 
 # ==============================================================================
 # STOCK OVERVIEW
 # ==============================================================================
+
 
 @login_required
 @require_business
@@ -1335,11 +1392,11 @@ def stock_overview(request):
     Stock overview with category batteries using configurable per-product and business-level targets.
     """
     from inventory.liquor_utils import get_stock_overview_data, recalculate_liquor_targets_for_business
-    
+
     business = get_active_business(request)
     location = getattr(request, "active_location", None)
     is_manager = _is_manager(request.user)
-    
+
     # Handle auto-adjust trigger (managers only)
     if request.method == "POST" and is_manager and "trigger_auto_adjust" in request.POST:
         try:
@@ -1352,10 +1409,10 @@ def stock_overview(request):
             return redirect("liquor:stock_overview")
         except Exception as e:
             messages.error(request, f"Error during auto-adjust: {str(e)}")
-    
+
     # Get stock overview data using the new utility function
     data = get_stock_overview_data(business, location)
-    
+
     ctx = {
         "business": business,
         "location": location,

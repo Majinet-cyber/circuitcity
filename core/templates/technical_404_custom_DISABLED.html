@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Page not found (404)</title>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 2rem; max-width: 900px; margin: 0 auto; line-height: 1.6; }
+        h1 { color: #d32f2f; margin-top: 0; }
+        code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; }
+        pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto; }
+        .info { background: #e3f2fd; padding: 1rem; border-radius: 4px; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <h1>Page not found (404)</h1>
+    <p>The requested page could not be found.</p>
+
+    <div class="info">
+        <p><strong>Requested URL:</strong> <code>{{ request_path|default:request.get_full_path }}</code></p>
+    </div>
+
+    {% if tried %}
+    <h2>URL patterns tried:</h2>
+    <pre>{{ tried|pprint }}</pre>
+    {% endif %}
+
+    <p>
+        <a href="/">Go to homepage</a> |
+        <a href="{% url 'admin:index' %}">Go to admin</a>
+    </p>
+</body>
+</html>

@@ -33,16 +33,10 @@ def _apply_unsold_filters(qs):
     """
     Conservative 'unsold' filters using only fields that exist on InventoryItem.
     """
-    return (
-        qs.filter(is_active=True)
-        .filter(sold_at__isnull=True)
-        .exclude(status__iexact="SOLD")
-    )
+    return qs.filter(is_active=True).filter(sold_at__isnull=True).exclude(status__iexact="SOLD")
 
 
-def _find_item_for_sale(
-    *, business, code: str
-) -> Optional[InventoryItem]:
+def _find_item_for_sale(*, business, code: str) -> Optional[InventoryItem]:
     """
     Locate a single in-stock item in the same business using 'code' as an IMEI.
     Rules:
@@ -55,8 +49,7 @@ def _find_item_for_sale(
     d15 = digits[-15:] if len(digits) >= 15 else digits
 
     base = _apply_unsold_filters(
-        InventoryItem.objects.select_related("product", "current_location")
-        .filter(business=business)
+        InventoryItem.objects.select_related("product", "current_location").filter(business=business)
     )
 
     hit: Optional[InventoryItem] = None
@@ -79,6 +72,7 @@ def _find_item_for_sale(
 # --------------------------------------------------------------------------------------
 # Public API
 # --------------------------------------------------------------------------------------
+
 
 @transaction.atomic
 def mark_item_sold(
@@ -128,11 +122,7 @@ def mark_item_sold(
         raise ValidationError("No matching in-stock item was found for this code/IMEI.")
 
     # Lock the row to prevent race conditions during sale
-    item = (
-        InventoryItem.objects.select_for_update()
-        .select_related("product", "current_location")
-        .get(pk=item.pk)
-    )
+    item = InventoryItem.objects.select_for_update().select_related("product", "current_location").get(pk=item.pk)
 
     # Idempotency / state checks
     if item.sold_at is not None or str(item.status).upper() == "SOLD":
@@ -161,12 +151,8 @@ def mark_item_sold(
     item.save(update_fields=["status", "sold_at", "sale"])
 
     # Fresh aggregates for UI
-    qs_instock = _apply_unsold_filters(
-        InventoryItem.objects.filter(business=business)
-    )
-    qs_sold = InventoryItem.objects.filter(
-        business=business, status__iexact="SOLD"
-    )
+    qs_instock = _apply_unsold_filters(InventoryItem.objects.filter(business=business))
+    qs_sold = InventoryItem.objects.filter(business=business, status__iexact="SOLD")
 
     sum_order = qs_instock.aggregate(total=Sum("order_price"))["total"] or Decimal(0)
     sum_selling = qs_instock.aggregate(total=Sum("selling_price"))["total"] or Decimal(0)

@@ -20,33 +20,30 @@ from tenants.models import Business, TenantManager
 class BarcodeRegistry(models.Model):
     """
     Maps barcodes to products in a multi-tenant system.
-    
+
     Each barcode is unique per business. Multiple barcodes can map to the same product.
     Both raw (as-scanned) and normalized (cleaned) versions are stored for matching.
     """
+
     business = models.ForeignKey(
         Business,
         on_delete=models.CASCADE,
         related_name="barcode_registry",
         db_index=True,
-        help_text="Business this barcode belongs to"
+        help_text="Business this barcode belongs to",
     )
-    
+
     # Raw barcode (exactly as scanned)
-    raw_code = models.CharField(
-        max_length=100,
-        db_index=True,
-        help_text="Original barcode exactly as scanned"
-    )
-    
+    raw_code = models.CharField(max_length=100, db_index=True, help_text="Original barcode exactly as scanned")
+
     # Normalized barcode (cleaned for matching)
     normalized_code = models.CharField(
         max_length=100,
         db_index=True,
         validators=[MinLengthValidator(3)],
-        help_text="Normalized barcode: uppercase, no spaces/hyphens, alphanumeric only"
+        help_text="Normalized barcode: uppercase, no spaces/hyphens, alphanumeric only",
     )
-    
+
     # Product reference (MerchProduct for clothing/pharmacy)
     product = models.ForeignKey(
         "inventory.MerchProduct",
@@ -54,9 +51,9 @@ class BarcodeRegistry(models.Model):
         related_name="barcodes",
         null=True,
         blank=True,
-        help_text="Product this barcode maps to"
+        help_text="Product this barcode maps to",
     )
-    
+
     # Optional: Pharmacy batch reference (for batch-level barcodes)
     batch = models.ForeignKey(
         "inventory.PharmacyBatch",
@@ -64,29 +61,23 @@ class BarcodeRegistry(models.Model):
         related_name="barcodes",
         null=True,
         blank=True,
-        help_text="Pharmacy batch this barcode maps to (if batch-level tracking)"
+        help_text="Pharmacy batch this barcode maps to (if batch-level tracking)",
     )
-    
+
     # Metadata
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(
-        "auth.User",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="created_barcodes"
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="created_barcodes"
     )
-    
+
     is_active = models.BooleanField(
-        default=True,
-        db_index=True,
-        help_text="Set to False to disable barcode without deleting"
+        default=True, db_index=True, help_text="Set to False to disable barcode without deleting"
     )
-    
+
     # Manager
     objects = TenantManager()
-    
+
     class Meta:
         verbose_name = "Barcode Registry Entry"
         verbose_name_plural = "Barcode Registry"
@@ -106,22 +97,22 @@ class BarcodeRegistry(models.Model):
             models.UniqueConstraint(
                 fields=["business", "normalized_code"],
                 condition=models.Q(is_active=True),
-                name="unique_barcode_per_business"
+                name="unique_barcode_per_business",
             )
         ]
-    
+
     def __str__(self):
         target = self.batch or self.product
-        target_name = getattr(target, 'name', 'Unknown') if target else 'Unlinked'
+        target_name = getattr(target, "name", "Unknown") if target else "Unlinked"
         return f"{self.raw_code} → {target_name}"
-    
+
     def save(self, *args, **kwargs):
         """Auto-normalize on save"""
         from inventory.utils_barcodes import normalize_barcode_enhanced
+
         self.normalized_code = normalize_barcode_enhanced(self.raw_code)
         super().save(*args, **kwargs)
 
 
 # Re-export for convenient imports
 __all__ = ["BarcodeRegistry"]
-

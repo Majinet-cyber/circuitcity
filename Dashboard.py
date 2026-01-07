@@ -8,26 +8,22 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- Google Sheets setup ---
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive"
-]
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-creds = ServiceAccountCredentials.from_json_keyfile_name(
-    "circuit-city-dashboard-7de3805a57c1.json",
-    scope
-)
+creds = ServiceAccountCredentials.from_json_keyfile_name("circuit-city-dashboard-7de3805a57c1.json", scope)
 
 client = gspread.authorize(creds)
 spreadsheet = client.open("circuit city cashflow")
 sheet = spreadsheet.worksheet("Cash Reserve")
 
+
 # âœ… Safe int helper to skip non-numeric cells
 def safe_int(cell):
     try:
-        return int(cell.replace(',', '').strip())
+        return int(cell.replace(",", "").strip())
     except (ValueError, AttributeError):
         return None
+
 
 dates = sheet.col_values(1)[1:]  # Skip header
 
@@ -69,24 +65,34 @@ def generate_dashboard(df):
         df["Profit"] = df["Sales"] * 0.2
         profit_over_time = df.groupby("Date")["Profit"].sum().reset_index()
         fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(x=profit_over_time["Date"], y=profit_over_time["Profit"],
-                                  mode="lines+markers", name="Profit Growth"))
+        fig2.add_trace(
+            go.Scatter(
+                x=profit_over_time["Date"], y=profit_over_time["Profit"], mode="lines+markers", name="Profit Growth"
+            )
+        )
         fig2.update_layout(title="Profit Growth Over Time", xaxis_title="Date", yaxis_title="Profit")
 
         # âœ… Live Cash Reserve chart from Google Sheets with safe data
-        cashflow_df = pd.DataFrame({
-            "Date": dates[:len(savings)],  # Match lengths in case they differ
-            "Savings": savings,
-            "Total Savings": totals[:len(savings)]
-        })
-        fig3 = px.bar(cashflow_df, x="Date", y=["Savings", "Total Savings"],
-                      barmode="group", title="Live Cash Reserve from Google Sheets")
+        cashflow_df = pd.DataFrame(
+            {
+                "Date": dates[: len(savings)],  # Match lengths in case they differ
+                "Savings": savings,
+                "Total Savings": totals[: len(savings)],
+            }
+        )
+        fig3 = px.bar(
+            cashflow_df,
+            x="Date",
+            y=["Savings", "Total Savings"],
+            barmode="group",
+            title="Live Cash Reserve from Google Sheets",
+        )
 
         output_path = "sales_dashboard.html"
         with open(output_path, "w") as f:
-            f.write(fig1.to_html(full_html=False, include_plotlyjs='cdn'))
-            f.write(fig2.to_html(full_html=False, include_plotlyjs='cdn'))
-            f.write(fig3.to_html(full_html=False, include_plotlyjs='cdn'))
+            f.write(fig1.to_html(full_html=False, include_plotlyjs="cdn"))
+            f.write(fig2.to_html(full_html=False, include_plotlyjs="cdn"))
+            f.write(fig3.to_html(full_html=False, include_plotlyjs="cdn"))
 
         messagebox.showinfo("Success", f"Dashboard saved as {output_path}")
     except Exception as e:
@@ -108,5 +114,3 @@ tk.Button(tk_root, text="Select Sales Data File", command=load_sales_data).pack(
 tk.Button(tk_root, text="Select Output Directory", command=select_output_directory).pack(pady=10)
 
 tk_root.mainloop()
-
-

@@ -143,6 +143,7 @@ def which_templates(request: HttpRequest) -> HttpResponse:
     """
     Show where each reports template is being resolved from.
     """
+
     def origin_for(cands: Iterable[str]) -> Dict[str, Any]:
         chosen, origin, errs = _resolve_first(cands)
         return {
@@ -158,5 +159,3 @@ def which_templates(request: HttpRequest) -> HttpResponse:
         "inventory": origin_for(("ccreports/inventory.html", "reports/inventory.html")),
     }
     return JsonResponse(data, json_dumps_params={"indent": 2})
-
-

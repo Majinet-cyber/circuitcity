@@ -37,10 +37,11 @@ def _normalize_path(path: str) -> str:
     """Normalize path by removing duplicate slashes."""
     # Replace multiple slashes with single slash
     import re
-    normalized = re.sub(r'/+', '/', path)
+
+    normalized = re.sub(r"/+", "/", path)
     # Ensure it starts with /
-    if not normalized.startswith('/'):
-        normalized = '/' + normalized
+    if not normalized.startswith("/"):
+        normalized = "/" + normalized
     return normalized
 
 
@@ -87,6 +88,7 @@ class RequestIDMiddleware(MiddlewareMixin):
     • Exposes request.request_id for views/templates.
     • Echoes back X-Request-ID on the response headers.
     """
+
     IN_HEADER = "HTTP_X_REQUEST_ID"
     OUT_HEADER = "X-Request-ID"
 
@@ -119,13 +121,10 @@ class AccessLogMiddleware(MiddlewareMixin):
 
     def process_response(self, request: HttpRequest, response: HttpResponse):
         try:
-            latency_ms = int(
-                (time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000
-            )
+            latency_ms = int((time.perf_counter() - getattr(request, "_start_ts", time.perf_counter())) * 1000)
             user = getattr(request, "user", None)
             user_id = _safe_user_id(user)
-            
-            
+
             access_logger.info(
                 "http_request",
                 extra={
@@ -170,14 +169,26 @@ _is_hq_admin = _get_is_hq_admin()
 
 # Always allowed for HQ shell / admin / static
 _HQ_ALLOW_PREFIXES = (
-    "/hq", "/admin", "/accounts", "/static", "/media",
-    "/favicon.ico", "/robots.txt", "/healthz", "/healthz/",
+    "/hq",
+    "/admin",
+    "/accounts",
+    "/static",
+    "/media",
+    "/favicon.ico",
+    "/robots.txt",
+    "/healthz",
+    "/healthz/",
     "/api/global-search/",
 )
 
 # Client/tenant entry points we block for HQ admins
 _BLOCK_PREFIXES = (
-    "/tenants", "/inventory", "/dashboard", "/sell", "/scan", "/stock",
+    "/tenants",
+    "/inventory",
+    "/dashboard",
+    "/sell",
+    "/scan",
+    "/stock",
 )
 
 
@@ -186,7 +197,7 @@ class PreventHQFromClientUI(MiddlewareMixin):
     If user is an HQ admin, redirect any request to tenant/store UI
     back to the HQ shell. We redirect directly to **hq:subscriptions**
     (not hq:home) to avoid alias loops.
-    
+
     CRITICAL LOOP GUARDS:
     - Never redirect when already on /hq/ paths
     - Never redirect if target equals current path
@@ -194,7 +205,7 @@ class PreventHQFromClientUI(MiddlewareMixin):
 
     def __call__(self, request):
         # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
-        path = (request.path_info or request.path or "/")
+        path = request.path_info or request.path or "/"
         if path.startswith("/hq/"):
             return self.get_response(request)
         return super().__call__(request)
@@ -204,7 +215,7 @@ class PreventHQFromClientUI(MiddlewareMixin):
         path = (request.path_info or request.path or "/").split("?")[0]
         if path.startswith("/hq/"):
             return None
-        
+
         user = getattr(request, "user", None)
         # ⚠️ Never boolean-cast the lazy user; use the safe helper.
         if not _safe_is_authenticated(user):
@@ -232,11 +243,11 @@ class PreventHQFromClientUI(MiddlewareMixin):
                 target = target.split("?")[0] if target else "/"
                 target_normalized = target.rstrip("/")
                 path_normalized = path.rstrip("/")
-                
+
                 # Anti-loop guard: Never redirect if target equals current path
                 if target.rstrip("/") == path.rstrip("/"):
                     return None
-                
+
                 return redirect(target)
 
         return None
@@ -331,10 +342,12 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
     def _import_membership_model(self):
         try:
             from tenants.models import BusinessMembership  # type: ignore
+
             return BusinessMembership
         except Exception:
             try:
                 from circuitcity.tenants.models import BusinessMembership  # type: ignore
+
                 return BusinessMembership
             except Exception:
                 return None
@@ -342,10 +355,12 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
     def _import_location_model(self):
         try:
             from tenants.models import Location  # type: ignore
+
             return Location
         except Exception:
             try:
                 from circuitcity.tenants.models import Location  # type: ignore
+
                 return Location
             except Exception:
                 return None
@@ -430,17 +445,17 @@ class NormalizeURLMiddleware(MiddlewareMixin):
         """Normalize URL path by removing duplicate slashes."""
         original_path = request.path
         normalized_path = _normalize_path(original_path)
-        
+
         # If path changed, redirect to normalized version
         if original_path != normalized_path:
             # Preserve query string
-            query_string = request.META.get('QUERY_STRING', '')
+            query_string = request.META.get("QUERY_STRING", "")
             if query_string:
                 normalized_url = f"{normalized_path}?{query_string}"
             else:
                 normalized_url = normalized_path
-            
+
             # 301 permanent redirect
             return redirect(normalized_url, permanent=True)
-        
+
         return None

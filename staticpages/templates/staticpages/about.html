@@ -4,10 +4,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>About Emajinet</title>
+  <title>About Us - Emajinet | Business Management for African Merchants</title>
+  <meta name="description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants. We help businesses digitize operations, manage inventory, and grow sustainably.">
+  
+  <!-- Open Graph / Social Media -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="About Us - Emajinet | Business Management for African Merchants">
+  <meta property="og:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
+  <meta property="og:site_name" content="Emajinet">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="About Us - Emajinet">
+  <meta name="twitter:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
   
   <!-- SEO: Canonical URL -->
-  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
+  <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
   
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <style>
@@ -191,25 +203,45 @@
     <section class="about-hero">
       <h1>About Emajinet</h1>
       <p>
-        We are pioneers determined to simplify business for everyday merchants.
+        Emajinet is a business management platform built specifically for African merchants. 
+        We help small and medium businesses digitize their operations, replacing manual ledgers 
+        with a modern, mobile-first system that works even when internet is unreliable.
       </p>
+      
+      <div style="margin: 2rem 0; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border-left: 4px solid var(--primary);">
+        <p style="font-weight: 600; color: var(--text-primary); margin-bottom: 1rem;">What Emajinet helps merchants do:</p>
+        <ul style="list-style: none; padding: 0; margin: 0;">
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Manage inventory and track stock levels in real-time</li>
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Process sales, generate reports, and analyze performance</li>
+          <li style="padding: 0.5rem 0; color: var(--text-secondary);">✓ Coordinate team members and agents across locations</li>
+        </ul>
+      </div>
+      
       <p>
-        We are motivated by the common men and women who give their all to survive,
-        support their families, and build society through business.
+        Built in Malawi for African realities, Emajinet is designed to work offline, load fast on 
+        mobile devices, and require minimal training. We understand the challenges of running a 
+        business in Africa—unreliable internet, limited budgets, and the need for simplicity. 
+        That's why we built a platform that adapts to your environment, not the other way around.
       </p>
-      <p>
-        May they never lose.
+      
+      <p style="font-style: italic; color: var(--primary); margin-top: 2rem;">
+        We are pioneers determined to simplify business for everyday merchants. We are motivated 
+        by the common men and women who give their all to survive, support their families, and 
+        build society through business. May they never lose.
       </p>
     </section>
   </div>
 
   <!-- Footer -->
   <footer class="footer">
-    <p class="footer-text">&copy; {{ CURRENT_YEAR }} Emajinet. All rights reserved.</p>
+    <p class="footer-text">&copy; {% now "Y" %} Emajinet. All rights reserved.</p>
     <div style="margin-top: 1rem; display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{% url 'staticpages:pricing' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Pricing</a>
       <a href="{% url 'staticpages:about' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">About</a>
-      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy Policy</a>
-      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms of Service</a>
+      <a href="{% url 'staticpages:contact' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Contact</a>
+      <a href="{% url 'staticpages:terms' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Terms</a>
+      <a href="{% url 'staticpages:privacy' %}" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Privacy</a>
+      <a href="{% url 'staticpages:terms' %}#refund-policy" style="color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.9rem;">Refund Policy</a>
     </div>
   </footer>
 </body>

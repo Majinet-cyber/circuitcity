@@ -13,11 +13,13 @@ log = logging.getLogger(__name__)
 
 IMEI_RE = re.compile(r"\d+")
 
+
 def normalize_code(raw: str) -> str:
     """Keep digits only; many scanners add spaces/dashes."""
     if not raw:
         return ""
     return "".join(IMEI_RE.findall(str(raw))).strip()
+
 
 @dataclass(frozen=True)
 class ScanResult:
@@ -29,17 +31,32 @@ class ScanResult:
     status: Optional[str] = None
     location_id: Optional[int] = None
 
-def _not_found(imei:str) -> ScanResult:
+
+def _not_found(imei: str) -> ScanResult:
     return ScanResult(False, "NOT_FOUND", "No item with this IMEI for this business.", None, imei, None, None)
 
-def _not_in_stock(it:InventoryItem) -> ScanResult:
-    return ScanResult(False, "NOT_IN_STOCK", "Item exists but is not in stock.", it.id, it.imei, it.status, getattr(it, "location_id", None))
 
-def _already_sold(it:InventoryItem) -> ScanResult:
-    return ScanResult(False, "ALREADY_SOLD", "Item already sold.", it.id, it.imei, it.status, getattr(it, "location_id", None))
+def _not_in_stock(it: InventoryItem) -> ScanResult:
+    return ScanResult(
+        False,
+        "NOT_IN_STOCK",
+        "Item exists but is not in stock.",
+        it.id,
+        it.imei,
+        it.status,
+        getattr(it, "location_id", None),
+    )
 
-def _sold_ok(it:InventoryItem) -> ScanResult:
+
+def _already_sold(it: InventoryItem) -> ScanResult:
+    return ScanResult(
+        False, "ALREADY_SOLD", "Item already sold.", it.id, it.imei, it.status, getattr(it, "location_id", None)
+    )
+
+
+def _sold_ok(it: InventoryItem) -> ScanResult:
     return ScanResult(True, "OK", "Item moved to SOLD.", it.id, it.imei, it.status, getattr(it, "location_id", None))
+
 
 def status_constants():
     """Centralize status strings/enums once."""
@@ -49,20 +66,25 @@ def status_constants():
     # fallback strings if you use CharField without Django Enum
     return "in_stock", "sold"
 
+
 def get_active_business(request):
     return getattr(request, "business", None) or getattr(request, "active_business", None)
 
+
 def get_active_location_id(request):
-    for k in ("active_location_id","location_id","store_id","current_location_id"):
+    for k in ("active_location_id", "location_id", "store_id", "current_location_id"):
         v = getattr(request, k, None)
-        if v is not None: return v
+        if v is not None:
+            return v
     sess = getattr(request, "session", {}) or {}
-    for k in ("active_location_id","location_id","store_id","current_location_id"):
+    for k in ("active_location_id", "location_id", "store_id", "current_location_id"):
         v = sess.get(k)
-        if v is not None: return v
+        if v is not None:
+            return v
     return None
 
-def find_item(business, imei: str, location_id: int|None = None) -> Optional[InventoryItem]:
+
+def find_item(business, imei: str, location_id: int | None = None) -> Optional[InventoryItem]:
     qs = InventoryItem.objects.filter(business=business, imei=imei)
     if location_id:
         # Prefer exact location if available, but donâ€™t hide the item if location id mismatched.
@@ -70,17 +92,14 @@ def find_item(business, imei: str, location_id: int|None = None) -> Optional[Inv
         return obj or qs.first()
     return qs.first()
 
+
 @transaction.atomic
-def mark_imei_sold(*, business, imei_raw: str, user, location_id: int|None=None) -> ScanResult:
+def mark_imei_sold(*, business, imei_raw: str, user, location_id: int | None = None) -> ScanResult:
     imei = normalize_code(imei_raw)
     if not imei:
         return ScanResult(False, "BAD_INPUT", "IMEI/Barcode missing or invalid.")
 
-    item = (
-        InventoryItem.objects.select_for_update()
-        .filter(business=business, imei=imei)
-        .first()
-    )
+    item = InventoryItem.objects.select_for_update().filter(business=business, imei=imei).first()
     if not item:
         return _not_found(imei)
 
@@ -101,7 +120,7 @@ def mark_imei_sold(*, business, imei_raw: str, user, location_id: int|None=None)
         item.location_id = location_id
 
     update_fields = ["status"]
-    for f in ("sold_at","sold_by","location"):
+    for f in ("sold_at", "sold_by", "location"):
         if hasattr(item, f):
             update_fields.append(f)
     item.save(update_fields=update_fields)
@@ -109,7 +128,8 @@ def mark_imei_sold(*, business, imei_raw: str, user, location_id: int|None=None)
     log.info("scan_sold: SOLD item_id=%s imei=%s by=%s", item.id, imei, getattr(user, "id", None))
     return _sold_ok(item)
 
-def probe_status(*, business, imei_raw: str, location_id: int|None=None) -> dict:
+
+def probe_status(*, business, imei_raw: str, location_id: int | None = None) -> dict:
     """Used by /api/stock-status/ â€” canonical, no UI logic here."""
     imei = normalize_code(imei_raw)
     if not imei:
@@ -129,5 +149,3 @@ def probe_status(*, business, imei_raw: str, location_id: int|None=None) -> dict
         "imei": it.imei,
         "location_id": getattr(it, "location_id", None),
     }
-
-

@@ -397,7 +397,6 @@ CATEGORY_SUGGESTIONS = {
         {"name": "Imperial Leather Soap", "icon": "👑"},
         {"name": "Vaseline Petroleum Jelly", "icon": "✨"},
     ],
-    
     # Medicine Categories
     "analgesic": [
         {"name": "Paracetamol 500mg", "icon": "💊"},
@@ -463,7 +462,6 @@ def get_all_categories_with_icons() -> dict:
         "baby_care": {"label": "Baby Care", "icon": "👶", "color": "#f97316"},
         "oral_care": {"label": "Oral Care", "icon": "🦷", "color": "#06b6d4"},
         "personal_care": {"label": "Personal Care", "icon": "🧴", "color": "#14b8a6"},
-        
         # Medicine (Top categories)
         "analgesic": {"label": "Pain Relief", "icon": "💊", "color": "#ef4444"},
         "antibiotic": {"label": "Antibiotic", "icon": "🛡️", "color": "#3b82f6"},
@@ -478,6 +476,7 @@ def get_all_categories_with_icons() -> dict:
 # ==============================================================================
 # GAMIFIED WIZARD HELPER FUNCTIONS
 # ==============================================================================
+
 
 def get_top_categories():
     """Get all top-level categories for the wizard."""
@@ -498,11 +497,11 @@ def get_items_for_subcategory(category_key: str, subcategory_key: str):
     # Medicine items
     if category_key == "medicines" and subcategory_key in MEDICINE_ITEMS:
         return MEDICINE_ITEMS[subcategory_key]
-    
+
     # Cosmetics items (brands)
     if category_key == "cosmetics" and subcategory_key in COSMETICS_BRAND_ITEMS:
         return COSMETICS_BRAND_ITEMS[subcategory_key]
-    
+
     return []
 
 
@@ -546,51 +545,58 @@ def get_all_brands() -> list[str]:
 def calculate_pharmacy_badges(pharmacy_data: dict) -> list[dict]:
     """
     Calculate gamification badges for pharmacy dashboard.
-    
+
     Args:
         pharmacy_data: Dictionary with keys like:
             - near_expiry_count: int
             - cosmetics_revenue_pct: float (0-100)
             - batches_count: int
             - etc.
-    
+
     Returns:
         List of badge dictionaries with keys: name, icon, description, earned
     """
     badges = []
-    
+
     # Fresh Stock Hero - No near-expiry batches
-    badges.append({
-        "name": "Fresh Stock Hero",
-        "icon": "✨",
-        "description": "All medicine batches have more than 30 days to expiry",
-        "earned": pharmacy_data.get("near_expiry_count", 999) == 0,
-    })
-    
+    badges.append(
+        {
+            "name": "Fresh Stock Hero",
+            "icon": "✨",
+            "description": "All medicine batches have more than 30 days to expiry",
+            "earned": pharmacy_data.get("near_expiry_count", 999) == 0,
+        }
+    )
+
     # Cosmetics Champion - Cosmetics revenue >= 25%
     cosmetics_pct = pharmacy_data.get("cosmetics_revenue_pct", 0)
-    badges.append({
-        "name": "Cosmetics Champion",
-        "icon": "💄",
-        "description": "Cosmetics revenue is 25% or more of total pharmacy revenue",
-        "earned": cosmetics_pct >= 25,
-    })
-    
-    # Batch Guardian - All batches have 30+ days to expiry
-    badges.append({
-        "name": "Batch Guardian",
-        "icon": "🛡️",
-        "description": "Managing batches perfectly with no near-expiry items",
-        "earned": pharmacy_data.get("all_batches_fresh", False),
-    })
-    
-    # Stock Master - Has at least 20 active batches
-    badges.append({
-        "name": "Stock Master",
-        "icon": "📦",
-        "description": "Maintaining healthy inventory with 20+ active batches",
-        "earned": pharmacy_data.get("batches_count", 0) >= 20,
-    })
-    
-    return badges
+    badges.append(
+        {
+            "name": "Cosmetics Champion",
+            "icon": "💄",
+            "description": "Cosmetics revenue is 25% or more of total pharmacy revenue",
+            "earned": cosmetics_pct >= 25,
+        }
+    )
 
+    # Batch Guardian - All batches have 30+ days to expiry
+    badges.append(
+        {
+            "name": "Batch Guardian",
+            "icon": "🛡️",
+            "description": "Managing batches perfectly with no near-expiry items",
+            "earned": pharmacy_data.get("all_batches_fresh", False),
+        }
+    )
+
+    # Stock Master - Has at least 20 active batches
+    badges.append(
+        {
+            "name": "Stock Master",
+            "icon": "📦",
+            "description": "Maintaining healthy inventory with 20+ active batches",
+            "earned": pharmacy_data.get("batches_count", 0) >= 20,
+        }
+    )
+
+    return badges

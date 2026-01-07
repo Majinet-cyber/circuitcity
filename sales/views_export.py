@@ -50,10 +50,10 @@ def export_sales_csv(request):
             qs = qs.filter(item__product_id=int(prod))
         else:
             qs = qs.filter(
-                Q(item__product__name__icontains=prod) |
-                Q(item__product__brand__icontains=prod) |
-                Q(item__product__model__icontains=prod) |
-                Q(item__product__variant__icontains=prod)
+                Q(item__product__name__icontains=prod)
+                | Q(item__product__brand__icontains=prod)
+                | Q(item__product__model__icontains=prod)
+                | Q(item__product__variant__icontains=prod)
             )
 
     # Agent filter (id or username)
@@ -68,13 +68,13 @@ def export_sales_csv(request):
     q = request.GET.get("q")
     if q:
         qs = qs.filter(
-            Q(item__imei__icontains=q) |
-            Q(item__product__name__icontains=q) |
-            Q(item__product__brand__icontains=q) |
-            Q(item__product__model__icontains=q) |
-            Q(item__product__variant__icontains=q) |
-            Q(agent__username__icontains=q) |
-            Q(location__name__icontains=q)
+            Q(item__imei__icontains=q)
+            | Q(item__product__name__icontains=q)
+            | Q(item__product__brand__icontains=q)
+            | Q(item__product__model__icontains=q)
+            | Q(item__product__variant__icontains=q)
+            | Q(agent__username__icontains=q)
+            | Q(location__name__icontains=q)
         )
 
     # Sensible ordering
@@ -97,13 +97,18 @@ def export_sales_csv(request):
         if not prod:
             return ""
         # Prefer `name` if present; otherwise compose from brand/model/variant
-        name = getattr(prod, "name", "") or " ".join(
-            part for part in [
-                getattr(prod, "brand", ""),
-                getattr(prod, "model", ""),
-                getattr(prod, "variant", ""),
-            ] if part
-        ).strip()
+        name = (
+            getattr(prod, "name", "")
+            or " ".join(
+                part
+                for part in [
+                    getattr(prod, "brand", ""),
+                    getattr(prod, "model", ""),
+                    getattr(prod, "variant", ""),
+                ]
+                if part
+            ).strip()
+        )
         return name
 
     def rows():
@@ -137,5 +142,3 @@ def export_sales_csv(request):
 
     fname = f"sales_{timezone.now():%Y%m%d_%H%M}.csv"
     return stream_csv(rows(), fname)
-
-

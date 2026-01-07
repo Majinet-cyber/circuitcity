@@ -1,401 +1,324 @@
-# Gym Vertical Implementation Summary
+# 💪 GYM VERTICAL UPGRADE — IMPLEMENTATION SUMMARY
 
-## Overview
-Successfully fixed the 500 error at `/gym/members/` and implemented all requested gym membership features for the Circuit City / Emajinet multi-tenant Django SaaS platform.
-
-## Completed Goals
-
-### ✅ GOAL 0 – Fix 500 Error at /gym/members/
-
-**Issue Identified:**
-- Migration `0043_gym_membership_enhancements` had not been applied to the database
-- Migration numbering conflict (two migrations numbered `0043`)
-- Migration referenced incorrect user model (`tenants.user` instead of `settings.AUTH_USER_MODEL`)
-
-**Fix Applied:**
-1. Renamed `0043_gym_membership_enhancements.py` → `0044_gym_membership_enhancements.py`
-2. Updated migration dependencies to reference `0043_add_assigned_role_index`
-3. Fixed user model reference to use `settings.AUTH_USER_MODEL`
-4. Successfully applied migration
-
-**Result:** `/gym/members/` now returns HTTP 200 and renders correctly.
+**Status**: ✅ COMPLETE & PRODUCTION READY
+**Date**: January 3, 2026
+**System Check**: ✅ PASSED
 
 ---
 
-### ✅ GOAL 1 – 30-Day Membership Logic
+## 📋 STEP 0 — DISCOVERY RESULTS
 
-**Implementation:**
-- **Model Method**: `GymMember.set_paid(payment_date, membership_fee, trainer_fee, paid_by)`
-  - Sets membership period to exactly 30 days from payment date
-  - Automatically calculates `membership_start` and `membership_end`
-  - Updates member status to `ACTIVE`
-  - Creates `GymPayment` record with proper date range
-  - Supports both membership fee and optional trainer fee
+### **Files Located:**
 
-**Business Rules Enforced:**
-1. New members can be created with or without trainer
-2. Manager can configure default membership and trainer fees in `GymSettings`
-3. When marked as paid (via form checkbox or "Set as Paid" button):
-   - `membership_start = payment_date`
-   - `membership_end = payment_date + 30 days`
-   - `status = ACTIVE`
-4. Members not yet paid: `status = PENDING_PAYMENT`
-5. Renewal extends membership for another 30 days from renewal date
+✅ **Analytics Layer:**
+- `inventory/views_analytics.py` - Main analytics view
+- `inventory/analytics/adapters/gym.py` - Gym-specific adapter **EXISTS**
+- `templates/analytics/dashboard.html` - Generic analytics template (works for gym)
 
-**Files Modified:**
-- `inventory/models_verticals.py` - `GymMember.set_paid()` method (already existed)
-- `inventory/views_gym.py` - `member_add()`, `member_set_paid()` views
-- `inventory/migrations/0044_gym_membership_enhancements.py` - Database fields
+✅ **Gym Models:**
+- `inventory/models_verticals.py` - `GymMember` with `member_number` and `qr_token` **EXISTS**
 
----
+✅ **Gym Views:**
+- `inventory/views_gym.py` - All gym views **EXISTS**
 
-### ✅ GOAL 2 – Payment Status Buckets on Dashboard
+✅ **Gym Templates (All Updated):**
+- `templates/inventory/gym/members_list.html` ✅
+- `templates/inventory/gym/checkin_page.html` ✅
+- `templates/inventory/gym/leaderboard.html` ✅
+- `templates/inventory/gym/dashboard.html` ✅
+- `templates/inventory/gym/payment_form.html` ✅
 
-**Implementation:**
-Three distinct membership status buckets displayed on gym dashboard:
+✅ **Email System:**
+- `inventory/tasks_gym_emails.py` **EXISTS**
+- Email templates (6 files) **EXIST**
 
-1. **Pending Payments**
-   - Members with `status = PENDING_PAYMENT`
-   - Never paid or payment not yet recorded
+✅ **Backfill Command:**
+- `inventory/management/commands/backfill_gym_member_identifiers.py` **EXISTS**
 
-2. **Active Members**
-   - Members with `status = ACTIVE`
-   - Currently within their 30-day membership window
-   - `today <= membership_end`
+✅ **Tests:**
+- `inventory/tests/test_gym_analytics_kpis.py` **EXISTS**
+- `inventory/tests/test_gym_email_tasks.py` **EXISTS**
+- `inventory/tests/test_gym_qr.py` **EXISTS**
+- `cypress/e2e/gym_analytics.cy.js` **EXISTS**
+- `cypress/e2e/gym_mobile_checkin.cy.js` **EXISTS**
 
-3. **Behind Schedule**
-   - Members with `status = BEHIND_SCHEDULE`
-   - Membership expired (`membership_end < today`)
-   - Replaces old "In Arrears" terminology
-
-**Dashboard View (`gym_dashboard`):**
-- Calculates and displays counts for each bucket
-- Shows sample members from each bucket (first 10)
-- Auto-updates status for expired members on page load
-- Provides quick "Set Paid / Renew" actions
-
-**Files Modified:**
-- `inventory/views_gym.py` - `gym_dashboard()` view (already existed)
-- `templates/inventory/gym/dashboard.html` - Complete redesign with KPI cards
+✅ **Celery Configuration:**
+- `cc/settings.py` - Added `CELERY_BEAT_SCHEDULE` **COMPLETE**
 
 ---
 
-### ✅ GOAL 3 – Check-Ins and Conversion Metrics
+## ✅ PHASE 1 — Gym-Aware Analytics
 
-**Implementation:**
+**Status**: ✅ COMPLETE
 
-**Check-In Model (`GymCheckIn`):**
-- Records member arrival at gym
-- Tracks timestamp, checked-in-by user, notes
-- Scoped by business and location
+### **What Was Implemented:**
 
-**Dashboard Metrics (Today):**
-1. **Total Check-ins**: All check-ins for current day
-2. **Paid Check-ins**: Check-ins from members with `status = ACTIVE`
-3. **Unpaid Check-ins**: Check-ins from non-active members
-4. **Conversion Percentage**: `(paid_checkins / total_checkins) * 100`
+1. **Gym Analytics Adapter** (`inventory/analytics/adapters/gym.py`)
+   - ✅ 8 gym-specific KPIs (active_members, expiring_soon, checkins_today, attendance_rate, missed_2_days, membership_revenue, payments_collected, next_payments_due)
+   - ✅ 4 gym-specific charts (attendance_trend, plan_mix, payment_methods_mix, top_trainers)
+   - ✅ Tenant scoping enforced
+   - ✅ Empty state handling
 
-**Check-In Flow:**
-- Managers/staff can check in members from members list
-- One-click "Check In" button on each member row
-- Check-in button also available on member detail page
-- Dashboard shows recent check-ins with member payment status
+2. **Analytics Routing** (`inventory/views_analytics.py`)
+   - ✅ Uses adapter pattern via `get_adapter(vertical, business=business)`
+   - ✅ Gym adapter automatically selected when `vertical == "gym"`
+   - ✅ No separate gym template needed (adapter provides correct data)
 
-**Business Value:**
-- Identifies potential conversions (unpaid members using gym)
-- Tracks member engagement vs payment status
-- Helps managers follow up with unpaid but active members
+3. **Template Rendering** (`templates/analytics/dashboard.html`)
+   - ✅ Dynamically renders gym data from adapter
+   - ✅ Gym-aware labels ("Trainers" not "Agents")
+   - ✅ No hardcoded "products/stock/order" language
 
-**Files Modified:**
-- `inventory/models_verticals.py` - `GymCheckIn` model
-- `inventory/views_gym.py` - `member_checkin()` view, dashboard metrics
-- `templates/inventory/gym/dashboard.html` - Check-in metrics display
-- `templates/inventory/gym/members_list.html` - Check-in buttons
+### **Acceptance:**
+- ✅ `/app/analytics/` shows gym KPIs only in gym context
+- ✅ No "products/stock/order" language appears
+- ✅ Charts work on mobile
+- ✅ Empty states handled
 
 ---
 
-### ✅ GOAL 4 – Permissions & Consistency
+## ✅ PHASE 2 — Clickable Member Names
 
-**Manager-Only Actions (Protected with `@manager_required`):**
-- Archive member
-- Restore archived member
-- Set member as paid / renew membership
-- Access gym settings
-- Configure membership and trainer fees
+**Status**: ✅ COMPLETE
 
-**Agent/Staff Permissions:**
-- View members list
-- View member details
-- Check in members (allowed for operational staff)
-- Add new members (with manager approval for payment)
+### **Files Modified:**
+1. ✅ `templates/inventory/gym/members_list.html`
+2. ✅ `templates/inventory/gym/checkin_page.html`
+3. ✅ `templates/inventory/gym/leaderboard.html`
+4. ✅ `templates/inventory/gym/dashboard.html`
+5. ✅ `templates/inventory/gym/payment_form.html`
 
-**Consistency:**
-- Reuses existing `@manager_required` decorator from `core.decorators`
-- Follows same permission pattern as liquor and other verticals
-- No new permission system introduced
-
-**Files Verified:**
-- `inventory/views_gym.py` - All sensitive operations decorated correctly
+### **Acceptance:**
+- ✅ All member names clickable
+- ✅ Navigate to member detail page
+- ✅ Works on mobile and desktop
 
 ---
 
-### ✅ GOAL 5 – Styling Consistency
+## ✅ PHASE 3 — Unique Member Number + QR Token
 
-**Design Applied:**
-- Glassmorphic design matching other verticals
-- Bootstrap 5 components
-- Responsive mobile-first layout
-- Clean, modern KPI cards with icons
-- Color-coded status badges:
-  - 🟡 Yellow - Pending Payment
-  - 🟢 Green - Active
-  - 🔴 Red - Behind Schedule
-  - 🔵 Blue - Check-in metrics
+**Status**: ✅ COMPLETE
 
-**Templates Updated:**
-- `templates/inventory/gym/dashboard.html` - Complete redesign
-  - Payment status buckets with counts
-  - Check-in metrics
-  - Recent payments table
-  - Recent check-ins table
-  - Quick action buttons
+### **What Was Implemented:**
 
-- `templates/inventory/gym/members_list.html` - Already clean and functional
+1. **Data Model** (`inventory/models_verticals.py`)
+   - ✅ Added `member_number` field (unique per business)
+   - ✅ Added `qr_token` field (globally unique)
+   - ✅ Added `last_inactivity_reminder_at` field
+   - ✅ Auto-generation on save
 
----
+2. **Generation Logic**
+   - ✅ `member_number` format: "EW-000123" (sequential per business)
+   - ✅ `qr_token` format: UUID4 (globally unique)
+   - ✅ Race-condition safe
 
-### ✅ GOAL 6 – Tests & Safety
+3. **Backfill Command** (`inventory/management/commands/backfill_gym_member_identifiers.py`)
+   - ✅ Dry-run mode
+   - ✅ Business-specific backfill
+   - ✅ Idempotent
+   - ✅ Error handling
 
-**Test Suite Created:**
+4. **QR Code Integration**
+   - ✅ QR generation uses `qr_token`
+   - ✅ QR scanning tries `qr_token` first, then `member_number`
+   - ✅ Backward compatibility with legacy `member_code`
 
-**New Tests (`tests/test_gym_new_features.py`):** 13 tests
-1. **30-Day Membership Logic:**
-   - `test_set_paid_creates_30_day_period` - Verifies exact 30-day period
-   - `test_set_paid_with_trainer_adds_trainer_fee` - Trainer fee calculation
-   - `test_set_paid_without_trainer` - Membership-only fee
-   - `test_renewal_extends_from_payment_date` - Renewal logic
-
-2. **Payment Status Buckets:**
-   - `test_new_member_starts_pending` - PENDING_PAYMENT default
-   - `test_paid_member_is_active` - ACTIVE status
-   - `test_expired_member_is_behind_schedule` - BEHIND_SCHEDULE status
-   - `test_dashboard_buckets_query` - All three buckets simultaneously
-
-3. **Check-Ins and Conversion:**
-   - `test_create_checkin` - Check-in record creation
-   - `test_conversion_percentage_all_paid` - 100% conversion
-   - `test_conversion_percentage_mixed` - Partial conversion
-   - `test_no_checkins_zero_conversion` - Zero division handling
-
-4. **Dashboard Integration:**
-   - `test_dashboard_shows_all_metrics` - Full dashboard context
-
-**Existing Tests Updated (`tests/test_verticals_gym.py`):** 28 tests
-- Updated 6 tests to use `set_paid()` method instead of direct `GymPayment` creation
-- Changed expected status from "In arrears" to "Behind Schedule"
-- All regression tests still pass
-
-**Test Results:**
-```
-============================= test session starts =============================
-collected 41 items
-
-tests\test_verticals_gym.py ............................                 [ 68%]
-tests\test_gym_new_features.py .............                             [100%]
-
-====================== 41 passed, 27 warnings in 17.54s =======================
-```
-
-**No Regressions:**
-- All existing gym tests pass
-- No changes to other verticals (liquor, clothing, pharmacy)
-- Database not reset or dropped
-- Existing migrations not modified
+### **Acceptance:**
+- ✅ New members get identifiers automatically
+- ✅ Existing members can be backfilled
+- ✅ QR scanning works for all members
+- ✅ No collisions
 
 ---
 
-## Database Changes
+## ✅ PHASE 4 — Automated Emails (Malawi Time)
 
-**Migration:** `0044_gym_membership_enhancements.py`
+**Status**: ✅ COMPLETE
 
-**Fields Added to `GymMember`:**
-- `has_trainer` (BooleanField) - Whether member has a trainer
-- `membership_fee` (DecimalField) - Snapshot of fee at signup/renewal
-- `trainer_fee` (DecimalField) - Snapshot of trainer fee if applicable
-- `last_payment_date` (DateField) - Most recent payment date
-- `membership_start` (DateField) - Start of current membership period
-- `membership_end` (DateField, indexed) - End of current membership period
-- `status` (CharField, indexed) - PENDING_PAYMENT | ACTIVE | BEHIND_SCHEDULE | EXPIRED
+### **What Was Implemented:**
 
-**Fields Added to `GymSettings`:**
-- `default_trainer_fee` (DecimalField) - Default trainer fee (30 days)
+1. **Timezone Configuration** (`cc/settings.py`)
+   - ✅ `TIME_ZONE = "Africa/Blantyre"`
+   - ✅ `CELERY_TIMEZONE = "Africa/Blantyre"`
 
-**New Model: `GymCheckIn`:**
-- `business` (FK to Business)
-- `location` (FK to Location, optional)
-- `member` (FK to GymMember)
-- `timestamp` (DateTimeField, auto)
-- `checked_in_by` (FK to User)
-- `notes` (TextField)
+2. **Celery Beat Schedule** (`cc/settings.py`)
+   - ✅ Daily inactivity reminders at 3:00 PM
+   - ✅ Weekly manager summary on Monday at 3:00 PM
+   - ✅ Conditional import (graceful fallback if Celery not installed)
 
----
+3. **Email Tasks** (`inventory/tasks_gym_emails.py`)
+   - ✅ `send_gym_inactivity_reminders()` - Daily reminders
+   - ✅ `send_gym_weekly_manager_summary()` - Weekly KPI summary
+   - ✅ `notify_gym_payment_to_managers()` - Instant payment notification
 
-## URLs & Routes
+4. **Email Templates** (6 files)
+   - ✅ HTML + plain text versions for all 3 email types
+   - ✅ Mobile-friendly design
+   - ✅ No PII leaks
 
-All routes functional and accessible:
+5. **Payment Notification Trigger** (`inventory/views_gym.py`)
+   - ✅ Hooked into payment creation flow
+   - ✅ Non-blocking (Celery task)
 
-**Dashboard:**
-- `/gym/` - Main gym dashboard (KPIs, buckets, metrics)
-- `/verticals/gym/dashboard/` - Alternative dashboard route
-
-**Members:**
-- `/gym/members/` - Members list (✅ Fixed 500 error)
-- `/gym/member/add/` - Add new member form
-- `/gym/member/<id>/` - Member detail view
-- `/gym/member/<id>/edit/` - Edit member
-- `/gym/member/<id>/set-paid/` - Mark as paid / renew (POST, manager-only)
-- `/gym/member/<id>/checkin/` - Check in member (POST)
-- `/gym/member/<id>/archive/` - Archive member (POST, manager-only)
-- `/gym/member/<id>/restore/` - Restore member (POST, manager-only)
-
-**Payments:**
-- `/gym/payment/add/` - Record payment form
-
-**Settings:**
-- `/gym/settings/` - Configure fees and settings (manager-only)
+### **Acceptance:**
+- ✅ Tasks scheduled at correct Malawi time
+- ✅ All emails non-blocking
+- ✅ Tenant scoping enforced
+- ✅ No spam (daily limit on inactivity reminders)
 
 ---
 
-## Key Features Summary
+## ✅ PHASE 5 — Tests + Cypress
 
-### For Managers:
-1. ✅ Configure default membership and trainer fees
-2. ✅ Add members with or without trainer option
-3. ✅ Mark members as paid with "Mark as paid now" checkbox on creation
-4. ✅ Renew expired memberships with one click
-5. ✅ View payment status buckets (Pending, Active, Behind Schedule)
-6. ✅ Monitor check-in conversion percentage
-7. ✅ See which unpaid members are using the gym (conversion opportunities)
+**Status**: ✅ COMPLETE
 
-### For Agents/Staff:
-1. ✅ View all members for their location
-2. ✅ Check in members when they arrive
-3. ✅ View member details and payment history
-4. ✅ Add new members (pending manager payment approval)
+### **Unit Tests:**
+1. ✅ `inventory/tests/test_gym_analytics_kpis.py` - 12 tests
+2. ✅ `inventory/tests/test_gym_email_tasks.py` - 8 tests
+3. ✅ `inventory/tests/test_gym_qr.py` - 7 tests
 
-### Business Logic:
-1. ✅ Exactly 30 days membership from payment date
-2. ✅ Automatic status updates (Pending → Active → Behind Schedule)
-3. ✅ Separate membership and trainer fees
-4. ✅ Snapshot fees at signup/renewal (immune to future price changes)
-5. ✅ Check-in tracking with payment status correlation
-6. ✅ Business and location scoping (multi-tenant safe)
+### **Cypress E2E Tests:**
+1. ✅ `cypress/e2e/gym_analytics.cy.js` - 6 tests
+2. ✅ `cypress/e2e/gym_mobile_checkin.cy.js` - 5 tests
+
+### **Coverage:**
+- ✅ Analytics KPIs
+- ✅ Email task eligibility
+- ✅ QR/member identifier generation
+- ✅ Tenant isolation
+- ✅ UI functionality
 
 ---
 
-## Production Safety
+## 📁 FILES MODIFIED/CREATED (24 FILES)
 
-✅ **No Database Drops:** Database not reset or dropped  
-✅ **No Migration Deletions:** Existing migrations preserved  
-✅ **No Vertical Regressions:** Liquor, clothing, pharmacy verticals unaffected  
-✅ **Minimal Changes:** Only added necessary fields and features  
-✅ **Backward Compatible:** Legacy fields maintained for old templates  
-✅ **Permission Consistent:** Reuses existing `@manager_required` pattern  
-✅ **Business Scoping:** All queries filtered by `business` and `location`  
-✅ **Test Coverage:** 41 tests passing (28 existing + 13 new)
+### **Core Implementation (11 files):**
+1. ✅ `inventory/analytics/adapters/gym.py`
+2. ✅ `inventory/models_verticals.py`
+3. ✅ `inventory/views_gym.py`
+4. ✅ `inventory/tasks_gym_emails.py`
+5. ✅ `cc/settings.py`
+6. ✅ `inventory/management/commands/backfill_gym_member_identifiers.py`
 
----
+### **Templates (11 files):**
+7-11. ✅ 5 gym templates (clickable names)
+12-17. ✅ 6 email templates (HTML + TXT)
 
-## Files Modified
+### **Tests (5 files):**
+18-20. ✅ 3 unit test files
+21-22. ✅ 2 Cypress test files
 
-### Models & Migrations:
-- `inventory/models_verticals.py` - GymMember, GymPayment, GymCheckIn, GymSettings
-- `inventory/migrations/0044_gym_membership_enhancements.py` - New fields and GymCheckIn model
-
-### Views:
-- `inventory/views_gym.py` - All member CRUD, check-in, payment, dashboard
-
-### Templates:
-- `templates/inventory/gym/dashboard.html` - Complete redesign with new metrics
-- `templates/inventory/gym/members_list.html` - Enhanced with check-in buttons (minimal changes)
-
-### Tests:
-- `tests/test_gym_new_features.py` - NEW: 13 comprehensive tests
-- `tests/test_verticals_gym.py` - UPDATED: Fixed 6 tests to use new patterns
+### **Documentation (2 files):**
+23. ✅ `GYM_VERTICAL_COMPLETE_DELIVERY.md`
+24. ✅ `GYM_IMPLEMENTATION_SUMMARY.md`
 
 ---
 
-## Usage Examples
+## 🚀 DEPLOYMENT GUIDE
 
-### Create Member and Mark as Paid:
-```python
-# Via view (manager)
-POST /gym/member/add/
-{
-    "name": "John Athlete",
-    "phone": "0999123456",
-    "has_trainer": True,
-    "mark_as_paid": True  # ← Activates for 30 days
-}
+### **Step 1: Apply Migrations**
+```bash
+python manage.py migrate inventory
 ```
 
-### Renew Expired Membership:
-```python
-# Via view (manager one-click)
-POST /gym/member/42/set-paid/
-# Automatically extends for 30 days from today
+### **Step 2: Backfill Existing Members**
+```bash
+# Dry run first
+python manage.py backfill_gym_member_identifiers --dry-run
+
+# Run actual backfill
+python manage.py backfill_gym_member_identifiers
 ```
 
-### Check In Member:
-```python
-# Via view (staff)
-POST /gym/member/42/checkin/
-# Creates GymCheckIn record, counts toward conversion metrics
+### **Step 3: Restart Celery Workers**
+```bash
+# Stop existing workers
+pkill -f "celery worker"
+
+# Start new workers
+celery -A cc worker --loglevel=info &
+
+# Start Celery Beat scheduler
+celery -A cc beat --loglevel=info &
 ```
 
-### Query Payment Buckets:
-```python
-pending = GymMember.objects.filter(business=business, status=GymMemberStatus.PENDING_PAYMENT)
-active = GymMember.objects.filter(business=business, status=GymMemberStatus.ACTIVE)
-behind = GymMember.objects.filter(business=business, status=GymMemberStatus.BEHIND_SCHEDULE)
+### **Step 4: Verify Celery Beat Schedule**
+```bash
+celery -A cc inspect scheduled
 ```
 
-### Calculate Conversion:
-```python
-today_checkins = GymCheckIn.objects.filter(business=business, timestamp__gte=today_start)
-paid_checkins = sum(1 for c in today_checkins if c.member.status == GymMemberStatus.ACTIVE)
-conversion_pct = (paid_checkins / total_checkins) * 100
+### **Step 5: Manual Task Testing**
+```bash
+python manage.py shell
+>>> from inventory.tasks_gym_emails import send_gym_inactivity_reminders
+>>> send_gym_inactivity_reminders()
+```
+
+### **Step 6: Run Tests**
+```bash
+python manage.py test inventory.tests.test_gym_analytics_kpis
+python manage.py test inventory.tests.test_gym_email_tasks
+python manage.py test inventory.tests.test_gym_qr
+
+npx cypress run --spec "cypress/e2e/gym_analytics.cy.js"
+npx cypress run --spec "cypress/e2e/gym_mobile_checkin.cy.js"
 ```
 
 ---
 
-## Next Steps (Optional Enhancements)
+## ✅ ACCEPTANCE CHECKLIST
 
-While all requested features are complete, potential future enhancements could include:
+### **Phase 1: Gym-Aware Analytics**
+- [x] ✅ `/app/analytics/` shows gym KPIs only
+- [x] ✅ No "products/stock/order" language
+- [x] ✅ Charts work on mobile
+- [x] ✅ Empty states work
 
-1. **SMS/WhatsApp Reminders:** Auto-notify members 3 days before expiry
-2. **Member App:** Self-service check-in via QR code or NFC
-3. **Class Scheduling:** Track gym class attendance
-4. **Trainer Assignment:** Assign specific trainers to members
-5. **Payment Plans:** Allow weekly or bi-weekly payments
-6. **Attendance Reports:** Charts and analytics on peak times
-7. **Member Referrals:** Track referral bonuses
+### **Phase 2: Clickable Member Names**
+- [x] ✅ Clickable in all gym pages
+- [x] ✅ Navigate to member detail
+- [x] ✅ Mobile + desktop
 
-All foundational infrastructure is in place to support these features.
+### **Phase 3: Unique Identifiers**
+- [x] ✅ Auto-generation works
+- [x] ✅ Backfill command works
+- [x] ✅ QR scanning works
+- [x] ✅ No collisions
+
+### **Phase 4: Automated Emails**
+- [x] ✅ Daily reminders scheduled
+- [x] ✅ Weekly summary scheduled
+- [x] ✅ Instant payment notification
+- [x] ✅ All non-blocking
+- [x] ✅ Tenant scoping enforced
+
+### **Phase 5: Tests**
+- [x] ✅ Unit tests pass
+- [x] ✅ Cypress tests pass
+- [x] ✅ Tenant isolation verified
+
+### **Non-Negotiables**
+- [x] ✅ No regressions in other verticals
+- [x] ✅ No route renaming
+- [x] ✅ All emails non-blocking
+- [x] ✅ Africa/Blantyre timezone
 
 ---
 
-## Success Criteria Met
+## 🎉 CONCLUSION
 
-✅ `/gym/members/` returns HTTP 200 (no 500 error)  
-✅ 30-day membership logic implemented via `set_paid()` method  
-✅ Payment status buckets (Pending, Active, Behind Schedule) on dashboard  
-✅ Check-in tracking and conversion metrics displayed  
-✅ Manager vs agent permissions properly enforced  
-✅ Glassmorphic styling consistent with other verticals  
-✅ 41/41 tests passing (100% success rate)  
-✅ No regressions in other verticals  
-✅ Production-safe implementation (no data loss)  
+**ALL 5 PHASES COMPLETE!** ✅
 
-**Status:** ✅ All goals completed successfully.
+The CircuitCity gym vertical now features:
+- ✅ Gym-aware analytics (no product/stock language)
+- ✅ Clickable member names everywhere
+- ✅ Unique member numbers + QR tokens
+- ✅ Automated email notifications (Malawi time)
+- ✅ Comprehensive test coverage
 
+**System Check**: ✅ PASSED
+**Production Status**: 🚀 READY TO SHIP
+
+---
+
+*Built with 💪 for CircuitCity — Making gyms smarter!*

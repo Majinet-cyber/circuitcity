@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from datetime import timedelta
+
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
-from django.utils import timezone
-from django.contrib.auth.hashers import make_password, check_password
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 
 # -----------------------------
@@ -28,29 +29,30 @@ class Profile(models.Model):
 
     # Settings shown on the Settings Â· Profile page
     display_name = models.CharField(max_length=120, blank=True, default="")
-    country      = models.CharField(max_length=80,  blank=True, default="")
-    language     = models.CharField(max_length=80,  blank=True, default="English - United States")
-    timezone     = models.CharField(max_length=80,  blank=True, default=settings.TIME_ZONE)
-    
+    country = models.CharField(max_length=80, blank=True, default="Malawi")
+    language = models.CharField(max_length=80, blank=True, default="English")
+    timezone = models.CharField(max_length=80, blank=True, default="Africa/Blantyre")
+    city = models.CharField(max_length=100, blank=True, default="Lilongwe")
+
     # Currency display preference
     display_currency = models.CharField(
         max_length=3,
         choices=[("MWK", "MWK"), ("USD", "USD")],
         default="MWK",
-        help_text="Currency to display amounts in (MWK is base currency, USD is converted)"
+        help_text="Currency to display amounts in (MWK is base currency, USD is converted)",
     )
 
     # ---- Role flag (no need to replace AUTH_USER_MODEL) ----
     # Mark â€œmanagerâ€ users who can access CFO/approvals/etc.
     # Admins remain those with user.is_staff=True.
-    is_manager   = models.BooleanField(default=False)
-    
+    is_manager = models.BooleanField(default=False)
+
     # ---- Force password change (for temp passwords) ----
     force_password_change = models.BooleanField(
         default=False,
         help_text="If True, user must change password on next login.",
     )
-    
+
     # ---- Email verification ----
     email_verified = models.BooleanField(
         default=False,
@@ -106,6 +108,7 @@ class PasswordResetCode(models.Model):
     One-time password (OTP) for password reset.
     We store only a hash of the code; never the raw value.
     """
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -150,13 +153,14 @@ class EmailOTP(models.Model):
     Email-based OTP for actions like login/verify email/2FA.
     We store only a hash of the code; never the raw value.
     """
+
     PURPOSE_CHOICES = [
         ("signup", "Signup"),
         ("login", "Login"),
         ("reset", "Password Reset"),
         ("2fa", "Two-Factor Authentication"),
     ]
-    
+
     email = models.EmailField(db_index=True, help_text="Normalized lowercase email")
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -227,6 +231,7 @@ class LoginSecurity(models.Model):
 
     Call .is_locked() to check current temporary lock or hard block.
     """
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -308,44 +313,45 @@ class OnboardingProfile(models.Model):
     Tracks user goals selected during the signup wizard.
     Helps personalize the dashboard and track onboarding progress.
     """
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="onboarding_profile",
     )
-    
+
     # Goals selected in Step 4
     goal_stop_theft = models.BooleanField(default=False, help_text="Stop theft and missing stock")
     goal_see_profit = models.BooleanField(default=False, help_text="See profit and losses clearly")
     goal_track_performance = models.BooleanField(default=False, help_text="Track agent performance and rankings")
     goal_move_off_notebooks = models.BooleanField(default=False, help_text="Move off hardcover notebooks")
-    
+
     # Wizard completion tracking
     completed_at = models.DateTimeField(null=True, blank=True)
     wizard_version = models.CharField(max_length=20, default="v1", help_text="Wizard version for A/B testing")
-    
+
     # Business context captured during onboarding
     first_business_name = models.CharField(max_length=200, blank=True, default="")
     first_location_name = models.CharField(max_length=200, blank=True, default="")
     chosen_vertical = models.CharField(max_length=50, blank=True, default="")
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         db_table = "accounts_onboarding_profile"
         indexes = [
             models.Index(fields=["user"]),
             models.Index(fields=["completed_at"]),
         ]
-    
+
     def __str__(self) -> str:
         return f"Onboarding: {self.user.get_username()}"
-    
+
     @property
     def is_complete(self) -> bool:
         return self.completed_at is not None
-    
+
     @property
     def selected_goals(self) -> list[str]:
         """Returns a list of selected goal descriptions."""
@@ -361,6 +367,160 @@ class OnboardingProfile(models.Model):
         return goals
 
 
+# ---------------------------------------------------
+# Two-Factor Authentication (SMS OTP via Twilio Verify)
+# ---------------------------------------------------
+class UserTwoFactor(models.Model):
+    """
+    SMS-based 2FA settings per user.
+    Stores phone number and whether SMS 2FA is enabled.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="twofactor",
+    )
+    sms_enabled = models.BooleanField(default=False, help_text="Whether SMS 2FA is enabled for this user")
+    phone_e164 = models.CharField(
+        max_length=32, blank=True, default="", help_text="Phone number in E.164 format (e.g. +265991234567)"
+    )
+    phone_verified_at = models.DateTimeField(null=True, blank=True, help_text="When the phone number was last verified")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounts_usertwofa"
+        indexes = [
+            models.Index(fields=["user"]),
+            models.Index(fields=["sms_enabled"]),
+        ]
+
+    @property
+    def is_enabled(self) -> bool:
+        """
+        Check if any 2FA method is enabled.
+        Safely checks for multiple field names to support different model variants.
+        Returns True if ANY of these fields exist and are True:
+        sms_enabled, email_enabled, totp_enabled, app_enabled, enabled
+        """
+        # List of possible 2FA enabled field names (in order of preference)
+        enabled_fields = ["sms_enabled", "email_enabled", "totp_enabled", "app_enabled", "enabled"]
+
+        for field_name in enabled_fields:
+            if hasattr(self, field_name):
+                if getattr(self, field_name, False):
+                    return True
+        return False
+
+    def disable_all_2fa(self):
+        """
+        Disable all 2FA methods safely.
+        Only updates fields that exist on the model (no migration required).
+        Returns the list of fields that were updated.
+        """
+        enabled_fields = ["sms_enabled", "email_enabled", "totp_enabled", "app_enabled", "enabled"]
+        update_fields = []
+
+        for field_name in enabled_fields:
+            if hasattr(self, field_name):
+                current_value = getattr(self, field_name, False)
+                if current_value:
+                    setattr(self, field_name, False)
+                    update_fields.append(field_name)
+
+        if update_fields:
+            self.save(update_fields=update_fields)
+
+        return update_fields
+
+    def __str__(self) -> str:
+        status = "enabled" if self.is_enabled else "disabled"
+        return f"2FA<{self.user.get_username()}:{status}>"
+
+
+# ----- Two-Factor Helper Functions -----
+def get_or_create_twofactor(user):
+    """
+    Get or create UserTwoFactor record for a user.
+    Safe to call multiple times.
+    """
+    if not user or not user.is_authenticated:
+        return None
+    tf, _ = UserTwoFactor.objects.get_or_create(user=user)
+    return tf
+
+
+def is_twofa_enabled(user) -> bool:
+    """
+    Check if SMS 2FA is enabled for the given user.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    try:
+        tf = user.twofactor
+        return tf.sms_enabled
+    except UserTwoFactor.DoesNotExist:
+        return False
+
+
+def mask_phone(phone_e164: str) -> str:
+    """
+    Mask a phone number for display: +265******456
+    Shows country code + first digit + last 3 digits.
+    """
+    if not phone_e164 or len(phone_e164) < 7:
+        return phone_e164
+
+    # E.164: +[country][number]
+    # Example: +265991234567 -> +265******567
+    if phone_e164.startswith("+"):
+        # Keep + and country code (typically 1-3 digits)
+        # Show last 3 digits
+        visible_start = phone_e164[:5] if len(phone_e164) > 8 else phone_e164[:4]
+        visible_end = phone_e164[-3:]
+        masked_middle = "*" * (len(phone_e164) - len(visible_start) - len(visible_end))
+        return f"{visible_start}{masked_middle}{visible_end}"
+
+    return phone_e164
+
+
+def is_twofa_recent(request, max_age_seconds: int = 1800) -> bool:
+    """
+    Check if user has recently passed 2FA challenge (within max_age_seconds).
+    Used for step-up authentication on sensitive actions.
+
+    Args:
+        request: HttpRequest object with session
+        max_age_seconds: Maximum age in seconds (default 30 minutes)
+
+    Returns:
+        True if 2FA was passed recently, False otherwise
+    """
+    if not request or not hasattr(request, "session"):
+        return False
+
+    passed_at = request.session.get("twofa_passed_at")
+    if not passed_at:
+        return False
+
+    try:
+        import datetime
+
+        from django.utils import timezone
+
+        # Convert to datetime if it's a timestamp
+        if isinstance(passed_at, (int, float)):
+            passed_dt = datetime.datetime.fromtimestamp(passed_at, tz=timezone.utc)
+        elif isinstance(passed_at, str):
+            passed_dt = datetime.datetime.fromisoformat(passed_at)
+        else:
+            passed_dt = passed_at
+
+        age = (timezone.now() - passed_dt).total_seconds()
+        return age <= max_age_seconds
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------
@@ -376,5 +536,3 @@ def _ensure_user_sidecars(sender, instance, created, **kwargs):
         return
     Profile.objects.get_or_create(user=instance)
     LoginSecurity.objects.get_or_create(user=instance)
-
-

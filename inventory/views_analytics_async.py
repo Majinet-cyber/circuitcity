@@ -14,9 +14,7 @@ from decimal import Decimal
 from inventory.decorators import require_business
 from inventory.helpers import get_active_business, business_vertical as get_business_vertical
 from inventory.analytics import get_adapter
-from inventory.analytics.common import (
-    parse_date_range, get_cache_key, cache_or_compute
-)
+from inventory.analytics.common import parse_date_range, get_cache_key, cache_or_compute
 from inventory.models import Location
 from tenants.models import Membership
 
@@ -45,58 +43,61 @@ def analytics_kpis_json(request):
         business = get_active_business(request)
         if not business:
             return JsonResponse({"error": "No business selected"}, status=400)
-        
+
         vertical = get_business_vertical(request)
-        
+
         # Parse filters
-        range_preset = request.GET.get('range', '')
-        start_str = request.GET.get('start', '')
-        end_str = request.GET.get('end', '')
+        range_preset = request.GET.get("range", "")
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
         date_params = parse_date_range(range_preset, start_str, end_str)
-        
-        location_id = request.GET.get('location')
+
+        location_id = request.GET.get("location")
         location = None
         if location_id:
             try:
                 location = Location.objects.filter(pk=location_id, business=business).first()
             except Exception:
                 pass
-        
+
         # Build cache key
         cache_key = get_cache_key(
-            'kpis',
+            "kpis",
             business.id,
             vertical=vertical,
-            start=date_params['start_date'].isoformat(),
-            end=date_params['end_date'].isoformat(),
+            start=date_params["start_date"].isoformat(),
+            end=date_params["end_date"].isoformat(),
             location=location.id if location else None,
         )
-        
+
         # Cache-or-compute pattern
         def compute_kpis():
             adapter = get_adapter(vertical, business=business)
             kpis = adapter.kpis(
                 business=business,
-                start_date=date_params['start_date'],
-                end_date=date_params['end_date'],
+                start_date=date_params["start_date"],
+                end_date=date_params["end_date"],
                 location=location,
             )
             return kpis or {}
-        
+
         kpis = cache_or_compute(cache_key, compute_kpis, timeout=300)
-        
+
         # Convert Decimals to floats for JSON
         kpis_json = _decimal_to_float(kpis)
-        
-        return JsonResponse({
-            'ok': True,
-            'kpis': kpis_json,
-            'period': date_params['range_label'],
-            'timestamp': timezone.now().isoformat(),
-        })
-    
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "kpis": kpis_json,
+                "period": date_params["range_label"],
+                "timestamp": timezone.now().isoformat(),
+            }
+        )
+
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Analytics KPIs error: {e}", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
@@ -115,58 +116,61 @@ def analytics_charts_json(request):
         business = get_active_business(request)
         if not business:
             return JsonResponse({"error": "No business selected"}, status=400)
-        
+
         vertical = get_business_vertical(request)
-        
+
         # Parse filters
-        range_preset = request.GET.get('range', '')
-        start_str = request.GET.get('start', '')
-        end_str = request.GET.get('end', '')
+        range_preset = request.GET.get("range", "")
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
         date_params = parse_date_range(range_preset, start_str, end_str)
-        
-        location_id = request.GET.get('location')
+
+        location_id = request.GET.get("location")
         location = None
         if location_id:
             try:
                 location = Location.objects.filter(pk=location_id, business=business).first()
             except Exception:
                 pass
-        
+
         # Build cache key
         cache_key = get_cache_key(
-            'charts',
+            "charts",
             business.id,
             vertical=vertical,
-            start=date_params['start_date'].isoformat(),
-            end=date_params['end_date'].isoformat(),
+            start=date_params["start_date"].isoformat(),
+            end=date_params["end_date"].isoformat(),
             location=location.id if location else None,
         )
-        
+
         # Cache-or-compute pattern
         def compute_charts():
             adapter = get_adapter(vertical, business=business)
             charts = adapter.charts(
                 business=business,
-                start_date=date_params['start_date'],
-                end_date=date_params['end_date'],
+                start_date=date_params["start_date"],
+                end_date=date_params["end_date"],
                 location=location,
             )
             return charts or {}
-        
+
         charts = cache_or_compute(cache_key, compute_charts, timeout=300)
-        
+
         # Convert Decimals to floats for JSON
         charts_json = _decimal_to_float(charts)
-        
-        return JsonResponse({
-            'ok': True,
-            'charts': charts_json,
-            'period': date_params['range_label'],
-            'timestamp': timezone.now().isoformat(),
-        })
-    
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "charts": charts_json,
+                "period": date_params["range_label"],
+                "timestamp": timezone.now().isoformat(),
+            }
+        )
+
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Analytics charts error: {e}", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
@@ -185,45 +189,49 @@ def analytics_stock_overview_json(request):
         business = get_active_business(request)
         if not business:
             return JsonResponse({"error": "No business selected"}, status=400)
-        
+
         vertical = get_business_vertical(request)
-        
-        location_id = request.GET.get('location')
+
+        location_id = request.GET.get("location")
         location = None
         if location_id:
             try:
                 location = Location.objects.filter(pk=location_id, business=business).first()
             except Exception:
                 pass
-        
+
         # Build cache key
         cache_key = get_cache_key(
-            'stock_overview',
+            "stock_overview",
             business.id,
             vertical=vertical,
             location=location.id if location else None,
         )
-        
+
         # Cache-or-compute pattern
         def compute_stock():
             # Use shared stock overview service
             from inventory.services.stock_overview_common import get_stock_overview
+
             stock = get_stock_overview(business=business, vertical=vertical, location=location)
             return stock or {}
-        
+
         stock = cache_or_compute(cache_key, compute_stock, timeout=600)  # 10 min cache
-        
+
         # Convert Decimals to floats for JSON
         stock_json = _decimal_to_float(stock)
-        
-        return JsonResponse({
-            'ok': True,
-            'stock': stock_json,
-            'timestamp': timezone.now().isoformat(),
-        })
-    
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "stock": stock_json,
+                "timestamp": timezone.now().isoformat(),
+            }
+        )
+
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Stock overview error: {e}", exc_info=True)
         return JsonResponse({"error": str(e)}, status=500)
@@ -241,19 +249,20 @@ def analytics_health_check(request):
         business = get_active_business(request)
         if not business:
             return JsonResponse({"error": "No business selected"}, status=400)
-        
+
         vertical = get_business_vertical(request)
         adapter = get_adapter(vertical, business=business)
-        
-        return JsonResponse({
-            'ok': True,
-            'business_id': business.id,
-            'business_name': business.name,
-            'vertical': vertical,
-            'adapter': adapter.__class__.__name__,
-            'timestamp': timezone.now().isoformat(),
-        })
-    
+
+        return JsonResponse(
+            {
+                "ok": True,
+                "business_id": business.id,
+                "business_name": business.name,
+                "vertical": vertical,
+                "adapter": adapter.__class__.__name__,
+                "timestamp": timezone.now().isoformat(),
+            }
+        )
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-

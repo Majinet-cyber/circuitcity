@@ -7,6 +7,7 @@ from django.utils import timezone
 
 register = template.Library()
 
+
 @register.inclusion_tag("billing/components/subscription_badge.html", takes_context=True)
 def subscription_badge(context):
     """
@@ -44,5 +45,3 @@ def subscription_badge(context):
             tone = "secondary"
 
     return {"label": label, "tone": tone}
-
-

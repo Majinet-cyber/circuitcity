@@ -2,4 +2,3 @@
 """
 Tests for dashboard app.
 """
-

@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0045_clothing_cost_tracking"),
     ]
@@ -40,9 +39,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="gymcheckin",
             name="timestamp",
-            field=models.DateTimeField(
-                db_index=True, default=django.utils.timezone.now
-            ),
+            field=models.DateTimeField(db_index=True, default=django.utils.timezone.now),
         ),
         migrations.AlterField(
             model_name="gymsettings",

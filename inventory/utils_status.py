@@ -11,17 +11,20 @@ from django.utils import timezone
 # Choice helpers (safe + robust)
 # ----------------------------
 
+
 def _get_field(model: type[models.Model], field: str):
     try:
         return model._meta.get_field(field)
     except Exception:
         return None
 
+
 def _field_is_datetime(f) -> bool:
     try:
         return isinstance(f, models.DateTimeField)
     except Exception:
         return False
+
 
 def _choice_value(model: type[models.Model], field: str, human_or_value: str, default: str) -> str:
     """
@@ -64,6 +67,7 @@ def in_stock_choice_for(model: type[models.Model]) -> str:
 # Canonical mutators / predicates
 # ----------------------------
 
+
 def _set_if_has(obj: Any, field: str, value: Any, updates: Dict[str, Any]) -> None:
     if hasattr(obj, field):
         try:
@@ -71,6 +75,7 @@ def _set_if_has(obj: Any, field: str, value: Any, updates: Dict[str, Any]) -> No
             updates[field] = value
         except Exception:
             pass
+
 
 def _first_existing_field(obj: Any, *names: str) -> str | None:
     for n in names:
@@ -155,7 +160,17 @@ def mark_item_sold(item: models.Model, *, price=None, sold_date=None, user=None,
 
     # ---------- Agent / ownership ----------
     if user:
-        for agent_field in ("sold_by", "agent", "assigned_agent", "assigned_to", "assignee", "owner", "user", "created_by", "added_by"):
+        for agent_field in (
+            "sold_by",
+            "agent",
+            "assigned_agent",
+            "assigned_to",
+            "assignee",
+            "owner",
+            "user",
+            "created_by",
+            "added_by",
+        ):
             if hasattr(item, agent_field) and getattr(item, agent_field, None) in (None, "", 0):
                 try:
                     setattr(item, agent_field, user)

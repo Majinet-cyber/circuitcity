@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .models import BusinessSubscription
 
+
 @login_required
 @permission_required("billing.view_businesssubscription", raise_exception=True)
 def hq_subscriptions(request):
@@ -15,9 +16,7 @@ def hq_subscriptions(request):
     """
     q = (request.GET.get("q") or "").strip()
 
-    qs = BusinessSubscription.objects.select_related("business", "plan").order_by(
-        "-started_at", "-created_at"
-    )
+    qs = BusinessSubscription.objects.select_related("business", "plan").order_by("-started_at", "-created_at")
 
     user = request.user
     if not user.is_superuser:
@@ -46,5 +45,3 @@ def hq_subscriptions(request):
         "query": q,
     }
     return render(request, "billing/hq_subscriptions.html", context)
-
-

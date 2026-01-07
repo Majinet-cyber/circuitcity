@@ -13,15 +13,15 @@ def rename_emailotp_table_if_needed(apps, schema_editor):
     connection = schema_editor.connection
     introspection = connection.introspection
     table_names = introspection.table_names()
-    
+
     # Source table name (what might exist)
     source_table = "emailotp"
     # Target table name (what we want)
     target_table = "accounts_emailotp"
-    
+
     # Normalize table names for case-insensitive comparison
     table_names_lower = [t.lower() for t in table_names]
-    
+
     # Only rename if source exists AND target does not exist
     if source_table.lower() in table_names_lower and target_table.lower() not in table_names_lower:
         quoted_source = schema_editor.quote_name(source_table)
@@ -37,10 +37,10 @@ def reverse_rename_emailotp_table(apps, schema_editor):
     connection = schema_editor.connection
     introspection = connection.introspection
     table_names = introspection.table_names()
-    
+
     source_table = "accounts_emailotp"
     target_table = "emailotp"
-    
+
     if source_table.lower() in [t.lower() for t in table_names]:
         if target_table.lower() not in [t.lower() for t in table_names]:
             quoted_source = schema_editor.quote_name(source_table)
@@ -50,7 +50,6 @@ def reverse_rename_emailotp_table(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0012_remove_emailotp_accounts_em_email_0204e8_idx_and_more"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -77,9 +76,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="code_hash",
-            field=models.CharField(
-                help_text="Hashed OTP code (never store plaintext)", max_length=256
-            ),
+            field=models.CharField(help_text="Hashed OTP code (never store plaintext)", max_length=256),
         ),
         migrations.AlterField(
             model_name="emailotp",
@@ -94,9 +91,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="email",
-            field=models.EmailField(
-                db_index=True, help_text="Normalized lowercase email", max_length=254
-            ),
+            field=models.EmailField(db_index=True, help_text="Normalized lowercase email", max_length=254),
         ),
         migrations.AlterField(
             model_name="emailotp",
@@ -117,9 +112,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="requester_ip",
-            field=models.GenericIPAddressField(
-                blank=True, help_text="IP address of requester", null=True
-            ),
+            field=models.GenericIPAddressField(blank=True, help_text="IP address of requester", null=True),
         ),
         migrations.AlterField(
             model_name="emailotp",
@@ -136,9 +129,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name="emailotp",
             name="user_agent",
-            field=models.TextField(
-                blank=True, help_text="User agent string", null=True
-            ),
+            field=models.TextField(blank=True, help_text="User agent string", null=True),
         ),
         migrations.AddIndex(
             model_name="emailotp",

@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+
 class PermissionsTests(TestCase):
     def test_admin_requires_login(self):
         resp = self.client.get("/admin/", follow=False)

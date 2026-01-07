@@ -28,4 +28,3 @@ __all__ = [
     "require_business_access",
     "scope_to_business",
 ]
-

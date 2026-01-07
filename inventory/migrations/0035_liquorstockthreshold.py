@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0034_add_gym_payment_method"),
         ("tenants", "0011_agentinvite_temp_password_hash_and_more"),

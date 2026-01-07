@@ -49,12 +49,13 @@ class ExchangeRate(TimeStampedModel):
     Only one row should exist (enforced by unique_together on base/quote).
     Rate represents: 1 USD = mwk_per_usd MWK (e.g., if 1 USD = 1750 MWK, mwk_per_usd = 1750.00)
     """
+
     base = models.CharField(max_length=3, default="MWK", help_text="Base currency (locked to MWK)")
     quote = models.CharField(max_length=3, default="USD", help_text="Quote currency (locked to USD)")
     mwk_per_usd = models.DecimalField(
         max_digits=12,
         decimal_places=2,
-        help_text="Exchange rate: 1 USD = mwk_per_usd MWK (e.g., 1750.00 means 1 USD = 1750 MWK)"
+        help_text="Exchange rate: 1 USD = mwk_per_usd MWK (e.g., 1750.00 means 1 USD = 1750 MWK)",
     )
     updated_by = models.ForeignKey(
         User,
@@ -62,7 +63,7 @@ class ExchangeRate(TimeStampedModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="exchange_rate_updates",
-        help_text="User who last updated this rate"
+        help_text="User who last updated this rate",
     )
 
     class Meta:

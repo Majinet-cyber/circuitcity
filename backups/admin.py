@@ -10,8 +10,8 @@ class BackupSnapshotAdmin(admin.ModelAdmin):
     search_fields = ["business__name", "created_by__username"]
     readonly_fields = ["created_at", "completed_at", "file_size", "records_count", "error_message"]
     date_hierarchy = "created_at"
-    
+
     def file_size_mb(self, obj):
         return f"{obj.file_size_mb} MB" if obj.file_size else "—"
-    file_size_mb.short_description = "File Size"
 
+    file_size_mb.short_description = "File Size"

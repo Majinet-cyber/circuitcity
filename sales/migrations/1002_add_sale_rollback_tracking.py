@@ -9,7 +9,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("sales", "1001_add_liquor_sale_attribution"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -28,9 +27,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="sale",
             name="rolled_back_at",
-            field=models.DateTimeField(
-                blank=True, help_text="When this sale was rolled back", null=True
-            ),
+            field=models.DateTimeField(blank=True, help_text="When this sale was rolled back", null=True),
         ),
         migrations.AddField(
             model_name="sale",
@@ -88,15 +85,11 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "return_to_stock",
-                    models.BooleanField(
-                        default=False, help_text="Whether item was returned to stock"
-                    ),
+                    models.BooleanField(default=False, help_text="Whether item was returned to stock"),
                 ),
                 (
                     "notes",
-                    models.TextField(
-                        blank=True, help_text="Additional notes about the rollback"
-                    ),
+                    models.TextField(blank=True, help_text="Additional notes about the rollback"),
                 ),
                 (
                     "created_at",

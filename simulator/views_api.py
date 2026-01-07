@@ -59,9 +59,9 @@ def _simulate(payload: Dict[str, Any]) -> Dict[str, Any]:
     price = base_price * (1.0 + price_delta)
     demand_multiplier = 1.0 - (price_delta * 0.5)  # simple elasticity
 
-    arrivals: Dict[int, int] = {}        # day -> qty arriving into stock
-    payments_ap: Dict[int, float] = {}   # day -> cash out after AP
-    receipts_ar: Dict[int, float] = {}   # day -> cash in after AR
+    arrivals: Dict[int, int] = {}  # day -> qty arriving into stock
+    payments_ap: Dict[int, float] = {}  # day -> cash out after AP
+    receipts_ar: Dict[int, float] = {}  # day -> cash in after AR
     reorder_qty = 50
 
     # Cumulative P&L trackers
@@ -119,7 +119,7 @@ def _simulate(payload: Dict[str, Any]) -> Dict[str, Any]:
         cash_in_today = receipts_ar.get(day, 0.0)
         cash_out_ap_today = payments_ap.get(day, 0.0)
         cash += cash_in_today
-        cash -= (cash_out_ap_today + cash_out_same_day)
+        cash -= cash_out_ap_today + cash_out_same_day
 
         # Cumulate P&L
         revenue_cum += revenue
@@ -129,24 +129,26 @@ def _simulate(payload: Dict[str, Any]) -> Dict[str, Any]:
         tax_cum += tax
         gross_profit_cum += gross_profit
 
-        series.append({
-            "day": day,
-            "demand": round(demand_today, 2),
-            "sold": sold,
-            "stock": stock,
-            "revenue": round(revenue, 2),
-            "cogs": round(cogs, 2),
-            "gross_profit": round(gross_profit, 2),
-            "opex": round(opex, 2),
-            "op_profit": round(op_profit, 2),
-            "tax": round(tax, 2),
-            "cash_in": round(cash_in_today, 2),
-            "cash_out": round(cash_out_ap_today + cash_out_same_day, 2),
-            "cash_cum": round(cash, 2),
-            "revenue_cum": round(revenue_cum, 2),
-            "gross_profit_cum": round(gross_profit_cum, 2),
-            "op_profit_cum": round(op_profit_cum, 2),
-        })
+        series.append(
+            {
+                "day": day,
+                "demand": round(demand_today, 2),
+                "sold": sold,
+                "stock": stock,
+                "revenue": round(revenue, 2),
+                "cogs": round(cogs, 2),
+                "gross_profit": round(gross_profit, 2),
+                "opex": round(opex, 2),
+                "op_profit": round(op_profit, 2),
+                "tax": round(tax, 2),
+                "cash_in": round(cash_in_today, 2),
+                "cash_out": round(cash_out_ap_today + cash_out_same_day, 2),
+                "cash_cum": round(cash, 2),
+                "revenue_cum": round(revenue_cum, 2),
+                "gross_profit_cum": round(gross_profit_cum, 2),
+                "op_profit_cum": round(op_profit_cum, 2),
+            }
+        )
 
     kpis = {
         "price": round(price, 2),
@@ -192,9 +194,7 @@ def _safe_daily_sales_history(days_back: int = 365) -> List[Tuple[int, float]]:
         return []
 
     start = timezone.now().date() - timedelta(days=days_back)
-    qs = (Sale.objects
-          .filter(created_at__date__gte=start)
-          .values_list("created_at__date", "quantity"))
+    qs = Sale.objects.filter(created_at__date__gte=start).values_list("created_at__date", "quantity")
 
     buckets: Dict[str, float] = {}
     for d, qty in qs:
@@ -296,8 +296,8 @@ def _monte_carlo(payload: Dict[str, Any], iterations: int = 500) -> Dict[str, An
 
     # Reasonable volatilities (tweakable)
     demand_sigma = 0.15  # 15% std dev
-    price_sigma = 0.08   # 8%
-    cost_sigma = 0.05    # 5%
+    price_sigma = 0.08  # 8%
+    cost_sigma = 0.05  # 5%
 
     for _ in range(int(iterations)):
         total_revenue = 0.0
@@ -329,6 +329,7 @@ def _monte_carlo(payload: Dict[str, Any], iterations: int = 500) -> Dict[str, An
         return {"p10": 0.0, "p50": 0.0, "p90": 0.0, "distribution_sample": []}
 
     results_sorted = sorted(results)
+
     def pct(p: float) -> float:
         k = max(min(int(round(p * (len(results_sorted) - 1))), len(results_sorted) - 1), 0)
         return round(results_sorted[k], 2)
@@ -337,7 +338,7 @@ def _monte_carlo(payload: Dict[str, Any], iterations: int = 500) -> Dict[str, An
         "p10": pct(0.10),
         "p50": pct(0.50),
         "p90": pct(0.90),
-        "distribution_sample": [round(x, 2) for x in results_sorted[::max(1, len(results_sorted)//200)]],
+        "distribution_sample": [round(x, 2) for x in results_sorted[:: max(1, len(results_sorted) // 200)]],
     }
 
 
@@ -352,6 +353,7 @@ def run_simulation(request: HttpRequest):
     Allows optional scenario_id hydration; returns JSON result and (if scenario_id provided) persists a SimulationRun.
     """
     import json
+
     try:
         body = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -489,6 +491,7 @@ def monte_carlo_api(request: HttpRequest):
     Responds with P10/P50/P90 of total operating profit for the horizon.
     """
     import json
+
     try:
         body = json.loads(request.body.decode("utf-8"))
     except Exception:
@@ -524,5 +527,3 @@ def monte_carlo_api(request: HttpRequest):
     bands = _monte_carlo(merged, iterations=max(100, min(iterations, 5000)))
 
     return JsonResponse({"ok": True, "bands": bands}, status=200)
-
-

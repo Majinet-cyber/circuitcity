@@ -1,7 +1,7 @@
 ﻿# circuitcity/accounts/urls.py
 from django.conf import settings
-from django.urls import path, reverse_lazy
 from django.contrib.auth.views import LogoutView
+from django.urls import path, reverse_lazy
 from django.views.generic import RedirectView
 
 from . import views
@@ -16,28 +16,33 @@ urlpatterns = [
     # Authentication
     # -------------------------------
     path("login/", views.login_view, name="login"),
-    
     # New multi-step wizard (primary signup flow)
     path("signup/", views.signup_wizard, {"step": 0}, name="signup"),
     path("signup/wizard/<int:step>/", views.signup_wizard, name="signup_wizard_step"),
     path("signup/verify-email/", views.signup_verify_email, name="signup_verify_email"),
-    
     # Legacy single-page signup (kept for backwards compatibility)
     path("signup/manager/", views.signup_manager, name="signup_manager"),
-
     # Logout (supports GET or POST), plus a vanilla CBV option
     path("logout/", views.logout_get_or_post, name="logout"),
     path("logout/post/", LogoutView.as_view(next_page=LOGIN_URL_LAZY), name="logout_post"),
-
     # -------------------------------
     # OTP (One-Time Password)
     # -------------------------------
     path("otp/", views.otp_challenge, name="otp_challenge"),
-    
     # OTP JSON API endpoints
     path("auth/otp/request/", views.otp_request_api, name="otp_request_api"),
     path("auth/otp/verify/", views.otp_verify_api, name="otp_verify_api"),
-
+    # -------------------------------
+    # Two-Factor Authentication (SMS OTP)
+    # -------------------------------
+    # Challenge screen (after password login)
+    path("2fa/challenge/", views.twofa_challenge, name="twofa_challenge"),
+    # Enable SMS 2FA flow
+    path("2fa/sms/enable/start/", views.twofa_sms_enable_start, name="twofa_sms_enable_start"),
+    path("2fa/sms/enable/verify/", views.twofa_sms_enable_verify, name="twofa_sms_enable_verify"),
+    # Disable SMS 2FA flow
+    path("2fa/sms/disable/start/", views.twofa_sms_disable_start, name="twofa_sms_disable_start"),
+    path("2fa/sms/disable/verify/", views.twofa_sms_disable_verify, name="twofa_sms_disable_verify"),
     # -------------------------------
     # Password Management
     # -------------------------------
@@ -45,7 +50,6 @@ urlpatterns = [
     path("password/forgot/", views.forgot_password_request_view, name="forgot_password_request"),
     # Step 2: verify code + set the new password
     path("password/reset/", views.forgot_password_verify_view, name="forgot_password_reset"),
-
     # âœ… Aliases expected by templates / legacy Django auth URLs
     path(
         "password_reset/",
@@ -72,18 +76,15 @@ urlpatterns = [
         RedirectView.as_view(pattern_name="accounts:forgot_password_reset", permanent=False),
         name="password_reset_confirm",
     ),
-
     # -------------------------------
     # Avatar Uploads
     # -------------------------------
     path("avatar/me/", views.upload_my_avatar, name="upload_my_avatar"),
     path("avatar/<int:agent_id>/", views.upload_agent_avatar, name="upload_agent_avatar"),
-
     # -------------------------------
     # Admin Actions
     # -------------------------------
     path("admin/unblock/", views.admin_unblock_user_view, name="admin_unblock_user"),
-
     # -------------------------------
     # User Settings
     # -------------------------------
@@ -122,10 +123,12 @@ if settings.DEBUG:
 # -------------------------------
 if settings.DEBUG or getattr(settings, "E2E_TESTING", False):
     from . import views_e2e
+
     urlpatterns += [
         path("__e2e__/latest-otp/", views_e2e.e2e_latest_otp, name="e2e_latest_otp"),
         path("__e2e__/verify-otp-bypass/", views_e2e.e2e_verify_otp_bypass, name="e2e_verify_otp_bypass"),
         path("__e2e__/seed-business/", views_e2e.e2e_seed_business, name="e2e_seed_business"),
+        # Add both slash and no-slash versions to avoid 301/404 issues
+        path("__e2e__/test-login", views_e2e.e2e_test_login, name="e2e_test_login_noslash"),
+        path("__e2e__/test-login/", views_e2e.e2e_test_login, name="e2e_test_login"),
     ]
-
-

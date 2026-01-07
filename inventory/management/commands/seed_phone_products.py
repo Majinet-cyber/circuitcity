@@ -28,7 +28,6 @@ DEFAULT_PRODUCTS = [
     ("TECNO", "Pop 10", 2, 64, 32000, 40000),
     ("TECNO", "Pop 10", 3, 64, 35000, 44000),
     ("TECNO", "Camon 40", 8, 256, 120000, 155000),
-    
     # Itel
     ("ITEL", "A18", 1, 16, 22000, 28000),
     ("ITEL", "P38", 2, 32, 28000, 35000),
@@ -39,7 +38,6 @@ DEFAULT_PRODUCTS = [
     ("ITEL", "A90", 3, 128, 48000, 62000),
     ("ITEL", "S25", 4, 128, 52000, 68000),
     ("ITEL", "City 100", 4, 128, 58000, 75000),
-    
     # Samsung
     ("SAMSUNG", "A03", 3, 32, 48000, 62000),
     ("SAMSUNG", "A13", 4, 64, 72000, 92000),
@@ -114,8 +112,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"\n{'[DRY RUN] ' if dry_run else ''}Complete! "
-                f"Created: {total_created}, Skipped: {total_skipped}"
+                f"\n{'[DRY RUN] ' if dry_run else ''}Complete! " f"Created: {total_created}, Skipped: {total_skipped}"
             )
         )
 
@@ -133,18 +130,12 @@ class Command(BaseCommand):
 
             # Check if already exists
             exists = PhoneProductCatalog.objects.filter(
-                business=business,
-                brand=brand,
-                model_name=model_name,
-                ram_gb=ram_gb,
-                rom_gb=rom_gb
+                business=business, brand=brand, model_name=model_name, ram_gb=ram_gb, rom_gb=rom_gb
             ).exists()
 
             if exists:
                 skipped += 1
-                self.stdout.write(
-                    self.style.WARNING(f"  ⏭  {brand} {model_name} ({variant_label}) (already exists)")
-                )
+                self.stdout.write(self.style.WARNING(f"  ⏭  {brand} {model_name} ({variant_label}) (already exists)"))
                 continue
 
             if dry_run:
@@ -172,16 +163,10 @@ class Command(BaseCommand):
                     is_flagship=True,
                 )
                 created += 1
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"  ✓  Created: {brand} {model_name} ({variant_label})"
-                    )
-                )
+                self.stdout.write(self.style.SUCCESS(f"  ✓  Created: {brand} {model_name} ({variant_label})"))
             except Exception as e:
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"  ✗  Failed to create {brand} {model_name} ({variant_label}): {e}"
-                    )
+                    self.style.ERROR(f"  ✗  Failed to create {brand} {model_name} ({variant_label}): {e}")
                 )
                 skipped += 1
 

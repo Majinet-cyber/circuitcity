@@ -33,6 +33,13 @@ try:
 except Exception:
     _sell_quick_page = TemplateView.as_view(template_name="inventory/sell_quick.html")
 
+# PHASE 4: Price editing views (manager-only)
+try:
+    from . import views_price_edit
+except Exception:
+    views_price_edit = SimpleNamespace()
+
+
 # ---------------------------------------------------------------------
 # Import API modules (prefer api_views)
 # ---------------------------------------------------------------------
@@ -42,8 +49,9 @@ def _import_optional(modname: str):
     except Exception:
         return SimpleNamespace()
 
-_api_v2_primary = _import_optional("api_views")   # Primary v2
-_api_v2_alt = _import_optional("api_view")        # Alt v2 module
+
+_api_v2_primary = _import_optional("api_views")  # Primary v2
+_api_v2_alt = _import_optional("api_view")  # Alt v2 module
 
 # Merge v2 sources into one namespace
 _api_v2 = SimpleNamespace()
@@ -121,17 +129,22 @@ from .views_dispatch import product_new_entry as product_new_entry_view, vertica
 try:
     from core.decorators import manager_required
 except Exception:
+
     def manager_required(view_func):
         return view_func
+
 
 try:
     from tenants.utils import require_business
 except Exception:
+
     def require_business(view_func):
         return view_func
 
+
 _need_biz = require_business
 app_name = "inventory"
+
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -139,7 +152,9 @@ app_name = "inventory"
 def _stub(msg: str):
     def _fn(_request, *args, **kwargs):
         return JsonResponse({"ok": False, "error": msg}, status=501)
+
     return _fn
+
 
 def _safe_reverse(view_name: str, *args, **kwargs) -> Optional[str]:
     try:
@@ -153,6 +168,7 @@ def _safe_reverse(view_name: str, *args, **kwargs) -> Optional[str]:
                 pass
     return None
 
+
 # JSON API safety
 def _ensure_response(view_func):
     def _wrapped(request, *args, **kwargs):
@@ -163,7 +179,9 @@ def _ensure_response(view_func):
             name = getattr(out, "__name__", "view")
             return HttpResponse(f"{name}: callable returned by view (not executed)")
         return HttpResponse(out if out is not None else "")
+
     return _wrapped
+
 
 # Turn CBVs into callables once.
 def _callable_view(obj):
@@ -175,9 +193,11 @@ def _callable_view(obj):
         pass
     return obj
 
+
 # IMPORTANT: Realize only CBVs. Do NOT pre-call functions/factories.
 def _realize_view(obj):
     return _callable_view(obj)
+
 
 # UPDATED: page executor with template fallback
 def _page_exec(view_func, template_name: Optional[str] = None):
@@ -185,6 +205,7 @@ def _page_exec(view_func, template_name: Optional[str] = None):
     Execute a page view; if it doesn't return a proper HttpResponse,
     render `template_name` (if provided) as a safe fallback.
     """
+
     def _wrapped(request, *args, **kwargs):
         out = view_func(request, *args, **kwargs)
 
@@ -218,8 +239,14 @@ def _page_exec(view_func, template_name: Optional[str] = None):
             return HttpResponse(out)
 
         # Final fallback to an empty but valid page
-        return render(request, "inventory/time_logs.html", {}) if template_name == "inventory/time_logs.html" else HttpResponse("")
+        return (
+            render(request, "inventory/time_logs.html", {})
+            if template_name == "inventory/time_logs.html"
+            else HttpResponse("")
+        )
+
     return _wrapped
+
 
 _FALLBACKS = {
     "inventory:stock_list": "/inventory/list/",
@@ -233,11 +260,14 @@ _FALLBACKS = {
     "inventory:product_create": "/inventory/products/new/",
 }
 
+
 def _redirect_to(view_name: str):
     def _v(request, *args, **kwargs):
         url = _safe_reverse(view_name, args, kwargs) or _FALLBACKS.get(view_name) or "/"
         return redirect(url)
+
     return _v
+
 
 def _forward_to_root_login(request, *args, **kwargs):
     qs = request.META.get("QUERY_STRING", "")
@@ -245,6 +275,7 @@ def _forward_to_root_login(request, *args, **kwargs):
     if qs:
         url = f"{url}?{qs}"
     return redirect(url)
+
 
 def _resolve_page(candidate_names: Iterable[str], template_name: str, missing_msg: str):
     for nm in candidate_names:
@@ -255,6 +286,7 @@ def _resolve_page(candidate_names: Iterable[str], template_name: str, missing_ms
         if callable(rv):
             return rv
     return TemplateView.as_view(template_name=template_name) if template_name else _stub(missing_msg)
+
 
 def _get_any(names: tuple[str, ...], *sources, msg: str | None = None):
     for src in sources:
@@ -267,6 +299,7 @@ def _get_any(names: tuple[str, ...], *sources, msg: str | None = None):
                 return rv
     return _stub(msg or f"{'/'.join(names)} endpoint not implemented")
 
+
 # ---------------------------------------------------------------------
 # Stock-list glue (+ keys used by product routing)
 # ---------------------------------------------------------------------
@@ -277,6 +310,7 @@ _SESS_BIZ = ("active_business_id", "business_id", "tenant_id", "current_business
 _SESS_LOC = ("active_location_id", "location_id", "store_id", "current_location_id")
 
 _VALID_STATUS = {"all", "available", "in_stock", "selling", "sold", "archived"}
+
 
 def _derive_active_ids(request):
     bid = getattr(request, "business_id", None)
@@ -303,11 +337,13 @@ def _derive_active_ids(request):
                 break
     return bid, lid
 
+
 def _coerce_int(v):
     try:
         return int(v)
     except Exception:
         return v
+
 
 def _stock_list_wrapper(view_func):
     def _wrapped(request, *args, **kwargs):
@@ -334,13 +370,19 @@ def _stock_list_wrapper(view_func):
                 return redirect(f"{request.path}?{qs.urlencode()}")
 
         return view_func(request, *args, **kwargs)
+
     return _wrapped
+
 
 # ---------------------------------------------------------------------
 # Resolve views safely
 # ---------------------------------------------------------------------
-_inventory_dashboard = _get_any(("inventory_dashboard",), views_dashboard, views, msg="inventory_dashboard view missing")
-_stock_list = _get_any(("stock_list", "inventory_list"), views, _api_v2, _api_legacy, msg="stock_list endpoint not implemented")
+_inventory_dashboard = _get_any(
+    ("inventory_dashboard",), views_dashboard, views, msg="inventory_dashboard view missing"
+)
+_stock_list = _get_any(
+    ("stock_list", "inventory_list"), views, _api_v2, _api_legacy, msg="stock_list endpoint not implemented"
+)
 
 _scan_in_page_view = _resolve_page(
     ("scan_in", "scan_in_page", "scan_in_view", "scan_in_form"),
@@ -363,10 +405,14 @@ _scan_sold_tester = _resolve_page(
     template_name="inventory/scan_sold.html",
     missing_msg="scan_sold page view missing",
 )
-_place_order_page = _resolve_page(("place_order_page", "place_order_view"),
-                                  template_name="inventory/place_order.html",
-                                  missing_msg="place order page not implemented")
-_scan_web = _resolve_page(("scan_web",), template_name="inventory/scan_web.html", missing_msg="scan_web page view missing")
+_place_order_page = _resolve_page(
+    ("place_order_page", "place_order_view"),
+    template_name="inventory/place_order.html",
+    missing_msg="place order page not implemented",
+)
+_scan_web = _resolve_page(
+    ("scan_web",), template_name="inventory/scan_web.html", missing_msg="scan_web page view missing"
+)
 
 _stock_detail = _get_any(("stock_detail",), views, msg="stock_detail page view missing")
 _export_csv = _get_any(("export_csv",), views, msg="export_csv view missing")
@@ -386,6 +432,7 @@ try:
         _mgr_time_overview_api,
         my_time_logs_page as __my_time_logs_page_raw,
     )
+
     _time_checkin_page = _realize_view(__time_checkin_page_raw)
     _time_logs_page = _realize_view(__time_logs_page_raw)
     _mgr_time_overview_page = _realize_view(__mgr_time_overview_page_raw)
@@ -394,10 +441,13 @@ except Exception:
     _time_checkin_page = TemplateView.as_view(template_name="inventory/time_checkin.html")
     _time_logs_page = TemplateView.as_view(template_name="inventory/time_logs.html")
     _time_logs_api = _stub("time_logs_api not implemented")
+
     def _mgr_time_overview_page(request, *a, **k):
         return render(request, "inventory/time_overview.html", {"agents": []})
+
     def _mgr_time_overview_api(request, *a, **k):
         return JsonResponse({"ok": False, "error": "manager_time_overview_api not available"}, status=501)
+
     _my_time_logs_page = lambda request, *a, **k: TemplateView.as_view(  # noqa: E731
         template_name="inventory/time_logs.html"
     )(request)
@@ -407,6 +457,7 @@ _wallet_page = _get_any(("wallet_page",), views, msg="wallet page view missing")
 _healthz = _get_any(("healthz",), views, msg="OK")
 _settings_view = _get_any(("settings_home", "settings"), views, msg="settings view missing")
 
+
 # ---------- ORDERS: resolve directly, no stub shadowing ----------
 def _resolve_orders_list_view():
     fn = getattr(views, "orders_list", None)
@@ -414,23 +465,30 @@ def _resolve_orders_list_view():
         rv = _realize_view(fn)
         if callable(rv):
             return rv
+
     def _fallback(request, *args, **kwargs):
         return render(
             request,
             "inventory/orders_list.html",
             {"page_obj": None, "orders": [], "message": "Orders model not available yet."},
         )
+
     return _fallback
 
+
 _orders_list_view = _resolve_orders_list_view()
+
 
 def _resolve_orders_list_api():
     api_fn = getattr(_api_v2_primary, "orders_list_api", None)
     if callable(api_fn):
         return api_fn
+
     def _api_ok(_request, *args, **kwargs):
         return JsonResponse({"ok": True, "count": 0, "orders": []}, status=200)
+
     return _api_ok
+
 
 _orders_list_api = _resolve_orders_list_api()
 
@@ -444,21 +502,23 @@ _api_stock_status_direct = getattr(views, "api_stock_status", None)
 _api_stock_status_view = (
     getattr(_api_v2_primary, "api_stock_status", None)
     or _api_stock_status_direct
-    or _get_any(("api_stock_status", "stock_status", "stock_status_api"), _api_v2, _api_legacy, msg="api_stock_status not implemented")
+    or _get_any(
+        ("api_stock_status", "stock_status", "stock_status_api"),
+        _api_v2,
+        _api_legacy,
+        msg="api_stock_status not implemented",
+    )
 )
-_mark_sold_view = (
-    getattr(_api_v2_primary, "api_mark_sold", None)
-    or _get_any(("api_mark_sold",), _api_v2, _api_legacy, msg="api_mark_sold not implemented")
+_mark_sold_view = getattr(_api_v2_primary, "api_mark_sold", None) or _get_any(
+    ("api_mark_sold",), _api_v2, _api_legacy, msg="api_mark_sold not implemented"
 )
 
-_api_imei_lookup = (
-    getattr(_api_v2_primary, "imei_lookup", None)
-    or _get_any(("imei_lookup", "api_imei_lookup"), _api_v2, _api_legacy, msg="imei_lookup not implemented")
+_api_imei_lookup = getattr(_api_v2_primary, "imei_lookup", None) or _get_any(
+    ("imei_lookup", "api_imei_lookup"), _api_v2, _api_legacy, msg="imei_lookup not implemented"
 )
 
-_api_stock_list_view = (
-    getattr(_api_v2_primary, "stock_list", None)
-    or _get_any(("stock_list",), _api_v2, _api_legacy, msg="stock_list API not implemented")
+_api_stock_list_view = getattr(_api_v2_primary, "stock_list", None) or _get_any(
+    ("stock_list",), _api_v2, _api_legacy, msg="stock_list API not implemented"
 )
 
 _scan_sold_submit_view = getattr(views, "scan_sold_submit", None) or _stub("scan_sold_submit view not implemented")
@@ -475,28 +535,38 @@ _api_time_logs_view = (
 
 _timeclock_event_view = _get_any(
     ("api_timeclock_event", "api_clock_event"),
-    views, _api_v2, _api_legacy,
+    views,
+    _api_v2,
+    _api_legacy,
     msg="api_timeclock_event not implemented",
 )
 _timeclock_bootstrap_view = _get_any(
     ("api_timeclock_bootstrap", "api_clock_bootstrap"),
-    views, _api_v2, _api_legacy,
+    views,
+    _api_v2,
+    _api_legacy,
     msg="api_timeclock_bootstrap not implemented",
 )
 
 _wallet_summary = _get_any(("api_wallet_summary",), _api_v2, _api_legacy, msg="api_wallet_summary not implemented")
 _wallet_add_txn = _get_any(("api_wallet_add_txn",), _api_v2, _api_legacy, msg="api_wallet_add_txn not implemented")
-_sales_trend_view = _get_any(("api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_sales_trend not implemented")
+_sales_trend_view = _get_any(
+    ("api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_sales_trend not implemented"
+)
 _top_models_view = _get_any(("api_top_models",), _api_v2, _api_legacy, msg="api_top_models not implemented")
 _profit_bar_view = _get_any(("api_profit_bar",), _api_v2, _api_legacy, msg="api_profit_bar not implemented")
-_value_trend_view = _get_any(("value_trend", "api_value_trend", "api_sales_trend", "sales_trend"), _api_v2, _api_legacy, msg="api_value_trend not implemented")
+_value_trend_view = _get_any(
+    ("value_trend", "api_value_trend", "api_sales_trend", "sales_trend"),
+    _api_v2,
+    _api_legacy,
+    msg="api_value_trend not implemented",
+)
 
 # >>> ADD THIS MISSING RESOLVER <<<
 _agent_trend_view = _get_any(("api_agent_trend",), _api_v2, _api_legacy, msg="api_agent_trend not implemented")
 
-_restock_heatmap = (
-    getattr(_api_v2_primary, "restock_heatmap_api", None)
-    or _get_any(("restock_heatmap", "restock_heatmap_api"), _api_v2, _api_legacy, msg="restock_heatmap not implemented")
+_restock_heatmap = getattr(_api_v2_primary, "restock_heatmap_api", None) or _get_any(
+    ("restock_heatmap", "restock_heatmap_api"), _api_v2, _api_legacy, msg="restock_heatmap not implemented"
 )
 
 _api_order_price = _get_any(("api_order_price",), _api_v2, _api_legacy, msg="api_order_price not implemented")
@@ -505,7 +575,9 @@ _api_place_order = _get_any(("api_place_order",), _api_v2, _api_legacy, msg="api
 
 _predictions_view = _get_any(
     ("predictions_summary", "predictions_view", "predictions_api"),
-    views_dashboard, _api_v2, _api_legacy,
+    views_dashboard,
+    _api_v2,
+    _api_legacy,
     msg="predictions endpoint not implemented",
 )
 
@@ -513,26 +585,30 @@ _cash_overview_view = _get_any(("api_cash_overview",), _api_v2, _api_legacy, msg
 
 _alerts_view = _get_any(("api_alerts",), _api_v2, _api_legacy, msg="api_alerts not implemented")
 
-_inventory_summary_view = (
-    getattr(_api_v2_primary, "api_inventory_summary", None)
-    or _get_any(("api_inventory_summary",), _api_v2, _api_legacy, msg="api_inventory_summary not implemented")
+_inventory_summary_view = getattr(_api_v2_primary, "api_inventory_summary", None) or _get_any(
+    ("api_inventory_summary",), _api_v2, _api_legacy, msg="api_inventory_summary not implemented"
 )
 
 _api_product_create = _get_any(
     ("api_product_create", "product_create_api", "api_create_product"),
-    _api_v2, _api_legacy,
+    _api_v2,
+    _api_legacy,
     msg="api_product_create not implemented",
 )
 _api_product_update_price = _get_any(
     ("api_product_update_price",),
-    _api_v2, _api_legacy,
+    _api_v2,
+    _api_legacy,
     msg="api_product_update_price not implemented",
 )
+
 
 def _json_501(msg: str):
     def _v(_request, *a, **k):
         return JsonResponse({"ok": False, "error": msg}, status=501)
+
     return _v
+
 
 _api_task_submit = (
     getattr(_api_v2_primary, "api_task_submit", None)
@@ -555,26 +631,28 @@ _api_audit_verify = (
     or _json_501("api_audit_verify missing")
 )
 
-_backfill_sale_view = (
-    getattr(_api_v2_primary, "api_backfill_sale", None)
-    or _get_any(("api_backfill_sale",), _api_v2, _api_legacy, msg="api_backfill_sale not implemented")
+_backfill_sale_view = getattr(_api_v2_primary, "api_backfill_sale", None) or _get_any(
+    ("api_backfill_sale",), _api_v2, _api_legacy, msg="api_backfill_sale not implemented"
 )
 
 # --- NEW: Business-manager stock update/delete resolvers (JSON) ---
 _api_stock_update_instock = _get_any(
     ("stock_update_instock", "api_stock_update_instock"),
-    _api_v2, _api_legacy,
+    _api_v2,
+    _api_legacy,
     msg="stock_update_instock not implemented",
 )
 _api_stock_delete = _get_any(
     ("stock_delete", "api_stock_delete"),
-    _api_v2, _api_legacy,
+    _api_v2,
+    _api_legacy,
     msg="api_stock_delete not implemented",
 )
 
 # NEW: Phone catalog API endpoints (from views_scan.py)
 try:
     from .views_scan import api_phone_brands, api_phone_models, api_phone_cost_by_imei
+
     _phone_brands_api = api_phone_brands
     _phone_models_api = api_phone_models
     _phone_cost_by_imei_api = api_phone_cost_by_imei
@@ -601,6 +679,7 @@ def _normalize_label(val: str) -> str:
         return "clothing"
     return "generic"
 
+
 def _coerce_str(v) -> Optional[str]:
     if v is None:
         return None
@@ -615,17 +694,25 @@ def _coerce_str(v) -> Optional[str]:
             pass
     return None
 
+
 def _mode_from_session(session) -> Optional[str]:
     if not session:
         return None
     for key in (
-        "business_kind", "business_type", "business_vertical", "vertical",
-        "category", "industry", "tenant_vertical", "active_business_vertical"
+        "business_kind",
+        "business_type",
+        "business_vertical",
+        "vertical",
+        "category",
+        "industry",
+        "tenant_vertical",
+        "active_business_vertical",
     ):
         val = _coerce_str(session.get(key))
         if val:
             return _normalize_label(val)
     return None
+
 
 def _current_business_from_request(request):
     biz = (
@@ -642,10 +729,12 @@ def _current_business_from_request(request):
     if bid:
         try:
             from tenants.models import Business
+
             return Business.objects.filter(id=bid).first()
         except Exception:
             return None
     return None
+
 
 def _infer_product_mode(request) -> str:
     q_mode = _normalize_label(request.GET.get("mode", ""))
@@ -674,6 +763,7 @@ def _infer_product_mode(request) -> str:
 
     return "generic"
 
+
 def _coerce_str(v) -> Optional[str]:  # (kept as-is; defined earlier)
     if v is None:
         return None
@@ -688,62 +778,81 @@ def _coerce_str(v) -> Optional[str]:  # (kept as-is; defined earlier)
             pass
     return None
 
+
 def product_create_page(request):
     from django import forms
 
     mode = _infer_product_mode(request)
 
     if mode == "phones":
+
         class DynamicProductForm(forms.Form):
             brand = forms.CharField(label="Brand name", max_length=80, required=True)
             model = forms.CharField(label="Model number (optional)", max_length=80, required=False)
             specs = forms.CharField(label="Specs", widget=forms.Textarea(attrs={"rows": 4}), required=True)
             price = forms.DecimalField(label="Price", max_digits=12, decimal_places=2, required=True)
             phone_name = forms.CharField(label="Phone name", max_length=120, required=True)
+
         page_title = "Add Phone"
         page_hint = "Phones: IMEI captured on Scan IN (15 digits)."
 
     elif mode == "liquor":
+
         class DynamicProductForm(forms.Form):
             liquor_name = forms.CharField(label="Liquor name", max_length=120, required=True)
             price_bottle = forms.DecimalField(label="Price per bottle", max_digits=12, decimal_places=2, required=True)
-            price_shot = forms.DecimalField(label="Price per shot (optional)", max_digits=12, decimal_places=2, required=False)
-            shots_per_bottle = forms.IntegerField(label="Number of shots in bottle (optional)", min_value=1, required=False)
-            qty_bottles = forms.IntegerField(label="Quantity of bottles received (optional)", min_value=0, required=False)
+            price_shot = forms.DecimalField(
+                label="Price per shot (optional)", max_digits=12, decimal_places=2, required=False
+            )
+            shots_per_bottle = forms.IntegerField(
+                label="Number of shots in bottle (optional)", min_value=1, required=False
+            )
+            qty_bottles = forms.IntegerField(
+                label="Quantity of bottles received (optional)", min_value=0, required=False
+            )
+
         page_title = "Add Liquor"
         page_hint = "Liquor: sell by bottle or shots; no Scan IN/Sold pages needed."
 
     elif mode == "pharmacy":
+
         class DynamicProductForm(forms.Form):
             barcode = forms.CharField(label="Barcode (12–13 digits, optional)", max_length=13, required=False)
             medicine_name = forms.CharField(label="Medicine name", max_length=120, required=True)
             quantity = forms.IntegerField(label="Quantity", min_value=0, required=True)
             price_per_unit = forms.DecimalField(label="Price per unit", max_digits=12, decimal_places=2, required=True)
+
         page_title = "Add Medicine"
         page_hint = "Pharmacy: medicine name, quantity and unit price."
 
     elif mode == "grocery":
+
         class DynamicProductForm(forms.Form):
             product_name = forms.CharField(label="Product name", max_length=120, required=True)
             quantity = forms.IntegerField(label="Quantity", min_value=0, required=True)
             price_per_unit = forms.DecimalField(label="Price per unit", max_digits=12, decimal_places=2, required=True)
             barcode = forms.CharField(label="Barcode (optional)", max_length=32, required=False)
+
         page_title = "Add Grocery Item"
         page_hint = "Groceries: simple product with quantity and unit price."
 
     elif mode == "clothing":
+
         class DynamicProductForm(forms.Form):
             product_name = forms.CharField(label="Clothing item", max_length=120, required=True)
             size = forms.CharField(label="Size (e.g., M, 42)", max_length=32, required=False)
             price = forms.DecimalField(label="Price", max_digits=12, decimal_places=2, required=True)
+
         page_title = "Add Clothing Item"
         page_hint = "Clothing: simple item with optional size."
 
     else:
+
         class DynamicProductForm(forms.Form):
             brand = forms.CharField(label="Brand", max_length=80, required=True)
             product_name = forms.CharField(label="Product name", max_length=120, required=True)
             price = forms.DecimalField(label="Price", max_digits=12, decimal_places=2, required=True)
+
         page_title = "Add Product"
         page_hint = "Generic products: simple details."
 
@@ -764,12 +873,13 @@ def product_create_page(request):
     }
     return render(request, "inventory/product_create.html", ctx)
 
+
 def product_create_router(request):
     mapping = {
-        "phones":   "inventory:product_create_phones",
+        "phones": "inventory:product_create_phones",
         "pharmacy": "inventory:product_create_pharmacy",
-        "liquor":   "inventory:product_create_liquor",
-        "grocery":  "inventory:product_create_grocery",
+        "liquor": "inventory:product_create_liquor",
+        "grocery": "inventory:product_create_grocery",
         "clothing": "inventory:product_create_clothing",
     }
     mode = _infer_product_mode(request)
@@ -778,19 +888,23 @@ def product_create_router(request):
         return redirect(url)
     return product_create_page(request)
 
+
 def _product_create_for_mode_factory(force_mode: str):
     def _view(request, *args, **kwargs):
         q = request.GET.copy()
         q["mode"] = force_mode
         request.GET = q
         return product_create_page(request)
+
     return _view
+
 
 # ---------------------------------------------------------------------
 # Import v2 polished create/edit/delete views — HARD require v2
 # ---------------------------------------------------------------------
 try:
     from . import views_products_v2 as prodv2
+
     if not getattr(prodv2, "V2_LOADED", False):
         raise ImportError("views_products_v2 did not set V2_LOADED")
 except Exception:
@@ -802,9 +916,11 @@ except Exception:
 try:
     from .helpers import product_new_url_for_business
 except Exception:
+
     def product_new_url_for_business(biz):  # type: ignore
         def _norm(val: Optional[str]) -> str:
             return (val or "").strip().lower()
+
         v = None
         if biz:
             for attr in ("template_key", "vertical", "category", "industry", "type", "kind", "sector"):
@@ -818,6 +934,7 @@ except Exception:
         if v in {"liquor", "bar", "pub"}:
             return _safe_reverse("inventory:liquor_product_new_v2") or "/inventory/liquor/products/new/v2/"
         return _safe_reverse("inventory:merch_product_new") or "/inventory/merch/products/new/v2/"
+
 
 @login_required
 @_need_biz
@@ -839,6 +956,7 @@ def _legacy_product_new_entry(request):
     url = product_new_url_for_business(getattr(request, "business", None))
     return redirect(url)
 
+
 # ---------------------------------------------------------------------
 # Local redirect helpers
 # ---------------------------------------------------------------------
@@ -849,16 +967,25 @@ def _list_all_redirect(request):
     join = "&" if "?" in base else "?"
     return redirect(f"{base}{join}{qs.urlencode()}")
 
+
 def _home_redirect(_request):
-    url = _safe_reverse("inventory:inventory_dashboard") or _safe_reverse("inventory_dashboard") or "/inventory/dashboard/"
+    url = (
+        _safe_reverse("inventory:inventory_dashboard")
+        or _safe_reverse("inventory_dashboard")
+        or "/inventory/dashboard/"
+    )
     return redirect(url)
+
 
 # ---------------------------------------------------------------------
 # NEW: Locations + Alerts page resolvers (safe fallbacks)
 # ---------------------------------------------------------------------
 _locations_view = _get_any(("locations",), views, msg="locations view missing")
-_alerts_page = _resolve_page(("alerts_feed", "alerts"), template_name="inventory/alerts_feed.html", missing_msg="alerts page view missing")
+_alerts_page = _resolve_page(
+    ("alerts_feed", "alerts"), template_name="inventory/alerts_feed.html", missing_msg="alerts page view missing"
+)
 _capture_gps = _get_any(("capture_gps",), views, msg="capture_gps not implemented")
+
 
 # ---------------------------------------------------------------------
 # Docs (Invoices / Quotations) resolvers — SAFE fallbacks
@@ -876,7 +1003,9 @@ def _html_fallback(title: str, tip: str):
             </div></body>""",
             content_type="text/html",
         )
+
     return _view
+
 
 _docs_home_view = getattr(_docs, "docs_home", None) or _html_fallback("Business Docs", "Docs module not loaded yet.")
 _doc_new_invoice = getattr(_docs, "doc_new_invoice", None) or _html_fallback(
@@ -891,11 +1020,13 @@ _doc_download_excel = getattr(_docs, "doc_download_excel", None) or _stub("doc_d
 _doc_send_email = getattr(_docs, "doc_send_email", None) or _stub("doc_send_email not implemented")
 _doc_send_whatsapp = getattr(_docs, "doc_send_whatsapp", None) or _stub("doc_send_whatsapp not implemented")
 
+
 # ---------------------------------------------------------------------
 # Scan-IN: direct to page
 # ---------------------------------------------------------------------
 def _scan_in_guarded(request, *args, **kwargs):
     return _scan_in_page_view(request, *args, **kwargs)
+
 
 # ---------------------------------------------------------------------
 # URL patterns
@@ -904,46 +1035,125 @@ urlpatterns = [
     # Login catch-alls
     re_path(r"^(?:.*/)?login/?$", _forward_to_root_login, name="inventory_login_catchall"),
     re_path(r"^(?:.*/)?accounts/login/?$", _forward_to_root_login, name="inventory_accounts_login_catchall"),
-
     path("", _home_redirect, name="home"),
-
     # Stock + dashboard (pages)
     path("list/", _need_biz(_stock_list_wrapper(_stock_list)), name="stock_list"),
     path("products/", _need_biz(_stock_list_wrapper(_stock_list)), name="product_list"),
     path("stock/", _need_biz(_stock_list_wrapper(_stock_list))),
     path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
-
+    # Generic dashboard (safe fallback for unrecognized verticals - NO redirects)
+    path("generic-dashboard/", _need_biz(views.generic_dashboard), name="generic_dashboard"),
     # Legacy inventory dashboard (not vertical-specific)
     path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
     path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
     path("dash/", _redirect_to("inventory:inventory_dashboard")),
-
     # Stock assignment (manager-only)
-    path("stock/assign/", _need_biz(getattr(_stock_assign, "assign_stock_owner", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="assign_stock_owner"),
-    path("stock/bulk-assign/", _need_biz(getattr(_stock_assign, "bulk_assign_stock", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="bulk_assign_stock"),
-    path("api/business-agents/", _need_biz(getattr(_stock_assign, "get_business_agents", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="api_business_agents"),
-    
+    path(
+        "stock/assign/",
+        _need_biz(
+            getattr(
+                _stock_assign, "assign_stock_owner", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="assign_stock_owner",
+    ),
+    path(
+        "stock/bulk-assign/",
+        _need_biz(
+            getattr(
+                _stock_assign, "bulk_assign_stock", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="bulk_assign_stock",
+    ),
+    path(
+        "api/business-agents/",
+        _need_biz(
+            getattr(
+                _stock_assign, "get_business_agents", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="api_business_agents",
+    ),
     # Stock controls (manager-only: transfer, edit IMEI, archive, restore)
-    path("stock/<int:pk>/transfer/", _need_biz(getattr(_stock_controls, "transfer_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="transfer_stock"),
-    path("stock/<int:pk>/edit-imei/", _need_biz(getattr(_stock_controls, "edit_imei", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="edit_imei"),
-    path("stock/<int:pk>/archive/", _need_biz(getattr(_stock_controls, "archive_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_stock"),
-    path("stock/<int:pk>/restore/", _need_biz(getattr(_stock_controls, "restore_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))), name="restore_stock"),
-    
+    path(
+        "stock/<int:pk>/transfer/",
+        _need_biz(
+            getattr(
+                _stock_controls, "transfer_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="transfer_stock",
+    ),
+    path(
+        "stock/<int:pk>/edit-imei/",
+        _need_biz(
+            getattr(_stock_controls, "edit_imei", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501))
+        ),
+        name="edit_imei",
+    ),
+    path(
+        "stock/<int:pk>/archive/",
+        _need_biz(
+            getattr(
+                _stock_controls, "archive_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="archive_stock",
+    ),
+    path(
+        "stock/<int:pk>/restore/",
+        _need_biz(
+            getattr(
+                _stock_controls, "restore_stock", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="restore_stock",
+    ),
     # Premium Archive Flow (4-step safety process)
-    path("archive/start/", _need_biz(getattr(_archive_views, "archive_flow_start", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_start"),
-    path("archive/summary/", _need_biz(getattr(_archive_views, "archive_flow_summary", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_summary"),
-    path("archive/confirm/", _need_biz(getattr(_archive_views, "archive_flow_confirm", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_confirm"),
-    path("archive/execute/", _need_biz(getattr(_archive_views, "archive_flow_execute", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="archive_flow_execute"),
-
+    path(
+        "archive/start/",
+        _need_biz(
+            getattr(
+                _archive_views, "archive_flow_start", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="archive_flow_start",
+    ),
+    path(
+        "archive/summary/",
+        _need_biz(
+            getattr(
+                _archive_views, "archive_flow_summary", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="archive_flow_summary",
+    ),
+    path(
+        "archive/confirm/",
+        _need_biz(
+            getattr(
+                _archive_views, "archive_flow_confirm", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="archive_flow_confirm",
+    ),
+    path(
+        "archive/execute/",
+        _need_biz(
+            getattr(
+                _archive_views, "archive_flow_execute", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="archive_flow_execute",
+    ),
     # Scanning — pages
     # Main scan-in now uses gamified phone view (with fallback to legacy for non-phone businesses)
     path("scan-in/", _need_biz(getattr(_phones_views, "phone_scan_in", _scan_in_page_view)), name="scan_in"),
     path("scan-sold/", _need_biz(_scan_sold_page_view), name="scan_sold"),
-
     # NEW — Quick Sell page (no post-sale probe)
     path("sell/quick/", _need_biz(_sell_quick_page), name="sell_quick"),
-
     # NEW — direct Sell submit endpoint (business-wide; prefers local view)
     path("scan-sold/submit/", _need_biz(_scan_sold_submit_view), name="scan_sold_submit"),
     path("api/scan-sold/submit/", _need_biz(_scan_sold_submit_view), name="api_scan_sold_submit"),
@@ -966,49 +1176,71 @@ except Exception:
     _barcode_api = SimpleNamespace()
 
 urlpatterns += [
-    path("api/fast-sell/lookup/", _need_biz(getattr(_fast_sell_api, "fast_sell_lookup", _stub("fast_sell_lookup not found"))), name="api_fast_sell_lookup"),
-    path("api/fast-sell/sell/", _need_biz(getattr(_fast_sell_api, "fast_sell_sell", _stub("fast_sell_sell not found"))), name="api_fast_sell_sell"),
-    path("api/fast-sell/kpis/", _need_biz(getattr(_fast_sell_api, "fast_sell_kpis", _stub("fast_sell_kpis not found"))), name="api_fast_sell_kpis"),
-    
+    path(
+        "api/fast-sell/lookup/",
+        _need_biz(getattr(_fast_sell_api, "fast_sell_lookup", _stub("fast_sell_lookup not found"))),
+        name="api_fast_sell_lookup",
+    ),
+    path(
+        "api/fast-sell/sell/",
+        _need_biz(getattr(_fast_sell_api, "fast_sell_sell", _stub("fast_sell_sell not found"))),
+        name="api_fast_sell_sell",
+    ),
+    path(
+        "api/fast-sell/kpis/",
+        _need_biz(getattr(_fast_sell_api, "fast_sell_kpis", _stub("fast_sell_kpis not found"))),
+        name="api_fast_sell_kpis",
+    ),
     # Barcode lookup & quick create (for instant scan-to-sell)
-    path("api/barcode/lookup/", _need_biz(getattr(_barcode_api, "barcode_lookup_api", _stub("barcode_lookup_api not found"))), name="api_barcode_lookup"),
-    path("api/barcode/quick-create/", _need_biz(getattr(_barcode_api, "barcode_quick_create_api", _stub("barcode_quick_create_api not found"))), name="api_barcode_quick_create"),
+    path(
+        "api/barcode/lookup/",
+        _need_biz(getattr(_barcode_api, "barcode_lookup_api", _stub("barcode_lookup_api not found"))),
+        name="api_barcode_lookup",
+    ),
+    path(
+        "api/barcode/quick-create/",
+        _need_biz(getattr(_barcode_api, "barcode_quick_create_api", _stub("barcode_quick_create_api not found"))),
+        name="api_barcode_quick_create",
+    ),
 ]
 
 urlpatterns += [
     path("api/scan-in/", _scan_in_api, name="api_scan_in"),
     path("api/scan-sold/", _scan_sold_api, name="api_scan_sold"),
-
     path("api/stock-status/", _api_stock_status_view, name="api_stock_status"),
     path("api/stock_status/", _api_stock_status_view),
-
     path("api/mark-sold/", _mark_sold_view, name="api_mark_sold"),
-
     path("api/backfill-sale/", _backfill_sale_view, name="api_backfill_sale"),
     path("api/backfill_sale/", _backfill_sale_view),
-
     path("api/stock-list/", _api_stock_list_view, name="api_stock_list"),
     path("api/stock_list/", _api_stock_list_view),
-
     # Phone catalog API endpoints (Brand → Model filtering)
     path("api/phone-brands/", _phone_brands_api, name="api_phone_brands"),
     path("api/phone-models/", _phone_models_api, name="api_phone_models"),
     path("api/phone-cost-by-imei/", _phone_cost_by_imei_api, name="api_phone_cost_by_imei"),
-    
     # IMEI lookup endpoint for smart scanner
     path("api/imei-lookup/", _api_imei_lookup, name="api_imei_lookup"),
 ]
 
 # --- NEW: Manager-only stock edit/delete (IN_STOCK only; JSON) ---
 urlpatterns += [
-    path("api/stock/<int:pk>/update-instock/", manager_required(_need_biz(_api_stock_update_instock)),
-         name="api_stock_update_instock"),
+    path(
+        "api/stock/<int:pk>/update-instock/",
+        manager_required(_need_biz(_api_stock_update_instock)),
+        name="api_stock_update_instock",
+    ),
     # convenience aliases pointing to same handler (accepts imei and/or selling_price)
     path("api/stock/<int:pk>/price/", manager_required(_need_biz(_api_stock_update_instock))),
     path("api/stock/<int:pk>/imei/", manager_required(_need_biz(_api_stock_update_instock))),
-
-    path("api/stock/<int:pk>/delete/", manager_required(_need_biz(_api_stock_delete)),
-         name="api_stock_delete"),
+    path("api/stock/<int:pk>/delete/", manager_required(_need_biz(_api_stock_delete)), name="api_stock_delete"),
+    # PHASE 4: Price editing (manager-only, audited)
+    path(
+        "api/stock/<int:item_id>/edit-prices/",
+        manager_required(
+            _need_biz(getattr(views_price_edit, "edit_stock_prices", _stub("edit_stock_prices not found")))
+        ),
+        name="api_edit_stock_prices",
+    ),
 ]
 
 # Orders — pages + APIs
@@ -1018,16 +1250,18 @@ urlpatterns += [
     path("orders/", manager_required(_need_biz(_orders_list_view)), name="orders_list"),
     path("orders/<int:po_id>/invoice/", manager_required(_need_biz(_po_invoice)), name="po_invoice"),
     path("orders/<int:po_id>/download/", manager_required(_need_biz(_po_invoice)), name="po_invoice_download"),
-
     path("api/orders/", manager_required(_need_biz(_orders_list_api)), name="orders_list_api"),
-
     path("api/place-order/", manager_required(_need_biz(_api_place_order)), name="api_place_order"),
     path("api/order-price/<int:product_id>/", manager_required(_need_biz(_api_order_price)), name="api_order_price"),
-
-    path("api/product/update-price/<int:product_id>/", manager_required(_need_biz(_api_product_update_price)), name="api_product_update_price"),
-    path("api/product/update_price/<int:product_id>/",
-         RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False)),
-
+    path(
+        "api/product/update-price/<int:product_id>/",
+        manager_required(_need_biz(_api_product_update_price)),
+        name="api_product_update_price",
+    ),
+    path(
+        "api/product/update_price/<int:product_id>/",
+        RedirectView.as_view(pattern_name="inventory:api_product_update_price", permanent=False),
+    ),
     path("api/stock-models/", manager_required(_need_biz(_api_stock_models)), name="api_stock_models"),
 ]
 
@@ -1061,20 +1295,15 @@ urlpatterns += [
     path("api/restock-heatmap/", _need_biz(_restock_heatmap), name="restock_heatmap_api"),
     path("api/wallet-summary/", _need_biz(_wallet_summary), name="api_wallet_summary"),
     path("api/wallet-txn/", _need_biz(_wallet_add_txn), name="api_wallet_add_txn"),
-
     # AFTER – APIs return JSON even if no active business.
     path("api/time-checkin/", _ensure_response(_time_checkin_view), name="api_time_checkin"),
     path("api/geo-ping/", _geo_ping_view, name="api_geo_ping"),
-
     path("api/timeclock/bootstrap/", _need_biz(_timeclock_bootstrap_view), name="api_timeclock_bootstrap"),
     path("api/timeclock/event/", _need_biz(_timeclock_event_view), name="api_timeclock_event"),
-
     path("api/task-submit/", _need_biz(_api_task_submit), name="api_task_submit"),
     path("api/task-status/", _need_biz(_api_task_status), name="api_task_status"),
     path("api/audit-verify/", _need_biz(_api_audit_verify), name="api_audit_verify"),
-
     path("api/summary/", _need_biz(_inventory_summary_view), name="inventory_api_summary"),
-
     # ✅ Prefer api_views.api_time_logs; keep legacy name too
     path("api/time-logs/", _ensure_response(_api_time_logs_view), name="time_logs_api"),
     path("api/time-logs/", _ensure_response(_api_time_logs_view), name="api_time_logs"),  # reverse alias
@@ -1085,8 +1314,8 @@ urlpatterns += [
 # ---------------------------------------------------------------------
 urlpatterns += [
     path("time/check-in/", _need_biz(_ensure_response(_time_checkin_page)), name="time_checkin"),
-    path("time/logs/",     _need_biz(_ensure_response(_time_logs_page)),      name="time_logs"),
-    path("time/my/",       _need_biz(_ensure_response(_my_time_logs_page)),   name="my_time_logs"),
+    path("time/logs/", _need_biz(_ensure_response(_time_logs_page)), name="time_logs"),
+    path("time/my/", _need_biz(_ensure_response(_my_time_logs_page)), name="my_time_logs"),
     path("timelogs/", _redirect_to("inventory:time_logs"), name="timelogs_short"),
     path("time/log/", _redirect_to("inventory:time_logs")),
 ]
@@ -1107,38 +1336,116 @@ urlpatterns += [
     path("merch/products/new/", manager_required(_need_biz(product_new_entry_view)), name="merch_product_create"),
     path("products/new/generic/", _redirect_to("inventory:product_new_entry"), name="product_create"),
     path("product/new/", _redirect_to("inventory:product_new_entry"), name="product_create_short"),
-
     # Product creation - NOW POINTS TO WIZARDS WHERE AVAILABLE
-    path("phones/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "phones_wizard", getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones"))))),   name="product_create_phones"),
-    
+    path(
+        "phones/products/new/",
+        manager_required(
+            _need_biz(
+                getattr(
+                    _wizard_views,
+                    "phones_wizard",
+                    getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones")),
+                )
+            )
+        ),
+        name="product_create_phones",
+    ),
     # Laptop management (for phones/electronics businesses)
-    path("laptops/stock-in/", manager_required(_need_biz(getattr(_laptop_views, "laptop_stock_in", lambda r: JsonResponse({"error": "Not implemented"}, status=501)))), name="laptop_stock_in"),
-    path("laptops/sell/", _need_biz(getattr(_laptop_views, "laptop_sell", lambda r: JsonResponse({"error": "Not implemented"}, status=501))), name="laptop_sell"),
-    path("laptops/products/", manager_required(_need_biz(getattr(_laptop_views, "laptop_products_list", lambda r: JsonResponse({"error": "Not implemented"}, status=501)))), name="laptop_products_list"),
-    
-    path("pharmacy/products/new/", manager_required(_need_biz(getattr(_wizard_views, "pharmacy_wizard", _product_create_for_mode_factory("pharmacy")))), name="product_create_pharmacy"),
-    path("liquor/products/new/",   manager_required(_need_biz(getattr(_wizard_views, "liquor_wizard", _product_create_for_mode_factory("liquor")))),   name="product_create_liquor"),
-    path("grocery/products/new/",  manager_required(_need_biz(_product_create_for_mode_factory("grocery"))),  name="product_create_grocery"),
-    path("clothing/products/new/", manager_required(_need_biz(getattr(_wizard_views, "clothing_wizard", _product_create_for_mode_factory("clothing")))), name="product_create_clothing"),
-
+    path(
+        "laptops/stock-in/",
+        manager_required(
+            _need_biz(
+                getattr(
+                    _laptop_views, "laptop_stock_in", lambda r: JsonResponse({"error": "Not implemented"}, status=501)
+                )
+            )
+        ),
+        name="laptop_stock_in",
+    ),
+    path(
+        "laptops/sell/",
+        _need_biz(
+            getattr(_laptop_views, "laptop_sell", lambda r: JsonResponse({"error": "Not implemented"}, status=501))
+        ),
+        name="laptop_sell",
+    ),
+    path(
+        "laptops/products/",
+        manager_required(
+            _need_biz(
+                getattr(
+                    _laptop_views,
+                    "laptop_products_list",
+                    lambda r: JsonResponse({"error": "Not implemented"}, status=501),
+                )
+            )
+        ),
+        name="laptop_products_list",
+    ),
+    path(
+        "pharmacy/products/new/",
+        manager_required(
+            _need_biz(getattr(_wizard_views, "pharmacy_wizard", _product_create_for_mode_factory("pharmacy")))
+        ),
+        name="product_create_pharmacy",
+    ),
+    path(
+        "liquor/products/new/",
+        manager_required(
+            _need_biz(getattr(_wizard_views, "liquor_wizard", _product_create_for_mode_factory("liquor")))
+        ),
+        name="product_create_liquor",
+    ),
+    path(
+        "grocery/products/new/",
+        manager_required(_need_biz(_product_create_for_mode_factory("grocery"))),
+        name="product_create_grocery",
+    ),
+    path(
+        "clothing/products/new/",
+        manager_required(
+            _need_biz(getattr(_wizard_views, "clothing_wizard", _product_create_for_mode_factory("clothing")))
+        ),
+        name="product_create_clothing",
+    ),
     # v2 merch router — left undecorated to avoid auth/guard loops
     path("merch/products/new/v2/", prodv2.product_create_v2_router, name="merch_product_new"),
     path("merch/products/new/v2/<str:category>/", prodv2.product_create_v2_router, name="merch_product_new_v2_cat"),
-
     # Direct v2 edit/delete
     path("merch/products/<int:pk>/edit/", manager_required(_need_biz(prodv2.product_edit_v2)), name="product_edit_v2"),
-    path("merch/products/<int:pk>/delete/", manager_required(_need_biz(prodv2.product_delete_v2)), name="product_delete_v2"),
-
+    path(
+        "merch/products/<int:pk>/delete/",
+        manager_required(_need_biz(prodv2.product_delete_v2)),
+        name="product_delete_v2",
+    ),
     # clothing v2 (explicit)
-    path("clothing/products/new/v2/", manager_required(_need_biz(prodv2.product_create_clothing_v2)), name="clothing_product_new_v2"),
-    path("clothing/products/<int:pk>/edit/", manager_required(_need_biz(prodv2.product_edit_clothing_v2)), name="clothing_product_edit_v2"),
-
+    path(
+        "clothing/products/new/v2/",
+        manager_required(_need_biz(prodv2.product_create_clothing_v2)),
+        name="clothing_product_new_v2",
+    ),
+    path(
+        "clothing/products/<int:pk>/edit/",
+        manager_required(_need_biz(prodv2.product_edit_clothing_v2)),
+        name="clothing_product_edit_v2",
+    ),
     # liquor v2 (explicit) - NOW POINTS TO WIZARD
-    path("liquor/products/new/v2/", manager_required(_need_biz(_wizard_views.liquor_wizard)), name="liquor_product_new_v2"),
-    path("liquor/products/<int:pk>/edit/v2/", manager_required(_need_biz(prodv2.product_edit_liquor_v2)), name="liquor_product_edit_v2"),
-    
+    path(
+        "liquor/products/new/v2/",
+        manager_required(_need_biz(_wizard_views.liquor_wizard)),
+        name="liquor_product_new_v2",
+    ),
+    path(
+        "liquor/products/<int:pk>/edit/v2/",
+        manager_required(_need_biz(prodv2.product_edit_liquor_v2)),
+        name="liquor_product_edit_v2",
+    ),
     # Classic form fallback (for users who prefer the old form)
-    path("liquor/products/new/v2/classic/", manager_required(_need_biz(prodv2.product_create_liquor_v2)), name="liquor_product_new_v2_classic"),
+    path(
+        "liquor/products/new/v2/classic/",
+        manager_required(_need_biz(prodv2.product_create_liquor_v2)),
+        name="liquor_product_new_v2_classic",
+    ),
 ]
 
 # Manager Locations + Alerts pages
@@ -1168,22 +1475,96 @@ except Exception:
 
 urlpatterns += [
     # Phone products management - Use brand-first UI (add_phone_products)
-    path("phone-products/", manager_required(_need_biz(getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found")))), name="phone_products"),
-    path("phone-products/new/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_wizard", getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found"))))), name="phone_product_create"),
-    path("phone-products/wizard/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_wizard", getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found"))))), name="phone_product_wizard"),
-    path("phone-products/<int:product_id>/edit/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_edit", _stub("phone_product_edit not found")))), name="phone_product_edit"),
-    path("phone-products/<int:product_id>/delete/", manager_required(_need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))), name="phone_product_delete"),
-    path("phone-products/<int:product_id>/remove/", manager_required(_need_biz(getattr(_phone_prods, "remove_phone_product", _stub("remove_phone_product not found")))), name="phone_product_remove"),
-    path("phone-products/<int:product_id>/update-prices/", manager_required(_need_biz(getattr(_phone_prods, "update_phone_product_prices", _stub("update_phone_product_prices not found")))), name="phone_product_update_prices"),
-    path("api/phone-products/models/", _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))), name="api_phone_products_models"),
-    
+    path(
+        "phone-products/",
+        manager_required(
+            _need_biz(getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found")))
+        ),
+        name="phone_products",
+    ),
+    path(
+        "phone-products/new/",
+        manager_required(
+            _need_biz(
+                getattr(
+                    _phone_prods,
+                    "phone_product_wizard",
+                    getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found")),
+                )
+            )
+        ),
+        name="phone_product_create",
+    ),
+    path(
+        "phone-products/wizard/",
+        manager_required(
+            _need_biz(
+                getattr(
+                    _phone_prods,
+                    "phone_product_wizard",
+                    getattr(_phone_products_views, "add_phone_products", _stub("add_phone_products not found")),
+                )
+            )
+        ),
+        name="phone_product_wizard",
+    ),
+    path(
+        "phone-products/<int:product_id>/edit/",
+        manager_required(_need_biz(getattr(_phone_prods, "phone_product_edit", _stub("phone_product_edit not found")))),
+        name="phone_product_edit",
+    ),
+    path(
+        "phone-products/<int:product_id>/delete/",
+        manager_required(
+            _need_biz(getattr(_phone_prods, "phone_product_delete", _stub("phone_product_delete not found")))
+        ),
+        name="phone_product_delete",
+    ),
+    path(
+        "phone-products/<int:product_id>/remove/",
+        manager_required(
+            _need_biz(getattr(_phone_prods, "remove_phone_product", _stub("remove_phone_product not found")))
+        ),
+        name="phone_product_remove",
+    ),
+    path(
+        "phone-products/<int:product_id>/update-prices/",
+        manager_required(
+            _need_biz(
+                getattr(_phone_prods, "update_phone_product_prices", _stub("update_phone_product_prices not found"))
+            )
+        ),
+        name="phone_product_update_prices",
+    ),
+    path(
+        "api/phone-products/models/",
+        _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))),
+        name="api_phone_products_models",
+    ),
     # Gamified phone sale wizard (original 5-step)
-    path("phone-sale-wizard/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard", _stub("phone_sale_wizard not found"))), name="phone_sale_wizard"),
-    path("phone-sale-wizard/reset/", _need_biz(getattr(_phone_wizard, "phone_sale_wizard_reset", _stub("phone_sale_wizard_reset not found"))), name="phone_sale_wizard_reset"),
-    
+    path(
+        "phone-sale-wizard/",
+        _need_biz(getattr(_phone_wizard, "phone_sale_wizard", _stub("phone_sale_wizard not found"))),
+        name="phone_sale_wizard",
+    ),
+    path(
+        "phone-sale-wizard/reset/",
+        _need_biz(getattr(_phone_wizard, "phone_sale_wizard_reset", _stub("phone_sale_wizard_reset not found"))),
+        name="phone_sale_wizard_reset",
+    ),
     # NEW: Simplified 3-step wizard (IMEI → Price → Payment)
-    path("sell-phone/", _need_biz(getattr(_phone_wizard_v2, "phone_sale_wizard_v2", _stub("phone_sale_wizard_v2 not found"))), name="phone_sale_wizard_v2"),
-    path("sell-phone/reset/", _need_biz(getattr(_phone_wizard_v2, "phone_sale_wizard_v2_reset", _stub("phone_sale_wizard_v2_reset not found"))), name="phone_sale_wizard_v2_reset"),
+    path(
+        "sell-phone/",
+        _need_biz(getattr(_phone_wizard_v2, "phone_sale_wizard_v2", _stub("phone_sale_wizard_v2 not found"))),
+        name="phone_sale_wizard_v2",
+    ),
+    path(
+        "sell-phone/reset/",
+        _need_biz(
+            getattr(_phone_wizard_v2, "phone_sale_wizard_v2_reset", _stub("phone_sale_wizard_v2_reset not found"))
+        ),
+        name="phone_sale_wizard_v2_reset",
+    ),
 ]
 
 # ---------------------------------------------------------------------
@@ -1193,11 +1574,22 @@ urlpatterns += [
 
 urlpatterns += [
     # Gamified scan-in/sell pages
-    path("phones/scan-in/", _need_biz(getattr(_phones_views, "phone_scan_in", _stub("phone_scan_in not found"))), name="phone_scan_in"),
-    path("phones/scan-sell/", _need_biz(getattr(_phones_views, "phone_scan_sell", _stub("phone_scan_sell not found"))), name="phone_scan_sell"),
-    
+    path(
+        "phones/scan-in/",
+        _need_biz(getattr(_phones_views, "phone_scan_in", _stub("phone_scan_in not found"))),
+        name="phone_scan_in",
+    ),
+    path(
+        "phones/scan-sell/",
+        _need_biz(getattr(_phones_views, "phone_scan_sell", _stub("phone_scan_sell not found"))),
+        name="phone_scan_sell",
+    ),
     # Intelligent IMEI picker API
-    path("phones/available-imeis/<int:product_id>/", login_required(getattr(_phones_views, "phone_available_imeis", _stub("phone_available_imeis not found"))), name="phones_available_imeis"),
+    path(
+        "phones/available-imeis/<int:product_id>/",
+        login_required(getattr(_phones_views, "phone_available_imeis", _stub("phone_available_imeis not found"))),
+        name="phones_available_imeis",
+    ),
 ]
 
 # Suspicious prices manager tool
@@ -1207,8 +1599,22 @@ except Exception:
     _suspicious_prices = SimpleNamespace()
 
 urlpatterns += [
-    path("phones/suspicious-prices/", manager_required(_need_biz(getattr(_suspicious_prices, "phones_suspicious_prices", _stub("phones_suspicious_prices not found")))), name="phones_suspicious_prices"),
-    path("api/phones/suspicious-prices/<int:item_id>/fix/", manager_required(_need_biz(getattr(_suspicious_prices, "fix_suspicious_price", _stub("fix_suspicious_price not found")))), name="api_fix_suspicious_price"),
+    path(
+        "phones/suspicious-prices/",
+        manager_required(
+            _need_biz(
+                getattr(_suspicious_prices, "phones_suspicious_prices", _stub("phones_suspicious_prices not found"))
+            )
+        ),
+        name="phones_suspicious_prices",
+    ),
+    path(
+        "api/phones/suspicious-prices/<int:item_id>/fix/",
+        manager_required(
+            _need_biz(getattr(_suspicious_prices, "fix_suspicious_price", _stub("fix_suspicious_price not found")))
+        ),
+        name="api_fix_suspicious_price",
+    ),
 ]
 
 # ---------------------------------------------------------------------
@@ -1217,30 +1623,40 @@ urlpatterns += [
 try:
     from .views_agent_performance import agent_performance as _agent_performance_view
 except Exception:
+
     def _agent_performance_view(request, agent_id):
         return HttpResponse("Agent performance view not available", status=501)
+
 
 # Commission settings (manager-only)
 try:
     from sales.views_commission import commission_settings, commission_settings_json
+
     _commission_settings_view = commission_settings
     _commission_settings_json_view = commission_settings_json
 except Exception:
+
     def _commission_settings_view(request):
         return HttpResponse("Commission settings not available", status=501)
+
     def _commission_settings_json_view(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
 
 # Sales trend (unified across verticals)
 try:
     from .views_sales_trend import sales_trend_json, sales_trend_test_page
+
     _sales_trend_json_view = sales_trend_json
     _sales_trend_test_view = sales_trend_test_page
 except Exception:
+
     def _sales_trend_json_view(request):
         return JsonResponse({"labels": [], "quantities": [], "revenue": []}, status=501)
+
     def _sales_trend_test_view(request):
         return HttpResponse("Sales trend test not available", status=501)
+
 
 urlpatterns += [
     path("agents/<int:agent_id>/", _need_biz(_agent_performance_view), name="agent_performance"),
@@ -1258,19 +1674,25 @@ try:
         analytics_stock_overview_json,
         analytics_health_check,
     )
+
     _analytics_kpis_json = analytics_kpis_json
     _analytics_charts_json = analytics_charts_json
     _analytics_stock_json = analytics_stock_overview_json
     _analytics_health = analytics_health_check
 except Exception:
+
     def _analytics_kpis_json(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _analytics_charts_json(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _analytics_stock_json(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _analytics_health(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
 
 urlpatterns += [
     path("api/analytics/kpis/", _need_biz(_analytics_kpis_json), name="analytics_kpis_json"),
@@ -1282,13 +1704,20 @@ urlpatterns += [
 # Stock Overview Cross-Vertical endpoint
 try:
     from .views_analytics import api_stock_overview_cross_vertical
+
     _stock_overview_cross_vertical = api_stock_overview_cross_vertical
 except Exception:
+
     def _stock_overview_cross_vertical(request):
         return JsonResponse({"ok": False, "error": "Not available"}, status=501)
 
+
 urlpatterns += [
-    path("analytics/stock-overview-cross-vertical.json", _need_biz(_stock_overview_cross_vertical), name="analytics_stock_overview_cross_vertical"),
+    path(
+        "analytics/stock-overview-cross-vertical.json",
+        _need_biz(_stock_overview_cross_vertical),
+        name="analytics_stock_overview_cross_vertical",
+    ),
 ]
 
 # Alerts/Notifications system
@@ -1300,22 +1729,29 @@ try:
         alerts_mark_all_read,
         alerts_page,
     )
+
     _alerts_list = alerts_list_json
     _alert_mark_read = alert_mark_read
     _alert_dismiss = alert_dismiss
     _alerts_mark_all = alerts_mark_all_read
     _alerts_page = alerts_page
 except Exception:
+
     def _alerts_list(request):
         return JsonResponse({"alerts": [], "unread_count": 0}, status=501)
+
     def _alert_mark_read(request, alert_id):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _alert_dismiss(request, alert_id):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _alerts_mark_all(request):
         return JsonResponse({"error": "Not available"}, status=501)
+
     def _alerts_page(request):
         return HttpResponse("Alerts not available", status=501)
+
 
 urlpatterns += [
     path("alerts/", _need_biz(_alerts_page), name="alerts"),
@@ -1339,10 +1775,30 @@ urlpatterns += [
     path("wizard/phones/", manager_required(_need_biz(_wizard_views.phones_wizard)), name="phones_wizard"),
     path("wizard/pharmacy/", manager_required(_need_biz(_wizard_views.pharmacy_wizard)), name="pharmacy_wizard"),
     path("wizard/clothing/", manager_required(_need_biz(_wizard_views.clothing_wizard)), name="clothing_wizard"),
-    
     # Wizard submission endpoints - Direct imports (no fallback stubs)
-    path("wizard/liquor/submit/", manager_required(_need_biz(_wizard_views.liquor_wizard_submit)), name="liquor_wizard_submit"),
-    path("wizard/phones/submit/", manager_required(_need_biz(_wizard_views.phones_wizard_submit)), name="phones_wizard_submit"),
-    path("wizard/pharmacy/submit/", manager_required(_need_biz(_wizard_views.pharmacy_wizard_submit)), name="pharmacy_wizard_submit"),
-    path("wizard/clothing/submit/", manager_required(_need_biz(_wizard_views.clothing_wizard_submit)), name="clothing_wizard_submit"),
+    path(
+        "wizard/liquor/submit/",
+        manager_required(_need_biz(_wizard_views.liquor_wizard_submit)),
+        name="liquor_wizard_submit",
+    ),
+    path(
+        "wizard/phones/submit/",
+        manager_required(_need_biz(_wizard_views.phones_wizard_submit)),
+        name="phones_wizard_submit",
+    ),
+    path(
+        "wizard/pharmacy/submit/",
+        manager_required(_need_biz(_wizard_views.pharmacy_wizard_submit)),
+        name="pharmacy_wizard_submit",
+    ),
+    path(
+        "wizard/clothing/submit/",
+        manager_required(_need_biz(_wizard_views.clothing_wizard_submit)),
+        name="clothing_wizard_submit",
+    ),
+    path(
+        "check-barcode-duplicate/",
+        _need_biz(_wizard_views.check_barcode_duplicate),
+        name="check_barcode_duplicate",
+    ),
 ]

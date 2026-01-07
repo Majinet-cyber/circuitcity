@@ -4,15 +4,32 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0023_alter_timelog_options_and_more'),
+        ("inventory", "0023_alter_timelog_options_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='inventoryaudit',
-            name='action',
-            field=models.CharField(choices=[('CREATE', 'Create'), ('UPDATE', 'Update'), ('EDIT', 'Edit'), ('STOCK_IN', 'Stock in'), ('SOLD', 'Sold'), ('SOLD_FORM', 'Sold via form'), ('SOLD_API', 'Sold via API'), ('SOLD_API_DUP', 'Sold via API (duplicate)'), ('BULK_PRICE_UPDATE', 'Bulk price update'), ('DELETE', 'Delete'), ('DELETE_DENIED', 'Delete denied'), ('DELETE_BLOCKED', 'Delete blocked (FK protect)'), ('ARCHIVE_FALLBACK', 'Archived instead of delete'), ('RESTORE', 'Restore')], max_length=32),
+            model_name="inventoryaudit",
+            name="action",
+            field=models.CharField(
+                choices=[
+                    ("CREATE", "Create"),
+                    ("UPDATE", "Update"),
+                    ("EDIT", "Edit"),
+                    ("STOCK_IN", "Stock in"),
+                    ("SOLD", "Sold"),
+                    ("SOLD_FORM", "Sold via form"),
+                    ("SOLD_API", "Sold via API"),
+                    ("SOLD_API_DUP", "Sold via API (duplicate)"),
+                    ("BULK_PRICE_UPDATE", "Bulk price update"),
+                    ("DELETE", "Delete"),
+                    ("DELETE_DENIED", "Delete denied"),
+                    ("DELETE_BLOCKED", "Delete blocked (FK protect)"),
+                    ("ARCHIVE_FALLBACK", "Archived instead of delete"),
+                    ("RESTORE", "Restore"),
+                ],
+                max_length=32,
+            ),
         ),
     ]

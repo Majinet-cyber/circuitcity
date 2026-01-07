@@ -5,25 +5,33 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('inventory', '0002_inventoryaudit'),
+        ("inventory", "0002_inventoryaudit"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='inventoryitem',
-            name='is_active',
+            model_name="inventoryitem",
+            name="is_active",
             field=models.BooleanField(default=True),
         ),
         migrations.AlterField(
-            model_name='inventoryaudit',
-            name='action',
-            field=models.CharField(choices=[('EDIT', 'Edit'), ('DELETE', 'Delete'), ('DELETE_DENIED', 'Delete denied'), ('DELETE_BLOCKED', 'Delete blocked (FK protect)'), ('ARCHIVE_FALLBACK', 'Archived instead of delete')], max_length=20),
+            model_name="inventoryaudit",
+            name="action",
+            field=models.CharField(
+                choices=[
+                    ("EDIT", "Edit"),
+                    ("DELETE", "Delete"),
+                    ("DELETE_DENIED", "Delete denied"),
+                    ("DELETE_BLOCKED", "Delete blocked (FK protect)"),
+                    ("ARCHIVE_FALLBACK", "Archived instead of delete"),
+                ],
+                max_length=20,
+            ),
         ),
         migrations.AddIndex(
-            model_name='inventoryitem',
-            index=models.Index(fields=['is_active', 'status'], name='inventory_i_is_acti_de80fa_idx'),
+            model_name="inventoryitem",
+            index=models.Index(fields=["is_active", "status"], name="inventory_i_is_acti_de80fa_idx"),
         ),
     ]

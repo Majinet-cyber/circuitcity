@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("notifications", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -41,9 +40,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "receive_sale_alerts",
-                    models.BooleanField(
-                        default=True, help_text="Notify on sales (for managers)"
-                    ),
+                    models.BooleanField(default=True, help_text="Notify on sales (for managers)"),
                 ),
                 (
                     "receive_profit_milestones",

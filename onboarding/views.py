@@ -134,8 +134,7 @@ def start(request: HttpRequest) -> HttpResponse:
     biz = _get_active_business(request)
     if not biz:
         # prefer user's latest, otherwise latest overall the user is related to
-        biz = (owner_qs.order_by("-id").first() if owner_qs.exists()
-               else Business.objects.order_by("-id").first())
+        biz = owner_qs.order_by("-id").first() if owner_qs.exists() else Business.objects.order_by("-id").first()
         if biz:
             _set_active_business(request, biz)
 
@@ -185,7 +184,7 @@ def create_business(request: HttpRequest) -> HttpResponse:
                     pass
 
             _set_active_business(request, biz)
-            messages.success(request, f'Business â€œ{biz}â€ created.')
+            messages.success(request, f"Business â€œ{biz}â€ created.")
             return redirect(_safe_reverse("onboarding:add_product", "/"))
         else:
             messages.error(request, "Please fix the errors below.")
@@ -203,7 +202,9 @@ def create_business(request: HttpRequest) -> HttpResponse:
           <p>Form fields:</p>
           <pre>{fields}</pre>
         </main>
-        """.format(fields="\n".join(getattr(form, "fields", {}).keys()))
+        """.format(
+            fields="\n".join(getattr(form, "fields", {}).keys())
+        )
         return HttpResponse(html)
 
 
@@ -254,7 +255,7 @@ def add_product(request: HttpRequest) -> HttpResponse:
           <p>Fields:</p>
           <pre>{fields}</pre>
         </main>
-        """.format(fields="\n".join(getattr(form, "fields", {}).keys()))
+        """.format(
+            fields="\n".join(getattr(form, "fields", {}).keys())
+        )
         return HttpResponse(html)
-
-

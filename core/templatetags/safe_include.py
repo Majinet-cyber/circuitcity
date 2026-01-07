@@ -5,6 +5,7 @@ from django.template import TemplateDoesNotExist
 
 register = template.Library()
 
+
 @register.simple_tag(takes_context=True)
 def include_optional(context, template_name, **kwargs):
     """
@@ -20,5 +21,3 @@ def include_optional(context, template_name, **kwargs):
     ctx = context.flatten()
     ctx.update(kwargs)
     return tpl.render(ctx)
-
-

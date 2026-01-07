@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0055_add_barcode_registry"),
         ("tenants", "0017_add_role_to_agent_invite"),
@@ -271,34 +270,24 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="accessoryproduct",
-            index=models.Index(
-                fields=["business", "name"], name="acc_prod_biz_name_idx"
-            ),
+            index=models.Index(fields=["business", "name"], name="acc_prod_biz_name_idx"),
         ),
         migrations.AddIndex(
             model_name="accessoryproduct",
-            index=models.Index(
-                fields=["business", "category"], name="acc_prod_biz_cat_idx"
-            ),
+            index=models.Index(fields=["business", "category"], name="acc_prod_biz_cat_idx"),
         ),
         migrations.AddIndex(
             model_name="accessoryproduct",
-            index=models.Index(
-                fields=["business", "barcode"], name="acc_prod_biz_barcode_idx"
-            ),
+            index=models.Index(fields=["business", "barcode"], name="acc_prod_biz_barcode_idx"),
         ),
         migrations.AddIndex(
             model_name="accessoryproduct",
-            index=models.Index(
-                fields=["business", "is_active"], name="acc_prod_biz_active_idx"
-            ),
+            index=models.Index(fields=["business", "is_active"], name="acc_prod_biz_active_idx"),
         ),
         migrations.AddConstraint(
             model_name="accessoryproduct",
             constraint=models.UniqueConstraint(
-                condition=models.Q(
-                    ("barcode__isnull", False), models.Q(("barcode", ""), _negated=True)
-                ),
+                condition=models.Q(("barcode__isnull", False), models.Q(("barcode", ""), _negated=True)),
                 fields=("business", "barcode"),
                 name="uniq_accessory_barcode_per_business",
             ),
@@ -309,21 +298,15 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="accessorystock",
-            index=models.Index(
-                fields=["business", "location"], name="acc_stock_biz_loc_idx"
-            ),
+            index=models.Index(fields=["business", "location"], name="acc_stock_biz_loc_idx"),
         ),
         migrations.AddIndex(
             model_name="accessorystock",
-            index=models.Index(
-                fields=["business", "product"], name="acc_stock_biz_prod_idx"
-            ),
+            index=models.Index(fields=["business", "product"], name="acc_stock_biz_prod_idx"),
         ),
         migrations.AddIndex(
             model_name="accessorystock",
-            index=models.Index(
-                fields=["product", "qty_on_hand"], name="acc_stock_prod_qty_idx"
-            ),
+            index=models.Index(fields=["product", "qty_on_hand"], name="acc_stock_prod_qty_idx"),
         ),
         migrations.AlterUniqueTogether(
             name="accessorystock",
@@ -338,8 +321,6 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="accessorystocklog",
-            index=models.Index(
-                fields=["product", "created_at"], name="acc_log_prod_time_idx"
-            ),
+            index=models.Index(fields=["product", "created_at"], name="acc_log_prod_time_idx"),
         ),
     ]

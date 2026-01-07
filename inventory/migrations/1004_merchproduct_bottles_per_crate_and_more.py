@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "1003_merchproduct_barcode_pharmacybatch_barcode_and_more"),
     ]
@@ -21,8 +20,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="merchproduct",
             name="supports_crates",
-            field=models.BooleanField(
-                default=False, help_text="True for beer/cider/wine; False for spirits"
-            ),
+            field=models.BooleanField(default=False, help_text="True for beer/cider/wine; False for spirits"),
         ),
     ]

@@ -13,13 +13,15 @@ from __future__ import annotations
 # ============================================================================
 # These verticals deal with physical products that can be bought/sold/inventoried
 
-INVENTORY_VERTICALS = frozenset([
-    "phones",
-    "liquor",
-    "pharmacy",
-    "clothing",
-    # NOT gym - gym is membership-based, not product-based
-])
+INVENTORY_VERTICALS = frozenset(
+    [
+        "phones",
+        "liquor",
+        "pharmacy",
+        "clothing",
+        # NOT gym - gym is membership-based, not product-based
+    ]
+)
 
 
 # ============================================================================
@@ -27,28 +29,31 @@ INVENTORY_VERTICALS = frozenset([
 # ============================================================================
 # These verticals deal with members/subscribers, not physical products
 
-MEMBERSHIP_VERTICALS = frozenset([
-    "gym",
-])
+MEMBERSHIP_VERTICALS = frozenset(
+    [
+        "gym",
+    ]
+)
 
 
 # ============================================================================
 # FEATURE CAPABILITY CHECKS
 # ============================================================================
 
+
 def vertical_supports_fast_sell(vertical_slug: str) -> bool:
     """
     Check if a vertical supports Fast Sell feature.
-    
+
     Fast Sell is ONLY enabled for pharmacy and clothing.
     Phones, liquor, and gym do NOT support fast sell.
-    
+
     Args:
         vertical_slug: Business kind slug (e.g., "phones", "gym", "liquor")
-    
+
     Returns:
         bool: True if vertical supports Fast Sell, False otherwise
-    
+
     Examples:
         >>> vertical_supports_fast_sell("pharmacy")
         True
@@ -63,7 +68,7 @@ def vertical_supports_fast_sell(vertical_slug: str) -> bool:
     """
     if not vertical_slug:
         return False
-    
+
     vertical_slug = str(vertical_slug).strip().lower()
     # Fast Sell ONLY for pharmacy and clothing
     return vertical_slug in ("pharmacy", "clothing")
@@ -72,16 +77,16 @@ def vertical_supports_fast_sell(vertical_slug: str) -> bool:
 def vertical_supports_inventory(vertical_slug: str) -> bool:
     """
     Check if a vertical supports inventory/stock management.
-    
+
     Args:
         vertical_slug: Business kind slug
-    
+
     Returns:
         bool: True if vertical supports inventory features
     """
     if not vertical_slug:
         return False
-    
+
     vertical_slug = str(vertical_slug).strip().lower()
     return vertical_slug in INVENTORY_VERTICALS
 
@@ -89,12 +94,12 @@ def vertical_supports_inventory(vertical_slug: str) -> bool:
 def vertical_supports_barcode_workflow(vertical_slug: str) -> bool:
     """
     Check if a vertical supports barcode scanning workflow.
-    
+
     Only inventory verticals support barcodes.
-    
+
     Args:
         vertical_slug: Business kind slug
-    
+
     Returns:
         bool: True if vertical supports barcode workflow
     """
@@ -104,16 +109,16 @@ def vertical_supports_barcode_workflow(vertical_slug: str) -> bool:
 def vertical_is_membership_based(vertical_slug: str) -> bool:
     """
     Check if a vertical is membership/subscription based.
-    
+
     Args:
         vertical_slug: Business kind slug
-    
+
     Returns:
         bool: True if vertical is membership-based
     """
     if not vertical_slug:
         return False
-    
+
     vertical_slug = str(vertical_slug).strip().lower()
     return vertical_slug in MEMBERSHIP_VERTICALS
 
@@ -121,15 +126,15 @@ def vertical_is_membership_based(vertical_slug: str) -> bool:
 def get_vertical_capabilities(vertical_slug: str) -> dict:
     """
     Get all capabilities for a vertical as a dictionary.
-    
+
     Useful for template context or debugging.
-    
+
     Args:
         vertical_slug: Business kind slug
-    
+
     Returns:
         dict: Dictionary of capability flags
-    
+
     Example:
         >>> get_vertical_capabilities("gym")
         {
@@ -156,4 +161,3 @@ __all__ = [
     "vertical_is_membership_based",
     "get_vertical_capabilities",
 ]
-

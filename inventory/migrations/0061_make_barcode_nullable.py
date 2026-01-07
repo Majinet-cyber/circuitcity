@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0060_remove_clothingsale_clothing_rollback_idx_and_more"),
     ]

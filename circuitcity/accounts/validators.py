@@ -94,10 +94,7 @@ def validate_strong_password(value: Optional[str]) -> None:
 
     if not PASSWORD_REGEX.match(pwd):
         raise ValidationError(
-            _(
-                "Password must be at least 10 characters and include: "
-                "a letter, a number, and a special character."
-            )
+            _("Password must be at least 10 characters and include: " "a letter, a number, and a special character.")
         )
 
     lower = pwd.lower()
@@ -122,5 +119,3 @@ __all__ = [
     "PASSWORD_REGEX",
     "validate_strong_password",
 ]
-
-

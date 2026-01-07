@@ -1,18 +1,48 @@
-Sale recorded 🎉
+🎉 A sale just went through!
 
-{% if product_name %}{{ product_name }}{% else %}Product{% endif %}
+{{ business_name|default:"Your business" }}
 
-{% if sku or imei %}Identifier: {% if sku %}{{ sku }}{% elif imei %}IMEI {{ imei }}{% endif %}
-{% endif %}Revenue: MK {{ revenue|default:total|floatformat:0|intcomma }}
-Cost: {% if cost %}MK {{ cost|floatformat:0|intcomma }}{% else %}—{% endif %}
-Profit: {% if profit %}MK {{ profit|floatformat:0|intcomma }}{% else %}—{% endif %}
-Quantity: {{ quantity|default:1 }}
-{% if payment_method %}Payment: {{ payment_method }}
-{% endif %}Sold by: {{ agent_name|default:cashier_name|default:"Unknown" }}
-{% if location or location_name %}Location: {{ location|default:location_name }}
-{% endif %}{% if business_name %}Business: {{ business_name }}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+SALE SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Sale ID:        {{ sale_ref|default:"N/A" }}
+Date & Time:    {% if time %}{{ time|date:"F d, Y" }} at {{ time|date:"g:i A" }}{% else %}—{% endif %}
+{% if location_name %}Location:       {{ location_name }}
+{% endif %}Sold by:        {{ agent_name|default:cashier_name|default:"Unknown" }}
+{% if payment_method %}Payment Method: {{ payment_method }}
 {% endif %}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ITEMS SOLD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Product:        {{ product_name|default:"Product" }}
+{% if sku or imei %}Identifier:      {% if imei %}IMEI: {{ imei }}{% elif sku %}SKU: {{ sku }}{% endif %}
+{% endif %}Quantity:        {{ quantity|default:1 }}
+Unit Price:      {% if revenue and quantity %}{% widthratio revenue quantity 1 as unit_price %}MK {{ unit_price|floatformat:0|intcomma }}{% else %}—{% endif %}
+Line Total:     MK {{ revenue|default:total|floatformat:0|intcomma }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FINANCIAL SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Revenue (Total): MK {{ revenue|default:total|floatformat:0|intcomma }}
+Cost (COGS):     {% if cost %}MK {{ cost|floatformat:0|intcomma }}{% else %}Cost unavailable{% endif %}
+Profit:          {% if profit %}MK {{ profit|floatformat:0|intcomma }}{% else %}—{% endif %}
+{% if profit_margin %}Profit Margin:   {{ profit_margin }}%
+{% elif profit and revenue %}{% widthratio profit revenue 100 as profit_margin_calc %}{% if profit_margin_calc %}Profit Margin:   {{ profit_margin_calc }}%
+{% endif %}{% endif %}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{% if sale_url %}
+View Sale Details: {{ sale_url }}
+{% endif %}
+
 You're receiving this notification because you're a manager for {{ business_name|default:"this business" }}.
 
----
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 This is an automated email. Please do not reply directly to this message.

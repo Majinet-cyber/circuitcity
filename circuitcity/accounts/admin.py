@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 
-from .models import Profile, PasswordResetCode, LoginSecurity
+from .models import Profile, PasswordResetCode, LoginSecurity, UserTwoFactor
 
 
 @admin.register(Profile)
@@ -16,12 +16,16 @@ class ProfileAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     def avatar_preview(self, obj):
         if obj.avatar:
-            return format_html('<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:50%;">', obj.avatar.url)
+            return format_html(
+                '<img src="{}" style="height:40px;width:40px;object-fit:cover;border-radius:50%;">', obj.avatar.url
+            )
         return "â€”"
+
     avatar_preview.short_description = "Avatar"
 
 
@@ -48,6 +52,7 @@ class PasswordResetCodeAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     @admin.display(boolean=True, description="Expired")
@@ -87,6 +92,7 @@ class LoginSecurityAdmin(admin.ModelAdmin):
 
     def user_email(self, obj):
         return obj.user.email
+
     user_email.short_description = "Email"
 
     @admin.display(boolean=True, description="Locked now")
@@ -107,3 +113,41 @@ class LoginSecurityAdmin(admin.ModelAdmin):
         self.message_user(request, f"Unblocked {updated} account(s).")
 
 
+@admin.register(UserTwoFactor)
+class UserTwoFactorAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "user_email",
+        "sms_enabled",
+        "phone_display",
+        "phone_verified_at",
+        "created_at",
+        "updated_at",
+    )
+    list_select_related = ("user",)
+    search_fields = ("user__email", "user__username", "phone_e164")
+    list_filter = ("sms_enabled", "phone_verified_at")
+    date_hierarchy = "created_at"
+    readonly_fields = ("created_at", "updated_at", "phone_verified_at")
+    raw_id_fields = ("user",)
+    actions = ("disable_2fa_for_selected",)
+
+    def user_email(self, obj):
+        return obj.user.email
+
+    user_email.short_description = "Email"
+
+    def phone_display(self, obj):
+        if obj.phone_e164:
+            from .models import mask_phone
+
+            return mask_phone(obj.phone_e164)
+        return "—"
+
+    phone_display.short_description = "Phone"
+
+    @admin.action(description="Disable 2FA for selected users")
+    def disable_2fa_for_selected(self, request, queryset):
+        updated = queryset.filter(sms_enabled=True).update(sms_enabled=False)
+        self.message_user(request, f"Disabled 2FA for {updated} user(s).")

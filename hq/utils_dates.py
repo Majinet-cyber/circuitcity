@@ -15,7 +15,7 @@ def get_month_range(year: int, month: int) -> Tuple[date, date]:
     Return (start_date, end_date) for a given year/month.
     - start_date: first day of the month (inclusive)
     - end_date: first day of the NEXT month (exclusive)
-    
+
     This ensures consistent filtering: start_date <= date < end_date
     """
     start_date = date(year, month, 1)
@@ -30,24 +30,24 @@ def get_month_range(year: int, month: int) -> Tuple[date, date]:
 def get_period_from_request(request, default_to_current_month: bool = True) -> Tuple[date, date, str]:
     """
     Extract date range from request query params.
-    
+
     Query params:
     - month (int): 1-12
     - year (int): e.g., 2025
     - range (str): "7d", "30d", "custom", or "all" (optional fallback)
-    
+
     Returns:
     - (start_date, end_date, period_type)
     - period_type: "month", "7d", "30d", "custom", or "all"
-    
+
     If default_to_current_month=True and no params given, returns current month range.
     """
     today = timezone.now().date()
-    
+
     # Try month/year first (most specific)
     month_str = request.GET.get("month", "").strip()
     year_str = request.GET.get("year", "").strip()
-    
+
     if month_str and year_str:
         try:
             month = int(month_str)
@@ -57,18 +57,18 @@ def get_period_from_request(request, default_to_current_month: bool = True) -> T
                 return start, end, "month"
         except (ValueError, TypeError):
             pass
-    
+
     # Fallback to range param
     rng = (request.GET.get("range") or "").lower()
-    
+
     if rng == "7d":
         start = today - timedelta(days=7)
         return start, today, "7d"
-    
+
     if rng == "30d":
         start = today - timedelta(days=30)
         return start, today, "30d"
-    
+
     if rng == "custom":
         start_str = request.GET.get("start", "").strip()
         end_str = request.GET.get("end", "").strip()
@@ -79,7 +79,7 @@ def get_period_from_request(request, default_to_current_month: bool = True) -> T
                 return start, end, "custom"
         except (ValueError, TypeError):
             pass
-    
+
     # Default behavior
     if default_to_current_month:
         start, end = get_month_range(today.year, today.month)
@@ -110,6 +110,7 @@ def month_list_for_year(year: int) -> list[Tuple[int, str]]:
     Useful for generating month selectors in templates.
     """
     import calendar
+
     return [(m, calendar.month_name[m]) for m in range(1, 13)]
 
 
@@ -127,4 +128,3 @@ def tz_aware_end_of_day(d: date) -> datetime:
     """
     tz = timezone.get_current_timezone()
     return timezone.make_aware(datetime.combine(d, datetime.max.time()), tz)
-

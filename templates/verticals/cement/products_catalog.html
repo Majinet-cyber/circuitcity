@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Products Catalog · Hardware & General Dealers · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --hw-primary: #2563eb;
+    --hw-secondary: #64748b;
+    --hw-success: #16a34a;
+    --hw-border: #e2e8f0;
+    --hw-bg: #f8fafc;
+  }
+
+  .hw-catalog-header {
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+  }
+
+  .hw-search-bar {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .hw-search-input {
+    border-radius: 50px;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .hw-category-chip {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    margin: 0.25rem;
+    border-radius: 50px;
+    background: white;
+    border: 2px solid var(--hw-border);
+    color: var(--hw-secondary);
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: 500;
+  }
+
+  .hw-category-chip:hover,
+  .hw-category-chip.active {
+    background: var(--hw-primary);
+    color: white;
+    border-color: var(--hw-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+  }
+
+  .hw-product-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--hw-border);
+    transition: all 0.3s;
+    height: 100%;
+  }
+
+  .hw-product-card:hover {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    transform: translateY(-4px);
+    border-color: var(--hw-primary);
+  }
+
+  .hw-product-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .hw-product-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+  }
+
+  .hw-product-keywords {
+    font-size: 0.875rem;
+    color: var(--hw-secondary);
+    margin-bottom: 1rem;
+  }
+
+  .hw-category-section {
+    margin-bottom: 3rem;
+  }
+
+  .hw-category-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: var(--hw-bg);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .hw-category-header:hover {
+    background: #e2e8f0;
+  }
+
+  .hw-category-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+    flex-grow: 1;
+  }
+
+  .hw-popular-section {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 3rem;
+  }
+
+  .hw-popular-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #92400e;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .hw-btn-view {
+    display: inline-block;
+    padding: 0.5rem 1.25rem;
+    background: var(--hw-primary);
+    color: white;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .hw-btn-view:hover {
+    background: #1e40af;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hw-catalog-header">
+  <div class="container">
+    <h1 class="text-center mb-4">
+      <i class="bi bi-grid-3x3-gap me-2"></i>
+      Hardware Products Catalog
+    </h1>
+    <p class="text-center mb-4 opacity-90">
+      Browse our curated catalog of hardware products. Select a product to add it to your inventory.
+    </p>
+    
+    <!-- Search Bar -->
+    <div class="hw-search-bar">
+      <form method="get" action="">
+        <div class="input-group">
+          <input 
+            type="text" 
+            name="q" 
+            class="form-control hw-search-input" 
+            placeholder="Search products by name or keyword..."
+            value="{{ search_query }}"
+            autofocus
+          >
+          <button class="btn btn-light" type="submit">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="container py-4">
+  <!-- Category Filter Chips -->
+  <div class="text-center mb-4">
+    <a href="{% url 'cement:products_catalog' %}" class="hw-category-chip {% if not category_filter %}active{% endif %}">
+      <i class="bi bi-grid-3x3-gap me-1"></i> All Products
+    </a>
+    {% for category in categories %}
+    <a href="?category={{ category.slug }}" class="hw-category-chip {% if category_filter == category.slug %}active{% endif %}">
+      <i class="{{ category.icon }} me-1"></i> {{ category.name }}
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if search_query %}
+  <div class="alert alert-info">
+    <i class="bi bi-search me-2"></i>
+    Showing <strong>{{ products|length }}</strong> result{{ products|length|pluralize }} for "<strong>{{ search_query }}</strong>"
+    <a href="{% url 'cement:products_catalog' %}" class="ms-3 text-decoration-none">Clear search</a>
+  </div>
+  {% endif %}
+
+  <!-- Popular Products Section (only show if no filters) -->
+  {% if not search_query and not category_filter %}
+  <div class="hw-popular-section">
+    <h2 class="hw-popular-title">
+      <i class="bi bi-star-fill me-2"></i>
+      Popular Items
+    </h2>
+    <div class="row g-3">
+      {% for product in popular_products %}
+      <div class="col-md-3 col-sm-6">
+        <div class="hw-product-card">
+          <div class="hw-product-icon">
+            <i class="bi bi-box-seam"></i>
+          </div>
+          <div class="hw-product-name">{{ product.base_name }}</div>
+          <div class="hw-product-keywords">
+            {{ product.keywords|slice:":3"|join:", " }}
+          </div>
+          <a href="{% url 'cement:product_detail' product.slug %}" class="hw-btn-view w-100 text-center">
+            <i class="bi bi-plus-circle me-1"></i> Add
+          </a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Products Grouped by Category -->
+  {% for category_slug, category_products in products_by_category.items %}
+  <div class="hw-category-section">
+    <div class="hw-category-header" data-bs-toggle="collapse" data-bs-target="#category-{{ category_slug }}">
+      <h3 class="hw-category-title">
+        <i class="bi bi-chevron-down me-2"></i>
+        {{ category_map|get_item:category_slug }} ({{ category_products|length }})
+      </h3>
+    </div>
+    <div class="collapse show" id="category-{{ category_slug }}">
+      <div class="row g-3">
+        {% for product in category_products %}
+        <div class="col-md-3 col-sm-6">
+          <div class="hw-product-card">
+            <div class="hw-product-icon">
+              <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="hw-product-name">{{ product.base_name }}</div>
+            <div class="hw-product-keywords">
+              {{ product.keywords|slice:":3"|join:", " }}
+            </div>
+            <a href="{% url 'cement:product_detail' product.slug %}" class="hw-btn-view w-100 text-center">
+              <i class="bi bi-eye me-1"></i> View Details
+            </a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="text-center py-5">
+    <i class="bi bi-inbox display-1 text-muted"></i>
+    <p class="text-muted mt-3">No products found matching your search.</p>
+    <a href="{% url 'cement:products_catalog' %}" class="btn btn-primary">
+      <i class="bi bi-arrow-left me-2"></i> Back to Catalog
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+  // Auto-collapse categories with chevron rotation
+  document.querySelectorAll('.hw-category-header').forEach(header => {
+    header.addEventListener('click', function() {
+      const icon = this.querySelector('.bi-chevron-down');
+      icon.classList.toggle('rotate-180');
+    });
+  });
+</script>
+{% endblock %}
+

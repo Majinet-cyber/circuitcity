@@ -37,6 +37,7 @@ _get_active_business = None
 # This ensures consistent role determination across the entire app
 try:
     from tenants.utils_roles import is_manager as _ur_is_manager, is_agent as _ur_is_agent, get_active_business as _ur_get_active_business  # type: ignore
+
     _is_manager = _ur_is_manager
     _is_agent = _ur_is_agent
     _get_active_business = _ur_get_active_business
@@ -44,17 +45,20 @@ except Exception:
     # Fallback: try old import paths for backward compatibility
     try:
         from circuitcity.tenants.utils import is_manager as _cc_is_manager, is_agent as _cc_is_agent  # type: ignore
+
         _is_manager = _cc_is_manager
         _is_agent = _cc_is_agent
     except Exception:
         try:
             from tenants.utils import is_manager as _t_is_manager, is_agent as _t_is_agent  # type: ignore
+
             _is_manager = _t_is_manager
             _is_agent = _t_is_agent
         except Exception:
             # Final fallbacks: always return False to avoid template crashes.
             def _is_manager(_user, _business=None):  # type: ignore
                 return False
+
             def _is_agent(_user, _business=None):  # type: ignore
                 return False
 
@@ -71,6 +75,7 @@ def _get_user_from_context(ctx) -> object | None:
         return getattr(req, "user", None)
     except Exception:
         return None
+
 
 # -----------------------------------------------------------------------------
 # Public template tags
@@ -90,7 +95,7 @@ def is_manager_(context) -> bool:
         business = getattr(req, "business", None) if req else None
         if business is None and _get_active_business is not None:
             business = _get_active_business(req)
-        
+
         return bool(_is_manager(user, business))
     except Exception:
         return False
@@ -111,7 +116,7 @@ def is_agent_(context) -> bool:
         business = getattr(req, "business", None) if req else None
         if business is None and _get_active_business is not None:
             business = _get_active_business(req)
-        
+
         return bool(_is_agent(user, business))
     except Exception:
         return False
@@ -164,7 +169,7 @@ def is_manager_filter(user):
     """
     Template filter: {{ request.user|is_manager }}
     ✅ Uses centralized role resolution from tenants.utils_roles.
-    
+
     NOTE: This filter cannot access request.business context (filters don't get context),
     so it checks against None business. For business-scoped checks, use {% is_manager_ %} tag instead.
     """
@@ -191,7 +196,7 @@ def is_agent_filter(user):
     Template filter: {{ request.user|is_agent }}
     ✅ Uses centralized role resolution from tenants.utils_roles.
     Returns True if user is in Agent group but NOT a manager.
-    
+
     NOTE: This filter cannot access request.business context (filters don't get context),
     so it checks against None business. For business-scoped checks, use {% is_agent_ %} tag instead.
     """
@@ -222,5 +227,3 @@ def business_kind(business, default="phones"):
     if not business:
         return default
     return getattr(business, "business_kind", None) or default
-
-

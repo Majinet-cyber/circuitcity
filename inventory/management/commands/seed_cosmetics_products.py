@@ -105,15 +105,11 @@ class Command(BaseCommand):
             if created > 0:
                 total_created += created
                 businesses_seeded += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f"[{biz.name}] Seeded {created} products.")
-                )
+                self.stdout.write(self.style.SUCCESS(f"[{biz.name}] Seeded {created} products."))
 
         if total_created > 0:
             self.stdout.write(
-                self.style.SUCCESS(
-                    f"✅ Done! Seeded {total_created} products across {businesses_seeded} business(es)."
-                )
+                self.style.SUCCESS(f"✅ Done! Seeded {total_created} products across {businesses_seeded} business(es).")
             )
         else:
             self.stdout.write(
@@ -133,29 +129,53 @@ class Command(BaseCommand):
             {"name": "Arabic", "category": "beauty_makeup", "cost": Decimal("5000.00"), "price": Decimal("8000.00")},
             {"name": "Emerald", "category": "beauty_makeup", "cost": Decimal("4500.00"), "price": Decimal("7000.00")},
             {"name": "Monalisa", "category": "beauty_makeup", "cost": Decimal("5500.00"), "price": Decimal("8500.00")},
-            {"name": "Pure Black", "category": "beauty_makeup", "cost": Decimal("6000.00"), "price": Decimal("9000.00")},
-            
+            {
+                "name": "Pure Black",
+                "category": "beauty_makeup",
+                "cost": Decimal("6000.00"),
+                "price": Decimal("9000.00"),
+            },
             # Skin Care
             {"name": "CeraVe Lotion", "category": "skin_care", "cost": Decimal("3500.00"), "price": Decimal("5500.00")},
-            {"name": "Vaseline Body Lotion", "category": "skin_care", "cost": Decimal("2000.00"), "price": Decimal("3500.00")},
+            {
+                "name": "Vaseline Body Lotion",
+                "category": "skin_care",
+                "cost": Decimal("2000.00"),
+                "price": Decimal("3500.00"),
+            },
             {"name": "Nivea Lotion", "category": "skin_care", "cost": Decimal("2500.00"), "price": Decimal("4000.00")},
-            
             # Hair Care
-            {"name": "Dark & Lovely Relaxer", "category": "hair_care", "cost": Decimal("2800.00"), "price": Decimal("4500.00")},
-            {"name": "Olive Oil Hair Food", "category": "hair_care", "cost": Decimal("1500.00"), "price": Decimal("2500.00")},
-            
+            {
+                "name": "Dark & Lovely Relaxer",
+                "category": "hair_care",
+                "cost": Decimal("2800.00"),
+                "price": Decimal("4500.00"),
+            },
+            {
+                "name": "Olive Oil Hair Food",
+                "category": "hair_care",
+                "cost": Decimal("1500.00"),
+                "price": Decimal("2500.00"),
+            },
             # Body Care (Personal Care)
             {"name": "Dove Soap", "category": "personal_care", "cost": Decimal("800.00"), "price": Decimal("1500.00")},
-            {"name": "Imperial Leather Soap", "category": "personal_care", "cost": Decimal("700.00"), "price": Decimal("1300.00")},
-            
+            {
+                "name": "Imperial Leather Soap",
+                "category": "personal_care",
+                "cost": Decimal("700.00"),
+                "price": Decimal("1300.00"),
+            },
             # Makeup
-            {"name": "Foundation", "category": "beauty_makeup", "cost": Decimal("3000.00"), "price": Decimal("5000.00")},
+            {
+                "name": "Foundation",
+                "category": "beauty_makeup",
+                "cost": Decimal("3000.00"),
+                "price": Decimal("5000.00"),
+            },
             {"name": "Lipstick", "category": "beauty_makeup", "cost": Decimal("1500.00"), "price": Decimal("2500.00")},
         ]
 
-    def _seed_for_business(
-        self, business, catalog: List[Dict], force: bool = False
-    ) -> int:
+    def _seed_for_business(self, business, catalog: List[Dict], force: bool = False) -> int:
         """
         Seed products for a single business. Returns count created.
         """
@@ -185,9 +205,7 @@ class Command(BaseCommand):
                         existing.selling_price = price
                         existing.is_active = True
                         existing.save()
-                        self.stdout.write(
-                            self.style.WARNING(f"  Updated: {name}")
-                        )
+                        self.stdout.write(self.style.WARNING(f"  Updated: {name}"))
                     continue
 
                 # Create new product
@@ -204,4 +222,3 @@ class Command(BaseCommand):
                 created_count += 1
 
         return created_count
-

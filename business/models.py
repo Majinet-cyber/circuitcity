@@ -5,9 +5,8 @@
     longitude = models.FloatField(null=True, blank=True)
     geofence_radius_m = models.PositiveIntegerField(default=60)  # managers set
 
+
 class AgentAssignment(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
     active = models.BooleanField(default=True)
-
-

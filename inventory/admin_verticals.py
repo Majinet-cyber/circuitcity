@@ -10,14 +10,28 @@ from django.utils.html import format_html
 try:
     from .models_verticals import (
         # Liquor
-        LiquorSale, LiquorCredit, LiquorCreditPayment, LiquorStockEditRequest,
-        LiquorExpense, LiquorWalletEntry, LiquorShift, LiquorShiftStock,
+        LiquorSale,
+        LiquorCredit,
+        LiquorCreditPayment,
+        LiquorStockEditRequest,
+        LiquorExpense,
+        LiquorWalletEntry,
+        LiquorShift,
+        LiquorShiftStock,
         # Gym
-        GymMember, GymPayment, GymMemberLog, GymSettings, GymWalletEntry, GymTrainer, GymCheckIn,
+        GymMember,
+        GymPayment,
+        GymMemberLog,
+        GymSettings,
+        GymWalletEntry,
+        GymTrainer,
+        GymCheckIn,
         # Clothing
-        ClothingSale, ClothingProductLog,
+        ClothingSale,
+        ClothingProductLog,
         # Cement
-        CementSale, CementCost,
+        CementSale,
+        CementCost,
         # Groceries
         GrocerySale,
     )
@@ -36,9 +50,20 @@ except ImportError:
 # ==============================================================================
 
 if LiquorSale:
+
     @admin.register(LiquorSale)
     class LiquorSaleAdmin(admin.ModelAdmin):
-        list_display = ("product", "unit", "quantity", "unit_price", "total_price", "sale_type", "is_credit", "sold_at", "sold_by")
+        list_display = (
+            "product",
+            "unit",
+            "quantity",
+            "unit_price",
+            "total_price",
+            "sale_type",
+            "is_credit",
+            "sold_at",
+            "sold_by",
+        )
         list_filter = ("sale_type", "unit", "is_credit", "sold_at")
         search_fields = ("product__name", "sold_by__username")
         date_hierarchy = "sold_at"
@@ -49,6 +74,7 @@ if LiquorSale:
 
 
 if LiquorCredit:
+
     @admin.register(LiquorCredit)
     class LiquorCreditAdmin(admin.ModelAdmin):
         list_display = ("customer_name", "customer_phone", "amount", "amount_paid", "balance", "status", "created_at")
@@ -59,13 +85,14 @@ if LiquorCredit:
         list_select_related = ("business", "created_by")
         autocomplete_fields = ("created_by",)
         list_per_page = 50
-        
+
         @admin.display(description="Balance")
         def balance(self, obj):
             return obj.balance
 
 
 if LiquorCreditPayment:
+
     @admin.register(LiquorCreditPayment)
     class LiquorCreditPaymentAdmin(admin.ModelAdmin):
         list_display = ("credit", "amount", "transaction_id", "status", "paid_by", "created_at", "reviewed_by")
@@ -77,13 +104,14 @@ if LiquorCreditPayment:
         autocomplete_fields = ("credit", "paid_by", "reviewed_by")
         list_per_page = 50
         readonly_fields = ("proof_file",)
-        
+
         def has_add_permission(self, request):
             # Payments should be created through the app, not admin
             return request.user.is_superuser
 
 
 if LiquorStockEditRequest:
+
     @admin.register(LiquorStockEditRequest)
     class LiquorStockEditRequestAdmin(admin.ModelAdmin):
         list_display = ("product", "status", "requested_by", "created_at", "reviewed_by", "reviewed_at")
@@ -97,6 +125,7 @@ if LiquorStockEditRequest:
 
 
 if LiquorExpense:
+
     @admin.register(LiquorExpense)
     class LiquorExpenseAdmin(admin.ModelAdmin):
         list_display = ("description", "amount", "category", "created_at", "created_by")
@@ -109,6 +138,7 @@ if LiquorExpense:
 
 
 if LiquorWalletEntry:
+
     @admin.register(LiquorWalletEntry)
     class LiquorWalletEntryAdmin(admin.ModelAdmin):
         list_display = ("description", "entry_type", "amount", "created_at", "created_by")
@@ -121,35 +151,59 @@ if LiquorWalletEntry:
 
 
 if LiquorShift:
+
     @admin.register(LiquorShift)
     class LiquorShiftAdmin(admin.ModelAdmin):
-        list_display = ("id", "barman", "status", "started_at", "ended_at", "total_sales_amount", "total_profit_amount", "missing_stock_value")
+        list_display = (
+            "id",
+            "barman",
+            "status",
+            "started_at",
+            "ended_at",
+            "total_sales_amount",
+            "total_profit_amount",
+            "missing_stock_value",
+        )
         list_filter = ("status", "started_at")
         search_fields = ("barman__username", "barman__first_name", "barman__last_name")
         date_hierarchy = "started_at"
         ordering = ("-started_at",)
         list_select_related = ("business", "location", "barman", "created_by")
         raw_id_fields = ("barman", "created_by", "location")
-        readonly_fields = ("started_at", "ended_at", "total_sales_amount", "total_cost_amount", "total_profit_amount", "total_credit_amount", "total_free_amount", "missing_stock_value")
+        readonly_fields = (
+            "started_at",
+            "ended_at",
+            "total_sales_amount",
+            "total_cost_amount",
+            "total_profit_amount",
+            "total_credit_amount",
+            "total_free_amount",
+            "missing_stock_value",
+        )
         list_per_page = 50
-        
+
         fieldsets = (
-            ("Shift Info", {
-                "fields": ("business", "location", "barman", "created_by", "status")
-            }),
-            ("Timing", {
-                "fields": ("started_at", "ended_at")
-            }),
-            ("Financials", {
-                "fields": ("total_sales_amount", "total_cost_amount", "total_profit_amount", "total_credit_amount", "total_free_amount", "missing_stock_value")
-            }),
-            ("Notes", {
-                "fields": ("opening_notes", "closing_notes")
-            }),
+            ("Shift Info", {"fields": ("business", "location", "barman", "created_by", "status")}),
+            ("Timing", {"fields": ("started_at", "ended_at")}),
+            (
+                "Financials",
+                {
+                    "fields": (
+                        "total_sales_amount",
+                        "total_cost_amount",
+                        "total_profit_amount",
+                        "total_credit_amount",
+                        "total_free_amount",
+                        "missing_stock_value",
+                    )
+                },
+            ),
+            ("Notes", {"fields": ("opening_notes", "closing_notes")}),
         )
 
 
 if LiquorShiftStock:
+
     @admin.register(LiquorShiftStock)
     class LiquorShiftStockAdmin(admin.ModelAdmin):
         list_display = ("shift", "product", "snapshot_type", "bottles_count", "shots_count", "recorded_at")
@@ -167,6 +221,7 @@ if LiquorShiftStock:
 # ==============================================================================
 
 if GymMember:
+
     @admin.register(GymMember)
     class GymMemberAdmin(admin.ModelAdmin):
         list_display = ("name", "phone", "email", "is_active", "is_archived", "joined_at", "membership_status")
@@ -177,7 +232,7 @@ if GymMember:
         list_select_related = ("business", "archived_by")
         autocomplete_fields = ("archived_by",)
         list_per_page = 50
-        
+
         @admin.display(description="Status")
         def membership_status(self, obj):
             status = obj.membership_status()
@@ -188,6 +243,7 @@ if GymMember:
 
 
 if GymPayment:
+
     @admin.register(GymPayment)
     class GymPaymentAdmin(admin.ModelAdmin):
         list_display = ("member", "amount", "start_date", "end_date", "is_active", "paid_at", "paid_by")
@@ -201,6 +257,7 @@ if GymPayment:
 
 
 if GymMemberLog:
+
     @admin.register(GymMemberLog)
     class GymMemberLogAdmin(admin.ModelAdmin):
         list_display = ("member", "action", "performed_by", "created_at")
@@ -210,13 +267,14 @@ if GymMemberLog:
         ordering = ("-created_at",)
         list_select_related = ("member", "performed_by")
         list_per_page = 50
-        
+
         def has_add_permission(self, request):
             # Logs are created automatically, not manually
             return False
 
 
 if GymSettings:
+
     @admin.register(GymSettings)
     class GymSettingsAdmin(admin.ModelAdmin):
         list_display = ("business", "support_phone", "support_email", "default_membership_price")
@@ -225,6 +283,7 @@ if GymSettings:
 
 
 if GymWalletEntry:
+
     @admin.register(GymWalletEntry)
     class GymWalletEntryAdmin(admin.ModelAdmin):
         list_display = ("description", "entry_type", "amount", "created_at", "created_by")
@@ -237,6 +296,7 @@ if GymWalletEntry:
 
 
 if GymTrainer:
+
     @admin.register(GymTrainer)
     class GymTrainerAdmin(admin.ModelAdmin):
         list_display = ("name", "phone", "email", "business", "is_active", "joined_at")
@@ -249,6 +309,7 @@ if GymTrainer:
 
 
 if GymCheckIn:
+
     @admin.register(GymCheckIn)
     class GymCheckInAdmin(admin.ModelAdmin):
         list_display = ("member", "timestamp", "checked_in_by", "business")
@@ -263,6 +324,7 @@ except ImportError:
     TrainerFee = None
 
 if TrainerFee:
+
     @admin.register(TrainerFee)
     class TrainerFeeAdmin(admin.ModelAdmin):
         list_display = ("trainer", "member", "amount", "period_start", "period_end", "created_at", "business")
@@ -281,6 +343,7 @@ if TrainerFee:
 # ==============================================================================
 
 if ClothingSale:
+
     @admin.register(ClothingSale)
     class ClothingSaleAdmin(admin.ModelAdmin):
         list_display = ("product", "quantity", "unit_price", "total_price", "sold_at", "sold_by")
@@ -294,6 +357,7 @@ if ClothingSale:
 
 
 if ClothingProductLog:
+
     @admin.register(ClothingProductLog)
     class ClothingProductLogAdmin(admin.ModelAdmin):
         list_display = ("product", "action", "performed_by", "created_at")
@@ -303,7 +367,7 @@ if ClothingProductLog:
         ordering = ("-created_at",)
         list_select_related = ("product", "performed_by")
         list_per_page = 50
-        
+
         def has_add_permission(self, request):
             # Logs are created automatically, not manually
             return False
@@ -314,9 +378,19 @@ if ClothingProductLog:
 # ==============================================================================
 
 if CementSale:
+
     @admin.register(CementSale)
     class CementSaleAdmin(admin.ModelAdmin):
-        list_display = ("product", "quantity", "unit_price", "total_price", "profit", "payment_method", "sold_at", "sold_by")
+        list_display = (
+            "product",
+            "quantity",
+            "unit_price",
+            "total_price",
+            "profit",
+            "payment_method",
+            "sold_at",
+            "sold_by",
+        )
         list_filter = ("payment_method", "sold_at")
         search_fields = ("product__name", "sold_by__username", "notes")
         date_hierarchy = "sold_at"
@@ -328,6 +402,7 @@ if CementSale:
 
 
 if CementCost:
+
     @admin.register(CementCost)
     class CementCostAdmin(admin.ModelAdmin):
         list_display = ("description", "category", "amount", "cost_date", "business", "created_by", "created_at")
@@ -345,9 +420,20 @@ if CementCost:
 # ==============================================================================
 
 if GrocerySale:
+
     @admin.register(GrocerySale)
     class GrocerySaleAdmin(admin.ModelAdmin):
-        list_display = ("product", "quantity", "sale_mode", "unit_price", "total_price", "profit", "payment_method", "sold_at", "sold_by")
+        list_display = (
+            "product",
+            "quantity",
+            "sale_mode",
+            "unit_price",
+            "total_price",
+            "profit",
+            "payment_method",
+            "sold_at",
+            "sold_by",
+        )
         list_filter = ("sale_mode", "payment_method", "sold_at")
         search_fields = ("product__name", "sold_by__username", "notes")
         date_hierarchy = "sold_at"
@@ -356,4 +442,3 @@ if GrocerySale:
         raw_id_fields = ("product", "sold_by")
         readonly_fields = ("profit",)
         list_per_page = 50
-

@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("sales", "1002_add_sale_rollback_tracking"),
     ]
@@ -22,8 +21,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name="salecommission",
             name="reversed_at",
-            field=models.DateTimeField(
-                blank=True, help_text="When this commission was reversed", null=True
-            ),
+            field=models.DateTimeField(blank=True, help_text="When this commission was reversed", null=True),
         ),
     ]

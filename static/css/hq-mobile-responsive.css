@@ -25,6 +25,17 @@ body.hq-nav-open {
   position: relative;
   min-height: 100vh;
   display: flex;
+  flex-direction: row;
+  background: var(--bs-body-bg, #ffffff);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Ensure shell takes full width */
+body > .hq-shell {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* ========================================
@@ -60,14 +71,45 @@ aside.sidebar.is-open {
 @media (min-width: 992px) {
   .hq-sidebar,
   .cc-sidebar,
-  aside.sidebar {
-    position: sticky;
-    top: 0;
-    transform: translateX(0);
-    width: 260px;
-    min-width: 260px;
-    max-width: 260px;
+  aside.sidebar,
+  #hqSidebar {
+    position: sticky !important;
+    top: 0 !important;
+    transform: translateX(0) !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    flex: 0 0 260px !important;
     height: 100vh;
+    z-index: 100;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+  
+  /* Ensure sidebar is never hidden on desktop */
+  .hq-sidebar[hidden],
+  .cc-sidebar[hidden],
+  aside.sidebar[hidden],
+  #hqSidebar[hidden] {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  /* Prevent any parent from collapsing sidebar */
+  .hq-shell > .hq-sidebar,
+  .hq-shell > .cc-sidebar,
+  .hq-shell > aside.sidebar,
+  .hq-shell > #hqSidebar,
+  .layout > .hq-sidebar,
+  .layout > .cc-sidebar,
+  .layout > aside.sidebar {
+    flex-shrink: 0 !important;
+    flex-grow: 0 !important;
+    width: 260px !important;
+    min-width: 260px !important;
   }
 }
 
@@ -76,25 +118,28 @@ aside.sidebar.is-open {
    ======================================== */
 .hq-main {
   flex: 1;
-  width: 100%;
   min-width: 0; /* Allow content to shrink below its content size */
-  margin-left: 0;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
-/* Desktop: add left margin for sidebar */
+/* Desktop: flexbox handles spacing - no margin or width calc needed */
 @media (min-width: 992px) {
   .hq-main {
-    margin-left: 260px;
+    /* Flexbox layout: sidebar takes 260px (flex: 0 0 260px), main takes rest (flex: 1) */
+    margin-left: 0;
+    width: auto;
   }
 }
 
 .hq-content {
   flex: 1;
   padding: 1rem;
-  max-width: 100%;
+  max-width: none !important;
+  width: 100% !important;
   overflow-x: hidden;
+  min-width: 0;
 }
 
 @media (min-width: 768px) {
@@ -105,8 +150,29 @@ aside.sidebar.is-open {
 
 @media (min-width: 992px) {
   .hq-content {
-    padding: 1.5rem;
+    padding: 1.5rem 2rem;
   }
+}
+
+/* Ensure content uses container-fluid for full width - remove max-width constraints */
+.hq-content,
+.hq-content.container-fluid {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.hq-content > .container-fluid,
+.hq-content > .container {
+  max-width: none !important;
+  width: 100% !important;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* Remove any max-width from shell or main */
+.hq-shell,
+.hq-main {
+  max-width: none !important;
 }
 
 /* ========================================
@@ -203,6 +269,7 @@ aside.sidebar.is-open {
 .layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
 }
 
 @media (max-width: 991px) {
@@ -222,6 +289,7 @@ aside.sidebar.is-open {
     transition: transform 0.2s ease;
     z-index: 1040;
     height: 100vh !important;
+    flex: none !important;
   }
   
   .layout .sidebar.is-open {
@@ -230,6 +298,28 @@ aside.sidebar.is-open {
   
   .layout .content {
     padding-top: 60px; /* Make room for mobile topbar */
+  }
+}
+
+@media (min-width: 992px) {
+  .layout {
+    flex-direction: row;
+  }
+  
+  .layout .sidebar {
+    flex: 0 0 260px !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    max-width: 260px !important;
+    position: sticky !important;
+    top: 0 !important;
+    transform: translateX(0) !important;
+  }
+  
+  .layout .hq-main {
+    flex: 1;
+    min-width: 0;
+    margin-left: 0;
   }
 }
 
@@ -514,11 +604,12 @@ aside.sidebar.is-open {
   }
 }
 
-/* Container Overrides */
-.container,
-.container-fluid,
-.shell {
-  max-width: 100%;
+/* Container Overrides - Remove max-width constraints for HQ */
+.hq-content .container,
+.hq-content .container-fluid,
+.hq-content .shell {
+  max-width: none !important;
+  width: 100% !important;
   overflow-x: hidden;
 }
 
@@ -577,8 +668,15 @@ iframe {
   height: auto;
 }
 
-/* Prevent horizontal scroll caused by wide elements */
+/* Prevent horizontal scroll caused by wide elements - but allow full width for containers */
 .hq-content > * {
   max-width: 100%;
+}
+
+.hq-content > .container-fluid,
+.hq-content > .card,
+.hq-content > .table-responsive {
+  max-width: none !important;
+  width: 100% !important;
 }
 

@@ -6,16 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contact Us - Emajinet</title>
   <meta name="description" content="Get in touch with Emajinet for custom plans, feature requests, or support.">
-  
+
   <!-- SEO: Canonical URL -->
   <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{{ request.path }}">
-  
+
   <meta name="theme-color" content="#0b1220">
   <link rel="icon" href="{% static 'favicon.ico' %}">
-  
+
   <!-- Bootstrap Icons -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-  
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons/bootstrap-icons.min.css' %}">
+
   <style>
     :root {
       --primary: #4f46e5;
@@ -372,4 +372,3 @@
   </script>
 </body>
 </html>
-

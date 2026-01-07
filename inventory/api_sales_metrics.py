@@ -12,16 +12,20 @@ from django.http import JsonResponse, HttpRequest
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
+
 # ---- tolerant import of Sale -------------------------------------------------
 def _try_import(modpath: str, attr: str | None = None):
     import importlib
+
     try:
         mod = importlib.import_module(modpath)
         return getattr(mod, attr) if attr else mod
     except Exception:
         return None
 
+
 Sale = _try_import("sales.models", "Sale")
+
 
 # ---- small helpers -----------------------------------------------------------
 def _ok(payload: dict, message: Optional[str] = None) -> JsonResponse:
@@ -31,17 +35,20 @@ def _ok(payload: dict, message: Optional[str] = None) -> JsonResponse:
         out["message"] = message
     return JsonResponse(out)
 
+
 def _err(message: str, extra: Optional[dict] = None) -> JsonResponse:
     out = {"ok": False, "error": message}
     if extra:
         out.update(extra)
     return JsonResponse(out, status=200)
 
+
 def _field_names(model) -> set[str]:
     try:
         return {getattr(f, "name", None) for f in model._meta.get_fields()}  # type: ignore[attr-defined]
     except Exception:
         return set()
+
 
 def _sale_time_field() -> Optional[str]:
     """Prefer 'sold_at', else 'date', else None."""
@@ -54,6 +61,7 @@ def _sale_time_field() -> Optional[str]:
         return "date"
     return None
 
+
 def _amount_field() -> str:
     """Best available amount/price field on Sale."""
     if Sale is None:
@@ -63,6 +71,7 @@ def _amount_field() -> str:
         if cand in names:
             return cand
     return "price"
+
 
 def _period_bounds(period: str) -> tuple[timezone.datetime.date, timezone.datetime.date]:
     """
@@ -80,6 +89,7 @@ def _period_bounds(period: str) -> tuple[timezone.datetime.date, timezone.dateti
         end = now.date() + timedelta(days=1)
         start = end - timedelta(days=30)
     return start, end
+
 
 def _maybe_scope_business(request: HttpRequest, qs):
     """
@@ -104,6 +114,7 @@ def _maybe_scope_business(request: HttpRequest, qs):
         except Exception:
             return qs
     return qs
+
 
 # ---- API: Top Models ---------------------------------------------------------
 @login_required
@@ -157,13 +168,10 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
 
     rows = (
         qs.values("id")  # dummy to enable annotate in SQLite safely
-          .annotate(model_name=name_expr)
-          .values("model_name")
-          .annotate(
-              qty=Count("id"),
-              amount=Coalesce(Sum(amount_field), Value(0))
-          )
-          .order_by("-qty", "-amount")[:10]
+        .annotate(model_name=name_expr)
+        .values("model_name")
+        .annotate(qty=Count("id"), amount=Coalesce(Sum(amount_field), Value(0)))
+        .order_by("-qty", "-amount")[:10]
     )
 
     series = [
@@ -171,6 +179,7 @@ def api_top_models(request: HttpRequest) -> JsonResponse:
         for r in rows
     ]
     return _ok({"series": series, "period": period, "count": len(series)})
+
 
 # ---- API: Sales Trend --------------------------------------------------------
 @login_required
@@ -198,7 +207,9 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
     amount_field = _amount_field()
 
     if not time_field:
-        return _ok({"series": [], "period": period, "total_qty": 0, "total_amount": 0.0}, "No sold_at/date field on Sale")
+        return _ok(
+            {"series": [], "period": period, "total_qty": 0, "total_amount": 0.0}, "No sold_at/date field on Sale"
+        )
 
     qs = Sale._default_manager.all()
     qs = _maybe_scope_business(request, qs)
@@ -213,13 +224,13 @@ def api_sales_trend(request: HttpRequest) -> JsonResponse:
 
     daily = (
         qs.annotate(day=trunc_expr)
-          .values("day")
-          .annotate(qty=Count("id"), amount=Coalesce(Sum(amount_field), Value(0)))
-          .order_by("day")
+        .values("day")
+        .annotate(qty=Count("id"), amount=Coalesce(Sum(amount_field), Value(0)))
+        .order_by("day")
     )
 
     # Fill missing days
-    by_day = { (r["day"] or timezone.localdate()).isoformat(): r for r in daily }
+    by_day = {(r["day"] or timezone.localdate()).isoformat(): r for r in daily}
     cursor = start
     series = []
     total_qty = 0

@@ -1,6 +1,7 @@
 ﻿from django.test import TestCase
 from django.apps import apps
 
+
 class AuditLogModelTests(TestCase):
     def test_audit_log_model_exists(self):
         try:

@@ -16,6 +16,7 @@ from ..models import PasswordResetCode
 @dataclass
 class ResetThrottle(Exception):
     """Raised when requests exceed the allowed window (3 per 45 minutes by default)."""
+
     message: str = "Too many reset codes requested. Please try again later."
 
 
@@ -141,5 +142,3 @@ def verify_code_and_consume(user, raw_code: str) -> bool:
         rec.save(update_fields=["attempts"])
 
     return False
-
-

@@ -25,5 +25,3 @@ except Exception as exc:  # pragma: no cover
     logger.info("Celery not available; continuing without it: %s", exc)
 
 __all__ = ("celery_app",)
-
-

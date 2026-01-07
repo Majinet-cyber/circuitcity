@@ -5,6 +5,7 @@ from django.shortcuts import render
 from billing.models import BusinessSubscription
 from tenants.models import Business
 
+
 @staff_member_required
 def hq_subscriptions(request):
     q = (request.GET.get("q") or "").strip()
@@ -13,5 +14,3 @@ def hq_subscriptions(request):
         subs = subs.filter(business__name__icontains=q) | subs.filter(plan__name__icontains=q)  # simple OR
 
     return render(request, "hq/subscriptions.html", {"subs": subs, "q": q})
-
-

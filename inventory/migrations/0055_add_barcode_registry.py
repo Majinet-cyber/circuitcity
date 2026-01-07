@@ -7,7 +7,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("inventory", "0054_liquor_payment_mix_and_wine_glass"),
         ("tenants", "0017_add_role_to_agent_invite"),
@@ -118,12 +117,8 @@ class Migration(migrations.Migration):
                         fields=["business", "raw_code", "is_active"],
                         name="barcode_biz_raw_active",
                     ),
-                    models.Index(
-                        fields=["product", "is_active"], name="barcode_product_active"
-                    ),
-                    models.Index(
-                        fields=["batch", "is_active"], name="barcode_batch_active"
-                    ),
+                    models.Index(fields=["product", "is_active"], name="barcode_product_active"),
+                    models.Index(fields=["batch", "is_active"], name="barcode_batch_active"),
                 ],
                 "constraints": [
                     models.UniqueConstraint(

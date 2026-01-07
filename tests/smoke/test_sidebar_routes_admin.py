@@ -17,8 +17,10 @@ from inventory.business_kinds import BusinessKind
 from tests.smoke.fixtures import SmokeTestFixtures
 from tests.smoke.helpers import SidebarLinkExtractor, SessionHelper
 
+# Mark all tests in this module as smoke tests
+pytestmark = [pytest.mark.django_db, pytest.mark.smoke]
 
-@pytest.mark.django_db
+
 class TestSidebarRoutesAdminPhones(TestCase):
     """Test admin sidebar routes for Phones vertical."""
     
@@ -74,7 +76,6 @@ class TestSidebarRoutesAdminPhones(TestCase):
         assert len(errors) == 0, f"URL loading errors for Phones admin:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAdminPharmacy(TestCase):
     """Test admin sidebar routes for Pharmacy vertical."""
     
@@ -130,7 +131,6 @@ class TestSidebarRoutesAdminPharmacy(TestCase):
         assert len(errors) == 0, f"URL loading errors for Pharmacy admin:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAdminClothing(TestCase):
     """Test admin sidebar routes for Clothing vertical."""
     
@@ -186,7 +186,6 @@ class TestSidebarRoutesAdminClothing(TestCase):
         assert len(errors) == 0, f"URL loading errors for Clothing admin:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAdminLiquor(TestCase):
     """Test admin sidebar routes for Liquor vertical."""
     
@@ -242,7 +241,6 @@ class TestSidebarRoutesAdminLiquor(TestCase):
         assert len(errors) == 0, f"URL loading errors for Liquor admin:\n" + "\n".join(errors)
 
 
-@pytest.mark.django_db
 class TestSidebarRoutesAdminGym(TestCase):
     """Test admin sidebar routes for Gym vertical."""
     

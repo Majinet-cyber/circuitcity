@@ -26,9 +26,8 @@ urlpatterns = [
     # Health & favicon
     path("healthz", healthz, name="healthz"),
     re_path(r"^favicon\.ico$", RedirectView.as_view(url=f"{settings.STATIC_URL}favicon.ico", permanent=False)),
-
     # Core app routes
-    path("", include("dashboard.urls")),            # / â†’ dashboard home
+    path("", include("dashboard.urls")),  # / â†’ dashboard home
     path("accounts/", include("accounts.urls")),
     path("tenants/", include("tenants.urls")),
     path("inventory/", include("inventory.urls")),
@@ -57,11 +56,10 @@ if "two_factor" in settings.INSTALLED_APPS:
 # Optional: Debug Toolbar
 if settings.DEBUG and "debug_toolbar" in settings.INSTALLED_APPS:
     import debug_toolbar  # type: ignore
+
     urlpatterns.append(path("__debug__/", include(debug_toolbar.urls)))
 
 # Serve static/media in dev
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-
-

@@ -81,7 +81,9 @@ def _get_vertical_stock_url(vertical: str) -> str:
         if vertical == CLOTHING:
             return reverse("inventory:stock_list")
         elif vertical == LIQUOR:
-            return reverse("liquor:stock_overview")
+            # CRITICAL FIX: Liquor must use liquor:stock_list (detailed inventory)
+            # NOT liquor:stock_overview (battery view) or inventory:stock_list (phones)
+            return reverse("liquor:stock_list")
         elif vertical == PHARMACY:
             return reverse("inventory:stock_list")  # Pharmacy uses default
         elif vertical == GYM:
@@ -119,7 +121,7 @@ def app_home(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     vertical = business_vertical(request)
     url = _get_vertical_dashboard_url(vertical)
     return redirect(url)
@@ -133,7 +135,7 @@ def app_scan(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     vertical = business_vertical(request)
     url = _get_vertical_scan_url(vertical)
     return redirect(url)
@@ -147,7 +149,7 @@ def app_sell(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     vertical = business_vertical(request)
     url = _get_vertical_sell_url(vertical)
     return redirect(url)
@@ -161,7 +163,7 @@ def app_stock(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     vertical = business_vertical(request)
     url = _get_vertical_stock_url(vertical)
     return redirect(url)
@@ -175,7 +177,7 @@ def app_wallet(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     url = _get_vertical_wallet_url("")  # Wallet is same for all
     return redirect(url)
 
@@ -188,7 +190,7 @@ def app_sim(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     url = _get_vertical_sim_url("")  # Simulator is business-aware internally
     return redirect(url)
 
@@ -201,9 +203,10 @@ def app_analytics(request: HttpRequest) -> HttpResponse:
     if not business:
         messages.error(request, "No active business selected")
         return redirect("dashboard:home")
-    
+
     try:
         from inventory.views_analytics import analytics_dashboard
+
         return analytics_dashboard(request)
     except ImportError:
         # Analytics not implemented yet, redirect to dashboard
@@ -211,4 +214,3 @@ def app_analytics(request: HttpRequest) -> HttpResponse:
         url = _get_vertical_dashboard_url(vertical)
         messages.info(request, "Analytics page coming soon")
         return redirect(url)
-

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Access Denied</title>
+  <meta name="robots" content="noindex">
+  <style>
+    :root{
+      --bg:#0b1220; --card:#0f172a; --ink:#e5e7eb; --muted:#94a3b8; --accent:#ef4444;
+      --radius:14px;
+    }
+    html,body{height:100%}
+    body{
+      margin:0; background:var(--bg); color:var(--ink);
+      font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+      display:grid; place-items:center;
+    }
+    .wrap{
+      max-width:680px; width:calc(100% - 32px);
+      padding:28px 24px; border-radius:var(--radius);
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.02));
+      box-shadow:0 10px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.08);
+      text-align:left;
+    }
+    h1{margin:0 0 .5rem; font-weight:900; letter-spacing:.2px; font-size:1.35rem}
+    p{margin:.45rem 0}
+    .muted{color:var(--muted)}
+    .btn{
+      display:inline-block; padding:.68rem .95rem; border-radius:10px; text-decoration:none; font-weight:600;
+      background:var(--accent); color:#fff; border:0;
+      box-shadow:0 10px 22px rgba(239,68,68,.35); margin-top:14px;
+    }
+    .foot{margin-top:12px; font-size:.9rem; color:var(--muted)}
+  </style>
+</head>
+<body>
+  <main class="wrap" role="main" aria-labelledby="h1">
+    <h1 id="h1">🚫 Access Denied</h1>
+    <p>You don't have permission to access this resource.</p>
+    <p class="muted">If you believe this is an error, please contact your administrator.</p>
+
+    <a class="btn" href="/">Go to Dashboard</a>
+
+    {% if request_id %}
+      <p class="foot">Reference: {{ request_id }}</p>
+    {% endif %}
+  </main>
+</body>
+</html>
+

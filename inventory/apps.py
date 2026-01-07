@@ -160,7 +160,7 @@ class InventoryConfig(AppConfig):
                 logger.info("inventory.signals not found; skipping signal wiring.")
         except Exception:
             logger.exception("Error loading inventory.signals")
-        
+
         # Import audit signals for stock integrity
         try:
             importlib.import_module("inventory.signals_audit")

@@ -1,5 +1,6 @@
 ﻿import numpy as np
 
+
 def monte_carlo_simulation(payload, iterations=1000):
     """
     Run a Monte Carlo simulation based on baseline payload.
@@ -34,5 +35,3 @@ def monte_carlo_simulation(payload, iterations=1000):
         "p90": round(np.percentile(results, 90), 2),
         "distribution": results[:200],  # sample for visualization
     }
-
-

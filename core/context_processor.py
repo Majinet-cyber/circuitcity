@@ -1,14 +1,15 @@
 ﻿# circuitcity/core/context_processors.py
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Any, Dict
+
 from django.conf import settings
 
 # ---------------------------------------------------------------------
 # Safe import of business rules (fallback keeps app running)
 # ---------------------------------------------------------------------
 try:
-    from core.business_rules import get_rule, BUSINESS_TYPES  # type: ignore
+    from core.business_rules import BUSINESS_TYPES, get_rule  # type: ignore
 except Exception:  # pragma: no cover
     # Minimal fallback so templates never crash if the module isn't present yet
     class _Rule:
@@ -135,12 +136,12 @@ def biz_context(request) -> Dict[str, Any]:
     """
     Single source of truth for business-type driven behavior.
     Exposes:
-      cc_business         â€” active Business (or None)
-      cc_business_code    â€” normalized code ('phone_sales', 'pharmacy', ...)
-      cc_business_name    â€” human name
-      cc_serial_min/max   â€” allowed serial length range (IMEI/SKU)
-      cc_require_imei     â€” UI hint for phones
-      cc_business_types   â€” map of available types (for sign-up selector)
+      cc_business         â€" active Business (or None)
+      cc_business_code    â€" normalized code ('phone_sales', 'pharmacy', ...)
+      cc_business_name    â€" human name
+      cc_serial_min/max   â€" allowed serial length range (IMEI/SKU)
+      cc_require_imei     â€" UI hint for phones
+      cc_business_types   â€" map of available types (for sign-up selector)
     """
     biz = _safe_getattr(request, "active_business", None)
     rule_code = _rule_code_for_business(biz)
@@ -157,3 +158,22 @@ def biz_context(request) -> Dict[str, Any]:
     }
 
 
+def static_versioning(request) -> Dict[str, Any]:
+    """
+    Provides static asset versioning for cache busting.
+    Uses BUILD_ID from env (production) or timestamp (dev).
+    """
+    import os
+    import time
+
+    # In production, use BUILD_ID from environment (set during deployment)
+    # In dev, use timestamp to ensure fresh assets on every server restart
+    build_id = os.environ.get("BUILD_ID") or os.environ.get("RENDER_GIT_COMMIT", "")[:8]
+    if not build_id:
+        # Fallback to timestamp for dev (changes on server restart)
+        build_id = str(int(time.time()))
+
+    return {
+        "BUILD_ID": build_id,
+        "STATIC_VERSION": build_id,  # Alias for backward compatibility
+    }

@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("accounts", "0007_profile_force_password_change"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
@@ -27,27 +26,19 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "goal_stop_theft",
-                    models.BooleanField(
-                        default=False, help_text="Stop theft and missing stock"
-                    ),
+                    models.BooleanField(default=False, help_text="Stop theft and missing stock"),
                 ),
                 (
                     "goal_see_profit",
-                    models.BooleanField(
-                        default=False, help_text="See profit and losses clearly"
-                    ),
+                    models.BooleanField(default=False, help_text="See profit and losses clearly"),
                 ),
                 (
                     "goal_track_performance",
-                    models.BooleanField(
-                        default=False, help_text="Track agent performance and rankings"
-                    ),
+                    models.BooleanField(default=False, help_text="Track agent performance and rankings"),
                 ),
                 (
                     "goal_move_off_notebooks",
-                    models.BooleanField(
-                        default=False, help_text="Move off hardcover notebooks"
-                    ),
+                    models.BooleanField(default=False, help_text="Move off hardcover notebooks"),
                 ),
                 ("completed_at", models.DateTimeField(blank=True, null=True)),
                 (
@@ -84,12 +75,8 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "accounts_onboarding_profile",
                 "indexes": [
-                    models.Index(
-                        fields=["user"], name="accounts_on_user_id_daaf43_idx"
-                    ),
-                    models.Index(
-                        fields=["completed_at"], name="accounts_on_complet_a1f91b_idx"
-                    ),
+                    models.Index(fields=["user"], name="accounts_on_user_id_daaf43_idx"),
+                    models.Index(fields=["completed_at"], name="accounts_on_complet_a1f91b_idx"),
                 ],
             },
         ),

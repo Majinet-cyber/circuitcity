@@ -8,10 +8,10 @@ with io.open(p, "r", encoding="utf-8") as f:
 # We handle both plain "accounts" and "accounts.apps.AccountsConfig".
 subs = [
     (r'([\'"])accounts\.apps\.AccountsConfig\1\s*,', r'"circuitcity.accounts.apps.AccountsConfig",'),
-    (r'([\'"])accounts\1\s*,',                        r'"circuitcity.accounts.apps.AccountsConfig",'),
-    (r'([\'"])inventory\1\s*,',                      r'"circuitcity.inventory",'),
-    (r'([\'"])sales\1\s*,',                          r'"circuitcity.sales",'),
-    (r'([\'"])dashboard\1\s*,',                      r'"circuitcity.dashboard",'),
+    (r'([\'"])accounts\1\s*,', r'"circuitcity.accounts.apps.AccountsConfig",'),
+    (r'([\'"])inventory\1\s*,', r'"circuitcity.inventory",'),
+    (r'([\'"])sales\1\s*,', r'"circuitcity.sales",'),
+    (r'([\'"])dashboard\1\s*,', r'"circuitcity.dashboard",'),
 ]
 
 for pat, repl in subs:
@@ -25,5 +25,3 @@ with io.open(p, "w", encoding="utf-8") as f:
     f.write(s)
 
 print("Patched:", p)
-
-

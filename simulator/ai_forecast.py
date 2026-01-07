@@ -6,6 +6,7 @@ from datetime import timedelta
 
 from sales.models import Sale  # Assuming we track daily or monthly sales
 
+
 def ai_forecast(days=90):
     """
     Predicts daily sales for the next N days using historical sales data.
@@ -37,9 +38,4 @@ def ai_forecast(days=90):
     future_days = np.arange(df["day_num"].max() + 1, df["day_num"].max() + days + 1).reshape(-1, 1)
     predictions = model.predict(future_days)
 
-    return [
-        {"day": int(i + 1), "predicted_sales": max(round(val, 2), 0)}
-        for i, val in enumerate(predictions)
-    ]
-
-
+    return [{"day": int(i + 1), "predicted_sales": max(round(val, 2), 0)} for i, val in enumerate(predictions)]

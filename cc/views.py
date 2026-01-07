@@ -1,8 +1,9 @@
 ﻿# cc/views.py
 from __future__ import annotations
-from decimal import Decimal
+
 from datetime import datetime, timedelta
-from typing import Dict, Any
+from decimal import Decimal
+from typing import Any, Dict
 
 from django.conf import settings
 from django.contrib import messages
@@ -10,11 +11,11 @@ from django.contrib.auth import get_user_model, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import connection
 from django.db.models import Sum
-from django.http import JsonResponse, HttpRequest, HttpResponse
-from django.shortcuts import redirect, render, get_object_or_404
+from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie, csrf_protect
 
 from inventory.models import InventoryItem, TimeLog, WalletTxn
 from sales.models import Sale
@@ -22,10 +23,10 @@ from sales.models import Sale
 User = get_user_model()
 
 # Compensation knobs
-BASE_SALARY = Decimal("40000")          # MK40,000
-EARLY_BIRD_BONUS = Decimal("5000")      # before 08:00
-LATE_STEP_PENALTY = Decimal("5000")     # every 30 min after 08:00
-SUNDAY_BONUS = Decimal("15000")         # any time on Sunday
+BASE_SALARY = Decimal("40000")  # MK40,000
+EARLY_BIRD_BONUS = Decimal("5000")  # before 08:00
+LATE_STEP_PENALTY = Decimal("5000")  # every 30 min after 08:00
+SUNDAY_BONUS = Decimal("15000")  # any time on Sunday
 
 
 # ==============================================================================
@@ -168,8 +169,8 @@ def admin_dashboard(_request: HttpRequest) -> HttpResponse:
 # ==============================================================================
 @login_required
 @user_passes_test(is_admin)
-@ensure_csrf_cookie         # set cookie on GET
-@csrf_protect               # enforce token on POST
+@ensure_csrf_cookie  # set cookie on GET
+@csrf_protect  # enforce token on POST
 def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     agent = get_object_or_404(User, pk=user_id)
 
@@ -211,16 +212,14 @@ def admin_agent_detail(request: HttpRequest, user_id: int) -> HttpResponse:
     month_commission = sum((s.commission_amount for s in sales_month), Decimal("0"))
     lifetime_commission = sum((s.commission_amount for s in sales_all), Decimal("0"))
 
-    month_txn_total = WalletTxn.objects.filter(
-        user=agent, created_at__date__gte=month_start
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    lifetime_txn_total = WalletTxn.objects.filter(user=agent).aggregate(
+    month_txn_total = WalletTxn.objects.filter(user=agent, created_at__date__gte=month_start).aggregate(
         t=Sum("amount")
     )["t"] or Decimal("0")
+    lifetime_txn_total = WalletTxn.objects.filter(user=agent).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
-    month_deductions = WalletTxn.objects.filter(
-        user=agent, created_at__date__gte=month_start, amount__lt=0
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+    month_deductions = WalletTxn.objects.filter(user=agent, created_at__date__gte=month_start, amount__lt=0).aggregate(
+        t=Sum("amount")
+    )["t"] or Decimal("0")
 
     total_monthly_earnings = BASE_SALARY + month_commission + month_txn_total
     lifetime_earnings = lifetime_commission + lifetime_txn_total
@@ -258,7 +257,7 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
 # ==============================================================================
 @login_required
 @ensure_csrf_cookie  # set csrftoken cookie for JS/phone before any POST
-@csrf_protect        # enforce token on POST
+@csrf_protect  # enforce token on POST
 def agent_dashboard(request: HttpRequest) -> HttpResponse:
     """
     Agent dashboard:
@@ -303,9 +302,7 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
                 "🎉 Sunday bonus MK15,000 added to your wallet!",
             )
         else:
-            eight_am = local_when.replace(
-                hour=8, minute=0, second=0, microsecond=0
-            )
+            eight_am = local_when.replace(hour=8, minute=0, second=0, microsecond=0)
             if local_when <= eight_am:
                 WalletTxn.objects.create(
                     user=user,
@@ -337,15 +334,9 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
         return redirect("agent_dashboard")
 
     # --- Stock for battery (agent-specific rules; max=20) ---
-    agent_in_stock = InventoryItem.objects.filter(
-        assigned_agent=user, status="IN_STOCK"
-    ).count()
+    agent_in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
     battery_max = 20
-    battery_pct = (
-        min(100, int(round((agent_in_stock / battery_max) * 100)))
-        if agent_in_stock > 0
-        else 0
-    )
+    battery_pct = min(100, int(round((agent_in_stock / battery_max) * 100))) if agent_in_stock > 0 else 0
     if agent_in_stock < 10:
         battery_color = "red"
         battery_label = "Critical"
@@ -363,16 +354,14 @@ def agent_dashboard(request: HttpRequest) -> HttpResponse:
     month_commission = sum((s.commission_amount for s in my_sales_month), Decimal("0"))
     lifetime_commission = sum((s.commission_amount for s in my_sales_all), Decimal("0"))
 
-    month_txn_total = WalletTxn.objects.filter(
-        user=user, created_at__date__gte=month_start
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
-    lifetime_txn_total = WalletTxn.objects.filter(user=user).aggregate(
+    month_txn_total = WalletTxn.objects.filter(user=user, created_at__date__gte=month_start).aggregate(t=Sum("amount"))[
+        "t"
+    ] or Decimal("0")
+    lifetime_txn_total = WalletTxn.objects.filter(user=user).aggregate(t=Sum("amount"))["t"] or Decimal("0")
+
+    month_deductions = WalletTxn.objects.filter(user=user, created_at__date__gte=month_start, amount__lt=0).aggregate(
         t=Sum("amount")
     )["t"] or Decimal("0")
-
-    month_deductions = WalletTxn.objects.filter(
-        user=user, created_at__date__gte=month_start, amount__lt=0
-    ).aggregate(t=Sum("amount"))["t"] or Decimal("0")
 
     total_monthly_earnings = BASE_SALARY + month_commission + month_txn_total
     lifetime_earnings = lifetime_commission + lifetime_txn_total
@@ -422,33 +411,23 @@ def api_recommendations(request: HttpRequest) -> JsonResponse:
     items: list[dict[str, Any]] = []
 
     # Stock-based nudge
-    in_stock = InventoryItem.objects.filter(
-        assigned_agent=user, status="IN_STOCK"
-    ).count()
+    in_stock = InventoryItem.objects.filter(assigned_agent=user, status="IN_STOCK").count()
     if in_stock < 10:
         items.append(
             {
                 "type": "restock",
-                "message": (
-                    f"Low stock: only {in_stock} items available. "
-                    "Consider restocking to at least 12."
-                ),
+                "message": (f"Low stock: only {in_stock} items available. " "Consider restocking to at least 12."),
                 "confidence": 0.82,
             }
         )
 
     # Recent sales nudge
-    recent_sales = Sale.objects.filter(
-        agent=user, sold_at__gte=now - timedelta(days=14)
-    ).count()
+    recent_sales = Sale.objects.filter(agent=user, sold_at__gte=now - timedelta(days=14)).count()
     if recent_sales == 0:
         items.append(
             {
                 "type": "marketing",
-                "message": (
-                    "No sales in the last 14 days. "
-                    "Try a small discount or a WhatsApp broadcast."
-                ),
+                "message": ("No sales in the last 14 days. " "Try a small discount or a WhatsApp broadcast."),
                 "confidence": 0.61,
             }
         )
@@ -495,38 +474,47 @@ def sw_js(request: HttpRequest) -> HttpResponse:
     """
     Serve service worker from root path /sw.js with proper headers.
     This allows the service worker to control the entire site scope (/).
+
+    CRITICAL: This view MUST be public (no @login_required) and always return 200.
+    Service workers must be accessible without authentication for PWA functionality.
+    All gating middleware bypass /sw.js via BYPASS_PREFIXES constant.
     """
-    from django.contrib.staticfiles import finders
     import os
     from pathlib import Path
-    
+
+    from django.contrib.staticfiles import finders
+
     # Try to find the service worker file using Django's static file finder
-    sw_path = finders.find('sw.js')
+    sw_path = finders.find("sw.js")
     if not sw_path:
         # Fallback: try to read from static directory relative to BASE_DIR
-        static_path = Path(settings.BASE_DIR) / 'static' / 'sw.js'
+        static_path = Path(settings.BASE_DIR) / "static" / "sw.js"
         if static_path.exists():
             sw_path = str(static_path)
         else:
             # Last resort: try STATIC_ROOT if set
             if settings.STATIC_ROOT:
-                static_root_path = Path(settings.STATIC_ROOT) / 'sw.js'
+                static_root_path = Path(settings.STATIC_ROOT) / "sw.js"
                 if static_root_path.exists():
                     sw_path = str(static_root_path)
-    
+
     if sw_path and os.path.exists(sw_path):
         try:
-            with open(sw_path, 'r', encoding='utf-8') as f:
+            with open(sw_path, "r", encoding="utf-8") as f:
                 content = f.read()
+            
+            # Inject BUILD_ID for cache busting (fixes "warped until hard refresh")
+            build_id = getattr(settings, 'BUILD_ID', getattr(settings, 'STATIC_VERSION', '1'))
+            content = content.replace('BUILD_ID_PLACEHOLDER', build_id)
         except (IOError, OSError):
             # Return minimal service worker if file read fails
             content = "// Service worker file not found\nself.skipWaiting();"
     else:
         # Return minimal service worker if file not found
         content = "// Service worker file not found\nself.skipWaiting();"
-    
-    response = HttpResponse(content, content_type='application/javascript')
+
+    response = HttpResponse(content, content_type="application/javascript")
     # Critical headers for service worker scope
-    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response['Service-Worker-Allowed'] = '/'
+    response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Service-Worker-Allowed"] = "/"
     return response

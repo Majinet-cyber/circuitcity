@@ -123,9 +123,8 @@ def emit_alert(
 
     try:
         # Look for an existing alert for this business in TTL window
-        existing = (
-            Alert.objects.filter(business=biz, alert_type=kind, created_at__gte=since)
-            .only("id", "title", "body", "created_at")
+        existing = Alert.objects.filter(business=biz, alert_type=kind, created_at__gte=since).only(
+            "id", "title", "body", "created_at"
         )
         for a in existing:
             # naive match; if your model has an explicit dedupe_key, prefer that
@@ -227,7 +226,12 @@ def generate_cfo_signals(
     # --- Stock low ---
     try:
         for item, reason in _iter_low_stock_items(stock_qs, low_stock_threshold, reorder_level_field):
-            pname = getattr(item, "name", None) or getattr(item, "title", None) or getattr(item, "product_name", None) or "Item"
+            pname = (
+                getattr(item, "name", None)
+                or getattr(item, "title", None)
+                or getattr(item, "product_name", None)
+                or "Item"
+            )
             qty = _first_value(item, ("quantity", "qty", "on_hand", "stock", "count"))
             rlevel = _first_value(item, (reorder_level_field, "reorder_point", "min_qty", "minimum"))
             title = f"Low stock: {pname}"
@@ -236,7 +240,7 @@ def generate_cfo_signals(
                 desc.append(f"Qty {qty}")
             if rlevel is not None:
                 desc.append(f"below threshold {rlevel}")
-            body = (", ".join(desc) or reason)
+            body = ", ".join(desc) or reason
 
             # Dedupe by item id + rule
             dedupe = _hash_key("stock_low", str(getattr(item, "id", "")), str(qty), str(rlevel))
@@ -329,5 +333,3 @@ def prune_old_alerts(days: int = 90) -> int:
         return n
     except Exception:
         return 0
-
-
