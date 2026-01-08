@@ -1,6 +1,8 @@
 # inventory/verticals/cement.py
 """
 Cement / Hardware Vertical - Building materials and hardware store
+
+SSOT: All product definitions come from inventory/catalog/construction_materials.py
 """
 from __future__ import annotations
 
@@ -11,18 +13,29 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, Q, Sum
-from django.http import Http404
+from django.db.models.functions import Coalesce
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
+from inventory.catalog.construction_materials import (
+    get_all_products,
+    get_categories,
+    get_cement_brands,
+    get_paint_sizes,
+    get_product_by_slug,
+    build_product_name,
+    normalize_paint_size,
+    is_valid_paint_size,
+)
 from inventory.catalog.hardware import (
     HARDWARE_CATEGORIES,
     get_catalog_products,
     get_popular_products,
-    get_product_by_slug,
+    get_product_by_slug as get_hardware_product,
     get_products_by_category,
     search_products,
 )
@@ -117,7 +130,7 @@ def dashboard(request):
     if start_dt and end_dt:
         costs_qs = costs_qs.filter(cost_date__gte=start_dt.date(), cost_date__lte=end_dt.date())
 
-    total_costs_period = costs_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0")
+    total_costs = costs_qs.aggregate(total=Coalesce(Sum("amount"), Decimal("0")))["total"]
 
     # Low stock items (less than 5 bags/units)
     low_stock_items = products.filter(quantity_in_stock__lt=5, quantity_in_stock__gt=0).order_by("quantity_in_stock")[
@@ -131,7 +144,7 @@ def dashboard(request):
         "business": business,
         "total_revenue": total_revenue,
         "total_profit": total_profit,
-        "total_costs": total_costs_period,
+        "total_costs": total_costs,
         "stock_value": total_stock_value,
         "total_sales_count": total_sales_count,
         "items_in_stock": items_in_stock,
@@ -191,6 +204,78 @@ def dashboard(request):
 
     context.update(ctx_enhancements)
 
+    # ===========================================================================
+    # DASHBOARD SHELL CONFIG (migrated to shared template 2026-01-08)
+    # ===========================================================================
+    dashboard_config = {
+        'vertical_title': 'Hardware & General Dealers',
+        'vertical_subtitle': 'Track sales, inventory, and profits',
+        'eyebrow_text': f'{business.name} · {date_label}',
+        'hero_gradient_classes': 'linear-gradient(120deg,#92400e,#d97706)',  # Brown/amber gradient
+        'hero_gradient_shadow': 'rgba(217,119,6,0.3)',
+        'hero_primary_text_color': '#92400e',
+        'primary_actions': [
+            {
+                'label': 'Stock In',
+                'url': reverse('cement:stock_in'),
+                'icon': 'bi-box-arrow-in-down',
+                'style': 'primary'
+            },
+            {
+                'label': 'Sell',
+                'url': reverse('cement:sell'),
+                'icon': 'bi-bag-check',
+                'style': 'primary'
+            },
+            {
+                'label': 'Products',
+                'url': reverse('cement:products_catalog'),
+                'icon': 'bi-box-seam',
+                'style': 'ghost'
+            },
+        ],
+        'show_date_filter': True,
+        'date_filter_data': {
+            'range_key': preset,
+            'start_date': start_date,
+            'end_date': end_date,
+            'range_label': date_label,
+        },
+        'show_more_dropdown': True,
+        'kpis': [
+            {
+                'title': 'Revenue',
+                'icon': 'bi-cash-stack',
+                'value': f'MK {total_revenue:,.0f}',
+                'subtitle': f'{total_sales_count} sales',
+                'color': '#3b82f6'
+            },
+            {
+                'title': 'Profit',
+                'icon': 'bi-graph-up',
+                'value': f'MK {total_profit:,.0f}',
+                'subtitle': f'{int((total_profit / total_revenue * 100) if total_revenue > 0 else 0)}% margin',
+                'color': '#16a34a'
+            },
+            {
+                'title': 'Stock Value',
+                'icon': 'bi-box-seam',
+                'value': f'MK {total_stock_value:,.0f}',
+                'subtitle': f'{items_in_stock:,.0f} items',
+                'color': '#f59e0b'
+            },
+            {
+                'title': 'Costs',
+                'icon': 'bi-receipt',
+                'value': f'MK {total_costs:,.0f}',
+                'subtitle': 'Operating expenses',
+                'color': '#06b6d4'
+            },
+        ],
+    }
+    
+    context['dashboard_config'] = dashboard_config
+
     # FORENSIC: Add debug info for Phase A verification
     response = render(request, "verticals/cement/dashboard.html", context)
 
@@ -224,7 +309,17 @@ def stock_list(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def stock_in(request):
-    """Gamified stock-in flow for cement: Brand → Product → Quantity → Pricing"""
+    """
+    Card-based Stock-In wizard for cement/construction materials.
+    
+    Flow:
+    Step 1: Category cards (Construction Materials, etc.)
+    Step 2: Product cards (Cement, Paint, Iron Sheets, etc.)
+    Step 3: Variant selection (Brand → Size → Finish/Color based on product)
+    Step 4: Quantity & Pricing
+    
+    All product definitions come from SSOT: inventory/catalog/construction_materials.py
+    """
     business = get_active_business(request)
 
     # Seed default cement brands if not already seeded (idempotent)
@@ -235,92 +330,152 @@ def stock_in(request):
 
     if request.method == "POST":
         try:
-            # Step 1: Brand selection
+            # Step 1: Category selection
             if step == "1":
-                brand = request.POST.get("brand", "").strip()
-                if not brand:
-                    messages.error(request, "Please select a brand")
+                category = request.POST.get("category", "").strip()
+                if not category:
+                    messages.error(request, "Please select a category")
                     return redirect(f"{reverse('cement:stock_in')}?step=1")
-                # Store brand in session for next step
-                request.session["cement_stock_in_brand"] = brand
+                # Store category in session for next step
+                request.session["cement_stock_in_category"] = category
                 return redirect(f"{reverse('cement:stock_in')}?step=2")
 
-            # Step 2: Product selection/creation
+            # Step 2: Product selection
             elif step == "2":
-                brand = request.session.get("cement_stock_in_brand", "")
-                product_name = request.POST.get("product_name", "").strip()
-                product_id = request.POST.get("product_id", "").strip()
-
-                if product_id:
-                    # Existing product selected
-                    request.session["cement_stock_in_product_id"] = int(product_id)
-                elif product_name:
-                    # New product name entered
-                    request.session["cement_stock_in_product_name"] = product_name
-                else:
-                    messages.error(request, "Please select or enter a product")
+                product_slug = request.POST.get("product", "").strip()
+                if not product_slug:
+                    messages.error(request, "Please select a product")
                     return redirect(f"{reverse('cement:stock_in')}?step=2")
-
-                request.session["cement_stock_in_brand"] = brand
+                
+                # Validate product exists in catalog
+                product_def = get_product_by_slug(product_slug)
+                if not product_def:
+                    messages.error(request, "Invalid product selected")
+                    return redirect(f"{reverse('cement:stock_in')}?step=2")
+                
+                # Store product slug in session
+                request.session["cement_stock_in_product_slug"] = product_slug
                 return redirect(f"{reverse('cement:stock_in')}?step=3")
 
-            # Step 3: Quantity and pricing
+            # Step 3: Variant selection (Brand → Size → Finish/Color)
             elif step == "3":
-                brand = request.session.get("cement_stock_in_brand", "")
-                product_id = request.session.get("cement_stock_in_product_id")
-                product_name = request.session.get("cement_stock_in_product_name", "")
+                product_slug = request.session.get("cement_stock_in_product_slug", "")
+                product_def = get_product_by_slug(product_slug)
+                
+                if not product_def:
+                    messages.error(request, "Product not found. Please start from Step 1.")
+                    return redirect("cement:stock_in")
+                
+                # Extract variant selections
+                brand = request.POST.get("brand", "").strip()
+                size = request.POST.get("size", "").strip()
+                finish = request.POST.get("finish", "").strip()
+                color = request.POST.get("color", "").strip()
+                gauge = request.POST.get("gauge", "").strip()
+                dimension = request.POST.get("dimension", "").strip()
+                
+                # Validate required variants based on product
+                if product_def.get("brands") and not brand:
+                    messages.error(request, "Please select a brand")
+                    return redirect(f"{reverse('cement:stock_in')}?step=3")
+                
+                if product_def.get("sizes") and not size:
+                    messages.error(request, "Please select a size")
+                    return redirect(f"{reverse('cement:stock_in')}?step=3")
+                
+                # Normalize paint size if needed (handles legacy 4L)
+                if product_slug == "paint" and size:
+                    size = normalize_paint_size(size)
+                
+                # Store variants in session
+                request.session["cement_stock_in_brand"] = brand
+                request.session["cement_stock_in_size"] = size
+                request.session["cement_stock_in_finish"] = finish
+                request.session["cement_stock_in_color"] = color
+                request.session["cement_stock_in_gauge"] = gauge
+                request.session["cement_stock_in_dimension"] = dimension
+                
+                return redirect(f"{reverse('cement:stock_in')}?step=4")
 
+            # Step 4: Quantity and pricing
+            elif step == "4":
+                product_slug = request.session.get("cement_stock_in_product_slug", "")
+                brand = request.session.get("cement_stock_in_brand", "")
+                size = request.session.get("cement_stock_in_size", "")
+                finish = request.session.get("cement_stock_in_finish", "")
+                color = request.session.get("cement_stock_in_color", "")
+                gauge = request.session.get("cement_stock_in_gauge", "")
+                dimension = request.session.get("cement_stock_in_dimension", "")
+                
+                product_def = get_product_by_slug(product_slug)
+                if not product_def:
+                    messages.error(request, "Product not found. Please start from Step 1.")
+                    return redirect("cement:stock_in")
+                
                 quantity = int(request.POST.get("quantity", 0))
                 cost_price = Decimal(request.POST.get("cost_price", "0"))
                 selling_price = Decimal(request.POST.get("selling_price", "0"))
-                unit = request.POST.get("unit", "bag").strip()
 
                 if quantity <= 0:
                     messages.error(request, "Quantity must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=3")
+                    return redirect(f"{reverse('cement:stock_in')}?step=4")
 
                 if cost_price <= 0 or selling_price <= 0:
                     messages.error(request, "Cost and selling prices must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=3")
+                    return redirect(f"{reverse('cement:stock_in')}?step=4")
 
                 with transaction.atomic():
-                    if product_id:
+                    # Build product name using SSOT
+                    product_name = build_product_name(
+                        product_slug,
+                        brand=brand,
+                        size=size,
+                        finish=finish,
+                        color=color,
+                        gauge=gauge,
+                        dimension=dimension,
+                    )
+                    
+                    # Get or create product
+                    product, created = MerchProduct.objects.get_or_create(
+                        business=business,
+                        name=product_name,
+                        kind=BusinessKind.CEMENT,
+                        defaults={
+                            "category": product_def["category"],
+                            "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
+                            "cost_price": cost_price,
+                            "selling_price": selling_price,
+                            "quantity_in_stock": quantity,
+                            "base_unit": product_def["default_unit"],
+                            "is_active": True,
+                            "track_inventory": True,
+                        },
+                    )
+
+                    if not created:
                         # Update existing product
-                        product = MerchProduct.objects.get(pk=product_id, business=business, kind=BusinessKind.CEMENT)
                         product.quantity_in_stock += quantity
                         product.cost_price = cost_price
                         product.selling_price = selling_price
                         product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
-                        final_name = product.name
-                    else:
-                        # Create new product
-                        final_name = f"{brand} - {product_name}" if brand else product_name
-                        product, created = MerchProduct.objects.get_or_create(
-                            business=business,
-                            name=final_name,
-                            kind=BusinessKind.CEMENT,
-                            defaults={
-                                "category": "cement",
-                                "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
-                                "cost_price": cost_price,
-                                "selling_price": selling_price,
-                                "quantity_in_stock": quantity,
-                                "base_unit": unit,
-                                "is_active": True,
-                                "track_inventory": True,
-                            },
-                        )
 
-                        if not created:
-                            product.quantity_in_stock += quantity
-                            product.cost_price = cost_price
-                            product.selling_price = selling_price
-                            product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
-
-                    messages.success(request, f"✅ Added {quantity} {unit} of {final_name} to stock")
+                    messages.success(
+                        request,
+                        f"✅ Added {quantity} {product_def['default_unit']} of {product_name} to stock"
+                    )
 
                     # Clear session
-                    for key in ["cement_stock_in_brand", "cement_stock_in_product_id", "cement_stock_in_product_name"]:
+                    for key in [
+                        "cement_stock_in_category",
+                        "cement_stock_in_product_slug",
+                        "cement_stock_in_brand",
+                        "cement_stock_in_size",
+                        "cement_stock_in_finish",
+                        "cement_stock_in_color",
+                        "cement_stock_in_gauge",
+                        "cement_stock_in_dimension",
+                    ]:
                         if key in request.session:
                             del request.session[key]
 
@@ -334,74 +489,72 @@ def stock_in(request):
             return redirect(f"{reverse('cement:stock_in')}?step={step}")
 
     # GET: Show appropriate step
-    # Get all cement brands (seeded + custom)
-    all_products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True).values_list(
-        "name", flat=True
-    )
-
-    # Use seeded brands list
-    seed_brands = get_cement_brands_list()
-
-    # Extract custom brands from products (not in seed list)
-    seed_names_lower = [b["name"].lower() for b in seed_brands]
-    custom_brands = set()
-    for name in all_products:
-        # Extract brand from "Brand - Product" format or use full name
-        brand_name = name.split(" - ")[0] if " - " in name else name
-        if brand_name.lower() not in seed_names_lower:
-            custom_brands.add(brand_name)
-
-    # Combine seeded + custom brands
-    all_brands = seed_brands + [{"key": b.lower().replace(" ", "_"), "name": b, "icon": "📦"} for b in custom_brands]
-
     context = {
         "business": business,
         "step": step,
-        "brands": all_brands,
         "active_tab": "stock_in",
     }
 
-    # Step 2: Show products for selected brand (with variation grouping)
-    if step == "2":
-        brand = request.session.get("cement_stock_in_brand", "")
-        if brand:
-            # Get existing products for this brand
-            products = MerchProduct.objects.filter(
-                business=business, kind=BusinessKind.CEMENT, is_active=True, name__istartswith=brand
-            ).order_by("name")
+    # Step 1: Show category cards
+    if step == "1":
+        categories = get_categories()
+        context["categories"] = categories
 
-            # Group products by base name (e.g., "Paint" instead of "Paint 1L", "Paint 4L")
-            grouped_products = group_products_by_base_name(products)
+    # Step 2: Show product cards for selected category
+    elif step == "2":
+        category = request.session.get("cement_stock_in_category", "")
+        products = get_all_products()  # Get all construction products
+        context["selected_category"] = category
+        context["products"] = products
 
-            context["selected_brand"] = brand
-            context["products"] = products
-            context["grouped_products"] = grouped_products
-
-    # Step 3: Show quantity/pricing form
+    # Step 3: Show variant selection for selected product
     elif step == "3":
+        product_slug = request.session.get("cement_stock_in_product_slug", "")
+        product_def = get_product_by_slug(product_slug)
+        
+        if not product_def:
+            messages.error(request, "Product not found. Please start from Step 1.")
+            return redirect("cement:stock_in")
+        
+        context["product_def"] = product_def
+        context["selected_product_slug"] = product_slug
+
+    # Step 4: Show quantity/pricing form
+    elif step == "4":
+        product_slug = request.session.get("cement_stock_in_product_slug", "")
         brand = request.session.get("cement_stock_in_brand", "")
-        product_id = request.session.get("cement_stock_in_product_id")
-        product_name = request.session.get("cement_stock_in_product_name", "")
-
+        size = request.session.get("cement_stock_in_size", "")
+        finish = request.session.get("cement_stock_in_finish", "")
+        color = request.session.get("cement_stock_in_color", "")
+        gauge = request.session.get("cement_stock_in_gauge", "")
+        dimension = request.session.get("cement_stock_in_dimension", "")
+        
+        product_def = get_product_by_slug(product_slug)
+        if not product_def:
+            messages.error(request, "Product not found. Please start from Step 1.")
+            return redirect("cement:stock_in")
+        
+        # Build suggested product name
+        suggested_name = build_product_name(
+            product_slug,
+            brand=brand,
+            size=size,
+            finish=finish,
+            color=color,
+            gauge=gauge,
+            dimension=dimension,
+        )
+        
+        context["product_def"] = product_def
+        context["suggested_name"] = suggested_name
         context["selected_brand"] = brand
-        if product_id:
-            try:
-                product = MerchProduct.objects.get(pk=product_id, business=business)
-                context["selected_product"] = product
-            except MerchProduct.DoesNotExist:
-                messages.error(request, "Product not found")
-                return redirect(f"{reverse('cement:stock_in')}?step=2")
-        else:
-            context["new_product_name"] = product_name
+        context["selected_size"] = size
+        context["selected_finish"] = finish
+        context["selected_color"] = color
+        context["selected_gauge"] = gauge
+        context["selected_dimension"] = dimension
 
-        units = [
-            ("bag", "Bag (50kg)"),
-            ("ton", "Ton"),
-            ("kg", "Kilograms"),
-        ]
-        context["units"] = units
-
-    return render(request, "verticals/cement/stock_in.html", context)
+    return render(request, "verticals/cement/stock_in_v2.html", context)
 
 
 @login_required
@@ -893,6 +1046,8 @@ def undo_sale(request, sale_id: int):
 def products_catalog(request):
     """
     Hardware Product Catalog - Category-based, searchable, no duplicates.
+    
+    Handles legacy paint size URLs (4L → 5L redirect).
 
     Features:
     - Category chips for filtering
@@ -901,6 +1056,19 @@ def products_catalog(request):
     - List results grouped by category (collapsible)
     """
     business = get_active_business(request)
+
+    # Handle legacy paint size (4L → 5L)
+    size_param = request.GET.get("size", "")
+    if size_param and not is_valid_paint_size(size_param):
+        # Invalid size, redirect to catalog home
+        return redirect("cement:products_catalog")
+    
+    if size_param in ["4L", "4l"]:
+        # Legacy 4L paint size - redirect to 5L
+        new_params = request.GET.copy()
+        new_params["size"] = "5L"
+        redirect_url = f"{reverse('cement:products_catalog')}?{new_params.urlencode()}"
+        return redirect(redirect_url)
 
     # Get search query and category filter
     search_query = request.GET.get("q", "").strip()
@@ -949,6 +1117,8 @@ def products_catalog(request):
 def product_detail(request, slug: str):
     """
     Product detail page with variation picker.
+    
+    Handles legacy paint size URLs (4L → 5L redirect).
 
     Flow:
     1. Show base product info
@@ -957,8 +1127,17 @@ def product_detail(request, slug: str):
     """
     business = get_active_business(request)
 
+    # Handle legacy paint size (4L → 5L)
+    size_param = request.GET.get("size", "")
+    if slug == "paint" and size_param in ["4L", "4l"]:
+        # Legacy 4L paint size - redirect to 5L
+        new_params = request.GET.copy()
+        new_params["size"] = "5L"
+        redirect_url = f"{reverse('cement:product_detail', args=[slug])}?{new_params.urlencode()}"
+        return redirect(redirect_url)
+
     # Get product from catalog
-    product = get_product_by_slug(slug)
+    product = get_hardware_product(slug)
     if not product:
         raise Http404("Product not found in catalog")
 
@@ -977,6 +1156,10 @@ def product_detail(request, slug: str):
     selected_dimension = request.GET.get("dimension", "")
     selected_viscosity = request.GET.get("viscosity", "")
     selected_gauge = request.GET.get("gauge", "")
+    
+    # Normalize paint size if needed
+    if slug == "paint" and selected_size:
+        selected_size = normalize_paint_size(selected_size)
 
     # Build suggested product name based on selections
     suggested_name_parts = [product["base_name"]]
