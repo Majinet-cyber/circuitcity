@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from django.db.models import Avg, Count, Q, QuerySet, Sum
+from django.db.models import Avg, Count, DecimalField, Q, QuerySet, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
@@ -105,9 +105,23 @@ class GymAdapter(AnalyticsAdapter):
             payments_in_range = apply_search_filter(payments_in_range, search_query, self.get_search_fields())
 
         # Revenue and payments in requested range
-        revenue = payments_in_range.aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))["total"] or Decimal(
-            "0.00"
-        )
+        # CRITICAL FIX: Calculate directly from membership_amount + trainer_fee
+        # This ensures revenue is ALWAYS correct even if amount field has legacy 0/NULL values
+        from django.db.models import ExpressionWrapper, F
+        
+        revenue = payments_in_range.aggregate(
+            total=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        Coalesce(F("membership_amount"), Decimal("0.00")) +
+                        Coalesce(F("trainer_fee"), Decimal("0.00")),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                ),
+                Decimal("0.00"),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
+            )
+        )["total"] or Decimal("0.00")
         total_sales = payments_in_range.count()
         avg_order_value = revenue / total_sales if total_sales > 0 else Decimal("0.00")
 

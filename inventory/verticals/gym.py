@@ -115,11 +115,13 @@ def dashboard(request):
     payment_count = range_metrics["payments_count"]
     payment_mix = range_metrics.get("payment_mix", [])
 
-    # Also get month metrics for MRR and legacy compatibility
+    # Also get month metrics for MRR
+    # MRR (Monthly Recurring Revenue) = total revenue THIS MONTH (month-to-date)
+    # This is the standard SaaS metric: revenue in the current calendar month
     from inventory.services.gym_metrics import get_this_month_metrics
 
     month_metrics = get_this_month_metrics(business)
-    mrr = month_metrics["revenue"]
+    mrr = month_metrics["revenue"]  # Total revenue this month (MTD)
 
     # ============================================================================
     # COSTS: Use admin wallet costs (same source as /wallet/admin/costs/)
@@ -130,28 +132,54 @@ def dashboard(request):
     costs_today = get_business_costs_for_period(business, today, today)
     costs_yesterday = get_business_costs_for_period(business, yesterday, yesterday)
     costs_this_month = get_business_costs_for_period(business, month_start.date(), today)
+    
+    # CRITICAL FIX: Calculate costs for the selected filter range (not just MTD)
+    costs_selected_range = get_business_costs_for_period(business, start_date, end_date)
 
     # ============================================================================
     # REVENUE: Calculate from GymPayment for today, yesterday, this month
-    # Use Coalesce for safe aggregation (avoids None)
+    # CRITICAL FIX: Calculate directly from membership_amount + trainer_fee
+    # This ensures revenue is ALWAYS correct even if amount field has legacy 0/NULL values
     # ============================================================================
+    from django.db.models import ExpressionWrapper, F
+    
     revenue_today = GymPayment.objects.filter(
         member__business=business,
         is_active=True,
         paid_at__gte=today_start,
         paid_at__lte=today_end,
-    ).aggregate(total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2)))[
-        "total"
-    ]
+    ).aggregate(
+        total=Coalesce(
+            Sum(
+                ExpressionWrapper(
+                    Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                    Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )["total"]
 
     revenue_yesterday = GymPayment.objects.filter(
         member__business=business,
         is_active=True,
         paid_at__gte=yesterday_start,
         paid_at__lte=yesterday_end,
-    ).aggregate(total=Coalesce(Sum("amount"), Value(0), output_field=DecimalField(max_digits=12, decimal_places=2)))[
-        "total"
-    ]
+    ).aggregate(
+        total=Coalesce(
+            Sum(
+                ExpressionWrapper(
+                    Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                    Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )["total"]
 
     # Use revenue from unified metrics service
     revenue_this_month = month_metrics["revenue"]
@@ -162,11 +190,15 @@ def dashboard(request):
     profit_today = revenue_today - costs_today
     profit_yesterday = revenue_yesterday - costs_yesterday
     profit_this_month = revenue_this_month - costs_this_month
+    
+    # CRITICAL FIX: Calculate profit for the selected filter range
+    profit_selected_range = revenue - costs_selected_range
 
-    # Legacy context variables (for backward compatibility)
-    costs = costs_this_month
-    revenue = revenue_this_month
-    profit = profit_this_month
+    # Context variables: Use selected filter range values (not hardcoded MTD)
+    # This ensures the "Financial Performance" section reflects the actual filter
+    costs = costs_selected_range  # FIX: Was costs_this_month (ignored filter!)
+    # revenue already set from range_metrics above (line 114)
+    profit = profit_selected_range  # FIX: Was profit_this_month (ignored filter!)
 
     # Trainer earnings (this month)
     from inventory.models_verticals import TrainerFee

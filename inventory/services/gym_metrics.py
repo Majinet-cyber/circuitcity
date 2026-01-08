@@ -58,11 +58,22 @@ def get_gym_dashboard_metrics(business, start_date, end_date):
     # Payment count
     payments_count = payments_qs.count()
 
-    # Revenue: Use Coalesce to ensure we get Decimal("0.00") instead of None
-    # Only exclude payments with amount=None (null), but include amount=0 payments
-    revenue_result = payments_qs.exclude(amount__isnull=True).aggregate(
+    # Revenue: CRITICAL FIX - Calculate directly from membership_amount + trainer_fee
+    # This ensures revenue is ALWAYS correct even if amount field has legacy 0/NULL values
+    # Never rely on amount field for calculations (defense in depth)
+    from django.db.models import ExpressionWrapper, F
+
+    revenue_result = payments_qs.aggregate(
         total=Coalesce(
-            Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField(max_digits=12, decimal_places=2)
+            Sum(
+                ExpressionWrapper(
+                    Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                    Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
         )
     )
     revenue = revenue_result["total"]
@@ -73,14 +84,22 @@ def get_gym_dashboard_metrics(business, start_date, end_date):
         revenue = Decimal(str(revenue))
 
     # Payment mix: Breakdown by payment method
-    # Use the same queryset (excluding null amounts only)
-    payment_mix_qs = payments_qs.exclude(amount__isnull=True)
+    # Use the same queryset and sum by method
+    # CRITICAL FIX: Calculate from membership_amount + trainer_fee (not amount field)
     payment_mix_agg = (
-        payment_mix_qs.values("payment_method")
+        payments_qs.values("payment_method")
         .annotate(
             count=Count("id"),
             total=Coalesce(
-                Sum("amount"), Value(Decimal("0.00")), output_field=DecimalField(max_digits=12, decimal_places=2)
+                Sum(
+                    ExpressionWrapper(
+                        Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                        Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                ),
+                Value(Decimal("0.00")),
+                output_field=DecimalField(max_digits=12, decimal_places=2),
             ),
         )
         .order_by("-total")
