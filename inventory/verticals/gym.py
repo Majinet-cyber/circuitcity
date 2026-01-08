@@ -200,6 +200,33 @@ def dashboard(request):
     # revenue already set from range_metrics above (line 114)
     profit = profit_selected_range  # FIX: Was profit_this_month (ignored filter!)
 
+    # SANITY CHECK (development only): If payments exist but revenue is 0, log ERROR
+    if payment_count > 0 and revenue == Decimal("0.00"):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(
+            f"GYM DASHBOARD BUG: {payment_count} payments exist but revenue=0! "
+            f"Business={business.id}, Range={start_date} to {end_date}"
+        )
+
+    # CRITICAL DEBUG INSTRUMENTATION (STEP 1)
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "GYM_DASH_DEBUG biz=%s loc=%s range=%s start=%s end=%s revenue=%s costs=%s profit=%s mrr=%s payment_count=%s payment_mix=%s",
+        business.id if business else None,
+        getattr(business, 'location_id', None),
+        range_param,
+        start_date,
+        end_date,
+        revenue,
+        costs,
+        profit,
+        mrr,
+        payment_count,
+        [(pm.get('method'), pm.get('amount')) for pm in payment_mix] if payment_mix else [],
+    )
+
     # Trainer earnings (this month)
     from inventory.models_verticals import TrainerFee
 
