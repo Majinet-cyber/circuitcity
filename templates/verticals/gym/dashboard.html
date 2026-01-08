@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load money %}
 
 {% block title %}Gym · Emajinet{% endblock %}
 
@@ -30,10 +31,10 @@
   .hero-actions .primary{background:#fff;color:#0f172a}
   .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
   /* Mobile-first dashboard fixes */
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;min-width:0;overflow:hidden}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);text-align:center;height:auto !important;min-height:90px;min-width:0;overflow:hidden}
+  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;min-width:0;overflow:visible}
+  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);text-align:center;height:auto !important;min-height:90px;min-width:0;overflow:visible}
   .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b;white-space:normal !important;line-height:1.2;word-wrap:break-word;overflow-wrap:break-word}
-  .metric-card p{margin:6px 0 0;font-size:2rem;font-weight:800;color:#0f172a;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .metric-card p{margin:6px 0 0;font-size:2rem;font-weight:800;color:#0f172a;min-width:0}
   .metric-card small{display:block;margin-top:4px;font-size:.85rem;color:#64748b;min-width:0;overflow-wrap:break-word}
   @media (max-width:640px){
     .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}

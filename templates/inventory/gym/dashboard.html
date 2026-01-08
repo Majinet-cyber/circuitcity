@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load humanize %}
+{% load money %}
 
 {% block title %}Gym Dashboard - {{ business.name }}{% endblock %}
 
@@ -173,28 +174,28 @@
                     <div class="col-12 col-md-3">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">Revenue</p>
-                            <h4 class="mb-0 fw-bold text-success">MWK {{ revenue_this_month|floatformat:2|intcomma|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold text-success">{{ revenue_this_month|money }}</h4>
                             <small class="text-muted">{{ payment_count_month|default:0|intcomma }} payment{{ payment_count_month|pluralize }}</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">Costs</p>
-                            <h4 class="mb-0 fw-bold text-danger">MWK {{ costs_this_month|floatformat:2|intcomma|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold text-danger">{{ costs_this_month|money }}</h4>
                             <small class="text-muted">From admin wallet</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">Profit</p>
-                            <h4 class="mb-0 fw-bold {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">MWK {{ profit_this_month|floatformat:2|intcomma|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">{{ profit_this_month|money }}</h4>
                             <small class="text-muted">Revenue - Costs</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">MRR</p>
-                            <h4 class="mb-0 fw-bold text-primary">MWK {{ mrr|floatformat:2|intcomma|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold text-primary">{{ mrr|money }}</h4>
                             <small class="text-muted">Monthly Recurring Revenue</small>
                         </div>
                     </div>
@@ -265,7 +266,7 @@
                     <div class="col-12 col-md-4">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">{{ method_data.label }}</p>
-                            <h4 class="mb-0 fw-bold">MWK {{ method_data.total|floatformat:2|intcomma }}</h4>
+                            <h4 class="mb-0 fw-bold">{{ method_data.total|money }}</h4>
                         </div>
                     </div>
                     {% endfor %}
@@ -406,7 +407,7 @@
                                     {% endif %}
                                 </td>
                                 <td class="fw-semibold">{{ stat.trainer.name }}</td>
-                                <td class="fw-semibold text-success">MWK {{ stat.trainer_fees|floatformat:2|intcomma }}</td>
+                                <td class="fw-semibold text-success">{{ stat.trainer_fees|money }}</td>
                                 <td>
                                     <span class="badge bg-primary-subtle text-primary">{{ stat.payment_count|intcomma }} session{{ stat.payment_count|pluralize }}</span>
                                 </td>
@@ -515,7 +516,7 @@
                                             {{ payment.member.name }}
                                         </a>
                                     </td>
-                                    <td class="fw-semibold">MWK {{ payment.amount|floatformat:2|intcomma }}</td>
+                                    <td class="fw-semibold">{{ payment.amount|money }}</td>
                                     <td>
                                         {{ payment.start_date|date:"d M" }} - {{ payment.end_date|date:"d M Y" }}
                                         <span class="badge bg-info-subtle text-info ms-1">30 days</span>
