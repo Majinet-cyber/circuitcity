@@ -1111,6 +1111,17 @@ urlpatterns = [
         ),
         name="restore_stock",
     ),
+    # Stock CRUD operations (manager-only: edit and delete)
+    path(
+        "stock/<int:pk>/edit/",
+        manager_required(_need_biz(_update_stock)),
+        name="stock_edit",
+    ),
+    path(
+        "stock/<int:pk>/delete/",
+        manager_required(_need_biz(_delete_stock)),
+        name="stock_delete",
+    ),
     # Premium Archive Flow (4-step safety process)
     path(
         "archive/start/",

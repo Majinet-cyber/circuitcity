@@ -66,6 +66,9 @@ step2_results.txt
 final_analysis.txt
 single_error.txt
 
+# Test reports (auto-generated)
+reports/
+
 # ----------------------------
 # Editor backups
 # ----------------------------

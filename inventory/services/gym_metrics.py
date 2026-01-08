@@ -105,20 +105,47 @@ def get_gym_dashboard_metrics(business, start_date, end_date):
         .order_by("-total")
     )
 
-    payment_mix = []
+    # Build payment mix dictionary with all methods (always include all 3, even if 0)
+    payment_mix_data = {}
     for item in payment_mix_agg:
         method_code = item["payment_method"]
-        method_display = dict(PaymentMethod.choices).get(method_code, method_code)
         amount = item["total"]
         if amount is None:
             amount = Decimal("0.00")
         elif not isinstance(amount, Decimal):
             amount = Decimal(str(amount))
+        payment_mix_data[method_code] = {
+            "count": item["count"],
+            "amount": amount,
+        }
+    
+    # Ensure all payment methods are present (CASH, BANK, MOBILE_MONEY)
+    # This guarantees consistent display even when a method has 0 transactions
+    all_methods = [
+        (PaymentMethod.CASH, "Cash", "cash"),
+        (PaymentMethod.MOBILE_MONEY, "Mobile Money", "mobile-money"),
+        (PaymentMethod.BANK, "Bank Transfer", "bank"),
+    ]
+    
+    payment_mix = []
+    for method_code, method_display, method_slug in all_methods:
+        data = payment_mix_data.get(method_code, {"count": 0, "amount": Decimal("0.00")})
+        amount = data["amount"]
+        count = data["count"]
+        
+        # Calculate percentage of total revenue
+        if revenue > 0:
+            percentage = round(float(amount / revenue * 100), 1)
+        else:
+            percentage = 0.0
+        
         payment_mix.append(
             {
                 "method": method_display,
-                "count": item["count"],
+                "method_code": method_slug,
+                "count": count,
                 "amount": amount,
+                "percentage": percentage,
             }
         )
 

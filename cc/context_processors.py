@@ -207,4 +207,24 @@ def current_year(request) -> Dict[str, Any]:
     }
 
 
-__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config", "current_year"]
+def marketing_constants(request) -> Dict[str, Any]:
+    """
+    Expose marketing and support constants to all templates.
+    
+    Provides centralized access to:
+    - SUPPORT_EMAIL: Official support email (support@emajinet.africa)
+    - SUPPORT_WHATSAPP_NUMBER: Real working WhatsApp number
+    - MARKETING_ACTIVE_BUSINESSES: Current count of active businesses for marketing
+    
+    This ensures consistency across all public-facing pages and prevents drift.
+    """
+    from django.conf import settings
+    
+    return {
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "support@emajinet.africa"),
+        "SUPPORT_WHATSAPP_NUMBER": getattr(settings, "SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135"),
+        "MARKETING_ACTIVE_BUSINESSES": getattr(settings, "MARKETING_ACTIVE_BUSINESSES", 34),
+    }
+
+
+__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config", "current_year", "marketing_constants"]

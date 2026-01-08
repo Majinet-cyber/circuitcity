@@ -40,7 +40,8 @@ CEMENT_BRANDS = [
     {"key": "duracrete", "name": "Duracrete", "icon": "🏗️"},
     {"key": "khoma", "name": "Khoma", "icon": "🏗️"},
     {"key": "lime", "name": "Lime", "icon": "🧱"},
-    {"key": "njati", "name": "Njati", "icon": "🏗️"},  # Single canonical "Njati" (no "Extra")
+    {"key": "njati", "name": "Njati", "icon": "🏗️"},
+    {"key": "njati_extra", "name": "Njati Extra", "icon": "🏗️"},  # Distinct from "Njati"
     {"key": "nkope", "name": "Nkope", "icon": "🏗️"},
     {"key": "nthanthwe", "name": "Nthanthwe", "icon": "🏗️"},
 ]

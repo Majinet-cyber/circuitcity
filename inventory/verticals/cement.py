@@ -31,6 +31,11 @@ from inventory.catalog.construction_materials import (
     normalize_paint_size,
     is_valid_paint_size,
 )
+from inventory.catalog.registry import (
+    get_all_stock_in_categories,
+    get_category_by_key,
+    get_category_handler,
+)
 from inventory.catalog.hardware import (
     HARDWARE_CATEGORIES,
     get_catalog_products,
@@ -313,12 +318,13 @@ def stock_in(request):
     Card-based Stock-In wizard for cement/construction materials.
     
     Flow:
-    Step 1: Category cards (Construction Materials, etc.)
+    Step 1: Category cards (Construction Materials, Welding Materials, Car Spares, etc.) - from catalog registry
     Step 2: Product cards (Cement, Paint, Iron Sheets, etc.)
     Step 3: Variant selection (Brand → Size → Finish/Color based on product)
     Step 4: Quantity & Pricing
     
     All product definitions come from SSOT: inventory/catalog/construction_materials.py
+    All categories come from SSOT: inventory/catalog/registry.py
     """
     business = get_active_business(request)
 
@@ -336,6 +342,22 @@ def stock_in(request):
                 if not category:
                     messages.error(request, "Please select a category")
                     return redirect(f"{reverse('cement:stock_in')}?step=1")
+                
+                # Validate category exists in registry
+                category_def = get_category_by_key(category)
+                if not category_def:
+                    messages.error(request, "Invalid category selected")
+                    return redirect(f"{reverse('cement:stock_in')}?step=1")
+                
+                # Check if category handler is implemented
+                handler = get_category_handler(category)
+                if handler == "coming_soon":
+                    messages.warning(
+                        request,
+                        f"⚠️ {category_def['label']} is coming soon! Stock-In flow not yet implemented."
+                    )
+                    return redirect(f"{reverse('cement:stock_in')}?step=1")
+                
                 # Store category in session for next step
                 request.session["cement_stock_in_category"] = category
                 return redirect(f"{reverse('cement:stock_in')}?step=2")
@@ -495,9 +517,9 @@ def stock_in(request):
         "active_tab": "stock_in",
     }
 
-    # Step 1: Show category cards
+    # Step 1: Show category cards from catalog registry
     if step == "1":
-        categories = get_categories()
+        categories = get_all_stock_in_categories()
         context["categories"] = categories
 
     # Step 2: Show product cards for selected category

@@ -338,6 +338,8 @@ TEMPLATES = [
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "cc.context_processors.currency_config",
+                "cc.context_processors.marketing_constants",
+                "cc.context_processors.current_year",
                 "core.context_processor.static_versioning",
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
@@ -586,6 +588,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# --------------------------- Profile defaults ---------------------------
+# Single source of truth for Profile sidecar creation defaults
+# These MUST match Profile model field names and ensure NOT NULL constraints are satisfied
+DEFAULT_PROFILE_CITY = "Lilongwe"
+DEFAULT_PROFILE_COUNTRY = "Malawi"
+DEFAULT_PROFILE_TIMEZONE = "Africa/Blantyre"
+DEFAULT_PROFILE_LANGUAGE = "English"
+DEFAULT_PROFILE_CURRENCY = "MWK"
 # Use faster password hashing in CI for speed
 if CI:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
@@ -944,6 +955,12 @@ WHATSAPP_API_BASE_URL = os.environ.get("WHATSAPP_API_BASE_URL", "https://graph.f
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
+
+# --------------------------- marketing & contact constants ---------------------------
+# Centralize marketing constants for consistency across public pages
+SUPPORT_EMAIL = "support@emajinet.africa"
+SUPPORT_WHATSAPP_NUMBER = os.environ.get("SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135")  # Real working number
+MARKETING_ACTIVE_BUSINESSES = 34  # Real count - update when milestones reached
 
 # --------------------------- global UI ---------------------------
 UI = {

@@ -3,12 +3,15 @@
 Integration tests for cement card-based Stock-In flow.
 
 Tests the complete wizard:
-1. Category selection
+1. Category selection (multiple categories from registry)
 2. Product selection  
 3. Variant selection (Brand → Size → Finish/Color)
 4. Quantity & Pricing → Creates inventory
 
-Also tests legacy 4L paint handling and that products are sellable after stock-in.
+Also tests:
+- Legacy 4L paint handling
+- Products are sellable after stock-in
+- Multi-category support (Construction Materials, Welding Materials, Car Spares)
 """
 from decimal import Decimal
 
@@ -435,4 +438,285 @@ class TestCementStockInValidation(TestCase):
 
         # Should reject
         assert response.status_code == 302
+
+
+@pytest.mark.django_db
+class TestCementStockInMultiCategory(TestCase):
+    """Test Stock-In wizard with multiple categories (Construction, Welding, Car Spares)"""
+
+    def setUp(self):
+        """Create cement business, manager, and authenticated client"""
+        self.user = User.objects.create_user(
+            username="cement_manager",
+            email="manager@cement.test",
+            password="test1234",
+        )
+        self.business = Business.objects.create(
+            name="Construction Hardware Store",
+            slug="construction-hardware",
+            business_kind=BusinessKind.CEMENT,
+            status="ACTIVE",
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+        )
+
+        self.client = Client()
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session.save()
+
+    def test_step1_shows_multiple_categories(self):
+        """Step 1 shows Construction Materials, Welding Materials, and Car Spares"""
+        response = self.client.get(reverse("cement:stock_in") + "?step=1")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        
+        # All three categories must be present
+        assert "Construction Materials" in content, "Construction Materials must be visible"
+        assert "Welding Materials" in content, "Welding Materials must be visible"
+        assert "Car Spares" in content, "Car Spares must be visible"
+
+    def test_step1_shows_category_icons(self):
+        """Step 1 shows category icons (🏗️, 🔥, 🚗)"""
+        response = self.client.get(reverse("cement:stock_in") + "?step=1")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        
+        # Check for icons
+        assert "🏗️" in content, "Construction Materials icon must be visible"
+        assert "🔥" in content, "Welding Materials icon must be visible"
+        assert "🚗" in content, "Car Spares icon must be visible"
+
+    def test_step1_construction_materials_has_testid(self):
+        """Construction Materials card has data-testid attribute"""
+        response = self.client.get(reverse("cement:stock_in") + "?step=1")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        assert 'data-testid="category-construction-materials"' in content or \
+               "data-testid='category-construction-materials'" in content, \
+               "Construction Materials must have data-testid for Cypress"
+
+    def test_step1_welding_materials_has_testid(self):
+        """Welding Materials card has data-testid attribute"""
+        response = self.client.get(reverse("cement:stock_in") + "?step=1")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        assert 'data-testid="category-welding-materials"' in content or \
+               "data-testid='category-welding-materials'" in content, \
+               "Welding Materials must have data-testid for Cypress"
+
+    def test_step1_car_spares_has_testid(self):
+        """Car Spares card has data-testid attribute"""
+        response = self.client.get(reverse("cement:stock_in") + "?step=1")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        assert 'data-testid="category-car-spares"' in content or \
+               "data-testid='category-car-spares'" in content, \
+               "Car Spares must have data-testid for Cypress"
+
+    def test_selecting_construction_materials_proceeds_to_products(self):
+        """Selecting Construction Materials proceeds to product selection"""
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=1",
+            {"step": "1", "category": "construction-materials"},
+        )
+        
+        # Should redirect to step 2
+        assert response.status_code == 302
+        assert "step=2" in response.url
+
+    def test_selecting_welding_materials_shows_coming_soon(self):
+        """Selecting Welding Materials shows coming soon message"""
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=1",
+            {"step": "1", "category": "welding-materials"},
+            follow=True,
+        )
+        
+        # Should stay on step 1 with warning message
+        assert response.status_code == 200
+        messages_list = list(response.context.get("messages", []))
+        assert any("coming soon" in str(m).lower() for m in messages_list), \
+            "Should show 'coming soon' message for Welding Materials"
+
+    def test_selecting_car_spares_shows_coming_soon(self):
+        """Selecting Car Spares shows coming soon message"""
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=1",
+            {"step": "1", "category": "car-spares"},
+            follow=True,
+        )
+        
+        # Should stay on step 1 with warning message
+        assert response.status_code == 200
+        messages_list = list(response.context.get("messages", []))
+        assert any("coming soon" in str(m).lower() for m in messages_list), \
+            "Should show 'coming soon' message for Car Spares"
+
+    def test_invalid_category_shows_error(self):
+        """Selecting invalid category shows error"""
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=1",
+            {"step": "1", "category": "nonexistent-category"},
+            follow=True,
+        )
+        
+        # Should show error
+        assert response.status_code == 200
+        messages_list = list(response.context.get("messages", []))
+        assert len(messages_list) > 0, "Should show error message for invalid category"
+
+
+@pytest.mark.django_db
+class TestCementBrandsIncludeNjatiExtra(TestCase):
+    """Test that Njati Extra is available as a distinct brand in Stock-In"""
+
+    def setUp(self):
+        """Create cement business, manager, and authenticated client"""
+        self.user = User.objects.create_user(
+            username="cement_manager",
+            email="manager@cement.test",
+            password="test1234",
+        )
+        self.business = Business.objects.create(
+            name="Construction Hardware Store",
+            slug="construction-hardware",
+            business_kind=BusinessKind.CEMENT,
+            status="ACTIVE",
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+        )
+
+        self.client = Client()
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session.save()
+
+    def test_step3_cement_shows_njati_and_njati_extra(self):
+        """Step 3 cement brand selection shows both Njati and Njati Extra"""
+        # Set up session for step 3
+        session = self.client.session
+        session["cement_stock_in_category"] = "construction-materials"
+        session["cement_stock_in_product_slug"] = "cement"
+        session.save()
+
+        response = self.client.get(reverse("cement:stock_in") + "?step=3")
+        assert response.status_code == 200
+        
+        content = response.content.decode('utf-8')
+        
+        # Both brands must be present
+        assert "Njati" in content, "Njati brand must be visible"
+        assert "Njati Extra" in content, "Njati Extra brand must be visible"
+        
+        # Verify they appear as separate options (not just substring match)
+        # Count occurrences in brand selection context
+        njati_count = content.count('>Njati<')
+        assert njati_count >= 1, "Njati should appear as a separate brand option"
+
+    def test_can_stock_in_njati_cement(self):
+        """Can complete stock-in flow with Njati brand"""
+        # Complete flow with Njati
+        self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
+        self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Njati", "size": "50kg"})
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=4",
+            {
+                "step": "4",
+                "quantity": "100",
+                "cost_price": "25000.00",
+                "selling_price": "30000.00",
+            },
+        )
+        
+        assert response.status_code == 302  # Success
+        
+        # Verify product was created with "Njati" (not "Njati Extra")
+        product = MerchProduct.objects.filter(
+            business=self.business,
+            name__icontains="Njati",
+        ).first()
+        
+        assert product is not None
+        assert "Njati" in product.name
+        # Should be exactly "Njati", not "Njati Extra"
+        assert product.name.count("Njati") == 1 or "Njati Cement" in product.name
+
+    def test_can_stock_in_njati_extra_cement(self):
+        """Can complete stock-in flow with Njati Extra brand"""
+        # Complete flow with Njati Extra
+        self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
+        self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Njati Extra", "size": "50kg"})
+        response = self.client.post(
+            reverse("cement:stock_in") + "?step=4",
+            {
+                "step": "4",
+                "quantity": "50",
+                "cost_price": "26000.00",
+                "selling_price": "31000.00",
+            },
+        )
+        
+        assert response.status_code == 302  # Success
+        
+        # Verify product was created with "Njati Extra"
+        product = MerchProduct.objects.filter(
+            business=self.business,
+            name__icontains="Njati Extra",
+        ).first()
+        
+        assert product is not None
+        assert "Njati Extra" in product.name, "Product name must include 'Njati Extra'"
+
+    def test_njati_and_njati_extra_are_distinct_products(self):
+        """Njati and Njati Extra create separate product entries"""
+        # Stock in Njati
+        self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
+        self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Njati", "size": "50kg"})
+        self.client.post(
+            reverse("cement:stock_in") + "?step=4",
+            {"step": "4", "quantity": "100", "cost_price": "25000.00", "selling_price": "30000.00"},
+        )
+        
+        # Stock in Njati Extra
+        self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
+        self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Njati Extra", "size": "50kg"})
+        self.client.post(
+            reverse("cement:stock_in") + "?step=4",
+            {"step": "4", "quantity": "50", "cost_price": "26000.00", "selling_price": "31000.00"},
+        )
+        
+        # Should have 2 distinct products
+        products = MerchProduct.objects.filter(
+            business=self.business,
+            kind=BusinessKind.CEMENT,
+            name__icontains="Njati",
+        )
+        
+        assert products.count() == 2, "Should have 2 distinct products (Njati and Njati Extra)"
+        
+        product_names = [p.name for p in products]
+        # One should contain just "Njati", the other "Njati Extra"
+        njati_products = [name for name in product_names if "Njati Extra" not in name and "Njati" in name]
+        njati_extra_products = [name for name in product_names if "Njati Extra" in name]
+        
+        assert len(njati_products) == 1, "Should have exactly 1 Njati product"
+        assert len(njati_extra_products) == 1, "Should have exactly 1 Njati Extra product"
 

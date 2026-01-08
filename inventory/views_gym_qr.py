@@ -174,127 +174,135 @@ def _generate_member_card_pdf(member: GymMember, request) -> Optional[bytes]:
     Returns:
         PDF bytes or None if ReportLab not available
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not REPORTLAB_AVAILABLE:
+        logger.warning("ReportLab not available for PDF generation")
         return None
 
     # Create PDF buffer
     buffer = io.BytesIO()
 
-    # Create PDF document (letter size, landscape orientation would be better but letter is fine)
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        rightMargin=2 * cm,
-        leftMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-    )
-
-    # Build PDF content
-    story = []
-    styles = getSampleStyleSheet()
-
-    # Custom styles
-    title_style = ParagraphStyle(
-        "CardTitle",
-        parent=styles["Heading1"],
-        fontSize=24,
-        textColor=colors.HexColor("#1a1a1a"),
-        spaceAfter=20,
-        alignment=TA_CENTER,
-    )
-
-    heading_style = ParagraphStyle(
-        "CardHeading",
-        parent=styles["Heading2"],
-        fontSize=16,
-        textColor=colors.HexColor("#333333"),
-        spaceAfter=10,
-        alignment=TA_CENTER,
-    )
-
-    normal_style = ParagraphStyle(
-        "CardNormal",
-        parent=styles["Normal"],
-        fontSize=12,
-        textColor=colors.HexColor("#333333"),
-        alignment=TA_CENTER,
-    )
-
-    # Get member status
-    status_info = get_member_status(member)
-    status_label = status_info["status"].upper()
-    next_payment = status_info.get("next_payment_date")
-
-    # Title
-    story.append(Paragraph("<b>Gym Member Card</b>", title_style))
-    story.append(Spacer(1, 0.5 * cm))
-
-    # Member Name
-    story.append(Paragraph(f"<b>{member.name}</b>", heading_style))
-
-    # Gym Number
-    gym_number = member.member_number or member.member_code or "N/A"
-    story.append(Paragraph(f"Gym #: {gym_number}", normal_style))
-    story.append(Spacer(1, 0.5 * cm))
-
-    # QR Code Image (centered)
     try:
-        qrcode_module = _get_qrcode_module()
-        public_url = request.build_absolute_uri(reverse("gym:member_qr_status_public", args=[str(member.qr_uuid)]))
-
-        # Generate QR code image
-        qr = qrcode_module.QRCode(
-            version=1,
-            error_correction=qrcode_module.constants.ERROR_CORRECT_M,
-            box_size=12,
-            border=3,
+        # Create PDF document (letter size, landscape orientation would be better but letter is fine)
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            rightMargin=2 * cm,
+            leftMargin=2 * cm,
+            topMargin=2 * cm,
+            bottomMargin=2 * cm,
         )
-        qr.add_data(public_url)
-        qr.make(fit=True)
-        qr_img = qr.make_image(fill_color="black", back_color="white")
 
-        # Convert QR to bytes for ReportLab Image
-        qr_buffer = BytesIO()
-        qr_img.save(qr_buffer, format="PNG")
-        qr_buffer.seek(0)
+        # Build PDF content
+        story = []
+        styles = getSampleStyleSheet()
 
-        # Add QR code image (5cm x 5cm, centered)
-        qr_image = Image(qr_buffer, width=5 * cm, height=5 * cm)
-        qr_image.hAlign = "CENTER"
-        story.append(qr_image)
+        # Custom styles
+        title_style = ParagraphStyle(
+            "CardTitle",
+            parent=styles["Heading1"],
+            fontSize=24,
+            textColor=colors.HexColor("#1a1a1a"),
+            spaceAfter=20,
+            alignment=TA_CENTER,
+        )
+
+        heading_style = ParagraphStyle(
+            "CardHeading",
+            parent=styles["Heading2"],
+            fontSize=16,
+            textColor=colors.HexColor("#333333"),
+            spaceAfter=10,
+            alignment=TA_CENTER,
+        )
+
+        normal_style = ParagraphStyle(
+            "CardNormal",
+            parent=styles["Normal"],
+            fontSize=12,
+            textColor=colors.HexColor("#333333"),
+            alignment=TA_CENTER,
+        )
+
+        # Get member status
+        status_info = get_member_status(member)
+        status_label = status_info.get("status", "UNKNOWN").upper()
+        next_payment = status_info.get("next_payment_date")
+
+        # Title
+        story.append(Paragraph("<b>Gym Member Card</b>", title_style))
         story.append(Spacer(1, 0.5 * cm))
-    except Exception:
-        # If QR generation fails, skip the image
-        pass
 
-    # Status
-    status_color = "#16a34a" if status_label == "ACTIVE" else "#dc2626"
-    story.append(Paragraph(f'<b>Status: <font color="{status_color}">{status_label}</font></b>', normal_style))
+        # Member Name (fallback if missing)
+        member_name = getattr(member, 'name', 'Member') or 'Member'
+        story.append(Paragraph(f"<b>{member_name}</b>", heading_style))
 
-    # Next Payment Date
-    if next_payment:
-        story.append(Paragraph(f"Next Payment: {next_payment.strftime('%B %d, %Y')}", normal_style))
+        # Gym Number
+        gym_number = member.member_number or member.member_code or "N/A"
+        story.append(Paragraph(f"Gym #: {gym_number}", normal_style))
+        story.append(Spacer(1, 0.5 * cm))
 
-    story.append(Spacer(1, 1 * cm))
+        # QR Code Image (centered)
+        try:
+            qrcode_module = _get_qrcode_module()
+            public_url = request.build_absolute_uri(reverse("gym:member_qr_status_public", args=[str(member.qr_uuid)]))
 
-    # Footer note
-    footer_style = ParagraphStyle(
-        "CardFooter",
-        parent=styles["Normal"],
-        fontSize=8,
-        textColor=colors.HexColor("#666666"),
-        alignment=TA_CENTER,
-    )
-    story.append(Paragraph("Scan QR code to view member status online", footer_style))
+            # Generate QR code image
+            qr = qrcode_module.QRCode(
+                version=1,
+                error_correction=qrcode_module.constants.ERROR_CORRECT_M,
+                box_size=12,
+                border=3,
+            )
+            qr.add_data(public_url)
+            qr.make(fit=True)
+            qr_img = qr.make_image(fill_color="black", back_color="white")
 
-    # Build PDF
-    try:
+            # Convert QR to bytes for ReportLab Image
+            qr_buffer = BytesIO()
+            qr_img.save(qr_buffer, format="PNG")
+            qr_buffer.seek(0)
+
+            # Add QR code image (5cm x 5cm, centered)
+            qr_image = Image(qr_buffer, width=5 * cm, height=5 * cm)
+            qr_image.hAlign = "CENTER"
+            story.append(qr_image)
+            story.append(Spacer(1, 0.5 * cm))
+        except Exception as e:
+            # If QR generation fails, add fallback text
+            logger.warning(f"QR code generation failed for member {member.id}: {e}")
+            story.append(Paragraph("QR Code generation failed", normal_style))
+            story.append(Spacer(1, 0.5 * cm))
+
+        # Status
+        status_color = "#16a34a" if status_label == "ACTIVE" else "#dc2626"
+        story.append(Paragraph(f'<b>Status: <font color="{status_color}">{status_label}</font></b>', normal_style))
+
+        # Next Payment Date
+        if next_payment:
+            story.append(Paragraph(f"Next Payment: {next_payment.strftime('%B %d, %Y')}", normal_style))
+
+        story.append(Spacer(1, 1 * cm))
+
+        # Footer note
+        footer_style = ParagraphStyle(
+            "CardFooter",
+            parent=styles["Normal"],
+            fontSize=8,
+            textColor=colors.HexColor("#666666"),
+            alignment=TA_CENTER,
+        )
+        story.append(Paragraph("Scan QR code to view member status online", footer_style))
+
+        # Build PDF
         doc.build(story)
         pdf_bytes = buffer.getvalue()
         buffer.close()
         return pdf_bytes
-    except Exception:
+    except Exception as e:
+        logger.error(f"PDF generation failed for member {member.id}: {e}", exc_info=True)
         buffer.close()
         return None
 

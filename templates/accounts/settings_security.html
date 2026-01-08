@@ -1,30 +1,12 @@
-{% extends "base.html" %}
+{% extends "accounts/_settings_shell.html" %}
 {% load static %}
 
 {% block title %}Settings · Security{% endblock %}
 {% block header_title %}Settings{% endblock %}
 
-{# Hide Layby + Notifications only on settings pages #}
-{% block extra_head %}
-<style>
-  .cc-header .cc-actions { display: none !important; }
-</style>
-{% endblock %}
+{% block settings_page_title %}Account Settings{% endblock %}
 
-{% block content %}
-<div class="container my-4">
-  <h2 class="fw-bold mb-3">Account Settings</h2>
-  {% include "accounts/_settings_nav.html" %}
-
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-
+{% block settings_content %}
   <div class="row g-4">
     <!-- Password change -->
     <div class="col-lg-6">
@@ -67,7 +49,7 @@
               </div>
             {% endif %}
 
-            <button type="submit" class="btn btn-primary px-4">
+            <button type="submit" class="btn btn-cc-primary px-4">
               <i class="bi bi-save me-1"></i> Update Password
             </button>
           </form>
@@ -163,7 +145,7 @@
                     <input type="tel" name="phone" class="form-control" placeholder="+265991234567" required>
                     <div class="form-text">Enter your phone number in international format (e.g. +265991234567)</div>
                   </div>
-                  <button type="submit" class="btn btn-primary">
+                  <button type="submit" class="btn btn-cc-primary">
                     <i class="bi bi-telephone me-1"></i> Send Verification Code
                   </button>
                 </form>
@@ -174,5 +156,4 @@
       </div>
     </div>
   </div>
-</div>
 {% endblock %}

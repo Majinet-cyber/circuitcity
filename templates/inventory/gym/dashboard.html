@@ -172,28 +172,28 @@
                 </div>
                 <div class="row g-3">
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total membership payments recorded in selected range">
                             <p class="text-muted mb-1 small text-uppercase">Revenue</p>
                             <h4 class="mb-0 fw-bold text-success">{{ revenue_this_month|money }}</h4>
                             <small class="text-muted">{{ payment_count_month|default:0|intcomma }} payment{{ payment_count_month|pluralize }}</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Costs recorded in Admin Wallet for selected range">
                             <p class="text-muted mb-1 small text-uppercase">Costs</p>
                             <h4 class="mb-0 fw-bold text-danger">{{ costs_this_month|money }}</h4>
                             <small class="text-muted">From admin wallet</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Revenue minus Costs">
                             <p class="text-muted mb-1 small text-uppercase">Profit</p>
                             <h4 class="mb-0 fw-bold {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">{{ profit_this_month|money }}</h4>
                             <small class="text-muted">Revenue - Costs</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Monthly recurring revenue estimate for selected range">
                             <p class="text-muted mb-1 small text-uppercase">MRR</p>
                             <h4 class="mb-0 fw-bold text-primary">{{ mrr|money }}</h4>
                             <small class="text-muted">Monthly Recurring Revenue</small>
@@ -573,4 +573,15 @@
     overflow: visible;
 }
 </style>
+
+<script>
+// Initialize Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize tooltips (Bootstrap 5)
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+});
+</script>
 {% endblock %}

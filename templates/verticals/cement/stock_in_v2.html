@@ -272,11 +272,11 @@
       
       <div class="card-grid">
         {% for category in categories %}
-        <div class="premium-card card-content" onclick="selectCategory('{{ category.slug }}')">
+        <div class="premium-card card-content" onclick="selectCategory('{{ category.key }}')" data-testid="{{ category.data_testid }}">
           <div class="card-icon">{{ category.icon }}</div>
-          <div class="card-name">{{ category.name }}</div>
+          <div class="card-name">{{ category.label }}</div>
           <div class="card-hint">👆 Tap to select</div>
-          <input type="radio" name="category" value="{{ category.slug }}" id="category_{{ category.slug }}" style="display: none;">
+          <input type="radio" name="category" value="{{ category.key }}" id="category_{{ category.key }}" style="display: none;">
         </div>
         {% endfor %}
       </div>
@@ -464,12 +464,12 @@
 </div>
 
 <script>
-  function selectCategory(categorySlug) {
+  function selectCategory(categoryKey) {
     document.querySelectorAll('.card-content').forEach(card => {
       card.classList.remove('selected');
     });
     event.currentTarget.classList.add('selected');
-    document.getElementById('category_' + categorySlug).checked = true;
+    document.getElementById('category_' + categoryKey).checked = true;
     document.getElementById('continue-btn').disabled = false;
   }
 

@@ -1424,9 +1424,12 @@ class GymPayment(models.Model):
 
     # Legacy amount field (for backward compatibility)
     # Total amount = membership_amount + trainer_fee
+    # CRITICAL FIX: Added null=True, blank=True to handle legacy data
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(Decimal("0.01"))],
         help_text="Total amount paid (membership + trainer fee)",
     )
@@ -1470,9 +1473,9 @@ class GymPayment(models.Model):
         return self.membership_amount + self.trainer_fee
 
     def save(self, *args, **kwargs):
-        # Auto-calculate total amount if not set
-        if not self.amount:
-            self.amount = self.membership_amount + self.trainer_fee
+        # CRITICAL FIX: Always calculate total amount from membership_amount + trainer_fee
+        # This ensures the amount field is never NULL and always reflects the total
+        self.amount = self.membership_amount + self.trainer_fee
 
         # End date should be set by the caller based on prorated calculation
         # Only set default if not provided (for backward compatibility)

@@ -77,10 +77,14 @@ class TestCementBrands:
         assert len(brand_names) == len(set(brand_names)), "Cement brands must be unique"
 
     def test_cement_brands_no_njati_extra(self):
-        """'Njati Extra' should NOT be in canonical brand list (only 'Njati')"""
-        brand_names = [b["name"].lower() for b in CEMENT_BRANDS]
-        assert "njati" in brand_names, "Njati must be in brand list"
-        assert "njati extra" not in brand_names, "Njati Extra must NOT be in canonical list (duplicate)"
+        """'Njati Extra' should be DISTINCT from 'Njati' (separate brand)"""
+        brand_names = [b["name"] for b in CEMENT_BRANDS]
+        assert "Njati" in brand_names, "Njati must be in brand list"
+        assert "Njati Extra" in brand_names, "Njati Extra must be in brand list (distinct brand)"
+        
+        # Verify they are distinct entries
+        njati_count = sum(1 for b in CEMENT_BRANDS if "Njati" in b["name"])
+        assert njati_count == 2, "Should have exactly 2 Njati variants: 'Njati' and 'Njati Extra'"
 
     def test_cement_brands_akshar_normalized(self):
         """'Akshar' (not 'Aksher') is the canonical spelling"""
@@ -96,8 +100,8 @@ class TestCementBrands:
 
     def test_cement_brand_count(self):
         """Expected number of canonical cement brands"""
-        # Expected: Dangote, Akshar, Duracrete, Khoma, Lime, Njati, Nkope, Nthanthwe
-        assert len(CEMENT_BRANDS) == 8, f"Expected 8 canonical brands, got {len(CEMENT_BRANDS)}"
+        # Expected: Dangote, Akshar, Duracrete, Khoma, Lime, Njati, Njati Extra, Nkope, Nthanthwe
+        assert len(CEMENT_BRANDS) == 9, f"Expected 9 canonical brands (including Njati Extra), got {len(CEMENT_BRANDS)}"
 
 
 class TestProductNameBuilding:
@@ -184,16 +188,18 @@ class TestSSotIntegration:
     """Integration tests - ensure SSOT is used correctly"""
 
     def test_cement_seed_uses_ssot(self):
-        """cement_seed.py uses SSOT brands (no duplicates)"""
+        """cement_seed.py uses SSOT brands (including Njati Extra)"""
         from inventory.cement_seed import CEMENT_CATALOG
-        
+
         # Check no duplicates in seeded products
         product_names = [p["name"].lower() for p in CEMENT_CATALOG]
         assert len(product_names) == len(set(product_names)), "Seeded products must be unique"
-        
-        # Check no "Njati Extra" in seed
-        assert not any("njati extra" in name.lower() for name in product_names), \
-            "Njati Extra should not be in cement seed (duplicate)"
+
+        # Check that both Njati and Njati Extra are in seed
+        assert any("njati cement" in name.lower() and "extra" not in name.lower() for name in product_names), \
+            "Njati should be in cement seed"
+        assert any("njati extra" in name.lower() for name in product_names), \
+            "Njati Extra should be in cement seed (distinct from Njati)"
 
     def test_hardware_catalog_uses_ssot_paint_sizes(self):
         """hardware.py catalog uses SSOT paint sizes (1L, 5L, 20L)"""

@@ -30,18 +30,16 @@ class Notification(models.Model):
     # For agent notifications, target user (nullable for admin-wide notices)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
+        null=True, blank=True,
         on_delete=models.CASCADE,
         related_name="notifications",
     )
     business = models.ForeignKey(
         "tenants.Business",
-        null=True,
-        blank=True,
+        null=True, blank=True,
         on_delete=models.CASCADE,
         related_name="notifications",
-        help_text="Business this notification belongs to (for multi-tenant support)",
+        help_text="Business this notification belongs to (for multi-tenant support)"
     )
 
     message = models.TextField()
@@ -79,46 +77,62 @@ class Notification(models.Model):
 # WhatsApp Notification Preferences
 # ==============================================================================
 
-
 class WhatsAppPreference(models.Model):
     """
     WhatsApp notification preferences for managers and agents.
     Allows opt-in/opt-out for real-time alerts via WhatsApp.
     """
-
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="whatsapp_preference")
-
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="whatsapp_preference"
+    )
+    
     # Contact info
-    phone_number = models.CharField(max_length=20, help_text="International format (e.g. +265888123456)")
-
+    phone_number = models.CharField(
+        max_length=20,
+        help_text="International format (e.g. +265888123456)"
+    )
+    
     # Global toggle
-    is_enabled = models.BooleanField(default=True, help_text="Master switch for all WhatsApp notifications")
-
-    # Notification types
-    receive_sale_alerts = models.BooleanField(default=True, help_text="Notify on sales (for managers)")
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text="Master switch for all WhatsApp notifications"
+    )
+    
+    # Notification types - ALL DEFAULT ON for opt-out model
+    receive_sale_alerts = models.BooleanField(
+        default=True,
+        help_text="Notify on sales (for managers)"
+    )
     receive_profit_milestones = models.BooleanField(
-        default=True, help_text="Notify when profit milestones are reached (for managers)"
+        default=True,
+        help_text="Notify when profit milestones are reached (for managers)"
     )
-    receive_low_stock_alerts = models.BooleanField(default=True, help_text="Notify when stock is low (for managers)")
+    receive_low_stock_alerts = models.BooleanField(
+        default=True,
+        help_text="Notify when stock is low (for managers)"
+    )
     receive_commission_alerts = models.BooleanField(
-        default=False, help_text="Notify on commission earnings (for agents)"
+        default=True,  # CHANGED from False to True
+        help_text="Notify on commission earnings (for agents)"
     )
-
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     class Meta:
         verbose_name = "WhatsApp Preference"
         verbose_name_plural = "WhatsApp Preferences"
         indexes = [
             models.Index(fields=["user", "is_enabled"]),
         ]
-
+    
     def __str__(self):
         status = "enabled" if self.is_enabled else "disabled"
         return f"{self.user.username} WhatsApp ({status})"
-
+    
     @classmethod
     def get_or_default(cls, user):
         """
@@ -134,85 +148,112 @@ class WhatsAppPreference(models.Model):
 # Email Notification Preferences
 # ==============================================================================
 
-
 class NotificationPreference(models.Model):
     """
     Email notification preferences for users.
     Auto-created on user creation via signal.
+    All notifications DEFAULT ON for opt-out model (user can disable).
     """
-
     user = models.OneToOneField(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="email_notification_preference"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="email_notification_preference"
     )
-
+    
     # Welcome emails
-    welcome_emails = models.BooleanField(default=True, help_text="Receive welcome emails")
-
+    welcome_emails = models.BooleanField(
+        default=True,
+        help_text="Receive welcome emails"
+    )
+    
     # Sale notifications (for managers)
     instant_sale_email = models.BooleanField(
-        default=True, help_text="Receive instant email notifications for completed sales"
+        default=True,
+        help_text="Receive instant email notifications for completed sales"
     )
-
+    
     # Sale emails enabled (alias for instant_sale_email, for consistency)
     sale_emails_enabled = models.BooleanField(
-        default=True, help_text="Receive sale completion emails (for managers: True, for agents: False by default)"
+        default=True,
+        help_text="Receive sale completion emails (for managers and agents)"
     )
-
+    
     # Daily summary (for managers)
-    daily_summary_email = models.BooleanField(default=True, help_text="Receive daily sales summary emails")
-
+    daily_summary_email = models.BooleanField(
+        default=True,
+        help_text="Receive daily sales summary emails"
+    )
+    
     # Important alerts
-    important_alerts_email = models.BooleanField(default=True, help_text="Receive important system alerts via email")
-
+    important_alerts_email = models.BooleanField(
+        default=True,
+        help_text="Receive important system alerts via email"
+    )
+    
     # High sales alerts
     high_sales_alerts = models.BooleanField(
-        default=True, help_text="Receive alerts when sales spike for specific products"
+        default=True,
+        help_text="Receive alerts when sales spike for specific products"
     )
-
-    # Commission emails (for agents)
+    
+    # Commission emails (for agents) - CHANGED to default=True for opt-out model
     commission_emails_enabled = models.BooleanField(
-        default=False, help_text="Receive commission emails when completing sales (for agents)"
+        default=True,
+        help_text="Receive commission emails when completing sales (for agents)"
     )
-
+    
     # Weekly digest (for managers)
     weekly_digest_enabled = models.BooleanField(
-        default=True, help_text="Receive weekly sales summary emails every Friday (for managers)"
+        default=True,
+        help_text="Receive weekly sales summary emails every Friday (for managers)"
     )
-
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     class Meta:
         verbose_name = "Email Notification Preference"
         verbose_name_plural = "Email Notification Preferences"
         indexes = [
             models.Index(fields=["user"]),
         ]
-
+    
     def __str__(self):
         return f"Email preferences for {self.user.username}"
-
+    
     @classmethod
     def get_or_create_default(cls, user):
-        """Get or create default preferences for a user."""
+        """
+        Get or create default preferences for a user.
+        Sets sale_emails_enabled based on role: True for managers, False for agents.
+        """
         try:
             return cls.objects.get(user=user)
         except cls.DoesNotExist:
-            return cls.objects.create(user=user)
+            # Determine if user is a manager/owner or agent
+            from tenants.models import Membership
+            is_manager = Membership.objects.filter(
+                user=user,
+                role__in=["MANAGER", "OWNER", "ADMIN"],
+                status="ACTIVE"
+            ).exists()
+            
+            return cls.objects.create(
+                user=user,
+                sale_emails_enabled=is_manager,  # Managers=True, Agents=False
+            )
 
 
 # ==============================================================================
 # Email Notification Events (Idempotency + Audit Trail)
 # ==============================================================================
 
-
 class NotificationEvent(models.Model):
     """
     Email notification events for idempotency and audit trail.
     Prevents duplicate emails and tracks delivery status.
     """
-
     EVENT_TYPE_CHOICES = [
         ("WELCOME_MANAGER", "Welcome Manager"),
         ("WELCOME_AGENT", "Welcome Agent"),
@@ -227,14 +268,14 @@ class NotificationEvent(models.Model):
         ("AGENT_COMMISSION", "Agent Commission"),
         ("WEEKLY_DIGEST", "Weekly Digest"),
     ]
-
+    
     STATUS_CHOICES = [
         ("PENDING", "Pending"),
         ("SENT", "Sent"),
         ("FAILED", "Failed"),
         ("SKIPPED", "Skipped"),  # Skipped due to user preference
     ]
-
+    
     event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES, db_index=True)
     business = models.ForeignKey(
         "tenants.Business",
@@ -242,17 +283,17 @@ class NotificationEvent(models.Model):
         blank=True,
         on_delete=models.CASCADE,
         related_name="email_notification_events",
-        db_index=True,
+        db_index=True
     )
     recipient_email = models.EmailField(db_index=True)
     dedupe_key = models.CharField(max_length=255, db_index=True)
     payload = models.JSONField(default=dict, help_text="Email template context data")
-
+    
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     sent_at = models.DateTimeField(null=True, blank=True)
     last_error = models.TextField(null=True, blank=True, help_text="Error message if failed")
-
+    
     class Meta:
         verbose_name = "Email Notification Event"
         verbose_name_plural = "Email Notification Events"
@@ -264,23 +305,26 @@ class NotificationEvent(models.Model):
         ]
         # Unique constraint to prevent duplicates
         constraints = [
-            models.UniqueConstraint(fields=["event_type", "recipient_email", "dedupe_key"], name="unique_email_event")
+            models.UniqueConstraint(
+                fields=["event_type", "recipient_email", "dedupe_key"],
+                name="unique_email_event"
+            )
         ]
         ordering = ["-created_at"]
-
+    
     def __str__(self):
         return f"{self.event_type} -> {self.recipient_email} ({self.status})"
-
+    
     def mark_sent(self):
         """Mark this event as successfully sent."""
         from django.utils import timezone
-
         self.status = "SENT"
         self.sent_at = timezone.now()
         self.save(update_fields=["status", "sent_at"])
-
+    
     def mark_failed(self, error_message: str):
         """Mark this event as failed with an error message."""
         self.status = "FAILED"
         self.last_error = str(error_message)[:1000]  # Limit error length
         self.save(update_fields=["status", "last_error"])
+
