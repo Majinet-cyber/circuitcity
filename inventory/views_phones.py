@@ -25,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 # Tenant/business scoping
-from tenants.utils import get_active_business
+from tenants.utils import get_active_business, require_business, require_role
 from tenants.scope import resolve_location_for_user
 
 # Models
@@ -38,7 +38,6 @@ from inventory.business_kinds import BusinessKind
 
 # Decorators
 from core.decorators import manager_required
-from tenants.utils import require_business
 
 # Role helpers
 from core.roles import is_manager, is_agent
@@ -186,6 +185,7 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_in(request: HttpRequest) -> HttpResponse:
@@ -420,6 +420,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_sell(request: HttpRequest) -> HttpResponse:
@@ -504,6 +505,11 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "location": location,
             "active_tab": "sell",  # For base.html bottom nav highlighting
         }
+        
+        # Apply SSOT defaults to prevent KeyError failures
+        from reports.services.context_defaults import apply_default_report_context
+        context = apply_default_report_context(context)
+        
         return render(request, "inventory/phones_scan_sell.html", context)
 
     # --- POST: Process sale ---

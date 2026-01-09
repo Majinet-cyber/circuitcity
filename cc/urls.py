@@ -72,7 +72,15 @@ def _try_from(modpath: str, attr: str):
 
 def include_or_raise(module_path: str, namespace: str | None = None):
     import_module(module_path)  # surface import errors immediately in DEBUG
-    return include(module_path, namespace=namespace) if namespace else include(module_path)
+    if namespace:
+        # Django expects include((module, app_name), namespace=namespace) for explicit namespace
+        mod = import_module(module_path)
+        app_name = getattr(mod, 'app_name', None)
+        if app_name:
+            return include((module_path, app_name), namespace=namespace)
+        else:
+            return include(module_path, namespace=namespace)
+    return include(module_path)
 
 
 def _safe_static(path_fragment: str) -> str:
@@ -882,6 +890,17 @@ urlpatterns += [
     path("stock/out/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="stock_out"),
     path("stock/list/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_list"),
 ]
+
+# ======================================================================================
+# BACKWARDS-COMPATIBLE GLOBAL ALIASES (SSOT imported from cc.urls_compat)
+# These allow reverse('home'), reverse('stock'), reverse('wallet'), reverse('sim'), 
+# reverse('businesses'), reverse('sell'), reverse('scan'), reverse('pharmacy_stock_in'),
+# reverse('member_qr_image'), reverse('export_monthly_costs') to work without namespace prefixes.
+# ======================================================================================
+from cc.urls_compat import get_compat_urlpatterns
+from cc.urls_compat_extra import get_extra_compat_urlpatterns
+urlpatterns += get_compat_urlpatterns()
+urlpatterns += get_extra_compat_urlpatterns()
 
 
 def _stock_trends_shim(_request):

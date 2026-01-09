@@ -16,12 +16,14 @@ from inventory.verticals import (
     clothing,
     clothing_v2,
     fallback,
+    farm,
     groceries,
     groceries_v2,
     gym,
     liquor,
     pharmacy,
     phones,
+    welding,
 )
 from tenants.utils import require_business
 
@@ -135,6 +137,36 @@ urlpatterns = [
     path("cement/sell/", cement.sell, name="cement_sell"),
     path("cement/costs/", cement.costs, name="cement_costs"),
     path("cement/analytics/", cement.analytics, name="cement_analytics"),
+    # ==================== FARM VERTICAL ====================
+    path("farm/dashboard/", farm.dashboard, name="farm_dashboard"),
+    path("farm/ledger/", farm.ledger_list, name="farm_ledger_list"),
+    path("farm/ledger/add-expense/", farm.add_expense, name="farm_add_expense"),
+    path("farm/ledger/add-sale/", farm.add_sale, name="farm_add_sale"),
+    path("farm/livestock/", farm.livestock_list, name="farm_livestock_list"),
+    path("farm/livestock/create/", farm.livestock_batch_create, name="farm_livestock_create"),
+    path("farm/livestock/add-event/", farm.livestock_add_event, name="farm_livestock_add_event"),
+    path("farm/crops/", farm.crops_list, name="farm_crops_list"),
+    path("farm/crops/create/", farm.crop_season_create, name="farm_crop_create"),
+    path("farm/crops/<int:season_id>/", farm.crop_season_detail, name="farm_crop_detail"),
+    path("farm/reports/", farm.reports, name="farm_reports"),
+    
+    # ==================== WELDING VERTICAL ====================
+    path("welding/dashboard/", welding.dashboard, name="welding_dashboard"),
+    path("welding/materials/", welding.materials_list, name="welding_materials_list"),
+    path("welding/materials/<int:material_id>/edit/", welding.material_edit, name="welding_material_edit"),
+    path("welding/stock-in/", welding.stock_in, name="welding_stock_in"),
+    path("welding/quotes/", welding.quotes_list, name="welding_quotes_list"),
+    path("welding/quotes/create/", welding.quote_create, name="welding_quote_create"),
+    path("welding/quotes/<int:quote_id>/", welding.quote_detail, name="welding_quote_detail"),
+    path("welding/quotes/<int:quote_id>/accept/", welding.quote_accept, name="welding_quote_accept"),
+    path("welding/quotes/<int:quote_id>/invoice/", welding.invoice_from_quote, name="welding_invoice_from_quote"),
+    path("welding/jobs/", welding.jobs_list, name="welding_jobs_list"),
+    path("welding/jobs/<int:job_id>/", welding.job_detail, name="welding_job_detail"),
+    path("welding/jobs/<int:job_id>/status/", welding.job_update_status, name="welding_job_update_status"),
+    path("welding/invoices/", welding.invoices_list, name="welding_invoices_list"),
+    path("welding/invoices/<int:invoice_id>/", welding.invoice_detail, name="welding_invoice_detail"),
+    path("welding/reports/", welding.reports, name="welding_reports"),
+    
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),
 ]

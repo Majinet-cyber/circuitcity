@@ -100,3 +100,18 @@ def format_mwk(value):
     Safely handles None, 0, and invalid values.
     """
     return money_filter(value, "MWK")
+
+
+@register.filter(name="wallet_money")
+def wallet_money(value, currency="MWK"):
+    """
+    Alias for money filter for backwards compatibility with wallet templates.
+    
+    Usage:
+        {{ amount|wallet_money }} -> "MWK 870,000.00"
+        {{ amount|wallet_money:"USD" }} -> "USD 870,000.00"
+    
+    This is an alias for the money filter to maintain compatibility with
+    templates that were using the wallet_money filter from wallet.templatetags.wallet_money.
+    """
+    return money_filter(value, currency)

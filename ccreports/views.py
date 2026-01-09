@@ -10,6 +10,9 @@ from django.shortcuts import render
 from django.template import TemplateDoesNotExist
 from django.template.loader import get_template
 
+# SSOT: Import context defaults to prevent KeyError failures
+from reports.services.context_defaults import apply_default_report_context
+
 __all__ = ["home", "sales_report", "inventory_report", "which_templates"]
 
 log = logging.getLogger(__name__)
@@ -58,7 +61,7 @@ def _render_with_candidates(
             resp["X-Template-Origin"] = origin
         return resp
 
-    # Nothing found â†’ return a helpful error page (keeps you out of a raw 500)
+    # Nothing found - return a helpful error page (keeps you out of a raw 500)
     pretty = "\n".join(f"- {e}" for e in errs) or "(no details)"
     html = f"""
       <h1>Reports template not found</h1>
@@ -66,8 +69,8 @@ def _render_with_candidates(
       <pre style="white-space:pre-wrap">{pretty}</pre>
       <p>Create one of these files and refresh:</p>
       <ul>
-        <li><code>templates/ccreports/â€¦</code></li>
-        <li><code>templates/reports/â€¦</code></li>
+        <li><code>templates/ccreports/...</code></li>
+        <li><code>templates/reports/...</code></li>
       </ul>
     """.strip()
     print(">> REPORTS TEMPLATE RESOLVE FAILED\n" + pretty)
@@ -83,16 +86,26 @@ def home(request: HttpRequest) -> HttpResponse:
     """
     Reports dashboard landing page.
     """
-    ctx: Dict[str, Any] = {
-        "title": "Reports",
-        "subtitle": "Overview",
-    }
-    # Try app-specific first, then generic folder for compatibility
-    return _render_with_candidates(
-        request,
-        candidates=("ccreports/home.html", "reports/home.html"),
-        context=ctx,
-    )
+    # Delegate to the full reports.views.reports_home for complete functionality
+    try:
+        from reports.views import reports_home
+        return reports_home(request)
+    except ImportError:
+        # Fallback: minimal context with SSOT defaults
+        ctx: Dict[str, Any] = {
+            "title": "Reports",
+            "subtitle": "Overview",
+        }
+        
+        # Apply SSOT defaults to prevent KeyError failures
+        ctx = apply_default_report_context(ctx)
+        
+        # Try app-specific first, then generic folder for compatibility
+        return _render_with_candidates(
+            request,
+            candidates=("ccreports/home.html", "reports/home.html"),
+            context=ctx,
+        )
 
 
 @login_required
@@ -100,18 +113,28 @@ def sales_report(request: HttpRequest) -> HttpResponse:
     """
     Sales report view (safe defaults).
     """
-    ctx: Dict[str, Any] = {
-        "title": "Reports Â· Sales",
-        "top_models": [],
-        "agents": [],
-        "recent_sales": [],
-        "page_obj": None,
-    }
-    return _render_with_candidates(
-        request,
-        candidates=("ccreports/sales.html", "reports/sales.html"),
-        context=ctx,
-    )
+    # Delegate to the full reports.views.sales_report for complete functionality
+    try:
+        from reports.views import sales_report as reports_sales
+        return reports_sales(request)
+    except ImportError:
+        # Fallback: minimal context with SSOT defaults
+        ctx: Dict[str, Any] = {
+            "title": "Reports - Sales",
+            "top_models": [],
+            "agents": [],
+            "recent_sales": [],
+            "page_obj": None,
+        }
+        
+        # Apply SSOT defaults to prevent KeyError failures
+        ctx = apply_default_report_context(ctx)
+        
+        return _render_with_candidates(
+            request,
+            candidates=("ccreports/sales.html", "reports/sales.html"),
+            context=ctx,
+        )
 
 
 @login_required
@@ -120,7 +143,7 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
     Inventory report view (safe defaults).
     """
     ctx: Dict[str, Any] = {
-        "title": "Reports Â· Inventory",
+        "title": "Reports - Inventory",
         "low_stock": [],
         "ageing": [],
         "turnover": [],
@@ -128,6 +151,10 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
         "snapshot": [],
         "page_obj": None,
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    ctx = apply_default_report_context(ctx)
+    
     return _render_with_candidates(
         request,
         candidates=("ccreports/inventory.html", "reports/inventory.html"),

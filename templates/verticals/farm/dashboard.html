@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Farm Dashboard - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">🌾 Farm Manager</h1>
+            <p class="text-muted mb-0">Track profitability, livestock, and crops</p>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_add_expense }}" class="btn btn-outline-danger" data-testid="farm-add-expense">
+                <i class="bi bi-dash-circle"></i> Add Expense
+            </a>
+            <a href="{{ url_add_sale }}" class="btn btn-success" data-testid="farm-add-sale">
+                <i class="bi bi-plus-circle"></i> Add Sale
+            </a>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    {% if alerts %}
+    <div class="mb-4">
+        {% for alert in alerts %}
+        <div class="alert alert-{% if alert.severity == 'critical' %}danger{% elif alert.severity == 'warning' %}warning{% else %}info{% endif %} d-flex align-items-center" role="alert">
+            <i class="bi bi-{% if alert.severity == 'critical' %}exclamation-triangle-fill{% elif alert.severity == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+            <div>
+                <strong>{{ alert.title }}</strong>: {{ alert.message }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- KPI Cards Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Profit This Month</div>
+                    <div class="h4 mb-0 {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">
+                        MWK {{ profit_this_month|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Income</div>
+                    <div class="h4 mb-0 text-primary">
+                        MWK {{ income_this_month|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Expenses</div>
+                    <div class="h4 mb-0 text-danger">
+                        MWK {{ expenses_this_month|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Sales Count</div>
+                    <div class="h4 mb-0">{{ sales_count_this_month }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{{ url_add_expense }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-add-expense">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-cash-stack text-danger h2"></i>
+                    <div class="mt-2 fw-medium">Add Expense</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_add_sale }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-add-sale">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-cart-check text-success h2"></i>
+                    <div class="mt-2 fw-medium">Add Sale</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_livestock_add_event }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-livestock-add-event">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-piggy-bank text-primary h2"></i>
+                    <div class="mt-2 fw-medium">Livestock Event</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_season_create }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-season-create">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-flower1 text-warning h2"></i>
+                    <div class="mt-2 fw-medium">New Season</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Livestock Summary -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🐖 Livestock</h5>
+                    <a href="/verticals/farm/livestock/" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    {% if livestock_snapshots %}
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Batch</th>
+                                        <th class="text-center">Count</th>
+                                        <th class="text-end">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for snapshot in livestock_snapshots %}
+                                    <tr>
+                                        <td>
+                                            {{ snapshot.batch_name }}
+                                            <small class="text-muted">({{ snapshot.animal_type }})</small>
+                                        </td>
+                                        <td class="text-center">{{ snapshot.count_current }}</td>
+                                        <td class="text-end">
+                                            {% if snapshot.estimated_value %}
+                                            MWK {{ snapshot.estimated_value|floatformat:0|intcomma }}
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold">
+                                        <td>Total</td>
+                                        <td class="text-center">{{ total_livestock_count }}</td>
+                                        <td class="text-end">
+                                            {% if total_livestock_value %}
+                                            MWK {{ total_livestock_value|floatformat:0|intcomma }}
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-piggy-bank h1"></i>
+                            <p class="mb-0">No livestock batches yet.</p>
+                            <a href="/verticals/farm/livestock/create/" class="btn btn-sm btn-primary mt-2">Add First Batch</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Expense Categories -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent">
+                    <h5 class="mb-0">📊 Top Expenses This Month</h5>
+                </div>
+                <div class="card-body">
+                    {% if top_expense_categories %}
+                        {% for cat in top_expense_categories %}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <div class="fw-medium text-capitalize">{{ cat.category }}</div>
+                                <small class="text-muted">{{ cat.percentage|floatformat:1 }}% of expenses</small>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">MWK {{ cat.amount|floatformat:0|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar bg-danger" style="width: {{ cat.percentage }}%"></div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-bar-chart h1"></i>
+                            <p class="mb-0">No expenses recorded this month.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Crop Seasons -->
+    {% if active_seasons %}
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">🌱 Active Crop Seasons</h5>
+            <a href="/verticals/farm/crops/" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                {% for season in active_seasons %}
+                <div class="col-md-4">
+                    <div class="card bg-light border-0">
+                        <div class="card-body">
+                            <h6 class="card-title">{{ season.name }}</h6>
+                            <p class="card-text small text-muted mb-1">
+                                {{ season.area_value }} {{ season.get_area_unit_display }} · {{ season.get_crop_type_display }}
+                            </p>
+                            <span class="badge bg-{% if season.status == 'active' %}success{% else %}warning{% endif %}">
+                                {{ season.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Recent Ledger Entries -->
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">📒 Recent Activity</h5>
+            <a href="/verticals/farm/ledger/" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="card-body p-0">
+            {% if recent_entries %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in recent_entries %}
+                        <tr>
+                            <td>{{ entry.date|date:"M d" }}</td>
+                            <td>
+                                {% if entry.entry_type == 'expense' %}
+                                <span class="badge bg-danger">Expense</span>
+                                {% else %}
+                                <span class="badge bg-success">Sale</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ entry.description|default:entry.get_category_display }}
+                                <small class="text-muted">({{ entry.get_enterprise_type_display }})</small>
+                            </td>
+                            <td class="text-end {% if entry.entry_type == 'expense' %}text-danger{% else %}text-success{% endif %}">
+                                {% if entry.entry_type == 'expense' %}-{% endif %}MWK {{ entry.amount_mwk|floatformat:0|intcomma }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-journal-text h1"></i>
+                <p class="mb-0">No entries yet. Start by adding an expense or sale!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

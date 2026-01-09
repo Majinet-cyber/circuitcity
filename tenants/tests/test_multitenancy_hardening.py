@@ -493,11 +493,16 @@ class TestMigrationIdempotency(TestCase):
         from django.db import connection
         from django.db.migrations.executor import MigrationExecutor
         from django.db.migrations import Migration
+        from tenants.utils_migrations import get_migration_safe
         
         executor = MigrationExecutor(connection)
         
-        # Get the migration
-        migration = executor.loader.get_migration('tenants', '0014_add_case_insensitive_unique_constraints')
+        # Get the migration using resilient lookup (SSOT)
+        migration = get_migration_safe(
+            executor.loader, 
+            'tenants', 
+            '0014_add_case_insensitive_unique_constraints'
+        )
         
         # Ensure we're at the migration before 0014
         # First, migrate to 0013

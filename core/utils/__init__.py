@@ -1,4 +1,13 @@
-﻿# core/utils.py
+# core/utils/__init__.py
+"""
+Core utilities package.
+
+This package was converted from a module file (utils.py) to allow
+for submodules like core.utils.money while maintaining backward compatibility.
+
+All functions from the original core/utils.py are re-exported here so that
+existing imports like `from core.utils import X` continue to work.
+"""
 from __future__ import annotations
 
 import math
@@ -24,7 +33,7 @@ def safe_int(val: Any, default: int = 0) -> int:
 
 
 def human_timedelta(td: timedelta) -> str:
-    """Convert timedelta â†’ '2h 15m' or '45m' human-friendly string."""
+    """Convert timedelta → '2h 15m' or '45m' human-friendly string."""
     total_minutes = int(td.total_seconds() // 60)
     hours, mins = divmod(total_minutes, 60)
     if hours and mins:
@@ -57,7 +66,7 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 def in_geofence(lat: float, lng: float, center: Tuple[float, float], radius_m: int) -> bool:
     """Return True if (lat,lng) is within radius_m of center."""
     if not all(center):
-        return True  # No coordinates defined â€” treat as inside
+        return True  # No coordinates defined – treat as inside
     dist = haversine_m(lat, lng, center[0], center[1])
     return dist <= radius_m
 
@@ -82,24 +91,24 @@ def make_greeting(user: User) -> str:
     name = user.first_name or user.username or "there"
 
     if hour < 12:
-        return f"Good morning, {name} â˜€ï¸"
+        return f"Good morning, {name} ☀️"
     elif 12 <= hour < 17:
-        return f"Good afternoon, {name} ðŸŒ¤ï¸"
+        return f"Good afternoon, {name} 🌤️"
     else:
-        return f"Good evening, {name} ðŸŒ™"
+        return f"Good evening, {name} 🌙"
 
 
 def generate_did_you_know(profile) -> list[str]:
     """
-    Return motivational or performance-based â€œDid you know...â€ messages.
+    Return motivational or performance-based "Did you know..." messages.
     """
     tips = []
     if profile.last_month_sales:
         tips.append(f"Did you know you made MWK {profile.last_month_sales:,.0f} in sales last month?")
     if profile.last_month_profit:
         tips.append(f"Did you know your profit last month was MWK {profile.last_month_profit:,.0f}?")
-    tips.append("Did you know consistent logging improves team trust? ðŸ’ª")
-    tips.append("Keep pushing â€” excellence becomes habit when tracked daily.")
+    tips.append("Did you know consistent logging improves team trust? 💪")
+    tips.append("Keep pushing – excellence becomes habit when tracked daily.")
     return tips
 
 
@@ -184,3 +193,4 @@ def push_notification(user: User, title: str, message: str, *, kind: str = "INFO
         )
     except Exception:
         pass
+

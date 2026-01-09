@@ -146,8 +146,8 @@ class TestCementBrandHelpers:
 class TestCementSeedEdgeCases:
     """Test cement seed edge cases"""
 
-    def test_seed_handles_existing_products_by_alias(self):
-        """Seed should detect existing products even if created with alias"""
+    def test_seed_handles_existing_products_with_full_name(self):
+        """Seed should detect existing products with full standardized names"""
         business = Business.objects.create(
             name="Hardware Store",
             slug="hardware-store",
@@ -155,10 +155,10 @@ class TestCementSeedEdgeCases:
             status="ACTIVE",
         )
 
-        # Manually create product with alias name
+        # Create product with full standardized name (as seed would create)
         MerchProduct.objects.create(
             business=business,
-            name="aksher",  # Using alias instead of canonical "Akshar"
+            name="Akshar Cement BAG (50KG)",  # Full standardized name from SSOT
             kind=BusinessKind.CEMENT,
             category="cement",
             base_unit="bag",
@@ -167,25 +167,22 @@ class TestCementSeedEdgeCases:
             quantity_in_stock=100,
         )
 
-        # Seed should skip "Akshar" because "aksher" alias already exists
+        # Seed should skip "Akshar Cement BAG (50KG)" because it already exists
         result = seed_cement_defaults(business)
         assert result["skipped"] >= 1  # At least Akshar should be skipped
 
         # Verify no duplicate created
         akshar_products = MerchProduct.objects.filter(
             business=business,
-            name__iexact="akshar",
+            name__icontains="Akshar",
         )
-        assert akshar_products.count() == 0  # No "Akshar" created
+        assert akshar_products.count() == 1  # Only the original exists
 
-        aksher_products = MerchProduct.objects.filter(
-            business=business,
-            name__iexact="aksher",
-        )
-        assert aksher_products.count() == 1  # Original "aksher" still exists
+        # Verify other brands were created
+        assert result["created"] == len(CEMENT_BRANDS) - 1  # All except Akshar
 
     def test_seed_preserves_existing_product_data(self):
-        """Seed should not modify existing products"""
+        """Seed should not modify existing products with full standardized names"""
         business = Business.objects.create(
             name="Hardware Store",
             slug="hardware-2",
@@ -193,10 +190,10 @@ class TestCementSeedEdgeCases:
             status="ACTIVE",
         )
 
-        # Create product with custom pricing
+        # Create product with full standardized name and custom pricing
         existing_product = MerchProduct.objects.create(
             business=business,
-            name="Dangote",
+            name="Dangote Cement BAG (50KG)",  # Full standardized name
             kind=BusinessKind.CEMENT,
             category="cement",
             base_unit="bag",

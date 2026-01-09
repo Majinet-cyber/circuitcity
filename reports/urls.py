@@ -22,6 +22,12 @@ except ImportError:
         inventory_report = _unavailable
         which_templates = _unavailable
 
+# Import export views
+try:
+    from . import views_export
+except ImportError:
+    views_export = None  # type: ignore
+
 app_name = "reports"
 
 urlpatterns = [
@@ -39,6 +45,14 @@ urlpatterns = [
     path("sales/", views.sales_report, name="sales"),
     path("inventory/", views.inventory_report, name="inventory"),
 ]
+
+# Monthly export endpoints (canonical patterns)
+if views_export:
+    urlpatterns += [
+        path("export/sales/", views_export.export_monthly_sales, name="export_monthly_sales"),
+        path("export/costs/", views_export.export_monthly_costs, name="export_monthly_costs"),
+        path("export/summary/", views_export.export_monthly_summary, name="export_monthly_summary"),
+    ]
 
 # Debug helper: shows which templates each URL resolves to
 if settings.DEBUG:

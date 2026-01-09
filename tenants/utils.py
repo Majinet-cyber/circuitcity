@@ -219,7 +219,18 @@ def set_active_business(request: "HttpRequest", business) -> None:
     """
     Persist the selected business in session, attach it to the request,
     and mirror into thread-local (if available). Pass business=None to clear.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import set_active_business as ssot_set
+        ssot_set(request, business)
+        return
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     try:
         if business is None:
             # Clear session + request (canonical + legacy) and mark modified
@@ -268,7 +279,17 @@ def get_active_business(request: "HttpRequest"):
     """
     Return the Business referenced by request or session, caching onto request.
     Tries request.business first, then tolerant session keys.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import get_active_business as ssot_get
+        return ssot_get(request)
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     # If middleware already set request.business, keep it authoritative.
     b = getattr(request, "business", None)
     if b is not None:
@@ -929,11 +950,19 @@ def require_business(_fn: Optional[Callable] = None) -> Callable:
 
             user = getattr(request, "user", None)
 
-            # Auto-pick if they have exactly one membership
-            auto_biz = _single_membership_business(user)
-            if auto_biz is not None:
-                set_active_business(request, auto_biz)
-                return view_func(request, *args, **kwargs)
+            # CRITICAL: Use SSOT service to auto-select single-business users
+            # This ensures consistent behavior with middleware
+            try:
+                from tenants.services.active_business import ensure_active_business
+                auto_biz = ensure_active_business(request, user, auto_select_single=True)
+                if auto_biz is not None:
+                    return view_func(request, *args, **kwargs)
+            except ImportError:
+                # Fallback to legacy logic if SSOT not available
+                auto_biz = _single_membership_business(user)
+                if auto_biz is not None:
+                    set_active_business(request, auto_biz)
+                    return view_func(request, *args, **kwargs)
 
             # Superusers should not be forced into tenant onboarding.
             if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):

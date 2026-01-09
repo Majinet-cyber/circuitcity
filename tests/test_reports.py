@@ -474,3 +474,180 @@ class ReportsRegressionTestCase(TestCase):
         self.assertEqual(summary.get('total_revenue', -1), 0.0)
         self.assertEqual(summary.get('net_profit', -1), 0.0)
 
+
+class ReportContextKeysTestCase(TestCase):
+    """
+    Test that all required context keys exist to prevent KeyError failures.
+    
+    This test suite verifies the SSOT context defaults are applied correctly
+    and prevents regression of KeyError: 'sold_today', 'payment_mix_json', etc.
+    """
+    
+    def setUp(self):
+        """Create minimal test data."""
+        self.business = Business.objects.create(
+            name="Context Test Shop",
+            kind="phones",
+            is_active=True,
+        )
+        
+        self.location = Location.objects.create(
+            name="Main Branch",
+            business=self.business,
+        )
+        
+        self.user = User.objects.create_user(
+            username="contextuser",
+            password="testpass123",
+            is_staff=True,
+        )
+        
+        # Set the business in session
+        self.client = Client()
+        self.client.force_login(self.user)
+        
+        # Simulate business selection
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+    
+    def test_reports_home_has_all_required_context_keys(self):
+        """Test that reports home has all required context keys (no KeyError)."""
+        response = self.client.get(reverse('reports:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # CRITICAL: These keys caused KeyError failures - verify they exist
+        required_keys = [
+            'sold_today',
+            'payment_mix_json',
+            'report_trend_json',
+            'report_summary',
+            'top_products',
+            'top_agents',
+        ]
+        
+        for key in required_keys:
+            with self.subTest(key=key):
+                self.assertIn(key, response.context, 
+                              f"Missing required context key: {key}")
+    
+    def test_reports_home_context_keys_have_safe_defaults(self):
+        """Test that context keys have safe default values when no data exists."""
+        response = self.client.get(reverse('reports:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify safe defaults
+        self.assertEqual(response.context['sold_today'], 0)
+        self.assertEqual(response.context['payment_mix_json'], '[]')
+        self.assertEqual(response.context['report_trend_json'], '[]')
+        
+        # report_summary should be a dict with expected keys
+        summary = response.context['report_summary']
+        self.assertIsInstance(summary, dict)
+        self.assertIn('total_revenue', summary)
+        self.assertIn('net_profit', summary)
+        self.assertIn('sales_count', summary)
+        
+        # Lists should be empty but not None
+        self.assertIsInstance(response.context['top_products'], list)
+        self.assertIsInstance(response.context['top_agents'], list)
+    
+    def test_reports_sales_has_required_context_keys(self):
+        """Test that reports sales page has required context keys."""
+        response = self.client.get(reverse('reports:sales'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Should have SSOT defaults applied
+        required_keys = [
+            'sold_today',
+            'payment_mix_json',
+            'report_trend_json',
+            'report_summary',
+        ]
+        
+        for key in required_keys:
+            with self.subTest(key=key):
+                self.assertIn(key, response.context,
+                              f"Missing required context key: {key}")
+    
+    def test_context_json_fields_are_valid_json(self):
+        """Test that JSON context fields contain valid JSON strings."""
+        response = self.client.get(reverse('reports:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify JSON fields are valid
+        json_fields = ['payment_mix_json', 'report_trend_json', 'quotes_json']
+        
+        for field in json_fields:
+            with self.subTest(field=field):
+                json_str = response.context.get(field)
+                self.assertIsNotNone(json_str, f"{field} is None")
+                
+                # Should be valid JSON
+                try:
+                    parsed = json.loads(json_str)
+                    self.assertIsInstance(parsed, (list, dict))
+                except json.JSONDecodeError as e:
+                    self.fail(f"{field} contains invalid JSON: {e}")
+    
+    def test_reports_context_is_template_safe(self):
+        """Test that context doesn't cause template rendering errors."""
+        response = self.client.get(reverse('reports:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Should not contain error messages in response
+        content = response.content.decode('utf-8')
+        
+        error_indicators = [
+            'KeyError',
+            'TemplateSyntaxError',
+            'VariableDoesNotExist',
+            'AttributeError',
+        ]
+        
+        for error in error_indicators:
+            self.assertNotIn(error, content,
+                           f"Template rendering error detected: {error}")
+    
+    def test_dashboard_context_defaults_dont_override_explicit_values(self):
+        """Test that SSOT defaults preserve explicit values from view."""
+        response = self.client.get(reverse('reports:home'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # If view sets explicit values, defaults shouldn't override them
+        # Example: report_summary is set by view, not by defaults
+        summary = response.context['report_summary']
+        
+        # View should have set these explicitly
+        self.assertIn('total_revenue', summary)
+        self.assertIn('total_cogs', summary)
+        self.assertIn('gross_profit', summary)
+        
+        # These are set by the view, not by defaults (verify non-negative)
+        self.assertGreaterEqual(summary['total_revenue'], 0.0)
+        self.assertGreaterEqual(summary['sales_count'], 0)
+    
+    def test_reports_inventory_has_required_context_keys(self):
+        """Test that reports inventory page has required context keys (no KeyError)."""
+        response = self.client.get(reverse('reports:inventory'))
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # CRITICAL: These keys caused KeyError failures - verify they exist
+        required_keys = [
+            'sold_today',
+            'payment_mix_json',
+            'report_trend_json',
+            'report_summary',
+        ]
+        
+        for key in required_keys:
+            with self.subTest(key=key):
+                self.assertIn(key, response.context, 
+                              f"Missing required context key: {key}")

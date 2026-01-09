@@ -55,8 +55,8 @@ def backfill_notification_preferences_to_true(apps, schema_editor):
         receive_commission_alerts=False
     ).update(receive_commission_alerts=True)
     
-    print(f"✅ Backfilled {NotificationPreference.objects.count()} NotificationPreference records")
-    print(f"✅ Backfilled {WhatsAppPreference.objects.count()} WhatsAppPreference records")
+    print(f"[OK] Backfilled {NotificationPreference.objects.count()} NotificationPreference records")
+    print(f"[OK] Backfilled {WhatsAppPreference.objects.count()} WhatsAppPreference records")
 
 
 def reverse_backfill(apps, schema_editor):

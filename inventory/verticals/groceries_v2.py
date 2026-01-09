@@ -167,6 +167,10 @@ def dashboard_v2(request):
         "gamification": agent_stats,
         "active_tab": "dashboard",
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    from reports.services.context_defaults import apply_default_report_context
+    context = apply_default_report_context(context)
 
     return render(request, "verticals/groceries_v2/dashboard.html", context)
 

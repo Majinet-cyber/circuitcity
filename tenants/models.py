@@ -17,6 +17,8 @@ from django.db.models.functions import Lower
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 
+from core.models_compat_kwargs import CompatKwargsMixin
+
 try:
     from tenants.constants import BusinessKind
 except Exception:  # pragma: no cover
@@ -78,10 +80,18 @@ def using_business(business: Optional["Business"] | int):
 # ===============================
 
 
-class Business(models.Model):
+class Business(CompatKwargsMixin, models.Model):
     """
     A tenant. Created by a 'manager' (pending approval by staff).
     """
+    
+    # Backwards compatibility: Map legacy kwargs to canonical fields
+    COMPAT_MAP = {
+        'kind': 'business_kind',       # Legacy alias
+        'vertical': 'business_kind',   # Alternative legacy alias
+        'owner': 'created_by',         # Legacy: owner maps to created_by (who created/proposed it)
+        'owner_email': '_ignored_owner_email',  # No direct field; ignore for now (could be stored in User if needed)
+    }
 
     STATUS_CHOICES = [
         ("PENDING", "Pending staff approval"),
@@ -169,15 +179,6 @@ class Business(models.Model):
             ),
         ]
 
-    def __init__(self, *args, **kwargs):
-        """
-        Custom __init__ to support legacy 'kind' parameter.
-        Maps 'kind' → 'business_kind' for backwards compatibility with tests.
-        """
-        if "kind" in kwargs:
-            kwargs["business_kind"] = kwargs.pop("kind")
-        super().__init__(*args, **kwargs)
-
     def __str__(self) -> str:
         return self.name
 
@@ -194,6 +195,36 @@ class Business(models.Model):
     @property
     def is_active(self) -> bool:
         return (self.status or "").upper() == "ACTIVE"
+    
+    @is_active.setter
+    def is_active(self, value: bool) -> None:
+        """
+        Setter for backwards compatibility with tests.
+        Maps boolean to status field (ACTIVE/SUSPENDED).
+        
+        Security note: This does NOT bypass subscription gates or validation.
+        It only sets the status field.
+        """
+        if value:
+            self.status = "ACTIVE"
+        else:
+            self.status = "SUSPENDED"
+    
+    @property
+    def members(self):
+        """
+        Backwards compatibility property.
+        Returns the memberships manager for this business.
+        
+        Usage:
+            business.members.filter(status="ACTIVE")
+            business.members.all()
+        
+        Note: This returns memberships, not users directly.
+        For legacy code that used business.members.add(user),
+        use Membership.objects.create() instead.
+        """
+        return self.memberships
 
     def save(self, *args, **kwargs):
         # Normalize subdomain to lowercase (if provided)
@@ -322,6 +353,14 @@ class Membership(models.Model):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDING", db_index=True)
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    
+    # Backwards compatibility: is_active field (maps to status="ACTIVE")
+    # This allows tests to pass is_active=True during creation
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Backwards compatibility flag. Prefer using status field.",
+    )
 
     # Default working location for agents (managers may leave this null)
     location = models.ForeignKey(
@@ -898,8 +937,15 @@ class MembershipLocationHistory(models.Model):
 
 
 # ===============================
-# Backwards compatibility: Re-export Location from inventory.models
+# Backwards compatibility aliases
 # ===============================
+
+# BusinessUserMembership was renamed to Membership
+# Keep this alias for backward compatibility with existing imports:
+#   from tenants.models import BusinessUserMembership
+BusinessUserMembership = Membership
+
+# Re-export Location from inventory.models for convenience
 # Many modules import Location from tenants.models for convenience.
 # We re-export it here to maintain backwards compatibility.
 try:

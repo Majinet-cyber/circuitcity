@@ -24,3 +24,15 @@ urlpatterns = [
     path("analytics/api/alerts/", views_analytics.api_alerts, name="analytics_api_alerts"),
     path("analytics/api/export_csv/", views_analytics.api_export_csv, name="analytics_api_export_csv"),
 ]
+
+# ======================================================================================
+# URL COMPATIBILITY ALIASES (SSOT)
+# Import compatibility URL patterns from cc.urls_compat to ensure consistent naming
+# across all URLConfs. This allows tests using reverse('stock'), reverse('sell'), etc.
+# to work correctly when app_router URLConf is loaded.
+# ======================================================================================
+try:
+    from cc.urls_compat import get_compat_urlpatterns
+    urlpatterns += get_compat_urlpatterns()
+except ImportError:
+    pass  # If cc.urls_compat not available, skip (shouldn't happen in normal operation)

@@ -117,12 +117,13 @@ def is_cement_brand(name: str) -> bool:
     """
     Check if a product name matches a known cement brand.
     Case-insensitive check against canonical SSOT brand list.
+    Supports aliases (e.g., "aksher" → "Akshar").
 
     Args:
         name: Product name to check
 
     Returns:
-        True if name matches a cement brand
+        True if name matches a cement brand (including aliases)
     """
     name_lower = name.lower().strip()
 
@@ -133,6 +134,11 @@ def is_cement_brand(name: str) -> bool:
         # Check key
         if name_lower == brand_spec["key"].lower():
             return True
+        # Check aliases
+        if "aliases" in brand_spec:
+            for alias in brand_spec["aliases"]:
+                if name_lower == alias.lower():
+                    return True
 
     return False
 
@@ -140,6 +146,7 @@ def is_cement_brand(name: str) -> bool:
 def normalize_cement_brand_name(name: str) -> str:
     """
     Normalize a cement brand name to the canonical display name (from SSOT).
+    Supports aliases (e.g., "aksher" → "Akshar").
 
     Args:
         name: Brand name or alias (e.g., "aksher", "Akshar", "AKSHAR")
@@ -156,6 +163,11 @@ def normalize_cement_brand_name(name: str) -> str:
         # Check key
         if name_lower == brand_spec["key"].lower():
             return brand_spec["name"]
+        # Check aliases
+        if "aliases" in brand_spec:
+            for alias in brand_spec["aliases"]:
+                if name_lower == alias.lower():
+                    return brand_spec["name"]
 
     # Return original if not found (custom brand)
     return name

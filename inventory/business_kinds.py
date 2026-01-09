@@ -31,6 +31,8 @@ class BusinessKind(models.TextChoices):
     GYM = "gym", "Gym / Fitness"
     HARDWARE = "hardware", "Hardware & General Dealers"  # NEW: Standalone hardware vertical
     CEMENT = "cement", "Cement / Building Materials"  # Legacy: Kept for backward compatibility
+    FARM = "farm", "Farm Manager"  # NEW: Farm profitability tracking
+    WELDING = "welding", "Welding Workshop"  # NEW: Welding job estimation & invoicing
 
 
 __all__ = ["BusinessKind"]

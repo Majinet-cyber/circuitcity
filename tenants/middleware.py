@@ -460,7 +460,25 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             _set_product_mode_on_request(request, None)
             return
 
+        # (0) CRITICAL: Auto-select single-business users FIRST
+        #     This prevents 302 redirects to /tenants/ for users with exactly one membership
+        #     Must happen BEFORE any other resolution to ensure session is populated
+        if getattr(user, "is_authenticated", False):
+            try:
+                from tenants.services.active_business import ensure_active_business
+                biz = ensure_active_business(request, user, auto_select_single=True)
+                if biz:
+                    # SSOT auto-selected a business - activate it and return
+                    _activate(request, biz)
+                    _set_product_mode_on_request(request, biz)
+                    _attach_location_scope(request)  # safe, optional
+                    _attach_role_to_request(request)  # AUTHORITATIVE role determination
+                    return
+            except Exception:
+                pass  # Continue with normal resolution if SSOT fails
+
         # (1) Canonical: use the same util as your views/templates
+        #     (This will now benefit from the session set by SSOT above)
         try:
             b = get_active_business(request)
             if b:

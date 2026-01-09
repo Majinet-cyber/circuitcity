@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Jobs - Welding Workshop{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">🔨 Jobs</h1>
+    </div>
+
+    <!-- Status Filter -->
+    <div class="mb-4">
+        <div class="btn-group">
+            <a href="/verticals/welding/jobs/" class="btn btn-sm {% if not filter_status %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+            {% for value, label in status_choices %}
+            <a href="/verticals/welding/jobs/?status={{ value }}" 
+               class="btn btn-sm {% if filter_status == value %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                {{ label }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Jobs Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if jobs %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Job #</th>
+                            <th>Customer</th>
+                            <th>Product</th>
+                            <th>Created</th>
+                            <th class="text-end">Price</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in jobs %}
+                        <tr>
+                            <td><strong>{{ job.job_number }}</strong></td>
+                            <td>{{ job.customer_name }}</td>
+                            <td>{{ job.product_description|default:job.template.name|default:"-" }}</td>
+                            <td>{{ job.created_at|date:"M d" }}</td>
+                            <td class="text-end fw-bold">MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
+                            <td>
+                                <span class="badge bg-{% if job.status == 'delivered' %}success{% elif job.status == 'ready' %}info{% elif job.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                    {{ job.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="/verticals/welding/jobs/{{ job.id }}/" class="btn btn-sm btn-outline-primary">
+                                    View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-clipboard-check h1"></i>
+                <p class="mb-0">No jobs found.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

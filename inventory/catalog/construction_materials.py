@@ -35,15 +35,15 @@ CONSTRUCTION_CATEGORIES = [
 # CEMENT BRANDS (Canonical List - NO DUPLICATES)
 # ============================================================
 CEMENT_BRANDS = [
-    {"key": "dangote", "name": "Dangote", "icon": "🏭"},
-    {"key": "akshar", "name": "Akshar", "icon": "🏗️"},  # Normalized from "Aksher"
-    {"key": "duracrete", "name": "Duracrete", "icon": "🏗️"},
-    {"key": "khoma", "name": "Khoma", "icon": "🏗️"},
-    {"key": "lime", "name": "Lime", "icon": "🧱"},
-    {"key": "njati", "name": "Njati", "icon": "🏗️"},
-    {"key": "njati_extra", "name": "Njati Extra", "icon": "🏗️"},  # Distinct from "Njati"
-    {"key": "nkope", "name": "Nkope", "icon": "🏗️"},
-    {"key": "nthanthwe", "name": "Nthanthwe", "icon": "🏗️"},
+    {"key": "dangote", "name": "Dangote", "icon": "🏭", "aliases": ["dangote"]},
+    {"key": "akshar", "name": "Akshar", "icon": "🏗️", "aliases": ["akshar", "aksher"]},  # Normalized from "Aksher"
+    {"key": "duracrete", "name": "Duracrete", "icon": "🏗️", "aliases": ["duracrete"]},
+    {"key": "khoma", "name": "Khoma", "icon": "🏗️", "aliases": ["khoma"]},
+    {"key": "lime", "name": "Lime", "icon": "🧱", "aliases": ["lime"]},
+    {"key": "njati", "name": "Njati", "icon": "🏗️", "aliases": ["njati"]},
+    {"key": "njati_extra", "name": "Njati Extra", "icon": "🏗️", "aliases": ["njati extra", "njatiextra"]},  # Distinct from "Njati"
+    {"key": "nkope", "name": "Nkope", "icon": "🏗️", "aliases": ["nkope"]},
+    {"key": "nthanthwe", "name": "Nthanthwe", "icon": "🏗️", "aliases": ["nthanthwe"]},
 ]
 
 
@@ -233,6 +233,49 @@ def get_paint_colors() -> List[str]:
     return PAINT_COLORS
 
 
+def normalize_brand(brand_name: str, product_slug: str = "cement") -> str:
+    """
+    Normalize a brand name to its canonical form, handling aliases.
+    
+    Args:
+        brand_name: Brand name or alias (e.g., "aksher", "Akshar")
+        product_slug: Product type (e.g., "cement", "paint")
+    
+    Returns:
+        Canonical brand name (e.g., "Akshar") or original name if not found
+    
+    Examples:
+        >>> normalize_brand("aksher", "cement")
+        "Akshar"
+        >>> normalize_brand("AKSHAR", "cement")
+        "Akshar"
+    """
+    name_lower = brand_name.lower().strip()
+    
+    # Get brands for this product
+    product = get_product_by_slug(product_slug)
+    if not product or not product.get("brands"):
+        return brand_name
+    
+    brands = product["brands"]
+    
+    for brand_spec in brands:
+        # Check main name
+        if name_lower == brand_spec["name"].lower():
+            return brand_spec["name"]
+        # Check key
+        if name_lower == brand_spec["key"].lower():
+            return brand_spec["name"]
+        # Check aliases
+        if "aliases" in brand_spec:
+            for alias in brand_spec["aliases"]:
+                if name_lower == alias.lower():
+                    return brand_spec["name"]
+    
+    # Return original if not found (custom brand)
+    return brand_name
+
+
 def is_valid_paint_size(size: str) -> bool:
     """Check if paint size is valid (handles legacy 4L as valid for redirect)"""
     return size in PAINT_SIZES or size in LEGACY_PAINT_SIZE_MAP
@@ -392,6 +435,7 @@ __all__ = [
     "get_paint_colors",
     "is_valid_paint_size",
     "normalize_paint_size",
+    "normalize_brand",
     "build_product_name",
     "get_brand_by_key",
     "search_products",

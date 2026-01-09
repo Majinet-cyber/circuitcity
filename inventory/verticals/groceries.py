@@ -141,6 +141,10 @@ def dashboard(request):
         "active_mode": mode,
         "active_tab": "dashboard",
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    from reports.services.context_defaults import apply_default_report_context
+    context = apply_default_report_context(context)
 
     # ===== PREMIUM: Personalized dashboard enhancements (quotes & greetings) =====
     ctx_enhancements = {}
