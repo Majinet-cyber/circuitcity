@@ -3,288 +3,949 @@
 
 {% block title %}Farm Dashboard - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Farm Dashboard Premium Styles ===== */
+.farm-dashboard {
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+    --farm-amber: #d97706;
+    --farm-amber-light: #fef3c7;
+    --farm-red: #dc2626;
+    --farm-red-light: #fee2e2;
+    --farm-blue: #2563eb;
+    --farm-blue-light: #dbeafe;
+}
+
+/* Page Header */
+.farm-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.farm-header-text h1 {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.farm-header-text p {
+    color: var(--muted);
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.farm-period-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink-500);
+    box-shadow: var(--shadow-xs);
+}
+
+.farm-period-pill i {
+    color: var(--farm-green);
+}
+
+/* KPI Cards Grid */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+}
+
+/* Premium KPI Card */
+.kpi-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.kpi-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+}
+
+.kpi-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.125rem;
+}
+
+.kpi-icon.profit { background: var(--farm-green-light); color: var(--farm-green); }
+.kpi-icon.income { background: var(--farm-blue-light); color: var(--farm-blue); }
+.kpi-icon.expense { background: var(--farm-red-light); color: var(--farm-red); }
+.kpi-icon.cost { background: var(--farm-amber-light); color: var(--farm-amber); }
+
+.kpi-value {
+    font-size: clamp(1.25rem, 3.5vw, 1.75rem);
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.2;
+    margin-bottom: 0.25rem;
+}
+
+.kpi-value.positive { color: var(--farm-green); }
+.kpi-value.negative { color: var(--farm-red); }
+
+.kpi-change {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+}
+
+.kpi-change.up { background: var(--farm-green-light); color: var(--farm-green); }
+.kpi-change.down { background: var(--farm-red-light); color: var(--farm-red); }
+.kpi-change.flat { background: #f1f5f9; color: var(--muted); }
+
+.kpi-subtitle {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+}
+
+/* Charts Section */
+.charts-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .charts-row {
+        grid-template-columns: 1.5fr 1fr;
+    }
+}
+
+.chart-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.chart-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chart-card-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--ink);
+}
+
+.chart-card-body {
+    padding: 1rem;
+    height: 220px;
+    position: relative;
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .quick-actions {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.8125rem;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+}
+
+.quick-action-btn:hover {
+    background: var(--surface-2);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.quick-action-btn .icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.quick-action-btn .icon.expense { background: var(--farm-red-light); color: var(--farm-red); }
+.quick-action-btn .icon.sale { background: var(--farm-green-light); color: var(--farm-green); }
+.quick-action-btn .icon.livestock { background: var(--farm-blue-light); color: var(--farm-blue); }
+.quick-action-btn .icon.crop { background: var(--farm-amber-light); color: var(--farm-amber); }
+
+/* Alerts Section */
+.alerts-section {
+    margin-bottom: 1.5rem;
+}
+
+.alert-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: var(--surface);
+    border-radius: var(--radius-sm);
+    border-left: 4px solid;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow-xs);
+}
+
+.alert-card.critical { border-left-color: var(--farm-red); background: var(--farm-red-light); }
+.alert-card.warning { border-left-color: var(--farm-amber); background: var(--farm-amber-light); }
+.alert-card.info { border-left-color: var(--farm-blue); background: var(--farm-blue-light); }
+
+.alert-icon {
+    flex-shrink: 0;
+    font-size: 1.25rem;
+}
+
+.alert-card.critical .alert-icon { color: var(--farm-red); }
+.alert-card.warning .alert-icon { color: var(--farm-amber); }
+.alert-card.info .alert-icon { color: var(--farm-blue); }
+
+.alert-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.alert-title {
+    font-weight: 700;
+    font-size: 0.875rem;
+    color: var(--ink);
+    margin: 0 0 0.125rem 0;
+}
+
+.alert-message {
+    font-size: 0.8125rem;
+    color: var(--ink-500);
+    margin: 0;
+}
+
+/* Summary Panels */
+.summary-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 768px) {
+    .summary-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.summary-panel {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+}
+
+.summary-panel-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.summary-panel-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-panel-body {
+    padding: 1rem 1.25rem;
+}
+
+.summary-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed var(--border);
+}
+
+.summary-stat:last-child {
+    border-bottom: none;
+}
+
+.summary-stat-label {
+    font-size: 0.8125rem;
+    color: var(--muted);
+}
+
+.summary-stat-value {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.summary-stat-value.positive { color: var(--farm-green); }
+.summary-stat-value.negative { color: var(--farm-red); }
+
+/* Recent Activity */
+.activity-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+}
+
+.activity-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.activity-header h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.activity-list {
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-item:hover {
+    background: var(--surface-2);
+}
+
+.activity-type {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.875rem;
+}
+
+.activity-type.expense { background: var(--farm-red-light); color: var(--farm-red); }
+.activity-type.sale { background: var(--farm-green-light); color: var(--farm-green); }
+
+.activity-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-desc {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.activity-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+.activity-amount {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.activity-amount.expense { color: var(--farm-red); }
+.activity-amount.sale { color: var(--farm-green); }
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 2.5rem 1rem;
+    color: var(--muted);
+}
+
+.empty-state i {
+    font-size: 2.5rem;
+    opacity: 0.5;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state p {
+    margin: 0 0 1rem 0;
+    font-size: 0.875rem;
+}
+
+/* Expense Bar Chart (CSS Fallback) */
+.expense-bar {
+    margin-bottom: 0.75rem;
+}
+
+.expense-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.expense-bar-label .name {
+    color: var(--ink-500);
+    text-transform: capitalize;
+}
+
+.expense-bar-label .amount {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.expense-bar-track {
+    height: 8px;
+    background: var(--surface-2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.expense-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--farm-red), #f87171);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+    .kpi-card {
+        padding: 0.875rem 1rem;
+    }
+    
+    .kpi-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 1rem;
+    }
+    
+    .kpi-value {
+        font-size: 1.25rem;
+    }
+    
+    .chart-card-body {
+        height: 180px;
+    }
+    
+    .quick-action-btn {
+        padding: 1rem 0.5rem;
+    }
+    
+    .quick-action-btn .icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-1">🌾 Farm Manager</h1>
-            <p class="text-muted mb-0">Track profitability, livestock, and crops</p>
+<div class="farm-dashboard container-fluid py-3">
+    
+    <!-- Page Header -->
+    <div class="farm-header">
+        <div class="farm-header-text">
+            <h1><span>🌾</span> Farm Dashboard</h1>
+            <p>Track profitability, costs, livestock & crops</p>
         </div>
-        <div class="btn-group">
-            <a href="{{ url_add_expense }}" class="btn btn-outline-danger" data-testid="farm-add-expense">
-                <i class="bi bi-dash-circle"></i> Add Expense
-            </a>
-            <a href="{{ url_add_sale }}" class="btn btn-success" data-testid="farm-add-sale">
-                <i class="bi bi-plus-circle"></i> Add Sale
-            </a>
+        <div class="farm-period-pill">
+            <i class="bi bi-calendar3"></i>
+            <span>{{ snapshot.month_name }} {{ snapshot.year }}</span>
         </div>
     </div>
 
-    <!-- Alerts -->
+    <!-- Alerts Section (if any) -->
     {% if alerts %}
-    <div class="mb-4">
-        {% for alert in alerts %}
-        <div class="alert alert-{% if alert.severity == 'critical' %}danger{% elif alert.severity == 'warning' %}warning{% else %}info{% endif %} d-flex align-items-center" role="alert">
-            <i class="bi bi-{% if alert.severity == 'critical' %}exclamation-triangle-fill{% elif alert.severity == 'warning' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
-            <div>
-                <strong>{{ alert.title }}</strong>: {{ alert.message }}
+    <div class="alerts-section" data-testid="farm-alerts">
+        {% for alert in alerts|slice:":3" %}
+        <div class="alert-card {{ alert.severity }}">
+            <div class="alert-icon">
+                {% if alert.severity == 'critical' %}
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                {% elif alert.severity == 'warning' %}
+                <i class="bi bi-exclamation-circle-fill"></i>
+                {% else %}
+                <i class="bi bi-info-circle-fill"></i>
+                {% endif %}
+            </div>
+            <div class="alert-content">
+                <p class="alert-title">{{ alert.title }}</p>
+                <p class="alert-message">{{ alert.message }}</p>
             </div>
         </div>
         {% endfor %}
     </div>
     {% endif %}
 
-    <!-- KPI Cards Row -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Profit This Month</div>
-                    <div class="h4 mb-0 {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">
-                        MWK {{ profit_this_month|floatformat:0|intcomma }}
-                    </div>
+    <!-- KPI Cards -->
+    <div class="kpi-grid" data-testid="farm-kpis">
+        <!-- Net Profit -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Net Profit</span>
+                <div class="kpi-icon profit">
+                    <i class="bi bi-graph-up-arrow"></i>
                 </div>
             </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Income</div>
-                    <div class="h4 mb-0 text-primary">
-                        MWK {{ income_this_month|floatformat:0|intcomma }}
-                    </div>
-                </div>
+            <div class="kpi-value {% if snapshot.net_profit_mwk >= 0 %}positive{% else %}negative{% endif %}">
+                MWK {{ snapshot.net_profit_mwk|floatformat:0|intcomma }}
             </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Expenses</div>
-                    <div class="h4 mb-0 text-danger">
-                        MWK {{ expenses_this_month|floatformat:0|intcomma }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Sales Count</div>
-                    <div class="h4 mb-0">{{ sales_count_this_month }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <a href="{{ url_add_expense }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-add-expense">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-cash-stack text-danger h2"></i>
-                    <div class="mt-2 fw-medium">Add Expense</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_add_sale }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-add-sale">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-cart-check text-success h2"></i>
-                    <div class="mt-2 fw-medium">Add Sale</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_livestock_add_event }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-livestock-add-event">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-piggy-bank text-primary h2"></i>
-                    <div class="mt-2 fw-medium">Livestock Event</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_season_create }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="farm-season-create">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-flower1 text-warning h2"></i>
-                    <div class="mt-2 fw-medium">New Season</div>
-                </div>
-            </a>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <!-- Livestock Summary -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">🐖 Livestock</h5>
-                    <a href="/verticals/farm/livestock/" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body">
-                    {% if livestock_snapshots %}
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Batch</th>
-                                        <th class="text-center">Count</th>
-                                        <th class="text-end">Value</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for snapshot in livestock_snapshots %}
-                                    <tr>
-                                        <td>
-                                            {{ snapshot.batch_name }}
-                                            <small class="text-muted">({{ snapshot.animal_type }})</small>
-                                        </td>
-                                        <td class="text-center">{{ snapshot.count_current }}</td>
-                                        <td class="text-end">
-                                            {% if snapshot.estimated_value %}
-                                            MWK {{ snapshot.estimated_value|floatformat:0|intcomma }}
-                                            {% else %}
-                                            <span class="text-muted">-</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                                <tfoot>
-                                    <tr class="fw-bold">
-                                        <td>Total</td>
-                                        <td class="text-center">{{ total_livestock_count }}</td>
-                                        <td class="text-end">
-                                            {% if total_livestock_value %}
-                                            MWK {{ total_livestock_value|floatformat:0|intcomma }}
-                                            {% endif %}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4 text-muted">
-                            <i class="bi bi-piggy-bank h1"></i>
-                            <p class="mb-0">No livestock batches yet.</p>
-                            <a href="/verticals/farm/livestock/create/" class="btn btn-sm btn-primary mt-2">Add First Batch</a>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+            {% if snapshot.profit_change_pct is not None %}
+            <span class="kpi-change {{ snapshot.profit_trend }}">
+                {% if snapshot.profit_trend == 'up' %}<i class="bi bi-arrow-up"></i>{% elif snapshot.profit_trend == 'down' %}<i class="bi bi-arrow-down"></i>{% else %}<i class="bi bi-dash"></i>{% endif %}
+                {{ snapshot.profit_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">vs last month</div>
         </div>
 
-        <!-- Top Expense Categories -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent">
-                    <h5 class="mb-0">📊 Top Expenses This Month</h5>
-                </div>
-                <div class="card-body">
-                    {% if top_expense_categories %}
-                        {% for cat in top_expense_categories %}
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <div class="fw-medium text-capitalize">{{ cat.category }}</div>
-                                <small class="text-muted">{{ cat.percentage|floatformat:1 }}% of expenses</small>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold">MWK {{ cat.amount|floatformat:0|intcomma }}</div>
-                            </div>
-                        </div>
-                        <div class="progress mb-2" style="height: 6px;">
-                            <div class="progress-bar bg-danger" style="width: {{ cat.percentage }}%"></div>
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center py-4 text-muted">
-                            <i class="bi bi-bar-chart h1"></i>
-                            <p class="mb-0">No expenses recorded this month.</p>
-                        </div>
-                    {% endif %}
+        <!-- Sales/Income -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Sales</span>
+                <div class="kpi-icon income">
+                    <i class="bi bi-cart-check"></i>
                 </div>
             </div>
+            <div class="kpi-value">
+                MWK {{ snapshot.total_income_mwk|floatformat:0|intcomma }}
+            </div>
+            {% if snapshot.income_change_pct is not None %}
+            <span class="kpi-change {% if snapshot.income_change_pct >= 0 %}up{% else %}down{% endif %}">
+                {% if snapshot.income_change_pct >= 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                {{ snapshot.income_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">{{ snapshot.sales_count }} transaction{% if snapshot.sales_count != 1 %}s{% endif %}</div>
         </div>
-    </div>
 
-    <!-- Active Crop Seasons -->
-    {% if active_seasons %}
-    <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">🌱 Active Crop Seasons</h5>
-            <a href="/verticals/farm/crops/" class="btn btn-sm btn-outline-primary">View All</a>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                {% for season in active_seasons %}
-                <div class="col-md-4">
-                    <div class="card bg-light border-0">
-                        <div class="card-body">
-                            <h6 class="card-title">{{ season.name }}</h6>
-                            <p class="card-text small text-muted mb-1">
-                                {{ season.area_value }} {{ season.get_area_unit_display }} · {{ season.get_crop_type_display }}
-                            </p>
-                            <span class="badge bg-{% if season.status == 'active' %}success{% else %}warning{% endif %}">
-                                {{ season.get_status_display }}
-                            </span>
-                        </div>
-                    </div>
+        <!-- Expenses -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Expenses</span>
+                <div class="kpi-icon expense">
+                    <i class="bi bi-cash-stack"></i>
                 </div>
-                {% endfor %}
             </div>
+            <div class="kpi-value">
+                MWK {{ snapshot.total_expenses_mwk|floatformat:0|intcomma }}
+            </div>
+            {% if snapshot.expense_change_pct is not None %}
+            <span class="kpi-change {% if snapshot.expense_change_pct <= 0 %}up{% else %}down{% endif %}">
+                {% if snapshot.expense_change_pct > 0 %}<i class="bi bi-arrow-up"></i>{% else %}<i class="bi bi-arrow-down"></i>{% endif %}
+                {{ snapshot.expense_change_pct|floatformat:1|default:"0" }}%
+            </span>
+            {% endif %}
+            <div class="kpi-subtitle">{{ snapshot.expense_count }} expense{% if snapshot.expense_count != 1 %}s{% endif %}</div>
         </div>
-    </div>
-    {% endif %}
 
-    <!-- Recent Ledger Entries -->
-    <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">📒 Recent Activity</h5>
-            <a href="/verticals/farm/ledger/" class="btn btn-sm btn-outline-primary">View All</a>
-        </div>
-        <div class="card-body p-0">
-            {% if recent_entries %}
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Date</th>
-                            <th>Type</th>
-                            <th>Description</th>
-                            <th class="text-end">Amount</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for entry in recent_entries %}
-                        <tr>
-                            <td>{{ entry.date|date:"M d" }}</td>
-                            <td>
-                                {% if entry.entry_type == 'expense' %}
-                                <span class="badge bg-danger">Expense</span>
-                                {% else %}
-                                <span class="badge bg-success">Sale</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {{ entry.description|default:entry.get_category_display }}
-                                <small class="text-muted">({{ entry.get_enterprise_type_display }})</small>
-                            </td>
-                            <td class="text-end {% if entry.entry_type == 'expense' %}text-danger{% else %}text-success{% endif %}">
-                                {% if entry.entry_type == 'expense' %}-{% endif %}MWK {{ entry.amount_mwk|floatformat:0|intcomma }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <!-- Top Cost Driver -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Top Cost</span>
+                <div class="kpi-icon cost">
+                    <i class="bi bi-pie-chart"></i>
+                </div>
             </div>
-            {% else %}
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-journal-text h1"></i>
-                <p class="mb-0">No entries yet. Start by adding an expense or sale!</p>
+            <div class="kpi-value" style="font-size: 1.125rem; text-transform: capitalize;">
+                {{ snapshot.top_cost_driver_name|default:"None" }}
+            </div>
+            {% if snapshot.top_cost_driver_amount > 0 %}
+            <div class="kpi-subtitle">
+                MWK {{ snapshot.top_cost_driver_amount|floatformat:0|intcomma }} ({{ snapshot.top_cost_driver_pct|floatformat:0 }}%)
             </div>
             {% endif %}
         </div>
     </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions" data-testid="farm-quick-actions">
+        <a href="{{ url_add_expense }}" class="quick-action-btn" data-testid="farm-add-expense">
+            <div class="icon expense"><i class="bi bi-dash-circle"></i></div>
+            <span>Add Expense</span>
+        </a>
+        <a href="{{ url_add_sale }}" class="quick-action-btn" data-testid="farm-add-sale">
+            <div class="icon sale"><i class="bi bi-plus-circle"></i></div>
+            <span>Add Sale</span>
+        </a>
+        <a href="{{ url_livestock_add_event }}" class="quick-action-btn" data-testid="farm-add-livestock-event">
+            <div class="icon livestock"><i class="bi bi-piggy-bank"></i></div>
+            <span>Livestock Event</span>
+        </a>
+        <a href="{{ url_season_create }}" class="quick-action-btn" data-testid="farm-add-season">
+            <div class="icon crop"><i class="bi bi-flower1"></i></div>
+            <span>New Season</span>
+        </a>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="charts-row">
+        <!-- Profit Trend Chart -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3><i class="bi bi-graph-up me-2"></i>Profit Trend</h3>
+                <span class="text-muted" style="font-size: 0.75rem;">Last 6 months</span>
+            </div>
+            <div class="chart-card-body">
+                <canvas id="profitTrendChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Expense Breakdown -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3><i class="bi bi-pie-chart me-2"></i>Expense Breakdown</h3>
+            </div>
+            <div class="chart-card-body" style="padding: 1rem 1.25rem;">
+                {% if snapshot.expense_breakdown %}
+                    {% for cat in snapshot.expense_breakdown %}
+                    <div class="expense-bar">
+                        <div class="expense-bar-label">
+                            <span class="name">{{ cat.label }}</span>
+                            <span class="amount">MWK {{ cat.amount|floatformat:0|intcomma }}</span>
+                        </div>
+                        <div class="expense-bar-track">
+                            <div class="expense-bar-fill" style="width: {{ cat.percentage }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state" style="padding: 1.5rem;">
+                        <i class="bi bi-bar-chart"></i>
+                        <p>No expenses this month</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Panels -->
+    <div class="summary-grid">
+        <!-- Livestock Summary -->
+        <div class="summary-panel">
+            <div class="summary-panel-header">
+                <h3><span>🐖</span> Livestock</h3>
+                <a href="/verticals/farm/livestock/" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="summary-panel-body">
+                {% if total_livestock_count > 0 %}
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Total Animals</span>
+                    <span class="summary-stat-value">{{ snapshot.total_livestock_count|intcomma }}</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Births</span>
+                    <span class="summary-stat-value positive">+{{ snapshot.livestock_births_this_month }}</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Deaths</span>
+                    <span class="summary-stat-value negative">-{{ snapshot.livestock_deaths_this_month }}</span>
+                </div>
+                {% if snapshot.mortality_rate_pct is not None %}
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Mortality Rate</span>
+                    <span class="summary-stat-value {% if snapshot.mortality_rate_pct > 10 %}negative{% endif %}">{{ snapshot.mortality_rate_pct|floatformat:1 }}%</span>
+                </div>
+                {% endif %}
+                {% if snapshot.total_livestock_value %}
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Est. Value</span>
+                    <span class="summary-stat-value">MWK {{ snapshot.total_livestock_value|floatformat:0|intcomma }}</span>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-piggy-bank"></i>
+                    <p>No livestock batches yet</p>
+                    <a href="/verticals/farm/livestock/add-batch/" class="btn btn-sm btn-primary">Add First Batch</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Crops Summary -->
+        <div class="summary-panel">
+            <div class="summary-panel-header">
+                <h3><span>🌱</span> Crops</h3>
+                <a href="/verticals/farm/crops/" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="summary-panel-body">
+                {% if snapshot.active_seasons_count > 0 %}
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Active Seasons</span>
+                    <span class="summary-stat-value">{{ snapshot.active_seasons_count }}</span>
+                </div>
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Total Area</span>
+                    <span class="summary-stat-value">{{ snapshot.total_crop_area|floatformat:1 }} acres</span>
+                </div>
+                {% if snapshot.projected_crop_income %}
+                <div class="summary-stat">
+                    <span class="summary-stat-label">Projected Income</span>
+                    <span class="summary-stat-value positive">MWK {{ snapshot.projected_crop_income|floatformat:0|intcomma }}</span>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-flower1"></i>
+                    <p>No active crop seasons</p>
+                    <a href="/verticals/farm/crops/add-season/" class="btn btn-sm btn-primary">Add Season</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="activity-card" data-testid="farm-recent-activity">
+        <div class="activity-header">
+            <h3><i class="bi bi-clock-history me-2"></i>Recent Activity</h3>
+            <a href="/verticals/farm/ledger/" class="btn btn-sm btn-outline-primary">View All</a>
+        </div>
+        <div class="activity-list">
+            {% if recent_entries %}
+                {% for entry in recent_entries %}
+                <div class="activity-item">
+                    <div class="activity-type {% if entry.entry_type == 'expense' %}expense{% else %}sale{% endif %}">
+                        {% if entry.entry_type == 'expense' %}
+                        <i class="bi bi-dash"></i>
+                        {% else %}
+                        <i class="bi bi-plus"></i>
+                        {% endif %}
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-desc">{{ entry.description|default:entry.get_category_display }}</div>
+                        <div class="activity-meta">{{ entry.date|date:"M d" }} · {{ entry.get_enterprise_type_display }}</div>
+                    </div>
+                    <div class="activity-amount {% if entry.entry_type == 'expense' %}expense{% else %}sale{% endif %}">
+                        {% if entry.entry_type == 'expense' %}-{% else %}+{% endif %}MWK {{ entry.amount_mwk|floatformat:0|intcomma }}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-state">
+                    <i class="bi bi-journal-text"></i>
+                    <p>No entries yet. Start by adding an expense or sale!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- AI Recommendations Placeholder -->
+    <div class="alert alert-info d-flex align-items-center gap-2" style="border-radius: var(--radius);">
+        <i class="bi bi-lightbulb-fill fs-5"></i>
+        <div>
+            <strong>AI Recommendations</strong>
+            <p class="mb-0 small text-muted">Coming soon: Smart insights based on your farm data.</p>
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Profit Trend Chart
+    const profitTrendData = {{ profit_trend_json|safe }};
+    
+    if (profitTrendData && profitTrendData.length > 0) {
+        const ctx = document.getElementById('profitTrendChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: profitTrendData.map(d => d.label),
+                    datasets: [
+                        {
+                            label: 'Net Profit',
+                            data: profitTrendData.map(d => d.net_profit),
+                            borderColor: '#16a34a',
+                            backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#16a34a',
+                            borderWidth: 2.5,
+                        },
+                        {
+                            label: 'Income',
+                            data: profitTrendData.map(d => d.income),
+                            borderColor: '#2563eb',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 1.5,
+                        },
+                        {
+                            label: 'Expenses',
+                            data: profitTrendData.map(d => d.expenses),
+                            borderColor: '#dc2626',
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            pointRadius: 0,
+                            borderWidth: 1.5,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                boxWidth: 8,
+                                padding: 16,
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleFont: { weight: 'bold' },
+                            bodyFont: { size: 12 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': MWK ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11 } }
+                        },
+                        y: {
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: {
+                                font: { size: 11 },
+                                callback: function(value) {
+                                    if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                                    if (value >= 1000) return (value / 1000).toFixed(0) + 'K';
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

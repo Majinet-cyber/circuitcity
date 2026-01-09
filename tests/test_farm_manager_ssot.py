@@ -556,3 +556,240 @@ class TestComputeAlerts:
         # Should have no alerts
         assert len(alerts) == 0
 
+
+# ==============================================================================
+# DASHBOARD SNAPSHOT TESTS
+# ==============================================================================
+
+
+class TestDashboardSnapshot:
+    """Tests for the get_farm_dashboard_snapshot SSOT function."""
+
+    def test_dashboard_snapshot_basic(self):
+        """Test dashboard snapshot returns all expected fields."""
+        from inventory.services.farm_manager import get_farm_dashboard_snapshot
+        
+        ledger_entries = [
+            LedgerEntryData(
+                id=1,
+                date=date(2026, 1, 5),
+                entry_type="expense",
+                enterprise_type="pigs",
+                category="feed",
+                amount_mwk=Decimal("50000"),
+                quantity=None,
+                unit="kg",
+            ),
+            LedgerEntryData(
+                id=2,
+                date=date(2026, 1, 15),
+                entry_type="sale",
+                enterprise_type="pigs",
+                category="sale",
+                amount_mwk=Decimal("150000"),
+                quantity=None,
+                unit="head",
+            ),
+        ]
+        
+        snapshot = get_farm_dashboard_snapshot(
+            ledger_entries=ledger_entries,
+            livestock_snapshots=[],
+            active_seasons_count=0,
+            total_crop_area=Decimal("0"),
+            projected_crop_income=None,
+            today=date(2026, 1, 20),
+            days_since_last_sale=5,
+        )
+        
+        # Check KPIs
+        assert snapshot.net_profit_mwk == Decimal("100000")
+        assert snapshot.total_income_mwk == Decimal("150000")
+        assert snapshot.total_expenses_mwk == Decimal("50000")
+        assert snapshot.sales_count == 1
+        assert snapshot.expense_count == 1
+        
+        # Check metadata
+        assert snapshot.as_of_date == date(2026, 1, 20)
+        assert snapshot.month_name == "January"
+        assert snapshot.year == 2026
+        
+        # Check top cost driver
+        assert snapshot.top_cost_driver_name == "feed"
+        assert snapshot.top_cost_driver_amount == Decimal("50000")
+
+    def test_dashboard_snapshot_profit_trend_data(self):
+        """Test that profit trend data contains 6 months."""
+        from inventory.services.farm_manager import get_farm_dashboard_snapshot
+        
+        snapshot = get_farm_dashboard_snapshot(
+            ledger_entries=[],
+            livestock_snapshots=[],
+            active_seasons_count=0,
+            total_crop_area=Decimal("0"),
+            projected_crop_income=None,
+            today=date(2026, 1, 20),
+            days_since_last_sale=None,
+        )
+        
+        # Should have 6 months of trend data
+        assert len(snapshot.profit_trend_data) == 6
+        
+        # Each month should have required keys
+        for month_data in snapshot.profit_trend_data:
+            assert "month" in month_data
+            assert "month_name" in month_data
+            assert "year" in month_data
+            assert "label" in month_data
+            assert "net_profit" in month_data
+            assert "income" in month_data
+            assert "expenses" in month_data
+
+    def test_dashboard_snapshot_livestock_summary(self):
+        """Test livestock summary aggregation."""
+        from inventory.services.farm_manager import (
+            get_farm_dashboard_snapshot,
+            LivestockSnapshotResult,
+        )
+        
+        # Create mock livestock snapshots
+        livestock_snapshots = [
+            LivestockSnapshotResult(
+                batch_id=1,
+                batch_name="Pigs Batch A",
+                animal_type="pigs",
+                count_current=25,
+                births_total=10,
+                deaths_total=2,
+                purchases_total=20,
+                sales_total=3,
+                mortality_rate=Decimal("6.67"),
+                estimated_value=Decimal("500000"),
+            ),
+            LivestockSnapshotResult(
+                batch_id=2,
+                batch_name="Chickens Batch B",
+                animal_type="chickens",
+                count_current=100,
+                births_total=50,
+                deaths_total=5,
+                purchases_total=60,
+                sales_total=5,
+                mortality_rate=Decimal("4.55"),
+                estimated_value=Decimal("200000"),
+            ),
+        ]
+        
+        snapshot = get_farm_dashboard_snapshot(
+            ledger_entries=[],
+            livestock_snapshots=livestock_snapshots,
+            active_seasons_count=0,
+            total_crop_area=Decimal("0"),
+            projected_crop_income=None,
+            today=date(2026, 1, 20),
+            days_since_last_sale=None,
+        )
+        
+        # Check livestock aggregation
+        assert snapshot.total_livestock_count == 125  # 25 + 100
+        assert snapshot.total_livestock_value == Decimal("700000")  # 500000 + 200000
+        assert snapshot.livestock_births_this_month == 60  # 10 + 50
+        assert snapshot.livestock_deaths_this_month == 7  # 2 + 5
+
+    def test_dashboard_snapshot_expense_breakdown(self):
+        """Test expense breakdown is computed correctly."""
+        from inventory.services.farm_manager import get_farm_dashboard_snapshot
+        
+        ledger_entries = [
+            LedgerEntryData(
+                id=1, date=date(2026, 1, 5), entry_type="expense",
+                enterprise_type="pigs", category="feed",
+                amount_mwk=Decimal("50000"), quantity=None, unit="kg",
+            ),
+            LedgerEntryData(
+                id=2, date=date(2026, 1, 6), entry_type="expense",
+                enterprise_type="pigs", category="veterinary",
+                amount_mwk=Decimal("30000"), quantity=None, unit="item",
+            ),
+            LedgerEntryData(
+                id=3, date=date(2026, 1, 7), entry_type="expense",
+                enterprise_type="general", category="labor",
+                amount_mwk=Decimal("20000"), quantity=None, unit="item",
+            ),
+        ]
+        
+        snapshot = get_farm_dashboard_snapshot(
+            ledger_entries=ledger_entries,
+            livestock_snapshots=[],
+            active_seasons_count=0,
+            total_crop_area=Decimal("0"),
+            projected_crop_income=None,
+            today=date(2026, 1, 20),
+            days_since_last_sale=None,
+        )
+        
+        # Should have 3 expense categories
+        assert len(snapshot.expense_breakdown) == 3
+        
+        # First should be the largest (feed)
+        assert snapshot.expense_breakdown[0]["category"] == "feed"
+        assert snapshot.expense_breakdown[0]["amount"] == 50000.0
+
+
+class TestProfitTrend:
+    """Tests for compute_profit_trend function."""
+
+    def test_profit_trend_spans_year_boundary(self):
+        """Test that profit trend correctly handles year boundary."""
+        from inventory.services.farm_manager import compute_profit_trend
+        
+        ledger_entries = [
+            LedgerEntryData(
+                id=1, date=date(2025, 12, 5), entry_type="sale",
+                enterprise_type="pigs", category="sale",
+                amount_mwk=Decimal("100000"), quantity=None, unit="head",
+            ),
+            LedgerEntryData(
+                id=2, date=date(2026, 1, 5), entry_type="sale",
+                enterprise_type="pigs", category="sale",
+                amount_mwk=Decimal("120000"), quantity=None, unit="head",
+            ),
+        ]
+        
+        trend = compute_profit_trend(ledger_entries, 2026, 1, num_months=3)
+        
+        # Should have 3 months
+        assert len(trend) == 3
+        
+        # Check the months are correct
+        assert trend[0]["month"] == 11  # November 2025
+        assert trend[0]["year"] == 2025
+        assert trend[1]["month"] == 12  # December 2025
+        assert trend[1]["year"] == 2025
+        assert trend[2]["month"] == 1   # January 2026
+        assert trend[2]["year"] == 2026
+
+    def test_profit_trend_includes_income_expense_profit(self):
+        """Test that trend data includes all three metrics."""
+        from inventory.services.farm_manager import compute_profit_trend
+        
+        ledger_entries = [
+            LedgerEntryData(
+                id=1, date=date(2026, 1, 5), entry_type="expense",
+                enterprise_type="pigs", category="feed",
+                amount_mwk=Decimal("30000"), quantity=None, unit="kg",
+            ),
+            LedgerEntryData(
+                id=2, date=date(2026, 1, 10), entry_type="sale",
+                enterprise_type="pigs", category="sale",
+                amount_mwk=Decimal("100000"), quantity=None, unit="head",
+            ),
+        ]
+        
+        trend = compute_profit_trend(ledger_entries, 2026, 1, num_months=1)
+        
+        assert len(trend) == 1
+        assert trend[0]["income"] == 100000.0
+        assert trend[0]["expenses"] == 30000.0
+        assert trend[0]["net_profit"] == 70000.0
+

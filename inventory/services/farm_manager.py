@@ -584,3 +584,285 @@ def crop_season_to_data(season) -> CropSeasonData:
         status=season.status,
     )
 
+
+# ==============================================================================
+# DASHBOARD SNAPSHOT (SSOT AGGREGATION)
+# ==============================================================================
+
+
+@dataclass
+class DashboardSnapshot:
+    """Complete dashboard data snapshot from SSOT."""
+    # KPIs
+    net_profit_mwk: Decimal
+    total_income_mwk: Decimal
+    total_expenses_mwk: Decimal
+    sales_count: int
+    expense_count: int
+    
+    # Comparison to previous month
+    profit_change_pct: Optional[Decimal]
+    income_change_pct: Optional[Decimal]
+    expense_change_pct: Optional[Decimal]
+    profit_trend: str  # "up", "down", "flat"
+    
+    # Top cost driver
+    top_cost_driver_name: str
+    top_cost_driver_amount: Decimal
+    top_cost_driver_pct: Decimal
+    
+    # Trends (last 6 months)
+    profit_trend_data: List[Dict[str, Any]]  # [{month, year, net_profit, income, expenses}]
+    
+    # Expense breakdown by category
+    expense_breakdown: List[Dict[str, Any]]  # [{category, amount, percentage}]
+    
+    # Alerts
+    alerts: List[AlertItem]
+    critical_alerts_count: int
+    warning_alerts_count: int
+    
+    # Livestock summary
+    total_livestock_count: int
+    total_livestock_value: Optional[Decimal]
+    livestock_births_this_month: int
+    livestock_deaths_this_month: int
+    mortality_rate_pct: Optional[Decimal]
+    
+    # Crops summary
+    active_seasons_count: int
+    total_crop_area: Decimal
+    projected_crop_income: Optional[Decimal]
+    
+    # Metadata
+    as_of_date: date
+    month_name: str
+    year: int
+
+
+def compute_profit_trend(
+    ledger_entries: List[LedgerEntryData],
+    end_year: int,
+    end_month: int,
+    num_months: int = 6,
+) -> List[Dict[str, Any]]:
+    """
+    Compute profit trend for the last N months.
+    
+    Args:
+        ledger_entries: All ledger entries
+        end_year: Year of the most recent month
+        end_month: Month of the most recent month (1-12)
+        num_months: Number of months to include
+    
+    Returns:
+        List of dicts with month, year, net_profit, income, expenses
+    """
+    import calendar
+    
+    trend_data = []
+    
+    for i in range(num_months - 1, -1, -1):
+        # Calculate month/year for this position
+        month = end_month - i
+        year = end_year
+        
+        while month <= 0:
+            month += 12
+            year -= 1
+        
+        month_profit = compute_monthly_profit(ledger_entries, year, month)
+        
+        trend_data.append({
+            "month": month,
+            "month_name": calendar.month_abbr[month],
+            "year": year,
+            "label": f"{calendar.month_abbr[month]} {str(year)[-2:]}",
+            "net_profit": float(month_profit.net_profit),
+            "income": float(month_profit.total_income),
+            "expenses": float(month_profit.total_expenses),
+        })
+    
+    return trend_data
+
+
+def get_farm_dashboard_snapshot(
+    ledger_entries: List[LedgerEntryData],
+    livestock_snapshots: List[LivestockSnapshotResult],
+    active_seasons_count: int,
+    total_crop_area: Decimal,
+    projected_crop_income: Optional[Decimal],
+    today: date,
+    days_since_last_sale: Optional[int] = None,
+) -> DashboardSnapshot:
+    """
+    Compute complete dashboard snapshot from raw data.
+    
+    This is the main SSOT function for the Farm Dashboard.
+    All dashboard values are computed here - the template only formats and renders.
+    
+    Args:
+        ledger_entries: All ledger entries for the business
+        livestock_snapshots: Computed livestock snapshots for all batches
+        active_seasons_count: Number of active crop seasons
+        total_crop_area: Total area under cultivation
+        projected_crop_income: Projected income from crops
+        today: Current date
+        days_since_last_sale: Days since last sale was recorded
+    
+    Returns:
+        DashboardSnapshot with all dashboard data
+    """
+    import calendar
+    
+    current_month = today.month
+    current_year = today.year
+    
+    # Current month profit
+    current_profit = compute_monthly_profit(ledger_entries, current_year, current_month)
+    
+    # Previous month for comparison
+    prev_month = current_month - 1 if current_month > 1 else 12
+    prev_year = current_year if current_month > 1 else current_year - 1
+    previous_profit = compute_monthly_profit(ledger_entries, prev_year, prev_month)
+    
+    # Calculate change percentages
+    profit_change_pct: Optional[Decimal] = None
+    income_change_pct: Optional[Decimal] = None
+    expense_change_pct: Optional[Decimal] = None
+    
+    if previous_profit.net_profit != 0:
+        profit_change_pct = (
+            (current_profit.net_profit - previous_profit.net_profit) 
+            / abs(previous_profit.net_profit) * 100
+        )
+    elif current_profit.net_profit != 0:
+        profit_change_pct = Decimal("100") if current_profit.net_profit > 0 else Decimal("-100")
+    
+    if previous_profit.total_income > 0:
+        income_change_pct = (
+            (current_profit.total_income - previous_profit.total_income)
+            / previous_profit.total_income * 100
+        )
+    
+    if previous_profit.total_expenses > 0:
+        expense_change_pct = (
+            (current_profit.total_expenses - previous_profit.total_expenses)
+            / previous_profit.total_expenses * 100
+        )
+    
+    # Determine profit trend
+    profit_trend = "flat"
+    if profit_change_pct is not None:
+        if profit_change_pct > 5:
+            profit_trend = "up"
+        elif profit_change_pct < -5:
+            profit_trend = "down"
+    
+    # Top cost driver
+    top_cost_driver_name = "None"
+    top_cost_driver_amount = Decimal("0")
+    top_cost_driver_pct = Decimal("0")
+    
+    if current_profit.top_expense_categories:
+        top_cat = current_profit.top_expense_categories[0]
+        top_cost_driver_name = top_cat["category"]
+        top_cost_driver_amount = top_cat["amount"]
+        top_cost_driver_pct = top_cat["percentage"]
+    
+    # Compute profit trend data for last 6 months
+    profit_trend_data = compute_profit_trend(
+        ledger_entries, current_year, current_month, num_months=6
+    )
+    
+    # Expense breakdown (use top 5 categories)
+    expense_breakdown = [
+        {
+            "category": cat["category"],
+            "label": cat["category"].replace("_", " ").title(),
+            "amount": float(cat["amount"]),
+            "percentage": float(cat["percentage"]),
+        }
+        for cat in current_profit.top_expense_categories[:5]
+    ]
+    
+    # Compute alerts
+    alerts = compute_alerts(
+        current_month_profit=current_profit,
+        previous_month_profit=previous_profit,
+        livestock_snapshots=livestock_snapshots,
+        days_since_last_sale=days_since_last_sale,
+    )
+    
+    critical_alerts_count = len([a for a in alerts if a.severity == "critical"])
+    warning_alerts_count = len([a for a in alerts if a.severity == "warning"])
+    
+    # Livestock summary
+    total_livestock_count = sum(s.count_current for s in livestock_snapshots)
+    total_livestock_value = Decimal("0")
+    total_births = 0
+    total_deaths = 0
+    total_animals_tracked = 0
+    
+    for s in livestock_snapshots:
+        if s.estimated_value:
+            total_livestock_value += s.estimated_value
+        total_births += s.births_total
+        total_deaths += s.deaths_total
+        total_animals_tracked += s.births_total + s.purchases_total
+    
+    total_livestock_value = total_livestock_value if total_livestock_value > 0 else None
+    
+    # Compute overall mortality rate
+    mortality_rate_pct: Optional[Decimal] = None
+    if total_animals_tracked > 0:
+        mortality_rate_pct = Decimal(total_deaths) / Decimal(total_animals_tracked) * 100
+    
+    return DashboardSnapshot(
+        # KPIs
+        net_profit_mwk=current_profit.net_profit,
+        total_income_mwk=current_profit.total_income,
+        total_expenses_mwk=current_profit.total_expenses,
+        sales_count=current_profit.sales_count,
+        expense_count=current_profit.expense_count,
+        
+        # Comparison
+        profit_change_pct=profit_change_pct,
+        income_change_pct=income_change_pct,
+        expense_change_pct=expense_change_pct,
+        profit_trend=profit_trend,
+        
+        # Top cost driver
+        top_cost_driver_name=top_cost_driver_name,
+        top_cost_driver_amount=top_cost_driver_amount,
+        top_cost_driver_pct=top_cost_driver_pct,
+        
+        # Trends
+        profit_trend_data=profit_trend_data,
+        
+        # Expense breakdown
+        expense_breakdown=expense_breakdown,
+        
+        # Alerts
+        alerts=alerts,
+        critical_alerts_count=critical_alerts_count,
+        warning_alerts_count=warning_alerts_count,
+        
+        # Livestock summary
+        total_livestock_count=total_livestock_count,
+        total_livestock_value=total_livestock_value,
+        livestock_births_this_month=total_births,
+        livestock_deaths_this_month=total_deaths,
+        mortality_rate_pct=mortality_rate_pct,
+        
+        # Crops summary
+        active_seasons_count=active_seasons_count,
+        total_crop_area=total_crop_area,
+        projected_crop_income=projected_crop_income,
+        
+        # Metadata
+        as_of_date=today,
+        month_name=calendar.month_name[current_month],
+        year=current_year,
+    )
+

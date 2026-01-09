@@ -36,6 +36,7 @@ from inventory.services.farm_manager import (
     compute_livestock_snapshot,
     compute_monthly_profit,
     crop_season_to_data,
+    get_farm_dashboard_snapshot,
     ledger_entry_to_data,
     livestock_batch_to_data,
     livestock_event_to_data,
@@ -54,6 +55,8 @@ from tenants.utils import require_business
 @require_business_kind(BusinessKind.FARM)
 def dashboard(request: HttpRequest) -> HttpResponse:
     """Farm Manager dashboard with KPIs and quick actions."""
+    import json
+    
     ctx = base.base_context(request)
     business = ctx.get("business")
     
@@ -61,20 +64,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         return redirect("verticals:no_business")
     
     today = timezone.now().date()
-    current_month = today.month
-    current_year = today.year
     
     # Get all ledger entries for computations
     ledger_qs = FarmLedgerEntry.objects.filter(business=business)
     ledger_entries = [ledger_entry_to_data(e) for e in ledger_qs]
-    
-    # Current month profit
-    current_profit = compute_monthly_profit(ledger_entries, current_year, current_month)
-    
-    # Previous month for comparison
-    prev_month = current_month - 1 if current_month > 1 else 12
-    prev_year = current_year if current_month > 1 else current_year - 1
-    previous_profit = compute_monthly_profit(ledger_entries, prev_year, prev_month)
     
     # Livestock snapshots
     batches = FarmLivestockBatch.objects.filter(business=business, is_active=True)
@@ -93,48 +86,62 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     if last_sale:
         days_since_last_sale = (today - last_sale.date).days
     
-    # Compute alerts
-    alerts = compute_alerts(
-        current_month_profit=current_profit,
-        previous_month_profit=previous_profit,
-        livestock_snapshots=livestock_snapshots,
-        days_since_last_sale=days_since_last_sale,
-    )
-    
-    # Recent ledger entries
-    recent_entries = ledger_qs.order_by("-date", "-created_at")[:10]
-    
     # Active crop seasons
     active_seasons = FarmCropSeason.objects.filter(
         business=business,
         status__in=[FarmSeasonStatus.PLANNING, FarmSeasonStatus.ACTIVE],
     ).order_by("-start_date")[:5]
     
-    # Total livestock value (if valuation enabled)
-    total_livestock_value = Decimal("0")
-    for snapshot in livestock_snapshots:
-        if snapshot.estimated_value:
-            total_livestock_value += snapshot.estimated_value
+    # Compute totals for crop summary
+    active_seasons_count = active_seasons.count()
+    total_crop_area = sum((s.area_value for s in active_seasons), Decimal("0"))
+    projected_crop_income = sum(
+        (s.projected_income_mwk for s in active_seasons if s.projected_income_mwk),
+        Decimal("0"),
+    ) or None
+    
+    # === SSOT: Get complete dashboard snapshot ===
+    snapshot = get_farm_dashboard_snapshot(
+        ledger_entries=ledger_entries,
+        livestock_snapshots=livestock_snapshots,
+        active_seasons_count=active_seasons_count,
+        total_crop_area=total_crop_area,
+        projected_crop_income=projected_crop_income,
+        today=today,
+        days_since_last_sale=days_since_last_sale,
+    )
+    
+    # Recent ledger entries (for display only, not computation)
+    recent_entries = ledger_qs.order_by("-date", "-created_at")[:10]
+    
+    # Serialize chart data to JSON for template
+    profit_trend_json = json.dumps(snapshot.profit_trend_data)
+    expense_breakdown_json = json.dumps(snapshot.expense_breakdown)
     
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Farm Manager",
         "hero_blurb": "Track your farm profitability, livestock, and crops in one place.",
         
-        # KPIs
-        "profit_this_month": current_profit.net_profit,
-        "income_this_month": current_profit.total_income,
-        "expenses_this_month": current_profit.total_expenses,
-        "sales_count_this_month": current_profit.sales_count,
+        # SSOT snapshot (all computed values)
+        "snapshot": snapshot,
         
-        # Top expense categories
-        "top_expense_categories": current_profit.top_expense_categories[:3],
+        # Chart data (JSON for Chart.js)
+        "profit_trend_json": profit_trend_json,
+        "expense_breakdown_json": expense_breakdown_json,
         
-        # Livestock summary
+        # For backwards compatibility with existing template parts
+        "profit_this_month": snapshot.net_profit_mwk,
+        "income_this_month": snapshot.total_income_mwk,
+        "expenses_this_month": snapshot.total_expenses_mwk,
+        "sales_count_this_month": snapshot.sales_count,
+        "top_expense_categories": snapshot.expense_breakdown,
+        
+        # Livestock display data
         "livestock_batches": batches,
         "livestock_snapshots": livestock_snapshots,
-        "total_livestock_count": sum(s.count_current for s in livestock_snapshots),
-        "total_livestock_value": total_livestock_value if total_livestock_value > 0 else None,
+        "total_livestock_count": snapshot.total_livestock_count,
+        "total_livestock_value": snapshot.total_livestock_value,
         
         # Crops
         "active_seasons": active_seasons,
@@ -142,16 +149,16 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         # Recent activity
         "recent_entries": recent_entries,
         
-        # Alerts
-        "alerts": alerts,
-        "alerts_count": len(alerts),
-        "critical_alerts_count": len([a for a in alerts if a.severity == "critical"]),
+        # Alerts (from SSOT)
+        "alerts": snapshot.alerts,
+        "alerts_count": len(snapshot.alerts),
+        "critical_alerts_count": snapshot.critical_alerts_count,
         
         # Quick action URLs
         "url_add_expense": "/verticals/farm/ledger/add-expense/",
         "url_add_sale": "/verticals/farm/ledger/add-sale/",
         "url_livestock_add_event": "/verticals/farm/livestock/add-event/",
-        "url_season_create": "/verticals/farm/crops/create/",
+        "url_season_create": "/verticals/farm/crops/add-season/",
     })
     
     return render(request, "verticals/farm/dashboard.html", ctx)
