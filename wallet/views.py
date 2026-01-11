@@ -34,12 +34,19 @@ try:
 except Exception:  # pragma: no cover
     from django.contrib.auth.decorators import login_required as otp_required  # type: ignore
 
-# Optional tenant helper (donâ€™t hard-fail if tenants app is unavailable)
+# Optional tenant helper (don't hard-fail if tenants app is unavailable)
 try:
     from tenants.utils import get_active_business  # type: ignore
 except Exception:  # pragma: no cover
     def get_active_business(_request):  # type: ignore
         return None
+
+# IDOR-safe scoping helper
+try:
+    from tenants.scoping import scoped_get_object_or_404  # type: ignore
+except ImportError:  # pragma: no cover
+    # Fallback to unsafe get_object_or_404 if scoping not available
+    scoped_get_object_or_404 = None  # type: ignore
 
 from .models import (
     AdminPurchaseOrder,
@@ -749,12 +756,27 @@ def api_ranking(request: HttpRequest):
 @login_required
 def entry_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
-    Transaction drill-down. Agents can see their own; staff can see any.
+    Transaction drill-down. Agents can see their own; staff can see their business's.
+    
+    SECURITY: Always scoped to active business to prevent IDOR.
     """
+    business = get_active_business(request)
+    
     if _staff(request.user):
-        entry = get_object_or_404(WalletTransaction, pk=pk)
+        # Staff can see any transaction within their business
+        if business:
+            entry = get_object_or_404(WalletTransaction, pk=pk, business=business)
+        else:
+            # Superuser with no business context can see any
+            entry = get_object_or_404(WalletTransaction, pk=pk)
     else:
-        entry = get_object_or_404(WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT)
+        # Agents can only see their own transactions
+        if business:
+            entry = get_object_or_404(
+                WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT, business=business
+            )
+        else:
+            entry = get_object_or_404(WalletTransaction, pk=pk, agent=request.user, ledger=Ledger.AGENT)
     return render(request, "wallet/entry_detail.html", {"entry": entry})
 
 
@@ -1039,13 +1061,19 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
     def post(self, request):
         bid = int(request.POST["budget_id"])
         action = request.POST["action"]  # approve / reject / pay
-        b = get_object_or_404(BudgetRequest, id=bid)
-
-        # Enforce manager scope on the object
-        if not request.user.is_superuser:
-            biz = get_active_business(request)
-            if not _agent_belongs_to_business(b.agent, biz):
-                return HttpResponse("Not allowed for this budget.", status=403)
+        
+        # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+        biz = get_active_business(request)
+        if request.user.is_superuser and not biz:
+            # Superuser without business context can access any
+            b = get_object_or_404(BudgetRequest, id=bid)
+        else:
+            # Scope via agent membership - only get budgets from agents in our business
+            from tenants.models import Membership
+            agent_ids = Membership.objects.filter(
+                business=biz, status="ACTIVE"
+            ).values_list("user_id", flat=True)
+            b = get_object_or_404(BudgetRequest, id=bid, agent_id__in=list(agent_ids))
 
         if action == "approve":
             b.status = BudgetRequest.Status.APPROVED
@@ -1096,10 +1124,21 @@ def admin_budget_set_status(request: HttpRequest, pk: int, action: str) -> HttpR
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    b = get_object_or_404(BudgetRequest, pk=pk)
-    # Enforce scope
-    if not request.user.is_superuser and not _agent_belongs_to_business(b.agent, get_active_business(request)):
-        return HttpResponse("Not allowed for this budget.", status=403)
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        # Superuser without business context can access any
+        b = get_object_or_404(BudgetRequest, pk=pk)
+    else:
+        # Scope via agent membership - only get budgets from agents in our business
+        from tenants.models import Membership
+        agent_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        try:
+            b = BudgetRequest.objects.get(pk=pk, agent_id__in=list(agent_ids))
+        except BudgetRequest.DoesNotExist:
+            raise Http404("Budget request not found")
 
     action = (action or "").lower()
     if action == "approve":
@@ -1388,11 +1427,23 @@ def run_payout_schedule(request: HttpRequest, schedule_id: int):
     """
     Manual trigger: issues payslips for all users on the schedule for
     the previous month. Useful for testing before wiring Celery.
+    
+    SECURITY: PayoutSchedule is a global entity scoped by created_by.
     """
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True)
+    # SECURITY: Only allow schedules created by users in the same business
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True)
+    else:
+        # Scope to schedules created by users in this business
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        sch = get_object_or_404(PayoutSchedule, id=schedule_id, active=True, created_by_id__in=list(user_ids))
     today = timezone.localdate()
     prev_year = today.year if today.month > 1 else (today.year - 1)
     prev_month = today.month - 1 if today.month > 1 else 12
@@ -1479,11 +1530,22 @@ def admin_po_new(request: HttpRequest):
 def admin_po_detail(request: HttpRequest, po_id: int):
     """
     View/edit a PO: add items, recompute totals, and move simple statuses.
+    
+    SECURITY: Scoped by created_by membership to prevent cross-tenant access.
     """
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
 
-    po = get_object_or_404(AdminPurchaseOrder, id=po_id)
+    # SECURITY: Scope to POs created by users in the same business
+    biz = get_active_business(request)
+    if request.user.is_superuser and not biz:
+        po = get_object_or_404(AdminPurchaseOrder, id=po_id)
+    else:
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(
+            business=biz, status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        po = get_object_or_404(AdminPurchaseOrder, id=po_id, created_by_id__in=list(user_ids))
 
     ItemForm = PurchaseOrderItemForm  # alias
     if ItemForm is None:
@@ -1733,18 +1795,21 @@ def admin_cost_create(request: HttpRequest):
 def admin_cost_edit(request: HttpRequest, cost_id: int):
     """
     Edit an existing cost transaction.
+    
+    SECURITY: Scoped to business BEFORE fetch to prevent IDOR.
     """
     if not _staff(request.user):
         messages.error(request, "Access denied.")
         return redirect("wallet:agent_wallet")
     
-    cost = get_object_or_404(WalletTransaction, id=cost_id)
     biz = get_active_business(request)
     
-    # Ensure cost belongs to the active business
-    if biz and cost.business_id != biz.id:
-        messages.error(request, "You cannot edit costs from another business.")
-        return redirect("wallet:admin_costs")
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    if biz:
+        cost = get_object_or_404(WalletTransaction, id=cost_id, business=biz)
+    else:
+        # Superuser without business context
+        cost = get_object_or_404(WalletTransaction, id=cost_id)
     
     if request.method == "POST":
         from .forms import AdminCostForm
@@ -1791,18 +1856,21 @@ def admin_cost_edit(request: HttpRequest, cost_id: int):
 def admin_cost_delete(request: HttpRequest, cost_id: int):
     """
     Delete a cost transaction.
+    
+    SECURITY: Scoped to business BEFORE fetch to prevent IDOR.
     """
     if not _staff(request.user):
         messages.error(request, "Access denied.")
         return redirect("wallet:agent_wallet")
     
-    cost = get_object_or_404(WalletTransaction, id=cost_id)
     biz = get_active_business(request)
     
-    # Ensure cost belongs to the active business
-    if biz and cost.business_id != biz.id:
-        messages.error(request, "You cannot delete costs from another business.")
-        return redirect("wallet:admin_costs")
+    # SECURITY: Scope to business BEFORE fetching to prevent IDOR
+    if biz:
+        cost = get_object_or_404(WalletTransaction, id=cost_id, business=biz)
+    else:
+        # Superuser without business context
+        cost = get_object_or_404(WalletTransaction, id=cost_id)
     
     # Only allow deletion of cost transactions
     if cost.type not in [TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]:
@@ -1829,20 +1897,21 @@ def wallet_adjust_agent(request: HttpRequest, membership_id: int):
         messages.error(request, "Access denied. Only managers/admins can adjust agent wallets.")
         return redirect("dashboard:agent_dashboard")
     
-    # Get membership
-    try:
-        from tenants.models import Membership
-        membership = get_object_or_404(Membership, pk=membership_id)
-    except ImportError:
-        messages.error(request, "Tenants app not available.")
-        return redirect("dashboard:admin_dashboard")
-    
-    # Get business (for scoping)
+    # SECURITY: Scope membership to business BEFORE fetching to prevent IDOR
     biz = get_active_business(request)
     
-    # Ensure membership belongs to the active business
-    if biz and membership.business_id != biz.id:
-        messages.error(request, "You cannot adjust wallets from another business.")
+    try:
+        from tenants.models import Membership
+        if request.user.is_superuser and not biz:
+            # Superuser without business context can access any
+            membership = get_object_or_404(Membership, pk=membership_id)
+        elif biz:
+            # Scope to this business
+            membership = get_object_or_404(Membership, pk=membership_id, business=biz)
+        else:
+            raise Http404("Membership not found")
+    except ImportError:
+        messages.error(request, "Tenants app not available.")
         return redirect("dashboard:admin_dashboard")
     
     # Get agent's current wallet

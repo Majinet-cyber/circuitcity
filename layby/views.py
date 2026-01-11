@@ -40,6 +40,54 @@ try:
 except Exception:  # pragma: no cover
     qrcode = None
 
+# Tenant scoping helpers
+try:
+    from tenants.utils import get_active_business
+    from tenants.models import Membership
+except ImportError:  # pragma: no cover
+    def get_active_business(_request):  # type: ignore
+        return None
+    Membership = None  # type: ignore
+
+
+def _scope_layby_order(request: HttpRequest, order_id: int) -> LaybyOrder:
+    """
+    Get a LaybyOrder scoped to the current business.
+    
+    SECURITY: LaybyOrder doesn't have a direct business FK, so we scope via
+    the created_by user's membership to prevent IDOR vulnerabilities.
+    
+    Uses PRE-FETCH scoping (not post-fetch checks) to prevent timing-based
+    information leaks about object existence.
+    
+    Returns the order if accessible, raises Http404 otherwise.
+    """
+    business = get_active_business(request)
+    
+    # ✅ SECURITY: Build scoped queryset BEFORE fetching to prevent IDOR info leaks
+    qs = LaybyOrder.objects.filter(pk=order_id)
+    
+    if business and Membership is not None:
+        # Scope via created_by membership in current business
+        business_user_ids = Membership.objects.filter(
+            business=business,
+            status="ACTIVE"
+        ).values_list("user_id", flat=True)
+        qs = qs.filter(created_by_id__in=list(business_user_ids))
+    elif not business:
+        # No business context - only allow access to user's own orders
+        qs = qs.filter(created_by_id=request.user.id)
+    else:
+        # No Membership model but have business - fallback to own orders only
+        qs = qs.filter(created_by_id=request.user.id)
+    
+    # Fetch from scoped queryset - returns None if doesn't exist OR doesn't match scope
+    order = qs.first()
+    if not order:
+        raise Http404("Order not found")
+    
+    return order
+
 
 # ---------------- helpers ----------------
 
@@ -693,7 +741,8 @@ def customer_portal(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def pay_now(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
     ser = _serialize_order(order)
     deeplink = f"circuitpay://pay?ref=LAYBY-{order.pk}&amount={ser['balance']}&label={escape(ser['product'])}"
     return _render_or_inline(
@@ -706,7 +755,8 @@ def pay_now(request: HttpRequest, order_id: int) -> HttpResponse:
 
 @login_required
 def qr_png(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
     ser = _serialize_order(order)
     payload = f"REF=LAYBY-{order.pk};AMOUNT={ser['balance']};DESC={ser['product']}"
     if not qrcode:  # pragma: no cover
@@ -736,7 +786,8 @@ class LaybyPaymentForm(forms.ModelForm):
 
 @login_required
 def agent_add_payment(request: HttpRequest, order_id: int) -> HttpResponse:
-    order = get_object_or_404(LaybyOrder, pk=order_id)
+    # SECURITY: Scope to business via created_by membership
+    order = _scope_layby_order(request, order_id)
 
     if request.method == "POST":
         form = LaybyPaymentForm(request.POST)
@@ -834,8 +885,10 @@ def manager_dashboard(request: HttpRequest) -> HttpResponse:
 def manager_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """
     Manager view for a single layby order with payment history.
+    
+    SECURITY: Scoped to business via created_by membership.
     """
-    order = get_object_or_404(LaybyOrder, pk=pk)
+    order = _scope_layby_order(request, pk)
     ser = _serialize_order(order)
 
     # Calculate percentage

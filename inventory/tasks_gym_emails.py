@@ -84,9 +84,12 @@ def send_gym_inactivity_reminders():
                 if not last_checkin:
                     # Never checked in and membership age >= 2
                     should_remind = True
-                elif last_checkin.timestamp.date() <= two_days_ago:
-                    # Last check-in was 2+ days ago
-                    should_remind = True
+                else:
+                    # Convert check-in timestamp to Malawi timezone for accurate date comparison
+                    last_checkin_date = last_checkin.timestamp.astimezone(MALAWI_TZ).date()
+                    if last_checkin_date <= two_days_ago:
+                        # Last check-in was 2+ days ago
+                        should_remind = True
 
                 if should_remind:
                     try:

@@ -2765,6 +2765,8 @@ def wallet_page(request):
     """
     Simple read-only wallet page for a specific agent.
     URL expected: /inventory/wallet/?user=<id>  (your urls.py already routes here)
+    
+    SECURITY: Scoped to active business via Membership to prevent IDOR.
     """
     User = get_user_model()
 
@@ -2773,6 +2775,19 @@ def wallet_page(request):
     if not uid:
         # Nothing to show; send them back to stock list (or anywhere you prefer)
         return redirect("/inventory/list/")
+
+    # SECURITY: Verify user belongs to active business via Membership BEFORE access
+    try:
+        from tenants.utils import get_active_business
+        from tenants.models import Membership
+        biz = get_active_business(request)
+        if biz:
+            # Only allow access to agents in the same business
+            if not Membership.objects.filter(user_id=uid, business=biz, status="ACTIVE").exists():
+                from django.http import Http404
+                raise Http404("Agent not found")
+    except ImportError:
+        pass  # Fallback if tenant models unavailable
 
     target = get_object_or_404(User, pk=uid)
 
