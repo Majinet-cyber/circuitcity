@@ -187,6 +187,47 @@ def dashboard(request):
 
     context.update(ctx_enhancements)
 
+    # ===== PREMIUM: Personalized dashboard enhancements (quotes & greetings) =====
+    ctx_enhancements = {}
+    try:
+        import json as json_lib
+
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_quotes import get_todays_quotes
+
+        # Personalized greeting (changes 3x daily: morning, afternoon, evening)
+        greeting_ctx = get_personalized_greeting(request.user, business)
+
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, "logo") and business.logo:
+            brand_logo_url = business.logo.url
+
+        # Hourly quotes (rotates every hour)
+        daily_quotes = get_todays_quotes(request.user, count=10)
+
+        # Extract quote texts for JavaScript rotation
+        quote_texts = [q.get("text", "") for q in daily_quotes.get("quotes", []) if q.get("text")]
+        quotes_json_data = json_lib.dumps(quote_texts)
+
+        ctx_enhancements.update(
+            {
+                "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+                "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+                "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+                "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+                "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+                "DASHBOARD_BRAND_TITLE": business.name if business else "Groceries Dashboard",
+                "DASHBOARD_QUOTES": daily_quotes,
+                "quotes_json": quotes_json_data,
+            }
+        )
+    except Exception:
+        # Gracefully degrade if helpers not available
+        pass
+
+    context.update(ctx_enhancements)
+
     return render(request, "verticals/groceries/dashboard.html", context)
 
 
