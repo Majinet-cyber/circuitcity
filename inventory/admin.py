@@ -675,24 +675,28 @@ class InventoryAuditAdmin(admin.ModelAdmin):
 
 # ---------- Time logs (GPS check-ins) ----------
 class TimeLogAdmin(admin.ModelAdmin):
-    list_display = ("user", "checkin_type", "logged_at", "location", "within_geofence", "distance_m", "accuracy_m")
-    list_filter = ("checkin_type", "within_geofence", "location", "logged_at")
-    search_fields = ("user__username", "note")
-    date_hierarchy = "logged_at"
-    ordering = ("-logged_at",)
-    list_select_related = ("user", "location")
+    """
+    Admin for TimeLog model (attendance events).
+    Fields: business, user, location, kind, ts, lat, lon
+    """
+    list_display = ("user", "kind", "ts", "location", "business")
+    list_filter = ("kind", "location", "ts")
+    search_fields = ("user__username", "user__email")
+    date_hierarchy = "ts"
+    ordering = ("-ts",)
+    list_select_related = ("user", "location", "business")
     autocomplete_fields = ("user", "location")
     fieldsets = (
-        ("When & who", {"fields": ("user", "checkin_type", "logged_at", "note")}),
+        ("When & Who", {"fields": ("user", "business", "kind", "ts")}),
         (
             "Where",
             {
-                "fields": ("location", "latitude", "longitude", "accuracy_m", "distance_m", "within_geofence"),
-                "description": "distance_m/within_geofence are usually filled by the API.",
+                "fields": ("location", "lat", "lon"),
+                "description": "Optional geo coordinates captured at check-in.",
             },
         ),
     )
-    readonly_fields = ("distance_m", "within_geofence")
+    readonly_fields = ("ts",)
     list_per_page = 50
     show_full_result_count = False
 
