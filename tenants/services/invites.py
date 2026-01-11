@@ -329,21 +329,12 @@ def accept_invite_by_token(
     except Exception as e:
         logger.warning(f"Failed to add user to group: {e}")
     
-    # If it existed but was not active/role differs, gently fix it (do no harm)
-    updates = []
-    if mem.status != "ACTIVE":
-        mem.status = "ACTIVE"
-        updates.append("status")
-    if role and mem.role != role:
-        mem.role = role
-        updates.append("role")
-    # For AGENT role, ensure location is set
-    if role == "AGENT" and not mem.location:
+    # For AGENT role, ensure location is set (only if location is provided)
+    # Note: actual_role and membership are already correctly set above; no need to re-update
+    if actual_role == "AGENT" and not mem.location and location_for_membership:
         mem.location = location_for_membership
-        updates.append("location")
+        mem.save(update_fields=["location"])
         logger.info(f"Updated existing membership to have location '{location_for_membership.name}'")
-    if updates:
-        mem.save(update_fields=updates)
 
     # Mark invite joined (idempotent)
     if inv.status != "JOINED" or inv.joined_user_id != getattr(user, "id", None):

@@ -65,28 +65,28 @@ def manager_user(business):
 
 
 @pytest.fixture
-def agent_user1(business):
+def agent_user1(business, location):
     """Create agent user 1."""
     user = User.objects.create_user(
         username="agent1",
         password="test123",
         is_staff=False,  # Agents are not staff
     )
-    # Create membership for agent
-    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE")
+    # Create membership for agent (agents must have a location)
+    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE", location=location)
     return user
 
 
 @pytest.fixture
-def agent_user2(business):
+def agent_user2(business, location):
     """Create agent user 2."""
     user = User.objects.create_user(
         username="agent2",
         password="test123",
         is_staff=False,
     )
-    # Create membership for agent
-    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE")
+    # Create membership for agent (agents must have a location)
+    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE", location=location)
     return user
 
 
@@ -408,7 +408,7 @@ class TestPhonesDashboardIntegration:
 
         assert response.status_code == 200
         kpis = response.context["dashboard_kpis"]
-
+        
         # Agent1 should see only their 1 sale
         assert kpis["units_sold"] == 1
         assert kpis["revenue"] == Decimal("60000")

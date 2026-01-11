@@ -48,7 +48,7 @@ def _get_vertical_dashboard_url(business_kind: str) -> str:
     """
     # Vertical dashboard URL mapping
     VERTICAL_DASHBOARDS = {
-        'phones': 'inventory:inventory_dashboard',
+        'phones': 'inventory_verticals:phones_dashboard',  # /inventory/verticals/phones/
         'clothing': 'verticals:clothing_dashboard',
         'gym': 'gym:dashboard',
         'cement': 'cement:dashboard',

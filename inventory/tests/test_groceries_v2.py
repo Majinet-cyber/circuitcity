@@ -18,6 +18,7 @@ from decimal import Decimal
 from django.test import TestCase, TransactionTestCase
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError, PermissionDenied
+from django.db.models import Sum
 from django.db import transaction
 
 from tenants.models import Business, Location
@@ -667,7 +668,7 @@ class GroceriesV2ConcurrencySafetyTest(TransactionTestCase):
 
         # Verify total sold <= 10
         total_sold = (
-            GrocerySale.objects.filter(business=self.business, product=self.product).aggregate(total=sum("quantity"))[
+            GrocerySale.objects.filter(business=self.business, product=self.product).aggregate(total=Sum("quantity"))[
                 "total"
             ]
             or 0

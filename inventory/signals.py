@@ -1,6 +1,7 @@
 ﻿# inventory/signals.py
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Dict, List, Optional, Any
 
 from django.conf import settings
@@ -10,6 +11,22 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import InventoryItem, AgentProfile
+
+
+def _ensure_aware_datetime(val):
+    """
+    Convert date or naive datetime to timezone-aware datetime.
+    Returns timezone.now() if val is None.
+    """
+    if val is None:
+        return timezone.now()
+    # If it's a date (not datetime), convert to datetime at midnight
+    if isinstance(val, date) and not isinstance(val, datetime):
+        val = datetime.combine(val, datetime.min.time())
+    # If it's a naive datetime, make it timezone-aware
+    if isinstance(val, datetime) and timezone.is_naive(val):
+        val = timezone.make_aware(val, timezone.get_current_timezone())
+    return val
 
 try:
     from .models import InventoryAudit  # optional in some setups
@@ -485,7 +502,7 @@ if Sale is not None:
                             if ref_key:
                                 create_kwargs[ref_key] = ref_val
                             if when_key:
-                                create_kwargs[when_key] = getattr(instance, "sold_at", None) or timezone.now()
+                                create_kwargs[when_key] = _ensure_aware_datetime(getattr(instance, "sold_at", None))
                             try:
                                 WalletTxn.objects.create(**create_kwargs)
                             except Exception:

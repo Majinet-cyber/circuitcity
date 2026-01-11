@@ -361,7 +361,18 @@ def manager_agents(request: HttpRequest) -> HttpResponse:
     Agents dashboard:
       - GET: show members + invites
       - POST: create an invite (posting here works too)
+    
+    Requires MANAGER, OWNER, BAR_MANAGER, or higher role. Agents get 403 Forbidden.
     """
+    # Role check: managers/owners/bar_managers only
+    from .utils import user_highest_role
+    if not (request.user.is_superuser or request.user.is_staff):
+        membership = getattr(request, "membership", None)
+        role = (user_highest_role(request.user) or "").upper()
+        allowed_roles = ("MANAGER", "OWNER", "BAR_MANAGER", "ADMIN", "AUDITOR")
+        if not (membership and membership.role in allowed_roles) and role not in allowed_roles:
+            from django.http import HttpResponseForbidden
+            return HttpResponseForbidden("This action requires manager privileges.")
     biz = _active_business_from_request(request) or _force_pick_any_membership(request)
     if not biz:
         messages.warning(request, "Please choose a business first.")

@@ -47,9 +47,7 @@ class TestBusinessKindWiring(TestCase):
         )
         
         self.assertEqual(business.business_kind, "farm")
-        
-        # Clean up
-        business.delete()
+        # Note: Django TestCase handles cleanup via transaction rollback
     
     def test_create_business_with_welding_kind(self):
         """Test creating a business with 'welding' business_kind."""
@@ -63,38 +61,29 @@ class TestBusinessKindWiring(TestCase):
         )
         
         self.assertEqual(business.business_kind, "welding")
-        
-        # Clean up
-        business.delete()
+        # Note: Django TestCase handles cleanup via transaction rollback
     
     def test_all_canonical_business_kinds_are_valid(self):
         """Test that all canonical business kinds can be saved to the database."""
         from tenants.models import Business
         from tenants.services.business_kind import CANONICAL_BUSINESS_KINDS
         
-        created_businesses = []
-        
-        try:
-            for i, kind in enumerate(CANONICAL_BUSINESS_KINDS.keys()):
-                business = Business.objects.create(
-                    name=f"Test {kind.title()} Business {i}",
-                    slug=f"test-{kind}-business-{i}",
-                    status="ACTIVE",
-                    business_kind=kind,
-                )
-                created_businesses.append(business)
-                
-                # Refresh from DB to verify it saved correctly
-                business.refresh_from_db()
-                self.assertEqual(
-                    business.business_kind,
-                    kind,
-                    f"Business kind '{kind}' should be saved correctly"
-                )
-        finally:
-            # Clean up
-            for business in created_businesses:
-                business.delete()
+        for i, kind in enumerate(CANONICAL_BUSINESS_KINDS.keys()):
+            business = Business.objects.create(
+                name=f"Test {kind.title()} Business {i}",
+                slug=f"test-{kind}-business-{i}",
+                status="ACTIVE",
+                business_kind=kind,
+            )
+            
+            # Refresh from DB to verify it saved correctly
+            business.refresh_from_db()
+            self.assertEqual(
+                business.business_kind,
+                kind,
+                f"Business kind '{kind}' should be saved correctly"
+            )
+        # Note: Django TestCase handles cleanup via transaction rollback
     
     def test_farm_in_business_kind_choices(self):
         """Verify 'farm' is in BusinessKind.choices."""
@@ -321,7 +310,4 @@ class TestBusinessKindInSignupFlow(TestCase):
         )
         
         self.assertEqual(business.business_kind, "farm")
-        
-        # Clean up
-        business.delete()
-
+        # Note: Django TestCase handles cleanup via transaction rollback
