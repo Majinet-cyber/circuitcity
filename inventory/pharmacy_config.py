@@ -28,8 +28,20 @@ class PharmacyCategory:
     DROPS = "drops"
     COSMETICS = "cosmetics"
     OTHER = "other"
+    
+    # Detailed cosmetics subcategories (from models_pharmacy.PharmacyCategory)
+    SKIN_CARE = "skin_care"
+    HAIR_CARE = "hair_care"
+    PERSONAL_CARE = "personal_care"
+    BEAUTY_MAKEUP = "beauty_makeup"
+    BABY_CARE = "baby_care"
+    ORAL_CARE = "oral_care"
 
-    ALL = [TABLETS_CAPSULES, SYRUP, OINTMENT, DROPS, COSMETICS, OTHER]
+    ALL = [
+        TABLETS_CAPSULES, SYRUP, OINTMENT, DROPS, COSMETICS, OTHER,
+        # Detailed cosmetics categories
+        SKIN_CARE, HAIR_CARE, PERSONAL_CARE, BEAUTY_MAKEUP, BABY_CARE, ORAL_CARE,
+    ]
 
     CHOICES = [
         (TABLETS_CAPSULES, "Tablets/Capsules"),

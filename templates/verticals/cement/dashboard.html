@@ -4,126 +4,25 @@
 {% block title %}Hardware & General Dealers Dashboard · {{ business.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <!-- PHASE A PROOF MARKER (visible) -->
-  {% if DEBUG %}
-  <div class="alert alert-success border-2 border-success mb-3" style="background: #d4edda;">
-    <h5 class="mb-2">✅ CEMENT PREMIUM v1 — TEMPLATE OK</h5>
-    <small class="d-block">Business Kind: <code>{{ BUSINESS_VERTICAL|default:'NONE' }}</code></small>
-    <small class="d-block">Sidebar Items: <code>{{ sidebar_items|length }}</code></small>
-    <small class="d-block">Business: <code>{{ business.name }}</code> (ID: {{ business.id }})</small>
-  </div>
-  {% endif %}
-  
-  {% comment %}Premium: Branded header with greeting{% endcomment %}
-  {% include "partials/dashboard_brand_header.html" %}
+{% comment %}Premium: Branded header with greeting{% endcomment %}
+{% include "partials/dashboard_brand_header.html" %}
 
-  {% comment %}Premium: Hourly wisdom quotes{% endcomment %}
-  {% include "partials/dashboard_quotes.html" %}
+{% comment %}Premium: Hourly wisdom quotes{% endcomment %}
+{% include "partials/dashboard_quotes.html" %}
 
-  <!-- Header with Date Filter -->
-  <div class="row mb-4 align-items-center">
-    <div class="col-md-6">
-      <h1 class="h3 mb-0">🏗️ Hardware & General Dealers Dashboard</h1>
-      <p class="text-muted mb-0">{{ business.name }}</p>
-    </div>
-    <div class="col-md-6">
-      <!-- Date Filter Chips -->
-      <div class="d-flex gap-2 justify-content-md-end flex-wrap">
-        {% for option in preset_options %}
-        <a href="?preset={{ option.value }}" 
-           class="btn btn-sm {% if preset == option.value %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-          <i class="bi {{ option.icon }}"></i> {{ option.label }}
-        </a>
-        {% endfor %}
-        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#customDateModal">
-          <i class="bi bi-calendar-range"></i> Custom
-        </button>
-      </div>
-      <div class="text-end mt-2">
-        <small class="text-muted">Showing: <strong>{{ date_label }}</strong></small>
-      </div>
-    </div>
-  </div>
+{% comment %}
+=============================================================================
+MIGRATED TO SHARED DASHBOARD SHELL (2026-01-08)
+=============================================================================
+Now using templates/verticals/_dashboard_shell.html for consistent structure.
+Cement/hardware vertical maintains its own colors (brown/amber gradient).
+=============================================================================
+{% endcomment %}
 
-  <!-- KPI Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-2">
-            <div class="flex-shrink-0">
-              <div class="bg-primary bg-opacity-10 rounded p-2">
-                <i class="bi bi-cash-stack text-primary fs-4"></i>
-              </div>
-            </div>
-            <div class="flex-grow-1 ms-3">
-              <h6 class="text-muted mb-0 small">Revenue</h6>
-              <h4 class="mb-0">MK {{ total_revenue|floatformat:0|intcomma }}</h4>
-            </div>
-          </div>
-          <small class="text-muted">{{ total_sales_count }} sales</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-2">
-            <div class="flex-shrink-0">
-              <div class="bg-success bg-opacity-10 rounded p-2">
-                <i class="bi bi-graph-up text-success fs-4"></i>
-              </div>
-            </div>
-            <div class="flex-grow-1 ms-3">
-              <h6 class="text-muted mb-0 small">Profit</h6>
-              <h4 class="mb-0">MK {{ total_profit|floatformat:0|intcomma }}</h4>
-            </div>
-          </div>
-          <small class="text-muted">
-            {% widthratio total_profit total_revenue 100 %}% margin
-          </small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-2">
-            <div class="flex-shrink-0">
-              <div class="bg-warning bg-opacity-10 rounded p-2">
-                <i class="bi bi-box-seam text-warning fs-4"></i>
-              </div>
-            </div>
-            <div class="flex-grow-1 ms-3">
-              <h6 class="text-muted mb-0 small">Stock Value</h6>
-              <h4 class="mb-0">MK {{ stock_value|floatformat:0|intcomma }}</h4>
-            </div>
-          </div>
-          <small class="text-muted">{{ items_in_stock|intcomma }} items</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3 col-6">
-      <div class="card border-0 shadow-sm">
-        <div class="card-body">
-          <div class="d-flex align-items-center mb-2">
-            <div class="flex-shrink-0">
-              <div class="bg-info bg-opacity-10 rounded p-2">
-                <i class="bi bi-receipt text-info fs-4"></i>
-              </div>
-            </div>
-            <div class="flex-grow-1 ms-3">
-              <h6 class="text-muted mb-0 small">Costs</h6>
-              <h4 class="mb-0">MK {{ total_costs|floatformat:0|intcomma }}</h4>
-            </div>
-          </div>
-          <small class="text-muted">Operating expenses</small>
-        </div>
-      </div>
-    </div>
-  </div>
+{% include "verticals/_dashboard_shell.html" with config=dashboard_config %}
 
+<!-- Custom Content Sections (below KPIs) -->
+<div style="max-width:1400px;margin:0 auto;padding:0 18px">
   <div class="row g-3 mb-4">
     <!-- Payment Mix -->
     <div class="col-md-4">
@@ -286,4 +185,3 @@
   </div>
 </div>
 {% endblock %}
-

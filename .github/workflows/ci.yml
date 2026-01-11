@@ -47,6 +47,7 @@ jobs:
       DEBUG: "0"
       ENABLE_EMAIL_OTP: "0"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
 
     steps:
       - uses: actions/checkout@v4
@@ -68,9 +69,36 @@ jobs:
           python manage.py check
           python manage.py migrate --noinput
 
-      - name: Run unit tests (pytest)
+      # CRITICAL RELIABILITY GATE
+      # These tests MUST pass - they cover the "embarrassing" failures
+      # Enforces: strict markers, strict config, warnings as errors
+      - name: Run CRITICAL tests (reliability gate)
         run: |
-          python -m pytest -q
+          echo "========================================"
+          echo "  CRITICAL RELIABILITY GATE"
+          echo "========================================"
+          echo "These tests must ALL pass to continue."
+          echo "Tier A (core): phones, liquor, grocery, pharmacy, clothing, gym, hardware, cement"
+          echo "Tier B (new): farm, welding (dashboard only)"
+          python -m pytest -m critical --maxfail=1 -q --strict-markers --strict-config -W error -ra
+        env:
+          PYTHONWARNINGS: "error"
+        continue-on-error: false
+
+      # OTP tests (run with OTP enabled to verify 2FA works)
+      - name: Run OTP critical tests
+        run: |
+          echo "Running OTP verification tests..."
+          python -m pytest -m "critical and otp" -q --strict-markers --strict-config -W error
+        env:
+          ENABLE_EMAIL_OTP: "1"
+          PYTHONWARNINGS: "error"
+        continue-on-error: false
+
+      # Full test suite runs after critical tests pass
+      - name: Run full test suite
+        run: |
+          python -m pytest -q --ignore=tests/critical/
 
 
   cypress:
@@ -99,6 +127,7 @@ jobs:
       ENABLE_EMAIL_OTP: "0"
       DEBUG: "0"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
 
     services:
       postgres:

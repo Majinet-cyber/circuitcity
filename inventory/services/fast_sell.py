@@ -307,6 +307,7 @@ def create_fast_sell(
                 location=location,
                 user=user,
                 barcode=barcode,
+                quantity=quantity,
                 payment_method=payment_method,
             )
 

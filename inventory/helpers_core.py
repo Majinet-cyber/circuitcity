@@ -15,6 +15,8 @@ LIQUOR = "liquor"
 GROCERY = "grocery"
 GYM = "gym"
 CEMENT = "cement"
+FARM = "farm"
+WELDING = "welding"
 GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -58,6 +60,18 @@ _ALIASES: Dict[str, str] = {
     "cement": CEMENT,
     "hardware": CEMENT,
     "building materials": CEMENT,
+    # farm / agriculture
+    "farm": FARM,
+    "farming": FARM,
+    "agriculture": FARM,
+    "farm manager": FARM,
+    "agribusiness": FARM,
+    # welding / fabrication
+    "welding": WELDING,
+    "welder": WELDING,
+    "welding workshop": WELDING,
+    "fabrication": WELDING,
+    "metalwork": WELDING,
 }
 
 # Which fields on Business we will probe to determine vertical

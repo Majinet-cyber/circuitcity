@@ -124,6 +124,8 @@ def tenant_context(request) -> Dict[str, Any]:
     Adds to every template:
       - business / business_id (new keys)
       - active_business / active_business_id (legacy-friendly mirror)
+      - membership: Membership for (request.user, active_business) or None
+      - subscription: business.subscription or None (never raises)
       - PRODUCT_MODE ∈ {'phones','pharmacy','liquor','grocery','generic'}
       - BUSINESS_VERTICAL (alias for PRODUCT_MODE)
       - sidebar_items (vertical-aware navigation config)
@@ -150,13 +152,35 @@ def tenant_context(request) -> Dict[str, Any]:
 
     # MULTI-TENANCY HARDENING: Expose user business status to templates
     user_has_business = False
+    membership = None
+    subscription = None
+    
     try:
         if hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
             from .utils import user_has_any_business
 
             user_has_business = user_has_any_business(request.user)
+            
+            # Get membership for (user, business) if both exist
+            if biz:
+                try:
+                    from tenants.models import Membership
+                    membership = Membership.objects.filter(
+                        user=request.user, 
+                        business=biz
+                    ).first()
+                except Exception:
+                    pass
     except Exception:
         pass
+    
+    # Safely get subscription (never raise ObjectDoesNotExist)
+    try:
+        if biz and hasattr(biz, "subscription"):
+            subscription = biz.subscription
+    except Exception:
+        # ObjectDoesNotExist, AttributeError, etc - all return None
+        subscription = None
 
     # 1) middleware (single source of truth if present)
     try:
@@ -205,9 +229,10 @@ def tenant_context(request) -> Dict[str, Any]:
         from inventory.utils_verticals import get_vertical_sidebar_items
 
         sidebar_items = get_vertical_sidebar_items(mode)
-        # Ensure all items have require_manager key with safe default
+        # Ensure all items have required keys with safe defaults
         for item in sidebar_items:
             item.setdefault("require_manager", False)
+            item.setdefault("testid", "")  # Prevent VariableDoesNotExist spam
     except Exception:
         pass  # Fail gracefully if utils_verticals is not available
 
@@ -233,6 +258,8 @@ def tenant_context(request) -> Dict[str, Any]:
         # New names
         "business": biz,
         "business_id": bid,
+        "membership": membership,  # Membership for (user, business) or None
+        "subscription": subscription,  # business.subscription or None (safe)
         "PRODUCT_MODE": mode,
         "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config

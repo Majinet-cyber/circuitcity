@@ -10,10 +10,20 @@ Premium, stupid-simple hardware product catalog with:
 - Search by product name + keywords
 
 CATALOG CONTENT: Curated for Malawian hardware dealers based on local demand
+
+IMPORTANT: Paint sizes now use SSOT from construction_materials.py
 """
 from __future__ import annotations
 
 from typing import List, Optional, TypedDict
+
+# Import SSOT paint sizes
+from inventory.catalog.construction_materials import (
+    PAINT_BRANDS,
+    PAINT_COLORS,
+    PAINT_FINISHES,
+    PAINT_SIZES,
+)
 
 
 class ProductVariation(TypedDict):
@@ -79,10 +89,10 @@ HARDWARE_CATALOG: List[CatalogProduct] = [
         "keywords": ["rainbow", "crown", "plascon", "emulsion", "gloss", "coating"],
         "default_unit": "tin",
         "variation_schema": {
-            "brands": ["Rainbow", "Crown", "Plascon", "Other"],
-            "sizes": ["1L", "4L", "20L"],
-            "colors": ["White", "Red", "Blue", "Green", "Yellow", "Black", "Other"],
-            "finishes": ["Emulsion", "Gloss", "Matt"],
+            "brands": [brand["name"] for brand in PAINT_BRANDS] + ["Other"],
+            "sizes": PAINT_SIZES,  # SSOT: 1L, 5L, 20L (NO 4L)
+            "colors": PAINT_COLORS + ["Other"],
+            "finishes": PAINT_FINISHES,
             "dimensions": None,
             "viscosity": None,
             "gauges": None,

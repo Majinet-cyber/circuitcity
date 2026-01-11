@@ -18,6 +18,14 @@ from inventory.models_verticals import ClothingSale
 
 from . import base
 
+# ============================================================================
+# COMPATIBILITY: Re-export CLOTHING_CATEGORIES from SSOT
+# ============================================================================
+# The single source of truth is inventory.clothing_config.CLOTHING_CATEGORIES
+# This re-export maintains backward compatibility for existing imports:
+#   from inventory.verticals.clothing import CLOTHING_CATEGORIES
+from inventory.clothing_config import CLOTHING_CATEGORIES  # noqa: F401
+
 
 @login_required
 @require_business

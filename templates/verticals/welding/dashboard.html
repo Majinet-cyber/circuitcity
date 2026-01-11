@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Welding Dashboard - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">🔧 Welding Workshop</h1>
+            <p class="text-muted mb-0">Create quotes, track jobs, generate invoices</p>
+        </div>
+        <a href="{{ url_create_quote }}" class="btn btn-success btn-lg" data-testid="welding-create-quote">
+            <i class="bi bi-plus-circle"></i> New Quote
+        </a>
+    </div>
+
+    <!-- Low Stock Alert -->
+    {% if low_stock_count > 0 %}
+    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+            <strong>{{ low_stock_count }} materials running low!</strong>
+            <a href="/verticals/welding/materials/?low_stock=1" class="alert-link ms-2">View &raquo;</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- KPI Cards Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Revenue This Month</div>
+                    <div class="h4 mb-0 text-success">
+                        MWK {{ revenue_this_month|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Quotes This Month</div>
+                    <div class="h4 mb-0 text-primary">{{ quotes_this_month }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Active Jobs</div>
+                    <div class="h4 mb-0 text-info">{{ jobs_active }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <div class="text-muted small mb-1">Outstanding</div>
+                    <div class="h4 mb-0 text-warning">
+                        MWK {{ total_outstanding|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <a href="{{ url_create_quote }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-create-quote">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-file-earmark-text text-success h2"></i>
+                    <div class="mt-2 fw-medium">New Quote</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_stock_in }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-stock-in">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-box-arrow-in-down text-primary h2"></i>
+                    <div class="mt-2 fw-medium">Stock In</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="{{ url_materials }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-add-material">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-gear text-secondary h2"></i>
+                    <div class="mt-2 fw-medium">Materials</div>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
+            <a href="/verticals/welding/jobs/" class="card h-100 text-decoration-none border-0 shadow-sm bg-light">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-clipboard-check text-info h2"></i>
+                    <div class="mt-2 fw-medium">Jobs</div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Pending Quotes -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📝 Recent Quotes</h5>
+                    <a href="/verticals/welding/quotes/" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_quotes %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Quote #</th>
+                                    <th>Customer</th>
+                                    <th>Total</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for quote in recent_quotes %}
+                                <tr onclick="window.location='/verticals/welding/quotes/{{ quote.id }}/';" style="cursor:pointer;">
+                                    <td>{{ quote.quote_number }}</td>
+                                    <td>{{ quote.customer_name|truncatechars:15 }}</td>
+                                    <td>MWK {{ quote.total|floatformat:0|intcomma }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if quote.status == 'accepted' %}success{% elif quote.status == 'sent' %}info{% elif quote.status == 'rejected' %}danger{% else %}secondary{% endif %}">
+                                            {{ quote.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-file-earmark-text h1"></i>
+                        <p class="mb-0">No quotes yet.</p>
+                        <a href="{{ url_create_quote }}" class="btn btn-sm btn-success mt-2">Create First Quote</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🔨 Recent Jobs</h5>
+                    <a href="/verticals/welding/jobs/" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Job #</th>
+                                    <th>Customer</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in recent_jobs %}
+                                <tr onclick="window.location='/verticals/welding/jobs/{{ job.id }}/';" style="cursor:pointer;">
+                                    <td>{{ job.job_number }}</td>
+                                    <td>{{ job.customer_name|truncatechars:15 }}</td>
+                                    <td>MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if job.status == 'delivered' %}success{% elif job.status == 'ready' %}info{% elif job.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
+                                            {{ job.get_status_display }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-clipboard-check h1"></i>
+                        <p class="mb-0">No jobs yet.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ready for Pickup -->
+    {% if jobs_ready > 0 %}
+    <div class="card border-0 shadow-sm mt-4 bg-success bg-opacity-10">
+        <div class="card-body">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-check-circle-fill text-success h3 mb-0 me-3"></i>
+                <div>
+                    <h5 class="mb-0">{{ jobs_ready }} job{{ jobs_ready|pluralize }} ready for pickup</h5>
+                    <a href="/verticals/welding/jobs/?status=ready" class="text-success">View ready jobs &raquo;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -2,11 +2,17 @@
 """
 Shared test fixtures for smoke tests.
 Creates deterministic test data for all verticals.
+
+CRITICAL: All fixtures use unique usernames to prevent IntegrityError collisions
+when tests run in parallel or with shared state.
 """
 from decimal import Decimal
+from uuid import uuid4
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.utils import timezone
+from django.utils.crypto import get_random_string
 
 from tenants.models import Business, Membership
 from inventory.models import Location, MerchProduct
@@ -14,6 +20,14 @@ from inventory.business_kinds import BusinessKind
 from conftest import unique_slug
 
 User = get_user_model()
+
+
+def _unique_username(base: str = "user") -> str:
+    """
+    Generate a unique username to prevent IntegrityError collisions.
+    Uses random suffix to ensure uniqueness across test runs.
+    """
+    return f"{base}_{get_random_string(8).lower()}"
 
 
 class SmokeTestFixtures:
@@ -53,11 +67,19 @@ class SmokeTestFixtures:
         )
     
     @staticmethod
-    def create_admin_user(username="admin_user", email="admin@test.com", password="testpass123"):
-        """Create admin/manager user."""
+    def create_admin_user(username=None, email=None, password="testpass123"):
+        """
+        Create admin/manager user with unique username.
+        
+        CRITICAL: Always generates unique username to prevent IntegrityError.
+        If username is provided, a random suffix is still appended for safety.
+        """
+        unique_name = _unique_username(username or "admin")
+        unique_email = email or f"{unique_name}@test.com"
+        
         user = User.objects.create_user(
-            username=username,
-            email=email,
+            username=unique_name,
+            email=unique_email,
             password=password,
             is_staff=False,
             is_superuser=False,
@@ -69,22 +91,36 @@ class SmokeTestFixtures:
         return user
     
     @staticmethod
-    def create_agent_user(username="agent_user", email="agent@test.com", password="testpass123"):
-        """Create agent user."""
+    def create_agent_user(username=None, email=None, password="testpass123"):
+        """
+        Create agent user with unique username.
+        
+        CRITICAL: Always generates unique username to prevent IntegrityError.
+        """
+        unique_name = _unique_username(username or "agent")
+        unique_email = email or f"{unique_name}@test.com"
+        
         return User.objects.create_user(
-            username=username,
-            email=email,
+            username=unique_name,
+            email=unique_email,
             password=password,
             is_staff=False,
             is_superuser=False,
         )
     
     @staticmethod
-    def create_superuser(username="superuser", email="super@test.com", password="testpass123"):
-        """Create platform superuser."""
+    def create_superuser(username=None, email=None, password="testpass123"):
+        """
+        Create platform superuser with unique username.
+        
+        CRITICAL: Always generates unique username to prevent IntegrityError.
+        """
+        unique_name = _unique_username(username or "superuser")
+        unique_email = email or f"{unique_name}@test.com"
+        
         return User.objects.create_superuser(
-            username=username,
-            email=email,
+            username=unique_name,
+            email=unique_email,
             password=password,
         )
     
@@ -205,6 +241,8 @@ class SmokeTestFixtures:
         """
         Create a complete setup for a vertical: business, location, admin, agent, product.
         
+        CRITICAL: Uses unique usernames to prevent IntegrityError collisions.
+        
         Returns:
             dict: {
                 'business': Business,
@@ -223,19 +261,15 @@ class SmokeTestFixtures:
         business = SmokeTestFixtures.create_business(business_name, business_kind)
         location = SmokeTestFixtures.create_hq_location(business, f"{business_name} HQ")
         
-        # Create users
-        admin_username = f"admin_{business_kind}"
-        agent_username = f"agent_{business_kind}"
+        # Create users (with unique usernames - suffix appended automatically)
         password = "testpass123"
         
         admin_user = SmokeTestFixtures.create_admin_user(
-            username=admin_username,
-            email=f"{admin_username}@test.com",
+            username=f"admin_{business_kind}",
             password=password
         )
         agent_user = SmokeTestFixtures.create_agent_user(
-            username=agent_username,
-            email=f"{agent_username}@test.com",
+            username=f"agent_{business_kind}",
             password=password
         )
         
@@ -243,17 +277,83 @@ class SmokeTestFixtures:
         SmokeTestFixtures.assign_manager_role(admin_user, business, location)
         SmokeTestFixtures.assign_agent_role(agent_user, business, location)
         
-        # Create product (if applicable)
+        # Create product using safe_create helper (if applicable)
         product = None
-        if business_kind == BusinessKind.PHONES:
-            product = SmokeTestFixtures.create_phone_product(business, location)
-        elif business_kind == BusinessKind.PHARMACY:
-            product = SmokeTestFixtures.create_pharmacy_product(business, location)
-        elif business_kind == BusinessKind.CLOTHING:
-            product = SmokeTestFixtures.create_clothing_product(business, location)
-        elif business_kind == BusinessKind.LIQUOR:
-            product = SmokeTestFixtures.create_liquor_product(business, location)
-        # Gym has no products (membership-based)
+        try:
+            from inventory.compat_create import safe_create
+            
+            if business_kind == BusinessKind.PHONES:
+                product = safe_create(
+                    MerchProduct,
+                    business=business,
+                    location=location,
+                    name="iPhone 12",
+                    cost_price=Decimal("50000"),
+                    selling_price=Decimal("60000"),
+                    quantity=10,
+                    category="phones",
+                    vertical_type="phones",
+                    status="ACTIVE",
+                )
+            elif business_kind == BusinessKind.PHARMACY:
+                product = safe_create(
+                    MerchProduct,
+                    business=business,
+                    location=location,
+                    name="Paracetamol 500mg",
+                    cost_price=Decimal("100"),
+                    selling_price=Decimal("150"),
+                    quantity=100,
+                    category="medicine",
+                    vertical_type="pharmacy",
+                    status="ACTIVE",
+                    batch_number="BATCH001",
+                    expiry_date=timezone.now().date() + timezone.timedelta(days=365),
+                )
+            elif business_kind == BusinessKind.CLOTHING:
+                product = safe_create(
+                    MerchProduct,
+                    business=business,
+                    location=location,
+                    name="T-Shirt",
+                    cost_price=Decimal("500"),
+                    selling_price=Decimal("800"),
+                    quantity=20,
+                    category="clothing",
+                    vertical_type="clothing",
+                    status="ACTIVE",
+                    size="M",
+                    color="Blue",
+                )
+            elif business_kind == BusinessKind.LIQUOR:
+                product = safe_create(
+                    MerchProduct,
+                    business=business,
+                    location=location,
+                    name="Whiskey",
+                    cost_price=Decimal("5000"),
+                    selling_price=Decimal("7000"),
+                    quantity=50,
+                    category="spirits",
+                    vertical_type="liquor",
+                    status="ACTIVE",
+                    has_shots=True,
+                    shots_per_bottle=20,
+                    barman_shots_reserved=2,
+                    price_per_bottle=Decimal("7000"),
+                    price_per_shot=Decimal("500"),
+                )
+            # Gym has no products (membership-based)
+        except ImportError:
+            # Fallback if safe_create not available yet - use old methods
+            if business_kind == BusinessKind.PHONES:
+                product = SmokeTestFixtures.create_phone_product(business, location)
+            elif business_kind == BusinessKind.PHARMACY:
+                product = SmokeTestFixtures.create_pharmacy_product(business, location)
+            elif business_kind == BusinessKind.CLOTHING:
+                product = SmokeTestFixtures.create_clothing_product(business, location)
+            elif business_kind == BusinessKind.LIQUOR:
+                product = SmokeTestFixtures.create_liquor_product(business, location)
         
         return {
             'business': business,

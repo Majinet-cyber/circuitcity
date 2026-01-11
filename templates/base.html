@@ -110,6 +110,9 @@
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
+  
+  <!-- UI/UX Standardization: Shared Mobile Card Utilities -->
+  <link rel="stylesheet" href="{% static 'cc/css/ui_cards.css' %}?v={{ ASSET_V }}">
 
   <!-- GLOBAL MOBILE GUTTER SYSTEM — Match landing page near-edge feel (2025-12-21) -->
   <link rel="stylesheet" href="{% static 'css/mobile-gutter-system.css' %}?v={{ ASSET_V }}">
@@ -555,8 +558,8 @@
           <div class="cc-page topbar">
             <h1 class="fw-bold d-flex align-items-center gap-2">
               {% block header_title %}Dashboard{% endblock %}
-              {% if request.business and request.business.subscription %}
-                {% with sub=request.business.subscription %}
+              {% if subscription %}
+                {% with sub=subscription %}
                   {% if sub.status == 'trial' or sub.status == 'trialing' %}
                     <span class="badge rounded-pill text-bg-info">Trial{% if sub.trial_end %} · ends {{ sub.trial_end|date:'M j' }}{% endif %}</span>
                   {% elif sub.status == 'active' %}
@@ -760,8 +763,8 @@
     <main id="app-main" class="cc-page">
       {# ===== Billing banners ===== #}
       {# MANAGER-ONLY: Subscription management UI #}
-      {% if request.is_manager_plus and request.business and request.business.subscription %}
-        {% with sub=request.business.subscription %}
+      {% if request.is_manager_plus and request.business and subscription %}
+        {% with sub=subscription %}
           {% if sub.status == 'trial' %}
             <div class="msg msg-info fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
@@ -1514,5 +1517,6 @@
   });
 })();
 </script>
+<!-- build: {{ BUILD_SHA|default:"unknown" }} -->
 </body>
 </html>

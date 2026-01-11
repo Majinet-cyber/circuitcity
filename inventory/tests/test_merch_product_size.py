@@ -173,8 +173,5 @@ class MerchProductSizeFieldTest(TestCase):
             )
             self.assertEqual(product.size, size)
 
-    def tearDown(self):
-        """Clean up test data"""
-        MerchProduct.objects.all().delete()
-        Business.objects.all().delete()
-        User.objects.all().delete()
+    # Note: Django's TestCase handles cleanup automatically via transaction rollback.
+    # Manual tearDown deletion is not needed and can cause cascade errors.

@@ -13,11 +13,22 @@ from django.views.decorators.http import require_http_methods
 from django.contrib.auth.decorators import login_required
 
 from inventory.decorators import require_business
+
+# Try to import role decorator from tenants.utils, fall back gracefully
+try:
+    from tenants.utils import require_role
+except ImportError:
+    # Fallback: create a no-op decorator if not available
+    def require_role(roles=None):
+        def decorator(func):
+            return func
+        return decorator
 from inventory.utils_barcodes import lookup_barcode, normalize_barcode_enhanced
 
 
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET"])
 def barcode_lookup_api(request):
     """
@@ -129,6 +140,7 @@ def barcode_lookup_api(request):
 
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["POST"])
 def barcode_quick_create_api(request):
     """

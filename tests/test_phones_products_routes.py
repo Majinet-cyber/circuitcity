@@ -48,8 +48,13 @@ class PhonesProductsRouteTestCase(TestCase):
         self.user.save()
         
         # Add user to business
-        self.business.members.add(self.user)
-        self.business.managers.add(self.user)
+        from tenants.models import Membership
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         
         self.client = Client()
         self.client.login(username="testmanager", password="testpass123")
@@ -123,8 +128,13 @@ def test_phones_products_route_pytest(client, django_user_model):
         password="pytest_pass",
         email="pytest.products@test.com",
     )
-    business.members.add(user)
-    business.managers.add(user)
+    from tenants.models import Membership
+    Membership.objects.create(
+        user=user,
+        business=business,
+        role="MANAGER",
+        status="ACTIVE"
+    )
     
     # Login and activate business
     client.login(username="pytest_products", password="pytest_pass")

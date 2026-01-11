@@ -31,19 +31,19 @@ def resolve_active_location(request, business):
     Resolve active location with fallback logic.
     
     Priority:
-    1. request.active_location (if exists)
-    2. session['active_location_id'] (if exists and valid)
+    1. request.active_location (if exists and is active)
+    2. session['active_location_id'] (if exists and is active)
     3. business default location (is_default=True)
-    4. first location for business
+    4. first active location
     
     Returns:
-        Location object or None if no locations exist
+        Location object or None if no active locations exist
     """
     from tenants.models import Location
     
     # 1. Check request.active_location
     location = getattr(request, "active_location", None)
-    if location:
+    if location and getattr(location, "is_active", False):
         # Store in session for subsequent calls
         request.session['active_location_id'] = location.id
         return location
@@ -52,17 +52,18 @@ def resolve_active_location(request, business):
     location_id = request.session.get('active_location_id')
     if location_id:
         try:
-            location = Location.objects.get(id=location_id, business=business)
+            location = Location.objects.get(id=location_id, business=business, is_active=True)
             request.active_location = location  # Set on request for consistency
             return location
         except Location.DoesNotExist:
             # Stale session, clear it
             request.session.pop('active_location_id', None)
     
-    # 3. Auto-select: prefer default, else first
+    # 3. Auto-select: prefer default, else first active
     try:
         location = Location.objects.filter(
-            business=business
+            business=business,
+            is_active=True
         ).order_by('-is_default', 'id').first()
         
         if location:
@@ -74,7 +75,7 @@ def resolve_active_location(request, business):
     except Exception:
         pass
     
-    # No location found
+    # No active location found
     return None
 
 

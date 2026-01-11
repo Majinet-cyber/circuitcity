@@ -18,12 +18,32 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.contrib import messages
 
+from django.http import Http404
 from tenants.utils import require_business, get_active_business
 from core.roles import is_manager
 from inventory.models import InventoryItem
 from sales.models import Sale
 
 User = get_user_model()
+
+
+def _get_scoped_agent(request, agent_id: int, business):
+    """
+    Get an agent user scoped to the current business.
+    
+    SECURITY: Verifies agent belongs to business via Membership BEFORE 
+    returning to prevent IDOR vulnerabilities.
+    
+    Returns 404 if agent doesn't exist or doesn't belong to business.
+    """
+    try:
+        from tenants.models import Membership
+        if not Membership.objects.filter(user_id=agent_id, business=business, status="ACTIVE").exists():
+            raise Http404("Agent not found")
+    except ImportError:
+        pass  # If Membership model unavailable, continue
+    
+    return get_object_or_404(User, pk=agent_id)
 
 
 def _parse_date_range(request: HttpRequest) -> tuple[date, date, str]:
@@ -85,25 +105,15 @@ def agent_performance(request: HttpRequest, agent_id: int) -> HttpResponse:
         messages.error(request, "No active business selected.")
         return redirect("inventory:inventory_dashboard")
 
-    # Get the agent user object (ensure they belong to this business)
-    agent = get_object_or_404(User, pk=agent_id)
-
     # Security: Only managers can view any agent's performance
-    # Optionally allow agents to view their own performance
+    # Agents can view their own performance only
     if not is_manager(request.user):
         if request.user.pk != agent_id:
             messages.error(request, "You don't have permission to view this agent's performance.")
             return redirect("inventory:inventory_dashboard")
 
-    # Verify agent belongs to this business (via AgentProfile or similar)
-    try:
-        if hasattr(agent, "agent_profile"):
-            agent_business_id = getattr(agent.agent_profile, "business_id", None)
-            if agent_business_id and agent_business_id != business.id:
-                messages.error(request, "This agent does not belong to your business.")
-                return redirect("inventory:inventory_dashboard")
-    except Exception:
-        pass  # Continue if no agent_profile exists
+    # ✅ SECURITY: Get agent with business scope BEFORE proceeding (prevents IDOR)
+    agent = _get_scoped_agent(request, agent_id, business)
 
     # Parse date range
     start_date, end_date, range_label = _parse_date_range(request)

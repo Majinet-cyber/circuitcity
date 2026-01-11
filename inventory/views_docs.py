@@ -242,7 +242,9 @@ def doc_email(request: HttpRequest, pk: int):
 @login_required
 @require_GET
 def doc_whatsapp(request: HttpRequest, pk: int):
-    doc = get_object_or_404(Doc, pk=pk)
+    # ✅ SECURITY: Scope to active business to prevent IDOR
+    business = get_active_business(request)
+    doc = get_object_or_404(Doc.objects.filter(business=business), pk=pk)
     phone = request.GET.get("phone") or (doc.customer.phone or "")
     if not phone:
         return JsonResponse({"ok": False, "error": "No phone provided"})

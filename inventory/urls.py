@@ -1111,6 +1111,17 @@ urlpatterns = [
         ),
         name="restore_stock",
     ),
+    # Stock CRUD operations (manager-only: edit and delete)
+    path(
+        "stock/<int:pk>/edit/",
+        manager_required(_need_biz(_update_stock)),
+        name="stock_edit",
+    ),
+    path(
+        "stock/<int:pk>/delete/",
+        manager_required(_need_biz(_delete_stock)),
+        name="stock_delete",
+    ),
     # Premium Archive Flow (4-step safety process)
     path(
         "archive/start/",
@@ -1802,3 +1813,15 @@ urlpatterns += [
         name="check_barcode_duplicate",
     ),
 ]
+
+# ======================================================================================
+# URL COMPATIBILITY ALIASES (SSOT)
+# Import compatibility URL patterns from cc.urls_compat to ensure consistent naming
+# across all URLConfs. This allows tests using reverse('stock'), reverse('sell'), etc.
+# to work correctly when inventory URLConf is loaded.
+# ======================================================================================
+try:
+    from cc.urls_compat import get_compat_urlpatterns
+    urlpatterns += get_compat_urlpatterns()
+except ImportError:
+    pass  # If cc.urls_compat not available, skip (shouldn't happen in normal operation)

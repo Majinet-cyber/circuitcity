@@ -7,6 +7,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 
+import requests
+# Expose requests.request for test patching compatibility
+request = requests.request
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required

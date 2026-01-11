@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.contrib import messages
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 
 
 def get_cfo_message(total_profit):
@@ -35,12 +36,18 @@ def get_cfo_message(total_profit):
         ])
 
 
+@never_cache
 def home(request):
     """
     Public home page with hero section and marketing copy.
+    Never cached to ensure template updates are visible immediately.
     """
     # Get live platform metrics for display with safe threshold check
     METRICS_THRESHOLD = 1  # Minimum credible value to show numbers
+    
+    # Use marketing constant from settings for consistency
+    from django.conf import settings
+    marketing_active_businesses = getattr(settings, 'MARKETING_ACTIVE_BUSINESSES', 34)
     
     try:
         from tenants.models import Business, Membership
@@ -65,6 +72,10 @@ def home(request):
                 'total_agents': total_agents,
             }, 300)
         
+        # Use marketing constant if actual count is below threshold for credibility
+        if total_merchants < METRICS_THRESHOLD:
+            total_merchants = marketing_active_businesses
+        
         # Check if metrics meet credibility threshold
         show_metrics = (total_merchants >= METRICS_THRESHOLD) or (total_agents >= METRICS_THRESHOLD)
         
@@ -72,9 +83,9 @@ def home(request):
         # Graceful degradation if models not available
         import logging
         logging.error(f"Error fetching platform stats: {e}")
-        total_merchants = 0
+        total_merchants = marketing_active_businesses
         total_agents = 0
-        show_metrics = False
+        show_metrics = True  # Always show if we have marketing constant
     
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
@@ -136,6 +147,7 @@ def simulator(request):
     })
 
 
+@never_cache
 def about(request):
     """
     About us page.
@@ -145,6 +157,7 @@ def about(request):
     })
 
 
+@never_cache
 def pricing(request):
     """
     Premium pricing page with tiers and 30-day free trial.
@@ -239,10 +252,14 @@ def onboarding_hq(request):
 def contact(request):
     """
     Contact form page for custom plan requests, feature requests, and support.
+    Implements PRG (Post-Redirect-Get) pattern to prevent duplicate submissions.
     """
     from django.http import JsonResponse
     from django.core.mail import send_mail
     from django.conf import settings
+    
+    # Check if we're showing success message (after redirect from POST)
+    show_success = request.GET.get('sent') == '1'
     
     if request.method == 'POST':
         # Handle AJAX form submission
@@ -266,11 +283,12 @@ Message:
             
             # Try to send email (fails gracefully if not configured)
             try:
+                support_email = getattr(settings, 'SUPPORT_EMAIL', 'support@emajinet.africa')
                 send_mail(
                     f'Emajinet Contact: {subject}',
                     email_body,
                     settings.DEFAULT_FROM_EMAIL,
-                    [settings.DEFAULT_FROM_EMAIL],
+                    [support_email],
                     fail_silently=True,
                 )
             except Exception:
@@ -279,13 +297,14 @@ Message:
             return JsonResponse({'success': True})
         
         # Handle regular form submission (redirect to success)
-        from django.contrib import messages
+        # PRG pattern: redirect to GET with success parameter
         from django.shortcuts import redirect
-        messages.success(request, 'Thank you! Your message has been received.')
-        return redirect('staticpages:contact')
+        from django.urls import reverse
+        return redirect(reverse('staticpages:contact') + '?sent=1')
     
     return render(request, 'staticpages/contact.html', {
         'hide_nav': True,
+        'show_success': show_success,
     })
 
 

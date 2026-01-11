@@ -7,6 +7,7 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
+from . import paychangu_service
 from .models import BusinessSubscription
 from .notify import fanout
 
@@ -386,10 +387,22 @@ def process_dunning_attempts():
             # Attempt to create PayChangu checkout session
             # (In production, if PayChangu supports push/collect API, use that instead)
             try:
-                from django.contrib.sites.models import Site
+                from django.conf import settings
                 from django.urls import reverse
 
-                domain = Site.objects.get_current().domain
+                # Get domain from settings, fallback to a sensible default
+                domain = getattr(settings, "SITE_DOMAIN", None)
+                if not domain:
+                    # Try to get from django.contrib.sites if installed
+                    try:
+                        if "django.contrib.sites" in getattr(settings, "INSTALLED_APPS", []):
+                            from django.contrib.sites.models import Site
+                            domain = Site.objects.get_current().domain
+                    except Exception:
+                        pass
+                if not domain:
+                    domain = "localhost"
+                
                 callback_url = f"https://{domain}{reverse('billing:paychangu_webhook')}"
                 return_url = f"https://{domain}/billing/manage/"
 

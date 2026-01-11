@@ -25,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 # Tenant/business scoping
-from tenants.utils import get_active_business
+from tenants.utils import get_active_business, require_business, require_role
 from tenants.scope import resolve_location_for_user
 
 # Models
@@ -38,7 +38,6 @@ from inventory.business_kinds import BusinessKind
 
 # Decorators
 from core.decorators import manager_required
-from tenants.utils import require_business
 
 # Role helpers
 from core.roles import is_manager, is_agent
@@ -186,6 +185,7 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_in(request: HttpRequest) -> HttpResponse:
@@ -194,38 +194,84 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 
     Shows brand cards (ITEL, TECNO, SAMSUNG) → model dropdown → IMEI → submit.
     Displays daily scan target progress bar at top.
+    
+    For non-PHONES businesses (e.g., hardware), renders the generic scan_in template
+    directly to avoid redirect loops.
     """
     business = get_active_business(request)
     if not business:
         messages.error(request, "No active business selected.")
         return redirect("inventory:inventory_dashboard")
 
-    # Only for PHONES businesses
+    # Non-PHONES businesses: render generic scan-in directly (no redirect to avoid loops)
     if getattr(business, "business_kind", None) != BusinessKind.PHONES:
-        # Redirect to generic scan-in
-        return redirect("inventory:scan_in")
+        # Use ScanInView's get_context_data to build context, then render template
+        from inventory.views_scan import (
+            _query_products, _query_locations, 
+            _pick_default_location
+        )
+        from inventory.models import Location
+        from django.urls import reverse_lazy
+        
+        # Resolve location for user (same as in phone_scan_in flow)
+        location_id = resolve_location_for_user(request)
+        location = None
+        if location_id:
+            try:
+                location = Location.objects.get(pk=location_id, business=business)
+            except Location.DoesNotExist:
+                pass
+        
+        # If no location found, ensure a default location exists
+        if not location:
+            location = Location.ensure_default_for_business(business)
+        
+        # Build context manually (same as ScanInView.get_context_data)
+        products = _query_products(request)
+        locations = _query_locations(request)
+        default_loc_id, default_loc_name = _pick_default_location(request, locations)
+        
+        # Always provide a dict with id/name keys to avoid template lookup errors
+        default_location_dict = {
+            "id": default_loc_id or (location.id if location else ""),
+            "name": default_loc_name or (location.name if location else ""),
+        }
+        
+        context = {
+            "post_url": reverse_lazy("inventory:api_scan_in"),
+            "products": products,
+            "locations": locations,
+            "default_location": default_location_dict,
+            "default_location_id": default_location_dict["id"],
+            "default_location_name": default_location_dict["name"],
+            "active_business_name": getattr(business, "name", None),
+            "business": business,
+            "location": location,
+            "lock_location": True,
+            "received_date_default": date.today(),
+            "phone_brands": [],
+            "rules": {
+                "imei_length": 15,
+                "require_product": True,
+                "order_price_autofill": True,
+            },
+        }
+        return render(request, "inventory/scan_in.html", context)
 
     location_id = resolve_location_for_user(request)
 
     # Get the actual Location object (required for creating InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
-
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
 
-    # If no location found, use business default
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-
-        location = Location.default_for(business)
-
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
+        location = Location.ensure_default_for_business(business)
 
     # --- Gamification stats: today's scans (role-based) ---
     today = date.today()
@@ -420,6 +466,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_sell(request: HttpRequest) -> HttpResponse:
@@ -442,24 +489,17 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     location_id = resolve_location_for_user(request)
 
     # Get the actual Location object (required for querying InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
-
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
 
-    # If no location found, use business default
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-
-        location = Location.default_for(business)
-
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
+        location = Location.ensure_default_for_business(business)
 
     # --- Gamification stats: today's sales ---
     today = date.today()
@@ -504,6 +544,11 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "location": location,
             "active_tab": "sell",  # For base.html bottom nav highlighting
         }
+        
+        # Apply SSOT defaults to prevent KeyError failures
+        from reports.services.context_defaults import apply_default_report_context
+        context = apply_default_report_context(context)
+        
         return render(request, "inventory/phones_scan_sell.html", context)
 
     # --- POST: Process sale ---

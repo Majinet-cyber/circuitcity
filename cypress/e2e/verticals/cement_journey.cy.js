@@ -59,8 +59,8 @@ describe('Cement Vertical Journey', () => {
     cy.visit(`/verticals/cement/dashboard/`);
     
     // Verify page loaded
-    cy.contains('Cement Store Dashboard').should('be.visible');
-    cy.contains('h1', /Cement Store Dashboard/i);
+    cy.contains('Hardware & General Dealers Dashboard').should('be.visible');
+    cy.contains('h1', /Hardware & General Dealers Dashboard/i);
     
     // Verify KPI cards exist
     cy.contains('Total Revenue').should('be.visible');
@@ -74,33 +74,86 @@ describe('Cement Vertical Journey', () => {
     cy.contains('View All Products').should('be.visible');
   });
 
-  it('should stock in Dangote cement successfully', () => {
+  it('should display multiple category cards in stock-in step 1', () => {
     // Navigate to stock in
-    cy.visit('/verticals/cement/stock-in/');
+    cy.visit('/verticals/cement/stock-in/?step=1');
     
-    // Step 1: Select brand (Dangote)
-    cy.contains('.brand-name', 'Dangote')
-      .closest('.premium-card')
-      .click();
+    // Verify all three categories are present with data-testid
+    cy.get('[data-testid="category-construction-materials"]').should('be.visible');
+    cy.get('[data-testid="category-welding-materials"]').should('be.visible');
+    cy.get('[data-testid="category-car-spares"]').should('be.visible');
+    
+    // Verify category labels are visible
+    cy.contains('Construction Materials').should('be.visible');
+    cy.contains('Welding Materials').should('be.visible');
+    cy.contains('Car Spares').should('be.visible');
+    
+    // Verify category icons are present
+    cy.contains('🏗️').should('be.visible'); // Construction
+    cy.contains('🔥').should('be.visible'); // Welding
+    cy.contains('🚗').should('be.visible'); // Car Spares
+  });
+
+  it('should proceed to product selection after selecting construction materials', () => {
+    // Navigate to stock in step 1
+    cy.visit('/verticals/cement/stock-in/?step=1');
+    
+    // Click Construction Materials category
+    cy.get('[data-testid="category-construction-materials"]').click();
+    
+    // Click Continue button
     cy.contains('button', 'Continue').should('not.be.disabled').click();
     
-    // Step 2: Select or create product
-    // If Dangote products exist, select one; otherwise enter new name
-    cy.get('body').then($body => {
-      if ($body.find('.product-card').length > 0) {
-        // Select existing product
-        cy.get('.product-card').first().click();
-      } else {
-        // Enter new product name
-        cy.get('input[name="product_name"]').type('Dangote Cement 50kg');
-      }
-    });
+    // Should navigate to step 2
+    cy.url().should('include', 'step=2');
+    
+    // Verify product cards are shown
+    cy.contains('Step 2: Select Product').should('be.visible');
+    cy.contains('Cement').should('be.visible');
+    cy.contains('Paint').should('be.visible');
+  });
+
+  it('should show coming soon for welding materials and car spares', () => {
+    // Test Welding Materials
+    cy.visit('/verticals/cement/stock-in/?step=1');
+    cy.get('[data-testid="category-welding-materials"]').click();
+    cy.contains('button', 'Continue').should('not.be.disabled').click();
+    
+    // Should stay on step 1 with warning
+    cy.url().should('include', 'step=1');
+    cy.contains(/coming soon/i).should('be.visible');
+    
+    // Test Car Spares
+    cy.visit('/verticals/cement/stock-in/?step=1');
+    cy.get('[data-testid="category-car-spares"]').click();
+    cy.contains('button', 'Continue').should('not.be.disabled').click();
+    
+    // Should stay on step 1 with warning
+    cy.url().should('include', 'step=1');
+    cy.contains(/coming soon/i).should('be.visible');
+  });
+
+  it('should stock in Dangote cement successfully via card wizard', () => {
+    // Navigate to stock in
+    cy.visit('/verticals/cement/stock-in/?step=1');
+    
+    // Step 1: Select Construction Materials category
+    cy.get('[data-testid="category-construction-materials"]').click();
+    cy.contains('button', 'Continue').should('not.be.disabled').click();
+    
+    // Step 2: Select Cement product
+    cy.contains('Cement').closest('.premium-card').click();
+    cy.contains('button', 'Continue').should('not.be.disabled').click();
+    
+    // Step 3: Select Dangote brand and 50kg size
+    cy.contains('Dangote').closest('.premium-card').click();
+    cy.contains('BAG (50KG)').closest('.premium-card').click();
     cy.contains('button', 'Continue').click();
     
-    // Step 3: Enter quantity and pricing
+    // Step 4: Enter quantity and pricing
     cy.get('input[name="quantity"]').type('100');
-    cy.get('input[name="cost_price"]').type('50000');
-    cy.get('input[name="selling_price"]').type('60000');
+    cy.get('input[name="cost_price"]').type('25000');
+    cy.get('input[name="selling_price"]').type('30000');
     cy.contains('button', /Save Stock/i).click();
     
     // Verify success message
@@ -189,17 +242,25 @@ describe('Cement Vertical Journey', () => {
     });
   });
 
-  it('should display seeded cement brands in stock-in', () => {
-    // Visit stock-in
-    cy.visit('/verticals/cement/stock-in/');
+  it('should display seeded cement brands including Njati and Njati Extra', () => {
+    // Visit stock-in and navigate to cement brand selection
+    cy.visit('/verticals/cement/stock-in/?step=1');
     
-    // Verify all 9 seeded brands are present
+    // Select Construction Materials
+    cy.get('[data-testid="category-construction-materials"]').click();
+    cy.contains('button', 'Continue').click();
+    
+    // Select Cement
+    cy.contains('Cement').closest('.premium-card').click();
+    cy.contains('button', 'Continue').click();
+    
+    // Verify all 9 seeded brands are present (including Njati Extra)
     const expectedBrands = [
       'Dangote',
       'Akshar',
       'Nthanthwe',
       'Njati',
-      'Njati Extra',
+      'Njati Extra',  // DISTINCT from Njati
       'Khoma',
       'Nkope',
       'Lime',
@@ -207,8 +268,12 @@ describe('Cement Vertical Journey', () => {
     ];
     
     expectedBrands.forEach(brand => {
-      cy.contains('.brand-name', brand).should('be.visible');
+      cy.contains(brand).should('be.visible');
     });
+    
+    // Specifically verify both Njati and Njati Extra are present and distinct
+    cy.contains('Njati').should('be.visible');
+    cy.contains('Njati Extra').should('be.visible');
   });
 
   it('should show no phone-specific UI elements', () => {

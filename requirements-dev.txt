@@ -30,9 +30,6 @@ freezegun==1.5.1  # Time freezing for tests
 # Pre-commit Hooks
 pre-commit==3.6.0  # Git hooks framework
 
-# Security Testing
-owasp-zap-scanner==0.1.0  # OWASP ZAP integration (optional)
-
 # Documentation
 sphinx==7.2.6  # Documentation generator
 sphinx-rtd-theme==2.0.0  # Read the Docs theme

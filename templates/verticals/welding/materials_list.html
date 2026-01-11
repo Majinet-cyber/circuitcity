@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Materials - Welding Workshop{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">🔩 Materials Catalog</h1>
+        <a href="/verticals/welding/stock-in/" class="btn btn-success" data-testid="welding-stock-in">
+            <i class="bi bi-box-arrow-in-down"></i> Stock In
+        </a>
+    </div>
+
+    <!-- Category Filter -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap gap-2">
+                <a href="/verticals/welding/materials/" class="btn btn-sm {% if not filter_category %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+                {% for value, label in categories %}
+                <a href="/verticals/welding/materials/?category={{ value }}" 
+                   class="btn btn-sm {% if filter_category == value %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    {{ label }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Materials Grid -->
+    <div class="row g-3">
+        {% for material in materials %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">{{ material.name }}</h6>
+                            <small class="text-muted">{{ material.get_category_display }} · {{ material.get_unit_display }}</small>
+                        </div>
+                        {% if material.is_seeded %}
+                        <span class="badge bg-light text-muted">Default</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mt-3 d-flex justify-content-between align-items-end">
+                        <div>
+                            <div class="h5 mb-0 text-primary">MWK {{ material.price_mwk|floatformat:0|intcomma }}</div>
+                            <small class="text-muted">per {{ material.get_unit_display }}</small>
+                        </div>
+                        <div class="text-end">
+                            <div class="{% if material.is_low_stock %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                Stock: {{ material.quantity_in_stock|floatformat:1 }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="/verticals/welding/materials/{{ material.id }}/edit/" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil"></i> Edit Price
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted">
+            <i class="bi bi-box-seam h1"></i>
+            <p class="mb-0">No materials found.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+

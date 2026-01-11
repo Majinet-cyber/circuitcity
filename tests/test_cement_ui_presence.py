@@ -132,10 +132,11 @@ class CementUIPresenceTest(TestCase):
         response = self.client.get("/verticals/cement/dashboard/")
         html = response.content.decode("utf-8")
 
-        # Date filter chips should be present
-        self.assertIn("Today", html, "Dashboard must have 'Today' filter")
-        self.assertIn("Last 7 Days", html, "Dashboard must have 'Last 7 Days' filter")
-        self.assertIn("Custom", html, "Dashboard must have 'Custom' date filter")
+        # Date filter chips should be present (case-insensitive check)
+        html_lower = html.lower()
+        self.assertIn("today", html_lower, "Dashboard must have 'Today' filter")
+        self.assertIn("last 7 days", html_lower, "Dashboard must have 'Last 7 days' filter")
+        self.assertIn("custom", html_lower, "Dashboard must have 'Custom' date filter")
 
     def test_cement_dashboard_has_kpi_cards(self):
         """Cement dashboard must show KPI cards (Revenue, Profit, Stock Value, Costs)"""

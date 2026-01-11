@@ -353,6 +353,8 @@ class AllVerticalsRedirectTest(TestCase):
             ("gym", "Gym Fitness"),
             ("grocery", "Grocery Store"),
             ("cement", "Cement Hardware"),
+            ("farm", "Farm Manager Test"),
+            ("welding", "Welding Workshop Test"),
         ]
 
         for kind, biz_name in verticals_to_test:

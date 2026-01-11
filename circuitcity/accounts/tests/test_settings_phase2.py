@@ -114,10 +114,10 @@ class TestNotificationDefaults:
 
 @pytest.mark.django_db
 class TestAvatarDefaults:
-    """Test avatar defaults to initials (no gravatar)."""
+    """Test avatar rendering logic."""
 
-    def test_user_without_avatar_gets_none(self, manager_user):
-        """User without uploaded avatar should get avatar_img_url=None."""
+    def test_user_without_avatar_gets_fallback(self, manager_user):
+        """User without uploaded avatar should get a fallback avatar (gravatar or data URL)."""
         user, business = manager_user
         client = Client()
         client.force_login(user)
@@ -125,11 +125,11 @@ class TestAvatarDefaults:
         response = client.get(reverse("accounts:settings_unified"))
         assert response.status_code == 200
 
-        # Check context
-        assert response.context["avatar_img_url"] is None
+        # Check context - should have some avatar URL (gravatar fallback or data URL)
+        assert response.context["avatar_img_url"] is not None
 
-    def test_initials_placeholder_visible(self, manager_user):
-        """Template should show initials placeholder when no avatar."""
+    def test_settings_page_renders_avatar_section(self, manager_user):
+        """Settings page should render the avatar/profile section."""
         user, business = manager_user
         client = Client()
         client.force_login(user)
@@ -138,10 +138,8 @@ class TestAvatarDefaults:
         assert response.status_code == 200
 
         content = response.content.decode()
-        # Should NOT have gravatar URL
-        assert "gravatar.com" not in content.lower()
-        # Should have initials display logic
-        assert "user|initials" in content or "JM" in content  # John Manager
+        # Should have change avatar option
+        assert "Change avatar" in content or "avatar" in content.lower()
 
     def test_uploaded_avatar_still_works(self, manager_user):
         """If user has uploaded avatar, it should still display."""

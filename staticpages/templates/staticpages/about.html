@@ -9,14 +9,22 @@
   
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.emajinet.africa{{ request.path }}">
   <meta property="og:title" content="About Us - Emajinet | Business Management for African Merchants">
   <meta property="og:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
   <meta property="og:site_name" content="Emajinet">
+  <meta property="og:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Emajinet Logo">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
+  <meta name="twitter:url" content="https://www.emajinet.africa{{ request.path }}">
   <meta name="twitter:title" content="About Us - Emajinet">
   <meta name="twitter:description" content="Learn about Emajinet, a business management platform built in Malawi for African merchants.">
+  <meta name="twitter:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta name="twitter:image:alt" content="Emajinet Logo">
   
   <!-- SEO: Canonical URL -->
   <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
@@ -223,6 +231,40 @@
         business in Africa—unreliable internet, limited budgets, and the need for simplicity. 
         That's why we built a platform that adapts to your environment, not the other way around.
       </p>
+      
+      <!-- Trust Block -->
+      <div style="margin: 2.5rem 0; padding: 2rem; background: linear-gradient(135deg, rgba(79, 70, 229, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%); border-radius: 16px; border-left: 4px solid var(--primary);">
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1.5rem;">Built for African Businesses</h3>
+        
+        <div style="display: grid; gap: 1.25rem;">
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">🎯 Who It's For</h4>
+            <p style="color: var(--text-secondary); margin: 0;">African SMEs and merchants—from phone shops to pharmacies, liquor stores to gyms—who want to digitize their operations without complexity.</p>
+          </div>
+          
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">💼 What It Does</h4>
+            <p style="color: var(--text-secondary); margin: 0;">Manage inventory, track sales, monitor agent performance, generate reports, and get AI-powered insights—all from a mobile-first platform.</p>
+          </div>
+          
+          <div>
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">🌍 Where We Focus</h4>
+            <p style="color: var(--text-secondary); margin: 0;">Proudly built in Malawi, serving businesses across Africa with understanding of local contexts, connectivity challenges, and business realities.</p>
+          </div>
+          
+          <div style="padding-top: 1rem; border-top: 1px solid rgba(79, 70, 229, 0.15);">
+            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.75rem;">📞 Get Support</h4>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              <p style="margin: 0; color: var(--text-secondary);">
+                <strong>Email:</strong> <a href="mailto:{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}" style="color: var(--primary); text-decoration: none;">{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}</a>
+              </p>
+              <p style="margin: 0; color: var(--text-secondary);">
+                <strong>WhatsApp:</strong> <a href="https://wa.me/{{ SUPPORT_WHATSAPP_NUMBER|default:'+265991234567'|cut:' '|cut:'+' }}" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none;">{{ SUPPORT_WHATSAPP_NUMBER|default:'+265 991 234 567' }}</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <p style="font-style: italic; color: var(--primary); margin-top: 2rem;">
         We are pioneers determined to simplify business for everyday merchants. We are motivated 

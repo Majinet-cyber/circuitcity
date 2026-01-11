@@ -660,6 +660,181 @@ Cypress.Commands.add("switchVertical", (vertical = "phones") => {
   cy.waitForAppShell();
 });
 
+// =============================================================================
+// PHONES JOURNEY UTILITIES - Added for slow-network resilience
+// =============================================================================
+
+/**
+ * Extended error detection - fails if any common server error appears in DOM.
+ * More comprehensive than assertNoServerError.
+ */
+Cypress.Commands.add("assertNoServerErrorPage", () => {
+  const errorPatterns = [
+    "Server Error (500)",
+    "A server error occurred",
+    "Traceback (most recent call last)",
+    "DisallowedHost",
+    "IntegrityError",
+    "OperationalError",
+    "DoesNotExist",
+    "TemplateDoesNotExist",
+    "ImproperlyConfigured",
+    "ProgrammingError",
+    "ValueError:",
+    "TypeError:",
+    "KeyError:",
+    "AttributeError:",
+    "DEBUG = True",           // Django debug page indicator
+    "Request Method:",        // Django debug page header
+  ];
+
+  cy.get("body", { timeout: 5000 }).then(($body) => {
+    const bodyText = $body.text();
+    errorPatterns.forEach((pattern) => {
+      if (bodyText.includes(pattern)) {
+        throw new Error(`Server error detected: "${pattern}" found on page`);
+      }
+    });
+  });
+});
+
+/**
+ * Safe click with visibility and timeout handling.
+ * @param {string} testid - The data-testid value
+ * @param {object} options - { timeout, force }
+ */
+Cypress.Commands.add("safeClick", (testid, options = {}) => {
+  const timeout = options.timeout || 15000;
+  const force = options.force || false;
+  
+  cy.get(`[data-testid="${testid}"]`, { timeout })
+    .should("be.visible")
+    .click({ force });
+});
+
+/**
+ * Safe click by data-cy selector.
+ * @param {string} cyName - The data-cy value
+ * @param {object} options - { timeout, force }
+ */
+Cypress.Commands.add("safeClickCy", (cyName, options = {}) => {
+  const timeout = options.timeout || 15000;
+  const force = options.force || false;
+  
+  cy.get(`[data-cy="${cyName}"]`, { timeout })
+    .should("be.visible")
+    .click({ force });
+});
+
+/**
+ * Wait for app to be idle (no spinners/loaders visible).
+ * Falls back to body existence + no server error if no loader exists.
+ */
+Cypress.Commands.add("waitForAppIdle", (options = {}) => {
+  const timeout = options.timeout || 15000;
+  
+  // Common loader/spinner selectors
+  const loaderSelectors = [
+    ".loading",
+    ".spinner",
+    ".loader",
+    "[data-loading]",
+    '[aria-busy="true"]',
+    ".cc-loading",
+    ".is-loading",
+  ];
+  
+  cy.get("body", { timeout }).should("exist").then(($body) => {
+    // Check if any loader is present and wait for it to disappear
+    const hasLoader = loaderSelectors.some((sel) => $body.find(sel).length > 0);
+    
+    if (hasLoader) {
+      loaderSelectors.forEach((sel) => {
+        if ($body.find(sel).length > 0) {
+          cy.get(sel, { timeout }).should("not.exist");
+        }
+      });
+    }
+    
+    // Always verify no server error
+    cy.assertNoServerErrorPage();
+  });
+});
+
+/**
+ * Navigate via sidebar and assert page loads without errors.
+ * @param {string} cyName - The data-cy value of the nav link (e.g., "nav-dashboard")
+ * @param {string} expectedUrlPart - URL substring to verify (e.g., "/dashboard/")
+ * @param {string} interceptPattern - Optional route pattern to intercept (e.g., "/inventory/**")
+ */
+Cypress.Commands.add("navAndAssert", (cyName, expectedUrlPart, interceptPattern = null) => {
+  const aliasName = `nav_${cyName.replace(/-/g, "_")}`;
+  
+  // Set up intercept if pattern provided
+  if (interceptPattern) {
+    cy.intercept("GET", interceptPattern).as(aliasName);
+  }
+  
+  // Click the nav item
+  cy.get(`[data-cy="${cyName}"]`, { timeout: 15000 })
+    .should("be.visible")
+    .click();
+  
+  // Wait for intercept if set
+  if (interceptPattern) {
+    cy.wait(`@${aliasName}`, { timeout: 15000 });
+  }
+  
+  // Wait for page to stabilize
+  cy.waitForAppIdle();
+  
+  // Verify URL contains expected part
+  if (expectedUrlPart) {
+    cy.url({ timeout: 15000 }).should("include", expectedUrlPart);
+  }
+  
+  // Verify no server errors
+  cy.assertNoServerErrorPage();
+});
+
+/**
+ * Fill an input by data-testid with visibility check.
+ * @param {string} testid - The data-testid value
+ * @param {string} value - Value to type
+ * @param {object} options - { clear, timeout }
+ */
+Cypress.Commands.add("fillByTestId", (testid, value, options = {}) => {
+  const timeout = options.timeout || 15000;
+  const clear = options.clear !== false; // default true
+  
+  const el = cy.get(`[data-testid="${testid}"]`, { timeout }).should("be.visible");
+  
+  if (clear) {
+    el.clear();
+  }
+  
+  el.type(String(value));
+});
+
+/**
+ * Generate deterministic test IMEIs based on timestamp.
+ * @param {number} count - How many IMEIs to generate
+ * @param {number} timestamp - Base timestamp (default: now)
+ * @returns {string[]} Array of 15-digit IMEI strings
+ */
+Cypress.Commands.add("generateIMEIs", (count, timestamp = null) => {
+  const ts = timestamp || Date.now();
+  const base = String(ts).slice(-10).padStart(10, "0");
+  
+  const imeis = [];
+  for (let i = 0; i < count; i++) {
+    const suffix = String(i).padStart(5, "0");
+    imeis.push(base + suffix);
+  }
+  
+  return cy.wrap(imeis);
+});
+
 /**
  * Click all sidebar navigation items and verify they load (smoke test).
  * Skips logout and external links.

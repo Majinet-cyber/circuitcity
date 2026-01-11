@@ -78,7 +78,8 @@ def create_barcode_batch_session(
         raise ValidationError("Selling price must be greater than zero")
 
     # Validate size (CRITICAL: shoes must be numeric only)
-    is_valid, error_msg = validate_clothing_size(size, category, subcategory)
+    # SIZE IS OPTIONAL in barcode wizard: Only validate format if size is provided
+    is_valid, error_msg = validate_clothing_size(size, category, subcategory, allow_blank=True)
     if not is_valid:
         raise ValidationError(error_msg)
 
@@ -244,6 +245,31 @@ def lookup_barcode_for_fast_sell(
         if sold_unit:
             return {"found": False, "error": f"Barcode {barcode} already sold on {sold_unit.sold_at}"}
 
+        # FALLBACK: Check MerchProduct (for legacy/test compatibility)
+        from inventory.models import MerchProduct
+        
+        merch_product = MerchProduct.objects.filter(
+            business=business,
+            kind="clothing",
+            is_active=True,
+            barcode__iexact=barcode,
+        ).first()
+        
+        # Check stock separately to give better error messages
+        if merch_product and merch_product.quantity_in_stock < 1:
+            return {"found": False, "error": f"Barcode {barcode} is out of stock"}
+        
+        if merch_product:
+            return {
+                "found": True,
+                "merch_product": merch_product,  # Use merch_product key to distinguish
+                "barcode": barcode,
+                "size": merch_product.size or "",
+                "category": merch_product.category or "clothing",
+                "selling_price": merch_product.selling_price or Decimal("0"),
+                "cost_price": merch_product.cost_price or Decimal("0"),
+            }
+
         return {"found": False, "error": f"Barcode {barcode} not found in stock"}
 
     return {
@@ -264,6 +290,7 @@ def create_fast_sell_from_barcode(
     location,
     user,
     barcode: str,
+    quantity: int = 1,
     payment_method: str = "cash",
 ) -> Dict[str, Any]:
     """
@@ -277,6 +304,7 @@ def create_fast_sell_from_barcode(
         location: Location instance
         user: User making the sale
         barcode: Barcode to sell
+        quantity: Quantity to sell (default 1, only used for MerchProduct fallback)
         payment_method: Payment method (cash, bank, mobile_money)
 
     Returns:
@@ -293,8 +321,6 @@ def create_fast_sell_from_barcode(
     if not lookup_result.get("found"):
         return {"ok": False, "error": lookup_result.get("error", "Unit not found")}
 
-    unit = lookup_result["unit"]
-
     # Validate payment method
     from inventory.models_verticals import PaymentMethod
 
@@ -305,6 +331,57 @@ def create_fast_sell_from_barcode(
         "mobile": PaymentMethod.MOBILE_MONEY,
     }
     payment_method_enum = payment_map.get(payment_method.lower(), PaymentMethod.CASH)
+
+    # Handle MerchProduct fallback (for legacy/test compatibility)
+    if "merch_product" in lookup_result:
+        merch_product = lookup_result["merch_product"]
+        selling_price = merch_product.selling_price or Decimal("0")
+        cost_price = merch_product.cost_price or Decimal("0")
+        
+        # Validate stock
+        if merch_product.quantity_in_stock < quantity:
+            return {"ok": False, "error": f"Insufficient stock. Available: {merch_product.quantity_in_stock}"}
+        
+        # Calculate totals
+        total_price = selling_price * quantity
+        total_cost = cost_price * quantity
+        
+        # Create sale from MerchProduct
+        sale = ClothingSale.objects.create(
+            business=business,
+            product=merch_product,
+            quantity=quantity,
+            unit_price=selling_price,
+            total_price=total_price,
+            unit_cost=cost_price,
+            total_cost=total_cost,
+            payment_method=payment_method_enum,
+            sold_by=user,
+            sold_at=timezone.now(),
+            notes=f"Fast sell - Barcode: {barcode}",
+        )
+        
+        # Decrement stock
+        merch_product.quantity_in_stock = max(0, merch_product.quantity_in_stock - quantity)
+        merch_product.save(update_fields=["quantity_in_stock"])
+        
+        # Calculate profit
+        profit = total_price - total_cost
+        
+        return {
+            "ok": True,
+            "sale_id": sale.id,
+            "product_id": merch_product.id,
+            "barcode": barcode,
+            "size": merch_product.size or "",
+            "amount": total_price,
+            "cost": total_cost,
+            "profit": profit,
+            "payment_method": payment_method_enum.value,
+        }
+
+    # Standard ClothingBarcodeUnit path
+    unit = lookup_result["unit"]
 
     # Create sale
     sale = ClothingSale.objects.create(

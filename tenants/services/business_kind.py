@@ -4,10 +4,89 @@ Business kind normalization service.
 
 Ensures business_kind values are always canonical codes, not display labels.
 Provides a single source of truth for business kind validation and normalization.
+
+SSOT: This is the CANONICAL source for business kind mappings.
+All signup forms, views, and routing should use this module.
 """
 from __future__ import annotations
 
 from typing import Optional
+
+
+# ============================================================================
+# SSOT: Canonical Business Kinds Registry
+# ============================================================================
+# This is the SINGLE SOURCE OF TRUTH for all supported business verticals.
+# Add new verticals here and they will propagate to:
+# - Signup forms (via BusinessKind.choices)
+# - Validation (validate_business_kind)
+# - Display names (get_display_name)
+# - Normalization (normalize_business_kind)
+
+CANONICAL_BUSINESS_KINDS = {
+    # Core Retail Verticals
+    "phones": {
+        "display_name": "Phones & Electronics",
+        "icon": "📱",
+        "description": "Mobile phones, electronics, accessories",
+        "dashboard_route": "inventory_verticals:phones_dashboard",
+    },
+    "liquor": {
+        "display_name": "Liquor / Bar",
+        "icon": "🍺",
+        "description": "Bars, bottle stores, alcohol retail",
+        "dashboard_route": "inventory_verticals:liquor_dashboard",
+    },
+    "grocery": {
+        "display_name": "Grocery / General",
+        "icon": "🛒",
+        "description": "Supermarkets, grocery stores, general retail",
+        "dashboard_route": "groceries:dashboard",
+    },
+    "pharmacy": {
+        "display_name": "Cosmetics & Pharmacy",
+        "icon": "💊",
+        "description": "Pharmacies, cosmetics, health products",
+        "dashboard_route": "inventory_verticals:pharmacy_dashboard",
+    },
+    "clothing": {
+        "display_name": "Clothing",
+        "icon": "👕",
+        "description": "Fashion, apparel, clothing retail",
+        "dashboard_route": "inventory_verticals:clothing_dashboard",
+    },
+    "gym": {
+        "display_name": "Gym / Fitness",
+        "icon": "🏋️",
+        "description": "Gyms, fitness centers, memberships",
+        "dashboard_route": "inventory_verticals:gym_dashboard",
+    },
+    "hardware": {
+        "display_name": "Hardware & General Dealers",
+        "icon": "🔧",
+        "description": "Hardware stores, general dealers",
+        "dashboard_route": "inventory:inventory_dashboard",
+    },
+    "cement": {
+        "display_name": "Cement / Building Materials",
+        "icon": "🧱",
+        "description": "Cement, building materials, construction supplies",
+        "dashboard_route": "verticals:cement_dashboard",
+    },
+    # NEW VERTICALS (fix/cypress-pharmacy + feat/vertical-farm-welding)
+    "farm": {
+        "display_name": "Farm Manager",
+        "icon": "🌾",
+        "description": "Farm profitability tracking, crop and livestock management",
+        "dashboard_route": "verticals:farm_dashboard",  # Farm has its own dashboard
+    },
+    "welding": {
+        "display_name": "Welding Workshop",
+        "icon": "⚡",
+        "description": "Welding job estimation, invoicing, workshop management",
+        "dashboard_route": "verticals:welding_dashboard",  # Welding has its own dashboard
+    },
+}
 
 
 def normalize_business_kind(value: str | None) -> str | None:
@@ -27,9 +106,9 @@ def normalize_business_kind(value: str | None) -> str | None:
         >>> normalize_business_kind("cement")
         'cement'
         >>> normalize_business_kind("Hardware & General Dealers")
-        'cement'
-        >>> normalize_business_kind("hardware and general dealers")
-        'cement'
+        'hardware'
+        >>> normalize_business_kind("Farm Manager")
+        'farm'
         >>> normalize_business_kind("Phones & Electronics")
         'phones'
         >>> normalize_business_kind("")
@@ -91,7 +170,7 @@ def normalize_business_kind(value: str | None) -> str | None:
         "fitness": "gym",
         "gym center": "gym",
         "fitness center": "gym",
-        # Hardware & General Dealers (NEW: Separate from cement)
+        # Hardware & General Dealers
         "hardware": "hardware",
         "hardware & general dealers": "hardware",
         "hardware and general dealers": "hardware",
@@ -99,13 +178,29 @@ def normalize_business_kind(value: str | None) -> str | None:
         "general dealers": "hardware",
         "general dealer": "hardware",
         "hardware store": "hardware",
-        # Cement / Building Materials (Legacy: Kept separate)
+        # Cement / Building Materials
         "cement": "cement",
         "cement / building materials": "cement",
         "cement / hardware": "cement",  # Legacy mapping (before hardware split)
         "cement store": "cement",
         "building materials": "cement",
         "construction": "cement",
+        # Farm Manager (NEW)
+        "farm": "farm",
+        "farm manager": "farm",
+        "farming": "farm",
+        "agriculture": "farm",
+        "agribusiness": "farm",
+        "crop": "farm",
+        "livestock": "farm",
+        # Welding Workshop (NEW)
+        "welding": "welding",
+        "welding workshop": "welding",
+        "welder": "welding",
+        "welding shop": "welding",
+        "metal work": "welding",
+        "metalwork": "welding",
+        "fabrication": "welding",
     }
 
     # Return canonical code if mapped, otherwise return normalized input
@@ -130,19 +225,8 @@ def validate_business_kind(value: str | None) -> bool:
     if not normalized:
         return False
 
-    # List of valid canonical codes
-    valid_kinds = [
-        "phones",
-        "liquor",
-        "grocery",
-        "pharmacy",
-        "clothing",
-        "gym",
-        "hardware",  # NEW: Hardware & General Dealers
-        "cement",  # Legacy: Cement / Building Materials
-    ]
-
-    return normalized in valid_kinds
+    # Use the SSOT registry for valid kinds
+    return normalized in CANONICAL_BUSINESS_KINDS
 
 
 def get_display_name(canonical_code: str | None) -> str:
@@ -158,18 +242,59 @@ def get_display_name(canonical_code: str | None) -> str:
     if not canonical_code:
         return "Unknown"
 
-    display_names = {
-        "phones": "Phones & Electronics",
-        "liquor": "Liquor / Bar",
-        "grocery": "Grocery / General",
-        "pharmacy": "Cosmetics & Pharmacy",
-        "clothing": "Clothing",
-        "gym": "Gym / Fitness",
-        "hardware": "Hardware & General Dealers",  # NEW: Hardware vertical
-        "cement": "Cement / Building Materials",  # Legacy: Cement vertical
+    code = str(canonical_code).lower()
+    if code in CANONICAL_BUSINESS_KINDS:
+        return CANONICAL_BUSINESS_KINDS[code]["display_name"]
+    
+    # Fallback for unknown codes
+    return canonical_code.replace("_", " ").title()
+
+
+def get_business_kind_info(canonical_code: str | None) -> dict:
+    """
+    Get full info for a business kind (icon, description, dashboard route).
+
+    Args:
+        canonical_code: Canonical business kind code
+
+    Returns:
+        Dict with display_name, icon, description, dashboard_route
+    """
+    if not canonical_code:
+        return {
+            "display_name": "Unknown",
+            "icon": "📦",
+            "description": "Unknown business type",
+            "dashboard_route": "inventory:inventory_dashboard",
+        }
+
+    code = str(canonical_code).lower()
+    if code in CANONICAL_BUSINESS_KINDS:
+        return CANONICAL_BUSINESS_KINDS[code].copy()
+    
+    return {
+        "display_name": canonical_code.replace("_", " ").title(),
+        "icon": "📦",
+        "description": f"{canonical_code} business",
+        "dashboard_route": "inventory:inventory_dashboard",
     }
 
-    return display_names.get(str(canonical_code).lower(), canonical_code.title())
+
+def get_all_business_kinds() -> list[tuple[str, str]]:
+    """
+    Get all business kinds as choices for forms.
+    
+    Returns:
+        List of (code, display_name) tuples suitable for Django form choices
+    """
+    return [(code, info["display_name"]) for code, info in CANONICAL_BUSINESS_KINDS.items()]
 
 
-__all__ = ["normalize_business_kind", "validate_business_kind", "get_display_name"]
+__all__ = [
+    "normalize_business_kind",
+    "validate_business_kind",
+    "get_display_name",
+    "get_business_kind_info",
+    "get_all_business_kinds",
+    "CANONICAL_BUSINESS_KINDS",
+]

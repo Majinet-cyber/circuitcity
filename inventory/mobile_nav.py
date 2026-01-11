@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 
-from .helpers_core import CEMENT, CLOTHING, GYM, LIQUOR, PHARMACY, PHONES, business_vertical
+from .helpers_core import CEMENT, CLOTHING, FARM, GYM, LIQUOR, PHARMACY, PHONES, WELDING, business_vertical
 
 
 def _safe_reverse(url_name: str, fallback: str = "#") -> str:
@@ -342,6 +342,96 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "icon_class": "bi-box-seam",
                 "url": _safe_reverse_any(["cement:stock_list"], "/cement/stock/"),
                 "active_prefix": "/cement/stock",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "More",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == FARM:
+        # Farm Manager vertical - profitability tracking
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["verticals:farm_dashboard"], "/verticals/farm/dashboard/"),
+                "active_prefix": "/verticals/farm/dashboard",
+                "is_menu": False,
+            },
+            {
+                "key": "ledger",
+                "label": "Ledger",
+                "icon_class": "bi-journal-text",
+                "url": _safe_reverse_any(["verticals:farm_ledger_list"], "/verticals/farm/ledger/"),
+                "active_prefix": "/verticals/farm/ledger",
+                "is_menu": False,
+            },
+            {
+                "key": "add_expense",
+                "label": "Expense",
+                "icon_class": "bi-dash-circle",
+                "url": _safe_reverse_any(["verticals:farm_add_expense"], "/verticals/farm/ledger/add-expense/"),
+                "active_prefix": "/verticals/farm/ledger/add-expense",
+                "is_menu": False,
+            },
+            {
+                "key": "add_sale",
+                "label": "Sale",
+                "icon_class": "bi-plus-circle",
+                "url": _safe_reverse_any(["verticals:farm_add_sale"], "/verticals/farm/ledger/add-sale/"),
+                "active_prefix": "/verticals/farm/ledger/add-sale",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "More",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == WELDING:
+        # Welding Workshop vertical - job estimation & invoicing
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["verticals:welding_dashboard"], "/verticals/welding/dashboard/"),
+                "active_prefix": "/verticals/welding/dashboard",
+                "is_menu": False,
+            },
+            {
+                "key": "quotes",
+                "label": "Quotes",
+                "icon_class": "bi-file-text",
+                "url": _safe_reverse_any(["verticals:welding_quotes_list"], "/verticals/welding/quotes/"),
+                "active_prefix": "/verticals/welding/quotes",
+                "is_menu": False,
+            },
+            {
+                "key": "jobs",
+                "label": "Jobs",
+                "icon_class": "bi-kanban",
+                "url": _safe_reverse_any(["verticals:welding_jobs_list"], "/verticals/welding/jobs/"),
+                "active_prefix": "/verticals/welding/jobs",
+                "is_menu": False,
+            },
+            {
+                "key": "materials",
+                "label": "Stock",
+                "icon_class": "bi-box-seam",
+                "url": _safe_reverse_any(["verticals:welding_materials_list"], "/verticals/welding/materials/"),
+                "active_prefix": "/verticals/welding/materials",
                 "is_menu": False,
             },
             {

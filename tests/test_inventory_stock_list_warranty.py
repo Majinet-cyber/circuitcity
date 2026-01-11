@@ -13,7 +13,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from inventory.models import InventoryItem, Location, Product
-from tenants.models import Business
+from tenants.models import Business, Membership
 
 User = get_user_model()
 
@@ -75,8 +75,12 @@ class StockListWarrantyTestCase(TestCase):
         self.user.save()
         
         # Add user to business
-        self.business.members.add(self.user)
-        self.business.managers.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         
         self.client = Client()
         self.client.login(username="testmanager", password="testpass123")
@@ -186,8 +190,12 @@ def test_stock_list_warranty_regression_pytest(client, django_user_model):
         password="pytest_pass",
         email="pytest@test.com",
     )
-    business.members.add(user)
-    business.managers.add(user)
+    Membership.objects.create(
+        user=user,
+        business=business,
+        role="MANAGER",
+        status="ACTIVE"
+    )
     
     # Login and activate business
     client.login(username="pytest_user", password="pytest_pass")

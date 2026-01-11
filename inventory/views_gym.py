@@ -1256,13 +1256,41 @@ def gym_dashboard(request):
     costs_this_month = get_business_costs_for_period(business, month_start, today)
 
     # Calculate revenue for different periods (from GymPayment)
+    # CRITICAL FIX: Calculate directly from membership_amount + trainer_fee
+    # This ensures revenue is ALWAYS correct even if amount field has legacy 0/NULL values
+    from django.db.models import ExpressionWrapper, F
+    
     revenue_today = GymPayment.objects.filter(
         member__business=business, is_active=True, paid_at__gte=today_start, paid_at__lte=today_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    ).aggregate(
+        total=Coalesce(
+            Sum(
+                ExpressionWrapper(
+                    Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                    Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )["total"] or Decimal("0.00")
 
     revenue_yesterday = GymPayment.objects.filter(
         member__business=business, is_active=True, paid_at__gte=yesterday_start, paid_at__lte=yesterday_end
-    ).aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    ).aggregate(
+        total=Coalesce(
+            Sum(
+                ExpressionWrapper(
+                    Coalesce(F("membership_amount"), Value(Decimal("0.00"))) +
+                    Coalesce(F("trainer_fee"), Value(Decimal("0.00"))),
+                    output_field=DecimalField(max_digits=12, decimal_places=2),
+                )
+            ),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=12, decimal_places=2),
+        )
+    )["total"] or Decimal("0.00")
 
     # Use unified metrics service for this month to ensure consistency
     # This ensures revenue and payment_count match exactly

@@ -72,7 +72,15 @@ def _try_from(modpath: str, attr: str):
 
 def include_or_raise(module_path: str, namespace: str | None = None):
     import_module(module_path)  # surface import errors immediately in DEBUG
-    return include(module_path, namespace=namespace) if namespace else include(module_path)
+    if namespace:
+        # Django expects include((module, app_name), namespace=namespace) for explicit namespace
+        mod = import_module(module_path)
+        app_name = getattr(mod, 'app_name', None)
+        if app_name:
+            return include((module_path, app_name), namespace=namespace)
+        else:
+            return include(module_path, namespace=namespace)
+    return include(module_path)
 
 
 def _safe_static(path_fragment: str) -> str:
@@ -212,11 +220,52 @@ def session_get(request):
     return HttpResponse(request.session.get("probe", "missing"))
 
 
+def _get_build_sha():
+    """Get current git commit SHA for debugging."""
+    import os
+    import subprocess
+    for key in ("RENDER_GIT_COMMIT", "GIT_SHA", "GIT_COMMIT"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value[:7]
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, timeout=2,
+            cwd=getattr(settings, "BASE_DIR", None),
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return "unknown"
+
+
+def _get_template_dirs():
+    """Get template dirs for debugging."""
+    try:
+        return [str(d) for d in settings.TEMPLATES[0].get("DIRS", [])]
+    except Exception:
+        return []
+
+
 def __whoami__(request):
     """
-    Return authenticated user info (for Cypress session validation).
+    Return authenticated user info and build diagnostics (for Cypress session validation).
     Never raises exceptions; returns 401 if not authenticated.
+    
+    Always includes build info for debugging template caching issues:
+    - build_sha: Current git commit SHA (short)
+    - debug: Whether DEBUG is True
+    - template_dirs: Effective TEMPLATE_DIRS order
     """
+    # Always include build info
+    build_info = {
+        "build_sha": _get_build_sha(),
+        "debug": settings.DEBUG,
+        "template_dirs": _get_template_dirs(),
+    }
+    
     # If user is authenticated, return user info (for Cypress session validation)
     if request.user.is_authenticated:
         data = {
@@ -225,6 +274,7 @@ def __whoami__(request):
             "username": request.user.username,
             "user_id": request.user.id,
             "is_authenticated": True,
+            **build_info,
         }
         # Optionally include business info if available (never raise exceptions)
         try:
@@ -241,7 +291,7 @@ def __whoami__(request):
         return JsonResponse(data)
 
     # Not authenticated - return 401
-    return JsonResponse({"ok": False, "error": "not_authenticated", "is_authenticated": False}, status=401)
+    return JsonResponse({"ok": False, "error": "not_authenticated", "is_authenticated": False, **build_info}, status=401)
 
 
 def __render_login__(request):
@@ -882,6 +932,17 @@ urlpatterns += [
     path("stock/out/", RedirectView.as_view(pattern_name="inventory:scan_sold", permanent=False), name="stock_out"),
     path("stock/list/", RedirectView.as_view(pattern_name="inventory:stock_list", permanent=False), name="stock_list"),
 ]
+
+# ======================================================================================
+# BACKWARDS-COMPATIBLE GLOBAL ALIASES (SSOT imported from cc.urls_compat)
+# These allow reverse('home'), reverse('stock'), reverse('wallet'), reverse('sim'), 
+# reverse('businesses'), reverse('sell'), reverse('scan'), reverse('pharmacy_stock_in'),
+# reverse('member_qr_image'), reverse('export_monthly_costs') to work without namespace prefixes.
+# ======================================================================================
+from cc.urls_compat import get_compat_urlpatterns
+from cc.urls_compat_extra import get_extra_compat_urlpatterns
+urlpatterns += get_compat_urlpatterns()
+urlpatterns += get_extra_compat_urlpatterns()
 
 
 def _stock_trends_shim(_request):

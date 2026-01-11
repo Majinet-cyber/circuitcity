@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Stock In · Construction Materials · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --cement-bg: #ffffff;
+    --cement-text: #0f172a;
+    --cement-muted: #64748b;
+    --cement-panel: #ffffff;
+    --cement-border: #e2e8f0;
+    --cement-accent: #2563eb;
+    --cement-success: #16a34a;
+    --cement-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  .cement-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .step-indicator {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--cement-border);
+    z-index: 0;
+  }
+
+  .step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    z-index: 1;
+    flex: 1;
+  }
+
+  .step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--cement-panel);
+    border: 2px solid var(--cement-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .step-item.active .step-circle {
+    background: var(--cement-accent);
+    color: white;
+    border-color: var(--cement-accent);
+  }
+
+  .step-item.completed .step-circle {
+    background: var(--cement-success);
+    color: white;
+    border-color: var(--cement-success);
+  }
+
+  .step-label {
+    font-size: 0.85rem;
+    color: var(--cement-muted);
+    text-align: center;
+  }
+
+  .step-item.active .step-label {
+    color: var(--cement-accent);
+    font-weight: 600;
+  }
+
+  .premium-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: var(--cement-shadow);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .premium-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cement-accent), #06b6d4);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .premium-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(59, 130, 246, 0.2);
+    border-color: var(--cement-accent);
+  }
+
+  .premium-card:hover::before {
+    opacity: 1;
+  }
+
+  .premium-card.selected {
+    border-color: var(--cement-accent);
+    background: linear-gradient(135deg, rgba(219, 234, 254, 0.5), rgba(224, 231, 255, 0.3));
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15), 0 8px 24px rgba(59, 130, 246, 0.2);
+  }
+
+  .premium-card.selected::before {
+    opacity: 1;
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  .card-content {
+    text-align: center;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .card-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--cement-text);
+    margin-bottom: 0.5rem;
+  }
+
+  .card-hint {
+    font-size: 0.9rem;
+    color: var(--cement-muted);
+    margin-top: 0.5rem;
+  }
+
+  .variant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  .variant-card {
+    min-height: 80px;
+    padding: 1rem;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .form-section {
+    background: var(--cement-panel);
+    border: 1px solid var(--cement-border);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: var(--cement-shadow);
+  }
+
+  .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--cement-border);
+    font-size: 1rem;
+    width: 100%;
+  }
+
+  .form-control:focus {
+    border-color: var(--cement-accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    outline: none;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-primary {
+    background: var(--cement-accent);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+  }
+
+  .btn-outline-secondary {
+    border: 1px solid var(--cement-border);
+    color: var(--cement-text);
+    background: white;
+  }
+
+  @media (max-width: 640px) {
+    .card-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .cement-container {
+      padding: 1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cement-container">
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <div class="step-item {% if step == '1' %}active{% elif step|add:'0' > 1 %}completed{% endif %}">
+      <div class="step-circle">{% if step|add:'0' > 1 %}✓{% else %}1{% endif %}</div>
+      <div class="step-label">Category</div>
+    </div>
+    <div class="step-item {% if step == '2' %}active{% elif step|add:'0' > 2 %}completed{% endif %}">
+      <div class="step-circle">{% if step|add:'0' > 2 %}✓{% elif step|add:'0' >= 2 %}2{% else %}2{% endif %}</div>
+      <div class="step-label">Product</div>
+    </div>
+    <div class="step-item {% if step == '3' %}active{% elif step|add:'0' > 3 %}completed{% endif %}">
+      <div class="step-circle">{% if step|add:'0' > 3 %}✓{% elif step|add:'0' >= 3 %}3{% else %}3{% endif %}</div>
+      <div class="step-label">Variant</div>
+    </div>
+    <div class="step-item {% if step == '4' %}active{% endif %}">
+      <div class="step-circle">4</div>
+      <div class="step-label">Quantity & Price</div>
+    </div>
+  </div>
+
+  <!-- Step 1: Category Selection -->
+  {% if step == '1' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 1: Select Category</h2>
+    <p class="text-muted mb-4">What type of product are you stocking in?</p>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="1">
+      
+      <div class="card-grid">
+        {% for category in categories %}
+        <div class="premium-card card-content" onclick="selectCategory('{{ category.key }}')" data-testid="{{ category.data_testid }}">
+          <div class="card-icon">{{ category.icon }}</div>
+          <div class="card-name">{{ category.label }}</div>
+          <div class="card-hint">👆 Tap to select</div>
+          <input type="radio" name="category" value="{{ category.key }}" id="category_{{ category.key }}" style="display: none;">
+        </div>
+        {% endfor %}
+      </div>
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary" id="continue-btn" disabled>Continue →</button>
+        <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Step 2: Product Selection -->
+  {% if step == '2' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 2: Select Product</h2>
+    <p class="text-muted mb-4">Category: <strong>{{ selected_category|title }}</strong></p>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="2">
+      
+      <div class="card-grid">
+        {% for product in products %}
+        <div class="premium-card card-content" onclick="selectProduct('{{ product.slug }}')">
+          <div class="card-icon">{{ product.icon }}</div>
+          <div class="card-name">{{ product.base_name }}</div>
+          <div class="card-hint">👆 Tap to select</div>
+          <input type="radio" name="product" value="{{ product.slug }}" id="product_{{ product.slug }}" style="display: none;">
+        </div>
+        {% endfor %}
+      </div>
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary" id="continue-btn-2" disabled>Continue →</button>
+        <a href="{% url 'cement:stock_in' %}?step=1" class="btn btn-outline-secondary">← Back</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Step 3: Variant Selection -->
+  {% if step == '3' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 3: Select {{ product_def.base_name }} Details</h2>
+    <p class="text-muted mb-4">Choose brand, size, and other options</p>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="3">
+      
+      <!-- Brand Selection (if applicable) -->
+      {% if product_def.brands %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Brand *</strong></label>
+        <div class="variant-grid">
+          {% for brand in product_def.brands %}
+          <div class="premium-card variant-card" onclick="selectRadio('brand_{{ brand.key }}')">
+            <div>{{ brand.icon }}</div>
+            <div>{{ brand.name }}</div>
+            <input type="radio" name="brand" value="{{ brand.name }}" id="brand_{{ brand.key }}" style="display: none;" required>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Size Selection (if applicable) -->
+      {% if product_def.sizes %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Size *</strong></label>
+        <div class="variant-grid">
+          {% for size in product_def.sizes %}
+          <div class="premium-card variant-card" onclick="selectRadio('size_{{ size.key }}')">
+            {{ size.label }}
+            <input type="radio" name="size" value="{{ size.key }}" id="size_{{ size.key }}" style="display: none;" required>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Finish Selection (for paint) -->
+      {% if product_def.variants.finishes %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Finish</strong></label>
+        <div class="variant-grid">
+          {% for finish in product_def.variants.finishes %}
+          <div class="premium-card variant-card" onclick="selectRadio('finish_{{ finish|slugify }}')">
+            {{ finish }}
+            <input type="radio" name="finish" value="{{ finish }}" id="finish_{{ finish|slugify }}" style="display: none;">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Color Selection (for paint/iron sheets) -->
+      {% if product_def.variants.colors %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Color</strong></label>
+        <div class="variant-grid">
+          {% for color in product_def.variants.colors %}
+          <div class="premium-card variant-card" onclick="selectRadio('color_{{ color|slugify }}')">
+            {{ color }}
+            <input type="radio" name="color" value="{{ color }}" id="color_{{ color|slugify }}" style="display: none;">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Gauge Selection (for iron sheets) -->
+      {% if product_def.variants.gauges %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Gauge</strong></label>
+        <div class="variant-grid">
+          {% for gauge in product_def.variants.gauges %}
+          <div class="premium-card variant-card" onclick="selectRadio('gauge_{{ gauge }}')">
+            Gauge {{ gauge }}
+            <input type="radio" name="gauge" value="{{ gauge }}" id="gauge_{{ gauge }}" style="display: none;">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- Dimension Selection (for angle iron) -->
+      {% if product_def.variants.dimensions %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Dimension</strong></label>
+        <div class="variant-grid">
+          {% for dimension in product_def.variants.dimensions %}
+          <div class="premium-card variant-card" onclick="selectRadio('dimension_{{ dimension|slugify }}')">
+            {{ dimension }}
+            <input type="radio" name="dimension" value="{{ dimension }}" id="dimension_{{ dimension|slugify }}" style="display: none;">
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">Continue →</button>
+        <a href="{% url 'cement:stock_in' %}?step=2" class="btn btn-outline-secondary">← Back</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Step 4: Quantity & Pricing -->
+  {% if step == '4' %}
+  <div class="form-section">
+    <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 4: Quantity & Pricing</h2>
+    <div class="alert alert-info mb-4">
+      <strong>Product:</strong> {{ suggested_name }}
+    </div>
+    
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="4">
+      
+      <div class="row g-3">
+        <div class="col-md-12">
+          <label class="form-label">Quantity *</label>
+          <input type="number" class="form-control" name="quantity" required min="1" placeholder="Enter quantity" autofocus>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Cost Price (MK) *</label>
+          <input type="number" class="form-control" name="cost_price" required step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Selling Price (MK) *</label>
+          <input type="number" class="form-control" name="selling_price" required step="0.01" min="0" placeholder="0.00">
+        </div>
+      </div>
+      
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">✅ Save Stock</button>
+        <a href="{% url 'cement:stock_in' %}?step=3" class="btn btn-outline-secondary">← Back</a>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+  function selectCategory(categoryKey) {
+    document.querySelectorAll('.card-content').forEach(card => {
+      card.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    document.getElementById('category_' + categoryKey).checked = true;
+    document.getElementById('continue-btn').disabled = false;
+  }
+
+  function selectProduct(productSlug) {
+    document.querySelectorAll('.card-content').forEach(card => {
+      card.classList.remove('selected');
+    });
+    event.currentTarget.classList.add('selected');
+    document.getElementById('product_' + productSlug).checked = true;
+    document.getElementById('continue-btn-2').disabled = false;
+  }
+
+  function selectRadio(radioId) {
+    // Remove selected state from siblings
+    const radio = document.getElementById(radioId);
+    const parentDiv = radio.closest('.variant-grid');
+    if (parentDiv) {
+      parentDiv.querySelectorAll('.variant-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+    }
+    
+    // Add selected state
+    event.currentTarget.classList.add('selected');
+    radio.checked = true;
+  }
+</script>
+{% endblock %}
+

@@ -10,6 +10,9 @@ from django.views.generic.base import RedirectView
 # Import inventory views for fallbacks
 from inventory import views as inv_views
 
+# Import whoami view for debugging/Cypress E2E
+from core import views_whoami
+
 # =========================
 # Inventory API fallbacks
 # =========================

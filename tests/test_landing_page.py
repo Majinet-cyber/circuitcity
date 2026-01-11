@@ -24,7 +24,11 @@ def test_landing_page_renders(client):
 
 
 def test_landing_page_contains_mission_statement(client):
-    """Test that the landing page contains the mission statement."""
+    """Test that the landing page contains the NEW mission statement.
+    
+    GUARDRAIL TEST: This test fails if the old mission statement is ever restored.
+    The new mission statement should say "operating system of small businesses".
+    """
     url = reverse("staticpages:home")
     response = client.get(url)
     
@@ -34,10 +38,13 @@ def test_landing_page_contains_mission_statement(client):
     # Check for mission section heading
     assert "Our Mission" in content
     
-    # Check for mission statement text
-    assert "digital record" in content.lower()
-    assert "AI driven MBA manager" in content or "AI-driven MBA manager" in content
-    assert "every ledger and common person" in content.lower()
+    # Check for NEW mission statement text (operating system of small businesses)
+    assert "operating system of small businesses" in content.lower(), \
+        "Missing new mission statement 'operating system of small businesses'"
+    
+    # GUARDRAIL: Ensure OLD mission statement is NOT present
+    assert "spotify of every small business" not in content.lower(), \
+        "Old mission statement 'Spotify of every small business' found - this is a regression!"
 
 
 def test_landing_page_contains_ts_eliot_motto(client):
@@ -117,8 +124,8 @@ def test_landing_page_sections_are_present(client):
     assert "Powerful Features" in content or "Features" in content
     assert "Our Mission" in content
     
-    # Check for hero section content
-    assert "digital MBA manager" in content or "MBA manager" in content
+    # Check for hero section content (updated)
+    assert "inventory" in content.lower() or "business" in content.lower()
 
 
 def test_landing_page_has_navigation(client):

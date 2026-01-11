@@ -56,6 +56,8 @@ def ensure_monthly_recurring_costs(business, month_start: Optional[date] = None)
         # Check if we already created a cost for this month from this template
         # We identify duplicates by:
         # - Same business
+        # - Same type (COST_RECURRING)
+        # - is_recurring=False (this is an instance, not a template)
         # - Same note (cost name)
         # - Same amount
         # - effective_date is within the target month
@@ -71,6 +73,8 @@ def ensure_monthly_recurring_costs(business, month_start: Optional[date] = None)
         existing = WalletTransaction.objects.filter(
             business=business,
             ledger=Ledger.COMPANY,
+            type=TxnType.COST_RECURRING,
+            is_recurring=False,  # CRITICAL: Instances have is_recurring=False
             note=template.note,
             amount=template.amount,
             effective_date__gte=month_start,
@@ -197,4 +201,75 @@ def get_cost_breakdown_by_category(
         breakdown[category] = breakdown.get(category, Decimal('0.00')) + amount
     
     return breakdown
+
+
+def seed_default_recurring_cost_templates(business, created_by=None):
+    """
+    Seed default recurring cost templates for a business.
+    
+    This is idempotent - it won't create duplicates if templates already exist.
+    
+    Args:
+        business: Business instance
+        created_by: User who is seeding (optional)
+    
+    Returns:
+        int: Number of templates created
+    """
+    if not business:
+        return 0
+    
+    # Check if any recurring cost templates already exist for this business
+    existing_templates = WalletTransaction.objects.filter(
+        business=business,
+        ledger=Ledger.COMPANY,
+        type=TxnType.COST_RECURRING,
+        is_recurring=True,
+    ).exists()
+    
+    # If templates already exist, don't seed (idempotent)
+    if existing_templates:
+        return 0
+    
+    # Default recurring cost templates (common business expenses)
+    default_templates = [
+        {"name": "Rentals", "category": "fixed"},
+        {"name": "Transport", "category": "variable"},
+        {"name": "Utilities", "category": "fixed"},
+        {"name": "Internet", "category": "fixed"},
+        {"name": "Salaries", "category": "fixed"},
+        {"name": "Security", "category": "fixed"},
+        {"name": "Cleaning", "category": "variable"},
+        {"name": "Insurance", "category": "fixed"},
+        {"name": "Licenses & Permits", "category": "fixed"},
+        {"name": "Marketing & Advertising", "category": "variable"},
+    ]
+    
+    today = timezone.localdate()
+    month_start = date(today.year, today.month, 1)
+    created_count = 0
+    
+    for template_data in default_templates:
+        # Create placeholder template (amount = 0.01, user will set actual amount)
+        WalletTransaction.objects.create(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type=TxnType.COST_RECURRING,
+            amount=Decimal("-0.01"),  # Placeholder (user will update)
+            note=template_data["name"],
+            effective_date=month_start,
+            effective_from=month_start,
+            is_recurring=True,
+            created_by=created_by,
+            meta={
+                'cost_category': template_data["category"],
+                'cost_name': template_data["name"],
+                'is_template': True,
+                'seeded': True,
+                'recurrence_day': 1,  # Default to 1st of month
+            }
+        )
+        created_count += 1
+    
+    return created_count
 

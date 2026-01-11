@@ -94,9 +94,9 @@ class LaybyOrder(models.Model):
             models.Index(fields=["status", "created_by"]),
         ]
         constraints = [
-            models.CheckConstraint(check=Q(term_months__gte=1) & Q(term_months__lte=12), name="layby_term_1_to_12"),
-            models.CheckConstraint(check=Q(total_price__gte=0), name="layby_total_price_nonneg"),
-            models.CheckConstraint(check=Q(deposit_amount__gte=0), name="layby_deposit_nonneg"),
+            models.CheckConstraint(condition=Q(term_months__gte=1) & Q(term_months__lte=12), name="layby_term_1_to_12"),
+            models.CheckConstraint(condition=Q(total_price__gte=0), name="layby_total_price_nonneg"),
+            models.CheckConstraint(condition=Q(deposit_amount__gte=0), name="layby_deposit_nonneg"),
         ]
 
     def __str__(self) -> str:  # pragma: no cover
@@ -139,7 +139,7 @@ class LaybyPayment(models.Model):
             models.Index(fields=["order", "received_at"]),
         ]
         constraints = [
-            models.CheckConstraint(check=Q(amount__gt=0), name="layby_payment_amount_positive"),
+            models.CheckConstraint(condition=Q(amount__gt=0), name="layby_payment_amount_positive"),
         ]
 
     def __str__(self) -> str:  # pragma: no cover

@@ -326,14 +326,39 @@ class BusinessSubscription(models.Model):
     @classmethod
     def ensure_trial_for_business(cls, business) -> "BusinessSubscription":
         """
-        Ensure a subscription exists; if missing, seed a trial on the cheapest active plan.
+        Ensure a subscription exists; if missing, seed a trial using SSOT plan resolver.
+        
+        This method is idempotent - calling it multiple times is safe.
+        It uses the centralized plan resolver to guarantee a valid plan.
         """
+        # Check if subscription already exists
         sub = getattr(business, "subscription", None)
         if sub:
             return sub
-        plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
-        if not plan:
-            plan = SubscriptionPlan.objects.create(code="starter", name="Starter", amount=Decimal("0.00"))
+        
+        # Also check via direct query (more reliable)
+        existing = cls.objects.filter(business=business).first()
+        if existing:
+            return existing
+        
+        # Use SSOT plan resolver (guaranteed to return a valid plan)
+        try:
+            from billing.services.plan_resolver import get_default_trial_plan
+            plan = get_default_trial_plan(
+                business_kind=getattr(business, "business_kind", None),
+                create_if_missing=True,
+            )
+        except Exception:
+            # Fallback if resolver fails (should never happen)
+            plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
+            if not plan:
+                plan = SubscriptionPlan.objects.create(
+                    code="starter", 
+                    name="Starter", 
+                    amount=Decimal("0.00"),
+                    is_active=True,
+                )
+        
         return cls.start_trial(business=business, plan=plan)
 
     # ---- Status helpers ------------------------------------------------
@@ -1167,25 +1192,14 @@ def _recalc_invoice_on_item_delete(sender, instance: InvoiceItem, **kwargs):
         inv.recalc_totals(save=True)
 
 
-# (Optional) Seed a trial automatically when a Business is created.
-# Wrapped in a try/import guard so it won't break during initial bootstrap.
-try:
-    from django.db.models.signals import post_save as _post_save_business
-
-    from tenants.models import Business as _BusinessModel  # type: ignore
-
-    @_post_save_business.connect(sender=_BusinessModel)
-    def _auto_seed_trial_on_business_create(sender, instance, created, **kwargs):
-        if created:
-            try:
-                BusinessSubscription.ensure_trial_for_business(instance)
-            except Exception:
-                # Avoid crashing tenant creation path
-                pass
-
-except Exception:
-    # No tenants model yet (e.g., during first migration)
-    pass
+# NOTE: Trial subscription creation is now handled by tenants/signals.py
+# using transaction.on_commit() for transaction safety. The signal there
+# uses the SSOT plan resolver from billing.services.plan_resolver.
+# 
+# DO NOT re-add a signal here - it would create duplicate subscriptions
+# and/or cause race conditions.
+#
+# See: tenants/signals.py:ensure_trial_on_business_creation
 
 
 # ======================================================================

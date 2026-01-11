@@ -134,6 +134,15 @@ def get_role(user, business) -> str:
     if _safe_bool(_safe_getattr(user, "is_superuser", False)):
         return "MANAGER"
     
+    # CRITICAL FIX: Business creators are always managers in their business
+    # This handles cases where business was created but membership wasn't set up
+    if business:
+        try:
+            if _safe_getattr(business, "created_by_id", None) == user.pk:
+                return "MANAGER"
+        except Exception:
+            pass
+    
     # If we have a business, do business-scoped checks
     if business:
         # 2. Check Membership model first (most authoritative for business-scoped roles)

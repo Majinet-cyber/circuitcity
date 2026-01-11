@@ -27,17 +27,23 @@ class TestLocationQueryFix(TestCase):
         )
 
     def test_location_has_no_is_active_field(self):
-        """Verify Location model does NOT have is_active field."""
+        """Verify Location model does NOT have is_active as a DATABASE field.
+        
+        Note: Location may have an is_active PROPERTY for backwards compatibility,
+        but it should NOT have is_active as a queryable database field.
+        """
         location = Location.objects.create(
             business=self.business,
             name="Test Location",
         )
         
-        # Should NOT have is_active attribute
-        assert not hasattr(location, 'is_active')
+        # Should NOT have is_active as a database field
+        # (hasattr returns True for properties, so check fields instead)
+        field_names = [f.name for f in Location._meta.get_fields()]
+        assert 'is_active' not in field_names, "is_active should not be a database field"
         
-        # Should have is_default instead
-        assert hasattr(location, 'is_default')
+        # Should have is_default as a database field instead
+        assert 'is_default' in field_names, "is_default should be a database field"
 
     def test_cannot_query_by_is_active(self):
         """Location queries by is_active should fail with FieldError."""

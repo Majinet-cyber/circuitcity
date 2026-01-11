@@ -212,9 +212,9 @@ class LegacyURLNameTests(TestCase):
         self.assertEqual(url, "/inventory/scan-sold/")
 
     def test_staticpages_simulator_url_resolves(self):
-        """staticpages:simulator should resolve"""
+        """staticpages:simulator should resolve to /landing/simulator/"""
         url = reverse("staticpages:simulator")
-        self.assertEqual(url, "/simulator/")
+        self.assertEqual(url, "/landing/simulator/")
 
     def test_business_simulator_url_resolves(self):
         """simulator:business_home should resolve to manager-only simulator"""

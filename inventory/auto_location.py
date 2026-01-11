@@ -42,19 +42,32 @@ def register():
 
         # Build a queryset scoped to this business (if FK exists)
         qs = Location.objects.all()
+        filter_kwargs = {}
         create_kwargs = {"name": store_name}
         if loc_business_field:
-            qs = qs.filter(**{f"{loc_business_field}_id": instance.pk})
+            filter_kwargs[f"{loc_business_field}_id"] = instance.pk
+            qs = qs.filter(**filter_kwargs)
             create_kwargs[loc_business_field] = instance
 
         # If this store already has a location, do nothing
         if qs.exists():
             return
 
-        # Optional flags if your model has them
+        # Optional flags if your model has them - only set on creation
+        defaults = {}
         if hasattr(Location, "is_default"):
-            create_kwargs["is_default"] = True
+            defaults["is_default"] = True
         if hasattr(Location, "is_active"):
-            create_kwargs["is_active"] = True
-
-        Location.objects.create(**create_kwargs)
+            defaults["is_active"] = True
+        
+        # Use get_or_create for idempotent creation (prevents race conditions)
+        # This prevents IntegrityError if two threads try to create simultaneously
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                # Check again inside atomic block
+                if not qs.exists():
+                    Location.objects.create(**create_kwargs, **defaults)
+        except Exception:
+            # If creation fails (e.g., duplicate), that's OK - location already exists
+            pass

@@ -1,0 +1,277 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                   PYTEST + CYPRESS INTEGRATION SYSTEM                        │
+│                        (Single Source of Truth)                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+                           ┌─────────────────────┐
+                           │   npm run test:all  │
+                           │  (SSOT for all CI)  │
+                           └──────────┬──────────┘
+                                      │
+                                      ▼
+                        ┌──────────────────────────┐
+                        │  run_all_tests.mjs       │
+                        │  (Orchestrator)          │
+                        └──────────┬───────────────┘
+                                   │
+                    ┌──────────────┴────────────────┐
+                    │                               │
+                    ▼                               ▼
+        ┌───────────────────────┐      ┌───────────────────────┐
+        │  STEP 1: PyTests      │      │  STEP 2: Cypress      │
+        └───────────┬───────────┘      └───────────┬───────────┘
+                    │                               │
+                    ▼                               │
+    ┌────────────────────────────────┐              │
+    │ run_pytests_and_summarize.mjs  │              │
+    └────────────────┬───────────────┘              │
+                     │                               │
+         ┌───────────┼───────────┐                   │
+         │           │           │                   │
+         ▼           ▼           ▼                   │
+    ┌────────┐ ┌─────────┐ ┌──────────┐             │
+    │ pytest │ │ Parse   │ │ Generate │             │
+    │ --junit│ │ junit   │ │ summary  │             │
+    │  xml   │ │ xml     │ │   .md    │             │
+    └────┬───┘ └────┬────┘ └─────┬────┘             │
+         │          │            │                   │
+         │          │            │                   │
+         ▼          ▼            ▼                   │
+    ┌─────────────────────────────────┐             │
+    │     reports/pytest/             │             │
+    │  ├─ junit.xml                   │             │
+    │  ├─ output.txt                  │             │
+    │  └─ summary.md                  │             │
+    └─────────────────────────────────┘             │
+         │                                           │
+         │ Always exits 0                            │
+         │ (allows Cypress to run)                   │
+         │                                           │
+         └───────────────────┬───────────────────────┘
+                             │
+                             │ Wrapper checks junit.xml
+                             │ for actual pytest status
+                             │
+                             ▼
+                    ┌────────────────────┐
+                    │  npx cypress run   │
+                    └─────────┬──────────┘
+                              │
+                    ┌─────────┴──────────┐
+                    │  before:run hook   │
+                    │  (cypress.config)  │
+                    └─────────┬──────────┘
+                              │
+                              │ Runs pytest
+                              │ (same script)
+                              ▼
+                    ┌──────────────────────┐
+                    │  Cypress E2E Tests   │
+                    └──────────┬───────────┘
+                               │
+                               ▼
+              ┌────────────────────────────┐
+              │   Final Exit Code          │
+              │                            │
+              │  Exit 0: All passed        │
+              │  Exit 1: Either failed     │
+              └────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                             ALTERNATIVE FLOWS
+
+
+Flow 1: Direct PyTest Only
+────────────────────────────
+
+    npm run pytest:all
+         │
+         ▼
+    run_pytests_and_summarize.mjs
+         │
+         ├─► python -m pytest
+         ├─► Generate reports
+         └─► Exit 0
+
+
+Flow 2: Direct Cypress Run
+────────────────────────────
+
+    npx cypress run
+         │
+         ▼
+    cypress.config.js
+         │
+         ▼
+    before:run hook
+         │
+         ▼
+    run_pytests_and_summarize.mjs
+         │
+         ├─► python -m pytest
+         ├─► Generate reports
+         └─► Exit 0
+              │
+              ▼
+         Cypress tests run
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                            KEY DESIGN DECISIONS
+
+
+1. PyTest Script Always Exits 0
+   ────────────────────────────
+   WHY: Allows Cypress to run even if PyTest fails
+   HOW: Wrapper script checks junit.xml for actual status
+
+
+2. Reports Always Generated
+   ─────────────────────────
+   WHY: Never lose failure information
+   HOW: Script catches all errors and writes minimal summary
+
+
+3. Both Hook and Wrapper
+   ──────────────────────
+   WHY: Cover all execution paths (direct cypress, npm script)
+   HOW: Hook for cypress run, wrapper for proper exit codes
+
+
+4. JUnit XML as Source of Truth
+   ─────────────────────────────
+   WHY: Reliable, parseable, CI-compatible
+   HOW: Parse XML to determine pass/fail instead of exit codes
+
+
+5. Error Categorization
+   ────────────────────
+   WHY: Quick failure diagnosis
+   HOW: Heuristic matching on error messages
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                              FILE STRUCTURE
+
+
+circuitcity_clean/
+├── scripts/
+│   ├── run_pytests_and_summarize.mjs  ← Core pytest runner + report generator
+│   ├── run_all_tests.mjs              ← Wrapper (pytest → cypress)
+│   ├── verify_test_system.mjs         ← Sanity check
+│   └── README_TEST_SYSTEM.md          ← Complete documentation
+│
+├── reports/                            ← Auto-generated (gitignored)
+│   └── pytest/
+│       ├── junit.xml                   ← JUnit format results
+│       ├── output.txt                  ← Raw pytest output
+│       └── summary.md                  ← Human-readable summary
+│
+├── cypress.config.js                   ← Modified: added before:run hook
+├── package.json                        ← Modified: added pytest:all, test:all
+├── .gitignore                          ← Modified: added reports/
+│
+├── IMPLEMENTATION_SUMMARY.md           ← Full implementation details
+└── QUICK_REFERENCE.txt                 ← Quick command reference
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                           ARTIFACTS BREAKDOWN
+
+
+reports/pytest/junit.xml
+────────────────────────
+- Standard JUnit XML format
+- Machine-readable test results
+- Used by CI systems (Jenkins, GitLab, GitHub Actions)
+- Contains: test counts, durations, pass/fail status
+
+
+reports/pytest/output.txt
+─────────────────────────
+- Complete pytest console output
+- Includes full tracebacks
+- Captured even on failure
+- For deep debugging
+
+
+reports/pytest/summary.md
+─────────────────────────
+- Human-readable markdown
+- Categorized failures (AssertionError, AttributeError, etc.)
+- Truncated to 30 lines per error (full in output.txt)
+- Always generated, even on fatal errors
+- Example sections:
+  1. Test Results (counts)
+  2. Failure Categories (grouped)
+  3. Detailed Failures (per-test breakdown)
+  4. Artifacts (file locations)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                            VERIFICATION STEPS
+
+
+1. Check Files Exist
+   ─────────────────
+   node scripts/verify_test_system.mjs
+   
+   Verifies:
+   ✓ All scripts exist
+   ✓ Package.json has correct scripts
+   ✓ Cypress config has before:run hook
+   ✓ .gitignore includes reports/
+
+
+2. Run PyTest Only
+   ───────────────
+   npm run pytest:all
+   
+   Expected:
+   - Creates reports/pytest/ folder
+   - Generates all 3 artifacts
+   - Exits 0 regardless of test results
+
+
+3. Run All Tests
+   ─────────────
+   npm run test:all
+   
+   Expected:
+   - Runs pytest first
+   - Generates reports
+   - Runs cypress
+   - Exits 1 if either failed
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+
+                          LOCKED IN AS SSOT ✅
+
+
+This system is now the Single Source of Truth for:
+
+  ✅ Test execution order (PyTest always first)
+  ✅ Report generation (3 artifacts: xml, txt, md)
+  ✅ Failure handling (never stops early, always summarizes)
+  ✅ CI/Local parity (npm run test:all everywhere)
+  ✅ Windows/Linux compatibility (tested on PowerShell)
+  ✅ Error categorization (automatic grouping)
+  ✅ Artifact management (auto-generated, gitignored)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+

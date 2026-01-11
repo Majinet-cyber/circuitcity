@@ -128,13 +128,13 @@ def mark_item_sold(
     if item.sold_at is not None or str(item.status).upper() == "SOLD":
         raise ValidationError("Item is already sold.")
 
-    # Build the Sale payload (only using fields that we know exist)
+    # Build the Sale payload (only using fields that actually exist on Sale model)
+    # Sale model fields: item, agent, location, sold_at, price, commission_pct, payment_method
+    # Note: Sale does NOT have: business, product, seller (use 'agent' instead of 'seller')
     sale_kwargs = {
-        "business": business,
         "item": item,
-        "product": item.product,
+        "agent": user if getattr(user, "is_authenticated", False) else None,
         "location": location,
-        "seller": user if getattr(user, "is_authenticated", False) else None,
         "price": price,
         "commission_pct": commission_pct or 0,
         "sold_at": sold_at or timezone.now(),
@@ -145,10 +145,10 @@ def mark_item_sold(
     # Flip inventory state using only existing fields
     item.status = "SOLD"
     item.sold_at = sale.sold_at
-    # Persist relation if your model has it (your InventoryItem DOES have `sale`)
-    item.sale = sale
-    # Note: there is no 'sold_price' or 'sold_location' field on InventoryItem in your DB
-    item.save(update_fields=["status", "sold_at", "sale"])
+    # NOTE: The Sale has a OneToOneField to InventoryItem (Sale.item), not the reverse.
+    # The reverse accessor is `item.sale` (from related_name='sale'), but it's not a concrete
+    # field - it's a reverse relation. So we don't include 'sale' in update_fields.
+    item.save(update_fields=["status", "sold_at"])
 
     # Fresh aggregates for UI
     qs_instock = _apply_unsold_filters(InventoryItem.objects.filter(business=business))

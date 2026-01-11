@@ -19,8 +19,8 @@ class ManagePageTrialTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
-        self.business = Business.objects.create(name="Test Business", slug="test-business")
-        Membership.objects.create(user=self.user, business=self.business, role="MANAGER")
+        self.business = Business.objects.create(name="Test Business", slug="test-business", status="ACTIVE")
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
         
         # Get or create starter plan
         self.starter_plan, _ = SubscriptionPlan.objects.get_or_create(

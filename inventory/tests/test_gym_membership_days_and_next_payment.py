@@ -21,6 +21,7 @@ from inventory.utils_gym import (
     compute_next_payment_date,
     get_membership_status,
     GYM_MEMBERSHIP_DAYS,
+    GYM_MONTHLY_FEE,  # Import the correct membership fee
 )
 
 User = get_user_model()
@@ -47,7 +48,7 @@ def gym_member(business):
         name="John Doe",
         phone="555-1234",
         email="john@example.com",
-        membership_fee=Decimal("50.00"),
+        membership_fee=GYM_MONTHLY_FEE,  # Use the correct membership fee (55,000 MWK)
     )
 
 
@@ -191,7 +192,7 @@ class TestGymMemberDaysLeftCurrent:
         """Test: days_left_current never exceeds duration_days."""
         # Set up a membership that started today
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         # Days left should be exactly 30
         assert gym_member.days_left_current == 30
@@ -203,7 +204,7 @@ class TestGymMemberDaysLeftCurrent:
         """Test: days_left_current decreases correctly over time."""
         # Set up a membership that started 5 days ago
         start_date = timezone.now().date() - timedelta(days=5)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         # Days left should be 25 (30 - 5)
         assert gym_member.days_left_current == 25
@@ -212,7 +213,7 @@ class TestGymMemberDaysLeftCurrent:
         """Test: days_left_current returns 0 for expired membership."""
         # Set up a membership that started 35 days ago (expired)
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         # Days left should be 0 (not negative)
         assert gym_member.days_left_current == 0
@@ -229,7 +230,7 @@ class TestGymMemberNextPaymentDate:
     def test_next_payment_date_is_30_days_after_last_payment(self, gym_member):
         """Test: next_payment_date is exactly 30 days after last payment."""
         payment_date = date(2025, 1, 1)
-        gym_member.set_paid(payment_date=payment_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=payment_date, membership_fee=GYM_MONTHLY_FEE)
 
         next_payment = gym_member.next_payment_date()
 
@@ -239,7 +240,7 @@ class TestGymMemberNextPaymentDate:
     def test_next_payment_date_not_blank_for_active_membership(self, gym_member):
         """Test: next_payment_date is never None for active memberships."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         next_payment = gym_member.next_payment_date()
 
@@ -260,7 +261,7 @@ class TestGetMembershipStatus:
     def test_membership_status_new_member_today(self, gym_member):
         """Test: New member today shows 30 days remaining."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         status = get_membership_status(gym_member, today)
 
@@ -323,42 +324,42 @@ class TestCentralizedMembershipProperties:
     def test_days_used_on_payment_day(self, gym_member):
         """Test: days_used is 0 on the day of payment."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_used == 0
 
     def test_days_used_after_5_days(self, gym_member):
         """Test: days_used is 5 after 5 days."""
         start_date = timezone.now().date() - timedelta(days=5)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_used == 5
 
     def test_days_used_caps_at_duration(self, gym_member):
         """Test: days_used never exceeds duration_days."""
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_used == 30
 
     def test_days_left_on_payment_day(self, gym_member):
         """Test: days_left is 30 on the day of payment."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left == 30
 
     def test_days_left_after_5_days(self, gym_member):
         """Test: days_left is 25 after 5 days."""
         start_date = timezone.now().date() - timedelta(days=5)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left == 25
 
     def test_days_left_expired_membership(self, gym_member):
         """Test: days_left is 0 for expired membership."""
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left == 0
 
@@ -369,28 +370,28 @@ class TestCentralizedMembershipProperties:
     def test_days_left_display_on_payment_day(self, gym_member):
         """Test: days_left_display shows '30 / 30 days' on payment day."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left_display == "30 / 30 days"
 
     def test_days_left_display_after_5_days(self, gym_member):
         """Test: days_left_display shows '25 / 30 days' after 5 days."""
         start_date = timezone.now().date() - timedelta(days=5)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left_display == "25 / 30 days"
 
     def test_days_left_display_expired(self, gym_member):
         """Test: days_left_display shows '0 / 30 days' when expired."""
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.days_left_display == "0 / 30 days"
 
     def test_next_payment_date_property_on_payment_day(self, gym_member):
         """Test: next_payment_date_property is 30 days after payment."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         expected = today + timedelta(days=30)
         assert gym_member.next_payment_date_property == expected
@@ -402,21 +403,21 @@ class TestCentralizedMembershipProperties:
     def test_is_active_membership_fresh_payment(self, gym_member):
         """Test: is_active_membership is True on payment day."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.is_active_membership is True
 
     def test_is_active_membership_during_period(self, gym_member):
         """Test: is_active_membership is True during membership period."""
         start_date = timezone.now().date() - timedelta(days=15)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.is_active_membership is True
 
     def test_is_active_membership_expired(self, gym_member):
         """Test: is_active_membership is False when expired."""
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.is_active_membership is False
 
@@ -427,7 +428,7 @@ class TestCentralizedMembershipProperties:
     def test_status_label_active(self, gym_member):
         """Test: status_label is 'Active' for active membership."""
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         assert gym_member.status_label == "Active"
 
@@ -436,11 +437,12 @@ class TestCentralizedMembershipProperties:
         assert gym_member.status_label == "No membership"
 
     def test_status_label_expired(self, gym_member):
-        """Test: status_label is 'No membership' when expired."""
+        """Test: status_label is 'Expired' when expired."""
         start_date = timezone.now().date() - timedelta(days=35)
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
 
-        assert gym_member.status_label == "No membership"
+        # SSOT service returns "Expired" for expired memberships (more accurate than "No membership")
+        assert gym_member.status_label == "Expired"
 
 
 class TestIntegrationScenarios:
@@ -451,7 +453,7 @@ class TestIntegrationScenarios:
         start_date = date(2025, 1, 1)
 
         # Day 0: Payment made
-        gym_member.set_paid(payment_date=start_date, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=start_date, membership_fee=GYM_MONTHLY_FEE)
         assert gym_member.membership_start == start_date
         assert gym_member.membership_end == date(2025, 1, 30)
         assert gym_member.next_payment_date() == date(2025, 1, 31)
@@ -479,7 +481,7 @@ class TestIntegrationScenarios:
         assert status["status_code"] == "expired"
         assert gym_member.next_payment_date() == date(2025, 1, 31)
 
-    def test_prevents_31_30_days_bug(self, gym_member):
+    def test_prevents_31_30_days_bug(self, business):
         """Test: Ensures "31 / 30 days" bug can never occur."""
         # Try various edge cases that might cause the bug
         test_dates = [
@@ -489,8 +491,17 @@ class TestIntegrationScenarios:
             date(2025, 12, 31),
         ]
 
-        for payment_date in test_dates:
-            gym_member.set_paid(payment_date=payment_date, membership_fee=Decimal("50.00"))
+        for idx, payment_date in enumerate(test_dates):
+            # Create a fresh member for each test to avoid auto-extension
+            gym_member = GymMember.objects.create(
+                business=business,
+                name=f"Test Member {idx}",
+                phone=f"555-{idx:04d}",
+                email=f"test{idx}@example.com",
+                membership_fee=GYM_MONTHLY_FEE,
+            )
+            
+            gym_member.set_paid(payment_date=payment_date, membership_fee=GYM_MONTHLY_FEE)
 
             # Check days_left never exceeds 30
             assert gym_member.days_left_current <= 30, f"days_left_current exceeds 30 for payment_date={payment_date}"
@@ -517,7 +528,7 @@ class TestIntegrationScenarios:
         ]
 
         for payment_date in test_dates:
-            gym_member.set_paid(payment_date=payment_date, membership_fee=Decimal("50.00"))
+            gym_member.set_paid(payment_date=payment_date, membership_fee=GYM_MONTHLY_FEE)
 
             next_payment = gym_member.next_payment_date()
 
@@ -538,7 +549,7 @@ class TestIntegrationScenarios:
         - Next Payment: payment_date + 30 days (not blank)
         """
         today = timezone.now().date()
-        gym_member.set_paid(payment_date=today, membership_fee=Decimal("50.00"))
+        gym_member.set_paid(payment_date=today, membership_fee=GYM_MONTHLY_FEE)
 
         # Verify all properties show correct values
         assert gym_member.status_label == "Active"

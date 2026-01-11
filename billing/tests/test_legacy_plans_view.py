@@ -16,10 +16,18 @@ class BillingPlansViewTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
-        self.business = Business.objects.create(name="Test Business", slug="test-business")
-        Membership.objects.create(user=self.user, business=self.business, role="MANAGER")
-        self.plan = SubscriptionPlan.objects.create(
-            code="starter", name="Starter", amount=Decimal("10000.00"), currency="MWK", interval="month", is_active=True
+        self.business = Business.objects.create(name="Test Business", slug="test-business", status="ACTIVE")
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        # Use get_or_create to avoid UNIQUE constraint errors if plan already exists
+        self.plan, _ = SubscriptionPlan.objects.get_or_create(
+            code="starter",
+            defaults={
+                "name": "Starter",
+                "amount": Decimal("10000.00"),
+                "currency": "MWK",
+                "interval": "month",
+                "is_active": True,
+            }
         )
 
     def test_plans_page_shows_active_subscription_not_trial(self):

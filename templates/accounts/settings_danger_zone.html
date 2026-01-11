@@ -1,13 +1,14 @@
-{% extends "base.html" %}
+{% extends "accounts/_settings_shell.html" %}
 {% load static %}
 
 {% block title %}Settings · Danger Zone{% endblock %}
 {% block header_title %}Settings{% endblock %}
 
-{# Hide Layby + Notifications only on settings pages #}
+{% block settings_page_title %}Account Settings{% endblock %}
+
 {% block extra_head %}
+{{ block.super }}
 <style>
-  .cc-header .cc-actions { display: none !important; }
   .danger-zone {
     border: 2px solid #dc3545;
     border-radius: 8px;
@@ -26,20 +27,7 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="container my-4">
-  <h2 class="fw-bold mb-3">Account Settings</h2>
-  {% include "accounts/_settings_nav.html" %}
-
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-      </div>
-    {% endfor %}
-  {% endif %}
-
+{% block settings_content %}
   <div class="danger-zone">
     <div class="text-center mb-4">
       <div class="warning-icon">⚠️</div>
@@ -148,6 +136,5 @@
       </div>
     </div>
   </div>
-</div>
 {% endblock %}
 

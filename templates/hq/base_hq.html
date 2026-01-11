@@ -18,8 +18,64 @@
   <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
   <!-- HQ Admin Layout CSS (Full Width) -->
   <link href="{% static 'css/hq_admin.css' %}" rel="stylesheet">
+  <!-- HQ Sidebar Fix: Sticky on Desktop, Offcanvas on Mobile (2026-01-08) -->
+  <link href="{% static 'css/hq_sidebar_fix.css' %}" rel="stylesheet">
 
   {% block extra_css %}{% endblock %}
+  
+  <script>
+    // Mobile sidebar toggle
+    document.addEventListener('DOMContentLoaded', function() {
+      const sidebar = document.getElementById('hqSidebar');
+      const sidebarToggle = document.getElementById('hqSidebarToggle');
+      const sidebarClose = document.getElementById('hqSidebarClose');
+      
+      // Create overlay
+      const overlay = document.createElement('div');
+      overlay.className = 'hq-sidebar-overlay';
+      document.body.appendChild(overlay);
+      
+      // Toggle sidebar
+      function toggleSidebar() {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+      }
+      
+      if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', toggleSidebar);
+      }
+      
+      if (sidebarClose) {
+        sidebarClose.addEventListener('click', toggleSidebar);
+      }
+      
+      overlay.addEventListener('click', function() {
+        if (sidebar.classList.contains('active')) {
+          toggleSidebar();
+        }
+      });
+      
+      // Close sidebar on escape key
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('active')) {
+          toggleSidebar();
+        }
+      });
+      
+      // Close sidebar when navigating (mobile only)
+      if (window.innerWidth < 992) {
+        const sidebarLinks = sidebar.querySelectorAll('.nav a');
+        sidebarLinks.forEach(link => {
+          link.addEventListener('click', function() {
+            if (sidebar.classList.contains('active')) {
+              setTimeout(toggleSidebar, 200);
+            }
+          });
+        });
+      }
+    });
+  </script>
 </head>
 <body>
 

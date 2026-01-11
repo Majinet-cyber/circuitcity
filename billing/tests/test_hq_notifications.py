@@ -94,15 +94,22 @@ class TestHQNotifications(TestCase):
         """Test subscription paid notification sends email to HQ."""
         mail.outbox = []
 
-        # Create invoice
+        # Create invoice with item (Invoice.save() recalculates total from items)
         invoice = Invoice.objects.create(
             business=self.business,
             subscription=self.subscription,
             status=Invoice.Status.PAID,
-            total=Decimal("20000.00"),
             currency="MWK",
             paid_at=timezone.now(),
         )
+        # Add item to set the total (recalc_totals is called on save)
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            description="Starter Plan - Monthly",
+            qty=Decimal("1"),
+            unit_price=Decimal("20000.00"),
+        )
+        invoice.recalc_totals(save=True)
 
         # Notify HQ
         notify_hq.notify_subscription_paid(invoice, self.subscription)
@@ -129,10 +136,17 @@ class TestHQNotifications(TestCase):
             business=self.business,
             subscription=self.subscription,
             status=Invoice.Status.PAID,
-            total=Decimal("20000.00"),
             currency="MWK",
             paid_at=timezone.now(),
         )
+        # Add item to set the total (recalc_totals is called on save)
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            description="Starter Plan - Monthly",
+            qty=Decimal("1"),
+            unit_price=Decimal("20000.00"),
+        )
+        invoice.recalc_totals(save=True)
 
         # First call: should send
         notify_hq.notify_subscription_paid(invoice, self.subscription)
@@ -289,15 +303,22 @@ class TestHQNotifications(TestCase):
         # Create some activity today
         now = timezone.now()
 
-        # Create paid invoice
+        # Create paid invoice with item (Invoice.save() recalculates total from items)
         invoice = Invoice.objects.create(
             business=self.business,
             subscription=self.subscription,
             status=Invoice.Status.PAID,
-            total=Decimal("20000.00"),
             currency="MWK",
             paid_at=now,
         )
+        # Add item to set the total
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            description="Starter Plan - Monthly",
+            qty=Decimal("1"),
+            unit_price=Decimal("20000.00"),
+        )
+        invoice.recalc_totals(save=True)
 
         # Get summary
         summary = notify_hq._get_today_summary()

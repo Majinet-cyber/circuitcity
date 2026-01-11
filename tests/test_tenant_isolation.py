@@ -12,6 +12,7 @@ User = get_user_model()
 
 
 @pytest.mark.django_db
+@pytest.mark.critical  # Multi-tenant isolation is security-critical
 class TenantIsolationTest(TestCase):
     """Test that managers cannot access other businesses' data."""
     

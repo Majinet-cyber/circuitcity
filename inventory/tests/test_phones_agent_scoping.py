@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from inventory.models import InventoryItem, Product, Location
 from inventory.utils_scope import get_visible_actor, scope_sales_qs, scope_stock_qs
-from tenants.models import Business, BusinessKind
+from tenants.models import Business, BusinessKind, Membership
 
 User = get_user_model()
 
@@ -25,7 +25,9 @@ def business():
     """Create a test business for Phones vertical."""
     return Business.objects.create(
         name="Test Phones Store",
-        kind=BusinessKind.PHONES,
+        slug="test-phones-store",
+        business_kind=BusinessKind.PHONES,
+        status="ACTIVE",
     )
 
 
@@ -50,33 +52,42 @@ def product(business):
 
 
 @pytest.fixture
-def manager_user():
+def manager_user(business):
     """Create a manager user (can see all data)."""
-    return User.objects.create_user(
+    user = User.objects.create_user(
         username="manager1",
         password="test123",
         is_staff=True,  # Managers are staff
     )
+    # Create membership for manager
+    Membership.objects.create(user=user, business=business, role="MANAGER", status="ACTIVE")
+    return user
 
 
 @pytest.fixture
-def agent_user1():
+def agent_user1(business, location):
     """Create agent user 1."""
-    return User.objects.create_user(
+    user = User.objects.create_user(
         username="agent1",
         password="test123",
         is_staff=False,  # Agents are not staff
     )
+    # Create membership for agent (agents must have a location)
+    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE", location=location)
+    return user
 
 
 @pytest.fixture
-def agent_user2():
+def agent_user2(business, location):
     """Create agent user 2."""
-    return User.objects.create_user(
+    user = User.objects.create_user(
         username="agent2",
         password="test123",
         is_staff=False,
     )
+    # Create membership for agent (agents must have a location)
+    Membership.objects.create(user=user, business=business, role="AGENT", status="ACTIVE", location=location)
+    return user
 
 
 @pytest.fixture
@@ -357,7 +368,7 @@ class TestPhonesDashboardIntegration:
 
     def test_agent_kpis_show_only_own_data(self, client, agent_user1, agent_user2, business, location, product):
         """Agent dashboard should show only their own data."""
-        # Create sales for agent1
+        # Create sales for agent1 (with all required fields for dashboard filtering)
         InventoryItem.objects.create(
             business=business,
             product=product,
@@ -367,6 +378,8 @@ class TestPhonesDashboardIntegration:
             sold_at=timezone.now(),
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
+            is_active=True,  # Explicitly set for clarity
+            imei="111111111111111",  # Add IMEI for phone items
         )
 
         # Create sales for agent2 (should NOT be visible to agent1)
@@ -379,6 +392,8 @@ class TestPhonesDashboardIntegration:
             sold_at=timezone.now(),
             order_price=Decimal("50000"),
             selling_price=Decimal("60000"),
+            is_active=True,
+            imei="222222222222222",
         )
 
         # Agent1 logs in
@@ -393,7 +408,7 @@ class TestPhonesDashboardIntegration:
 
         assert response.status_code == 200
         kpis = response.context["dashboard_kpis"]
-
+        
         # Agent1 should see only their 1 sale
         assert kpis["units_sold"] == 1
         assert kpis["revenue"] == Decimal("60000")

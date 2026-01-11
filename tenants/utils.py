@@ -219,7 +219,18 @@ def set_active_business(request: "HttpRequest", business) -> None:
     """
     Persist the selected business in session, attach it to the request,
     and mirror into thread-local (if available). Pass business=None to clear.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import set_active_business as ssot_set
+        ssot_set(request, business)
+        return
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     try:
         if business is None:
             # Clear session + request (canonical + legacy) and mark modified
@@ -268,7 +279,17 @@ def get_active_business(request: "HttpRequest"):
     """
     Return the Business referenced by request or session, caching onto request.
     Tries request.business first, then tolerant session keys.
+    
+    UPDATED: Now delegates to SSOT service when available (backwards compatible).
     """
+    # Try SSOT service first (if available)
+    try:
+        from tenants.services.active_business import get_active_business as ssot_get
+        return ssot_get(request)
+    except ImportError:
+        pass  # Fall back to legacy implementation
+    
+    # Legacy implementation (for backwards compatibility)
     # If middleware already set request.business, keep it authoritative.
     b = getattr(request, "business", None)
     if b is not None:
@@ -547,6 +568,8 @@ def scope_queryset_to_business(qs, business):
     """
     Helper to scope any queryset to a specific business.
     Returns filtered queryset if business is valid, otherwise returns empty qs.
+    
+    Special case: If queryset is for the Business model itself, filter by pk.
     """
     if business is None:
         return qs.none()
@@ -557,11 +580,17 @@ def scope_queryset_to_business(qs, business):
     
     # Try common field names
     if hasattr(qs.model, "_meta"):
-        field_names = {f.name for f in qs.model._meta.get_fields()}
+        model = qs.model
+        field_names = {f.name for f in model._meta.get_fields()}
+        
+        # Special case: If the model IS the Business model, filter by pk
+        if model.__name__ == "Business":
+            return qs.filter(pk=business_id).distinct()
+        
         if "business" in field_names:
-            return qs.filter(business_id=business_id)
+            return qs.filter(business_id=business_id).distinct()
         elif "business_id" in field_names:
-            return qs.filter(business_id=business_id)
+            return qs.filter(business_id=business_id).distinct()
     
     return qs
 
@@ -929,11 +958,19 @@ def require_business(_fn: Optional[Callable] = None) -> Callable:
 
             user = getattr(request, "user", None)
 
-            # Auto-pick if they have exactly one membership
-            auto_biz = _single_membership_business(user)
-            if auto_biz is not None:
-                set_active_business(request, auto_biz)
-                return view_func(request, *args, **kwargs)
+            # CRITICAL: Use SSOT service to auto-select single-business users
+            # This ensures consistent behavior with middleware
+            try:
+                from tenants.services.active_business import ensure_active_business
+                auto_biz = ensure_active_business(request, user, auto_select_single=True)
+                if auto_biz is not None:
+                    return view_func(request, *args, **kwargs)
+            except ImportError:
+                # Fallback to legacy logic if SSOT not available
+                auto_biz = _single_membership_business(user)
+                if auto_biz is not None:
+                    set_active_business(request, auto_biz)
+                    return view_func(request, *args, **kwargs)
 
             # Superusers should not be forced into tenant onboarding.
             if getattr(user, "is_authenticated", False) and getattr(user, "is_superuser", False):
@@ -1025,15 +1062,48 @@ def require_role(roles: Optional[Iterable[str]] = None) -> Callable:
                 href = f"{target}?next={next_q}" if next_q else target
                 return redirect(href)
 
-            # Must be an ACTIVE member of the active business
-            if not _has_active_membership(user, biz):
+            # Map role names to normalized forms for case-insensitive comparison
+            role_set_upper = {r.upper() for r in role_set}
+            # "Manager" and "Admin" roles should both match membership role "MANAGER"
+            manager_roles_requested = "MANAGER" in role_set_upper or "ADMIN" in role_set_upper
+            if manager_roles_requested:
+                role_set_upper.add("MANAGER")
+                role_set_upper.add("OWNER")  # Owner implies manager-level access
+            
+            # CRITICAL: Check if user is business owner/creator (always has manager access)
+            # This handles cases where business was created but membership wasn't explicitly set up
+            if manager_roles_requested:
                 try:
-                    messages.error(request, "You don’t have access to this business.")
+                    if getattr(biz, "created_by_id", None) == user.pk:
+                        return fn(request, *args, **kwargs)
+                except Exception:
+                    pass
+
+            # Check ACTIVE membership in the active business
+            membership = None
+            try:
+                if Membership is not None:
+                    membership = Membership.objects.filter(
+                        user=user, business=biz, status__iexact="ACTIVE"
+                    ).first()
+            except Exception:
+                pass
+            
+            # If membership exists, check role
+            if membership:
+                mem_role = getattr(membership, "role", "")
+                if mem_role and mem_role.upper() in role_set_upper:
+                    return fn(request, *args, **kwargs)
+            
+            # If no membership but checking for Agent role, deny access (agents must have membership)
+            if not membership and "AGENT" in role_set_upper and not manager_roles_requested:
+                try:
+                    messages.error(request, "You don't have access to this business.")
                 except Exception:
                     pass
                 return redirect_manager_safe_choose(request)
-
-            # Check group role
+            
+            # Check group role (Django groups) as fallback
             if _user_group_names(user).intersection(role_set):
                 return fn(request, *args, **kwargs)
 
@@ -1171,24 +1241,43 @@ def get_business_home_url(user=None, business: Optional["Business"] = None) -> s
     """
     Compute the appropriate business home/dashboard URL for a user.
     
+    SSOT: Uses inventory.utils_verticals for vertical-specific dashboard routing.
+    
     Priority:
-      1) Phones vertical dashboard (if available)
-      2) Inventory dashboard
+      1) Vertical-specific dashboard (based on business_kind)
+      2) Inventory dashboard (fallback)
       3) Generic dashboard:home
       4) Root (/)
     
     Args:
         user: Optional user instance (for future role-based routing)
-        business: Optional Business instance (for future vertical detection)
+        business: Optional Business instance for vertical detection
     
     Returns:
         str: The URL path to redirect to
     """
-    # Try phones vertical dashboard first (most common for agents)
+    # SSOT: Use vertical routing from utils_verticals
+    if business:
+        try:
+            from inventory.utils_verticals import get_vertical_kind, get_vertical_dashboard_url
+            from django.urls import reverse
+            
+            vertical_kind = get_vertical_kind(business)
+            dashboard_url_name = get_vertical_dashboard_url(vertical_kind)
+            
+            if dashboard_url_name:
+                try:
+                    return reverse(dashboard_url_name)
+                except Exception:
+                    pass
+        except ImportError:
+            pass
+    
+    # Fallback: Try common dashboard URLs
     url = safe_reverse_many(
         (
-            "inventory:phones_dashboard",
-            "inventory:verticals_phones",
+            "inventory_verticals:phones_dashboard",
+            "inventory:inventory_dashboard",
             "inventory:dashboard",
             "dashboard:home",
         ),
@@ -1198,21 +1287,6 @@ def get_business_home_url(user=None, business: Optional["Business"] = None) -> s
     # If we got a valid URL that's not just root, use it
     if url and url != "/":
         return url
-    
-    # Fallback: try to construct the phones vertical URL manually
-    # (in case the URL name doesn't match what we expect)
-    try:
-        from django.urls import reverse
-        # Try common patterns
-        for pattern in [
-            "inventory/verticals/phones/",
-            "inventory/dashboard/",
-            "dashboard/",
-        ]:
-            if pattern:
-                return f"/{pattern.lstrip('/')}"
-    except Exception:
-        pass
     
     return "/"
 

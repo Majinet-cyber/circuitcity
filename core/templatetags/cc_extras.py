@@ -4,6 +4,7 @@ Custom template tags and filters for CircuitCity.
 These helpers are registered as builtins in settings.py, so they work
 everywhere without {% load cc_extras %}.
 """
+from decimal import Decimal, InvalidOperation
 from django import template
 from django.utils.safestring import mark_safe
 import hashlib
@@ -108,3 +109,57 @@ def url_for(context, **kwargs):
 
     pairs = [f"{k}={v}" for k, v in params.items()]
     return "?" + "&".join(pairs)
+
+
+@register.filter
+def get_item(obj, key):
+    """
+    Get item from dict-like object by key. Returns empty string if key missing or error.
+
+    Args:
+        obj: A dict-like object (or anything with __getitem__)
+        key: The key to retrieve
+
+    Returns:
+        The value for the key, or "" if not found or error
+
+    Examples:
+        {{ category_map|get_item:category_slug }}
+        {{ dict_var|get_item:"some_key" }}
+    """
+    if obj is None:
+        return ""
+    try:
+        if hasattr(obj, "get"):
+            return obj.get(key, "")
+        return obj[key]
+    except Exception:
+        return ""
+
+
+@register.filter
+def mul(a, b):
+    """
+    Multiply two values safely. Handles None, strings, and Decimal.
+
+    Args:
+        a: First value (numeric or None)
+        b: Second value (numeric or None)
+
+    Returns:
+        Product of a * b, or 0 if either is None or invalid
+
+    Examples:
+        {{ quantity|mul:price }}
+        {{ 5|mul:3 }} -> 15
+        {{ None|mul:5 }} -> 0
+    """
+    if a is None or b is None:
+        return 0
+    try:
+        return Decimal(str(a)) * Decimal(str(b))
+    except (InvalidOperation, ValueError, TypeError):
+        try:
+            return float(a) * float(b)
+        except Exception:
+            return 0

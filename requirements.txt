@@ -25,6 +25,9 @@ statsmodels==0.14.5
 # --- Email (SendGrid via Anymail) ---
 django-anymail[sendgrid]==14.0
 
+# --- Task queue (Celery) ---
+celery>=5.3,<6
+
 # --- Support libraries ---
 asgiref==3.9.1
 certifi==2025.8.3

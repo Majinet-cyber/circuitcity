@@ -10,7 +10,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
-    "cypress:phone": "cypress run --spec 'cypress/e2e/phone_manager_flow.cy.js,cypress/e2e/phone_reports_flow.cy.js'"
+    "cypress:phone": "cypress run --spec 'cypress/e2e/phone_manager_flow.cy.js,cypress/e2e/phone_reports_flow.cy.js'",
+    "pytest:all": "node scripts/run_pytests_and_summarize.mjs",
+    "test:all": "node scripts/run_all_tests.mjs"
   },
   "repository": {
     "type": "git",
@@ -24,6 +26,9 @@
     "url": "https://github.com/Majinet-cyber/circuitcity/issues"
   },
   "homepage": "https://github.com/Majinet-cyber/circuitcity#readme",
+  "dependencies": {
+    "fast-xml-parser": "^4.3.3"
+  },
   "devDependencies": {
     "cypress": "^15.7.0"
   }

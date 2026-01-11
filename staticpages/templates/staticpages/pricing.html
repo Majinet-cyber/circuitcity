@@ -575,7 +575,7 @@
       </p>
       <a href="{% url 'staticpages:contact' %}" class="btn btn-primary">Request custom plan</a>
       <p style="margin-top: 1.5rem; color: var(--text-secondary); font-size: 0.95rem;">
-        Or email us at <a href="mailto:support@emajinet.com" style="color: var(--primary); text-decoration: underline;">support@emajinet.com</a>
+        Or email us at <a href="mailto:{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}" style="color: var(--primary); text-decoration: underline;">{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}</a>
       </p>
     </div>
   </section>

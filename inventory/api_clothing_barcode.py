@@ -116,13 +116,13 @@ def barcode_batch_step1_api(request):
     if location_id:
         # Location explicitly provided
         try:
-            from tenants.models import Location
+            from inventory.models import Location
             location = Location.objects.get(id=location_id, business=business)
         except Location.DoesNotExist:
             return JsonResponse({
                 "ok": False,
                 "code": "invalid_location",
-                "error": f"Location {location_id} not found",
+                "error": f"Location {location_id} not found or inactive",
                 "field_errors": {"location": "Invalid location"}
             }, status=200)
     else:
@@ -133,7 +133,7 @@ def barcode_batch_step1_api(request):
             location_id = request.session.get('active_location_id')
             if location_id:
                 try:
-                    from tenants.models import Location
+                    from inventory.models import Location
                     location = Location.objects.get(id=location_id, business=business)
                 except Location.DoesNotExist:
                     location = None
@@ -141,9 +141,9 @@ def barcode_batch_step1_api(request):
             # Last resort: auto-select
             if not location:
                 try:
-                    from tenants.models import Location
+                    from inventory.models import Location
                     location = Location.objects.filter(
-                        business=business
+                        business=business,
                     ).order_by('-is_default', 'id').first()
                     
                     if location:
@@ -157,7 +157,7 @@ def barcode_batch_step1_api(request):
         return JsonResponse({
             "ok": False,
             "code": "no_active_location",
-            "error": "No location found. Please create a location first.",
+            "error": "No active location found. Please create a location first.",
             "action_url": "/tenants/manage/locations/"
         }, status=200)
 
@@ -420,13 +420,13 @@ def fast_sell_create_api(request):
     if location_id:
         # Location explicitly provided in POST
         try:
-            from tenants.models import Location
+            from inventory.models import Location
             location = Location.objects.get(id=location_id, business=business)
         except Location.DoesNotExist:
             return JsonResponse({
                 "ok": False,
                 "code": "invalid_location",
-                "error": f"Location {location_id} not found"
+                "error": f"Location {location_id} not found or inactive"
             }, status=400)
     else:
         # Fallback to request attribute or session
@@ -435,7 +435,7 @@ def fast_sell_create_api(request):
             location_id = request.session.get('active_location_id')
             if location_id:
                 try:
-                    from tenants.models import Location
+                    from inventory.models import Location
                     location = Location.objects.get(id=location_id, business=business)
                 except Location.DoesNotExist:
                     pass
@@ -443,9 +443,9 @@ def fast_sell_create_api(request):
         # Last resort: auto-select first location
         if not location:
             try:
-                from tenants.models import Location
+                from inventory.models import Location
                 location = Location.objects.filter(
-                    business=business
+                    business=business,
                 ).order_by('-is_default', 'id').first()
                 
                 if location:
@@ -457,7 +457,7 @@ def fast_sell_create_api(request):
         return JsonResponse({
             "ok": False,
             "code": "no_active_location",
-            "error": "No location found. Please create a location first.",
+            "error": "No active location found. Please create a location first.",
             "action_url": "/tenants/manage/locations/"
         }, status=400)
 

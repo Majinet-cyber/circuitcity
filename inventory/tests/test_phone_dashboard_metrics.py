@@ -26,9 +26,10 @@ class PhoneDashboardMetricsTestCase(TestCase):
 
     def setUp(self):
         """Set up test data."""
-        # Create user
+        # Create user - must be is_staff=True for get_visible_actor to recognize as manager
         self.user = User.objects.create_user(
-            username="phonemanager", email="manager@phones.com", password="testpass123"
+            username="phonemanager", email="manager@phones.com", password="testpass123",
+            is_staff=True  # Required for manager visibility in dashboard
         )
 
         # Create phone business
@@ -110,9 +111,10 @@ class PhoneDashboardMetricsTestCase(TestCase):
             payment_method=PaymentMethod.MOBILE_MONEY,
         )
 
-        # Update item status
+        # Update item status (including payment method for dashboard payment mix)
         item.status = "SOLD"
         item.sold_at = timezone.now()
+        item.payment_method = "MOBILE_MONEY"  # Must match Sale.payment_method for dashboard
         item.save()
 
         # Set active business in session
@@ -347,13 +349,15 @@ class PhoneDashboardMetricsTestCase(TestCase):
         )
 
         # Add business cost (rent)
+        # Use timezone.now().date() to be consistent with Django's timezone handling
+        # (date.today() uses local timezone, but dashboard uses timezone.now() which may differ)
         WalletTransaction.objects.create(
             business=self.business,
             ledger=Ledger.COMPANY,
             type=TxnType.COST_ONCE_OFF,
             amount=Decimal("-100000.00"),  # Negative = expense
             note="Rent",
-            effective_date=date.today(),
+            effective_date=timezone.now().date(),
             created_by=self.user,
         )
 
@@ -366,6 +370,12 @@ class PhoneDashboardMetricsTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
         kpis = response.context["dashboard_kpis"]
+        
+        # DEBUG: Print IS_MANAGER flag
+        print(f"DEBUG: IS_MANAGER={response.context.get('IS_MANAGER')}")
+        print(f"DEBUG: IS_AGENT={response.context.get('IS_AGENT')}")
+        print(f"DEBUG: business_costs={kpis.get('business_costs')}")
+        print(f"DEBUG: cost_of_goods={kpis.get('cost_of_goods')}")
 
         # Revenue: 600k
         self.assertEqual(float(kpis["revenue"]), 600000.0)

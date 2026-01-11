@@ -19,8 +19,9 @@ from inventory.models import MerchProduct
 from tests.smoke.fixtures import SmokeTestFixtures
 from tests.smoke.helpers import SessionHelper
 
-# Mark all tests in this module as smoke tests
-pytestmark = [pytest.mark.django_db, pytest.mark.smoke]
+# Mark all tests in this module as smoke AND critical tests
+# These tests cover core business workflows that must never fail
+pytestmark = [pytest.mark.django_db, pytest.mark.smoke, pytest.mark.critical]
 
 
 class TestPhonesWorkflow(TestCase):

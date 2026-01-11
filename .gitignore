@@ -57,6 +57,8 @@ pytest_cache/
 .ruff_cache/
 test_output.txt
 test_output*.txt
+testoutput.txt
+testoutput*.txt
 pytest_full_output.txt
 pytest_output.txt
 pytest_summary.txt
@@ -65,6 +67,9 @@ step1_results.txt
 step2_results.txt
 final_analysis.txt
 single_error.txt
+
+# Test reports (auto-generated)
+reports/
 
 # ----------------------------
 # Editor backups

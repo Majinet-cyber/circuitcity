@@ -20,8 +20,8 @@ class BillingPlansTrialUXTest(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(username="testuser", email="test@example.com", password="testpass123")
-        self.business = Business.objects.create(name="Test Business", slug="test-business")
-        Membership.objects.create(user=self.user, business=self.business, role="MANAGER")
+        self.business = Business.objects.create(name="Test Business", slug="test-business", status="ACTIVE")
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
         
         # Get or create starter plan (may already exist from migrations)
         self.starter_plan, _ = SubscriptionPlan.objects.get_or_create(
@@ -49,7 +49,9 @@ class BillingPlansTrialUXTest(TestCase):
         # Should show trial banner
         self.assertContains(response, "You're on a free trial")
         # Should NOT show CURRENT badge anywhere (critical fix)
-        self.assertNotContains(response, "CURRENT")
+        # Note: We check for the badge HTML specifically to avoid false positives from
+        # JavaScript variables like CURRENT_VERSION in base.html
+        self.assertNotContains(response, ">CURRENT</span>")
         # Should NOT show "Current Plan" disabled button
         self.assertNotContains(response, "Current Plan")
 
@@ -98,8 +100,8 @@ class BillingPlansTrialUXTest(TestCase):
 
         # Should show trial banner
         self.assertContains(response, "You're on a free trial")
-        # Should NOT show CURRENT badge
-        self.assertNotContains(response, "CURRENT")
+        # Should NOT show CURRENT badge (check specific badge HTML to avoid false positives)
+        self.assertNotContains(response, ">CURRENT</span>")
 
     def test_active_user_sees_current_badge_on_paid_plan(self):
         """Active (paid) users should see CURRENT badge on their plan"""

@@ -8,6 +8,8 @@ specifically catching issues like:
 - Orphan {% endwith %} or {% endif %} tags
 - Missing filter arguments
 - Invalid pagination syntax
+- Missing {% load %} statements for templatetags/filters
+- {% extends %} not being the first tag
 """
 from django.test import SimpleTestCase
 from django.template.loader import get_template
@@ -42,6 +44,35 @@ class TemplateCompileTests(SimpleTestCase):
                 error_lines.append(f"  - {name}")
                 error_lines.append(f"    {error_type}: {msg}")
             self.fail('\n'.join(error_lines))
+    
+    def test_critical_templates_compile(self):
+        """
+        Test that critical templates that had compilation issues compile correctly.
+        
+        This specifically tests templates that were previously failing:
+        - accounts/_settings_shell.html: {% extends %} must be first
+        - partials/dashboard_kpis.html: wallet_money filter + missing {% load static %}
+        - partials/kpi_card_clickable.html: wallet_money filter
+        - partials/smart_pricing_feedback.html: missing {% load static %}
+        """
+        critical_templates = [
+            'accounts/_settings_shell.html',
+            'partials/dashboard_kpis.html',
+            'partials/kpi_card_clickable.html',
+            'partials/smart_pricing_feedback.html',
+        ]
+        
+        for template_name in critical_templates:
+            with self.subTest(template=template_name):
+                try:
+                    template = get_template(template_name)
+                    # Successfully getting the template means it compiled without errors
+                    self.assertIsNotNone(template)
+                except Exception as e:
+                    self.fail(
+                        f"Template '{template_name}' failed to compile:\n"
+                        f"  {type(e).__name__}: {e}"
+                    )
     
     def test_phones_dashboard_template_compiles(self):
         """

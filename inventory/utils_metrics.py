@@ -10,8 +10,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Optional
 
-from django.db.models import Avg, Count, F, Q
-from django.db.models.functions import Coalesce
+from django.db.models import Avg, Count, F, Q, DecimalField, ExpressionWrapper
+from django.db.models.functions import Coalesce, Cast
 
 
 # Default gross margin for electronics/phones when no sales history exists
@@ -117,29 +117,23 @@ def _compute_margin_from_sales(sales_qs) -> Optional[Decimal]:
     Returns average margin across all sales, or None if invalid.
     """
     try:
-        # Annotate each sale with its margin percentage
-        # margin = (price - order_price) / order_price
-        annotated = sales_qs.annotate(
-            margin_pct=Coalesce(
-                (F("price") - F("item__order_price")) / F("item__order_price"),
-                Decimal("0"),
-            )
-        )
-
-        # Filter out extreme outliers (negative margins or > 200%)
-        # This prevents bad data from skewing the average
-        valid_margins = annotated.filter(
-            margin_pct__gte=Decimal("-0.5"),  # Allow some negative (returns/errors)
-            margin_pct__lte=Decimal("2.0"),  # Cap at 200% margin
-        )
-
-        if valid_margins.count() == 0:
+        # Use Python-side calculation for reliability across databases
+        margins = []
+        for sale in sales_qs.select_related("item"):
+            price = getattr(sale, "price", None)
+            order_price = getattr(sale.item, "order_price", None) if sale.item else None
+            
+            if price and order_price and order_price > 0:
+                margin = (Decimal(str(price)) - Decimal(str(order_price))) / Decimal(str(order_price))
+                # Filter out extreme outliers
+                if Decimal("-0.5") <= margin <= Decimal("2.0"):
+                    margins.append(margin)
+        
+        if not margins:
             return None
-
-        avg_margin = valid_margins.aggregate(avg=Avg("margin_pct"))["avg"]
-
-        if avg_margin is not None:
-            return Decimal(str(avg_margin))
+        
+        avg_margin = sum(margins) / len(margins)
+        return Decimal(str(avg_margin))
 
     except Exception:
         pass
@@ -155,26 +149,23 @@ def _compute_margin_from_inventory(inventory_qs) -> Optional[Decimal]:
     Returns average margin, or None if invalid.
     """
     try:
-        annotated = inventory_qs.annotate(
-            margin_pct=Coalesce(
-                (F("selling_price") - F("order_price")) / F("order_price"),
-                Decimal("0"),
-            )
-        )
-
-        # Filter out extreme outliers
-        valid_margins = annotated.filter(
-            margin_pct__gte=Decimal("-0.5"),
-            margin_pct__lte=Decimal("2.0"),
-        )
-
-        if valid_margins.count() == 0:
+        # Use Python-side calculation for reliability across databases
+        margins = []
+        for item in inventory_qs:
+            selling_price = getattr(item, "selling_price", None)
+            order_price = getattr(item, "order_price", None)
+            
+            if selling_price and order_price and order_price > 0:
+                margin = (Decimal(str(selling_price)) - Decimal(str(order_price))) / Decimal(str(order_price))
+                # Filter out extreme outliers
+                if Decimal("-0.5") <= margin <= Decimal("2.0"):
+                    margins.append(margin)
+        
+        if not margins:
             return None
-
-        avg_margin = valid_margins.aggregate(avg=Avg("margin_pct"))["avg"]
-
-        if avg_margin is not None:
-            return Decimal(str(avg_margin))
+        
+        avg_margin = sum(margins) / len(margins)
+        return Decimal(str(avg_margin))
 
     except Exception:
         pass
@@ -186,10 +177,10 @@ def _clamp_margin(margin: Decimal) -> Decimal:
     """
     Clamp margin to reasonable bounds (0% to MAX_MARGIN).
 
-    If margin is negative or unrealistic, return DEFAULT_MARGIN instead.
+    If margin is negative, zero, or unrealistic, return DEFAULT_MARGIN instead.
     """
-    # If negative or zero, use default
-    if margin < Decimal("0"):
+    # If negative or zero, use default (zero margin is unrealistic)
+    if margin <= Decimal("0"):
         return DEFAULT_MARGIN
 
     # If unrealistically high, cap it

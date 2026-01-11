@@ -44,6 +44,8 @@ def _relaxed_test_settings(settings):
         pass
     # Speed up password hashing in tests
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+    # Ensure TESTING is True for notification/on_commit handling
+    settings.TESTING = True
 
 
 # --- Test helpers for creating unique test data ----------------------------

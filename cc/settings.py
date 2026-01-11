@@ -182,6 +182,22 @@ if IS_RUNSERVER:
     SECURE_PROXY_SSL_HEADER = None
     USE_X_FORWARDED_HOST = False
 
+# 🧪 CI/TESTING: disable SSL redirect and secure cookies even when DEBUG=False
+# This ensures tests can run on http://testserver without redirect/cookie issues.
+# Production protection remains intact when CI and TESTING are both falsy.
+if CI or TESTING:
+    USE_SSL = False
+    FORCE_SSL = False
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    # Also disable proxy headers in CI/tests
+    SECURE_PROXY_SSL_HEADER = None
+    USE_X_FORWARDED_HOST = False
+
 # --------------------------- canonical host (SEO) ---------------------------
 # Canonical host for production: www.emajinet.africa
 # This is used by CanonicalURLMiddleware to enforce one canonical domain.
@@ -328,7 +344,8 @@ TEMPLATES = [
         ],
         "APP_DIRS": True,
         "OPTIONS": {
-            "debug": DEBUG,
+            # Disable template debug during tests to prevent VariableDoesNotExist spam
+            "debug": DEBUG and not TESTING,
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
@@ -338,6 +355,8 @@ TEMPLATES = [
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "cc.context_processors.currency_config",
+                "cc.context_processors.marketing_constants",
+                "cc.context_processors.current_year",
                 "core.context_processor.static_versioning",
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
@@ -586,6 +605,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# --------------------------- Profile defaults ---------------------------
+# Single source of truth for Profile sidecar creation defaults
+# These MUST match Profile model field names and ensure NOT NULL constraints are satisfied
+DEFAULT_PROFILE_CITY = "Lilongwe"
+DEFAULT_PROFILE_COUNTRY = "Malawi"
+DEFAULT_PROFILE_TIMEZONE = "Africa/Blantyre"
+DEFAULT_PROFILE_LANGUAGE = "English"
+DEFAULT_PROFILE_CURRENCY = "MWK"
 # Use faster password hashing in CI for speed
 if CI:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
@@ -933,7 +961,8 @@ PAYCHANGU_WEBHOOK_DEBUG = env_bool("PAYCHANGU_WEBHOOK_DEBUG", False)
 PAYCHANGU_API_BASE = os.environ.get("PAYCHANGU_API_BASE", "https://api.paychangu.com")
 
 # Production guard: prevent test mode in production
-if not DEBUG and PAYCHANGU_MODE == "test":
+# Allow test mode in CI/tests (where DEBUG=False is expected but real payments should never happen)
+if not DEBUG and PAYCHANGU_MODE == "test" and not (CI or TESTING):
     raise ImproperlyConfigured(
         "PAYCHANGU_MODE cannot be 'test' when DEBUG=False. "
         "Set PAYCHANGU_MODE=live in production or enable DEBUG for local testing."
@@ -944,6 +973,12 @@ WHATSAPP_API_BASE_URL = os.environ.get("WHATSAPP_API_BASE_URL", "https://graph.f
 WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
+
+# --------------------------- marketing & contact constants ---------------------------
+# Centralize marketing constants for consistency across public pages
+SUPPORT_EMAIL = "support@emajinet.africa"
+SUPPORT_WHATSAPP_NUMBER = os.environ.get("SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135")  # Real working number
+MARKETING_ACTIVE_BUSINESSES = 34  # Real count - update when milestones reached
 
 # --------------------------- global UI ---------------------------
 UI = {
@@ -988,7 +1023,8 @@ LOGGING = {
     "loggers": {
         "django.template": {
             "handlers": ["console"],
-            "level": "DEBUG" if DEBUG else "INFO",
+            # Reduce template debug spam during tests; only DEBUG when not testing
+            "level": "DEBUG" if (DEBUG and not TESTING) else "INFO",
             "propagate": True,
         },
     },

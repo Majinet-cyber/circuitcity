@@ -20,14 +20,76 @@
   
   <!-- Open Graph / Social Media -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.emajinet.africa{{ request.path }}">
   <meta property="og:title" content="Emajinet – Malawian Business Management SaaS for African Businesses">
   <meta property="og:description" content="Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.">
   <meta property="og:site_name" content="Emajinet">
+  <meta property="og:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Emajinet Logo">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://www.emajinet.africa{{ request.path }}">
   <meta name="twitter:title" content="Emajinet – Malawian Business Management SaaS for African Businesses">
   <meta name="twitter:description" content="Emajinet is a Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.">
+  <meta name="twitter:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
+  <meta name="twitter:image:alt" content="Emajinet Logo">
+  
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Emajinet",
+    "url": "https://www.emajinet.africa/",
+    "logo": "https://www.emajinet.africa{% static 'img/majn.png' %}",
+    "description": "A Malawian SaaS platform built for African businesses to manage inventory, track stock, and replace manual ledgers with AI-driven insights.",
+    "foundingLocation": {
+      "@type": "Place",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "MW"
+      }
+    },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "telephone": "{{ SUPPORT_WHATSAPP_NUMBER|default:'+265 993 396 135' }}",
+      "contactType": "customer support",
+      "email": "{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}",
+      "availableLanguage": ["en"]
+    },
+    "sameAs": []
+  }
+  </script>
+  
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Emajinet",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "url": "https://www.emajinet.africa/",
+    "description": "Business management SaaS platform for African SMEs and merchants. Manage inventory, track sales, monitor performance, and get AI-powered insights—all from a mobile-first platform.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "MWK",
+      "priceSpecification": {
+        "@type": "UnitPriceSpecification",
+        "billingDuration": "P30D",
+        "name": "30-day free trial"
+      }
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "5",
+      "ratingCount": "{{ total_merchants|default:34 }}"
+    }
+  }
+  </script>
   <style>
     :root {
       --primary: #4f46e5;
@@ -1681,9 +1743,7 @@
           Doing business <span class="highlight">shouldn't be a headache</span>
         </h1>
         <p class="hero-subtitle">
-          Emajinet puts your business in a system that survives tomorrow.<br>
-          Track inventory, sales, performance, and adverts—one digital platform.<br>
-          Built in Malawi for African businesses.
+          The operating system for small businesses—manage stock, track sales and profits, run your shop, farm, or workshop, and grow with AI-powered insights.
         </p>
         
         <!-- Live Platform Growth Metrics -->
@@ -1707,7 +1767,7 @@
         {% else %}
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1); text-align: center;">
           <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Growing daily</div>
-          <div style="font-size: 0.875rem; color: var(--text-secondary);">Join businesses already using Emajinet</div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary);">Join {{ total_merchants|default:34 }}+ businesses already using Emajinet</div>
         </div>
         {% endif %}
       </div>
@@ -1720,7 +1780,7 @@
   <!-- Section CTA after Stats -->
   <section class="section-cta landing-container">
     <h3>Ready to get started?</h3>
-    <p>Join businesses already using Emajinet to manage their operations</p>
+    <p>Join {{ total_merchants|default:34 }}+ businesses already using Emajinet to manage their operations</p>
   </section>
 
   <!-- Reality → Solution Stats Section -->
@@ -1851,7 +1911,7 @@
     <div style="max-width: 800px; margin: 0 auto;">
       <h2 class="section-title" style="margin-bottom: 1.5rem;">Our Mission</h2>
       <p style="font-size: 1.25rem; line-height: 1.8; color: var(--text-secondary); margin-bottom: 0;">
-        The <strong>Spotify of every small business</strong>. A digital record and AI-driven MBA manager for every ledger and common person in Malawi and beyond.
+        The <strong>operating system of small businesses</strong>. We give every shop, farm, and workshop an AI-powered backoffice that handles inventory, sales, and insights — so owners can focus on what they do best.
       </p>
     </div>
   </section>
@@ -1995,7 +2055,7 @@
           <div class="team-avatar">JM</div>
           <div style="flex: 1; min-width: 0;">
             <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Josephy Miamba</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Director of Operations</p>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Head of Marketing</p>
           </div>
         </div>
         <ul class="education-list" data-team-member="jm">
@@ -2039,6 +2099,33 @@
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">BSc in ICT — Mzuzu University</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Faith Banda -->
+      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
+        <div class="team-card-header">
+          <div class="team-avatar">FB</div>
+          <div style="flex: 1; min-width: 0;">
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Faith Banda</h3>
+            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Executive Director</p>
+          </div>
+        </div>
+        <ul class="education-list" data-team-member="fb">
+          <li>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
+              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
+              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
+            </svg>
+            <span style="overflow: hidden; text-overflow: ellipsis;">Master of Science in Sustainable Energy — University of Strathclyde</span>
+          </li>
+          <li>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
+              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
+              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
+            </svg>
+            <span style="overflow: hidden; text-overflow: ellipsis;">BSc. in Sustainable Energy — MUST</span>
           </li>
         </ul>
       </div>
@@ -2206,7 +2293,7 @@
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
-    <p class="cta-subtitle">Join thousands of merchants already using Emajinet</p>
+    <p class="cta-subtitle">Join {{ total_merchants|default:34 }}+ businesses already using Emajinet</p>
   </section>
 
   <!-- Footer -->
@@ -2949,6 +3036,7 @@
     })();
 
   </script>
+<!-- build: {{ BUILD_SHA|default:"unknown" }} -->
 </body>
 </html>
 

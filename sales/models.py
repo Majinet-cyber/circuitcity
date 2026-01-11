@@ -78,9 +78,9 @@ class Sale(models.Model):
         ]
         ordering = ["-created_at"]
         constraints = [
-            models.CheckConstraint(check=models.Q(price__gte=0), name="sale_price_nonneg"),
+            models.CheckConstraint(condition=models.Q(price__gte=0), name="sale_price_nonneg"),
             models.CheckConstraint(
-                check=models.Q(commission_pct__gte=0) & models.Q(commission_pct__lte=100),
+                condition=models.Q(commission_pct__gte=0) & models.Q(commission_pct__lte=100),
                 name="sale_commission_pct_0_100",
             ),
         ]

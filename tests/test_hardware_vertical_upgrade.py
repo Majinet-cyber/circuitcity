@@ -25,7 +25,7 @@ from inventory.catalog.hardware import (
     search_products,
 )
 from inventory.utils_verticals import get_vertical_display_name, get_vertical_sidebar_items
-from tenants.models import Business
+from tenants.models import Business, Membership
 
 User = get_user_model()
 
@@ -202,7 +202,12 @@ class HardwareCatalogViewsTest(TestCase):
             business_kind=BusinessKind.CEMENT,
             status="ACTIVE",
         )
-        self.hardware_business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.hardware_business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
 
         # Create a non-hardware business for leakage tests
         self.phones_business = Business.objects.create(
@@ -210,7 +215,12 @@ class HardwareCatalogViewsTest(TestCase):
             business_kind=BusinessKind.PHONES,
             status="ACTIVE",
         )
-        self.phones_business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.phones_business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
 
     def test_products_catalog_accessible_for_hardware(self):
         """Hardware businesses should access products catalog"""
@@ -275,7 +285,12 @@ class HardwareNoRegressionsTest(TestCase):
             business_kind=BusinessKind.CEMENT,
             status="ACTIVE",
         )
-        self.business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
 
     def test_cement_dashboard_still_works(self):
         """Existing cement dashboard should still be accessible"""
@@ -342,7 +357,12 @@ class HardwareVerticalLeakageTest(TestCase):
             business_kind=BusinessKind.PHONES,
             status="ACTIVE",
         )
-        business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
 
         sidebar_items = get_vertical_sidebar_items("phones")
 

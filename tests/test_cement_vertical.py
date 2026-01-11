@@ -11,7 +11,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from inventory.business_kinds import BusinessKind
-from inventory.cement_seed import CEMENT_BRANDS, seed_cement_defaults
+from inventory.cement_seed import CEMENT_BRANDS, CEMENT_CATALOG, seed_cement_defaults
 from inventory.models import MerchProduct
 from inventory.models_verticals import CementSale
 from tenants.models import Business, Membership
@@ -44,9 +44,9 @@ class TestCementSeeding(TestCase):
         products = MerchProduct.objects.filter(business=self.business, kind=BusinessKind.CEMENT)
         assert products.count() == 9
 
-        # Verify brand names match
+        # Verify brand names match (using full product names from CEMENT_CATALOG SSOT)
         product_names = set(p.name for p in products)
-        expected_names = {brand["name"] for brand in CEMENT_BRANDS}
+        expected_names = {item["name"] for item in CEMENT_CATALOG}
         assert product_names == expected_names
 
     def test_seed_cement_defaults_is_idempotent(self):
@@ -67,7 +67,9 @@ class TestCementSeeding(TestCase):
         """Test that seeded products have correct default values"""
         seed_cement_defaults(self.business)
 
-        product = MerchProduct.objects.get(business=self.business, name="Dangote", kind=BusinessKind.CEMENT)
+        # Use full SSOT product name (e.g., "Dangote Cement BAG (50KG)")
+        dangote_name = next(item["name"] for item in CEMENT_CATALOG if "Dangote" in item["name"])
+        product = MerchProduct.objects.get(business=self.business, name=dangote_name, kind=BusinessKind.CEMENT)
 
         assert product.base_unit == "bag"
         assert product.quantity_in_stock == 0
@@ -75,7 +77,7 @@ class TestCementSeeding(TestCase):
         assert product.selling_price == Decimal("0.00")
         assert product.is_active is True
         assert product.track_inventory is True
-        assert product.low_stock_threshold == 50
+        # Note: low_stock_threshold was removed from MerchProduct model
 
     def test_seed_cement_defaults_wrong_vertical(self):
         """Test that seeding fails for non-cement businesses"""
@@ -101,9 +103,10 @@ class TestCementSellGuardrails(TestCase):
         )
         Membership.objects.create(user=self.user, business=self.business, role="Agent")
 
-        # Seed and stock Dangote cement
+        # Seed and stock Dangote cement (use full SSOT name)
         seed_cement_defaults(self.business)
-        self.dangote = MerchProduct.objects.get(business=self.business, name="Dangote", kind=BusinessKind.CEMENT)
+        dangote_name = next(item["name"] for item in CEMENT_CATALOG if "Dangote" in item["name"])
+        self.dangote = MerchProduct.objects.get(business=self.business, name=dangote_name, kind=BusinessKind.CEMENT)
         self.dangote.quantity_in_stock = 10  # Stock 10 bags
         self.dangote.cost_price = Decimal("50000")
         self.dangote.selling_price = Decimal("60000")
@@ -250,7 +253,9 @@ class TestCementStockIn(TestCase):
         # Seed defaults
         seed_cement_defaults(self.business)
 
-        akshar = MerchProduct.objects.get(business=self.business, name="Akshar", kind=BusinessKind.CEMENT)
+        # Use full SSOT product name
+        akshar_name = next(item["name"] for item in CEMENT_CATALOG if "Akshar" in item["name"])
+        akshar = MerchProduct.objects.get(business=self.business, name=akshar_name, kind=BusinessKind.CEMENT)
         initial_stock = akshar.quantity_in_stock
 
         # Stock in via form (simulating step 3)

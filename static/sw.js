@@ -1,9 +1,13 @@
 // ---- Emajinet Service Worker (PWA) ----
-// Network-first for HTML, Stale-While-Revalidate for static assets
-// VERSION is dynamically injected from BUILD_ID/STATIC_VERSION to ensure cache busting
-const VERSION = 'emajinet-v1-BUILD_ID_PLACEHOLDER';
+// CRITICAL: Never cache HTML navigation responses
+// HTML always goes to network (no cache fallback)
+// This prevents stale templates from persisting after deploys
+// 
+// Static assets use Stale-While-Revalidate for performance
+//
+// VERSION changes on each deploy to bust old caches
+const VERSION = 'emajinet-v2-20260110';
 const STATIC_CACHE = `${VERSION}-static`;
-const PAGE_CACHE   = `${VERSION}-pages`;
 const CDN_CACHE    = `${VERSION}-cdn`;
 const OFFLINE_PAGE = '/offline/';
 
@@ -57,26 +61,23 @@ async function swr(cacheName, request) {
   return cached || (await fetchPromise) || cached || Response.error();
 }
 
-// Network-First (with cache fallback and offline page)
-async function networkFirst(cacheName, request) {
+// Network-Only for HTML (NEVER cache HTML to prevent stale templates)
+async function networkOnlyHtml(request) {
   try {
     const res = await fetch(request);
-    cachePut(cacheName, request, res);
-    return res.clone();
+    // CRITICAL: Do NOT cache HTML responses
+    // This ensures template changes are visible immediately after deploy
+    return res;
   } catch (_) {
-    const cache = await caches.open(cacheName);
-    const cached = await cache.match(request, { ignoreVary: true });
-    if (cached) return cached;
+    // If network fails, try to serve offline page
+    const offlinePage = await caches.match(OFFLINE_PAGE);
+    if (offlinePage) return offlinePage;
     
-    // If no cached version, try to serve offline page for HTML requests
-    if (isDoc(request)) {
-      const offlinePage = await caches.match(OFFLINE_PAGE);
-      if (offlinePage) return offlinePage;
-    }
-    
-    // Last resort: try app shell
-    const appShell = await caches.match('/');
-    return appShell || Response.error();
+    // Last resort: return a minimal error response
+    return new Response(
+      '<html><body><h1>Offline</h1><p>Please check your internet connection.</p></body></html>',
+      { status: 503, headers: { 'Content-Type': 'text/html' } }
+    );
   }
 }
 
@@ -104,14 +105,17 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate: clean old caches
+// Activate: clean ALL old caches (cache busting)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
-      const keep = new Set([STATIC_CACHE, PAGE_CACHE, CDN_CACHE]);
+      // Only keep current version caches - delete ALL old caches
+      const keep = new Set([STATIC_CACHE, CDN_CACHE]);
       const keys = await caches.keys();
       await Promise.all(keys.map((k) => (keep.has(k) ? null : caches.delete(k))));
+      // Take control of all clients immediately
       await self.clients.claim();
+      console.log(`[SW] Activated version ${VERSION}, cleaned old caches`);
     })()
   );
 });
@@ -123,9 +127,10 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // HTML & navigations -> network first (so new deploys show immediately)
+  // CRITICAL: HTML & navigations -> NETWORK ONLY (never cache HTML)
+  // This is the fix for stale template issues
   if (isDoc(request)) {
-    event.respondWith(networkFirst(PAGE_CACHE, request));
+    event.respondWith(networkOnlyHtml(request));
     return;
   }
 

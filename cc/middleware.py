@@ -258,12 +258,17 @@ class PreventHQFromClientUI(MiddlewareMixin):
 # ------------------------------------------------------------------
 class AutoSelectBusinessMiddleware(MiddlewareMixin):
     """
+    SSOT-based active business middleware.
+    
     If an authenticated user has exactly one active membership, automatically set:
       - request.active_business / request.session['active_business_id']
       - request.active_location  (first active location for that business)
 
-    This makes pages like stock list / scan-in work without the user manually
-    choosing a business each time.
+    This prevents 302 redirects to /tenants/ for single-business users.
+    Multi-business users still see the tenant chooser (no behavior change).
+    
+    CRITICAL: This must run BEFORE any middleware that checks for active business
+    and redirects to /tenants/ (e.g., require_business decorator logic).
     """
 
     def process_request(self, request: HttpRequest):
@@ -272,48 +277,65 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
             if not _safe_is_authenticated(user):
                 return
 
+            # Use SSOT service to ensure active business
+            try:
+                from tenants.services.active_business import ensure_active_business, _ensure_default_location
+                
+                biz = ensure_active_business(request, user, auto_select_single=True)
+                
+                # If business was set, ensure location too
+                if biz:
+                    _ensure_default_location(request, biz)
+            except ImportError:
+                # SSOT service not available, fall back to inline logic
+                self._fallback_auto_select(request, user)
+        except Exception:
+            # Never break requests because of auto-select logic
+            pass
+
+    # ----------------- fallback for backwards compatibility -----------------
+
+    def _fallback_auto_select(self, request: HttpRequest, user):
+        """Fallback implementation if SSOT service is not available."""
+        try:
             # If already set on request or session, do nothing.
-            try:
-                if getattr(request, "active_business", None) or request.session.get("active_business_id"):
-                    # Ensure a location is present if business exists but location isn't set.
-                    if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
-                        self._ensure_location(request)
-                    return
-            except Exception:
-                # If session access explodes due to DB, quietly skip auto-select
+            if getattr(request, "active_business", None) or request.session.get("active_business_id"):
+                # Ensure a location is present if business exists but location isn't set.
+                if getattr(request, "active_business", None) and not getattr(request, "active_location", None):
+                    self._ensure_location(request)
                 return
 
-            # Try tenants models (prefer un-namespaced, then circuitcity.*)
-            BM = self._import_membership_model()
-            if not BM:
+            # Try tenants models
+            try:
+                from tenants.models import Membership
+            except ImportError:
                 return
 
-            qs = BM.objects.filter(user=user)
-            # Be defensive about flags
+            qs = Membership.objects.filter(user=user).select_related("business")
+            
+            # Filter active memberships
             try:
-                field_names = [fld.name for fld in BM._meta.fields]
+                field_names = {f.name for f in Membership._meta.fields}
+                if "status" in field_names:
+                    qs = qs.filter(status="ACTIVE")
+                elif "is_active" in field_names:
+                    qs = qs.filter(is_active=True)
             except Exception:
-                field_names = []
+                pass
 
-            for f in ("is_active", "active", "accepted"):
-                if f in field_names:
-                    try:
-                        qs = qs.filter(**{f: True})
-                    except Exception:
-                        pass
-
-            # Avoid expensive count() if DB is unhappy
+            # Filter active businesses
             try:
-                count = qs.count()
+                qs = qs.filter(business__status="ACTIVE")
             except Exception:
-                return
+                pass
 
+            # Only auto-select if exactly ONE
+            count = qs.count()
             if count != 1:
                 return
 
-            try:
-                membership = qs.first()
-            except Exception:
+            membership = qs.first()
+            if not membership:
                 return
 
             biz = getattr(membership, "business", None)
@@ -322,69 +344,61 @@ class AutoSelectBusinessMiddleware(MiddlewareMixin):
 
             # Set business on request and session
             request.active_business = biz
+            request.business = biz
             request.active_business_id = getattr(biz, "id", None)
+            
             try:
                 request.session["active_business_id"] = getattr(biz, "id", None)
-                # legacy keys some old code might read
                 request.session["biz_id"] = getattr(biz, "id", None)
+                request.session.modified = True
             except Exception:
-                # If session write fails, still keep request-scoped values
                 pass
 
             # Ensure a default location
             self._ensure_location(request)
         except Exception:
-            # Never break requests because of auto-select logic
             pass
 
-    # ----------------- helpers -----------------
-
-    def _import_membership_model(self):
-        try:
-            from tenants.models import BusinessMembership  # type: ignore
-
-            return BusinessMembership
-        except Exception:
-            try:
-                from circuitcity.tenants.models import BusinessMembership  # type: ignore
-
-                return BusinessMembership
-            except Exception:
-                return None
-
-    def _import_location_model(self):
-        try:
-            from tenants.models import Location  # type: ignore
-
-            return Location
-        except Exception:
-            try:
-                from circuitcity.tenants.models import Location  # type: ignore
-
-                return Location
-            except Exception:
-                return None
-
     def _ensure_location(self, request: HttpRequest):
-        biz = getattr(request, "active_business", None)
+        """Ensure a default location is set."""
+        biz = getattr(request, "active_business", None) or getattr(request, "business", None)
         if not biz:
             return
-        Location = self._import_location_model()
-        if not Location:
+        
+        # Skip if already set
+        if getattr(request, "active_location", None):
             return
+        
         try:
-            field_names = [f.name for f in Location._meta.fields]
-        except Exception:
-            field_names = []
+            from tenants.models import Location
+        except ImportError:
+            return
 
         try:
             qs = Location.objects.filter(business=biz)
-            if "is_active" in field_names:
-                qs = qs.filter(is_active=True)
-            loc = qs.order_by("name").first()
+            
+            # Prefer active locations
+            try:
+                if hasattr(Location, "is_active"):
+                    qs = qs.filter(is_active=True)
+            except Exception:
+                pass
+            
+            # Prefer headquarters or default
+            loc = (
+                qs.filter(is_headquarters=True).first()
+                or qs.filter(is_default=True).first()
+                or qs.order_by("name").first()
+            )
+            
             if loc:
                 request.active_location = loc
                 request.active_location_id = getattr(loc, "id", None)
+                try:
+                    request.session["active_location_id"] = getattr(loc, "id", None)
+                    request.session.modified = True
+                except Exception:
+                    pass
         except Exception:
             pass
 

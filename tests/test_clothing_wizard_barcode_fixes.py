@@ -13,7 +13,7 @@ from decimal import Decimal
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
-from tenants.models import Business
+from tenants.models import Business, Membership
 from inventory.models import MerchProduct
 from inventory.models_verticals import ClothingSale
 from inventory.business_kinds import BusinessKind
@@ -37,7 +37,12 @@ class ClothingWizardBarcodeFixesTestCase(TestCase):
             kind=BusinessKind.CLOTHING,
             owner=self.user
         )
-        self.business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         self.client.login(username="testmanager", password="testpass123")
         
         # Set active business in session
@@ -276,7 +281,12 @@ class ClothingDashboardRecentSalesTestCase(TestCase):
             kind=BusinessKind.CLOTHING,
             owner=self.user
         )
-        self.business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         self.client.login(username="testmanager", password="testpass123")
         
         # Set active business in session
@@ -355,7 +365,12 @@ class ClothingPaymentMethodPanelsTestCase(TestCase):
             kind=BusinessKind.CLOTHING,
             owner=self.user
         )
-        self.business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         self.client.login(username="testmanager", password="testpass123")
         
         # Set active business in session
@@ -443,7 +458,12 @@ class ClothingSmartPricingTestCase(TestCase):
             kind=BusinessKind.CLOTHING,
             owner=self.user
         )
-        self.business.members.add(self.user)
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
         self.client.login(username="testmanager", password="testpass123")
         
         # Set active business in session
