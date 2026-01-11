@@ -1,5 +1,6 @@
 # Generated manually to add missing location_id column to CementCost
 # Fixed: Check if column exists before adding (idempotent)
+# Fixed: Use Django introspection instead of SQLite PRAGMA (works on Postgres too)
 
 import django.db.models.deletion
 from django.db import migrations, models
@@ -9,14 +10,25 @@ def add_location_if_missing(apps, schema_editor):
     """
     Add location_id column to CementCost if it doesn't exist.
     This makes the migration idempotent - safe to run even if column exists.
+    Uses Django's database-agnostic introspection (works on SQLite and Postgres).
     """
     connection = schema_editor.connection
     cursor = connection.cursor()
 
-    # Check if location_id column exists
+    # Check if location_id column exists using Django's introspection
+    # This works on all database backends (SQLite, Postgres, MySQL, etc.)
     table_name = "inventory_cementcost"
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    columns = {row[1] for row in cursor.fetchall()}
+
+    # Get table description - returns list of FieldInfo named tuples
+    # Each has .name attribute for column name
+    try:
+        table_description = connection.introspection.get_table_description(
+            cursor, table_name
+        )
+        columns = {col.name for col in table_description}
+    except Exception:
+        # Table might not exist yet - let Django handle it
+        columns = set()
 
     if "location_id" not in columns:
         # Column doesn't exist, add it
