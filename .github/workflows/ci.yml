@@ -47,6 +47,7 @@ jobs:
       DEBUG: "0"
       ENABLE_EMAIL_OTP: "0"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
 
     steps:
       - uses: actions/checkout@v4
@@ -126,6 +127,7 @@ jobs:
       ENABLE_EMAIL_OTP: "0"
       DEBUG: "0"
       ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PAYCHANGU_MODE: "test"  # Explicit: never hit live payments in CI
 
     services:
       postgres:

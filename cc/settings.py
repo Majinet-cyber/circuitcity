@@ -945,7 +945,8 @@ PAYCHANGU_WEBHOOK_DEBUG = env_bool("PAYCHANGU_WEBHOOK_DEBUG", False)
 PAYCHANGU_API_BASE = os.environ.get("PAYCHANGU_API_BASE", "https://api.paychangu.com")
 
 # Production guard: prevent test mode in production
-if not DEBUG and PAYCHANGU_MODE == "test":
+# Allow test mode in CI/tests (where DEBUG=False is expected but real payments should never happen)
+if not DEBUG and PAYCHANGU_MODE == "test" and not (CI or TESTING):
     raise ImproperlyConfigured(
         "PAYCHANGU_MODE cannot be 'test' when DEBUG=False. "
         "Set PAYCHANGU_MODE=live in production or enable DEBUG for local testing."
