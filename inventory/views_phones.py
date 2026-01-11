@@ -194,16 +194,69 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 
     Shows brand cards (ITEL, TECNO, SAMSUNG) → model dropdown → IMEI → submit.
     Displays daily scan target progress bar at top.
+    
+    For non-PHONES businesses (e.g., hardware), renders the generic scan_in template
+    directly to avoid redirect loops.
     """
     business = get_active_business(request)
     if not business:
         messages.error(request, "No active business selected.")
         return redirect("inventory:inventory_dashboard")
 
-    # Only for PHONES businesses
+    # Non-PHONES businesses: render generic scan-in directly (no redirect to avoid loops)
     if getattr(business, "business_kind", None) != BusinessKind.PHONES:
-        # Redirect to generic scan-in
-        return redirect("inventory:scan_in")
+        # Use ScanInView's get_context_data to build context, then render template
+        from inventory.views_scan import (
+            _query_products, _query_locations, 
+            _pick_default_location
+        )
+        from inventory.models import Location
+        from django.urls import reverse_lazy
+        
+        # Resolve location for user (same as in phone_scan_in flow)
+        location_id = resolve_location_for_user(request)
+        location = None
+        if location_id:
+            try:
+                location = Location.objects.get(pk=location_id, business=business)
+            except Location.DoesNotExist:
+                pass
+        
+        # If no location found, ensure a default location exists
+        if not location:
+            location = Location.ensure_default_for_business(business)
+        
+        # Build context manually (same as ScanInView.get_context_data)
+        products = _query_products(request)
+        locations = _query_locations(request)
+        default_loc_id, default_loc_name = _pick_default_location(request, locations)
+        
+        # Always provide a dict with id/name keys to avoid template lookup errors
+        default_location_dict = {
+            "id": default_loc_id or (location.id if location else ""),
+            "name": default_loc_name or (location.name if location else ""),
+        }
+        
+        context = {
+            "post_url": reverse_lazy("inventory:api_scan_in"),
+            "products": products,
+            "locations": locations,
+            "default_location": default_location_dict,
+            "default_location_id": default_location_dict["id"],
+            "default_location_name": default_location_dict["name"],
+            "active_business_name": getattr(business, "name", None),
+            "business": business,
+            "location": location,
+            "lock_location": True,
+            "received_date_default": date.today(),
+            "phone_brands": [],
+            "rules": {
+                "imei_length": 15,
+                "require_product": True,
+                "order_price_autofill": True,
+            },
+        }
+        return render(request, "inventory/scan_in.html", context)
 
     location_id = resolve_location_for_user(request)
 
