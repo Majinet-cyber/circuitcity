@@ -61,13 +61,13 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Step 1: Add fields WITHOUT unique constraint
+        # Step 1: Add fields WITHOUT indexes (we'll add them idempotently later)
         migrations.AddField(
             model_name="gymmember",
             name="member_number",
             field=models.CharField(
                 blank=True,
-                db_index=True,
+                db_index=False,  # Changed: will add index via RunSQL
                 default="",
                 help_text="Human-friendly member number (e.g., EW-000123)",
                 max_length=20,
@@ -78,28 +78,75 @@ class Migration(migrations.Migration):
             name="qr_token",
             field=models.CharField(
                 blank=True,
-                db_index=True,
+                db_index=False,  # Changed: will add index via RunSQL
                 default="",
                 help_text="Stable unique QR token for scanning (UUID-based)",
                 max_length=64,
-                unique=False,  # Will add unique constraint later
+                unique=False,
             ),
         ),
         # Step 2: Populate unique values for existing members
         migrations.RunPython(populate_member_identifiers, reverse_populate),
-        # Step 3: Now add unique constraint to qr_token
-        migrations.AlterField(
-            model_name="gymmember",
-            name="qr_token",
-            field=models.CharField(
-                blank=True,
-                db_index=True,
-                default="",
-                help_text="Stable unique QR token for scanning (UUID-based)",
-                max_length=64,
-                unique=True,
-            ),
+        # Step 3: Add unique constraint and indexes using idempotent SQL
+        # Use SeparateDatabaseAndState so Django's state knows about the constraints
+        # but the actual SQL is guarded with IF NOT EXISTS
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                # Tell Django the field is now unique with db_index
+                migrations.AlterField(
+                    model_name="gymmember",
+                    name="qr_token",
+                    field=models.CharField(
+                        blank=True,
+                        db_index=True,
+                        default="",
+                        help_text="Stable unique QR token for scanning (UUID-based)",
+                        max_length=64,
+                        unique=True,
+                    ),
+                ),
+            ],
+            database_operations=[
+                # Create unique constraint idempotently
+                migrations.RunSQL(
+                    sql="""
+                    DO $$
+                    BEGIN
+                        -- Drop non-unique index if it exists (from partial migrations)
+                        DROP INDEX IF EXISTS inventory_gymmember_qr_token_d804806a;
+                        DROP INDEX IF EXISTS inventory_gymmember_qr_token_d804806a_like;
+                        
+                        -- Create unique constraint if not exists
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint 
+                            WHERE conname = 'inventory_gymmember_qr_token_key'
+                        ) THEN
+                            ALTER TABLE inventory_gymmember 
+                            ADD CONSTRAINT inventory_gymmember_qr_token_key UNIQUE (qr_token);
+                        END IF;
+                        
+                        -- Create like index if not exists
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_indexes 
+                            WHERE indexname = 'inventory_gymmember_qr_token_like'
+                        ) THEN
+                            CREATE INDEX inventory_gymmember_qr_token_like 
+                            ON inventory_gymmember (qr_token varchar_pattern_ops);
+                        END IF;
+                    END $$;
+                    """,
+                    reverse_sql="""
+                    DO $$
+                    BEGIN
+                        ALTER TABLE inventory_gymmember 
+                        DROP CONSTRAINT IF EXISTS inventory_gymmember_qr_token_key;
+                        DROP INDEX IF EXISTS inventory_gymmember_qr_token_like;
+                    END $$;
+                    """,
+                ),
+            ],
         ),
+        # Update member_code field
         migrations.AlterField(
             model_name="gymmember",
             name="member_code",
@@ -111,12 +158,77 @@ class Migration(migrations.Migration):
                 max_length=20,
             ),
         ),
-        migrations.AddIndex(
-            model_name="gymmember",
-            index=models.Index(fields=["member_number"], name="inventory_g_member__efd743_idx"),
+        # Add explicit indexes using idempotent SQL
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddIndex(
+                    model_name="gymmember",
+                    index=models.Index(fields=["member_number"], name="inventory_g_member__efd743_idx"),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql="CREATE INDEX IF NOT EXISTS inventory_g_member__efd743_idx ON inventory_gymmember (member_number);",
+                    reverse_sql="DROP INDEX IF EXISTS inventory_g_member__efd743_idx;",
+                ),
+            ],
         ),
-        migrations.AddIndex(
-            model_name="gymmember",
-            index=models.Index(fields=["qr_token"], name="inventory_g_qr_toke_a433f7_idx"),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddIndex(
+                    model_name="gymmember",
+                    index=models.Index(fields=["qr_token"], name="inventory_g_qr_toke_a433f7_idx"),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql="CREATE INDEX IF NOT EXISTS inventory_g_qr_toke_a433f7_idx ON inventory_gymmember (qr_token);",
+                    reverse_sql="DROP INDEX IF EXISTS inventory_g_qr_toke_a433f7_idx;",
+                ),
+            ],
+        ),
+        # Update member_number field state to reflect db_index=True
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AlterField(
+                    model_name="gymmember",
+                    name="member_number",
+                    field=models.CharField(
+                        blank=True,
+                        db_index=True,
+                        default="",
+                        help_text="Human-friendly member number (e.g., EW-000123)",
+                        max_length=20,
+                    ),
+                ),
+            ],
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_indexes 
+                            WHERE indexname = 'inventory_gymmember_member_number_idx'
+                        ) THEN
+                            CREATE INDEX inventory_gymmember_member_number_idx 
+                            ON inventory_gymmember (member_number);
+                        END IF;
+                        
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_indexes 
+                            WHERE indexname = 'inventory_gymmember_member_number_like'
+                        ) THEN
+                            CREATE INDEX inventory_gymmember_member_number_like 
+                            ON inventory_gymmember (member_number varchar_pattern_ops);
+                        END IF;
+                    END $$;
+                    """,
+                    reverse_sql="""
+                    DROP INDEX IF EXISTS inventory_gymmember_member_number_idx;
+                    DROP INDEX IF EXISTS inventory_gymmember_member_number_like;
+                    """,
+                ),
+            ],
         ),
     ]
