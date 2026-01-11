@@ -68,9 +68,21 @@ jobs:
           python manage.py check
           python manage.py migrate --noinput
 
-      - name: Run unit tests (pytest)
+      # CRITICAL RELIABILITY GATE
+      # These tests MUST pass - they cover the "embarrassing" failures
+      - name: Run CRITICAL tests (reliability gate)
         run: |
-          python -m pytest -q
+          echo "========================================"
+          echo "  CRITICAL RELIABILITY GATE"
+          echo "========================================"
+          echo "These tests must ALL pass to continue."
+          python -m pytest -m critical --maxfail=1 -q
+        continue-on-error: false
+
+      # Full test suite runs after critical tests pass
+      - name: Run full test suite
+        run: |
+          python -m pytest -q --ignore=tests/critical/
 
 
   cypress:

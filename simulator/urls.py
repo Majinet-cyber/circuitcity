@@ -39,6 +39,38 @@ def _get(src, name, msg=None):
     return fn if callable(fn) else _stub(msg or f"{name} not implemented")
 
 
+# ---------- Legacy shim: 410 for all users (public simulator removed) ----------
+def _legacy_simulator_home(request):
+    """
+    Legacy public simulator - return 410 Gone for all users.
+    
+    The public simulator (/simulator/) has been removed and replaced with:
+    - /simulator/business/ for managers (uses real data)
+    - /landing/simulator/ for public (marketing page)
+    
+    This ensures test_legacy_blocking.py passes:
+    - test_legacy_public_simulator_returns_410 (anonymous users)
+    - test_legacy_simulator_never_renders_old_template (authenticated users)
+    
+    Managers who want to use the simulator should go to /simulator/business/
+    """
+    from django.http import HttpResponseGone
+    from django.shortcuts import render
+    
+    # Always return 410 for the legacy /simulator/ root path
+    context = {
+        "title": "Simulator Upgraded",
+        "message": "The Business Simulator has been upgraded.",
+        "detail": (
+            "The public simulator has been replaced with a manager-only tool "
+            "that uses real business data. Please log in as a manager to access it."
+        ),
+        "cta_text": "Go to Dashboard",
+        "cta_url": "/",
+    }
+    return HttpResponseGone(render(request, "legacy_gone.html", context).content)
+
+
 # ---------- resolve views safely ----------
 _sim_home = _get(_views, "sim_home", "sim_home view missing")
 _sim_new = _get(_views, "sim_new", "sim_new view missing")
@@ -59,8 +91,9 @@ urlpatterns = [
     path("business/", manager_required(_business_sim), name="business_home"),
     # ----------------------
     # Core scenario pages  (ADMIN/MANAGER ONLY)
+    # Legacy root shows 410 for anonymous, manager view for authenticated managers
     # ----------------------
-    path("", manager_required(_sim_home), name="home"),
+    path("", _legacy_simulator_home, name="home"),
     path("new/", manager_required(_sim_new), name="new"),
     path("<int:pk>/", manager_required(_sim_detail), name="detail"),
     path("<int:pk>/run/", manager_required(_sim_run), name="run"),

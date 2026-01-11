@@ -1042,6 +1042,8 @@ urlpatterns = [
     path("stock/", _need_biz(_stock_list_wrapper(_stock_list))),
     path("list/all/", _need_biz(_stock_list_wrapper(_list_all_redirect)), name="stock_list_all"),
     path("stocks/", _redirect_to("inventory:stock_list")),
+    # Generic dashboard (safe fallback for unrecognized verticals - NO redirects)
+    path("generic-dashboard/", _need_biz(views.generic_dashboard), name="generic_dashboard"),
     # Legacy inventory dashboard (not vertical-specific)
     path("dashboard/", _need_biz(_inventory_dashboard), name="inventory_dashboard"),
     path("dashboard", _redirect_to("inventory:inventory_dashboard"), name="dashboard"),
@@ -1108,6 +1110,17 @@ urlpatterns = [
             )
         ),
         name="restore_stock",
+    ),
+    # Stock CRUD operations (manager-only: edit and delete)
+    path(
+        "stock/<int:pk>/edit/",
+        manager_required(_need_biz(_update_stock)),
+        name="stock_edit",
+    ),
+    path(
+        "stock/<int:pk>/delete/",
+        manager_required(_need_biz(_delete_stock)),
+        name="stock_delete",
     ),
     # Premium Archive Flow (4-step safety process)
     path(
@@ -1794,4 +1807,21 @@ urlpatterns += [
         manager_required(_need_biz(_wizard_views.clothing_wizard_submit)),
         name="clothing_wizard_submit",
     ),
+    path(
+        "check-barcode-duplicate/",
+        _need_biz(_wizard_views.check_barcode_duplicate),
+        name="check_barcode_duplicate",
+    ),
 ]
+
+# ======================================================================================
+# URL COMPATIBILITY ALIASES (SSOT)
+# Import compatibility URL patterns from cc.urls_compat to ensure consistent naming
+# across all URLConfs. This allows tests using reverse('stock'), reverse('sell'), etc.
+# to work correctly when inventory URLConf is loaded.
+# ======================================================================================
+try:
+    from cc.urls_compat import get_compat_urlpatterns
+    urlpatterns += get_compat_urlpatterns()
+except ImportError:
+    pass  # If cc.urls_compat not available, skip (shouldn't happen in normal operation)

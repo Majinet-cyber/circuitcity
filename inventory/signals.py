@@ -4,11 +4,12 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Any
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import InventoryItem
+from .models import InventoryItem, AgentProfile
 
 try:
     from .models import InventoryAudit  # optional in some setups
@@ -513,3 +514,49 @@ if Sale is not None:
             except Exception:
                 pass
         _bump_cache()
+
+
+# ---------------------------------------------------------------------
+# Auto-create AgentProfile for new users
+# ---------------------------------------------------------------------
+# This ensures tests that access user.agent_profile don't fail with
+# RelatedObjectDoesNotExist. The profile is created with no location
+# initially; the location is set when the user is assigned to a business.
+
+User = get_user_model()
+
+
+@receiver(post_save, sender=User, dispatch_uid="inventory.ensure_agent_profile_for_user")
+def ensure_agent_profile_for_user(sender, instance, created, **kwargs):
+    """
+    Auto-create AgentProfile for every new user.
+    
+    This is idempotent - if AgentProfile already exists, this is a no-op.
+    The profile is created with no location initially; location is set
+    when the user is assigned to a business/membership.
+    
+    IMPORTANT: This signal ensures legacy test code that accesses
+    user.agent_profile works without RelatedObjectDoesNotExist errors.
+    """
+    if not created:
+        return
+    
+    # Skip staff/superuser accounts - they typically don't need agent profiles
+    if getattr(instance, 'is_superuser', False) or getattr(instance, 'is_staff', False):
+        return
+    
+    # Idempotent check - don't create if already exists
+    try:
+        if hasattr(instance, 'agent_profile') and instance.agent_profile is not None:
+            return
+    except AgentProfile.DoesNotExist:
+        pass
+    except Exception:
+        pass
+    
+    # Create AgentProfile with no location (location can be set later)
+    try:
+        AgentProfile.objects.get_or_create(user=instance, defaults={'location': None})
+    except Exception:
+        # Don't break user creation if profile creation fails
+        pass

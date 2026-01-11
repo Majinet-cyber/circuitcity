@@ -18,8 +18,10 @@ from tests.smoke.helpers import SidebarLinkExtractor
 
 User = get_user_model()
 
+# Mark all tests in this module as smoke tests
+pytestmark = [pytest.mark.django_db, pytest.mark.smoke]
 
-@pytest.mark.django_db
+
 class TestHQPlatformSidebarRoutes(TestCase):
     """Test HQ platform sidebar routes for staff/superuser."""
     
@@ -80,7 +82,6 @@ class TestHQPlatformSidebarRoutes(TestCase):
         assert 'Server Error (500)' not in content, "HQ dashboard contains error"
 
 
-@pytest.mark.django_db
 class TestHQAccessControl(TestCase):
     """Test that HQ routes are protected (non-staff cannot access)."""
     
@@ -113,7 +114,6 @@ class TestHQAccessControl(TestCase):
             f"Non-staff should not access /hq/businesses/, got {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestHQBusinessCreation(TestCase):
     """Test HQ business creation workflow (smoke test for onboarding)."""
     

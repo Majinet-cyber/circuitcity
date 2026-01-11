@@ -28,6 +28,7 @@ User = get_user_model()
 
 
 @pytest.mark.django_db
+@pytest.mark.critical  # Data isolation is security-critical
 class TestDashboardDataIsolation(TestCase):
     """
     Test that dashboard metrics are correctly scoped to business and don't leak data.

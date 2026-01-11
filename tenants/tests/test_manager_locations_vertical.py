@@ -35,7 +35,9 @@ def phones_business(db):
     """Create a phones business"""
     return Business.objects.create(
         name="Phone Shop",
-        business_kind=BusinessKind.PHONES
+        business_kind=BusinessKind.PHONES,
+        status="ACTIVE",
+        slug="phone-shop"
     )
 
 
@@ -44,7 +46,9 @@ def liquor_business(db):
     """Create a liquor business"""
     return Business.objects.create(
         name="Liquor Store",
-        business_kind=BusinessKind.LIQUOR
+        business_kind=BusinessKind.LIQUOR,
+        status="ACTIVE",
+        slug="liquor-store"
     )
 
 
@@ -53,7 +57,9 @@ def gym_business(db):
     """Create a gym business"""
     return Business.objects.create(
         name="Fitness Center",
-        business_kind=BusinessKind.GYM
+        business_kind=BusinessKind.GYM,
+        status="ACTIVE",
+        slug="fitness-center"
     )
 
 
@@ -62,7 +68,9 @@ def clothing_business(db):
     """Create a clothing business"""
     return Business.objects.create(
         name="Fashion Boutique",
-        business_kind=BusinessKind.CLOTHING
+        business_kind=BusinessKind.CLOTHING,
+        status="ACTIVE",
+        slug="fashion-boutique"
     )
 
 
@@ -407,7 +415,9 @@ class TestManagerLocationsGeneric:
         # Create a business with no specific kind
         business = Business.objects.create(
             name="Generic Store",
-            business_kind="generic"  # or any unknown vertical
+            business_kind="generic",  # or any unknown vertical
+            status="ACTIVE",
+            slug="generic-store"
         )
         
         setup_client_for_business(client, manager_user, business)

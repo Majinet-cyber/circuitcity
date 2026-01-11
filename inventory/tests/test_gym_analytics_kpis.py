@@ -5,11 +5,13 @@ Tests for gym analytics KPIs and charts.
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from circuitcity.accounts.models import User
 from inventory.analytics.adapters.gym import GymAdapter
+
+User = get_user_model()
 from inventory.models_verticals import GymCheckIn, GymMember, GymMemberStatus, GymPayment, GymTrainer, PaymentMethod
 from tenants.models import Business
 

@@ -14,6 +14,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from core.models_compat_kwargs import CompatKwargsMixin
 from tenants.models import Business
 
 User = settings.AUTH_USER_MODEL
@@ -159,11 +160,18 @@ class PharmacyBatchQuerySet(models.QuerySet):
 # ==============================================================================
 
 
-class PharmacyBatch(models.Model):
+class PharmacyBatch(CompatKwargsMixin, models.Model):
     """
     Batch-level tracking for pharmacy products with expiry dates.
     Essential for FIFO (first-in-first-out) and expiry management.
     """
+
+    # Backwards compatibility: Map legacy kwargs to canonical fields
+    COMPAT_MAP = {
+        'units_remaining': 'quantity',               # Legacy alias for quantity
+        'cost_price_per_unit': 'cost_price',         # Legacy alias for cost_price
+        'selling_price_per_unit': 'selling_price',   # Legacy alias for selling_price
+    }
 
     merch_product = models.ForeignKey(
         "inventory.MerchProduct",

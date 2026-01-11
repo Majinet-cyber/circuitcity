@@ -29,6 +29,10 @@ class DashboardMetricsTestCase(TestCase):
         self.business = Business.objects.create(
             name="Test Business", slug="test-business", business_kind=BusinessKind.PHONES, status="ACTIVE"
         )
+        
+        # Disable commissions for this business to isolate admin costs testing
+        # (Commission tests should be separate; this tests admin costs specifically)
+        self._disable_commissions()
 
         # Create location
         self.location = Location.objects.create(business=self.business, name="Main Store", city="Test City")
@@ -73,6 +77,20 @@ class DashboardMetricsTestCase(TestCase):
         now = timezone.now()
         self.start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         self.end_date = self.start_date + timedelta(days=1)
+
+    def _disable_commissions(self):
+        """Disable commissions for the test business to isolate admin costs testing."""
+        try:
+            from sales.models import CommissionConfig
+            CommissionConfig.objects.update_or_create(
+                business=self.business,
+                defaults={
+                    "commissions_enabled": False,
+                    "commission_mode": "PERCENT",
+                },
+            )
+        except ImportError:
+            pass  # CommissionConfig may not exist
 
     def test_admin_wallet_costs_included_in_inventory_dashboard(self):
         """Test that admin wallet costs are included in dashboard metrics."""

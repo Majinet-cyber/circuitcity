@@ -110,9 +110,10 @@ class PhoneDashboardMetricsTestCase(TestCase):
             payment_method=PaymentMethod.MOBILE_MONEY,
         )
 
-        # Update item status
+        # Update item status (including payment method for dashboard payment mix)
         item.status = "SOLD"
         item.sold_at = timezone.now()
+        item.payment_method = "MOBILE_MONEY"  # Must match Sale.payment_method for dashboard
         item.save()
 
         # Set active business in session

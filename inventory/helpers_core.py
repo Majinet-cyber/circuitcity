@@ -1,8 +1,9 @@
 ﻿# inventory/helpers.py
 from __future__ import annotations
 
-from typing import Optional, Dict, Iterable
-from django.urls import reverse, NoReverseMatch
+from typing import Dict, Iterable, Optional
+
+from django.urls import NoReverseMatch, reverse
 
 # ------------------------------------------------------------------
 # Canonical vertical keys
@@ -13,6 +14,9 @@ CLOTHING = "clothing"
 LIQUOR = "liquor"
 GROCERY = "grocery"
 GYM = "gym"
+CEMENT = "cement"
+FARM = "farm"
+WELDING = "welding"
 GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -52,6 +56,22 @@ _ALIASES: Dict[str, str] = {
     "gym": GYM,
     "fitness": GYM,
     "fit": GYM,
+    # cement / hardware
+    "cement": CEMENT,
+    "hardware": CEMENT,
+    "building materials": CEMENT,
+    # farm / agriculture
+    "farm": FARM,
+    "farming": FARM,
+    "agriculture": FARM,
+    "farm manager": FARM,
+    "agribusiness": FARM,
+    # welding / fabrication
+    "welding": WELDING,
+    "welder": WELDING,
+    "welding workshop": WELDING,
+    "fabrication": WELDING,
+    "metalwork": WELDING,
 }
 
 # Which fields on Business we will probe to determine vertical

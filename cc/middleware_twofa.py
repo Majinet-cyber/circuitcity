@@ -15,6 +15,19 @@ from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import Resolver404, resolve, reverse
 
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES as SHARED_BYPASS_PREFIXES
+except ImportError:
+    # Fallback if import fails
+    SHARED_BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
+
 
 class TwoFactorAuthMiddleware:
     """
@@ -30,7 +43,8 @@ class TwoFactorAuthMiddleware:
     """
 
     # Paths that are always allowed (even without passing 2FA)
-    ALLOWLIST = [
+    # Combine shared bypass prefixes with 2FA-specific allowlist
+    ALLOWLIST = list(SHARED_BYPASS_PREFIXES) + [
         # 2FA-related pages
         "/accounts/2fa/challenge/",
         "/accounts/2fa/resend/",
@@ -43,9 +57,6 @@ class TwoFactorAuthMiddleware:
         "/accounts/logout/",
         # Admin (prevent staff lockout)
         "/admin/",
-        # Static/media assets
-        "/static/",
-        "/media/",
         # Health checks (for load balancers)
         "/health/",
         "/ping/",

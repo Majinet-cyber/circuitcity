@@ -10,19 +10,28 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.deprecation import MiddlewareMixin
 
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES as SHARED_BYPASS_PREFIXES
+except ImportError:
+    # Fallback if import fails
+    SHARED_BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
 
 # Paths that should always be accessible (no force password change check)
-FORCE_PWD_EXEMPT_PREFIXES = (
+# Combine shared bypass prefixes with password-change-specific exemptions
+FORCE_PWD_EXEMPT_PREFIXES = list(SHARED_BYPASS_PREFIXES) + [
     "/accounts/logout/",
     "/accounts/password/change/",
     "/accounts/password/set/",
     "/accounts/set-new-password/",
-    "/static/",
-    "/media/",
     "/admin/",
-    settings.STATIC_URL or "/static/",
-    settings.MEDIA_URL or "/media/",
-)
+]
 
 
 class ForcePasswordChangeMiddleware(MiddlewareMixin):

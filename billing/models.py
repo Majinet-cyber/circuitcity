@@ -21,6 +21,104 @@ GRACE_DAYS_DEFAULT = getattr(settings, "BILLING_GRACE_DAYS", 30)  # default 30-d
 
 
 # ======================================================================
+# Pending Checkout (tracks plan selection before payment confirmation)
+# ======================================================================
+class PendingCheckout(models.Model):
+    """
+    Tracks plan selection and checkout attempts BEFORE payment is confirmed.
+    This avoids creating invoices or locking in plans until payment succeeds.
+    """
+    
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+        EXPIRED = "expired", "Expired"
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="pending_checkouts",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    
+    selected_plan = models.ForeignKey(
+        "SubscriptionPlan",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pending_checkouts",
+    )
+    selected_plan_code = models.CharField(
+        max_length=50,
+        help_text="Plan code user selected",
+    )
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(0)],
+        help_text="Plan amount at time of selection",
+    )
+    currency = models.CharField(max_length=10, default="MWK")
+    
+    tx_ref = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Payment provider transaction reference",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+    
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Additional metadata (payment method, provider, etc.)",
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When this pending checkout expires",
+    )
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "status"]),
+            models.Index(fields=["tx_ref"]),
+        ]
+    
+    def __str__(self):
+        return f"{self.business.name} - {self.selected_plan_code} - {self.status}"
+    
+    def mark_succeeded(self):
+        """Mark this checkout as succeeded."""
+        self.status = self.Status.SUCCEEDED
+        self.save(update_fields=["status", "updated_at"])
+    
+    def mark_failed(self, reason: str = ""):
+        """Mark this checkout as failed."""
+        self.status = self.Status.FAILED
+        if reason:
+            self.metadata["failure_reason"] = reason
+        self.save(update_fields=["status", "metadata", "updated_at"])
+
+
+# ======================================================================
 # Plans
 # ======================================================================
 class SubscriptionPlan(models.Model):
@@ -145,6 +243,43 @@ class BusinessSubscription(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
     )
 
+    # Dunning & auto-billing fields
+    billing_phone = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        help_text="Phone number (MSISDN) for automated billing prompts. Format: +265991234567",
+    )
+    grace_until = models.DateTimeField(
+        null=True, blank=True, help_text="Grace period end (period_end + 2 days when renewal unpaid)"
+    )
+    past_due_since = models.DateTimeField(null=True, blank=True, help_text="When subscription became past_due")
+    suspended_at = models.DateTimeField(null=True, blank=True, help_text="When subscription was suspended")
+
+    # Cancellation tracking
+    cancel_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When cancel_at_period_end was set (user requested cancellation)",
+    )
+
+    # HQ notification tracking (idempotency)
+    hq_notified_cancel_requested_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of cancellation request (idempotency)",
+    )
+    hq_notified_canceled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of effective cancellation (idempotency)",
+    )
+    hq_notified_suspended_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of suspension (idempotency)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -191,14 +326,39 @@ class BusinessSubscription(models.Model):
     @classmethod
     def ensure_trial_for_business(cls, business) -> "BusinessSubscription":
         """
-        Ensure a subscription exists; if missing, seed a trial on the cheapest active plan.
+        Ensure a subscription exists; if missing, seed a trial using SSOT plan resolver.
+        
+        This method is idempotent - calling it multiple times is safe.
+        It uses the centralized plan resolver to guarantee a valid plan.
         """
+        # Check if subscription already exists
         sub = getattr(business, "subscription", None)
         if sub:
             return sub
-        plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
-        if not plan:
-            plan = SubscriptionPlan.objects.create(code="starter", name="Starter", amount=Decimal("0.00"))
+        
+        # Also check via direct query (more reliable)
+        existing = cls.objects.filter(business=business).first()
+        if existing:
+            return existing
+        
+        # Use SSOT plan resolver (guaranteed to return a valid plan)
+        try:
+            from billing.services.plan_resolver import get_default_trial_plan
+            plan = get_default_trial_plan(
+                business_kind=getattr(business, "business_kind", None),
+                create_if_missing=True,
+            )
+        except Exception:
+            # Fallback if resolver fails (should never happen)
+            plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
+            if not plan:
+                plan = SubscriptionPlan.objects.create(
+                    code="starter", 
+                    name="Starter", 
+                    amount=Decimal("0.00"),
+                    is_active=True,
+                )
+        
         return cls.start_trial(business=business, plan=plan)
 
     # ---- Status helpers ------------------------------------------------
@@ -540,6 +700,20 @@ class Invoice(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
     paid_at = models.DateTimeField(null=True, blank=True)
 
+    # Dunning / Auto-billing retry fields
+    next_attempt_at = models.DateTimeField(
+        null=True, blank=True, help_text="When to attempt next billing retry (dunning)"
+    )
+    attempt_count = models.PositiveIntegerField(default=0, help_text="Number of billing attempts made")
+    locked_for_dunning = models.BooleanField(default=False, help_text="Lock to prevent concurrent dunning processing")
+
+    # HQ notification tracking (idempotency)
+    hq_notified_paid_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When HQ was notified of payment (idempotency)",
+    )
+
     # Money
     currency = models.CharField(max_length=8, default=CURRENCY_DEFAULT)
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -682,6 +856,72 @@ class InvoiceItem(models.Model):
     @property
     def line_total(self) -> Decimal:
         return (self.qty * self.unit_price).quantize(Decimal("0.01"))
+
+
+# ======================================================================
+# Billing Attempts (Dunning Audit Trail)
+# ======================================================================
+class BillingAttempt(models.Model):
+    """
+    Records each attempt to bill a subscription renewal invoice.
+    Used for dunning retries and audit trail (idempotent + auditable).
+    """
+
+    class Status(models.TextChoices):
+        INITIATED = "initiated", "Initiated"
+        FAILED = "failed", "Failed"
+        SUCCEEDED = "succeeded", "Succeeded"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="billing_attempts")
+    subscription = models.ForeignKey(
+        BusinessSubscription, on_delete=models.CASCADE, related_name="billing_attempts", null=True, blank=True
+    )
+
+    attempt_no = models.PositiveIntegerField(default=1, help_text="Attempt number (1-6 for dunning retries)")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.INITIATED)
+
+    # Payment session details
+    provider_ref = models.CharField(
+        max_length=255, blank=True, default="", help_text="Payment provider reference (tx_ref, etc.)"
+    )
+    payment_session_id = models.CharField(
+        max_length=255, blank=True, default="", help_text="Payment session/checkout ID"
+    )
+    error_message = models.TextField(blank=True, default="", help_text="Error message if failed")
+
+    # Metadata
+    meta = models.JSONField(default=dict, blank=True, help_text="Additional metadata (method, amount, etc.)")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["invoice", "attempt_no"]),
+            models.Index(fields=["subscription", "status"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Attempt #{self.attempt_no} for {self.invoice} - {self.get_status_display()}"
+
+    def mark_succeeded(self, provider_ref: str = "", save: bool = True):
+        """Mark this attempt as succeeded."""
+        self.status = self.Status.SUCCEEDED
+        if provider_ref:
+            self.provider_ref = provider_ref
+        if save:
+            self.save(update_fields=["status", "provider_ref", "updated_at"])
+
+    def mark_failed(self, error_message: str = "", save: bool = True):
+        """Mark this attempt as failed."""
+        self.status = self.Status.FAILED
+        if error_message:
+            self.error_message = error_message
+        if save:
+            self.save(update_fields=["status", "error_message", "updated_at"])
 
 
 # ======================================================================
@@ -952,25 +1192,14 @@ def _recalc_invoice_on_item_delete(sender, instance: InvoiceItem, **kwargs):
         inv.recalc_totals(save=True)
 
 
-# (Optional) Seed a trial automatically when a Business is created.
-# Wrapped in a try/import guard so it won't break during initial bootstrap.
-try:
-    from django.db.models.signals import post_save as _post_save_business
-
-    from tenants.models import Business as _BusinessModel  # type: ignore
-
-    @_post_save_business.connect(sender=_BusinessModel)
-    def _auto_seed_trial_on_business_create(sender, instance, created, **kwargs):
-        if created:
-            try:
-                BusinessSubscription.ensure_trial_for_business(instance)
-            except Exception:
-                # Avoid crashing tenant creation path
-                pass
-
-except Exception:
-    # No tenants model yet (e.g., during first migration)
-    pass
+# NOTE: Trial subscription creation is now handled by tenants/signals.py
+# using transaction.on_commit() for transaction safety. The signal there
+# uses the SSOT plan resolver from billing.services.plan_resolver.
+# 
+# DO NOT re-add a signal here - it would create duplicate subscriptions
+# and/or cause race conditions.
+#
+# See: tenants/signals.py:ensure_trial_on_business_creation
 
 
 # ======================================================================

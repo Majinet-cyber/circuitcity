@@ -327,8 +327,90 @@
     </div>
   </div>
 
-  {# Current Plan Card #}
-  {% if sub and sub.plan %}
+  {# Cancellation/Past Due Banners #}
+  {% if sub.cancel_at_period_end %}
+  <div class="card" style="background: linear-gradient(135deg, rgba(251, 146, 60, 0.1), rgba(253, 186, 116, 0.1)); border-color: rgba(251, 146, 60, 0.3);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.5rem;">😔</span>
+      <div style="flex: 1;">
+        <p style="margin: 0; font-weight: 700; font-size: 1.1rem;">Subscription Cancels on {{ sub.current_period_end|date:"F j, Y" }}</p>
+        <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">You'll keep access until then. Changed your mind?</p>
+      </div>
+      <form method="post" action="{% url 'billing:undo_cancellation' %}" style="margin: 0;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+          Undo Cancellation
+        </button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sub.status == 'past_due' %}
+  <div class="card" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(252, 165, 165, 0.1)); border-color: rgba(239, 68, 68, 0.3);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.5rem;">⚠️</span>
+      <div style="flex: 1;">
+        <p style="margin: 0; font-weight: 700; font-size: 1.1rem; color: rgb(220, 38, 38);">Payment Required</p>
+        <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">
+          {% if sub.grace_until %}
+            Grace period until {{ sub.grace_until|date:"F j, Y" }}. Please pay to avoid suspension.
+          {% else %}
+            Please pay to avoid suspension.
+          {% endif %}
+        </p>
+      </div>
+      <a href="{% url 'billing:checkout' %}" class="btn btn-primary" style="white-space: nowrap;">
+        Pay Now
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sub.status == 'suspended' %}
+  <div class="card" style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(252, 165, 165, 0.15)); border-color: rgba(239, 68, 68, 0.4);">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="font-size: 1.5rem;">🚫</span>
+      <div style="flex: 1;">
+        <p style="margin: 0; font-weight: 700; font-size: 1.1rem; color: rgb(220, 38, 38);">Subscription Suspended</p>
+        <p style="margin: 4px 0 0; opacity: 0.9; font-size: 0.95rem;">Your grace period has expired. Please pay to reactivate.</p>
+      </div>
+      <a href="{% url 'billing:checkout' %}" class="btn btn-primary" style="white-space: nowrap;">
+        Reactivate
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Trial Info Card (for trial users who haven't paid yet) #}
+  {% if not is_paid_active and sub.status in 'trial,trialing' %}
+  <div class="card" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.08), rgba(147, 197, 253, 0.08)); border-color: rgba(59, 130, 246, 0.2);">
+    <h2 style="margin: 0 0 16px; font-size: 1.2rem; font-weight: 700; opacity: 0.9;">🎯 Free Trial</h2>
+    <p style="margin: 0 0 12px; font-size: 1rem; opacity: 0.9;">
+      You're currently on a free trial. Choose a plan below to continue access after your trial ends.
+    </p>
+    {% if sub.trial_end %}
+    <div class="plan-details">
+      <div class="detail-row">
+        <span class="detail-label">Trial ends</span>
+        <span class="detail-value">{{ sub.trial_end|date:"F j, Y" }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Days remaining</span>
+        <span class="detail-value">{{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }}</span>
+      </div>
+    </div>
+    {% endif %}
+    <div style="margin-top: 16px;">
+      <a href="{% url 'billing:plans' %}" class="btn btn-primary" style="width: 100%;">
+        Choose a Plan & Pay
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Current Plan Card (only for paid/active subscriptions) #}
+  {% if is_paid_active and sub and sub.plan %}
   <div class="card current-plan">
     <h2 style="margin: 0 0 16px; font-size: 1.2rem; font-weight: 700; opacity: 0.9;">Current Plan</h2>
     <div class="plan-name">{{ sub.plan.name }}</div>
@@ -337,21 +419,10 @@
     </div>
 
     <div class="plan-details">
-      {% if sub.status == 'trial' or sub.status == 'trialing' %}
-        {% if sub.trial_end %}
-        <div class="detail-row">
-          <span class="detail-label">Trial ends</span>
-          <span class="detail-value">{{ sub.trial_end|date:"F j, Y" }}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Days remaining</span>
-          <span class="detail-value">{{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }}</span>
-        </div>
-        {% endif %}
-      {% elif sub.status == 'active' %}
+      {% if sub.status == 'active' %}
         {% if sub.current_period_end %}
         <div class="detail-row">
-          <span class="detail-label">Next billing date</span>
+          <span class="detail-label">{% if sub.cancel_at_period_end %}Cancels on{% else %}Next billing date{% endif %}</span>
           <span class="detail-value">{{ sub.current_period_end|date:"F j, Y" }}</span>
         </div>
         {% endif %}
@@ -369,7 +440,52 @@
         <span class="detail-value">{{ sub.get_payment_method_display }}</span>
       </div>
       {% endif %}
+
+      {# Billing Phone #}
+      <div class="detail-row">
+        <span class="detail-label">Billing phone</span>
+        <span class="detail-value">{{ sub.billing_phone|default:"Not set" }}</span>
+      </div>
     </div>
+
+    {# Billing Phone Form #}
+    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
+      <h3 style="margin: 0 0 12px; font-size: 1rem; font-weight: 700;">Update Billing Phone</h3>
+      <p style="margin: 0 0 12px; opacity: 0.85; font-size: 0.9rem;">
+        Phone number for automated billing prompts (e.g., +265991234567)
+      </p>
+      <form method="post" action="{% url 'billing:update_billing_phone' %}" style="display: flex; gap: 8px;">
+        {% csrf_token %}
+        <input
+          type="tel"
+          name="billing_phone"
+          value="{{ sub.billing_phone }}"
+          placeholder="+265991234567"
+          style="flex: 1; padding: 10px 14px; border: 2px solid var(--line, rgba(0, 0, 0, 0.1)); border-radius: 8px; font-size: 0.95rem;"
+        >
+        <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+          Update
+        </button>
+      </form>
+    </div>
+
+    {# Cancel Button (only if not already canceling and status is active) #}
+    {% if not sub.cancel_at_period_end and sub.status in 'active,trialing,trial' %}
+    <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(0, 0, 0, 0.08);">
+      <button
+        type="button"
+        class="btn btn-outline"
+        onclick="if(confirm('Sad to see you go 😔\n\nAre you sure you want to cancel your subscription?\n\nYou\'ll keep access until {{ sub.current_period_end|date:"F j, Y" }}.')){ document.getElementById('cancel-form').submit(); }"
+        style="width: 100%; color: rgb(220, 38, 38); border-color: rgba(220, 38, 38, 0.3);"
+      >
+        Cancel Subscription
+      </button>
+      <form id="cancel-form" method="post" action="{% url 'billing:cancel_subscription' %}" style="display: none;">
+        {% csrf_token %}
+        <input type="hidden" name="confirm" value="yes">
+      </form>
+    </div>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -380,8 +496,8 @@
 
     <div class="plans-grid">
       {% for p in plans %}
-      <div class="plan-card {% if sub.plan and sub.plan.id == p.id %}current-highlight{% endif %}">
-        {% if sub.plan and sub.plan.id == p.id %}
+      <div class="plan-card {% if paid_plan_id and paid_plan_id == p.id %}current-highlight{% endif %}">
+        {% if paid_plan_id and paid_plan_id == p.id %}
         <span class="current-badge">Current</span>
         {% endif %}
 
@@ -404,9 +520,9 @@
         </div>
 
         {# Action button #}
-        {% if sub.plan and sub.plan.id == p.id %}
+        {% if paid_plan_id and paid_plan_id == p.id %}
           <button class="btn btn-disabled" disabled>Current Plan</button>
-        {% elif sub.plan and p.amount > sub.plan.amount %}
+        {% elif paid_plan_id and p.amount > sub.plan.amount %}
           {# Upgrade available #}
           <form method="post" action="{% url 'billing:upgrade_start' p.code %}">
             {% csrf_token %}

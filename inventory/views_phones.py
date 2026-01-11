@@ -25,7 +25,7 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods
 
 # Tenant/business scoping
-from tenants.utils import get_active_business
+from tenants.utils import get_active_business, require_business, require_role
 from tenants.scope import resolve_location_for_user
 
 # Models
@@ -38,7 +38,6 @@ from inventory.business_kinds import BusinessKind
 
 # Decorators
 from core.decorators import manager_required
-from tenants.utils import require_business
 
 # Role helpers
 from core.roles import is_manager, is_agent
@@ -186,6 +185,7 @@ def phone_available_imeis(request: HttpRequest, product_id: int) -> JsonResponse
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_in(request: HttpRequest) -> HttpResponse:
@@ -208,24 +208,17 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
     location_id = resolve_location_for_user(request)
 
     # Get the actual Location object (required for creating InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
-
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
 
-    # If no location found, use business default
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-
-        location = Location.default_for(business)
-
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
+        location = Location.ensure_default_for_business(business)
 
     # --- Gamification stats: today's scans (role-based) ---
     today = date.today()
@@ -420,6 +413,7 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
 @never_cache
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def phone_scan_sell(request: HttpRequest) -> HttpResponse:
@@ -442,24 +436,17 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
     location_id = resolve_location_for_user(request)
 
     # Get the actual Location object (required for querying InventoryItem)
+    from inventory.models import Location
     location = None
     if location_id:
         try:
-            from inventory.models import Location
-
             location = Location.objects.get(pk=location_id, business=business)
         except Location.DoesNotExist:
             pass
 
-    # If no location found, use business default
+    # If no location found, ensure a default location exists (creates one if needed)
     if not location:
-        from inventory.models import Location
-
-        location = Location.default_for(business)
-
-    if not location:
-        messages.error(request, "No location available for this business.")
-        return redirect("inventory:inventory_dashboard")
+        location = Location.ensure_default_for_business(business)
 
     # --- Gamification stats: today's sales ---
     today = date.today()
@@ -504,6 +491,11 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "location": location,
             "active_tab": "sell",  # For base.html bottom nav highlighting
         }
+        
+        # Apply SSOT defaults to prevent KeyError failures
+        from reports.services.context_defaults import apply_default_report_context
+        context = apply_default_report_context(context)
+        
         return render(request, "inventory/phones_scan_sell.html", context)
 
     # --- POST: Process sale ---

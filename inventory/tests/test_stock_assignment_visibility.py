@@ -66,11 +66,11 @@ class StockListAssignedRoleVisibilityTest(TestCase):
             location=self.location,
         )
 
-        # Create agent profile
-        self.agent_profile = AgentProfile.objects.create(
-            user=self.agent,
-            location=self.location,
-        )
+        # Create/update agent profile (idempotent - may already exist from signal)
+        self.agent_profile, _ = AgentProfile.objects.get_or_create(user=self.agent)
+        if self.agent_profile.location != self.location:
+            self.agent_profile.location = self.location
+            self.agent_profile.save(update_fields=["location"])
 
         # Create products
         self.product1 = Product.objects.create(
@@ -301,10 +301,10 @@ class StockListAssignedRoleVisibilityTest(TestCase):
             location=self.location,
         )
 
-        AgentProfile.objects.create(
-            user=agent2,
-            location=self.location,
-        )
+        agent2_profile, _ = AgentProfile.objects.get_or_create(user=agent2)
+        if agent2_profile.location != self.location:
+            agent2_profile.location = self.location
+            agent2_profile.save(update_fields=["location"])
 
         # Create item for agent2
         agent2_item = InventoryItem.objects.create(

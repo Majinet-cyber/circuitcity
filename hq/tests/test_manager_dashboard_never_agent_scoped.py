@@ -79,12 +79,12 @@ class TestManagerDashboardNeverAgentScoped(TestCase):
         )
 
         # CRITICAL: Also create agent membership for SAME user at location1
-        # This simulates the downgrade condition
+        # This simulates the downgrade condition (idempotent - may exist from signal)
         if AgentProfile:
-            self.agent_profile = AgentProfile.objects.create(
-                user=self.manager,
-                primary_location=self.location1,
-            )
+            self.agent_profile, _ = AgentProfile.objects.get_or_create(user=self.manager)
+            if self.agent_profile.location != self.location1:
+                self.agent_profile.location = self.location1
+                self.agent_profile.save(update_fields=["location"])
 
         # Create another agent membership with role AGENT
         # (This should be IGNORED because user is already MANAGER)
@@ -140,10 +140,10 @@ class TestManagerDashboardNeverAgentScoped(TestCase):
             status="ACTIVE",
         )
         if AgentProfile:
-            AgentProfile.objects.create(
-                user=self.agent2,
-                primary_location=self.location2,
-            )
+            agent2_profile, _ = AgentProfile.objects.get_or_create(user=self.agent2)
+            if agent2_profile.location != self.location2:
+                agent2_profile.location = self.location2
+                agent2_profile.save(update_fields=["location"])
 
         self.sale2 = Sale.objects.create(
             business=self.business,
@@ -384,10 +384,10 @@ class TestAgentDashboardScoped(TestCase):
         )
 
         if AgentProfile:
-            AgentProfile.objects.create(
-                user=self.agent,
-                primary_location=self.location1,
-            )
+            agent_profile, _ = AgentProfile.objects.get_or_create(user=self.agent)
+            if agent_profile.location != self.location1:
+                agent_profile.location = self.location1
+                agent_profile.save(update_fields=["location"])
 
         # Create stock in agent's location
         self.stock1 = InventoryItem.objects.create(

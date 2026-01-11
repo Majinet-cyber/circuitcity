@@ -22,6 +22,64 @@ from inventory.business_kinds import BusinessKind as BK
 
 
 # =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+def resolve_active_location(request, business):
+    """
+    Resolve active location with fallback logic.
+    
+    Priority:
+    1. request.active_location (if exists and is active)
+    2. session['active_location_id'] (if exists and is active)
+    3. business default location (is_default=True)
+    4. first active location
+    
+    Returns:
+        Location object or None if no active locations exist
+    """
+    from tenants.models import Location
+    
+    # 1. Check request.active_location
+    location = getattr(request, "active_location", None)
+    if location and getattr(location, "is_active", False):
+        # Store in session for subsequent calls
+        request.session['active_location_id'] = location.id
+        return location
+    
+    # 2. Try session active_location_id
+    location_id = request.session.get('active_location_id')
+    if location_id:
+        try:
+            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            request.active_location = location  # Set on request for consistency
+            return location
+        except Location.DoesNotExist:
+            # Stale session, clear it
+            request.session.pop('active_location_id', None)
+    
+    # 3. Auto-select: prefer default, else first active
+    try:
+        location = Location.objects.filter(
+            business=business,
+            is_active=True
+        ).order_by('-is_default', 'id').first()
+        
+        if location:
+            # Store in session
+            request.session['active_location_id'] = location.id
+            request.session.modified = True
+            request.active_location = location
+            return location
+    except Exception:
+        pass
+    
+    # No active location found
+    return None
+
+
+# =============================================================================
 # Wizard Page Views
 # =============================================================================
 
@@ -69,7 +127,18 @@ def pharmacy_wizard(request):
 @require_business
 def clothing_wizard(request):
     """Render the clothing add-product wizard"""
-    return render(request, "inventory/wizards/clothing_wizard.html")
+    business = get_active_business(request)
+    
+    # Resolve active location (auto-select if needed)
+    location = resolve_active_location(request, business)
+    
+    context = {
+        'business': business,
+        'active_location': location,
+        'location_id': location.id if location else None
+    }
+    
+    return render(request, "inventory/wizards/clothing_wizard.html", context)
 
 
 # =============================================================================
@@ -364,6 +433,63 @@ def pharmacy_wizard_submit(request):
 
 
 @login_required
+@require_business
+@require_http_methods(["POST"])
+def check_barcode_duplicate(request):
+    """
+    Check if a barcode already exists for this business.
+    Used by clothing wizard to prevent duplicate barcodes.
+    """
+    try:
+        data = json.loads(request.body)
+        barcode = data.get("barcode", "").strip()
+        business = get_active_business(request)
+
+        if not barcode or not business:
+            return JsonResponse({"exists": False})
+
+        # Check if barcode exists in MerchProduct for this business
+        existing_product = MerchProduct.objects.filter(
+            business=business,
+            barcode=barcode
+        ).first()
+
+        if existing_product:
+            return JsonResponse({
+                "exists": True,
+                "product_name": existing_product.name,
+                "product_id": existing_product.id
+            })
+
+        # Also check InventoryBarcode table if it exists
+        try:
+            from inventory.models import InventoryBarcode
+            existing_barcode = InventoryBarcode.objects.filter(
+                business=business,
+                code=barcode
+            ).first()
+
+            if existing_barcode:
+                product_name = "Unknown Product"
+                if existing_barcode.product:
+                    product_name = existing_barcode.product.name
+                return JsonResponse({
+                    "exists": True,
+                    "product_name": product_name
+                })
+        except ImportError:
+            pass  # InventoryBarcode model doesn't exist
+
+        return JsonResponse({"exists": False})
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception(f"Error checking barcode duplicate: {e}")
+        return JsonResponse({"exists": False})  # Fail gracefully
+
+
+@login_required
 @manager_required
 @require_business
 @require_http_methods(["POST"])
@@ -374,7 +500,7 @@ def clothing_wizard_submit(request):
         business = get_active_business(request)
 
         if not business:
-            return JsonResponse({"success": False, "error": "No active business"}, status=400)
+            return JsonResponse({"success": False, "error": "No active business found. Please select a business first."})
 
         # Extract data - simplified flow
         category = data.get("category", "").strip()
@@ -416,25 +542,25 @@ def clothing_wizard_submit(request):
 
         # Validate required fields
         if not category:
-            return JsonResponse({"success": False, "error": "Product type is required"}, status=400)
+            return JsonResponse({"success": False, "error": "Product type is required. Please go back and select a category."})
         # CRITICAL FIX: product_name is optional - we build it from category/brand/color/size
         # Only require it if we can't build a meaningful name from other fields
         if not size:
-            return JsonResponse({"success": False, "error": "Size is required"}, status=400)
+            return JsonResponse({"success": False, "error": "Size is required. Please go back and select or enter a size."})
 
         # Parse pricing
         try:
             selling_price = Decimal(data.get("selling_price", 0))
             if selling_price <= 0:
-                return JsonResponse({"success": False, "error": "Selling price must be greater than zero"}, status=400)
+                return JsonResponse({"success": False, "error": "Selling price must be greater than zero. Please enter a valid price."})
             cost_price = Decimal(data.get("cost_price", 0)) if data.get("cost_price") else None
             if cost_price is not None and cost_price < 0:
-                return JsonResponse({"success": False, "error": "Cost price cannot be negative"}, status=400)
+                return JsonResponse({"success": False, "error": "Cost price cannot be negative. Please enter a valid cost price."})
             initial_stock = int(data.get("quantity", data.get("initial_stock", 0)))
             if initial_stock < 0:
-                return JsonResponse({"success": False, "error": "Quantity cannot be negative"}, status=400)
+                return JsonResponse({"success": False, "error": "Quantity cannot be negative. Please enter a valid quantity."})
         except (ValueError, InvalidOperation) as e:
-            return JsonResponse({"success": False, "error": f"Invalid pricing data: {str(e)}"}, status=400)
+            return JsonResponse({"success": False, "error": f"Invalid pricing data: {str(e)}. Please check your inputs."})
 
         # Handle barcode - CRITICAL: "No barcode" must work smoothly
         has_barcode = data.get("has_barcode", "no").strip().lower()
@@ -443,35 +569,59 @@ def clothing_wizard_submit(request):
 
         # Only validate barcode if user explicitly selected "yes"
         if has_barcode == "yes":
+            # Trim all barcodes in the list
+            barcodes_list = [bc.strip() for bc in barcodes_list if bc and bc.strip()]
+
             # If quantity > 1, we need multiple barcodes
             if initial_stock > 1:
                 if not barcodes_list or len(barcodes_list) != initial_stock:
+                    # FIXED: Return 200 with validation error instead of 400
                     return JsonResponse(
                         {
                             "success": False,
-                            "error": f"You must scan exactly {initial_stock} unique barcodes. Currently scanned: {len(barcodes_list) if barcodes_list else 0}",
-                        },
-                        status=400,
+                            "error": f"Please scan all {initial_stock} barcodes before continuing. Currently scanned: {len(barcodes_list) if barcodes_list else 0}. Go back to the barcode step to scan the remaining barcodes.",
+                        }
                     )
 
-                # Validate all barcodes are unique
+                # Validate all barcodes are unique within the list
                 if len(barcodes_list) != len(set(barcodes_list)):
+                    # FIXED: Return 200 with validation error instead of 400
                     return JsonResponse(
-                        {"success": False, "error": "Duplicate barcodes detected. Each barcode must be unique."},
-                        status=400,
+                        {"success": False, "error": "Duplicate barcodes detected within your scanned list. Each barcode must be unique. Please remove duplicates and try again."}
                     )
+
+                # Check for duplicate barcodes in database
+                for bc in barcodes_list:
+                    existing = MerchProduct.objects.filter(business=business, barcode=bc).first()
+                    if existing:
+                        return JsonResponse(
+                            {
+                                "success": False,
+                                "error": f"Barcode '{bc}' is already used by product: {existing.name}. Please use unique barcodes."
+                            }
+                        )
 
                 # Use first barcode for product-level barcode field
                 barcode_value = barcodes_list[0] if barcodes_list else ""
             else:
                 # Single barcode
                 if not barcode_value:
+                    # FIXED: Return 200 with validation error instead of 400
                     return JsonResponse(
                         {
                             "success": False,
-                            "error": 'Barcode is required when "With barcode" is selected. Please scan or enter a barcode.',
-                        },
-                        status=400,
+                            "error": 'Barcode is required when "With barcode" is selected. Please go back and scan or enter a barcode.',
+                        }
+                    )
+
+                # Check for duplicate barcode in database (single barcode)
+                existing = MerchProduct.objects.filter(business=business, barcode=barcode_value).first()
+                if existing:
+                    return JsonResponse(
+                        {
+                            "success": False,
+                            "error": f"Barcode '{barcode_value}' is already used by product: {existing.name}. Please use a unique barcode."
+                        }
                     )
 
         # If "no" or not provided, barcode_value is empty string, which we'll set to None

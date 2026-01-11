@@ -275,7 +275,11 @@ def _ensure_active_business_and_location(request):
     # Choose a location automatically if missing
     if biz and not loc and Location:
         try:
-            loc = Location.objects.filter(business=biz, is_active=True).order_by("name").first()
+            # Prefer default location, fallback to any location
+            loc = (
+                Location.objects.filter(business=biz, is_default=True).first()
+                or Location.objects.filter(business=biz).order_by("name").first()
+            )
             if loc:
                 request.active_location = loc
                 request.active_location_id = getattr(loc, "id", None)
@@ -6060,7 +6064,7 @@ def _two_factor_status(user) -> dict:
 @login_required
 def settings_home(request):
     user = request.user
-    profile = getattr(user, "profile", None)  # ok if you donâ€™t have a Profile model
+    profile = getattr(user, "profile", None)  # ok if you don't have a Profile model
     avatar_url = getattr(profile, "avatar_url", None) or _gravatar(user.email, 160)
 
     # SMS 2FA context (replaces old TOTP-based twofa dict)
@@ -6070,6 +6074,35 @@ def settings_home(request):
     tf, _ = UserTwoFactor.objects.get_or_create(user=user)
     twofa_sms_enabled = bool(tf.sms_enabled)
     twofa_phone_masked = mask_phone(tf.phone_e164) if tf.phone_e164 else ""
+
+    # Notification preferences with defaults (SSOT)
+    from notifications.models import NotificationPreference
+    from circuitcity.accounts.services.settings_defaults import ensure_notification_defaults
+    
+    ensure_notification_defaults(user)
+    
+    try:
+        notif_pref = NotificationPreference.objects.get(user=user)
+    except NotificationPreference.DoesNotExist:
+        # Safety fallback with defaults ON
+        notif_pref = NotificationPreference(
+            instant_sale_email=True,
+            daily_summary_email=True,
+            weekly_digest_enabled=True,
+            high_sales_alerts=True,
+            important_alerts_email=True,
+        )
+    
+    # Handle save notification settings POST
+    if request.method == "POST" and request.POST.get("save_notifications") == "1":
+        notif_pref.instant_sale_email = request.POST.get("instant_sale_email") == "on"
+        notif_pref.daily_summary_email = request.POST.get("daily_summary_email") == "on"
+        notif_pref.weekly_digest_enabled = request.POST.get("weekly_digest_enabled") == "on"
+        notif_pref.high_sales_alerts = request.POST.get("high_sales_alerts") == "on"
+        notif_pref.important_alerts_email = request.POST.get("important_alerts_email") == "on"
+        notif_pref.save()
+        messages.success(request, "Notification settings saved.")
+        return redirect("inventory:settings")
 
     context = {
         "title": "Settings",
@@ -6084,6 +6117,8 @@ def settings_home(request):
         "twofa_available": twofa_available,
         "twofa_sms_enabled": twofa_sms_enabled,
         "twofa_phone_masked": twofa_phone_masked,
+        # Notification preferences with defaults
+        "notif_pref": notif_pref,
     }
     return render(request, "inventory/settings.html", context)
 
@@ -7199,7 +7234,125 @@ from django.http import HttpResponseBase  # make sure this import exists
 
 
 @login_required
+def generic_dashboard(request):
+    """
+    Generic/fallback dashboard for any business type.
+    
+    This is a REAL 200 page (no redirects) for:
+    - Unrecognized business_kind
+    - Legacy verticals  
+    - Misconfigured registries
+    
+    CRITICAL: This view MUST NOT redirect or call vertical routing.
+    It is the safe landing page to prevent infinite redirect loops.
+    
+    This is a MINIMAL, ROBUST implementation that cannot fail.
+    """
+    from django.contrib import messages
+    
+    # Require/resolve active business exactly once
+    gate = _require_active_business(request)
+    if isinstance(gate, HttpResponseBase):  # redirect/message case
+        return gate
+    try:
+        biz, biz_id = gate  # expected tuple
+    except Exception:
+        # Fallback: no active business tuple; be defensive
+        biz, biz_id = (None, None)
+    
+    # Get business_kind for display
+    business_kind = getattr(biz, "business_kind", None) if biz else None
+    
+    # Minimal context - just enough to render the template
+    ctx = {
+        "business": biz,
+        "business_kind": business_kind,
+        "active_tab": "inventory_dashboard",
+        # Safe defaults for template variables
+        "sales_count": 0,
+        "in_stock": 0,
+        "sold": 0,
+        "all_time_count": 0,
+        "daily_labels": [],
+        "daily_data": [],
+        "cumulative": {},
+        "top_stock": [],
+        "products": [],
+        "selected_model": None,
+        "scope_label": "All",
+        "period": "month",
+        "range_preset": "month",
+        "day_str": None,
+        "start_dt": None,
+        "end_dt": None,
+        # Additional safe defaults
+        "items_in_stock": 0,
+        "active_stock_count": 0,
+        "units_sold": 0,
+        "total_units": 0,
+        "revenue_total": 0,
+        "total_revenue": 0,
+        "costs_total": 0,
+        "profit_total": 0,
+        "low_items": 0,
+        "revenue": 0,
+        "costs": 0,
+        "profit": 0,
+    }
+    
+    # Try to render the dashboard template, but provide a safe fallback
+    try:
+        return render(request, "inventory/dashboard.html", ctx)
+    except Exception as e:
+        # Last resort fallback - show a simple page
+        import logging
+        logging.getLogger(__name__).error(f"Generic dashboard template error: {e}")
+        
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Dashboard · {biz.name if biz else 'Emajinet'}</title>
+            <style>
+                body {{ font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f8fafc; }}
+                .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 32px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+                h1 {{ margin: 0 0 16px; color: #0f172a; }}
+                p {{ color: #64748b; line-height: 1.6; }}
+                .btn {{ display: inline-block; padding: 12px 24px; background: #2563eb; color: white; text-decoration: none; border-radius: 8px; margin: 16px 8px 0 0; }}
+                .btn:hover {{ background: #1d4ed8; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>Dashboard</h1>
+                <p>Welcome to your dashboard. Your business is set up and ready to use.</p>
+                <p><strong>Business:</strong> {biz.name if biz else 'N/A'}</p>
+                <p><strong>Type:</strong> {business_kind or 'Not set'}</p>
+                <a href="/inventory/" class="btn">View Inventory</a>
+                <a href="/accounts/settings/" class="btn">Settings</a>
+            </div>
+        </body>
+        </html>
+        """
+        return HttpResponse(html)
+
+
+@login_required
 def inventory_dashboard(request):
+    """
+    Main inventory dashboard dispatcher.
+    
+    ROUTING LOGIC (Best Practice SaaS):
+    1. Recognized vertical -> redirect to vertical dashboard
+    2. business_kind NULL/blank -> redirect to settings
+    3. business_kind unknown/legacy -> redirect ONCE to generic_dashboard
+    4. Already on dispatcher or phones business -> show phones dashboard
+    
+    LOOP PREVENTION:
+    - Never redirect to self
+    - Never redirect from generic_dashboard back here
+    - Always provide a 200 landing page
+    """
     # Require/resolve active business exactly once
     gate = _require_active_business(request)
     if isinstance(gate, HttpResponseBase):  # redirect/message case
@@ -7214,29 +7367,66 @@ def inventory_dashboard(request):
     # VERTICAL ROUTING: Redirect non-phone businesses to their vertical dashboards
     # ============================================================================
     # This is the PHONES inventory dashboard - only phone businesses should see it
+    import logging
+    log = logging.getLogger(__name__)
+    
     try:
         from inventory.utils_verticals import get_vertical_dashboard_url, get_vertical_kind
+        from django.urls import NoReverseMatch, reverse
 
         # Try request.business first (set by middleware), then fall back to biz from gate
         active_business = getattr(request, "business", None) or biz
+        business_kind = getattr(active_business, "business_kind", None) if active_business else None
+        
+        # Case 1: business_kind is NULL/blank -> redirect to settings
+        if not business_kind:
+            log.warning(f"Business {biz.name if biz else 'Unknown'} has no business_kind, redirecting to settings")
+            try:
+                return redirect(reverse("accounts:settings_unified"))
+            except NoReverseMatch:
+                try:
+                    return redirect(reverse("accounts:settings_profile"))
+                except NoReverseMatch:
+                    # Last resort: continue to phones dashboard
+                    pass
+        
+        # Case 2: Get vertical kind and route accordingly
         vertical_kind = get_vertical_kind(active_business)
-
-        # If not a phones business, redirect to the appropriate vertical dashboard
-        if vertical_kind and vertical_kind != "phones":
+        
+        # If vertical is "generic" (unrecognized), redirect to generic dashboard
+        if vertical_kind == "generic":
+            log.info(f"Business {biz.name if biz else 'Unknown'} has unrecognized kind '{business_kind}', routing to generic dashboard")
+            try:
+                generic_url = reverse("inventory:generic_dashboard")
+                # CRITICAL: Prevent loop - don't redirect if already on target
+                if generic_url != request.path:
+                    return redirect(generic_url)
+            except NoReverseMatch:
+                # If generic dashboard doesn't exist, show phones dashboard as fallback
+                pass
+        
+        # If not a phones business and vertical is recognized, redirect to vertical dashboard
+        if vertical_kind and vertical_kind != "phones" and vertical_kind != "generic":
             vertical_url_name = get_vertical_dashboard_url(vertical_kind)
             if vertical_url_name:
-                from django.urls import NoReverseMatch, reverse
-
                 try:
-                    return redirect(reverse(vertical_url_name))
+                    target_url = reverse(vertical_url_name)
+                    # CRITICAL: Prevent redirect loop - if target is same as current path, don't redirect
+                    if target_url != request.path:
+                        return redirect(target_url)
                 except NoReverseMatch:
-                    # If vertical dashboard doesn't exist, continue to default
-                    pass
+                    # If vertical dashboard doesn't exist, redirect to generic dashboard
+                    log.error(f"Vertical dashboard '{vertical_url_name}' not found for kind '{vertical_kind}', routing to generic")
+                    try:
+                        generic_url = reverse("inventory:generic_dashboard")
+                        if generic_url != request.path:
+                            return redirect(generic_url)
+                    except NoReverseMatch:
+                        pass
+                        
     except Exception as e:
         # If vertical utilities aren't available, continue to default dashboard
-        import logging
-
-        logging.getLogger(__name__).debug(f"Vertical routing failed: {e}")
+        log.debug(f"Vertical routing failed: {e}")
         pass
 
     # NEW: calendar filter (range: all | 7d | month | day; day: YYYY-MM-DD)

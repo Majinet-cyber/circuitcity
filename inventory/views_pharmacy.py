@@ -576,6 +576,14 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         request.session.pop("pharmacy_wizard_item", None)
 
     # Build context based on current step
+    # Get membership for base template (prevents AttributeError on request.membership)
+    from tenants.models import Membership
+    membership = (
+        Membership.objects.filter(user=request.user, business=business).first()
+        if request.user.is_authenticated
+        else None
+    )
+    
     ctx = {
         "step": step,
         "success_data": success_data,
@@ -583,6 +591,8 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
         "selected_category": selected_category,
         "selected_subcategory": selected_subcategory,
         "selected_item": selected_item,
+        "active_tab": "stock_in",  # For base template navigation highlighting
+        "membership": membership,  # For base template role display
     }
 
     if step == 0:
@@ -845,22 +855,28 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
     NOW USES SERVICE LAYER for clean, atomic operations.
     """
     try:
-        # Extract form data
-        product_name = request.POST.get("product_name", "").strip()
+        # Get wizard mode from session FIRST (needed for product_name fallback)
+        wizard_mode = request.session.get("pharmacy_wizard_mode", "pharmacy")
+        selected_category = request.session.get("pharmacy_wizard_category", "")
+        selected_subcategory = request.session.get("pharmacy_wizard_subcategory", "")
+        selected_item = request.session.get("pharmacy_wizard_item", "")
+
+        # Extract form data - support both field naming conventions
+        # product_name: from form, or fallback to selected_item from session
+        product_name = (
+            request.POST.get("product_name", "").strip() or 
+            request.POST.get("selected_item", "").strip() or 
+            selected_item
+        )
         quantity = request.POST.get("quantity", "0")
-        cost_price = request.POST.get("cost_price", "0")
+        # Support both buying_price (test convention) and cost_price (view convention)
+        cost_price = request.POST.get("cost_price") or request.POST.get("buying_price", "0")
         selling_price = request.POST.get("selling_price", "0")
         batch_number = request.POST.get("batch_number", "").strip()
         expiry_date_str = request.POST.get("expiry_date", "")
         supplier = request.POST.get("supplier", "").strip()
         has_barcode = request.POST.get("has_barcode", "no")
         barcode_value = request.POST.get("barcode", "").strip()
-
-        # Get wizard mode from session
-        wizard_mode = request.session.get("pharmacy_wizard_mode", "pharmacy")
-        selected_category = request.session.get("pharmacy_wizard_category", "")
-        selected_subcategory = request.session.get("pharmacy_wizard_subcategory", "")
-        selected_item = request.session.get("pharmacy_wizard_item", "")
 
         # Determine if this is cosmetics
         is_cosmetics = wizard_mode == "cosmetics" or selected_category == "cosmetics"
@@ -940,7 +956,7 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
             errors.append("Invalid selling price.")
             selling = Decimal("0.00")
 
-        # Parse expiry date (optional)
+        # Parse expiry date (required for pharmacy/medicines, optional for cosmetics)
         expiry_date = None
         if expiry_date_str:
             try:
@@ -948,8 +964,9 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
             except (ValueError, TypeError):
                 errors.append("Invalid expiry date format.")
 
-        # For medicines, expiry date is recommended but NOT enforced (service layer handles it)
-        # Let the service layer handle the validation
+        # Expiry date validation: REQUIRED for pharmacy (medicines), OPTIONAL for cosmetics
+        if not is_cosmetics and not expiry_date:
+            errors.append("Expiry date is required for medicines.")
 
         # Normalize barcode if provided
         final_barcode = None
@@ -971,10 +988,13 @@ def _handle_wizard_save(request: HttpRequest, business: Business) -> HttpRespons
         from inventory.services.pharmacy_sale import stock_in_pharmacy
 
         try:
+            # Use detailed category for cosmetics mode, simplified category otherwise
+            category_for_service = product_category if wizard_mode == "cosmetics" else service_category
+            
             result = stock_in_pharmacy(
                 business=business,
                 product_name=product_name,
-                category=service_category,
+                category=category_for_service,
                 user=request.user,
                 quantity=qty,
                 unit="piece",  # Wizard uses base units by default

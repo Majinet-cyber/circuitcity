@@ -2,21 +2,59 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from typing import Any, Dict
+
+
+def _get_git_sha() -> str:
+    """
+    Get current git commit SHA (short).
+    
+    Priority:
+    1. RENDER_GIT_COMMIT (set by Render on deploy)
+    2. GIT_SHA / GIT_COMMIT env var
+    3. git rev-parse --short HEAD
+    4. "unknown" as fallback
+    """
+    # Try env vars first (faster, works in production)
+    for key in ("RENDER_GIT_COMMIT", "GIT_SHA", "GIT_COMMIT"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            # Return short SHA (first 7 chars)
+            return value[:7]
+    
+    # Try git command (works in local dev)
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    
+    return "unknown"
 
 
 def build_meta(_request) -> Dict[str, Any]:
     """
     Expose build/version info to templates.
 
-    - BUILD_ID prefers Render/Git envs, falls back to "dev".
-    - STATIC_VERSION defaults to BUILD_ID (used as a cache-buster in base.html).
+    - BUILD_SHA: The current git commit SHA (short form) for cache busting and debugging.
+    - BUILD_ID: Alias for BUILD_SHA (backwards compatibility).
+    - STATIC_VERSION defaults to BUILD_SHA (used as a cache-buster in base.html).
     - Also passes APP_NAME/APP_ENV for convenience in layouts.
     """
-    build_id = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or os.getenv("APP_VERSION") or "dev"
-    static_version = os.getenv("STATIC_VERSION") or build_id
+    build_sha = _get_git_sha()
+    build_id = os.getenv("RENDER_GIT_COMMIT") or os.getenv("GIT_COMMIT") or os.getenv("APP_VERSION") or build_sha
+    static_version = os.getenv("STATIC_VERSION") or build_sha
 
     return {
+        "BUILD_SHA": build_sha,
         "BUILD_ID": build_id,
         "STATIC_VERSION": static_version,
         "APP_NAME": os.getenv("APP_NAME", "Emajinet"),
@@ -207,4 +245,24 @@ def current_year(request) -> Dict[str, Any]:
     }
 
 
-__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config", "current_year"]
+def marketing_constants(request) -> Dict[str, Any]:
+    """
+    Expose marketing and support constants to all templates.
+    
+    Provides centralized access to:
+    - SUPPORT_EMAIL: Official support email (support@emajinet.africa)
+    - SUPPORT_WHATSAPP_NUMBER: Real working WhatsApp number
+    - MARKETING_ACTIVE_BUSINESSES: Current count of active businesses for marketing
+    
+    This ensures consistency across all public-facing pages and prevents drift.
+    """
+    from django.conf import settings
+    
+    return {
+        "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "support@emajinet.africa"),
+        "SUPPORT_WHATSAPP_NUMBER": getattr(settings, "SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135"),
+        "MARKETING_ACTIVE_BUSINESSES": getattr(settings, "MARKETING_ACTIVE_BUSINESSES", 34),
+    }
+
+
+__all__ = ["build_meta", "brand", "role_flags", "app_version", "currency_config", "current_year", "marketing_constants"]

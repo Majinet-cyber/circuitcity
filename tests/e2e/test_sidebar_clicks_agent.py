@@ -19,8 +19,8 @@ from playwright.sync_api import Page
 from tests.e2e.helpers import PlaywrightHelper
 
 
-# Mark all tests in this module as requiring the Django DB
-pytestmark = pytest.mark.django_db
+# Mark all tests in this module as requiring the Django DB and being E2E tests
+pytestmark = [pytest.mark.django_db, pytest.mark.e2e]
 
 
 class TestAgentSidebarClicksPhones:

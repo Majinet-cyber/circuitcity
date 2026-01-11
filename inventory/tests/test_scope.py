@@ -240,13 +240,15 @@ class ScopeTests(TestCase):
         cls.loc_a1 = _create_location(cls.biz_a, "A1") or None
         cls.loc_b1 = _create_location(cls.biz_b, "B1") or None
 
-        # Codes
-        cls.code_shared = "111222333444555"  # 15 digits – works with IMEI-style fields
-        cls.code_only_b = "999888777666555"
+        # Codes - MUST be unique since IMEI has GLOBAL uniqueness constraint
+        # Each item needs a unique 15-digit code to avoid IntegrityError
+        cls.code_a = f"11122233344{_rand(4).zfill(4)[:4]}"[:15].ljust(15, '0')  # Unique for biz A
+        cls.code_b = f"22233344455{_rand(4).zfill(4)[:4]}"[:15].ljust(15, '0')  # Unique for biz B
+        cls.code_only_b = f"99988877766{_rand(4).zfill(4)[:4]}"[:15].ljust(15, '0')  # Extra for B
 
-        # Items with same code in different businesses
-        cls.item_a = _create_item_for_business(cls.biz_a, cls.code_shared, cls.loc_a1)
-        cls.item_b = _create_item_for_business(cls.biz_b, cls.code_shared, cls.loc_b1)
+        # Items with UNIQUE codes in different businesses (IMEI is globally unique)
+        cls.item_a = _create_item_for_business(cls.biz_a, cls.code_a, cls.loc_a1)
+        cls.item_b = _create_item_for_business(cls.biz_b, cls.code_b, cls.loc_b1)
 
         # Extra item existing only in B
         cls.item_b2 = _create_item_for_business(cls.biz_b, cls.code_only_b, cls.loc_b1)
@@ -298,33 +300,45 @@ class ScopeTests(TestCase):
 
     # -------- tests --------
 
-    def test_business_scoping_same_code_prefers_active_business(self):
+    def test_business_scoping_resolves_item_in_active_business(self):
         """
-        With the same 15-digit code existing in multiple businesses,
-        the active business session must resolve the one in the active business.
+        Each business has its own unique IMEI. When that business is active,
+        its item should be found. When another business is active, its item should be found.
+        
+        Note: IMEI is globally unique (per physical device), so each item has a unique code.
         """
+        # Test business A finds its item
         _set_active_business_in_session(self.client, self.biz_a.id)
-        status_a, j_a = self._get(self.code_shared)
+        status_a, j_a = self._get(self.code_a)
         self.assertEqual(status_a, 200)
         self.assertIs(self._parse_found(j_a), True, msg=f"Expected found in biz A, got {j_a}")
 
-        # Switch to biz B and ensure it's also found there (scoped by session)
+        # Test business B finds its item
         _set_active_business_in_session(self.client, self.biz_b.id)
-        status_b, j_b = self._get(self.code_shared)
+        status_b, j_b = self._get(self.code_b)
         self.assertEqual(status_b, 200)
         self.assertIs(self._parse_found(j_b), True, msg=f"Expected found in biz B, got {j_b}")
 
     def test_other_business_item_not_found_when_not_active(self):
         """
         If a code exists only in Business B, querying under Business A should not find it.
+        Also, Business B's primary code should not be found when Business A is active.
         """
         _set_active_business_in_session(self.client, self.biz_a.id)
+        
+        # Business B's extra item should not be visible in Business A
         status, j = self._get(self.code_only_b)
         self.assertEqual(status, 200)
         found = self._parse_found(j)
         # If endpoint signals not found explicitly, expect False.
         # If endpoint doesn't distinguish, at least it should not claim True.
         self.assertIn(found, (False, None), msg=f"Item from other business should not be visible: {j}")
+        
+        # Business B's primary item should also not be found when A is active
+        status2, j2 = self._get(self.code_b)
+        self.assertEqual(status2, 200)
+        found2 = self._parse_found(j2)
+        self.assertIn(found2, (False, None), msg=f"B's item should not be visible in A: {j2}")
 
     def test_optional_location_param_does_not_leak_cross_business(self):
         """

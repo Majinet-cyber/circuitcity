@@ -119,33 +119,87 @@ def inventory_dashboard(request: HttpRequest) -> HttpResponse:
     if not business:
         return HttpResponse("No active business found", status=400)
 
-    # For phones, redirect to analytics (replaces inventory dashboard)
-    from inventory.helpers import business_vertical, PHONES
+    # Route to vertical-specific dashboards
+    from inventory.helpers import business_vertical, PHONES, FARM, WELDING, CEMENT, CLOTHING, LIQUOR, GYM, GROCERY
+    from django.shortcuts import redirect
 
     vertical = business_vertical(request)
-    if vertical == PHONES:
-        from django.shortcuts import redirect
-
-        # Check if JSON is requested - if so, we still need to provide data
-        wants_json = (
-            (request.GET.get("format") or "").lower() == "json"
-            or request.headers.get("x-requested-with") == "XMLHttpRequest"
-            or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
-        )
-        if not wants_json:
-            # Redirect to analytics for phones - safe redirect with fallback
-            try:
-                from django.urls import reverse
-
-                analytics_url = reverse("app_router:analytics")
-                return redirect(analytics_url)
-            except Exception:
-                # Fallback to safe URL if reverse fails
-                return redirect("/app/analytics/")
+    
+    # Check if JSON is requested - if so, we still need to provide data
+    wants_json = (
+        (request.GET.get("format") or "").lower() == "json"
+        or request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in (request.headers.get("Accept") or request.headers.get("accept") or "")
+    )
+    
+    # PHONES: redirect to analytics (replaces inventory dashboard)
+    if vertical == PHONES and not wants_json:
+        try:
+            from django.urls import reverse
+            analytics_url = reverse("app_router:analytics")
+            return redirect(analytics_url)
+        except Exception:
+            return redirect("/app/analytics/")
+    elif vertical == PHONES and wants_json:
         # For JSON requests, continue with analytics data (analytics view handles JSON)
         from inventory.views_analytics import analytics_dashboard
-
         return analytics_dashboard(request)
+    
+    # FARM: redirect to farm dashboard
+    if vertical == FARM and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:farm_dashboard"))
+        except Exception:
+            return redirect("/verticals/farm/dashboard/")
+    
+    # WELDING: redirect to welding dashboard
+    if vertical == WELDING and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:welding_dashboard"))
+        except Exception:
+            return redirect("/verticals/welding/dashboard/")
+    
+    # CEMENT: redirect to cement dashboard
+    if vertical == CEMENT and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:cement_dashboard"))
+        except Exception:
+            return redirect("/verticals/cement/dashboard/")
+    
+    # CLOTHING: redirect to clothing dashboard
+    if vertical == CLOTHING and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:clothing_dashboard"))
+        except Exception:
+            return redirect("/verticals/clothing/dashboard/")
+    
+    # LIQUOR: redirect to liquor dashboard
+    if vertical == LIQUOR and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:liquor_dashboard"))
+        except Exception:
+            return redirect("/verticals/liquor/dashboard/")
+    
+    # GYM: redirect to gym dashboard
+    if vertical == GYM and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("verticals:gym_dashboard"))
+        except Exception:
+            return redirect("/verticals/gym/dashboard/")
+    
+    # GROCERY: redirect to groceries dashboard
+    if vertical == GROCERY and not wants_json:
+        try:
+            from django.urls import reverse
+            return redirect(reverse("groceries:dashboard"))
+        except Exception:
+            return redirect("/verticals/groceries/dashboard/")
 
     # Parse date range
     range_key, start_date, end_date, range_label = _parse_date_range(request)

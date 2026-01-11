@@ -5,10 +5,11 @@ Groceries Vertical - Simple retail store for food and household items
 from __future__ import annotations
 
 from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from inventory.authz import require_business_kind
@@ -20,10 +21,10 @@ from inventory.verticals.groceries_seed import (
     CATEGORIES,
     SEED_ITEMS,
     get_category_by_key,
-    get_items_by_category,
     get_item_by_key,
-    get_variant_by_label,
+    get_items_by_category,
     get_seed_key,
+    get_variant_by_label,
     parse_seed_key,
 )
 from tenants.utils import require_business
@@ -52,7 +53,7 @@ def dashboard(request):
     # Sales data (from actual sales)
     today = timezone.now().date()
     from django.db import connection
-    from django.db.models import Sum, F, DecimalField, Value
+    from django.db.models import DecimalField, F, Sum, Value
     from django.db.models.functions import Coalesce
 
     # Check if total_price column exists in GrocerySale table (works for both SQLite and Postgres)
@@ -140,6 +141,51 @@ def dashboard(request):
         "active_mode": mode,
         "active_tab": "dashboard",
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    from reports.services.context_defaults import apply_default_report_context
+    context = apply_default_report_context(context)
+
+    # ===== PREMIUM: Personalized dashboard enhancements (quotes & greetings) =====
+    ctx_enhancements = {}
+    try:
+        import json as json_lib
+
+        from dashboard.helpers_greetings import get_personalized_greeting
+        from dashboard.helpers_quotes import get_todays_quotes
+
+        # Personalized greeting (changes 3x daily: morning, afternoon, evening)
+        greeting_ctx = get_personalized_greeting(request.user, business)
+
+        # Brand header context
+        brand_logo_url = None
+        if business and hasattr(business, "logo") and business.logo:
+            brand_logo_url = business.logo.url
+
+        # Hourly quotes (rotates every hour)
+        daily_quotes = get_todays_quotes(request.user, count=10)
+
+        # Extract quote texts for JavaScript rotation
+        quote_texts = [q.get("text", "") for q in daily_quotes.get("quotes", []) if q.get("text")]
+        quotes_json_data = json_lib.dumps(quote_texts)
+
+        ctx_enhancements.update(
+            {
+                "DASHBOARD_GREETING": greeting_ctx.get("greeting"),
+                "DASHBOARD_USER_NAME": greeting_ctx.get("user_name"),
+                "DASHBOARD_SHOW_WELCOME": greeting_ctx.get("show_welcome"),
+                "DASHBOARD_MILESTONE_MESSAGE": greeting_ctx.get("milestone"),
+                "DASHBOARD_BRAND_LOGO_URL": brand_logo_url,
+                "DASHBOARD_BRAND_TITLE": business.name if business else "Groceries Dashboard",
+                "DASHBOARD_QUOTES": daily_quotes,
+                "quotes_json": quotes_json_data,
+            }
+        )
+    except Exception:
+        # Gracefully degrade if helpers not available
+        pass
+
+    context.update(ctx_enhancements)
 
     return render(request, "verticals/groceries/dashboard.html", context)
 
@@ -662,10 +708,11 @@ def rollback_sale(request, sale_id):
     Rollback/cancel a grocery sale and restore product inventory.
     Manager-only feature for correcting mistakes.
     """
-    from django.http import JsonResponse
     from django.contrib import messages
-    from django.shortcuts import redirect
     from django.db import transaction
+    from django.http import JsonResponse
+    from django.shortcuts import redirect
+
     from tenants.models import Membership
 
     business = get_active_business(request)

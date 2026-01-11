@@ -18,6 +18,14 @@ from inventory.models_verticals import ClothingSale
 
 from . import base
 
+# ============================================================================
+# COMPATIBILITY: Re-export CLOTHING_CATEGORIES from SSOT
+# ============================================================================
+# The single source of truth is inventory.clothing_config.CLOTHING_CATEGORIES
+# This re-export maintains backward compatibility for existing imports:
+#   from inventory.verticals.clothing import CLOTHING_CATEGORIES
+from inventory.clothing_config import CLOTHING_CATEGORIES  # noqa: F401
+
 
 @login_required
 @require_business
@@ -44,6 +52,13 @@ def dashboard(request):
 
     # ===== INVENTORY VALUE METRICS (Current Stock) =====
     inventory_data = base.clothing_inventory_metrics(business, location=location)
+
+    # ===== RECENT SALES (Last 10 sales for display) =====
+    recent_sales = (
+        ClothingSale.objects.filter(business=business)
+        .select_related("product", "sold_by")
+        .order_by("-sold_at")[:10]
+    )
 
     # Extract metrics from sales_data
     revenue_mtd = sales_data["revenue"]
@@ -150,6 +165,8 @@ def dashboard(request):
             "scan_required_count": metrics["scan_required"],
             "inventory_tracked_count": metrics["inventory_tracked"],
             "recent_products": metrics["recent"],
+            # Recent Sales List (Last 10 transactions)
+            "recent_sales": recent_sales,
             # KPI Panels (Sales Metrics)
             "revenue_mtd": revenue_mtd,
             "cost_mtd": cost_mtd,

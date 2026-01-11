@@ -18,6 +18,23 @@ def avatar_upload_to(instance: "Profile", filename: str) -> str:
     return f"avatars/{instance.user_id}/{filename}"
 
 
+def build_default_profile_fields() -> dict:
+    """
+    Single source of truth for Profile field defaults.
+    CRITICAL: This ensures Profile creation never fails due to NOT NULL constraints.
+    
+    Returns:
+        dict: Default values for all NOT NULL Profile fields
+    """
+    return {
+        "city": getattr(settings, "DEFAULT_PROFILE_CITY", "Lilongwe"),
+        "country": getattr(settings, "DEFAULT_PROFILE_COUNTRY", "Malawi"),
+        "timezone": getattr(settings, "DEFAULT_PROFILE_TIMEZONE", "Africa/Blantyre"),
+        "language": getattr(settings, "DEFAULT_PROFILE_LANGUAGE", "English"),
+        "display_currency": getattr(settings, "DEFAULT_PROFILE_CURRENCY", "MWK"),
+    }
+
+
 class Profile(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -29,9 +46,10 @@ class Profile(models.Model):
 
     # Settings shown on the Settings Â· Profile page
     display_name = models.CharField(max_length=120, blank=True, default="")
-    country = models.CharField(max_length=80, blank=True, default="")
-    language = models.CharField(max_length=80, blank=True, default="English - United States")
-    timezone = models.CharField(max_length=80, blank=True, default=settings.TIME_ZONE)
+    country = models.CharField(max_length=80, blank=True, default="Malawi")
+    language = models.CharField(max_length=80, blank=True, default="English")
+    timezone = models.CharField(max_length=80, blank=True, default="Africa/Blantyre")
+    city = models.CharField(max_length=100, blank=True, default="Lilongwe")
 
     # Currency display preference
     display_currency = models.CharField(
@@ -529,9 +547,47 @@ def is_twofa_recent(request, max_age_seconds: int = 1800) -> bool:
 def _ensure_user_sidecars(sender, instance, created, **kwargs):
     """
     Automatically create Profile and LoginSecurity records for new users.
-    Safe to call multiple times; uses get_or_create.
+    Safe to call multiple times; uses get_or_create with robust defaults.
+    
+    CRITICAL FIX: Always supplies defaults to prevent IntegrityError on NOT NULL fields.
+    Includes retry logic for race conditions.
     """
+    from django.db import IntegrityError
+    
     if not instance:
         return
-    Profile.objects.get_or_create(user=instance)
+    
+    # Create Profile with full defaults (prevents NOT NULL constraint violations)
+    try:
+        profile, profile_created = Profile.objects.get_or_create(
+            user=instance,
+            defaults=build_default_profile_fields()
+        )
+        
+        # Defensive: ensure city is set even if profile existed but had null city
+        if not profile.city:
+            profile.city = getattr(settings, "DEFAULT_PROFILE_CITY", "Lilongwe")
+            profile.save(update_fields=["city"])
+            
+    except IntegrityError:
+        # Race condition or partial migration state - retry get without create
+        try:
+            profile = Profile.objects.get(user=instance)
+            profile_created = False
+            
+            # Ensure city is set
+            if not profile.city:
+                profile.city = getattr(settings, "DEFAULT_PROFILE_CITY", "Lilongwe")
+                profile.save(update_fields=["city"])
+        except Profile.DoesNotExist:
+            # Still doesn't exist - log and re-raise
+            import logging
+            log = logging.getLogger(__name__)
+            log.error(
+                f"CRITICAL: Failed to create Profile for user {instance.id} after retry. "
+                f"Database constraint issue."
+            )
+            raise
+    
+    # Create LoginSecurity (simpler, no special constraints)
     LoginSecurity.objects.get_or_create(user=instance)

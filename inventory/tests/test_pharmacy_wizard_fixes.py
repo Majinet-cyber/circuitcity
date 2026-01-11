@@ -223,8 +223,8 @@ class PharmacyWizardCosmeticsFlowTest(TestCase):
         # Verify PharmacyBatch was created
         batch = PharmacyBatch.objects.filter(merch_product=product, business=self.business).first()
         self.assertIsNotNone(batch, "PharmacyBatch should be created")
-        self.assertEqual(batch.quantity_total, 100)
-        self.assertEqual(batch.buying_price, Decimal("5.00"))
+        self.assertEqual(batch.quantity, 100)
+        self.assertEqual(batch.cost_price, Decimal("5.00"))
         self.assertEqual(batch.selling_price, Decimal("10.00"))
 
     def test_cosmetics_expiry_date_optional(self):

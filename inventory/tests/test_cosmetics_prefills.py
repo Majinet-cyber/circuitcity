@@ -33,6 +33,9 @@ class CosmeticsPrefillsTestCase(TestCase):
             business_kind="pharmacy",
         )
 
+        # Create a subscription for the business (required for views to work)
+        self._ensure_subscription(self.business)
+
         self.user = User.objects.create_user(
             username="testuser",
             email="test@example.com",
@@ -50,6 +53,40 @@ class CosmeticsPrefillsTestCase(TestCase):
 
         self.client = Client()
         self.client.force_login(self.user)
+
+    def _ensure_subscription(self, business):
+        """Ensure the business has a subscription (test helper)."""
+        from datetime import timedelta
+        from django.utils import timezone
+        try:
+            from billing.models import BusinessSubscription, SubscriptionPlan
+            from decimal import Decimal
+
+            # Get or create a plan
+            plan, _ = SubscriptionPlan.objects.get_or_create(
+                code="test_plan",
+                defaults={
+                    "name": "Test Plan",
+                    "amount": Decimal("0.00"),
+                    "is_active": True,
+                },
+            )
+
+            # Create subscription if not exists
+            now = timezone.now()
+            trial_end = now + timedelta(days=30)
+            BusinessSubscription.objects.get_or_create(
+                business=business,
+                defaults={
+                    "plan": plan,
+                    "status": "trial",
+                    "trial_end": trial_end,
+                    "current_period_start": now,
+                    "current_period_end": trial_end,
+                },
+            )
+        except ImportError:
+            pass  # Billing app not installed
 
     def test_management_command_creates_prefills(self):
         """Test that management command creates prefills for pharmacy business."""
@@ -141,16 +178,18 @@ class CosmeticsPrefillsTestCase(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-        # Select cosmetics mode
+        # Select cosmetics mode (wizard redirects after POST)
         response = self.client.post(
             url,
             {
                 "wizard_step": 0,
                 "selected_mode": "cosmetics",
             },
+            follow=True,  # Follow the redirect to see the next step
         )
 
-        # Should show categories with product counts
+        # Should show categories with product counts (after redirect to step 1)
+        self.assertEqual(response.status_code, 200)
         self.assertContains(response, "product")  # "X products" badge
 
         # Check that Perfumes and Skin Care show counts > 0

@@ -19,11 +19,21 @@ class PhoneWizardRedirectsTestCase(TestCase):
 
     def setUp(self):
         """Set up test data"""
-        # Create a PHONES business
-        self.business = Business.objects.create(name="Test Phone Shop", kind=BusinessKind.PHONES, is_active=True)
-
-        # Create a test user
+        # Create a test user FIRST (needed for Business.created_by)
         self.user = User.objects.create_user(username="wizarduser", email="wizard@example.com", password="testpass123")
+        
+        # Create a PHONES business
+        self.business = Business.objects.create(
+            name="Test Phone Shop",
+            slug="test-phone-shop",
+            business_kind=BusinessKind.PHONES,
+            status="ACTIVE",
+            created_by=self.user,
+        )
+        
+        # Create Membership for user (required for access to business views)
+        from tenants.models import Membership
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
 
         # Create a test phone product
         self.product = PhoneProductCatalog.objects.create(
@@ -100,9 +110,10 @@ class PhoneWizardRedirectsTestCase(TestCase):
     def test_wizard_base_url_accessible(self):
         """Test that wizard base URL is accessible"""
         url = reverse("inventory:phone_sale_wizard")
-        response = self.client.get(url)
+        response = self.client.get(url, follow=True)
 
-        # Should return 200 (step 1 by default)
+        # Should return 200 (step 1 by default) after following any redirects
+        # Note: Wizard may redirect for business selection, then back to wizard
         self.assertEqual(response.status_code, 200)
 
     def test_wizard_reset_works(self):

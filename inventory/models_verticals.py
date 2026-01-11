@@ -871,20 +871,25 @@ class GymMember(models.Model):
     # CENTRALIZED MEMBERSHIP CALCULATION PROPERTIES
     # ==============================================================================
 
+    def _get_membership_service(self):
+        """
+        Get the SSOT membership service for this member.
+        
+        This is a private helper that lazy-loads the service.
+        All membership computations should use this service.
+        """
+        from inventory.services.gym_membership import GymMembershipService
+        return GymMembershipService(self)
+
     @property
     def duration_days(self) -> int:
         """
         Get the duration of the membership in days.
         Returns the actual granted days based on the current membership period.
+        
+        Uses SSOT service for computation.
         """
-        if self.membership_start and self.membership_end:
-            # Calculate actual days in the current period (inclusive)
-            return (self.membership_end - self.membership_start).days + 1
-
-        # Fallback to 30 if no membership exists
-        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS
-
-        return GYM_MEMBERSHIP_DAYS
+        return self._get_membership_service().get_duration_days()
 
     @property
     def days_used(self) -> int:
@@ -899,20 +904,10 @@ class GymMember(models.Model):
         - Today is after the membership has expired (capped at duration_days)
 
         Otherwise returns the number of days elapsed since membership_start.
+        
+        Uses SSOT service for computation.
         """
-        if not self.membership_start:
-            return 0
-
-        today = timezone.now().date()
-        used = (today - self.membership_start).days
-
-        # Clamp to valid range [0, duration_days]
-        if used < 0:
-            used = 0
-        if used > self.duration_days:
-            used = self.duration_days
-
-        return used
+        return self._get_membership_service().get_days_used()
 
     @property
     def days_left(self) -> int:
@@ -930,16 +925,10 @@ class GymMember(models.Model):
         - Today = Jan 1, membership_end = Jan 30: returns 30 days
         - Today = Jan 30, membership_end = Jan 30: returns 1 day
         - Today = Jan 31, membership_end = Jan 30: returns 0 days
+        
+        Uses SSOT service for computation.
         """
-        if not self.membership_end:
-            return 0
-
-        today = timezone.now().date()
-        if self.membership_end < today:
-            return 0
-
-        # Inclusive calculation: (end - today).days + 1
-        return (self.membership_end - today).days + 1
+        return self._get_membership_service().get_days_left()
 
     @property
     def days_left_display(self) -> str:
@@ -950,8 +939,10 @@ class GymMember(models.Model):
         - "30 / 30 days" on payment day
         - "29 / 30 days" the day after
         - "0 / 30 days" when expired
+        
+        Uses SSOT service for computation.
         """
-        return f"{self.days_left} / {self.duration_days} days"
+        return self._get_membership_service().get_days_display()
 
     @property
     def next_payment_date_property(self):
@@ -969,10 +960,10 @@ class GymMember(models.Model):
         - Duration: 30 days
         - Membership period: Jan 1 - Jan 30
         - Next payment due: Jan 31
+        
+        Uses SSOT service for computation.
         """
-        if not self.last_payment_date:
-            return None
-        return self.last_payment_date + timedelta(days=self.duration_days)
+        return self._get_membership_service().get_next_payment_date()
 
     @property
     def is_active_membership(self) -> bool:
@@ -986,8 +977,10 @@ class GymMember(models.Model):
         Returns:
         - True if membership is active
         - False if expired or never existed
+        
+        Uses SSOT service for computation.
         """
-        return bool(self.last_payment_date and self.days_left > 0)
+        return self._get_membership_service().is_active()
 
     @property
     def status_label(self) -> str:
@@ -997,10 +990,10 @@ class GymMember(models.Model):
         Returns:
         - "Active" if membership is active
         - "No membership" if never paid or expired
+        
+        Uses SSOT service for computation.
         """
-        if self.is_active_membership:
-            return "Active"
-        return "No membership"
+        return self._get_membership_service().get_status_label()
 
     # ==============================================================================
     # LEGACY PROPERTIES (kept for backward compatibility)
@@ -1030,27 +1023,21 @@ class GymMember(models.Model):
     @property
     def days_left_current(self) -> int:
         """
-        Calculate days left based on current_payment.
-        Returns the number of days remaining (inclusive) in the current payment period.
-        If no current payment exists, returns 0.
+        Calculate days left based on the SSOT service.
+        Returns the number of days remaining (inclusive) in the current membership period.
 
-        This is the correct way to calculate days left based on GymPayment records.
-        Use this instead of days_left() for accurate results.
-
-        FIXED: Now caps at duration_days to prevent "31 / 30 days" bug.
-
-        DEPRECATED: Use days_left property instead for the new centralized logic.
+        This is the correct way to calculate days left.
+        
+        Uses SSOT service for computation.
+        This replaces the old logic that used current_payment (GymPayment records).
+        
+        Examples:
+        - Payment day (Jan 1, membership ends Jan 30): returns 30
+        - After 5 days (Jan 6): returns 25
+        - Last day (Jan 30): returns 1
+        - Expired (Jan 31+): returns 0
         """
-        from inventory.utils_gym import GYM_MEMBERSHIP_DAYS, compute_membership_days
-
-        payment = self.current_payment
-        if not payment:
-            return 0
-
-        today = timezone.localdate()
-        # Use the centralized helper function that caps days_left at duration
-        days_left, _ = compute_membership_days(payment.start_date, GYM_MEMBERSHIP_DAYS, today)
-        return days_left
+        return self._get_membership_service().get_days_left_current()
 
     def days_left_legacy(self) -> int:
         """
@@ -1122,12 +1109,19 @@ class GymMember(models.Model):
         """
         Get accurate membership status using the single source of truth.
 
-        Returns MembershipStatus dict from utils_gym.get_membership_status().
+        Returns MembershipStatusDict from the SSOT service.
         Use this instead of days_left() or membership_status() for accurate results.
+        
+        Returns a dictionary with all membership calculations:
+        - status_code: "none" | "active" | "expired"
+        - status_label: "No membership" | "Active" | "Expired"
+        - is_active: bool
+        - membership_start, membership_end: dates or None
+        - total_days, days_used, days_left: int
+        - days_display: formatted string
+        - next_payment_date: date or None
         """
-        from inventory.utils_gym import get_membership_status
-
-        return get_membership_status(self)
+        return self._get_membership_service().get_membership_status()
 
     def update_status(self):
         """Update status based on membership dates"""
@@ -1424,9 +1418,12 @@ class GymPayment(models.Model):
 
     # Legacy amount field (for backward compatibility)
     # Total amount = membership_amount + trainer_fee
+    # CRITICAL FIX: Added null=True, blank=True to handle legacy data
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
         validators=[MinValueValidator(Decimal("0.01"))],
         help_text="Total amount paid (membership + trainer fee)",
     )
@@ -1470,9 +1467,9 @@ class GymPayment(models.Model):
         return self.membership_amount + self.trainer_fee
 
     def save(self, *args, **kwargs):
-        # Auto-calculate total amount if not set
-        if not self.amount:
-            self.amount = self.membership_amount + self.trainer_fee
+        # CRITICAL FIX: Always calculate total amount from membership_amount + trainer_fee
+        # This ensures the amount field is never NULL and always reflects the total
+        self.amount = self.membership_amount + self.trainer_fee
 
         # End date should be set by the caller based on prorated calculation
         # Only set default if not provided (for backward compatibility)
@@ -1713,7 +1710,14 @@ class ClothingSale(models.Model):
     """
 
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="clothing_sales", db_index=True)
-    product = models.ForeignKey("inventory.MerchProduct", on_delete=models.PROTECT, related_name="clothing_sales")
+    product = models.ForeignKey(
+        "inventory.MerchProduct",
+        on_delete=models.PROTECT,
+        related_name="clothing_sales",
+        null=True,
+        blank=True,
+        help_text="Product sold (may be null for barcode-based sales where unit has all info)",
+    )
 
     # Sale details
     quantity = models.PositiveIntegerField(default=1)
@@ -1872,7 +1876,7 @@ class CementSale(models.Model):
     # Sale details
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
-    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
 
     # Cost tracking (for profit calculation)
     unit_cost = models.DecimalField(
@@ -1901,28 +1905,75 @@ class CementSale(models.Model):
     sold_at = models.DateTimeField(default=timezone.now, db_index=True)
     notes = models.TextField(blank=True, default="")
 
+    # Void/undo tracking
+    is_void = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="True if this sale was undone/voided (do not include in reports)",
+    )
+
     class Meta:
         ordering = ["-sold_at"]
         indexes = [
             models.Index(fields=["business", "-sold_at"]),
             models.Index(fields=["business", "payment_method", "-sold_at"]),
+            models.Index(fields=["business", "is_void", "-sold_at"]),
         ]
 
     def __str__(self):
         return f"{self.product.name} x {self.quantity} - {self.total_price}"
 
     def save(self, *args, **kwargs):
-        # Auto-calculate totals if not set
-        if not self.total_price:
-            self.total_price = Decimal(self.quantity) * self.unit_price
-        if not self.total_cost:
-            self.total_cost = Decimal(self.quantity) * self.unit_cost
+        # Always auto-calculate totals to ensure consistency
+        self.total_price = Decimal(self.quantity) * self.unit_price
+        self.total_cost = Decimal(self.quantity) * self.unit_cost
         super().save(*args, **kwargs)
 
     @property
     def profit(self):
         """Calculate profit for this sale"""
         return self.total_price - self.total_cost
+
+
+class CementSaleUndo(models.Model):
+    """
+    Records an undo/rollback of a cement sale.
+    Used to fix data entry errors - restores stock and reverses transactions.
+    """
+
+    sale = models.OneToOneField(
+        CementSale,
+        on_delete=models.CASCADE,
+        related_name="undo_record",
+        help_text="The sale that was undone",
+    )
+    business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="cement_sale_undos", db_index=True)
+
+    # Undo metadata
+    undone_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="cement_sales_undone",
+        help_text="Manager who undid the sale",
+    )
+    undone_at = models.DateTimeField(default=timezone.now, db_index=True)
+    reason = models.TextField(blank=True, default="", help_text="Reason for undoing the sale")
+
+    # Audit trail (snapshot of original sale data)
+    original_quantity = models.PositiveIntegerField(help_text="Original quantity sold")
+    original_total_price = models.DecimalField(max_digits=12, decimal_places=2, help_text="Original sale amount")
+    original_product_name = models.CharField(max_length=255, help_text="Product name at time of undo")
+
+    class Meta:
+        ordering = ["-undone_at"]
+        indexes = [
+            models.Index(fields=["business", "-undone_at"]),
+        ]
+
+    def __str__(self):
+        return f"Undo: {self.original_product_name} x {self.original_quantity} (MK {self.original_total_price})"
 
 
 class GrocerySale(models.Model):

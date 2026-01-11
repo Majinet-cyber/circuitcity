@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Create your store · Step 2 of 4 · Emajinet</title>
+  <title>Create your store · Step 2 of 3 · Emajinet</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1220" />
   <style>
@@ -147,7 +147,7 @@
       <span>Emajinet</span>
     </div>
 
-    <div class="step-indicator">Step 2 of 4</div>
+    <div class="step-indicator">Step 2 of 3</div>
     <h1 class="page-title">Your store</h1>
     <p class="subtitle">Tell us about your business.</p>
 
@@ -163,36 +163,30 @@
 
       <div class="grid">
         <!-- Store name (posted as business_name) -->
-        {% with has_err=form.errors.business_name %}
         <div class="field">
           <div class="label">Store name</div>
           <span class="addon">🏬</span>
-          <input class="input{% if has_err %} is-error{% endif %}" aria-invalid="{% if has_err %}true{% else %}false{% endif %}"
+          <input class="input{% if form.business_name.errors %} is-error{% endif %}" aria-invalid="{% if form.business_name.errors %}true{% else %}false{% endif %}"
                  type="text" name="business_name" required placeholder="e.g. Circuitly"
                  value="{{ form.business_name.value|default:'' }}">
           <div class="hint">This becomes your business name in the app.</div>
-          {% if has_err %}<div class="err">{{ form.errors.business_name|striptags }}</div>{% endif %}
+          {% if form.business_name.errors %}<div class="err">{{ form.business_name.errors|striptags }}</div>{% endif %}
         </div>
-        {% endwith %}
 
         <!-- Business type (custom icon dropdown + hidden real select) -->
-        {% with has_err=form.errors.business_kind %}
+        <!-- SSOT: Options are dynamically rendered from business_kinds context variable -->
         <div class="field">
           <div class="label">Business type</div>
 
           <select name="business_kind" id="id_business_kind" required style="display:none">
             <option value="" {% if not form.business_kind.value %}selected{% endif %}>---------</option>
-            <option value="phones" {% if form.business_kind.value == 'phones' %}selected{% endif %}>Phones & Electronics</option>
-            <option value="clothing" {% if form.business_kind.value == 'clothing' %}selected{% endif %}>Clothing & Fashion</option>
-            <option value="liquor" {% if form.business_kind.value == 'liquor' %}selected{% endif %}>Liquor / Bar</option>
-            <option value="pharmacy" {% if form.business_kind.value == 'pharmacy' %}selected{% endif %}>Pharmacy</option>
-            <option value="grocery" {% if form.business_kind.value == 'grocery' %}selected{% endif %}>Grocery / General</option>
-            <option value="cement" {% if form.business_kind.value == 'cement' %}selected{% endif %}>Cement Store</option>
-            <option value="gym" {% if form.business_kind.value == 'gym' %}selected{% endif %}>Gym & Fitness</option>
+            {% for kind in business_kinds %}
+            <option value="{{ kind.key }}" {% if form.business_kind.value == kind.key %}selected{% endif %}>{{ kind.display_name }}</option>
+            {% endfor %}
           </select>
 
           <div class="cc-select" id="ccBizSelect">
-            <button type="button" class="cc-select-btn{% if has_err %} is-error{% endif %}" aria-haspopup="listbox" aria-expanded="false">
+            <button type="button" class="cc-select-btn{% if form.business_kind.errors %} is-error{% endif %}" aria-haspopup="listbox" aria-expanded="false">
               <span class="cc-value">
                 <span class="cc-icon" id="bizIcon"></span>
                 <span id="bizLabel" style="font-weight:800;color:#1c2b55">Choose business type…</span>
@@ -201,53 +195,16 @@
             </button>
 
             <div class="cc-menu" role="listbox" aria-labelledby="bizLabel">
-              <div class="cc-option" data-value="phones">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4V6zm14 3h2v9h-2z"/></svg>
-                </span>
-                Phones &amp; Electronics
+              {% for kind in business_kinds %}
+              <div class="cc-option" data-value="{{ kind.key }}" data-icon="{{ kind.icon }}" data-display="{{ kind.display_name }}">
+                <span class="cc-icon">{{ kind.icon }}</span>
+                {{ kind.display_name }}
               </div>
-              <div class="cc-option" data-value="clothing">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 1 0-2-2h2a4 4 0 0 1 4 4l6 5v3H2v-3l10-8z"/></svg>
-                </span>
-                Clothing &amp; Fashion
-              </div>
-              <div class="cc-option" data-value="liquor">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M7 3h10v3l-3 5v7a2 2 0 0 1-4 0V11L7 6zM6 21h12" /></svg>
-                </span>
-                Liquor / Bar
-              </div>
-              <div class="cc-option" data-value="pharmacy">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>
-                </span>
-                Pharmacy
-              </div>
-              <div class="cc-option" data-value="grocery">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z"/></svg>
-                </span>
-                Grocery / General
-              </div>
-              <div class="cc-option" data-value="cement">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M3 3h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>
-                </span>
-                Cement Store
-              </div>
-              <div class="cc-option" data-value="gym">
-                <span class="cc-icon">
-                  <svg viewBox="0 0 24 24"><path d="M5 7h2l1-2h8l1 2h2v2h-1l1 3-1 3h1v2h-2l-1 2H8l-1-2H5v-2h1l-1-3 1-3H5z"/></svg>
-                </span>
-                Gym &amp; Fitness
-              </div>
+              {% endfor %}
             </div>
           </div>
-          {% if has_err %}<div class="err">{{ form.errors.business_kind|striptags }}</div>{% endif %}
+          {% if form.business_kind.errors %}<div class="err">{{ form.business_kind.errors|striptags }}</div>{% endif %}
         </div>
-        {% endwith %}
 
         <!-- Subdomain -->
         <div class="field">
@@ -277,7 +234,7 @@
 </div>
 
 <script>
-  // Icon dropdown wiring
+  // Icon dropdown wiring - SSOT-driven (reads from data attributes)
   (function(){
     const host=document.getElementById('ccBizSelect');
     const real=document.getElementById('id_business_kind');
@@ -286,28 +243,20 @@
     const menu=host.querySelector('.cc-menu');
     const labelEl=host.querySelector('#bizLabel');
     const iconEl=host.querySelector('#bizIcon');
-    const icons={
-      phones:'<svg viewBox="0 0 24 24"><path d="M4 6h10a2 2 0 012 2v8a2 2 0 01-2 2H4V6zm14 3h2v9h-2z"/></svg>',
-      clothing:'<svg viewBox="0 0 24 24"><path d="M12 6a2 2 0 10-2-2h2a4 4 0 014 4l6 5v3H2v-3l10-8z"/></svg>',
-      liquor:'<svg viewBox="0 0 24 24"><path d="M7 3h10v3l-3 5v7a2 2 0 0 1-4 0V11L7 6zM6 21h12"/></svg>',
-      pharmacy:'<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>',
-      grocery:'<svg viewBox="0 0 24 24"><path d="M4 7h16l-2 10H6L4 7zm5 11a2 2 0 110 4 2 2 0 010-4zm6 0a2 2 0 110 4 2 2 0 010-4z"/></svg>',
-      cement:'<svg viewBox="0 0 24 24"><path d="M3 3h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3zm0 4h18v2H3z"/></svg>',
-      gym:'<svg viewBox="0 0 24 24"><path d="M5 7h2l1-2h8l1 2h2v2h-1l1 3-1 3h1v2h-2l-1 2H8l-1-2H5v-2h1l-1-3 1-3H5z"/></svg>'
-    };
-    const textMap={
-      phones:'Phones & Electronics',
-      clothing:'Clothing & Fashion',
-      liquor:'Liquor / Bar',
-      pharmacy:'Pharmacy',
-      grocery:'Grocery / General',
-      cement:'Cement Store',
-      gym:'Gym & Fitness'
-    };
+    
+    // Build icons and textMap dynamically from data attributes (SSOT)
+    const icons = {};
+    const textMap = {};
+    host.querySelectorAll('.cc-option').forEach(opt => {
+      const key = opt.dataset.value;
+      icons[key] = opt.dataset.icon || '📦';
+      textMap[key] = opt.dataset.display || key;
+    });
+    
     function setValue(v){
       real.value=v||'';
       labelEl.textContent=v?textMap[v]:'Choose business type…';
-      iconEl.innerHTML=v?icons[v]:'';
+      iconEl.textContent=v?icons[v]:'';
       host.querySelectorAll('.cc-option').forEach(o=>o.dataset.active=(o.dataset.value===v));
       if(real.hasAttribute('required')) real.setCustomValidity(v?'':'Please choose your business type');
     }

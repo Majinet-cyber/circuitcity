@@ -21,7 +21,8 @@ from django.utils import timezone
 
 User = get_user_model()
 
-pytestmark = pytest.mark.django_db
+# Mark as critical - these tests ensure no 500 errors in normal usage
+pytestmark = [pytest.mark.django_db, pytest.mark.critical]
 
 
 # =====================================================================

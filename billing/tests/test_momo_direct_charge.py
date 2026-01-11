@@ -388,12 +388,19 @@ class TestMoMoPollingAPI:
     """Test payment status polling API for MoMo."""
 
     @pytest.fixture
-    def setup_data(self):
+    def setup_data(self, client):
         """Create test data with pending MoMo transaction."""
         user = make_user(email="test@test.com", password="pass")
         business = make_business(created_by=user, name="Test", slug="test")
         location = make_location(business=business, name="Main Store")
         make_membership(business=business, user=user, role="MANAGER")
+        
+        # Set up client session with active business
+        client.force_login(user)
+        session = client.session
+        session["active_business_id"] = business.id
+        session["active_location_id"] = location.id
+        session.save()
 
         transaction = PaymentTransaction.objects.create(
             business=business,
@@ -430,6 +437,7 @@ class TestMoMoPollingAPI:
             "transaction": transaction,
             "invoice": invoice,
             "subscription": sub,
+            "client": client,
         }
 
     @override_settings(
@@ -448,8 +456,7 @@ class TestMoMoPollingAPI:
             "raw_response": {},
         }
 
-        client = Client()
-        client.force_login(setup_data["user"])
+        client = setup_data["client"]
 
         url = reverse("billing:payment_status_api")
         response = client.get(url, {"charge_id": "charge-momo-123"})
@@ -480,8 +487,7 @@ class TestMoMoPollingAPI:
             "raw_response": {},
         }
 
-        client = Client()
-        client.force_login(setup_data["user"])
+        client = setup_data["client"]
 
         url = reverse("billing:payment_status_api")
         response = client.get(url, {"charge_id": "charge-momo-123"})

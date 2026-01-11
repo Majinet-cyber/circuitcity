@@ -9,6 +9,19 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.deprecation import MiddlewareMixin
 
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES as SHARED_BYPASS_PREFIXES
+except ImportError:
+    # Fallback if import fails
+    SHARED_BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
+
 # URLs that should always be accessible (even for revoked businesses)
 ALWAYS_ALLOWED_URLS = [
     "/accounts/login/",
@@ -16,14 +29,12 @@ ALWAYS_ALLOWED_URLS = [
     "/billing/",
     "/billing/subscribe/",
     "/billing/payment/",
-    "/static/",
-    "/media/",
     "/healthz",
-    "/favicon.ico",
 ]
 
 # URL prefixes that should bypass gating (HQ admin, public pages)
-BYPASS_PREFIXES = [
+# Combine shared bypass prefixes with subscription-specific bypasses
+BYPASS_PREFIXES = list(SHARED_BYPASS_PREFIXES) + [
     "/hq/",
     "/__admin__/",
     "/admin/",

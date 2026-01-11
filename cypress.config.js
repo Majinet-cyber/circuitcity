@@ -23,7 +23,29 @@ module.exports = defineConfig({
     },
 
     setupNodeEvents(on, config) {
-      // implement node event listeners here if needed
+      // ✅ Run PyTests BEFORE Cypress starts (unless already ran in wrapper)
+      on('before:run', async () => {
+        // Skip pytest if wrapper already ran it (prevents double execution)
+        if (process.env.CC_SKIP_PYTEST === '1') {
+          console.log('[test-system] Skipping pytest in Cypress (already ran in wrapper).');
+          return;
+        }
+        
+        console.log('\n🔄 Running PyTests before Cypress...\n');
+        
+        try {
+          const { execSync } = require('child_process');
+          execSync('node scripts/run_pytests_and_summarize.mjs', {
+            stdio: 'inherit',
+            shell: true,
+          });
+          console.log('\n✅ PyTest execution complete. Starting Cypress...\n');
+        } catch (err) {
+          // Script always exits 0, so this shouldn't happen
+          // But if it does, log and continue
+          console.error('⚠️  PyTest script error (continuing anyway):', err.message);
+        }
+      });
     },
   },
 });

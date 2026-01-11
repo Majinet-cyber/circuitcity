@@ -318,9 +318,9 @@ def choose_business(request: HttpRequest) -> HttpResponse:
                 home_url = get_business_home_url(user=user, business=single_biz)
                 return redirect(home_url)
         
-        # No business yet - redirect to onboarding
+        # No business yet - redirect to signup manager flow
         messages.info(request, "Please set up or join a business first.")
-        return redirect("onboarding:start")
+        return redirect("accounts:signup_manager")
 
     # SUPERUSERS ONLY beyond this point
     memberships_qs = (

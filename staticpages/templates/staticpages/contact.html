@@ -273,9 +273,15 @@
     </p>
 
     <div class="contact-card">
+      {% if show_success %}
+      <div class="success-message show" id="successMessage">
+        <i class="bi bi-check-circle-fill"></i> Thank you! Your message has been received. We'll get back to you shortly.
+      </div>
+      {% else %}
       <div class="success-message" id="successMessage">
         <i class="bi bi-check-circle-fill"></i> Thank you! Your message has been received. We'll get back to you shortly.
       </div>
+      {% endif %}
 
       <form id="contactForm" method="post">
         {% csrf_token %}
@@ -318,7 +324,7 @@
         <i class="bi bi-envelope-fill"></i>
         <div class="contact-method-content">
           <h3>Email</h3>
-          <p><a href="mailto:support@emajinet.com">support@emajinet.com</a></p>
+          <p><a href="mailto:{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}">{{ SUPPORT_EMAIL|default:'support@emajinet.africa' }}</a></p>
         </div>
       </div>
 
@@ -326,7 +332,7 @@
         <i class="bi bi-whatsapp"></i>
         <div class="contact-method-content">
           <h3>WhatsApp</h3>
-          <p>+265 XXX XXX XXX (Coming soon)</p>
+          <p><a href="https://wa.me/{{ SUPPORT_WHATSAPP_NUMBER|default:'+265991234567'|cut:' '|cut:'+' }}" target="_blank" rel="noopener">{{ SUPPORT_WHATSAPP_NUMBER|default:'+265 991 234 567' }}</a></p>
         </div>
       </div>
     </div>
@@ -365,7 +371,7 @@
         })
         .catch(error => {
           console.error('Error:', error);
-          alert('There was an error sending your message. Please try emailing us directly at support@emajinet.com');
+          alert('There was an error sending your message. Please try emailing us directly at {{ SUPPORT_EMAIL|default:"support@emajinet.africa" }}');
         });
       });
     });

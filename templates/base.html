@@ -51,6 +51,45 @@
         localStorage.setItem("cc-theme", "light");
       } catch (_) {}
 
+      // PHASE 2: One-time cleanup of service workers on localhost (dev only)
+      // Prevents "warped until hard refresh" caused by stale cached assets
+      var hostname = window.location.hostname;
+      if ((hostname === 'localhost' || hostname === '127.0.0.1') && 'serviceWorker' in navigator) {
+        try {
+          var cleanupKey = 'sw_cleanup_20260106';
+          if (!localStorage.getItem(cleanupKey)) {
+            console.log('[DEV] Running one-time service worker cleanup...');
+
+            // Unregister all service workers
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+              for (var registration of registrations) {
+                registration.unregister();
+                console.log('[DEV] Unregistered SW:', registration.scope);
+              }
+            });
+
+            // Clear all caches
+            if ('caches' in window) {
+              caches.keys().then(function(names) {
+                for (var name of names) {
+                  caches.delete(name);
+                  console.log('[DEV] Deleted cache:', name);
+                }
+              });
+            }
+
+            // Mark cleanup as done
+            localStorage.setItem(cleanupKey, '1');
+            console.log('[DEV] Service worker cleanup complete. Reloading...');
+
+            // Reload once to get fresh assets
+            setTimeout(function() { window.location.reload(true); }, 100);
+          }
+        } catch (e) {
+          console.warn('[DEV] SW cleanup failed:', e);
+        }
+      }
+
       // Base.html loaded
     })();
   </script>
@@ -71,6 +110,9 @@
   <link rel="stylesheet" href="{% static 'css/mobile.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-fixes.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/mobile-tables-responsive.css' %}?v={{ ASSET_V }}">
+  
+  <!-- UI/UX Standardization: Shared Mobile Card Utilities -->
+  <link rel="stylesheet" href="{% static 'cc/css/ui_cards.css' %}?v={{ ASSET_V }}">
 
   <!-- GLOBAL MOBILE GUTTER SYSTEM — Match landing page near-edge feel (2025-12-21) -->
   <link rel="stylesheet" href="{% static 'css/mobile-gutter-system.css' %}?v={{ ASSET_V }}">
@@ -343,6 +385,60 @@
       background:#9ca3af !important;
       box-shadow:0 0 0 3px rgba(156,163,175,.18) inset !important;
     }
+
+    /* ========= Tenant Pill & Notification Button ========= */
+    .tenant-pill{
+      display:inline-flex; align-items:center; gap:.5rem;
+      padding:.5rem .75rem; border-radius:999px;
+      background:rgba(255,255,255,.98); border:1px solid var(--line);
+      font-weight:700; color:var(--ink); text-decoration:none;
+      box-shadow:0 4px 12px rgba(0,0,0,.06);
+      transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .tenant-pill:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
+    .tenant-dot{
+      width:10px; height:10px; border-radius:999px;
+      background:#10b981; box-shadow:0 0 0 2px rgba(16,185,129,.25);
+    }
+    .tenant-name{ font-size:14px; }
+    .tenant-role{ font-size:12px; opacity:.75; }
+    .tenant-caret{ opacity:.6; }
+
+    .tenant-menu{
+      position:absolute; right:0; top:calc(100% + 8px);
+      min-width:220px; background:#fff; border:1px solid var(--line);
+      border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,.12);
+      display:none; z-index:1100; overflow:hidden;
+    }
+    .tenant-menu.show{ display:block; }
+    .tenant-item{
+      display:flex; align-items:center; gap:.75rem;
+      padding:.75rem 1rem; text-decoration:none; color:var(--ink);
+      font-weight:600; transition:background .12s ease;
+    }
+    .tenant-item:hover{ background:rgba(37,99,235,.06); }
+    .tenant-divider{ height:1px; background:var(--line); margin:.5rem 0; }
+
+    .notif-btn{
+      position:relative; display:inline-flex; align-items:center; justify-content:center;
+      width:40px; height:40px; border-radius:12px;
+      border:1px solid var(--line); background:#fff; color:var(--ink);
+      cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;
+    }
+    .notif-btn:hover{ transform:translateY(-1px); box-shadow:0 8px 18px rgba(0,0,0,.10); }
+    .notif-dot{
+      position:absolute; right:4px; top:4px;
+      width:8px; height:8px; border-radius:999px;
+      background:#ef4444; box-shadow:0 0 0 2px #fff;
+    }
+
+    .notif-menu{
+      /* Bootstrap dropdown handles positioning */
+      border-radius:12px !important;
+    }
+    .notif-empty{
+      padding:2rem 1rem; text-align:center; color:var(--muted);
+    }
   </style>
 
   {# Pin sidebar on HQ pages #}
@@ -462,9 +558,9 @@
           <div class="cc-page topbar">
             <h1 class="fw-bold d-flex align-items-center gap-2">
               {% block header_title %}Dashboard{% endblock %}
-              {% if request.business and request.business.subscription %}
-                {% with sub=request.business.subscription %}
-                  {% if sub.status == 'trial' %}
+              {% if subscription %}
+                {% with sub=subscription %}
+                  {% if sub.status == 'trial' or sub.status == 'trialing' %}
                     <span class="badge rounded-pill text-bg-info">Trial{% if sub.trial_end %} · ends {{ sub.trial_end|date:'M j' }}{% endif %}</span>
                   {% elif sub.status == 'active' %}
                     <span class="badge rounded-pill text-bg-success">Active</span>
@@ -472,7 +568,7 @@
                     <span class="badge rounded-pill text-bg-warning">Grace</span>
                   {% elif sub.status == 'past_due' %}
                     <span class="badge rounded-pill text-bg-warning">Past due</span>
-                  {% elif sub.status == 'expired' or sub.status == 'canceled' %}
+                  {% elif sub.status == 'expired' or sub.status == 'canceled' or sub.status == 'cancelled' %}
                     <span class="badge rounded-pill text-bg-danger">Inactive</span>
                   {% endif %}
                 {% endwith %}
@@ -667,8 +763,8 @@
     <main id="app-main" class="cc-page">
       {# ===== Billing banners ===== #}
       {# MANAGER-ONLY: Subscription management UI #}
-      {% if request.is_manager_plus and request.business and request.business.subscription %}
-        {% with sub=request.business.subscription %}
+      {% if request.is_manager_plus and request.business and subscription %}
+        {% with sub=subscription %}
           {% if sub.status == 'trial' %}
             <div class="msg msg-info fade-in d-flex align-items-center justify-content-between" id="subscription-actions" data-testid="subscription-actions">
               <div>
@@ -1385,6 +1481,15 @@
   if (!('serviceWorker' in navigator)) return;
   if (window.location.pathname.startsWith('/admin/')) return;
 
+  // CRITICAL: Disable service worker on local dev to prevent cache poisoning
+  // Service workers can cache bad responses (302 redirects, 500 errors) during development,
+  // causing "blank page" or "warped dashboard" issues that persist even after fixes.
+  var hostname = window.location.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    console.log('[DEV] Service worker disabled on localhost to prevent cache issues');
+    return;
+  }
+
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(function(registration) {
@@ -1405,12 +1510,13 @@
       })
       .catch(function(error) {
         // Fail silently in production, log in dev
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
           console.warn('ServiceWorker registration failed: ', error);
         }
       });
   });
 })();
 </script>
+<!-- build: {{ BUILD_SHA|default:"unknown" }} -->
 </body>
 </html>

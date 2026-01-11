@@ -13,9 +13,20 @@ from django.utils import timezone
 from inventory.utils_barcodes import find_sellable_by_barcode, normalize_barcode, validate_barcode
 from tenants.utils import get_active_business, require_business
 
+# Try to import role decorator from tenants.utils
+try:
+    from tenants.utils import require_role
+except ImportError:
+    # Fallback: create a no-op decorator if not available
+    def require_role(roles=None):
+        def decorator(func):
+            return func
+        return decorator
+
 
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET"])
 def fast_sell_lookup(request):
     """
@@ -90,6 +101,7 @@ def fast_sell_lookup(request):
 
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["POST"])
 def fast_sell_sell(request):
     """
@@ -194,8 +206,11 @@ def fast_sell_sell(request):
             # Get active location
             location = getattr(request, "active_location", None)
             if not location:
-                # Try to get first active location for business
-                location = Location.objects.filter(business=business, is_active=True).first()
+                # Try to get default location, or any location for business
+                location = (
+                    Location.objects.filter(business=business, is_default=True).first()
+                    or Location.objects.filter(business=business).first()
+                )
 
                 if not location:
                     return JsonResponse(
@@ -245,6 +260,7 @@ def fast_sell_sell(request):
 
 @login_required
 @require_business
+@require_role(["Manager", "Admin", "Agent"])
 @require_http_methods(["GET"])
 def fast_sell_kpis(request):
     """

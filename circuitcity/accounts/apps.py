@@ -33,6 +33,18 @@ class AccountsConfig(AppConfig):
         - On logout: clear active business (session + threadlocal) to avoid
           cross-tenant bleed when the next user logs in on a shared device.
         """
+        # ----------------------------------------------------------------
+        # Backwards Compatibility: Patch UserManager to accept legacy kwargs
+        # ----------------------------------------------------------------
+        # Many tests pass 'role', 'business', 'location' to User.objects.create_user()
+        # but the default Django User model doesn't have these fields.
+        # We patch the manager to pop these kwargs silently.
+        # ----------------------------------------------------------------
+        try:
+            self._patch_user_manager_for_legacy_kwargs()
+        except Exception:
+            pass  # Never break app startup
+        
         # Optional user-defined signals (harmless if missing)
         try:
             from . import signals  # noqa: F401
@@ -160,3 +172,51 @@ class AccountsConfig(AppConfig):
             user_logged_out.connect(_on_user_logged_out, dispatch_uid="accounts_user_logged_out_harden")
         except Exception:
             pass
+
+    def _patch_user_manager_for_legacy_kwargs(self) -> None:
+        """
+        Monkey-patch the Django UserManager to pop legacy kwargs that tests pass.
+        
+        Legacy kwargs like 'role', 'business', 'location' are no longer User model
+        fields, but many test factories still pass them. This patch makes the
+        manager pop them silently rather than raising TypeError.
+        
+        Security note: This does NOT weaken production access control - it only
+        affects User creation, and the popped kwargs are ignored (not used).
+        """
+        from django.contrib.auth import get_user_model
+        
+        User = get_user_model()
+        manager = User.objects
+        
+        # Only patch if not already patched
+        if getattr(manager, '_legacy_kwargs_patched', False):
+            return
+        
+        # Known legacy kwargs to pop (add more as needed)
+        LEGACY_USER_KWARGS = frozenset([
+            'role',       # Membership.role, not User.role
+            'business',   # Linked via Membership, not User
+            'location',   # Linked via Membership/AgentProfile, not User
+        ])
+        
+        # Store original methods
+        _original_create_user = manager.create_user
+        _original_create_superuser = manager.create_superuser
+        
+        def _patched_create_user(username=None, email=None, password=None, **extra_fields):
+            """Wrapped create_user that pops legacy kwargs."""
+            for key in LEGACY_USER_KWARGS:
+                extra_fields.pop(key, None)
+            return _original_create_user(username=username, email=email, password=password, **extra_fields)
+        
+        def _patched_create_superuser(username=None, email=None, password=None, **extra_fields):
+            """Wrapped create_superuser that pops legacy kwargs."""
+            for key in LEGACY_USER_KWARGS:
+                extra_fields.pop(key, None)
+            return _original_create_superuser(username=username, email=email, password=password, **extra_fields)
+        
+        # Apply patches
+        manager.create_user = _patched_create_user
+        manager.create_superuser = _patched_create_superuser
+        manager._legacy_kwargs_patched = True

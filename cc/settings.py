@@ -268,6 +268,8 @@ MIDDLEWARE = [
     "cc.middleware.RequestIDMiddleware",
     "cc.middleware.AccessLogMiddleware",
     "django.middleware.common.CommonMiddleware",
+    # ✅ FIX: Normalize double slashes (must be after CommonMiddleware)
+    "core.middleware.NormalizeDoubleSlashMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # HQ admins stay in HQ
@@ -326,7 +328,8 @@ TEMPLATES = [
         ],
         "APP_DIRS": True,
         "OPTIONS": {
-            "debug": DEBUG,
+            # Disable template debug during tests to prevent VariableDoesNotExist spam
+            "debug": DEBUG and not TESTING,
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
@@ -336,6 +339,9 @@ TEMPLATES = [
                 "cc.context_processors.role_flags",
                 "cc.context_processors.brand",
                 "cc.context_processors.currency_config",
+                "cc.context_processors.marketing_constants",
+                "cc.context_processors.current_year",
+                "core.context_processor.static_versioning",
                 "tenants.context_processors.tenant_context",
                 "tenants.context_processors.notifications_context",
                 "billing.context_processors.trial_banner",
@@ -583,6 +589,15 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
+
+# --------------------------- Profile defaults ---------------------------
+# Single source of truth for Profile sidecar creation defaults
+# These MUST match Profile model field names and ensure NOT NULL constraints are satisfied
+DEFAULT_PROFILE_CITY = "Lilongwe"
+DEFAULT_PROFILE_COUNTRY = "Malawi"
+DEFAULT_PROFILE_TIMEZONE = "Africa/Blantyre"
+DEFAULT_PROFILE_LANGUAGE = "English"
+DEFAULT_PROFILE_CURRENCY = "MWK"
 # Use faster password hashing in CI for speed
 if CI:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
@@ -601,6 +616,9 @@ try:
     from celery.schedules import crontab
 
     CELERY_BEAT_SCHEDULE = {
+        # ======================================================================
+        # GYM EMAILS
+        # ======================================================================
         # Daily inactivity reminders at 3:00 PM Malawi time
         "gym-daily-inactivity-reminders": {
             "task": "inventory.tasks_gym_emails.send_gym_inactivity_reminders",
@@ -611,6 +629,39 @@ try:
         "gym-weekly-manager-summary": {
             "task": "inventory.tasks_gym_emails.send_gym_weekly_manager_summary",
             "schedule": crontab(hour=15, minute=0, day_of_week="monday"),
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # ======================================================================
+        # BILLING & SUBSCRIPTION MANAGEMENT
+        # ======================================================================
+        # Create renewal invoices at period end (runs hourly, safe/idempotent)
+        "billing-create-renewal-invoices": {
+            "task": "billing.tasks.create_renewal_invoices",
+            "schedule": crontab(minute=0),  # Every hour at :00
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Process dunning attempts (3x/day = every 8 hours)
+        "billing-process-dunning": {
+            "task": "billing.tasks.process_dunning_attempts",
+            "schedule": crontab(hour="*/8", minute=15),  # Every 8 hours at :15
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Suspend subscriptions after grace period expires (runs hourly)
+        "billing-suspend-expired-grace": {
+            "task": "billing.tasks.suspend_expired_grace_periods",
+            "schedule": crontab(minute=30),  # Every hour at :30
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Process cancellations at period end (runs hourly)
+        "billing-process-cancellations": {
+            "task": "billing.tasks.process_cancellations",
+            "schedule": crontab(minute=45),  # Every hour at :45
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # Remind trials ending soon (daily at 10 AM)
+        "billing-remind-trials-ending": {
+            "task": "billing.tasks.remind_trials_ending_soon",
+            "schedule": crontab(hour=10, minute=0),
             "options": {"timezone": "Africa/Blantyre"},
         },
     }
@@ -653,7 +704,9 @@ STORAGES = {
 
 # WhiteNoise tuning
 WHITENOISE_AUTOREFRESH = DEBUG
-WHITENOISE_MAX_AGE = 60 * 60 * 24 * 365
+# In DEBUG mode, disable caching to prevent stale assets causing "warped" layouts
+# In production, cache for 1 year for performance
+WHITENOISE_MAX_AGE = 0 if DEBUG else (60 * 60 * 24 * 365)
 WHITENOISE_INDEX_FILE = False
 # DO NOT hard-fail on manifest mismatches during rolling deploys.
 WHITENOISE_MANIFEST_STRICT = False
@@ -904,6 +957,12 @@ WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "")
 WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", "+265")  # Malawi
 
+# --------------------------- marketing & contact constants ---------------------------
+# Centralize marketing constants for consistency across public pages
+SUPPORT_EMAIL = "support@emajinet.africa"
+SUPPORT_WHATSAPP_NUMBER = os.environ.get("SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135")  # Real working number
+MARKETING_ACTIVE_BUSINESSES = 34  # Real count - update when milestones reached
+
 # --------------------------- global UI ---------------------------
 UI = {
     "SIDEBAR_COLLAPSIBLE": False,
@@ -947,7 +1006,8 @@ LOGGING = {
     "loggers": {
         "django.template": {
             "handlers": ["console"],
-            "level": "DEBUG" if DEBUG else "INFO",
+            # Reduce template debug spam during tests; only DEBUG when not testing
+            "level": "DEBUG" if (DEBUG and not TESTING) else "INFO",
             "propagate": True,
         },
     },

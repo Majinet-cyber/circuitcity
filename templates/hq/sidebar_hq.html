@@ -79,6 +79,11 @@
 </style>
 
 <aside id="hqSidebar" class="cc-sidebar hq-sidebar">
+  <!-- Mobile close button -->
+  <button id="hqSidebarClose" class="sidebar-close" aria-label="Close sidebar">
+    <i class="bi bi-x-lg"></i>
+  </button>
+  
   <a class="cc-brand" href="{{ url_hq_home|default:'/hq/' }}">
     <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>Emajinet HQ</span>

@@ -6,14 +6,14 @@ Phones and liquor use their own dedicated scan/sell flows.
 """
 from __future__ import annotations
 
-from decimal import Decimal
-from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
+from decimal import Decimal
+from typing import Any, Dict, Optional
 
-from django.db import transaction
-from django.db.models import Sum, Count, Q
-from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Count, Q, Sum
+from django.utils import timezone
 
 
 def lookup_product_by_barcode(
@@ -95,34 +95,29 @@ def lookup_product_by_barcode(
             }
 
         elif vertical == "clothing":
-            # Clothing: Look up by barcode in MerchProduct
-            product = MerchProduct.objects.filter(
-                business=business, kind="clothing", is_active=True, barcode=barcode
-            ).first()
+            # Clothing: MUST use ClothingBarcodeUnit lookup (barcoded items only)
+            from inventory.services.clothing_barcode_service import lookup_barcode_for_fast_sell
 
-            if not product:
-                return {"ok": True, "found": False, "error": "Product not found"}
+            result = lookup_barcode_for_fast_sell(business=business, barcode=barcode)
 
-            stock_qty = product.quantity_in_stock or 0
-            if stock_qty <= 0:
-                return {"ok": True, "found": False, "error": "Out of stock"}
+            if not result.get("found"):
+                return {"ok": True, "found": False, "error": result.get("error", "Barcode not found")}
 
-            selling_price = product.selling_price or Decimal("0.00")
-            needs_price = selling_price == 0
+            unit = result["unit"]
 
             return {
                 "ok": True,
                 "found": True,
                 "product": {
-                    "id": product.id,
-                    "name": product.name,
-                    "category": product.category or "",
-                    "size": getattr(product, "size", ""),
-                    "color": getattr(product, "color", ""),
+                    "id": unit.id,
+                    "name": f"{unit.category.title()} - Size {unit.size}",
+                    "category": unit.category or "",
+                    "size": unit.size,
+                    "color": unit.color or "",
                 },
-                "stock_qty": stock_qty,
-                "selling_price": float(selling_price),
-                "needs_price": needs_price,
+                "stock_qty": 1,  # Always 1 for barcoded units
+                "selling_price": float(unit.selling_price),
+                "needs_price": False,  # Price is pre-stored
             }
 
         elif vertical == "liquor":
@@ -190,11 +185,13 @@ def create_fast_sell(
         - kpis: dict (updated KPIs)
         - error: str (if not ok)
     """
-    from inventory.models import MerchProduct
-    from inventory.models_verticals import ClothingSale, PaymentMethod as VPaymentMethod
-    from inventory.models_pharmacy import PharmacySale, PharmacyBatch
-    from inventory.utils_vertical_capabilities import vertical_supports_fast_sell
     from django.contrib.auth import get_user_model
+
+    from inventory.models import MerchProduct
+    from inventory.models_pharmacy import PharmacyBatch, PharmacySale
+    from inventory.models_verticals import ClothingSale
+    from inventory.models_verticals import PaymentMethod as VPaymentMethod
+    from inventory.utils_vertical_capabilities import vertical_supports_fast_sell
 
     User = get_user_model()
 
@@ -282,60 +279,39 @@ def create_fast_sell(
             }
 
         elif vertical == "clothing":
-            # Clothing Fast Sell
-            product = (
-                MerchProduct.objects.select_for_update()
-                .filter(business=business, kind="clothing", is_active=True, barcode=barcode)
-                .first()
-            )
+            # Clothing Fast Sell - MUST use ClothingBarcodeUnit (unique barcoded items)
+            # Import here to avoid circular dependency
+            from inventory.services.clothing_barcode_service import create_fast_sell_from_barcode
 
-            if not product:
-                return {"ok": False, "error": "Product not found"}
+            # Get active location (required for clothing)
+            location = None
+            if hasattr(user, "active_location"):
+                location = user.active_location
 
-            stock_qty = product.quantity_in_stock or 0
-            if stock_qty < quantity:
-                return {"ok": False, "error": f"Insufficient stock (available: {stock_qty})"}
+            if not location:
+                # Try to get from business's default location, or any location
+                from inventory.models import Location
 
-            # Determine selling price
-            if selling_price is None:
-                selling_price = product.selling_price or Decimal("0.00")
+                # Prefer default location, fallback to any location
+                location = (
+                    Location.objects.filter(business=business, is_default=True).first()
+                    or Location.objects.filter(business=business).first()
+                )
 
-            if selling_price == 0:
-                if selling_price is None:
-                    return {"ok": False, "needs_price": True, "error": "Selling price required"}
-                else:
-                    # Update product selling price
-                    product.selling_price = selling_price
-                    product.save(update_fields=["selling_price"])
+                if not location:
+                    return {"ok": False, "error": "No location found for this business"}
 
-            # Calculate totals
-            unit_price = selling_price
-            total_price = unit_price * quantity
-            unit_cost = product.cost_price or Decimal("0.00")
-            total_cost = unit_cost * quantity
-
-            # Decrease stock
-            product.quantity_in_stock -= quantity
-            product.save(update_fields=["quantity_in_stock"])
-
-            # Create sale
-            sale = ClothingSale.objects.create(
+            # Use clothing barcode service to create sale
+            result = create_fast_sell_from_barcode(
                 business=business,
-                product=product,
+                location=location,
+                user=user,
+                barcode=barcode,
                 quantity=quantity,
-                unit_price=unit_price,
-                total_price=total_price,
-                unit_cost=unit_cost,
-                total_cost=total_cost,
                 payment_method=payment_method,
-                sold_by=user,
             )
 
-            return {
-                "ok": True,
-                "sale_id": sale.id,
-                "message": f"Sold {quantity} × {product.name}",
-            }
+            return result
 
         else:
             return {"ok": False, "error": f"Unsupported vertical: {vertical}"}
@@ -367,8 +343,8 @@ def get_fast_sell_kpis(
         - revenue_today: Decimal
         - profit_today: Decimal (if cost tracking available)
     """
-    from inventory.models_verticals import ClothingSale
     from inventory.models_pharmacy import PharmacySale
+    from inventory.models_verticals import ClothingSale
     from inventory.utils_vertical_capabilities import vertical_supports_fast_sell
 
     # CRITICAL: Capability check - Fast Sell ONLY for pharmacy + clothing

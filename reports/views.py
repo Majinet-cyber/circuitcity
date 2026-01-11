@@ -21,6 +21,9 @@ from sales.models import Sale  # noqa
 from inventory.models import InventoryItem  # noqa
 from wallet.models import WalletTransaction, TxnType, Ledger  # noqa
 
+# SSOT: Import context defaults to prevent KeyError failures
+from reports.services.context_defaults import apply_default_report_context
+
 
 # -------------------------------
 # Auth helpers
@@ -441,6 +444,9 @@ def reports_home(request: HttpRequest) -> HttpResponse:
         ],
     }
     
+    # Apply SSOT defaults to prevent KeyError failures
+    context = apply_default_report_context(context)
+    
     return _render(request, context)
 
 
@@ -454,6 +460,10 @@ def sales_report(request: HttpRequest) -> HttpResponse:
         "title": "Sales Report",
         "subtitle": "Top movers, revenue, agents",
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    context = apply_default_report_context(context)
+    
     # Try to render a dedicated sales template, fall back to generic
     tpl_name, origin = _resolve_template(["reports/sales_report.html", "ccreports/sales.html", "reports/home.html"])
     resp = render(request, tpl_name, context)
@@ -472,6 +482,10 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
         "title": "Inventory Report",
         "subtitle": "Stock ageing, low stock, turnover",
     }
+    
+    # Apply SSOT defaults to prevent KeyError failures
+    context = apply_default_report_context(context)
+    
     # Try to render a dedicated inventory template, fall back to generic
     tpl_name, origin = _resolve_template(["reports/inventory_report.html", "ccreports/inventory.html", "reports/home.html"])
     resp = render(request, tpl_name, context)

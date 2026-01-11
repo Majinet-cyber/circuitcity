@@ -737,6 +737,9 @@ def _process_upgrade_payment(
 def _find_or_create_invoice_for_transaction(payment_txn: PaymentTransaction) -> Optional[Invoice]:
     """
     Find or create invoice for payment transaction.
+    
+    NEW BEHAVIOR: If there's a PendingCheckout with this tx_ref, create invoice from it
+    (this is the first time invoice is created - only after payment success).
 
     Args:
         payment_txn: PaymentTransaction instance
@@ -744,6 +747,8 @@ def _find_or_create_invoice_for_transaction(payment_txn: PaymentTransaction) -> 
     Returns:
         Invoice instance or None
     """
+    from billing.models import PendingCheckout, InvoiceItem
+    
     # Try to find existing invoice by provider_reference
     invoice = Invoice.objects.filter(
         provider_reference=payment_txn.tx_ref,
@@ -753,7 +758,64 @@ def _find_or_create_invoice_for_transaction(payment_txn: PaymentTransaction) -> 
     if invoice:
         return invoice
 
-    # Try to find by amount + currency + business (heuristic match)
+    # NEW: Check for PendingCheckout with this tx_ref (new flow)
+    pending = PendingCheckout.objects.filter(
+        tx_ref=payment_txn.tx_ref,
+        business=payment_txn.business,
+        status=PendingCheckout.Status.PENDING,
+    ).first()
+    
+    if pending and pending.selected_plan:
+        # Create invoice NOW (first time - payment succeeded)
+        subscription = getattr(payment_txn.business, "subscription", None)
+        now = timezone.now()
+        period_end = now + timedelta(days=30)
+        
+        invoice = Invoice.objects.create(
+            business=payment_txn.business,
+            subscription=subscription,
+            currency=pending.currency,
+            billing_period_start=now.date(),
+            billing_period_end=period_end.date(),
+            provider_reference=payment_txn.tx_ref,
+            status=Invoice.Status.ISSUED,  # Will be marked PAID shortly
+            issued_at=now,
+        )
+        
+        InvoiceItem.objects.create(
+            invoice=invoice,
+            description=f"{pending.selected_plan.name} – Monthly plan",
+            qty=Decimal("1"),
+            unit="month",
+            unit_price=pending.amount,
+        )
+        
+        invoice.recalc_totals(save=True)
+        
+        # Mark pending checkout as succeeded
+        pending.mark_succeeded()
+        
+        # Activate subscription with the selected plan
+        if subscription:
+            subscription.plan = pending.selected_plan
+            subscription.status = BusinessSubscription.Status.ACTIVE
+            subscription.current_period_start = now
+            subscription.current_period_end = period_end
+            subscription.next_billing_date = period_end
+            subscription.last_payment_at = now
+            subscription.save(update_fields=[
+                "plan", "status", "current_period_start", "current_period_end",
+                "next_billing_date", "last_payment_at", "updated_at"
+            ])
+        
+        logger.info(
+            f"Invoice {invoice.number} created from PendingCheckout on payment success, "
+            f"business={payment_txn.business.id}, plan={pending.selected_plan_code}"
+        )
+        
+        return invoice
+
+    # Try to find by amount + currency + business (heuristic match - old flow)
     invoice = (
         Invoice.objects.filter(
             business=payment_txn.business,
@@ -771,9 +833,9 @@ def _find_or_create_invoice_for_transaction(payment_txn: PaymentTransaction) -> 
         invoice.save(update_fields=["provider_reference", "updated_at"])
         return invoice
 
-    # Create new invoice for subscription payment
+    # Fallback: Create new invoice for subscription payment (old flow)
     subscription = getattr(payment_txn.business, "subscription", None)
-    if subscription:
+    if subscription and subscription.plan:
         invoice = create_subscription_invoice(
             business=payment_txn.business,
             subscription=subscription,

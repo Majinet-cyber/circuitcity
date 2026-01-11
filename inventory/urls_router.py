@@ -24,3 +24,15 @@ if views_router:
         path("sim/", views_router.app_sim, name="sim"),
         path("analytics/", views_router.app_analytics, name="analytics"),
     ]
+
+# ======================================================================================
+# URL COMPATIBILITY ALIASES (SSOT)
+# Import compatibility URL patterns from cc.urls_compat to ensure consistent naming
+# across all URLConfs. This allows tests using reverse('stock'), reverse('sell'), etc.
+# to work correctly when router URLConf is loaded.
+# ======================================================================================
+try:
+    from cc.urls_compat import get_compat_urlpatterns
+    urlpatterns += get_compat_urlpatterns()
+except ImportError:
+    pass  # If cc.urls_compat not available, skip (shouldn't happen in normal operation)

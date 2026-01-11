@@ -45,6 +45,7 @@ def make_business(
     kind=BusinessKind.PHARMACY,
     name="Test Business",
     slug=None,
+    status="ACTIVE",
 ):
     """
     Create a test business.
@@ -54,6 +55,7 @@ def make_business(
         kind: BusinessKind enum value (default: BusinessKind.PHARMACY)
         name: Business name (default: "Test Business")
         slug: Business slug (defaults to slugified name if not provided)
+        status: Business status (default: "ACTIVE")
     
     Returns:
         Business instance
@@ -63,6 +65,7 @@ def make_business(
         slug=slug or slugify(name),
         business_kind=kind,
         created_by=created_by,
+        status=status,
     )
 
 

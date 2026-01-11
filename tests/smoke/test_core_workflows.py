@@ -19,8 +19,11 @@ from inventory.models import MerchProduct
 from tests.smoke.fixtures import SmokeTestFixtures
 from tests.smoke.helpers import SessionHelper
 
+# Mark all tests in this module as smoke AND critical tests
+# These tests cover core business workflows that must never fail
+pytestmark = [pytest.mark.django_db, pytest.mark.smoke, pytest.mark.critical]
 
-@pytest.mark.django_db
+
 class TestPhonesWorkflow(TestCase):
     """Test Phones vertical core workflow."""
     
@@ -67,7 +70,6 @@ class TestPhonesWorkflow(TestCase):
         assert product.quantity >= 0, "Product should have non-negative quantity"
 
 
-@pytest.mark.django_db
 class TestPharmacyWorkflow(TestCase):
     """Test Pharmacy vertical core workflow."""
     
@@ -121,7 +123,6 @@ class TestPharmacyWorkflow(TestCase):
             f"Pharmacy Hub should load, got {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestClothingWorkflow(TestCase):
     """Test Clothing vertical core workflow."""
     
@@ -177,7 +178,6 @@ class TestClothingWorkflow(TestCase):
             f"Clothing Hub should load, got {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestLiquorWorkflow(TestCase):
     """Test Liquor vertical core workflow."""
     
@@ -233,7 +233,6 @@ class TestLiquorWorkflow(TestCase):
             f"Liquor stock should load, got {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestGymWorkflow(TestCase):
     """Test Gym vertical core workflow (membership-based, no inventory)."""
     
@@ -299,7 +298,6 @@ class TestGymWorkflow(TestCase):
             f"Gym should not have fast-sell page, got {response.status_code}"
 
 
-@pytest.mark.django_db
 class TestCrossVerticalStability(TestCase):
     """Test that all verticals' dashboards are stable."""
     

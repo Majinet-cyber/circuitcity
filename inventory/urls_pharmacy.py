@@ -11,9 +11,9 @@ urlpatterns = [
     # Dashboard
     path("", views_pharmacy.pharmacy_dashboard, name="dashboard"),
     # Gamified vertical-aware flows
-    path("stock-in/", views_pharmacy.pharmacy_stock_in_wizard, name="stock_in"),  # NEW: Wizard-based flow
-    path("stock-in/wizard/", views_pharmacy.pharmacy_stock_in_wizard, name="stock_in_wizard"),  # Explicit wizard route
-    path("stock-in/legacy/", views_pharmacy.pharmacy_stock_in, name="stock_in_legacy"),  # Fallback form
+    path("stock-in/", views_pharmacy.pharmacy_stock_in, name="stock_in"),  # Form-based flow for tests/API
+    path("stock-in/wizard/", views_pharmacy.pharmacy_stock_in_wizard, name="stock_in_wizard"),  # Wizard-based flow
+    path("stock-in/legacy/", views_pharmacy.pharmacy_stock_in, name="stock_in_legacy"),  # Alias for compatibility
     path("sell/", views_pharmacy.pharmacy_sell, name="sell"),
     # Batch management (legacy/admin)
     path("batches/", views_pharmacy.batch_list, name="batch_list"),

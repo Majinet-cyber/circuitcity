@@ -16,6 +16,19 @@ except Exception:  # pragma: no cover
 
     settings = _S()  # type: ignore
 
+# Import shared bypass prefixes for consistent middleware behavior
+try:
+    from cc.middleware_constants import BYPASS_PREFIXES
+except Exception:  # pragma: no cover
+    # Fallback if import fails
+    BYPASS_PREFIXES = (
+        "/sw.js",
+        "/manifest.json",
+        "/favicon.ico",
+        "/static/",
+        "/media/",
+    )
+
 try:
     from tenants.models import Business, Membership, set_current_business_id  # thread-local setter
 except Exception:  # pragma: no cover
@@ -228,12 +241,19 @@ def _pick_owned_business_for_user(user) -> Optional[object]:
 
 def _pick_active_membership_business_for_user(user) -> Optional[object]:
     """
-    Choose the most recent ACTIVE membership's business where the Business itself is ACTIVE.
+    Choose the SINGLE ACTIVE membership's business if user has exactly one.
+    Returns None if user has 0 or 2+ active memberships (preserves multi-business selection flow).
+    
+    CRITICAL FIX: Only auto-select when user has exactly ONE membership.
+    Multi-business users should NOT have auto-selected business - they must choose.
     """
     if Membership is None or user is None:
         return None
     try:
         mem_qs = Membership.objects.filter(user=user).select_related("business").order_by("-created_at", "-id")
+        
+        # Filter to only ACTIVE memberships with ACTIVE businesses
+        active_memberships = []
         for mem in mem_qs:
             biz = getattr(mem, "business", None)
             if not biz:
@@ -241,10 +261,15 @@ def _pick_active_membership_business_for_user(user) -> Optional[object]:
             if _has_field(Business, "status") and str(getattr(biz, "status", "")).upper() != "ACTIVE":
                 continue
             if _is_active_membership(mem):
-                return biz
+                active_memberships.append((mem, biz))
+        
+        # CRITICAL: Only auto-select if exactly ONE membership
+        if len(active_memberships) != 1:
+            return None
+        
+        return active_memberships[0][1]  # Return the business
     except Exception:
         return None
-    return None
 
 
 def _derive_product_mode_from_business(biz) -> str:
@@ -383,8 +408,15 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         return Business is not None
 
     def __call__(self, request):
-        # CRITICAL: Bypass HQ paths at the very top to prevent redirect loops
+        # CRITICAL: Bypass critical paths at the very top to prevent redirect loops
         path = request.path_info or request.path or "/"
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                return self.get_response(request)
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
         if path.startswith("/hq/"):
             return self.get_response(request)
         # CRITICAL: Bypass public gym QR code endpoints (no tenant resolution required)
@@ -410,8 +442,16 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         except Exception:
             pass
 
-        # CRITICAL: Bypass HQ paths entirely to prevent redirect loops
+        # CRITICAL: Bypass critical paths entirely to prevent redirect loops
         path = getattr(request, "path", "")
+
+        # Bypass shared allowlist paths (service worker, static, etc.)
+        for prefix in BYPASS_PREFIXES:
+            if path.startswith(prefix):
+                _set_product_mode_on_request(request, None)
+                return
+
+        # CRITICAL: Bypass HQ paths to prevent redirect loops
         if path.startswith("/hq/"):
             _set_product_mode_on_request(request, None)
             return
@@ -432,7 +472,25 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             _set_product_mode_on_request(request, None)
             return
 
+        # (0) CRITICAL: Auto-select single-business users FIRST
+        #     This prevents 302 redirects to /tenants/ for users with exactly one membership
+        #     Must happen BEFORE any other resolution to ensure session is populated
+        if getattr(user, "is_authenticated", False):
+            try:
+                from tenants.services.active_business import ensure_active_business
+                biz = ensure_active_business(request, user, auto_select_single=True)
+                if biz:
+                    # SSOT auto-selected a business - activate it and return
+                    _activate(request, biz)
+                    _set_product_mode_on_request(request, biz)
+                    _attach_location_scope(request)  # safe, optional
+                    _attach_role_to_request(request)  # AUTHORITATIVE role determination
+                    return
+            except Exception:
+                pass  # Continue with normal resolution if SSOT fails
+
         # (1) Canonical: use the same util as your views/templates
+        #     (This will now benefit from the session set by SSOT above)
         try:
             b = get_active_business(request)
             if b:
@@ -472,7 +530,9 @@ class TenantResolutionMiddleware(MiddlewareMixin):
         if bid:
             try:
                 b = _filter_active_business(Business.objects).get(pk=bid)
-                if getattr(user, "is_superuser", False) or _user_has_active_membership(user, b):
+                # CRITICAL FIX: Also accept business creators as valid (owner == manager access)
+                is_creator = getattr(b, "created_by_id", None) == getattr(user, "pk", None)
+                if getattr(user, "is_superuser", False) or _user_has_active_membership(user, b) or is_creator:
                     _activate(request, b)
                     _set_product_mode_on_request(request, b)
                     _attach_location_scope(request)

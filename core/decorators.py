@@ -73,7 +73,7 @@ def _is_manager(user, request=None) -> bool:
 
     Priority:
     1. If request.cc_is_manager is set (from middleware), use it (PREFERRED)
-    2. Fallback: check staff, superuser, groups, profile (for backward compatibility)
+    2. Fallback: check staff, superuser, groups, profile, business creator (for backward compatibility)
 
     Args:
         user: User instance
@@ -103,6 +103,13 @@ def _is_manager(user, request=None) -> bool:
         profile = _safe_getattr(user, "profile", None)
         if profile and bool(_safe_getattr(profile, "is_manager", False)):
             return True
+        
+        # CRITICAL FIX: Check if user is the business creator/owner
+        # This handles cases where business was created but membership wasn't set up
+        if request:
+            business = getattr(request, "business", None)
+            if business and getattr(business, "created_by_id", None) == user.pk:
+                return True
     except Exception:
         # Be conservative if anything goes wrong
         return False

@@ -10,6 +10,7 @@ from .helpers import (
     business_vertical,
     add_product_url_for_request,
 )
+from .url_home import get_home_url_for_business
 
 
 def resolve_active_context(request: HttpRequest) -> Tuple[object | None, Dict[str, Any]]:
@@ -32,6 +33,12 @@ def resolve_active_context(request: HttpRequest) -> Tuple[object | None, Dict[st
         add_product_url = add_product_url_for_request(request)
     except Exception:
         add_product_url = "/inventory/products/new/generic/"
+    
+    # Get the correct "Home" URL based on business_kind
+    try:
+        url_home = get_home_url_for_business(biz)
+    except Exception:
+        url_home = "/inventory/dashboard/"  # Safe fallback
 
     ctx: Dict[str, Any] = {
         # Business + vertical
@@ -40,6 +47,8 @@ def resolve_active_context(request: HttpRequest) -> Tuple[object | None, Dict[st
         "BUSINESS_VERTICAL": vertical,
         # One canonical target for all â€œAdd Productâ€ buttons
         "ADD_PRODUCT_URL": add_product_url,
+        # Smart "Home" URL based on business_kind (prevents redirect loops)
+        "url_home": url_home,
     }
     return biz, ctx
 
@@ -59,4 +68,5 @@ def active_scope_ctx(request: HttpRequest) -> Dict[str, Any]:
             "ACTIVE_BUSINESS_ID": None,
             "BUSINESS_VERTICAL": "phones",
             "ADD_PRODUCT_URL": "/inventory/products/new/generic/",
+            "url_home": "/inventory/dashboard/",  # Safe fallback
         }

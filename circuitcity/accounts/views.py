@@ -12,48 +12,43 @@ from urllib.parse import quote_plus, urlencode
 from django.apps import apps
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import (
-    get_user_model,
-    update_session_auth_hash,
-    authenticate,
-    login,
-    logout,
-)
+from django.contrib.auth import authenticate, get_user_model, login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.sessions.models import Session
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
 from django.template.exceptions import TemplateDoesNotExist
 from django.template.loader import get_template
 from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.utils.text import slugify
-from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
-from django.middleware.csrf import get_token
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import (
     AvatarForm,
     ForgotPasswordRequestForm,
-    VerifyCodeResetForm,
     IdentifierLoginForm,
-    ProfileForm,
-    PasswordChangeSimpleForm,
     ManagerSignUpForm,
-    WizardStep1Form,
-    WizardStep2Form,
-    WizardStep3Form,
-    WizardStep4Form,
     ManagerWizardStep1Form,
     ManagerWizardStep2Form,
     ManagerWizardStep3Form,
     ManagerWizardStep4Form,
+    PasswordChangeSimpleForm,
+    ProfileForm,
+    VerifyCodeResetForm,
+    WizardStep1Form,
+    WizardStep2Form,
+    WizardStep3Form,
+    WizardStep4Form,
 )
-from .models import EmailOTP, LoginSecurity, Profile, OnboardingProfile
+from .models import EmailOTP, LoginSecurity, OnboardingProfile, Profile
 from .services.email_otp import request_email_otp, verify_email_otp
 
 # Optional tenants (graceful fallbacks if app not installed)
@@ -219,6 +214,7 @@ def _send_email_otp(email: str, code: str, *, purpose: str, otp_id: int | None =
     Uses transaction.on_commit to ensure email is sent after DB commit.
     """
     from django.db import transaction
+
     from notifications.services import emit_event
 
     subject = {
@@ -343,26 +339,32 @@ def _no_store(resp: HttpResponse) -> HttpResponse:
 
 def _post_login_url(request=None) -> str:
     """
-    Best-effort landing page after successful login.
-
-    CRITICAL: Always redirect to vertical dashboard (NOT analytics/insights).
-    Routes by business_kind: phones → phones dashboard, liquor → liquor dashboard, etc.
+    DEPRECATED: Use get_post_login_redirect from services.post_auth_redirect instead.
+    
+    This function is kept for backwards compatibility but now delegates to the
+    centralized redirect service.
     """
-    # If we have a request with an active business, route to vertical dashboard
-    if request:
-        business = getattr(request, "business", None)
-        if not business:
-            # Try to get from session
-            try:
-                from tenants.models import Business
+    from .services.post_auth_redirect import get_post_login_redirect
+    
+    # Get user from request
+    user = getattr(request, 'user', None) if request else None
+    if not user or not user.is_authenticated:
+        # Fallback to old behavior if no user
+        # If we have a request with an active business, route to vertical dashboard
+        if request:
+            business = getattr(request, "business", None)
+            if not business:
+                # Try to get from session
+                try:
+                    from tenants.models import Business
 
-                business_id = request.session.get("active_business_id")
-                if business_id:
-                    business = Business.objects.filter(id=business_id).first()
-            except Exception:
-                pass
+                    business_id = request.session.get("active_business_id")
+                    if business_id:
+                        business = Business.objects.filter(id=business_id).first()
+                except Exception:
+                    pass
 
-        # Redirect to vertical-specific dashboard based on business_kind
+            # Redirect to vertical-specific dashboard based on business_kind
         if business:
             try:
                 from inventory.business_kinds import BusinessKind
@@ -370,6 +372,7 @@ def _post_login_url(request=None) -> str:
                 business_kind = getattr(business, "business_kind", None)
 
                 # Map business_kind to vertical dashboard
+                # SSOT: All verticals must be listed here for post-login routing
                 vertical_routes = {
                     BusinessKind.PHONES: "inventory_verticals:phones_dashboard",
                     "phones": "inventory_verticals:phones_dashboard",
@@ -384,6 +387,15 @@ def _post_login_url(request=None) -> str:
                     BusinessKind.GROCERY: "groceries:dashboard",
                     "grocery": "groceries:dashboard",
                     "groceries": "groceries:dashboard",
+                    BusinessKind.HARDWARE: "inventory:inventory_dashboard",
+                    "hardware": "inventory:inventory_dashboard",
+                    BusinessKind.CEMENT: "verticals:cement_dashboard",
+                    "cement": "verticals:cement_dashboard",
+                    # CRITICAL: Farm and Welding must be first-class verticals
+                    BusinessKind.FARM: "verticals:farm_dashboard",
+                    "farm": "verticals:farm_dashboard",
+                    BusinessKind.WELDING: "verticals:welding_dashboard",
+                    "welding": "verticals:welding_dashboard",
                 }
 
                 route = vertical_routes.get(business_kind)
@@ -528,7 +540,9 @@ def login_view(request):
                         challenge_url += f"?next={next_url}"
                     return redirect(challenge_url)
 
-                return redirect(next_url or _post_login_url(request))
+                # Use centralized redirect helper
+                from .services.post_auth_redirect import get_post_login_redirect
+                return redirect(next_url or get_post_login_redirect(auth_user, request))
 
             if user:
                 sec, _ = LoginSecurity.objects.get_or_create(user=user)
@@ -827,6 +841,7 @@ def forgot_password_request_view(request):
     Transaction-safe: OTP creation and email sending happen after DB commit.
     """
     from django.db import transaction
+
     from notifications.services import emit_event
 
     form = ForgotPasswordRequestForm(request.POST or None)
@@ -1028,9 +1043,18 @@ def settings_home(request):
 @login_required
 @require_http_methods(["GET", "POST"])
 def settings_profile(request):
+    from .services.settings_defaults import ensure_all_settings_defaults
+
+    # Ensure profile exists and has defaults
     profile = getattr(request.user, "profile", None)
     if profile is None:
         profile, _ = Profile.objects.get_or_create(user=request.user)
+
+    # Apply defaults for new users or users with blank fields
+    ensure_all_settings_defaults(request.user)
+
+    # Refresh profile from DB after defaults are applied
+    profile.refresh_from_db()
 
     if request.method == "POST":
         form = ProfileForm(request.POST, request.FILES, instance=profile)
@@ -1090,6 +1114,7 @@ def _inject_sms_twofa_context(request, context):
     """
     try:
         from django.conf import settings as dj_settings
+
         from .models import UserTwoFactor
 
         # Try to import mask_phone from templatetags, fallback to models
@@ -1125,7 +1150,7 @@ def _inject_sms_twofa_context(request, context):
 
     except Exception as e:
         # Fail safe: set unavailable
-        logger.warning(f"Failed to inject SMS 2FA context: {e}")
+        log.warning(f"Failed to inject SMS 2FA context: {e}")
         context["twofa_available"] = False
         context["twofa_sms_enabled"] = False
         context["twofa_phone_masked"] = ""
@@ -1143,8 +1168,9 @@ def settings_security(request):
     Security settings page: password change and 2FA management.
     Password change requires recent 2FA if enabled.
     """
-    from .models import get_or_create_twofactor, is_twofa_enabled
     from django.conf import settings as django_settings
+
+    from .models import get_or_create_twofactor, is_twofa_enabled
 
     # Get user's 2FA settings
     tf = get_or_create_twofactor(request.user)
@@ -1376,6 +1402,41 @@ def settings_unified(request):
     # Inject SMS 2FA context for _twofa_sms_card.html partial
     ctx = _inject_sms_twofa_context(request, ctx)
 
+    # Inject notification preferences with defaults (SSOT for checkboxes)
+    from notifications.models import NotificationPreference
+    from circuitcity.accounts.services.settings_defaults import ensure_notification_defaults
+    
+    # Ensure user has notification preferences created with defaults
+    ensure_notification_defaults(user)
+    
+    # Now get the preferences (they're guaranteed to exist and have defaults)
+    try:
+        notif_pref = NotificationPreference.objects.get(user=user)
+    except NotificationPreference.DoesNotExist:
+        # Should never happen after ensure_notification_defaults, but safety fallback
+        notif_pref = NotificationPreference(
+            user=user,
+            instant_sale_email=True,
+            daily_summary_email=True,
+            weekly_digest_enabled=True,
+            high_sales_alerts=True,
+            important_alerts_email=True,
+        )
+        notif_pref.save()
+    
+    # Handle save notification settings POST
+    if request.method == "POST" and request.POST.get("save_notifications") == "1":
+        notif_pref.instant_sale_email = request.POST.get("instant_sale_email") == "on"
+        notif_pref.daily_summary_email = request.POST.get("daily_summary_email") == "on"
+        notif_pref.weekly_digest_enabled = request.POST.get("weekly_digest_enabled") == "on"
+        notif_pref.high_sales_alerts = request.POST.get("high_sales_alerts") == "on"
+        notif_pref.important_alerts_email = request.POST.get("important_alerts_email") == "on"
+        notif_pref.save()
+        messages.success(request, "Notification settings saved.")
+        return redirect("accounts:settings_unified")
+    
+    ctx["notif_pref"] = notif_pref
+
     try:
         return render(request, "inventory/settings.html", ctx)
     except TemplateDoesNotExist:
@@ -1415,8 +1476,10 @@ def _seed_defaults_for_business(biz) -> None:
             wh_kwargs["is_default"] = True
         Warehouse.objects.create(**wh_kwargs)
 
-    # Seed phone products and accessories for phone businesses
+    # Seed vertical-specific defaults
     business_kind = getattr(biz, "business_kind", "").lower()
+
+    # Seed phone products and accessories for phone businesses
     if business_kind in ("phones", "phone", "electronics", "mobile", "mobiles"):
         try:
             from django.core.management import call_command
@@ -1432,6 +1495,17 @@ def _seed_defaults_for_business(biz) -> None:
             call_command("seed_accessories", business=biz.id, verbosity=0)
         except Exception as e:
             log.warning(f"Failed to seed accessories for {biz.name}: {e}")
+
+    # Seed cement products for cement businesses
+    elif business_kind in ("cement", "hardware"):
+        try:
+            from inventory.cement_seed import seed_cement_defaults
+
+            result = seed_cement_defaults(biz)
+            if result.get("created", 0) > 0:
+                log.info(f"Seeded {result['created']} cement products for {biz.name}")
+        except Exception as e:
+            log.warning(f"Failed to seed cement products for {biz.name}: {e}")
 
 
 # =========================================
@@ -1463,11 +1537,13 @@ def _clear_manager_wizard_data(request):
 @require_http_methods(["GET", "POST"])
 def signup_manager(request):
     """
-    4-step wizard for manager signup:
+    3-step wizard for manager signup:
     Step 1: Account (email, full name, password)
     Step 2: Store basics (business name, type, subdomain)
-    Step 3: Brand (logo upload)
-    Step 4: Review & Create
+    Step 3: Review & Create
+    
+    Note: Logo upload has been removed from the wizard. Users can add their logo
+    later from the settings page.
     """
     # If already signed in, just go to app
     if request.user.is_authenticated:
@@ -1477,7 +1553,13 @@ def signup_manager(request):
 
     # Determine current step from query param or POST
     step = int(request.GET.get("step", request.POST.get("step", 1)))
-    if step < 1 or step > 4:
+    
+    # CRITICAL FIX: Backward compatibility - redirect step=4 to step=3
+    if step == 4:
+        # Old sessions may try to access step 4 (now step 3)
+        return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+    
+    if step < 1 or step > 3:
         step = 1
 
     wizard_data = _get_manager_wizard_data(request)
@@ -1497,7 +1579,7 @@ def signup_manager(request):
             {
                 "form": form,
                 "step": step,
-                "total_steps": 4,
+                "total_steps": 3,
                 "wizard_data": wizard_data,
             },
         )
@@ -1517,111 +1599,115 @@ def signup_manager(request):
                 wizard_data["step2"] = form.cleaned_data
                 _set_manager_wizard_data(request, wizard_data)
                 return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+        
+        # SSOT: Get business kinds from canonical registry
+        from tenants.services.business_kind import CANONICAL_BUSINESS_KINDS
+        business_kinds = [
+            {
+                "key": key,
+                "display_name": info["display_name"],
+                "icon": info.get("icon", "📦"),
+                "description": info.get("description", ""),
+            }
+            for key, info in CANONICAL_BUSINESS_KINDS.items()
+        ]
+        
         return render(
             request,
             "accounts/signup_manager_wizard_step2.html",
             {
                 "form": form,
                 "step": step,
-                "total_steps": 4,
+                "total_steps": 3,
                 "wizard_data": wizard_data,
+                "business_kinds": business_kinds,  # SSOT-driven
             },
         )
 
-    # Step 3: Brand
+    # Step 3: Review & Create (formerly Step 4)
     elif step == 3:
         # Must have completed steps 1 & 2
         if "step1" not in wizard_data or "step2" not in wizard_data:
             return redirect(f"{reverse('accounts:signup_manager')}?step=1")
 
-        form = ManagerWizardStep3Form(request.POST or None, request.FILES or None, initial=wizard_data.get("step3", {}))
-        if request.method == "POST":
-            action = request.POST.get("action", "next")
-            if action == "back":
-                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
-            elif action == "skip":
-                # Skip button: no logo, just store empty step3 and proceed
-                wizard_data["step3"] = {}
-                _set_manager_wizard_data(request, wizard_data)
-                return redirect(f"{reverse('accounts:signup_manager')}?step=4")
-            elif action == "next":
-                # Defensive logo upload handling - never crash signup
-                try:
-                    if form.is_valid():
-                        # Store logo file in session (as base64 if provided)
-                        logo_file = form.cleaned_data.get("logo")
-                        if logo_file:
-                            import base64
-
-                            # Validate basic constraints (5MB limit)
-                            if logo_file.size > 5 * 1024 * 1024:
-                                raise ValueError("Logo file too large (max 5MB)")
-
-                            wizard_data["step3"] = {
-                                "logo_name": logo_file.name,
-                                "logo_content_type": logo_file.content_type,
-                                "logo_data": base64.b64encode(logo_file.read()).decode("utf-8"),
-                            }
-                        else:
-                            wizard_data["step3"] = {}
-                        _set_manager_wizard_data(request, wizard_data)
-                        return redirect(f"{reverse('accounts:signup_manager')}?step=4")
-                except (ValidationError, ValueError, OSError, IOError) as e:
-                    # Expected errors: validation, file I/O, image processing
-                    log.warning("Logo upload failed during wizard step 3: %s", e)
-                    messages.info(request, "Logo upload is not available yet — continuing without a logo.")
-                    wizard_data["step3"] = {}
-                    _set_manager_wizard_data(request, wizard_data)
-                    return redirect(f"{reverse('accounts:signup_manager')}?step=4")
-                except Exception as e:
-                    # Safety net for any unexpected errors
-                    log.error("Unexpected error during logo upload in wizard step 3: %s", e, exc_info=True)
-                    messages.info(request, "Logo upload is not available yet — continuing without a logo.")
-                    wizard_data["step3"] = {}
-                    _set_manager_wizard_data(request, wizard_data)
-                    return redirect(f"{reverse('accounts:signup_manager')}?step=4")
-        return render(
-            request,
-            "accounts/signup_manager_wizard_step3.html",
-            {
-                "form": form,
-                "step": step,
-                "total_steps": 4,
-                "wizard_data": wizard_data,
-            },
-        )
-
-    # Step 4: Review & Create
-    elif step == 4:
-        # Must have completed steps 1, 2, & 3
-        if "step1" not in wizard_data or "step2" not in wizard_data or "step3" not in wizard_data:
-            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
+        # Logo step removed - set empty step3 data for backward compatibility
+        if "step3" not in wizard_data:
+            wizard_data["step3"] = {}
+            _set_manager_wizard_data(request, wizard_data)
 
         form = ManagerWizardStep4Form(request.POST or None)
         if request.method == "POST":
             action = request.POST.get("action", "create")
             if action == "back":
-                return redirect(f"{reverse('accounts:signup_manager')}?step=3")
+                return redirect(f"{reverse('accounts:signup_manager')}?step=2")
             elif action == "create" and form.is_valid():
-                # Create everything
+                # Create everything with enhanced error handling
+                import uuid
+                
+                request_id = str(uuid.uuid4())[:8]
                 try:
-                    return _complete_manager_wizard_signup(request, wizard_data)
+                    return _complete_manager_wizard_signup(request, wizard_data, request_id)
                 except Exception as e:
-                    log.error("Manager wizard signup failed: %s", e, exc_info=True)
-                    # Don't expose raw database errors to users
-                    if "NOT NULL constraint" in str(e) or "IntegrityError" in str(type(e).__name__):
-                        messages.error(request, "Could not create store. Please try again or contact support.")
+                    # Enhanced logging with context
+                    log.error(
+                        "Manager wizard signup failed | RequestID: %s | User email: %s | Business: %s | Error: %s",
+                        request_id,
+                        wizard_data.get("step1", {}).get("email", "UNKNOWN"),
+                        wizard_data.get("step2", {}).get("business_name", "UNKNOWN"),
+                        str(e),
+                        exc_info=True,
+                        extra={
+                            "request_id": request_id,
+                            "wizard_step1": wizard_data.get("step1", {}),
+                            "wizard_step2": wizard_data.get("step2", {}),
+                            "exception_type": type(e).__name__,
+                        },
+                    )
+                    # User-friendly error with reference ID
+                    from django.db import IntegrityError
+                    
+                    if isinstance(e, IntegrityError):
+                        if "subdomain" in str(e).lower():
+                            messages.error(
+                                request,
+                                f"The subdomain is already taken. Please try a different subdomain. (Ref: {request_id})",
+                            )
+                        elif "unique" in str(e).lower() or "duplicate" in str(e).lower():
+                            messages.error(
+                                request,
+                                f"A store with similar details already exists. Please check your entries. (Ref: {request_id})",
+                            )
+                        else:
+                            messages.error(
+                                request,
+                                f"Could not create store due to a database constraint. Please try different values. (Ref: {request_id})",
+                            )
+                    elif "NOT NULL constraint" in str(e):
+                        messages.error(
+                            request,
+                            f"Missing required field. Please ensure all required information is provided. (Ref: {request_id})",
+                        )
                     else:
-                        messages.error(request, f"Something went wrong: {str(e)}. Please try again or contact support.")
+                        messages.error(
+                            request,
+                            f"An error occurred while creating your store. Our team has been notified. (Ref: {request_id})",
+                        )
 
-        # Prepare summary data for review
+        # Prepare summary data for review (logo removed)
+        business_kind_key = wizard_data.get("step2", {}).get("business_kind")
+        
+        # SSOT: Get display name from canonical registry
+        from tenants.services.business_kind import get_display_name
+        business_kind_display = get_display_name(business_kind_key) if business_kind_key else "—"
+        
         summary = {
             "email": wizard_data.get("step1", {}).get("email"),
             "full_name": wizard_data.get("step1", {}).get("full_name"),
             "business_name": wizard_data.get("step2", {}).get("business_name"),
-            "business_kind": wizard_data.get("step2", {}).get("business_kind"),
+            "business_kind": business_kind_key,
+            "business_kind_display": business_kind_display,
             "subdomain": wizard_data.get("step2", {}).get("subdomain"),
-            "has_logo": bool(wizard_data.get("step3", {}).get("logo_data")),
+            "has_logo": False,  # Logo step removed
         }
 
         return render(
@@ -1630,7 +1716,7 @@ def signup_manager(request):
             {
                 "form": form,
                 "step": step,
-                "total_steps": 4,
+                "total_steps": 3,
                 "wizard_data": wizard_data,
                 "summary": summary,
             },
@@ -1640,31 +1726,79 @@ def signup_manager(request):
     return redirect(f"{reverse('accounts:signup_manager')}?step=1")
 
 
-def _complete_manager_wizard_signup(request, wizard_data):
+def _complete_manager_wizard_signup(request, wizard_data, request_id=None):
     """
     Complete the manager wizard signup by creating all entities.
-    This keeps all the existing business logic intact.
+    Enhanced with idempotency, collision handling, and robust logging.
+    
+    Args:
+        request: HttpRequest
+        wizard_data: Dict containing step1, step2, step3 data
+        request_id: Optional request ID for tracking
+    
+    Returns:
+        HttpResponse redirect to dashboard
     """
-    from django.db import transaction
-    from django.core.files.base import ContentFile
     import base64
+    import re
+
+    from django.core.files.base import ContentFile
+    from django.db import transaction
+
+    if request_id is None:
+        import uuid
+        request_id = str(uuid.uuid4())[:8]
 
     step1 = wizard_data.get("step1", {})
     step2 = wizard_data.get("step2", {})
     step3 = wizard_data.get("step3", {})
 
+    email = step1["email"].strip().lower()
+    full_name = step1["full_name"].strip()
+    password = step1["password1"]
+    
+    log.info(
+        "Starting manager wizard signup | RequestID: %s | Email: %s | Business: %s",
+        request_id,
+        email,
+        step2.get("business_name", "UNKNOWN"),
+    )
+
     with transaction.atomic():
-        # 1. Create User
-        email = step1["email"].strip().lower()
-        full_name = step1["full_name"].strip()
-        password = step1["password1"]
-
-        # Guard: unique user/email (double-check)
-        if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
-            messages.error(request, "An account with that email already exists. Please sign in instead.")
-            return redirect(f"{reverse('accounts:signup_manager')}?step=1")
-
-        user = User.objects.create_user(username=email, email=email, password=password)
+        # 1. Create User (with idempotency check)
+        user = None
+        user_created = False
+        
+        # Check if user already exists
+        existing_user = User.objects.filter(Q(username__iexact=email) | Q(email__iexact=email)).first()
+        
+        if existing_user:
+            # User exists - check if they already have a business
+            if Business is not None and Business.objects.filter(created_by=existing_user).exists():
+                # User already has a business - redirect them to login
+                messages.warning(
+                    request,
+                    f"An account with email {email} already exists and has a store. Please sign in instead.",
+                )
+                log.warning(
+                    "Signup attempted for existing user with business | RequestID: %s | Email: %s",
+                    request_id,
+                    email,
+                )
+                return redirect("accounts:login")
+            else:
+                # User exists but no business - we can continue with this user
+                user = existing_user
+                log.info(
+                    "Using existing user without business | RequestID: %s | UserID: %s",
+                    request_id,
+                    user.id,
+                )
+        else:
+            # Create new user
+            user = User.objects.create_user(username=email, email=email, password=password)
+            user_created = True
+            log.info("Created new user | RequestID: %s | UserID: %s", request_id, user.id)
 
         # Split name
         try:
@@ -1672,38 +1806,71 @@ def _complete_manager_wizard_signup(request, wizard_data):
             user.first_name = parts[0]
             user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
             user.save(update_fields=["first_name", "last_name"])
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Failed to split name | RequestID: %s | Error: %s", request_id, e)
 
         # Add to Manager group
         try:
             mgr_group = _get_or_create_manager_group()
             user.groups.add(mgr_group)
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("Failed to add user to manager group | RequestID: %s | Error: %s", request_id, e)
 
-        # 2. Create Business
+        # 2. Create Business (with collision handling)
         biz = None
         if Business is not None:
             biz_name = step2["business_name"].strip()
-            business_kind = step2["business_kind"]
+            business_kind_raw = step2["business_kind"]
             subdomain = (step2.get("subdomain") or "").strip().lower()
 
-            # Validate subdomain
+            # CRITICAL: Normalize business_kind to ensure canonical value
+            try:
+                from tenants.services.business_kind import normalize_business_kind
+
+                business_kind = normalize_business_kind(business_kind_raw)
+                if not business_kind:
+                    business_kind = business_kind_raw
+            except Exception:
+                business_kind = business_kind_raw
+
+            # Handle subdomain with collision auto-resolution
             if subdomain:
-                import re
-
                 if not re.fullmatch(r"[a-z0-9-]+", subdomain):
-                    raise ValueError("Invalid subdomain format")
-                if Business.objects.filter(subdomain__iexact=subdomain).exists():
-                    raise ValueError("Subdomain already taken")
+                    raise ValueError(f"Invalid subdomain format: {subdomain}")
+                
+                # Check collision and auto-suffix if needed
+                original_subdomain = subdomain
+                attempt = 0
+                while Business.objects.filter(subdomain__iexact=subdomain).exists():
+                    attempt += 1
+                    if attempt > 50:
+                        raise ValueError(f"Could not find available subdomain for {original_subdomain}")
+                    # Add numeric suffix
+                    subdomain = f"{original_subdomain}-{attempt}"
+                
+                if subdomain != original_subdomain:
+                    log.info(
+                        "Subdomain collision resolved | RequestID: %s | Original: %s | New: %s",
+                        request_id,
+                        original_subdomain,
+                        subdomain,
+                    )
+                    messages.info(
+                        request,
+                        f"Subdomain '{original_subdomain}' was taken, using '{subdomain}' instead.",
+                    )
 
-            # Unique slug
+            # Unique slug with collision handling
             base = slugify(biz_name)[:40] or "store"
             unique = base
             i = 1
             while Business.objects.filter(slug=unique).exists():
                 i += 1
+                if i > 100:
+                    # Add random suffix to avoid infinite loop
+                    import random
+                    unique = f"{base}-{random.randint(1000, 9999)}"
+                    break
                 unique = f"{base}-{i}"
 
             bkwargs = {"name": biz_name, "slug": unique}
@@ -1726,9 +1893,16 @@ def _complete_manager_wizard_signup(request, wizard_data):
                     if hasattr(Business, key):
                         bkwargs[key] = value
             except Exception as e:
-                log.warning("Failed to set section defaults: %s", e)
+                log.warning("Failed to set section defaults | RequestID: %s | Error: %s", request_id, e)
 
             biz = Business.objects.create(**bkwargs)
+            log.info(
+                "Created business | RequestID: %s | BusinessID: %s | Name: %s | Subdomain: %s",
+                request_id,
+                biz.id,
+                biz.name,
+                subdomain or "NONE",
+            )
 
             # Membership
             if Membership is not None:
@@ -1739,44 +1913,84 @@ def _complete_manager_wizard_signup(request, wizard_data):
                 )
 
             # Seed defaults
-            _seed_defaults_for_business(biz)
+            try:
+                _seed_defaults_for_business(biz)
+            except Exception as e:
+                log.warning("Failed to seed defaults | RequestID: %s | Error: %s", request_id, e)
 
-            # 3. Save logo if provided (with defensive handling)
+            # 3. Logo handling (step3 now always empty after removing logo step)
+            # Keeping this code for backward compatibility if old sessions exist
             logo_data = step3.get("logo_data")
             if logo_data and hasattr(biz, "logo"):
                 try:
-                    import base64
-                    from django.core.files.base import ContentFile
-
                     logo_bytes = base64.b64decode(logo_data)
                     logo_name = step3.get("logo_name", "logo.png")
                     biz.logo.save(logo_name, ContentFile(logo_bytes), save=True)
+                    log.info("Saved logo | RequestID: %s | BusinessID: %s", request_id, biz.id)
                 except (ValueError, OSError, IOError) as e:
-                    # Expected errors: base64 decode, file storage, I/O
-                    log.warning("Failed to save logo during manager wizard: %s", e)
+                    log.warning("Failed to save logo | RequestID: %s | Error: %s", request_id, e)
                 except Exception as e:
-                    # Safety net - never crash signup due to logo
-                    log.error("Unexpected error saving logo during manager wizard: %s", e, exc_info=True)
+                    log.error("Unexpected error saving logo | RequestID: %s | Error: %s", request_id, e, exc_info=True)
 
         # 4. Ensure Profile exists and mark as manager (NOT an agent)
+        # CRITICAL: Profile creation must succeed with proper defaults
         try:
             profile = getattr(user, "profile", None)
             if profile is None:
-                profile, _ = Profile.objects.get_or_create(user=user)
+                # Import here to use the helper function
+                from circuitcity.accounts.models import build_default_profile_fields
+                
+                # Force profile creation with retry logic (handles race conditions)
+                from django.db import IntegrityError
+                try:
+                    profile, profile_created = Profile.objects.get_or_create(
+                        user=user,
+                        defaults=build_default_profile_fields()
+                    )
+                    if profile_created:
+                        log.info("Created profile with defaults | RequestID: %s | UserID: %s", request_id, user.id)
+                except IntegrityError:
+                    # Race condition - retry get
+                    profile = Profile.objects.get(user=user)
+                    log.info("Retrieved existing profile after IntegrityError | RequestID: %s", request_id)
+            
+            # Ensure profile is marked as manager
             if hasattr(profile, "is_manager"):
                 profile.is_manager = True
                 profile.save(update_fields=["is_manager"])
-        except Exception:
-            pass
+                
+            # Defensive: ensure city is never NULL (production safety)
+            if not profile.city:
+                profile.city = "Lilongwe"
+                profile.save(update_fields=["city"])
+                log.warning("Fixed missing city field | RequestID: %s | UserID: %s", request_id, user.id)
+                
+        except Exception as e:
+            log.error(
+                "CRITICAL: Failed to create/update profile | RequestID: %s | UserID: %s | Error: %s",
+                request_id,
+                user.id,
+                e,
+                exc_info=True
+            )
+            # If profile creation fails, this is critical - show user a helpful message
+            messages.error(
+                request,
+                f"We couldn't complete your profile setup. Please contact support with reference: {request_id}"
+            )
+            # Don't fail the entire signup - user is created, they can retry login
+            # But log this prominently for investigation
 
         # 5. Explicitly ensure NO AgentProfile is created for managers
         try:
             from inventory.models import AgentProfile
 
             # Delete any accidentally created AgentProfile
-            AgentProfile.objects.filter(user=user).delete()
-        except Exception:
-            pass
+            deleted_count = AgentProfile.objects.filter(user=user).delete()[0]
+            if deleted_count > 0:
+                log.info("Deleted agent profile for manager | RequestID: %s | Count: %s", request_id, deleted_count)
+        except Exception as e:
+            log.warning("Failed to cleanup agent profiles | RequestID: %s | Error: %s", request_id, e)
 
         # 6. Auto-login + select business
         login(request, user)
@@ -1786,14 +2000,22 @@ def _complete_manager_wizard_signup(request, wizard_data):
             except Exception:
                 pass
             messages.success(request, f"🎉 Welcome to {biz.name}! Your store is ready.")
+            log.info(
+                "Signup completed successfully | RequestID: %s | UserID: %s | BusinessID: %s",
+                request_id,
+                user.id,
+                biz.id,
+            )
         else:
             messages.success(request, "🎉 Your manager account is ready!")
+            log.info("Signup completed (no business) | RequestID: %s | UserID: %s", request_id, user.id)
 
         # Clear wizard data
         _clear_manager_wizard_data(request)
 
         # Send welcome email after transaction commit
         from django.db import transaction
+
         from notifications.services import emit_event
 
         transaction.on_commit(
@@ -1812,7 +2034,7 @@ def _complete_manager_wizard_signup(request, wizard_data):
                     ],
                 },
                 business=biz,
-                user=user,  # Pass user for preference checking (though transactional emails bypass preferences)
+                user=user,
             )
         )
 
@@ -2039,7 +2261,19 @@ def _complete_wizard_signup(request, wizard_data):
         biz = None
         if Business is not None:
             biz_name = step2["business_name"].strip()
-            business_kind = step2["business_kind"]
+            business_kind_raw = step2["business_kind"]
+
+            # CRITICAL: Normalize business_kind to ensure canonical value
+            try:
+                from tenants.services.business_kind import normalize_business_kind
+
+                business_kind = normalize_business_kind(business_kind_raw)
+                if not business_kind:
+                    # Fallback to raw value if normalization returns None
+                    business_kind = business_kind_raw
+            except Exception:
+                # If normalization fails, use raw value
+                business_kind = business_kind_raw
 
             # Unique slug
             base = slugify(biz_name)[:40] or "store"
@@ -2412,8 +2646,9 @@ def _check_2fa_rate_limit(user, action: str) -> tuple[bool, str | None]:
     Returns:
         (allowed: bool, error_message: str | None)
     """
-    from django.core.cache import cache
     import time
+
+    from django.core.cache import cache
 
     user_id = user.id
     now = time.time()
@@ -2466,9 +2701,10 @@ def twofa_sms_enable_start(request):
     Stores pending_phone in session for verification.
     Supports resend: if phone not provided, uses session phone.
     """
+    from django.conf import settings
+
     from .models import get_or_create_twofactor
     from .services.twilio_verify import send_otp
-    from django.conf import settings
 
     # Check if Twilio is configured
     if not getattr(settings, "TWILIO_VERIFY_ENABLED", False):
@@ -2520,9 +2756,10 @@ def twofa_sms_enable_verify(request):
     """
     Step 2 of enabling SMS 2FA: verify OTP and enable 2FA.
     """
+    from django.utils import timezone
+
     from .models import get_or_create_twofactor
     from .services.twilio_verify import check_otp
-    from django.utils import timezone
 
     code = request.POST.get("code", "").strip()
     pending_phone = request.session.get("twofa_pending_phone")
@@ -2656,10 +2893,12 @@ def twofa_challenge(request):
     2FA challenge screen after password login.
     User must enter OTP sent to their phone to complete login.
     """
-    from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
-    from .services.twilio_verify import send_otp, check_otp
-    from django.utils import timezone
     import time
+
+    from django.utils import timezone
+
+    from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
+    from .services.twilio_verify import check_otp, send_otp
 
     # Must be authenticated to see this page
     if not request.user.is_authenticated:

@@ -125,7 +125,7 @@ class Command(BaseCommand):
         ]
         """
         return [
-            # Perfumes (under beauty_makeup category)
+            # Perfumes (under beauty_makeup category) - exactly 4 items
             {"name": "Arabic", "category": "beauty_makeup", "cost": Decimal("5000.00"), "price": Decimal("8000.00")},
             {"name": "Emerald", "category": "beauty_makeup", "cost": Decimal("4500.00"), "price": Decimal("7000.00")},
             {"name": "Monalisa", "category": "beauty_makeup", "cost": Decimal("5500.00"), "price": Decimal("8500.00")},
@@ -135,15 +135,26 @@ class Command(BaseCommand):
                 "cost": Decimal("6000.00"),
                 "price": Decimal("9000.00"),
             },
-            # Skin Care
+            # Skin Care - exactly 4 items
             {"name": "CeraVe Lotion", "category": "skin_care", "cost": Decimal("3500.00"), "price": Decimal("5500.00")},
+            {
+                "name": "Nivea Soft Cream",
+                "category": "skin_care",
+                "cost": Decimal("2500.00"),
+                "price": Decimal("4000.00"),
+            },
             {
                 "name": "Vaseline Body Lotion",
                 "category": "skin_care",
                 "cost": Decimal("2000.00"),
                 "price": Decimal("3500.00"),
             },
-            {"name": "Nivea Lotion", "category": "skin_care", "cost": Decimal("2500.00"), "price": Decimal("4000.00")},
+            {
+                "name": "Dove Beauty Cream",
+                "category": "skin_care",
+                "cost": Decimal("1800.00"),
+                "price": Decimal("3000.00"),
+            },
             # Hair Care
             {
                 "name": "Dark & Lovely Relaxer",
@@ -165,14 +176,6 @@ class Command(BaseCommand):
                 "cost": Decimal("700.00"),
                 "price": Decimal("1300.00"),
             },
-            # Makeup
-            {
-                "name": "Foundation",
-                "category": "beauty_makeup",
-                "cost": Decimal("3000.00"),
-                "price": Decimal("5000.00"),
-            },
-            {"name": "Lipstick", "category": "beauty_makeup", "cost": Decimal("1500.00"), "price": Decimal("2500.00")},
         ]
 
     def _seed_for_business(self, business, catalog: List[Dict], force: bool = False) -> int:

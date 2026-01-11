@@ -37,8 +37,16 @@ def base_context(request) -> Dict[str, Any]:
 
     Provides vertical-aware URLs so liquor/gym/clothing contexts route correctly.
     """
+    from tenants.models import Membership
+
     business = get_active_business(request)
     vertical = business_vertical(request)
+    
+    # Get membership for the user (needed by base template to avoid VariableDoesNotExist)
+    user = getattr(request, "user", None)
+    membership = None
+    if business and user and getattr(user, "is_authenticated", False):
+        membership = Membership.objects.filter(user=user, business=business).first()
 
     try:
         request.session["active_business_vertical"] = vertical
@@ -100,6 +108,7 @@ def base_context(request) -> Dict[str, Any]:
         "location": location,
         "location_label": location_label,
         "vertical": vertical,
+        "membership": membership,  # Needed by base template to avoid VariableDoesNotExist
         # Vertical-aware URLs (for sidebar & templates)
         "url_home": url_home,
         "url_stock": url_stock,

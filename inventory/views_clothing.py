@@ -4,25 +4,25 @@ Views for clothing store operations: product management, sales, dashboard.
 """
 from __future__ import annotations
 
-from decimal import Decimal
 from datetime import timedelta
+from decimal import Decimal
 
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.db.models import Sum, Count, Q, F
-from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Count, F, Q, Sum
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from inventory.authz import require_business_kind, manager_required
+from core.decorators import manager_required
+from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
-from inventory.models_verticals import ClothingSale, ClothingProductLog, ClothingProductAction
+from inventory.models_verticals import ClothingProductAction, ClothingProductLog, ClothingSale
 from tenants.utils import require_business
-
 
 # ==============================================================================
 # CLOTHING PRODUCT MANAGEMENT (Manager only)
@@ -242,7 +242,7 @@ def sell_clothing(request):
 
     return render(
         request,
-        "inventory/clothing/sell.html",
+        "verticals/clothing/sell.html",
         {
             "form": form,
             "recent_sales": recent_sales,
@@ -346,7 +346,7 @@ def clothing_dashboard(request):
 
     return render(
         request,
-        "inventory/clothing/dashboard.html",
+        "verticals/clothing/dashboard.html",
         {
             "business": business,
             # Stock metrics
@@ -395,3 +395,4 @@ def product_logs(request, product_id):
             "business": business,
         },
     )
+

@@ -375,6 +375,105 @@
       <a class="btn-deep tap is-primary" href="{{ request.path }}" onclick="window.buzz&&buzz(6)">Hide table</a>
     </div>
 
+    <!-- Mobile: Card view (NO ELLIPSIS ON IMEI OR PRODUCT) -->
+    <div class="d-lg-none" style="margin-bottom:20px">
+      {% if page_obj %}
+        {% for it in page_obj.object_list %}
+          <div class="cc-stock-card">
+            <div class="cc-stock-card__header">
+              <div style="flex:1;min-width:0">
+                <!-- IMEI: ALWAYS fully visible (word-break) -->
+                <div class="cc-stock-card__imei" data-cy="mobile-stock-imei">
+                  {{ it.imei|default:"No IMEI" }}
+                </div>
+                <!-- Product: ALWAYS fully visible (no dots) -->
+                <div class="cc-stock-card__product" style="margin-top:8px" data-cy="mobile-stock-product">
+                  {{ it.product }}
+                </div>
+              </div>
+              <div>
+                {% if it.status|lower == 'sold' %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--danger">Sold</span>
+                {% else %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--success">In stock</span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <div class="cc-stock-card__meta">
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Order: MK {{ it.order_price|default:0|floatformat:0|intcomma }}
+              </span>
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Sell: MK {{ it.selling_price|default:0|floatformat:0|intcomma }}
+              </span>
+            </div>
+            
+            {% if it.current_location_id %}
+            <div style="margin-top:8px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-geo-alt"></i> {{ it.current_location.name }}
+            </div>
+            {% endif %}
+            
+            {% if it.assigned_agent_id %}
+            <div style="margin-top:4px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-person"></i> {{ it.assigned_agent|agent_link:request.user }}
+            </div>
+            {% endif %}
+            
+            {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <a href="{% url 'inventory:stock_edit' it.id %}" class="btn btn-sm btn-outline-primary" style="flex:1">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+              <a href="{% url 'inventory:stock_delete' it.id %}" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        {% for row in rows %}
+          <div class="cc-stock-card">
+            <div class="cc-stock-card__header">
+              <div style="flex:1;min-width:0">
+                <div class="cc-stock-card__imei">{{ row.imei }}</div>
+                <div class="cc-stock-card__product" style="margin-top:8px">{{ row.product }}</div>
+              </div>
+              <div>
+                {% if row.status|lower == 'sold' %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--danger">Sold</span>
+                {% else %}
+                  <span class="cc-stock-card__badge cc-stock-card__badge--success">In stock</span>
+                {% endif %}
+              </div>
+            </div>
+            
+            <div class="cc-stock-card__meta">
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Order: MK {{ row.order_price|floatformat:0|intcomma }}
+              </span>
+              <span class="cc-stock-card__badge cc-stock-card__badge--info">
+                Sell: MK {{ row.selling_price|default:0|floatformat:0|intcomma }}
+              </span>
+            </div>
+            
+            <div style="margin-top:8px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-geo-alt"></i> {{ row.location }}
+            </div>
+            <div style="margin-top:4px;font-size:0.85rem;color:#64748b">
+              <i class="bi bi-person"></i> {{ row.agent }}
+            </div>
+          </div>
+        {% empty %}
+          <div class="text-center" style="padding:40px;color:#64748b">
+            No stock yet. <a href="{{ scan_in_url|default:'#' }}">Scan IN your first item →</a>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
     <!-- Mobile: Horizontal scrollable table with hint -->
     <div class="d-lg-none cc-table-slider-container" style="position:relative;margin-top:8px;">
       <div class="cc-table-slider__viewport" data-cc-table-slider style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;box-shadow:var(--cc-shadow);">
