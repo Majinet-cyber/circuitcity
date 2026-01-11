@@ -1138,14 +1138,14 @@ class InventoryItem(CompatKwargsMixin, models.Model):
                 condition=Q(imei__isnull=False) & ~Q(imei=""),
                 name="uniq_imei_globally",
             ),
-            models.CheckConstraint(check=Q(order_price__gte=0), name="inv_order_price_nonneg"),
+            models.CheckConstraint(condition=Q(order_price__gte=0), name="inv_order_price_nonneg"),
             models.CheckConstraint(
-                check=Q(selling_price__gte=0) | Q(selling_price__isnull=True),
+                condition=Q(selling_price__gte=0) | Q(selling_price__isnull=True),
                 name="inv_selling_price_nonneg",
             ),
-            models.CheckConstraint(check=Q(status__in=["IN_STOCK", "SOLD"]), name="inv_status_allowed"),
+            models.CheckConstraint(condition=Q(status__in=["IN_STOCK", "SOLD"]), name="inv_status_allowed"),
             models.CheckConstraint(
-                check=Q(product__isnull=False) & Q(current_location__isnull=False),
+                condition=Q(product__isnull=False) & Q(current_location__isnull=False),
                 name="inv_requires_product_and_location",
             ),
         ]
