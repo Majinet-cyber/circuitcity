@@ -182,6 +182,22 @@ if IS_RUNSERVER:
     SECURE_PROXY_SSL_HEADER = None
     USE_X_FORWARDED_HOST = False
 
+# 🧪 CI/TESTING: disable SSL redirect and secure cookies even when DEBUG=False
+# This ensures tests can run on http://testserver without redirect/cookie issues.
+# Production protection remains intact when CI and TESTING are both falsy.
+if CI or TESTING:
+    USE_SSL = False
+    FORCE_SSL = False
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_HSTS_PRELOAD = False
+    # Also disable proxy headers in CI/tests
+    SECURE_PROXY_SSL_HEADER = None
+    USE_X_FORWARDED_HOST = False
+
 # --------------------------- canonical host (SEO) ---------------------------
 # Canonical host for production: www.emajinet.africa
 # This is used by CanonicalURLMiddleware to enforce one canonical domain.
