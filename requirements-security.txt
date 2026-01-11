@@ -1,0 +1,11 @@
+# Security Testing Tools (separate from dev deps)
+# NOTE: These require manual installation for security audits
+# Not installed in CI - some packages may not be on PyPI
+
+# OWASP ZAP integration (requires local ZAP install)
+# owasp-zap-scanner==0.1.0  # Commented: not available on PyPI
+
+# Future security tools can be added here:
+# nikto  # Web scanner
+# sqlmap  # SQL injection detection
+
