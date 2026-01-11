@@ -9,9 +9,9 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
-from tenants.models import Business
-from .models import Location  # your existing Location model
-
+# Use string references to avoid circular imports
+# Location is defined in inventory.models, which imports TimeLog from here
+# This allows syncdb/migrations to create tables in the correct order
 User = get_user_model()
 
 # ---------------------------------------------------------------------
@@ -38,7 +38,7 @@ class TimeLog(models.Model):
     """
 
     business = models.ForeignKey(
-        Business,
+        "tenants.Business",  # String reference to avoid circular import
         on_delete=models.CASCADE,
         related_name="time_logs",
         db_index=True,
@@ -46,13 +46,13 @@ class TimeLog(models.Model):
         blank=True,  # <-- keep nullable for smooth migration
     )
     user = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,  # String reference for user model
         on_delete=models.CASCADE,
         related_name="time_logs",
         db_index=True,
     )
     location = models.ForeignKey(
-        Location,
+        "inventory.Location",  # String reference to avoid circular import
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
