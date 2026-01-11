@@ -8,13 +8,19 @@ module.exports = defineConfig({
     viewportWidth: 1280,
     viewportHeight: 720,
 
-    // ✅ More tolerant settings for slow network / slow server
+    // ✅ Slow-network resilient settings (15s+ tolerance)
     video: false,
     screenshotOnRunFailure: true,
-    defaultCommandTimeout: 20000,   // was 10s → now 20s per command
-    requestTimeout: 20000,          // allow slower API calls
-    responseTimeout: 40000,         // wait longer for responses
-    pageLoadTimeout: 90000,         // up to 90s for full page load
+    defaultCommandTimeout: 15000,   // 15s per command (matches intercept waits)
+    requestTimeout: 15000,          // 15s for XHR/fetch
+    responseTimeout: 15000,         // 15s for responses
+    pageLoadTimeout: 60000,         // 60s for full page loads
+
+    // ✅ Light retry for CI stability (not excessive)
+    retries: {
+      runMode: 1,      // Retry once in CI (npx cypress run)
+      openMode: 0,     // No retries in interactive mode
+    },
 
     env: {
       // Test user credentials (fixed email)

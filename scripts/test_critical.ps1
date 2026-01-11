@@ -46,10 +46,10 @@ Write-Host "These tests must ALL pass to deploy." -ForegroundColor Yellow
 Write-Host ""
 
 # Build pytest command
-$pytestArgs = @("-m", "critical", "--maxfail=1")
+$pytestArgs = @("-m", "critical", "--maxfail=1", "--strict-markers", "--strict-config")
 
 if ($Verbose) {
-    $pytestArgs += @("-v", "--tb=short")
+    $pytestArgs += @("-v", "--tb=short", "-ra")
 } else {
     $pytestArgs += @("-q")
 }

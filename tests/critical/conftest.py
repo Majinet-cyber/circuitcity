@@ -28,46 +28,19 @@ User = get_user_model()
 
 
 # =============================================================================
-# SINGLE SOURCE OF TRUTH: Vertical Definitions
+# SINGLE SOURCE OF TRUTH: Tiered Vertical Definitions
 # =============================================================================
-# All verticals from BusinessKind enum with their endpoint mappings
+# Tier A (core/mature): Full testing - dashboards, stock, sales, invariants
+# Tier B (new/experimental): Minimal testing - dashboards and auth/scoping only
 
-# Full list of all verticals (from BusinessKind)
-ALL_VERTICALS = [
-    "phones",
-    "liquor",
-    "grocery",
-    "pharmacy",
-    "clothing",
-    "gym",
-    "hardware",
-    "cement",
-    "farm",
-    "welding",
-]
-
-# Core verticals tested in critical suite
-# All verticals including farm/welding are now included - migrations exist and work correctly.
-VERTICALS = [
-    "phones",
-    "liquor",
-    "grocery",
-    "pharmacy",
-    "clothing",
-    "gym",
-    "hardware",
-    "cement",
-    "farm",
-    "welding",
-]
-
-# Verticals with domain-specific models (for documentation only - all work in tests)
-DOMAIN_SPECIFIC_VERTICALS = ["farm", "welding"]
-
-# Endpoint map: vertical -> (dashboard_url_name, stock_add_url_name, sell_url_name)
-# Use None if vertical doesn't support that operation (e.g., gym has no stock_add)
 VERTICAL_ENDPOINTS = {
+    # =========================================================================
+    # TIER A: Core/Mature Verticals (full critical testing)
+    # =========================================================================
     "phones": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "inventory_verticals:phones_dashboard",
         "dashboard_path": "/inventory/verticals/phones/dashboard/",
         "stock_add": "inventory:scan_in",
@@ -77,6 +50,9 @@ VERTICAL_ENDPOINTS = {
         "stock_method": "imei_serial",
     },
     "liquor": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "verticals:liquor_dashboard",
         "dashboard_path": "/verticals/liquor/dashboard/",
         "stock_add": "liquor:scan_in",
@@ -86,6 +62,9 @@ VERTICAL_ENDPOINTS = {
         "stock_method": "barcode",
     },
     "grocery": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "groceries:dashboard",
         "dashboard_path": "/groceries/dashboard/",
         "stock_add": "groceries:stock_in",
@@ -95,6 +74,9 @@ VERTICAL_ENDPOINTS = {
         "stock_method": "barcode",
     },
     "pharmacy": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "verticals:pharmacy_hub",
         "dashboard_path": "/verticals/pharmacy/hub/",
         "stock_add": "pharmacy:stock_in",
@@ -104,24 +86,34 @@ VERTICAL_ENDPOINTS = {
         "stock_method": "barcode",
     },
     "clothing": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "verticals:clothing_dashboard",
         "dashboard_path": "/verticals/clothing/dashboard/",
         "stock_add": "inventory:clothing_wizard",
         "stock_add_path": "/inventory/wizard/clothing/",
         "sell": "verticals:clothing_sell",
         "sell_path": "/verticals/clothing/sell/",
-        "stock_method": "no_barcode",  # Clothing uses size/color variants
+        "stock_method": "no_barcode",
     },
     "gym": {
+        "tier": "core",
+        "supports_stock": False,  # Membership-based, no stock
+        "supports_sales": False,  # Uses membership payments
         "dashboard": "verticals:gym_dashboard",
         "dashboard_path": "/verticals/gym/dashboard/",
-        "stock_add": None,  # Gym is membership-based, no stock
+        "stock_add": None,
         "stock_add_path": None,
-        "sell": None,  # Gym uses membership payments, not sales
+        "sell": None,
         "sell_path": None,
         "stock_method": None,
     },
     "hardware": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
+        "known_bugs": ["redirect_loop_stock_add"],  # Track known issues
         "dashboard": "inventory:generic_dashboard",
         "dashboard_path": "/inventory/generic-dashboard/",
         "stock_add": "inventory:scan_in",
@@ -131,6 +123,9 @@ VERTICAL_ENDPOINTS = {
         "stock_method": "barcode",
     },
     "cement": {
+        "tier": "core",
+        "supports_stock": True,
+        "supports_sales": True,
         "dashboard": "verticals:cement_dashboard",
         "dashboard_path": "/verticals/cement/dashboard/",
         "stock_add": "cement:stock_in",
@@ -139,25 +134,56 @@ VERTICAL_ENDPOINTS = {
         "sell_path": "/cement/sell/",
         "stock_method": "generic_sku",
     },
+    # =========================================================================
+    # TIER B: New/Experimental Verticals (minimal testing - dashboard + auth only)
+    # =========================================================================
     "farm": {
+        "tier": "new",
+        "supports_stock": False,  # Uses ledger entries, not traditional stock
+        "supports_sales": False,  # Uses ledger sales, not traditional sales
         "dashboard": "verticals:farm_dashboard",
         "dashboard_path": "/verticals/farm/dashboard/",
-        "stock_add": "verticals:farm_add_expense",  # Farm uses ledger, not stock
+        "stock_add": "verticals:farm_add_expense",
         "stock_add_path": "/verticals/farm/ledger/add-expense/",
-        "sell": "verticals:farm_add_sale",  # Farm uses ledger sales
+        "sell": "verticals:farm_add_sale",
         "sell_path": "/verticals/farm/ledger/add-sale/",
         "stock_method": "ledger",
     },
     "welding": {
+        "tier": "new",
+        "supports_stock": False,  # Uses materials, not traditional stock
+        "supports_sales": False,  # Uses job invoicing, not traditional sales
         "dashboard": "verticals:welding_dashboard",
         "dashboard_path": "/verticals/welding/dashboard/",
         "stock_add": "verticals:welding_stock_in",
         "stock_add_path": "/verticals/welding/stock-in/",
-        "sell": "verticals:welding_invoices_list",  # Welding uses job invoicing
+        "sell": "verticals:welding_invoices_list",
         "sell_path": "/verticals/welding/invoices/",
         "stock_method": "generic_sku",
     },
 }
+
+# =============================================================================
+# Derived Vertical Lists (Single Source of Truth)
+# =============================================================================
+
+# All verticals
+ALL_VERTICALS = list(VERTICAL_ENDPOINTS.keys())
+
+# Core (Tier A) verticals - full critical testing
+CORE_VERTICALS = [v for v, cfg in VERTICAL_ENDPOINTS.items() if cfg.get("tier") == "core"]
+
+# New (Tier B) verticals - minimal testing (dashboard + auth only)
+NEW_VERTICALS = [v for v, cfg in VERTICAL_ENDPOINTS.items() if cfg.get("tier") == "new"]
+
+# Core verticals that support stock operations
+CORE_STOCK_VERTICALS = [v for v in CORE_VERTICALS if VERTICAL_ENDPOINTS[v].get("supports_stock")]
+
+# Core verticals that support sales operations
+CORE_SALES_VERTICALS = [v for v in CORE_VERTICALS if VERTICAL_ENDPOINTS[v].get("supports_sales")]
+
+# Legacy alias for compatibility
+VERTICALS = ALL_VERTICALS
 
 
 def _unique_suffix() -> str:

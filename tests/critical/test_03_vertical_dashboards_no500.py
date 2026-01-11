@@ -15,7 +15,8 @@ from django.test import Client
 from django.urls import reverse, NoReverseMatch
 
 from tests.critical.conftest import (
-    VERTICALS,
+    ALL_VERTICALS,
+    CORE_VERTICALS,
     VERTICAL_ENDPOINTS,
     get_dashboard_url,
     setup_authenticated_client,
@@ -27,9 +28,9 @@ pytestmark = [pytest.mark.critical, pytest.mark.django_db]
 
 
 class TestVerticalDashboardsNo500:
-    """Test that ALL vertical dashboards load without 500 errors."""
+    """Test that ALL vertical dashboards load without 500 errors (Tier A + Tier B)."""
     
-    @pytest.mark.parametrize("vertical", VERTICALS)
+    @pytest.mark.parametrize("vertical", ALL_VERTICALS)
     def test_dashboard_no_500_for_authenticated_user(self, vertical):
         """
         Dashboard must not return 500 for authenticated user.
@@ -72,7 +73,7 @@ class TestVerticalDashboardsNo500:
                 assert indicator not in content, \
                     f"{vertical} dashboard contains error: {indicator}"
     
-    @pytest.mark.parametrize("vertical", VERTICALS)
+    @pytest.mark.parametrize("vertical", ALL_VERTICALS)
     def test_dashboard_unauthenticated_redirects(self, vertical):
         """Unauthenticated users should be redirected, not see 500."""
         dashboard_url = get_dashboard_url(vertical)
@@ -95,7 +96,7 @@ class TestVerticalDashboardsNo500:
 class TestDashboardURLResolution:
     """Test that dashboard URLs resolve correctly via reverse()."""
     
-    @pytest.mark.parametrize("vertical", VERTICALS)
+    @pytest.mark.parametrize("vertical", ALL_VERTICALS)
     def test_dashboard_url_name_resolves(self, vertical):
         """Dashboard URL name should resolve via reverse()."""
         endpoints = VERTICAL_ENDPOINTS.get(vertical, {})
@@ -113,3 +114,44 @@ class TestDashboardURLResolution:
             fallback = endpoints.get("dashboard_path")
             assert fallback is not None, \
                 f"{vertical} dashboard has neither working URL name nor fallback path: {e}"
+
+
+class TestDashboardPerformanceGuardrails:
+    """
+    Test that CORE dashboards don't have accidental N+1 query explosions.
+    
+    This is a lightweight guardrail, not a strict optimization test.
+    Cap is generous (100 queries) to catch only egregious issues.
+    
+    NOTE: This uses Django's CaptureQueriesContext which works regardless of DEBUG setting.
+    """
+    
+    # Very generous cap to catch only severe N+1 issues
+    # Based on current measurements: phones ~125, so cap at 150
+    MAX_QUERIES_PER_DASHBOARD = 150
+    
+    @pytest.mark.parametrize("vertical", CORE_VERTICALS)
+    def test_core_dashboard_query_count_reasonable(self, vertical):
+        """Core dashboards should not exceed query cap (catch N+1 explosions)."""
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        
+        user, business, location = bootstrap_business_with_user(vertical)
+        client = setup_authenticated_client(user, business, location)
+        
+        dashboard_url = get_dashboard_url(vertical)
+        if not dashboard_url:
+            pytest.skip(f"No dashboard URL for {vertical}")
+        
+        # Count queries using CaptureQueriesContext (works without DEBUG=True)
+        with CaptureQueriesContext(connection) as context:
+            response = client.get(dashboard_url, follow=True)
+        
+        query_count = len(context)
+        
+        # Check query count
+        if query_count > self.MAX_QUERIES_PER_DASHBOARD:
+            pytest.fail(
+                f"PERFORMANCE: {vertical} dashboard made {query_count} queries "
+                f"(cap: {self.MAX_QUERIES_PER_DASHBOARD}). May indicate N+1 problem."
+            )

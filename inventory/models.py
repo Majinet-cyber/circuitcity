@@ -50,6 +50,40 @@ try:
 except Exception:
     PhoneProductCatalog = None  # safe fallback
 
+# Re-export Farm models for syncdb table creation
+try:
+    from .models_farm import (  # noqa: F401
+        FarmLedgerEntry,
+        FarmCropSeason,
+        FarmLivestockBatch,
+        FarmLivestockEvent,
+    )
+except Exception:
+    FarmLedgerEntry = None
+    FarmCropSeason = None
+    FarmLivestockBatch = None
+    FarmLivestockEvent = None
+
+# Re-export Welding models for syncdb table creation
+try:
+    from .models_welding import (  # noqa: F401
+        WeldingMaterial,
+        WeldingMaterialStockMove,
+        WeldingTemplate,
+        WeldingQuote,
+        WeldingJob,
+        WeldingInvoice,
+        WeldingEstimatorTuning,
+    )
+except Exception:
+    WeldingMaterial = None
+    WeldingMaterialStockMove = None
+    WeldingTemplate = None
+    WeldingQuote = None
+    WeldingJob = None
+    WeldingInvoice = None
+    WeldingEstimatorTuning = None
+
 # Re-export StockActivityLog for audit trail
 try:
     from .models_audit import StockAction, StockActivityLog  # noqa: F401

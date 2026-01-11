@@ -113,7 +113,8 @@
               placeholder="Enter 15-digit IMEI"
               aria-required="true"
               aria-invalid="false"
-              data-cc-imei-input>
+              data-cc-imei-input
+              data-testid="sell-imei-input">
           </div>
 
           <div class="hstack" style="margin-top:.5rem">
@@ -184,7 +185,7 @@
 
       <input type="hidden" id="id_location_id" name="location_id" value="">
       <div class="hstack">
-        <button class="btn btn-primary" type="submit" id="submitBtn" disabled>Mark as SOLD</button>
+        <button class="btn btn-primary" type="submit" id="submitBtn" disabled data-testid="sell-submit">Mark as SOLD</button>
         <a class="btn" href="{{ stock_url|default:'/inventory/list/' }}">Stock list</a>
         <a class="btn" href="{{ scan_in_url|default:'/inventory/scan-in/' }}">← Back to Scan In</a>
       </div>

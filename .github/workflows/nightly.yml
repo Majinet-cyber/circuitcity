@@ -1,0 +1,110 @@
+# .github/workflows/nightly.yml
+# Nightly comprehensive test suite with detailed reporting
+name: Nightly Tests
+
+on:
+  schedule:
+    # Run at 3:00 AM UTC every day
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  nightly-full-suite:
+    runs-on: ubuntu-24.04
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: cc_nightly
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DJANGO_SETTINGS_MODULE: cc.settings
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY_CI }}
+      CI: "true"
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cc_nightly
+      PGSSLMODE: disable
+      DEBUG: "0"
+      ENABLE_EMAIL_OTP: "0"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      PYTHONWARNINGS: "error"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install -r requirements-dev.txt
+
+      - name: Django checks + migrate
+        run: |
+          python manage.py check
+          python manage.py migrate --noinput
+
+      # CRITICAL TESTS (must pass)
+      - name: Run CRITICAL tests (reliability gate)
+        run: |
+          echo "========================================"
+          echo "  NIGHTLY CRITICAL RELIABILITY GATE"
+          echo "========================================"
+          python -m pytest -m critical -v --strict-markers --strict-config -W error -ra --durations=20
+        continue-on-error: false
+
+      # OTP TESTS
+      - name: Run OTP critical tests
+        run: |
+          python -m pytest -m "critical and otp" -v --strict-markers --strict-config -W error
+        env:
+          ENABLE_EMAIL_OTP: "1"
+        continue-on-error: false
+
+      # FULL SUITE with detailed reporting
+      - name: Run full test suite
+        run: |
+          echo "========================================"
+          echo "  NIGHTLY FULL TEST SUITE"
+          echo "========================================"
+          python -m pytest -v --durations=20 -ra
+        continue-on-error: true  # Report failures but don't block
+
+      # Report slowest tests for optimization
+      - name: Report slowest tests
+        if: always()
+        run: |
+          echo "========================================"
+          echo "  SLOWEST TESTS REPORT"
+          echo "========================================"
+          python -m pytest --collect-only -q 2>/dev/null | head -20 || true
+
+      # Check for xfail strict that passed (bugs fixed)
+      - name: Check for fixed bugs (xfail strict passes)
+        if: always()
+        run: |
+          echo "========================================"
+          echo "  XFAIL STRICT CHECK"
+          echo "========================================"
+          echo "If any xfail(strict=True) tests pass, the bug is fixed!"
+          echo "Check test_04b_no_redirect_loops.py for hardware redirect loop status."
+

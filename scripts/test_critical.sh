@@ -65,10 +65,10 @@ echo -e "${YELLOW}These tests must ALL pass to deploy.${NC}"
 echo ""
 
 # Build pytest command
-PYTEST_ARGS="-m critical --maxfail=1"
+PYTEST_ARGS="-m critical --maxfail=1 --strict-markers --strict-config"
 
 if [ "$VERBOSE" = true ]; then
-    PYTEST_ARGS="$PYTEST_ARGS -v --tb=short"
+    PYTEST_ARGS="$PYTEST_ARGS -v --tb=short -ra"
 else
     PYTEST_ARGS="$PYTEST_ARGS -q"
 fi

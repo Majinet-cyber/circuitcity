@@ -57,6 +57,8 @@ pytest_cache/
 .ruff_cache/
 test_output.txt
 test_output*.txt
+testoutput.txt
+testoutput*.txt
 pytest_full_output.txt
 pytest_output.txt
 pytest_summary.txt

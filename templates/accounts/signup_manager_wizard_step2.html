@@ -168,7 +168,8 @@
           <span class="addon">🏬</span>
           <input class="input{% if form.business_name.errors %} is-error{% endif %}" aria-invalid="{% if form.business_name.errors %}true{% else %}false{% endif %}"
                  type="text" name="business_name" required placeholder="e.g. Circuitly"
-                 value="{{ form.business_name.value|default:'' }}">
+                 value="{{ form.business_name.value|default:'' }}"
+                 data-testid="signup-business-name">
           <div class="hint">This becomes your business name in the app.</div>
           {% if form.business_name.errors %}<div class="err">{{ form.business_name.errors|striptags }}</div>{% endif %}
         </div>
@@ -178,7 +179,7 @@
         <div class="field">
           <div class="label">Business type</div>
 
-          <select name="business_kind" id="id_business_kind" required style="display:none">
+          <select name="business_kind" id="id_business_kind" required style="display:none" data-testid="signup-business-kind">
             <option value="" {% if not form.business_kind.value %}selected{% endif %}>---------</option>
             {% for kind in business_kinds %}
             <option value="{{ kind.key }}" {% if form.business_kind.value == kind.key %}selected{% endif %}>{{ kind.display_name }}</option>
@@ -219,8 +220,8 @@
       </div>
 
       <div class="actions">
-        <button class="btn secondary" type="submit" name="action" value="back">← Back</button>
-        <button class="btn" type="submit" name="action" value="next">Next →</button>
+        <button class="btn secondary" type="submit" name="action" value="back" data-testid="signup-step2-back">← Back</button>
+        <button class="btn" type="submit" name="action" value="next" data-testid="signup-step2-submit">Next →</button>
       </div>
     </form>
 
