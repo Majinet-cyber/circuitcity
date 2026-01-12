@@ -44,6 +44,8 @@ def reverse_fix(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
+    replaces = [("tenants", "0019_fix_cement_business_kind")]
+
     dependencies = [
         ("tenants", "0019_add_section_flags_with_defaults"),
     ]
