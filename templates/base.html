@@ -190,7 +190,7 @@
     /* ===== Sidebar ===== */
     .cc-sidebar{
       position:sticky; top:0; width:var(--sidebar-w); flex:0 0 var(--sidebar-w);
-      height:100dvh; overflow:auto; z-index:2000; padding:16px;
+      height:100dvh; overflow:auto; z-index:1030; padding:16px;
       display:flex; flex-direction:column; gap:14px;
       color: var(--mid-ink); color-scheme: light;
       background:
@@ -260,13 +260,13 @@
         backdrop-filter:blur(3px);
         -webkit-backdrop-filter:blur(3px);
         display:none;
-        z-index:1990;
+        z-index:1035;
         cursor: pointer;
       }
       .cc-backdrop.show{ display:block; }
 
       .mobile-toggle{
-        position:fixed; top:12px; left:12px; z-index:2010;
+        position:fixed; top:12px; left:12px; z-index:1036;
         border:0; border-radius:12px; width:42px; height:42px;
         display:grid; place-items:center; background:var(--cc-accent); color:#fff;
         box-shadow:0 10px 22px rgba(59,130,246,.35);
@@ -408,7 +408,7 @@
       position:absolute; right:0; top:calc(100% + 8px);
       min-width:220px; background:#fff; border:1px solid var(--line);
       border-radius:12px; box-shadow:0 14px 40px rgba(0,0,0,.12);
-      display:none; z-index:1100; overflow:hidden;
+      display:none; z-index:1020; overflow:hidden;
     }
     .tenant-menu.show{ display:block; }
     .tenant-item{
@@ -1431,7 +1431,7 @@
           banner.style.position = "fixed";
           banner.style.bottom = "1rem";
           banner.style.right = "1rem";
-          banner.style.zIndex = "9999";
+          banner.style.zIndex = "10005";
           banner.style.padding = "0.75rem 1.5rem";
           banner.style.borderRadius = "999px";
           banner.style.backdropFilter = "blur(12px)";
