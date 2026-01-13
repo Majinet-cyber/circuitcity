@@ -638,6 +638,28 @@ def sell(request):
                     quantity_in_stock__gt=0,
                 ).order_by("name")
 
+        def clean_payment_method(self):
+            """Normalize legacy payment method values for backward compatibility."""
+            value = self.cleaned_data.get("payment_method", "")
+            if not value:
+                return PaymentMethod.CASH
+            # Map legacy uppercase values to correct lowercase values
+            mapping = {
+                "CASH": PaymentMethod.CASH,
+                "cash": PaymentMethod.CASH,
+                "BANK": PaymentMethod.BANK,
+                "BANK_TRANSFER": PaymentMethod.BANK,
+                "bank": PaymentMethod.BANK,
+                "bank_transfer": PaymentMethod.BANK,
+                "MOBILE_MONEY": PaymentMethod.MOBILE_MONEY,
+                "MOBILE": PaymentMethod.MOBILE_MONEY,
+                "MOMO": PaymentMethod.MOBILE_MONEY,
+                "mobile_money": PaymentMethod.MOBILE_MONEY,
+                "mobile": PaymentMethod.MOBILE_MONEY,
+                "momo": PaymentMethod.MOBILE_MONEY,
+            }
+            return mapping.get(value, PaymentMethod.CASH)
+
     if request.method == "POST":
         form = ClothingSellForm(business, request.POST)
         if form.is_valid():

@@ -155,5 +155,72 @@ class ClothingMultiTenantTestCase(TestCase):
             )
 
 
+class ClothingPaymentMethodNormalizationTestCase(TestCase):
+    """
+    Test payment method normalization for backward compatibility.
+    
+    Issue: Frontend was sending BANK/CASH (uppercase) but backend expects
+    lowercase values (cash, bank, mobile_money).
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser", password="testpass123")
+        self.business = Business.objects.create(name="Fashion Store", kind=BusinessKind.CLOTHING)
+        Membership.objects.create(user=self.user, business=self.business, role="manager")
+        
+        # Create a product with stock for sale tests
+        self.product = MerchProduct.objects.create(
+            business=self.business,
+            name="Test Shirt",
+            kind=BusinessKind.CLOTHING,
+            quantity_in_stock=100,
+            cost_price=Decimal("25.00"),
+            selling_price=Decimal("50.00"),
+        )
+
+    def test_sell_with_lowercase_cash_payment_method(self):
+        """Test selling with correct lowercase payment method works"""
+        sale_result = sell_clothing(
+            business=self.business,
+            user=self.user,
+            product_id=self.product.id,
+            quantity=1,
+            payment_method=PaymentMethod.CASH,
+        )
+        self.assertTrue(sale_result["ok"])
+        self.assertEqual(sale_result["sale"].payment_method, PaymentMethod.CASH)
+
+    def test_sell_with_lowercase_bank_payment_method(self):
+        """Test selling with bank payment method works"""
+        sale_result = sell_clothing(
+            business=self.business,
+            user=self.user,
+            product_id=self.product.id,
+            quantity=1,
+            payment_method=PaymentMethod.BANK,
+        )
+        self.assertTrue(sale_result["ok"])
+        self.assertEqual(sale_result["sale"].payment_method, PaymentMethod.BANK)
+
+    def test_sell_with_mobile_money_payment_method(self):
+        """Test selling with mobile_money payment method works"""
+        sale_result = sell_clothing(
+            business=self.business,
+            user=self.user,
+            product_id=self.product.id,
+            quantity=1,
+            payment_method=PaymentMethod.MOBILE_MONEY,
+        )
+        self.assertTrue(sale_result["ok"])
+        self.assertEqual(sale_result["sale"].payment_method, PaymentMethod.MOBILE_MONEY)
+
+    def test_payment_method_enum_values_are_lowercase(self):
+        """Verify PaymentMethod enum values are lowercase (regression test)"""
+        self.assertEqual(PaymentMethod.CASH, "cash")
+        self.assertEqual(PaymentMethod.BANK, "bank")
+        self.assertEqual(PaymentMethod.MOBILE_MONEY, "mobile_money")
+
+
 # Run specific test:
+# python manage.py test inventory.tests.test_clothing_premium.ClothingPaymentMethodNormalizationTestCase --keepdb
 # python manage.py test inventory.tests.test_clothing_premium.ClothingBasicFlowsTestCase --keepdb
