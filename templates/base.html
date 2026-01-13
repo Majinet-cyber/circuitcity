@@ -240,11 +240,11 @@
         width: var(--nav-drawer-w) !important;
         max-width: 75vw !important;
 
-        /* Light solid background on mobile for consistency */
-        background: rgba(255,255,255,0.98) !important;
-        border-right: 1px solid rgba(148,163,184,.3) !important;
-        -webkit-backdrop-filter: blur(8px) !important;
-        backdrop-filter: blur(8px) !important;
+        /* Keep dark sidebar theme on mobile (matches sidebar.html styling) */
+        background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%) !important;
+        border-right: 1px solid rgba(255,255,255,.06) !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
 
         /* Ensure it's scrollable if content overflows */
         overflow-y: auto;

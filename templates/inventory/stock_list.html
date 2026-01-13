@@ -728,11 +728,13 @@
   </div>
 </section>
 
-{# ============================================================ #}
-{# MODALS: Defined ONCE at page level (outside responsive tables)
-   This prevents duplicate modal IDs from desktop/mobile tables.
-   Each modal is dynamically populated via JS when action button is clicked. #}
-{# ============================================================ #}
+{% comment %}
+============================================================
+MODALS: Defined ONCE at page level (outside responsive tables)
+This prevents duplicate modal IDs from desktop/mobile tables.
+Each modal is dynamically populated via JS when action button is clicked.
+============================================================
+{% endcomment %}
 
 <!-- Mobile Actions Modal (Offcanvas) -->
 {% if IS_MANAGER|default:False or request.user.is_staff or request.user.is_superuser or request.user.profile.is_manager %}
