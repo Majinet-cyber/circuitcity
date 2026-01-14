@@ -451,6 +451,91 @@
     </div>
   </div>
 
+  {# ========== NEW: Dynamic Network Activity Stats (PREMIUM FEATURE) ========== #}
+  {% if active_businesses_today or active_agents_today or new_agents_this_week %}
+  <div class="chart-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(236, 72, 153, 0.05)); border: 2px solid rgba(168, 85, 247, 0.2); position: relative; overflow: hidden;">
+    {# Animated background particles #}
+    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(168, 85, 247, 0.1) 1px, transparent 1px); background-size: 50px 50px; opacity: 0.3; animation: float 20s linear infinite;"></div>
+    
+    <div class="chart-header" style="position: relative; z-index: 1;">
+      <div>
+        <div class="chart-title" style="font-size: 1.25rem; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 8px;">
+          <span style="animation: pulse-glow 2s ease-in-out infinite;">🌐</span> Live Network Activity
+        </div>
+        <div style="font-size: 0.875rem; color: var(--dash-muted);">
+          Real-time statistics across all businesses on the platform
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 20px;">
+        <span style="width: 8px; height: 8px; background: #10b981; border-radius: 50%; animation: pulse-dot 1.5s ease-in-out infinite;"></span>
+        <span style="font-size: 0.75rem; font-weight: 600; color: #065f46;">LIVE</span>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin-top: 1.5rem; position: relative; z-index: 1;">
+      {# Active Businesses Today #}
+      <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.05)); border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">🏪</div>
+        <div style="font-size: 0.8rem; color: #1e40af; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Active Businesses</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #1e40af; animation: count-up 1.5s ease-out;" data-animate-value="{{ active_businesses_today|default:0 }}" data-format="number">
+          {{ active_businesses_today|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #1e40af; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-arrow-up-circle-fill"></i> Businesses with sales today
+        </div>
+      </div>
+
+      {# Active Agents Today #}
+      <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); border: 2px solid rgba(16, 185, 129, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">👥</div>
+        <div style="font-size: 0.8rem; color: #065f46; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">Active Agents</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #065f46; animation: count-up 1.5s ease-out;" data-animate-value="{{ active_agents_today|default:0 }}" data-format="number">
+          {{ active_agents_today|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #065f46; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-lightning-charge-fill"></i> Agents making sales today
+        </div>
+      </div>
+
+      {# New Agents This Week #}
+      <div style="background: linear-gradient(135deg, rgba(236, 72, 153, 0.1), rgba(219, 39, 119, 0.05)); border: 2px solid rgba(236, 72, 153, 0.3); border-radius: 16px; padding: 1.5rem; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; right: 0; font-size: 4rem; opacity: 0.1; transform: rotate(15deg);">✨</div>
+        <div style="font-size: 0.8rem; color: #831843; margin-bottom: 0.5rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">New This Week</div>
+        <div style="font-size: 2.5rem; font-weight: 900; color: #831843; animation: count-up 1.5s ease-out;" data-animate-value="{{ new_agents_this_week|default:0 }}" data-format="number">
+          {{ new_agents_this_week|default:0 }}
+        </div>
+        <div style="font-size: 0.75rem; color: #831843; margin-top: 0.5rem; opacity: 0.8;">
+          <i class="bi bi-person-plus-fill"></i> New agents joined (last 7 days)
+        </div>
+      </div>
+    </div>
+
+    {# Floating particles animation #}
+    <style>
+      @keyframes float {
+        0% { transform: translate(0, 0); }
+        50% { transform: translate(-20px, -20px); }
+        100% { transform: translate(0, 0); }
+      }
+      
+      @keyframes pulse-glow {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.1); }
+      }
+      
+      @keyframes pulse-dot {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+      }
+      
+      @keyframes count-up {
+        0% { opacity: 0; transform: translateY(20px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+  </div>
+  {% endif %}
+
   {# ========== Costs & Commissions Panel (Manager Only) ========== #}
   {% if costs_commissions_panel %}
   <div class="chart-card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02)); border: 2px solid rgba(37, 99, 235, 0.2);">
@@ -758,32 +843,6 @@
     </div>
   </div>
   {% endif %}
-
-  {# Quick Links #}
-  <div class="chart-card">
-    <div class="chart-title" style="margin-bottom:1rem">Quick Links</div>
-    <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'inventory:stock_list' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-list"></i> Stock List
-      </a>
-      <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-columns-gap"></i> Inventory Dashboard
-      </a>
-      {% if IS_MANAGER %}
-      {% if HAS_REPORTS_NAMESPACE %}
-      <a href="{% url 'reports:home' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-graph-up"></i> Reports
-      </a>
-      {% endif %}
-      <a href="{% url 'tenants:manager_review_agents' %}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-people"></i> Manage {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}
-      </a>
-      <a href="{% url 'billing:plans' %}" class="btn btn-sm btn-outline-warning">
-        <i class="bi bi-rocket-takeoff"></i> Upgrade Plan
-      </a>
-      {% endif %}
-    </div>
-  </div>
 </div>
 
 {# Include mobile bottom nav (hidden on desktop) #}
