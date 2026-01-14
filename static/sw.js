@@ -6,7 +6,7 @@
 // Static assets use Stale-While-Revalidate for performance
 //
 // VERSION changes on each deploy to bust old caches
-const VERSION = 'emajinet-v2-20260110';
+const VERSION = 'emajinet-v2-20260114';
 const STATIC_CACHE = `${VERSION}-static`;
 const CDN_CACHE    = `${VERSION}-cdn`;
 const OFFLINE_PAGE = '/offline/';

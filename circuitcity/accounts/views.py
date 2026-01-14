@@ -31,6 +31,9 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods, require_POST
 
+# Initialize logger for this module
+logger = logging.getLogger(__name__)
+
 from .forms import (
     AvatarForm,
     ForgotPasswordRequestForm,
@@ -2704,7 +2707,14 @@ def twofa_sms_enable_start(request):
     from django.conf import settings
 
     from .models import get_or_create_twofactor
-    from .services.twilio_verify import send_otp
+    
+    # Try to import Twilio service gracefully
+    try:
+        from .services.twilio_verify import send_otp
+    except ImportError as e:
+        logger.error(f"Could not import twilio_verify service: {e}")
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        return redirect("accounts:settings_security")
 
     # Check if Twilio is configured
     if not getattr(settings, "TWILIO_VERIFY_ENABLED", False):
@@ -2771,7 +2781,14 @@ def twofa_sms_enable_verify(request):
     from django.utils import timezone
 
     from .models import get_or_create_twofactor
-    from .services.twilio_verify import check_otp
+    
+    # Try to import Twilio service gracefully
+    try:
+        from .services.twilio_verify import check_otp
+    except ImportError as e:
+        logger.error(f"Could not import twilio_verify service: {e}")
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        return redirect("accounts:settings_security")
 
     code = request.POST.get("code", "").strip()
     pending_phone = request.session.get("twofa_pending_phone")
@@ -2819,7 +2836,14 @@ def twofa_sms_disable_start(request):
     Step 1 of disabling SMS 2FA: send OTP to verify identity.
     """
     from .models import get_or_create_twofactor
-    from .services.twilio_verify import send_otp
+    
+    # Try to import Twilio service gracefully
+    try:
+        from .services.twilio_verify import send_otp
+    except ImportError as e:
+        logger.error(f"Could not import twilio_verify service: {e}")
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        return redirect("accounts:settings_security")
 
     tf = get_or_create_twofactor(request.user)
 
@@ -2856,7 +2880,14 @@ def twofa_sms_disable_verify(request):
     Step 2 of disabling SMS 2FA: verify OTP and disable 2FA.
     """
     from .models import get_or_create_twofactor
-    from .services.twilio_verify import check_otp
+    
+    # Try to import Twilio service gracefully
+    try:
+        from .services.twilio_verify import check_otp
+    except ImportError as e:
+        logger.error(f"Could not import twilio_verify service: {e}")
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        return redirect("accounts:settings_security")
 
     code = request.POST.get("code", "").strip()
     disable_flow = request.session.get("twofa_disable_flow")
@@ -2910,7 +2941,16 @@ def twofa_challenge(request):
     from django.utils import timezone
 
     from .models import get_or_create_twofactor, is_twofa_enabled, mask_phone
-    from .services.twilio_verify import check_otp, send_otp
+    
+    # Try to import Twilio service gracefully
+    try:
+        from .services.twilio_verify import check_otp, send_otp
+    except ImportError as e:
+        logger.error(f"Could not import twilio_verify service: {e}")
+        messages.error(request, "SMS verification is not available. Please contact your administrator.")
+        # Fallback: skip 2FA if service unavailable
+        next_url = request.GET.get("next") or request.POST.get("next") or "/"
+        return redirect(next_url)
 
     # Must be authenticated to see this page
     if not request.user.is_authenticated:

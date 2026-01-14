@@ -15,6 +15,9 @@ qrcode[pil]==7.4.2
 requests==2.32.3
 reportlab==4.2.5
 
+# --- SMS / 2FA ---
+twilio
+
 # --- Scientific stack (if used by your app) ---
 numpy==2.2.3
 pandas==2.3.2

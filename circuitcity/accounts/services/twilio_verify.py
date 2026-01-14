@@ -12,9 +12,24 @@ SECURITY NOTES:
 """
 from typing import Tuple
 from django.conf import settings
+import os
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _load_twilio():
+    """
+    Safely load Twilio dependencies.
+    Returns (Client, TwilioRestException) if available, (None, None) if not.
+    """
+    try:
+        from twilio.rest import Client
+        from twilio.base.exceptions import TwilioRestException
+        return Client, TwilioRestException
+    except Exception as e:
+        logger.warning(f"Twilio library not available: {e}")
+        return None, None
 
 
 def send_otp(phone_e164: str) -> Tuple[bool, str | None]:
@@ -36,17 +51,26 @@ def send_otp(phone_e164: str) -> Tuple[bool, str | None]:
     if not getattr(settings, "TWILIO_VERIFY_ENABLED", False):
         return False, "SMS verification is not configured. Contact your administrator."
 
+    # Load Twilio dependencies safely
+    Client, TwilioRestException = _load_twilio()
+    if Client is None:
+        logger.warning("Twilio library not installed")
+        return False, "SMS OTP is temporarily unavailable. Please contact support."
+
+    # Check environment variables
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID") or getattr(settings, "TWILIO_ACCOUNT_SID", None)
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN") or getattr(settings, "TWILIO_AUTH_TOKEN", None)
+    verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID") or getattr(settings, "TWILIO_VERIFY_SERVICE_SID", None)
+
+    if not (account_sid and auth_token and verify_service_sid):
+        logger.error("Twilio credentials not configured")
+        return False, "SMS service is not configured. Please contact support."
+
     try:
-        from twilio.rest import Client
-        from twilio.base.exceptions import TwilioRestException
-
-        account_sid = settings.TWILIO_ACCOUNT_SID
-        auth_token = settings.TWILIO_AUTH_TOKEN
-        verify_service_sid = settings.TWILIO_VERIFY_SERVICE_SID
-
         client = Client(account_sid, auth_token)
-
-        verification = client.verify.v2.services(verify_service_sid).verifications.create(to=phone_e164, channel="sms")
+        verification = client.verify.v2.services(verify_service_sid).verifications.create(
+            to=phone_e164, channel="sms"
+        )
 
         if verification.status in ("pending", "approved"):
             # DO NOT LOG THE CODE - security requirement
@@ -56,24 +80,22 @@ def send_otp(phone_e164: str) -> Tuple[bool, str | None]:
             logger.warning(f"Twilio Verify send failed with status: {verification.status}")
             return False, f"Failed to send code (status: {verification.status})"
 
-    except TwilioRestException as e:
-        logger.error(f"Twilio REST error sending OTP: {e.code} - {e.msg}")
-
-        # User-friendly error messages
-        if e.code == 60200:
-            return False, "Invalid phone number format. Use international format (e.g. +265991234567)"
-        elif e.code == 60203:
-            return False, "Maximum send attempts reached. Please try again later."
-        else:
-            return False, f"Unable to send verification code. Please try again later."
-
-    except ImportError:
-        logger.error("Twilio library not installed")
-        return False, "SMS verification is not available. Contact your administrator."
-
     except Exception as e:
-        logger.exception(f"Unexpected error sending OTP: {e}")
-        return False, "An error occurred while sending the verification code."
+        # Check if it's a TwilioRestException (only if we have the class)
+        if TwilioRestException and isinstance(e, TwilioRestException):
+            logger.warning(f"Twilio REST error sending OTP: {e.code} - {e.msg}")
+
+            # User-friendly error messages
+            if e.code == 60200:
+                return False, "Invalid phone number format. Use international format (e.g. +265991234567)"
+            elif e.code == 60203:
+                return False, "Maximum send attempts reached. Please try again later."
+            else:
+                return False, "Unable to send verification code. Please try again later."
+        
+        # Generic error fallback
+        logger.exception("Unexpected error sending OTP")
+        return False, "Could not send OTP. Please try again."
 
 
 def check_otp(phone_e164: str, code: str) -> Tuple[bool, str | None]:
@@ -99,16 +121,23 @@ def check_otp(phone_e164: str, code: str) -> Tuple[bool, str | None]:
     if not getattr(settings, "TWILIO_VERIFY_ENABLED", False):
         return False, "SMS verification is not configured. Contact your administrator."
 
+    # Load Twilio dependencies safely
+    Client, TwilioRestException = _load_twilio()
+    if Client is None:
+        logger.warning("Twilio library not installed")
+        return False, "SMS OTP is temporarily unavailable. Please contact support."
+
+    # Check environment variables
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID") or getattr(settings, "TWILIO_ACCOUNT_SID", None)
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN") or getattr(settings, "TWILIO_AUTH_TOKEN", None)
+    verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID") or getattr(settings, "TWILIO_VERIFY_SERVICE_SID", None)
+
+    if not (account_sid and auth_token and verify_service_sid):
+        logger.error("Twilio credentials not configured")
+        return False, "SMS service is not configured. Please contact support."
+
     try:
-        from twilio.rest import Client
-        from twilio.base.exceptions import TwilioRestException
-
-        account_sid = settings.TWILIO_ACCOUNT_SID
-        auth_token = settings.TWILIO_AUTH_TOKEN
-        verify_service_sid = settings.TWILIO_VERIFY_SERVICE_SID
-
         client = Client(account_sid, auth_token)
-
         verification_check = client.verify.v2.services(verify_service_sid).verification_checks.create(
             to=phone_e164, code=code
         )
@@ -125,23 +154,21 @@ def check_otp(phone_e164: str, code: str) -> Tuple[bool, str | None]:
             logger.warning(f"Twilio Verify check returned status: {verification_check.status}")
             return False, "Verification failed. Please request a new code."
 
-    except TwilioRestException as e:
-        logger.error(f"Twilio REST error checking OTP: {e.code} - {e.msg}")
-
-        # User-friendly error messages
-        if e.code == 60200:
-            return False, "Invalid phone number"
-        elif e.code == 60202:
-            return False, "Maximum verification attempts reached. Please request a new code."
-        elif e.code == 60223:
-            return False, "Verification code has expired. Please request a new code."
-        else:
-            return False, "Unable to verify code. Please try again."
-
-    except ImportError:
-        logger.error("Twilio library not installed")
-        return False, "SMS verification is not available. Contact your administrator."
-
     except Exception as e:
-        logger.exception(f"Unexpected error checking OTP: {e}")
+        # Check if it's a TwilioRestException (only if we have the class)
+        if TwilioRestException and isinstance(e, TwilioRestException):
+            logger.warning(f"Twilio REST error checking OTP: {e.code} - {e.msg}")
+
+            # User-friendly error messages
+            if e.code == 60200:
+                return False, "Invalid phone number"
+            elif e.code == 60202:
+                return False, "Maximum verification attempts reached. Please request a new code."
+            elif e.code == 60223:
+                return False, "Verification code has expired. Please request a new code."
+            else:
+                return False, "Unable to verify code. Please try again."
+        
+        # Generic error fallback
+        logger.exception("Unexpected error checking OTP")
         return False, "An error occurred during verification."

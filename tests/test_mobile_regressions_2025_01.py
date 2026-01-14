@@ -273,6 +273,90 @@ class TestTwoFactorPhoneValidation:
         content = response.content.decode("utf-8")
         assert "not available" in content.lower() or "contact" in content.lower()
 
+    def test_twilio_import_failure_returns_200(self, client, django_user_model, settings, monkeypatch):
+        """If twilio library is not installed, should return 200 with error message, not 500."""
+        import sys
+        
+        # Mock twilio module to not exist (simulate missing package)
+        # Save original modules
+        original_twilio = sys.modules.get('twilio')
+        original_twilio_rest = sys.modules.get('twilio.rest')
+        original_twilio_base = sys.modules.get('twilio.base.exceptions')
+        
+        # Remove twilio from sys.modules to simulate it not being installed
+        for mod in list(sys.modules.keys()):
+            if mod.startswith('twilio'):
+                sys.modules.pop(mod, None)
+        
+        # Also monkeypatch import to raise ModuleNotFoundError for twilio
+        import builtins
+        real_import = builtins.__import__
+        
+        def mock_import(name, *args, **kwargs):
+            if 'twilio' in name:
+                raise ModuleNotFoundError(f"No module named '{name}'")
+            return real_import(name, *args, **kwargs)
+        
+        monkeypatch.setattr(builtins, '__import__', mock_import)
+        
+        try:
+            # Enable Twilio in settings (but it won't be importable)
+            settings.TWILIO_VERIFY_ENABLED = True
+            settings.TWILIO_ACCOUNT_SID = "test_sid"
+            settings.TWILIO_AUTH_TOKEN = "test_token"
+            settings.TWILIO_VERIFY_SERVICE_SID = "test_service"
+            
+            user = django_user_model.objects.create_user(username="testuser", password="testpass123")
+            Profile.objects.get_or_create(user=user, defaults={"display_name": "Test User"})
+            client.login(username="testuser", password="testpass123")
+
+            response = client.post(
+                reverse("accounts:twofa_sms_enable_start"),
+                {"phone": "+265991234567"},
+                follow=True
+            )
+            
+            # Should NOT 500 - should return 200 with error message
+            assert response.status_code == 200, f"Got status {response.status_code}, expected 200"
+            
+            # Should show error about SMS being unavailable
+            content = response.content.decode("utf-8").lower()
+            assert "temporarily unavailable" in content or "not available" in content or "contact support" in content
+        
+        finally:
+            # Restore original modules
+            if original_twilio is not None:
+                sys.modules['twilio'] = original_twilio
+            if original_twilio_rest is not None:
+                sys.modules['twilio.rest'] = original_twilio_rest
+            if original_twilio_base is not None:
+                sys.modules['twilio.base.exceptions'] = original_twilio_base
+
+    def test_missing_twilio_env_vars_returns_200(self, client, django_user_model, settings):
+        """If Twilio env vars are missing, should return 200 with error message, not 500."""
+        # Enable Twilio but don't set credentials
+        settings.TWILIO_VERIFY_ENABLED = True
+        settings.TWILIO_ACCOUNT_SID = None
+        settings.TWILIO_AUTH_TOKEN = None
+        settings.TWILIO_VERIFY_SERVICE_SID = None
+        
+        user = django_user_model.objects.create_user(username="testuser", password="testpass123")
+        Profile.objects.get_or_create(user=user, defaults={"display_name": "Test User"})
+        client.login(username="testuser", password="testpass123")
+
+        response = client.post(
+            reverse("accounts:twofa_sms_enable_start"),
+            {"phone": "+265991234567"},
+            follow=True
+        )
+        
+        # Should NOT 500 - should return 200 with configuration error
+        assert response.status_code == 200, f"Got status {response.status_code}, expected 200"
+        
+        # Should show error about service not being configured
+        content = response.content.decode("utf-8").lower()
+        assert "not configured" in content or "contact support" in content
+
 
 @pytest.mark.django_db
 class TestNoRegressionSmoke(TestCase):
