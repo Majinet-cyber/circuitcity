@@ -7,6 +7,7 @@ SSOT: All product definitions come from inventory/catalog/construction_materials
 from __future__ import annotations
 
 from decimal import Decimal
+import re
 from urllib.parse import urlencode
 
 from django.contrib import messages
@@ -32,6 +33,7 @@ from inventory.catalog.construction_materials import (
     is_valid_paint_size,
 )
 from inventory.catalog.registry import (
+    STOCK_IN_CATEGORIES,
     get_all_stock_in_categories,
     get_category_by_key,
     get_category_handler,
@@ -55,6 +57,175 @@ from inventory.utils_product_variations import (
     should_use_variation_picker,
 )
 from tenants.utils import manager_required, require_business
+
+
+def normalize_label(value: str) -> str:
+    """Normalize labels by replacing separators, collapsing whitespace, and title-casing."""
+    if not value:
+        return ""
+    cleaned = re.sub(r"[_-]+", " ", str(value))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned.title()
+
+
+def infer_brand_from_name(name: str) -> str:
+    """Infer cement brand from product name using 'Brand Cement' or first token fallback."""
+    if not name:
+        return ""
+    cleaned = re.sub(r"[_-]+", " ", str(name))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    lowered = cleaned.lower()
+    cement_index = lowered.find(" cement")
+    if cement_index != -1:
+        brand_chunk = cleaned[:cement_index].strip()
+        if brand_chunk:
+            return normalize_label(brand_chunk)
+    tokens = cleaned.split()
+    return normalize_label(tokens[0] if tokens else cleaned)
+
+
+def _has_unit_markers(name: str) -> bool:
+    lowered = (name or "").lower()
+    if re.search(r"\d", lowered):
+        return True
+    markers = ("kg", "bag", "bags", "pack", "tin", "sheet", "sheets", "mm", "cm", "m", "l", "litre", "liter")
+    return any(marker in lowered for marker in markers) or ("(" in lowered and ")" in lowered)
+
+
+def get_brand_label_for_product(product: MerchProduct) -> str:
+    brand_value = getattr(product, "brand", "").strip()
+    return normalize_label(brand_value) if brand_value else infer_brand_from_name(product.name)
+
+
+def is_placeholder_product(product: MerchProduct) -> bool:
+    """Exclude placeholder brand rows that shouldn't appear in cement UI."""
+    name = (product.name or "").strip()
+    if not name:
+        return True
+    inferred_brand = get_brand_label_for_product(product)
+    if not inferred_brand:
+        return False
+    if normalize_label(name) != normalize_label(inferred_brand):
+        return False
+    has_variant_markers = _has_unit_markers(name) or bool(product.base_unit) or bool(product.pack_size) or bool(
+        product.spec_label
+    )
+    has_stock_data = any(
+        [
+            (product.quantity_in_stock or 0) > 0,
+            (product.cost_price or Decimal("0")) > 0,
+            (product.selling_price or Decimal("0")) > 0,
+        ]
+    )
+    return (not has_variant_markers) or (not has_stock_data)
+
+
+def build_unit_label(product: MerchProduct) -> str:
+    unit = (product.base_unit or "").strip()
+    pack_size = product.pack_size
+    if pack_size and unit:
+        return f"{unit.upper()} {pack_size}KG"
+    spec = (product.spec_label or "").strip()
+    if spec:
+        return spec
+    return unit.upper() if unit else "Unit"
+
+
+def build_cement_brand_choices(business, in_stock_only: bool = True) -> list[dict]:
+    products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True)
+    if in_stock_only:
+        products = products.filter(quantity_in_stock__gt=0)
+    products = [p for p in products if not is_placeholder_product(p)]
+    brand_icon_map = {
+        normalize_label(b["name"]).lower(): b.get("icon", "🏗️") for b in get_cement_brands_list()
+    }
+    seen = {}
+    for product in products:
+        label = get_brand_label_for_product(product)
+        if not label:
+            continue
+        key = label.lower().replace(" ", "_")
+        if key not in seen:
+            seen[key] = {
+                "key": key,
+                "name": label,
+                "icon": brand_icon_map.get(label.lower(), "📦"),
+            }
+    return list(seen.values())
+
+
+def get_filtered_stock_in_categories(business) -> list[dict]:
+    """
+    Get stock-in categories filtered by what the business actually has in inventory.
+    
+    Rules:
+    - If the business has NO products OR only cement products, show ONLY 'construction-materials'
+    - If the business has products in multiple categories, show all categories that have products
+    - Categories are determined by the 'category' field on MerchProduct
+    
+    This ensures cement vendor demos show only cement by default, but the system
+    expands to show other categories once the business actually stocks them.
+    """
+    from inventory.catalog.construction_materials import CONSTRUCTION_PRODUCTS
+    
+    # Get all products for this cement business
+    products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CEMENT,
+        is_active=True
+    )
+    
+    # Get unique categories from existing products
+    existing_categories = set()
+    for product in products:
+        cat = (product.category or "").strip().lower()
+        if cat:
+            existing_categories.add(cat)
+    
+    # Map product categories to registry category keys
+    # 'construction-materials' includes cement, paint, iron-sheets, etc.
+    category_mapping = {
+        "construction-materials": "construction-materials",
+        "cement": "construction-materials",
+        "paint": "construction-materials",
+        "iron-sheets": "construction-materials",
+        "angle-iron": "construction-materials",
+        "welding-materials": "welding-materials",
+        "welding": "welding-materials",
+        "car-spares": "car-spares",
+        "automotive": "car-spares",
+    }
+    
+    # Determine which registry categories have products
+    active_category_keys = set()
+    for cat in existing_categories:
+        mapped_key = category_mapping.get(cat, None)
+        if mapped_key:
+            active_category_keys.add(mapped_key)
+    
+    # If no products or only construction-materials, show only construction-materials (cement)
+    if not active_category_keys or active_category_keys == {"construction-materials"}:
+        return [cat for cat in STOCK_IN_CATEGORIES if cat["key"] == "construction-materials" and cat.get("enabled", True)]
+    
+    # Otherwise, show all categories that have products
+    return [
+        cat for cat in STOCK_IN_CATEGORIES
+        if cat["key"] in active_category_keys and cat.get("enabled", True)
+    ]
+
+
+def is_cement_product(product_slug: str) -> bool:
+    """Check if a product slug is cement (for skip-variant logic)."""
+    return product_slug == "cement"
+
+
+def get_cement_default_variant() -> dict:
+    """Get the default cement variant (BAG 50KG) - used to skip variant step."""
+    return {
+        "brand": None,  # Brand still required
+        "size": "50kg",
+        "size_label": "BAG (50KG)",
+    }
 
 
 @login_required
@@ -304,14 +475,81 @@ def dashboard(request):
 @require_business
 @require_business_kind(BusinessKind.CEMENT)
 def stock_list(request):
-    """List all cement/hardware products"""
+    """List all cement/hardware products with premium KPIs"""
     business = get_active_business(request)
 
-    products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True).order_by("name")
+    products_qs = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True).order_by(
+        "name"
+    )
+    products = []
+    healthy_count = 0
+    low_stock_items = []
+    out_of_stock_items = []
+    total_units = 0
+    total_stock_value = Decimal("0")
+    total_potential_profit = Decimal("0")
+    
+    for product in products_qs:
+        if is_placeholder_product(product):
+            continue
+        product.display_name = normalize_label(product.name) if any(c in product.name for c in "_-") else product.name
+        product.unit_label = build_unit_label(product)
+        product.brand_label = get_brand_label_for_product(product)
+        product.brand_key = product.brand_label.lower().replace(" ", "_") if product.brand_label else ""
+        qty = product.quantity_in_stock or 0
+        total_units += qty
+        
+        if qty <= 0:
+            product.stock_badge_label = "Out of stock"
+            product.stock_badge_class = "danger"
+            out_of_stock_items.append(product)
+        elif qty <= 3:
+            product.stock_badge_label = "Low stock"
+            product.stock_badge_class = "warning"
+            low_stock_items.append(product)
+        elif qty <= 10:
+            product.stock_badge_label = "Good"
+            product.stock_badge_class = "success"
+            healthy_count += 1
+        else:
+            product.stock_badge_label = "Plenty"
+            product.stock_badge_class = "primary"
+            healthy_count += 1
+            
+        if product.cost_price is not None and product.selling_price is not None:
+            product.potential_profit = (product.selling_price - product.cost_price) * Decimal(qty)
+            total_potential_profit += product.potential_profit
+        else:
+            product.potential_profit = None
+            
+        if product.cost_price is not None:
+            product.stock_value = Decimal(qty) * product.cost_price
+            total_stock_value += product.stock_value
+        else:
+            product.stock_value = None
+        products.append(product)
+
+    total_products = len(products)
+    warehouse_score = round((healthy_count / total_products) * 100) if total_products else 0
+    
+    # Build reorder queue: top 3 low/out items by urgency (out of stock first, then lowest qty)
+    reorder_queue = out_of_stock_items[:3]
+    if len(reorder_queue) < 3:
+        reorder_queue.extend(low_stock_items[:3 - len(reorder_queue)])
 
     context = {
         "business": business,
         "products": products,
+        "warehouse_score": warehouse_score,
+        "warehouse_healthy_count": healthy_count,
+        "warehouse_total_products": total_products,
+        # Premium KPIs
+        "total_units": total_units,
+        "total_stock_value": total_stock_value,
+        "total_potential_profit": total_potential_profit,
+        "low_stock_count": len(low_stock_items),
+        "out_of_stock_count": len(out_of_stock_items),
+        "reorder_queue": reorder_queue,
         "active_tab": "stock",
     }
 
@@ -385,6 +623,13 @@ def stock_in(request):
                 
                 # Store product slug in session
                 request.session["cement_stock_in_product_slug"] = product_slug
+                
+                # CEMENT OPTIMIZATION: Skip variant step for cement (always BAG 50KG)
+                if is_cement_product(product_slug):
+                    # Auto-set cement defaults
+                    request.session["cement_stock_in_size"] = "50kg"
+                    return redirect(f"{reverse('cement:stock_in')}?step=3")  # Will auto-redirect to step 4
+                
                 return redirect(f"{reverse('cement:stock_in')}?step=3")
 
             # Step 3: Variant selection (Brand → Size → Finish/Color)
@@ -519,15 +764,23 @@ def stock_in(request):
             return redirect(f"{reverse('cement:stock_in')}?step={step}")
 
     # GET: Show appropriate step
+    # CEMENT FLOW OPTIMIZATION: For cement products, skip the variant step (always BAG 50KG)
+    # If user directly navigates to step 3 for cement, redirect to step 4 (pricing)
+    product_slug = request.session.get("cement_stock_in_product_slug", "")
+    if step == "3" and is_cement_product(product_slug):
+        # Auto-set cement defaults and skip to pricing step
+        request.session["cement_stock_in_size"] = "50kg"
+        return redirect(f"{reverse('cement:stock_in')}?step=4")
+    
     context = {
         "business": business,
         "step": step,
         "active_tab": "stock_in",
     }
 
-    # Step 1: Show category cards from catalog registry
+    # Step 1: Show category cards filtered by business inventory
     if step == "1":
-        categories = get_all_stock_in_categories()
+        categories = get_filtered_stock_in_categories(business)
         context["categories"] = categories
 
     # Step 2: Show product cards for selected category
@@ -537,9 +790,8 @@ def stock_in(request):
         context["selected_category"] = category
         context["products"] = products
 
-    # Step 3: Show variant selection for selected product
+    # Step 3: Show variant selection for selected product (skipped for cement)
     elif step == "3":
-        product_slug = request.session.get("cement_stock_in_product_slug", "")
         product_def = get_product_by_slug(product_slug)
         
         if not product_def:
@@ -551,7 +803,6 @@ def stock_in(request):
 
     # Step 4: Show quantity/pricing form
     elif step == "4":
-        product_slug = request.session.get("cement_stock_in_product_slug", "")
         brand = request.session.get("cement_stock_in_brand", "")
         size = request.session.get("cement_stock_in_size", "")
         finish = request.session.get("cement_stock_in_finish", "")
@@ -575,6 +826,17 @@ def stock_in(request):
             dimension=dimension,
         )
         
+        # For prefill: look up existing product's selling price if it exists
+        default_selling_price = None
+        existing_product = MerchProduct.objects.filter(
+            business=business,
+            name=suggested_name,
+            kind=BusinessKind.CEMENT,
+            is_active=True
+        ).first()
+        if existing_product and existing_product.selling_price:
+            default_selling_price = existing_product.selling_price
+        
         context["product_def"] = product_def
         context["suggested_name"] = suggested_name
         context["selected_brand"] = brand
@@ -583,6 +845,8 @@ def stock_in(request):
         context["selected_color"] = color
         context["selected_gauge"] = gauge
         context["selected_dimension"] = dimension
+        context["default_selling_price"] = default_selling_price
+        context["is_cement"] = is_cement_product(product_slug)
 
     return render(request, "verticals/cement/stock_in_v2.html", context)
 
@@ -596,15 +860,48 @@ def sell(request):
 
     step = request.GET.get("step", "1")
 
+    if request.method == "GET" and step == "1":
+        prefill_product = request.GET.get("prefill_product")
+        prefill_brand = request.GET.get("prefill_brand")
+        if prefill_product:
+            try:
+                product = MerchProduct.objects.get(pk=int(prefill_product), business=business)
+                if not is_placeholder_product(product) and (product.quantity_in_stock or 0) > 0:
+                    brand_label = get_brand_label_for_product(product)
+                    brand_key = brand_label.lower().replace(" ", "_") if brand_label else ""
+                    request.session["cement_sell_brand"] = brand_label
+                    request.session["cement_sell_brand_label"] = brand_label
+                    request.session["cement_sell_brand_key"] = brand_key
+                    request.session["cement_sell_product_id"] = product.id
+                    return redirect(f"{reverse('cement:sell')}?step=3")
+            except (MerchProduct.DoesNotExist, ValueError, TypeError):
+                pass
+        elif prefill_brand:
+            available_brands = build_cement_brand_choices(business)
+            brand_map = {b["key"]: b["name"] for b in available_brands}
+            if prefill_brand in brand_map:
+                request.session["cement_sell_brand"] = brand_map[prefill_brand]
+                request.session["cement_sell_brand_label"] = brand_map[prefill_brand]
+                request.session["cement_sell_brand_key"] = prefill_brand
+                return redirect(f"{reverse('cement:sell')}?step=2")
+
     if request.method == "POST":
         try:
             # Step 1: Brand selection
             if step == "1":
-                brand = request.POST.get("brand", "").strip()
-                if not brand:
+                brand_key = request.POST.get("brand", "").strip()
+                if not brand_key:
                     messages.error(request, "Please select a brand")
                     return redirect(f"{reverse('cement:sell')}?step=1")
-                request.session["cement_sell_brand"] = brand
+                available_brands = build_cement_brand_choices(business)
+                brand_map = {b["key"]: b["name"] for b in available_brands}
+                brand_label = brand_map.get(brand_key)
+                if not brand_label:
+                    messages.error(request, "Invalid brand selection")
+                    return redirect(f"{reverse('cement:sell')}?step=1")
+                request.session["cement_sell_brand"] = brand_label
+                request.session["cement_sell_brand_label"] = brand_label
+                request.session["cement_sell_brand_key"] = brand_key
                 return redirect(f"{reverse('cement:sell')}?step=2")
 
             # Step 2: Product selection
@@ -689,41 +986,7 @@ def sell(request):
             return redirect(f"{reverse('cement:sell')}?step={step}")
 
     # GET: Show appropriate step
-    # Get all cement brands with stock
-    in_stock_products = MerchProduct.objects.filter(
-        business=business, kind=BusinessKind.CEMENT, is_active=True, quantity_in_stock__gt=0
-    ).values_list("name", flat=True)
-
-    # Use seeded brands list
-    seed_brands = get_cement_brands_list()
-
-    # Extract custom brands from in-stock products (not in seed list)
-    seed_names_lower = [b["name"].lower() for b in seed_brands]
-    custom_brands = set()
-    for name in in_stock_products:
-        # Extract brand from "Brand - Product" format or use full name
-        brand_name = name.split(" - ")[0] if " - " in name else name
-        if brand_name.lower() not in seed_names_lower:
-            custom_brands.add(brand_name)
-
-    # Filter seed brands to only show those with stock
-    available_seed_brands = []
-    for brand in seed_brands:
-        # Check if any product with this brand name (or starting with it) has stock
-        has_stock = MerchProduct.objects.filter(
-            business=business,
-            kind=BusinessKind.CEMENT,
-            is_active=True,
-            quantity_in_stock__gt=0,
-            name__istartswith=brand["name"],
-        ).exists()
-        if has_stock:
-            available_seed_brands.append(brand)
-
-    # Combine available seeded + custom brands
-    all_brands = available_seed_brands + [
-        {"key": b.lower().replace(" ", "_"), "name": b, "icon": "📦"} for b in custom_brands
-    ]
+    all_brands = build_cement_brand_choices(business, in_stock_only=True)
 
     context = {
         "business": business,
@@ -734,16 +997,26 @@ def sell(request):
 
     # Step 2: Show products for selected brand
     if step == "2":
-        brand = request.session.get("cement_sell_brand", "")
-        if brand:
-            products = MerchProduct.objects.filter(
+        brand_label = request.session.get("cement_sell_brand_label") or request.session.get("cement_sell_brand", "")
+        if brand_label:
+            products_qs = MerchProduct.objects.filter(
                 business=business,
                 kind=BusinessKind.CEMENT,
                 is_active=True,
                 quantity_in_stock__gt=0,
-                name__istartswith=brand,
             ).order_by("name")
-            context["selected_brand"] = brand
+            products = []
+            for product in products_qs:
+                if is_placeholder_product(product):
+                    continue
+                if get_brand_label_for_product(product).lower() != brand_label.lower():
+                    continue
+                product.display_name = (
+                    normalize_label(product.name) if any(c in product.name for c in "_-") else product.name
+                )
+                product.unit_label = build_unit_label(product)
+                products.append(product)
+            context["selected_brand_label"] = normalize_label(brand_label)
             context["products"] = products
 
     # Step 3: Show quantity/payment form
@@ -752,6 +1025,10 @@ def sell(request):
         if product_id:
             try:
                 product = MerchProduct.objects.get(pk=product_id, business=business)
+                product.display_name = (
+                    normalize_label(product.name) if any(c in product.name for c in "_-") else product.name
+                )
+                product.unit_label = build_unit_label(product)
                 context["selected_product"] = product
             except MerchProduct.DoesNotExist:
                 messages.error(request, "Product not found")

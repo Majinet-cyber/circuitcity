@@ -75,8 +75,8 @@ class TestCementStockInWizard(TestCase):
         assert b"Step 2: Select Product" in response.content
         assert b"Cement" in response.content or b"Paint" in response.content
 
-    def test_stock_in_step3_variant_renders_cement(self):
-        """Step 3 (Variant selection) renders for cement product"""
+    def test_stock_in_step3_skipped_for_cement(self):
+        """Step 3 is SKIPPED for cement (redirects to step 4) - cement always BAG 50KG"""
         # Simulate selections in session
         session = self.client.session
         session["cement_stock_in_category"] = "construction-materials"
@@ -84,11 +84,9 @@ class TestCementStockInWizard(TestCase):
         session.save()
 
         response = self.client.get(reverse("cement:stock_in") + "?step=3")
-        assert response.status_code == 200
-        assert b"Step 3: Select" in response.content
-        assert b"Brand" in response.content
-        # Should show cement brands (Dangote, Akshar, etc.)
-        assert b"Dangote" in response.content or b"dangote" in response.content
+        # Should redirect to step 4 (pricing) for cement
+        assert response.status_code == 302
+        assert "step=4" in response.url, "Cement should skip step 3 and go to step 4"
 
     def test_stock_in_step3_variant_renders_paint(self):
         """Step 3 (Variant selection) renders for paint with correct sizes"""
@@ -122,7 +120,8 @@ class TestCementStockInWizard(TestCase):
 
         response = self.client.get(reverse("cement:stock_in") + "?step=4")
         assert response.status_code == 200
-        assert b"Step 4: Quantity" in response.content
+        # For cement, step 4 displays as "Step 3" in UI since variant step is skipped
+        assert b"Quantity" in response.content
         assert b"Dangote" in response.content
         assert b"Cement" in response.content
 
@@ -469,29 +468,63 @@ class TestCementStockInMultiCategory(TestCase):
         session["active_business_id"] = self.business.id
         session.save()
 
-    def test_step1_shows_multiple_categories(self):
-        """Step 1 shows Construction Materials, Welding Materials, and Car Spares"""
+    def test_step1_shows_multiple_categories_when_products_exist(self):
+        """Step 1 shows multiple categories ONLY when business has products in those categories"""
+        # Create products in multiple categories
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Dangote Cement 50KG",
+            kind=BusinessKind.CEMENT,
+            category="construction-materials",
+            is_active=True,
+            quantity_in_stock=10,
+        )
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Welding Rods 2.5mm",
+            kind=BusinessKind.CEMENT,
+            category="welding-materials",
+            is_active=True,
+            quantity_in_stock=50,
+        )
+        
         response = self.client.get(reverse("cement:stock_in") + "?step=1")
         assert response.status_code == 200
         
         content = response.content.decode('utf-8')
         
-        # All three categories must be present
+        # Categories with products must be present
         assert "Construction Materials" in content, "Construction Materials must be visible"
         assert "Welding Materials" in content, "Welding Materials must be visible"
-        assert "Car Spares" in content, "Car Spares must be visible"
 
-    def test_step1_shows_category_icons(self):
-        """Step 1 shows category icons (🏗️, 🔥, 🚗)"""
+    def test_step1_shows_category_icons_when_products_exist(self):
+        """Step 1 shows category icons when products exist in those categories"""
+        # Create products in multiple categories
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Dangote Cement 50KG",
+            kind=BusinessKind.CEMENT,
+            category="construction-materials",
+            is_active=True,
+            quantity_in_stock=10,
+        )
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Welding Rods 2.5mm",
+            kind=BusinessKind.CEMENT,
+            category="welding-materials",
+            is_active=True,
+            quantity_in_stock=50,
+        )
+        
         response = self.client.get(reverse("cement:stock_in") + "?step=1")
         assert response.status_code == 200
         
         content = response.content.decode('utf-8')
         
-        # Check for icons
+        # Check for icons of categories with products
         assert "🏗️" in content, "Construction Materials icon must be visible"
         assert "🔥" in content, "Welding Materials icon must be visible"
-        assert "🚗" in content, "Car Spares icon must be visible"
 
     def test_step1_construction_materials_has_testid(self):
         """Construction Materials card has data-testid attribute"""
@@ -503,8 +536,18 @@ class TestCementStockInMultiCategory(TestCase):
                "data-testid='category-construction-materials'" in content, \
                "Construction Materials must have data-testid for Cypress"
 
-    def test_step1_welding_materials_has_testid(self):
-        """Welding Materials card has data-testid attribute"""
+    def test_step1_welding_materials_has_testid_when_products_exist(self):
+        """Welding Materials card has data-testid attribute when products exist"""
+        # Create welding products
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Welding Rods 2.5mm",
+            kind=BusinessKind.CEMENT,
+            category="welding-materials",
+            is_active=True,
+            quantity_in_stock=50,
+        )
+        
         response = self.client.get(reverse("cement:stock_in") + "?step=1")
         assert response.status_code == 200
         
@@ -513,8 +556,18 @@ class TestCementStockInMultiCategory(TestCase):
                "data-testid='category-welding-materials'" in content, \
                "Welding Materials must have data-testid for Cypress"
 
-    def test_step1_car_spares_has_testid(self):
-        """Car Spares card has data-testid attribute"""
+    def test_step1_car_spares_has_testid_when_products_exist(self):
+        """Car Spares card has data-testid attribute when products exist"""
+        # Create car spares products
+        MerchProduct.objects.create(
+            business=self.business,
+            name="Oil Filter",
+            kind=BusinessKind.CEMENT,
+            category="car-spares",
+            is_active=True,
+            quantity_in_stock=25,
+        )
+        
         response = self.client.get(reverse("cement:stock_in") + "?step=1")
         assert response.status_code == 200
         
@@ -605,27 +658,27 @@ class TestCementBrandsIncludeNjatiExtra(TestCase):
         session["active_business_id"] = self.business.id
         session.save()
 
-    def test_step3_cement_shows_njati_and_njati_extra(self):
-        """Step 3 cement brand selection shows both Njati and Njati Extra"""
-        # Set up session for step 3
-        session = self.client.session
-        session["cement_stock_in_category"] = "construction-materials"
-        session["cement_stock_in_product_slug"] = "cement"
-        session.save()
-
-        response = self.client.get(reverse("cement:stock_in") + "?step=3")
-        assert response.status_code == 200
+    def test_cement_catalog_has_njati_and_njati_extra(self):
+        """Cement catalog SSOT includes both Njati and Njati Extra as distinct brands"""
+        # Import from the catalog SSOT
+        from inventory.catalog.construction_materials import CEMENT_BRANDS
         
-        content = response.content.decode('utf-8')
+        brand_names = [b["name"] for b in CEMENT_BRANDS]
         
-        # Both brands must be present
-        assert "Njati" in content, "Njati brand must be visible"
-        assert "Njati Extra" in content, "Njati Extra brand must be visible"
+        # Both brands must be present in the catalog
+        assert "Njati" in brand_names, "Njati brand must be in catalog"
+        assert "Njati Extra" in brand_names, "Njati Extra brand must be in catalog"
         
-        # Verify they appear as separate options (not just substring match)
-        # Count occurrences in brand selection context
-        njati_count = content.count('>Njati<')
-        assert njati_count >= 1, "Njati should appear as a separate brand option"
+        # Verify they are distinct entries (not duplicates)
+        njati_entries = [b for b in CEMENT_BRANDS if b["name"] == "Njati"]
+        njati_extra_entries = [b for b in CEMENT_BRANDS if b["name"] == "Njati Extra"]
+        
+        assert len(njati_entries) == 1, "Njati should appear exactly once"
+        assert len(njati_extra_entries) == 1, "Njati Extra should appear exactly once"
+        
+        # Verify they have different keys
+        assert njati_entries[0]["key"] != njati_extra_entries[0]["key"], \
+            "Njati and Njati Extra must have different keys"
 
     def test_can_stock_in_njati_cement(self):
         """Can complete stock-in flow with Njati brand"""

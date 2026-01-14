@@ -213,6 +213,28 @@
     color: white;
   }
 
+  .payment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+  }
+
+  .payment-card {
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 14px;
+    cursor: pointer;
+    background: white;
+    transition: all 0.2s ease;
+    text-align: center;
+  }
+
+  .payment-card.active {
+    border-color: var(--cement-accent);
+    box-shadow: 0 10px 20px rgba(37, 99, 235, 0.18);
+    background: #f8fbff;
+  }
+
   @media (max-width: 640px) {
     .brand-grid,
     .product-grid {
@@ -272,19 +294,19 @@
   {% if step == '2' %}
   <div class="form-section">
     <h2 class="mb-4" style="font-weight: 800;">Step 2: Select Product</h2>
-    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand }}</strong></p>
+    <p class="text-muted mb-4">Brand: <strong>{{ selected_brand_label }}</strong></p>
     
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="step" value="2">
-      <input type="hidden" name="brand" value="{{ selected_brand }}">
+      <input type="hidden" name="brand" value="{{ selected_brand_label }}">
       
       {% if products %}
       <div class="product-grid">
         {% for product in products %}
         <div class="premium-card product-card" onclick="selectProduct({{ product.id }})">
-          <div class="product-name">{{ product.name }}</div>
-          <div class="product-info">Stock: {{ product.quantity_in_stock }} {{ product.base_unit|default:"bags" }}</div>
+          <div class="product-name">{{ product.display_name }}</div>
+          <div class="product-info">Stock: {{ product.quantity_in_stock }} {{ product.unit_label|default:"bags" }}</div>
           <div class="product-price">MK {{ product.selling_price|floatformat:0|intcomma }}</div>
           <input type="radio" name="product_id" value="{{ product.id }}" id="product_{{ product.id }}" style="display: none;">
         </div>
@@ -311,9 +333,9 @@
     
     {% if selected_product %}
     <div class="mb-4 p-3" style="background: #f8fafc; border-radius: 12px;">
-      <div><strong>Product:</strong> {{ selected_product.name }}</div>
-      <div><strong>Price:</strong> MK {{ selected_product.selling_price|floatformat:0|intcomma }} per {{ selected_product.base_unit|default:"bag" }}</div>
-      <div><strong>Available Stock:</strong> {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</div>
+      <div><strong>Product:</strong> {{ selected_product.display_name }}</div>
+      <div><strong>Price:</strong> MK {{ selected_product.selling_price|floatformat:0|intcomma }} per {{ selected_product.unit_label|default:"bag" }}</div>
+      <div><strong>Available Stock:</strong> {{ selected_product.quantity_in_stock }} {{ selected_product.unit_label|default:"bags" }}</div>
     </div>
     {% endif %}
     
@@ -323,17 +345,51 @@
       
       <div class="mb-3">
         <label class="form-label">Quantity *</label>
-        <input type="number" class="form-control" name="quantity" required min="1" max="{{ selected_product.quantity_in_stock }}" value="1">
+        <input type="number" class="form-control" name="quantity" id="sell-quantity" required min="1" max="{{ selected_product.quantity_in_stock }}" value="1">
         <small class="text-muted">Max: {{ selected_product.quantity_in_stock }} {{ selected_product.base_unit|default:"bags" }}</small>
+      </div>
+      
+      <!-- Smart Sale Summary with Margin Feedback -->
+      <div id="sale-summary" class="mb-4 p-3" style="background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 12px; border: 1px solid #86efac;">
+        <h5 class="mb-3" style="font-weight: 700; color: #15803d;">📊 Sale Summary</h5>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Total Revenue:</span>
+          <strong id="total-revenue" class="text-success">MK {{ selected_product.selling_price|floatformat:0|intcomma }}</strong>
+        </div>
+        <div class="d-flex justify-content-between mb-2">
+          <span class="text-muted">Total Cost:</span>
+          <span id="total-cost">MK {{ selected_product.cost_price|floatformat:0|intcomma }}</span>
+        </div>
+        <div class="d-flex justify-content-between mb-2" style="border-top: 1px solid #86efac; padding-top: 8px;">
+          <span class="text-muted">Profit:</span>
+          <strong id="total-profit" class="text-success">MK {% widthratio selected_product.selling_price 1 1 as sp %}{% widthratio selected_product.cost_price 1 1 as cp %}—</strong>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="text-muted">Margin:</span>
+          <span id="margin-badge" class="badge bg-success">—</span>
+        </div>
       </div>
       
       <div class="mb-3">
         <label class="form-label">Payment Method *</label>
-        <select class="form-control" name="payment_method" required>
-          <option value="CASH">Cash</option>
-          <option value="MOBILE_MONEY">Mobile Money</option>
-          <option value="BANK">Bank Transfer</option>
-        </select>
+        <input type="hidden" name="payment_method" id="payment_method_value" value="CASH">
+        <div class="payment-grid" data-testid="payment-method-cards">
+          <div class="payment-card active" data-method="CASH" onclick="selectPaymentMethod(this)">
+            <div style="font-size:1.8rem;margin-bottom:6px">💵</div>
+            <div style="font-weight:700;color:#0f172a">Cash</div>
+            <small class="text-muted">Immediate payment</small>
+          </div>
+          <div class="payment-card" data-method="MOBILE_MONEY" onclick="selectPaymentMethod(this)">
+            <div style="font-size:1.8rem;margin-bottom:6px">📱</div>
+            <div style="font-weight:700;color:#0f172a">Mobile Money</div>
+            <small class="text-muted">Airtel/TNM</small>
+          </div>
+          <div class="payment-card" data-method="BANK" onclick="selectPaymentMethod(this)">
+            <div style="font-size:1.8rem;margin-bottom:6px">🏦</div>
+            <div style="font-weight:700;color:#0f172a">Bank Transfer</div>
+            <small class="text-muted">Electronic</small>
+          </div>
+        </div>
       </div>
       
       <div class="mb-3">
@@ -347,6 +403,55 @@
       </div>
     </form>
   </div>
+  
+  <!-- Sale Summary JS -->
+  <script>
+  (function() {
+    const quantityInput = document.getElementById('sell-quantity');
+    const unitPrice = {{ selected_product.selling_price|default:0 }};
+    const unitCost = {{ selected_product.cost_price|default:0 }};
+    
+    const revenueEl = document.getElementById('total-revenue');
+    const costEl = document.getElementById('total-cost');
+    const profitEl = document.getElementById('total-profit');
+    const marginBadge = document.getElementById('margin-badge');
+    
+    function updateSummary() {
+      const qty = parseInt(quantityInput.value) || 1;
+      const totalRevenue = qty * unitPrice;
+      const totalCost = qty * unitCost;
+      const profit = totalRevenue - totalCost;
+      const margin = totalRevenue > 0 ? ((profit / totalRevenue) * 100) : 0;
+      
+      revenueEl.textContent = 'MK ' + totalRevenue.toLocaleString('en', {maximumFractionDigits: 0});
+      costEl.textContent = 'MK ' + totalCost.toLocaleString('en', {maximumFractionDigits: 0});
+      profitEl.textContent = 'MK ' + profit.toLocaleString('en', {maximumFractionDigits: 0});
+      
+      if (profit < 0) {
+        profitEl.className = 'text-danger fw-bold';
+        marginBadge.className = 'badge bg-danger';
+        marginBadge.textContent = 'Loss';
+      } else if (margin < 10) {
+        profitEl.className = 'text-warning fw-bold';
+        marginBadge.className = 'badge bg-warning text-dark';
+        marginBadge.textContent = margin.toFixed(0) + '% Low';
+      } else if (margin < 25) {
+        profitEl.className = 'text-success fw-bold';
+        marginBadge.className = 'badge bg-success';
+        marginBadge.textContent = margin.toFixed(0) + '% Good';
+      } else {
+        profitEl.className = 'text-success fw-bold';
+        marginBadge.className = 'badge bg-primary';
+        marginBadge.textContent = margin.toFixed(0) + '% Great';
+      }
+    }
+    
+    if (quantityInput) {
+      quantityInput.addEventListener('input', updateSummary);
+      updateSummary(); // Initial calculation
+    }
+  })();
+  </script>
   {% endif %}
 </div>
 
@@ -368,5 +473,19 @@
     document.getElementById('product_' + productId).checked = true;
     document.getElementById('continue-btn').disabled = false;
   }
+
+  function selectPaymentMethod(card) {
+    document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    const method = card.dataset.method;
+    document.getElementById('payment_method_value').value = method;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const defaultPaymentCard = document.querySelector('.payment-card[data-method="CASH"]');
+    if (defaultPaymentCard) {
+      defaultPaymentCard.classList.add('active');
+    }
+  });
 </script>
 {% endblock %}

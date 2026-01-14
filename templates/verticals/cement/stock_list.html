@@ -4,6 +4,81 @@
 
 {% block title %}Stock List · Cement · {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  .warehouse-score-card {
+    background: linear-gradient(135deg, rgba(30, 64, 175, 0.06), rgba(16, 185, 129, 0.08));
+    border: 1px solid #e2e8f0;
+  }
+  .cement-card-actions .btn {
+    min-width: 120px;
+  }
+  .cement-card-meta {
+    font-size: 0.85rem;
+  }
+  
+  /* Premium KPI Strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .kpi-card {
+    background: linear-gradient(135deg, #ffffff, #f8fafc);
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .kpi-card .kpi-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .kpi-card .kpi-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .kpi-card .kpi-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .kpi-card.danger .kpi-value { color: #dc2626; }
+  .kpi-card.warning .kpi-value { color: #d97706; }
+  .kpi-card.success .kpi-value { color: #16a34a; }
+  .kpi-card.primary .kpi-value { color: #2563eb; }
+  
+  /* Reorder Queue */
+  .reorder-queue {
+    background: linear-gradient(135deg, #fef3c7, #fef9c3);
+    border: 1px solid #fbbf24;
+    border-radius: 14px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .reorder-queue h5 {
+    color: #92400e;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+  .reorder-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(251, 191, 36, 0.3);
+  }
+  .reorder-item:last-child { border-bottom: none; }
+  .reorder-item .item-name { font-weight: 600; color: #78350f; }
+  .reorder-item .item-status { font-size: 0.85rem; }
+  .reorder-item .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.85rem; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
   <div class="row mb-4">
@@ -18,42 +93,138 @@
     </div>
   </div>
 
+  <!-- Premium KPI Strip -->
+  <div class="kpi-strip" data-testid="kpi-strip">
+    <div class="kpi-card primary">
+      <div class="kpi-icon">📦</div>
+      <div class="kpi-value">{{ total_units|intcomma }}</div>
+      <div class="kpi-label">Total Units</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-value">MK {{ total_stock_value|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Stock Value</div>
+    </div>
+    <div class="kpi-card success">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-value">MK {{ total_potential_profit|floatformat:0|intcomma }}</div>
+      <div class="kpi-label">Potential Profit</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-value">{{ low_stock_count }}</div>
+      <div class="kpi-label">Low Stock</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kpi-icon">🚫</div>
+      <div class="kpi-value">{{ out_of_stock_count }}</div>
+      <div class="kpi-label">Out of Stock</div>
+    </div>
+  </div>
+
+  <!-- Warehouse Health Score -->
+  <div class="card warehouse-score-card mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div>
+          <h2 class="h5 mb-1">🏗️ Warehouse Health Score</h2>
+          <div class="text-muted">{{ warehouse_healthy_count }} of {{ warehouse_total_products }} SKUs in healthy stock</div>
+        </div>
+        <div class="text-md-end">
+          <div class="display-6 fw-bold {% if warehouse_score >= 80 %}text-success{% elif warehouse_score >= 50 %}text-warning{% else %}text-danger{% endif %}">{{ warehouse_score }}%</div>
+          <div class="text-muted">{% if warehouse_score >= 80 %}Excellent{% elif warehouse_score >= 50 %}Needs Attention{% else %}Critical{% endif %}</div>
+        </div>
+      </div>
+      <div class="progress mt-3" style="height:12px;">
+        <div class="progress-bar {% if warehouse_score >= 80 %}bg-success{% elif warehouse_score >= 50 %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ warehouse_score }}%;"
+             aria-valuenow="{{ warehouse_score }}" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reorder Queue -->
+  {% if reorder_queue %}
+  <div class="reorder-queue" data-testid="reorder-queue">
+    <h5>🔔 Reorder Queue</h5>
+    {% for item in reorder_queue %}
+    <div class="reorder-item">
+      <div>
+        <span class="item-name">{{ item.display_name }}</span>
+        <span class="item-status badge bg-{{ item.stock_badge_class }} ms-2">{{ item.stock_badge_label }}</span>
+      </div>
+      <a href="{% url 'cement:stock_in' %}" class="btn btn-warning btn-sm">Stock In →</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="card">
     <div class="card-body">
       {% if products %}
-      <div class="table-responsive">
-        <table class="table table-hover">
-          <thead>
-            <tr>
-              <th>Product Name</th>
-              <th>Category</th>
-              <th>Unit</th>
-              <th class="text-end">Cost Price</th>
-              <th class="text-end">Selling Price</th>
-              <th class="text-end">Stock</th>
-              <th class="text-end">Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for product in products %}
-            <tr>
-              <td><strong>{{ product.name }}</strong></td>
-              <td>{{ product.category|title }}</td>
-              <td>{{ product.base_unit|upper }}</td>
-              <td class="text-end">MK {{ product.cost_price|floatformat:2|intcomma }}</td>
-              <td class="text-end">MK {{ product.selling_price|floatformat:2|intcomma }}</td>
-              <td class="text-end">
-                {% if product.quantity_in_stock < 5 %}
-                <span class="badge bg-warning">{{ product.quantity_in_stock }}</span>
+      <div class="row g-3">
+        {% for product in products %}
+        <div class="col-12 col-md-6">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex align-items-start justify-content-between gap-3">
+                <div>
+                  <div class="fw-semibold">{{ product.display_name }}</div>
+                  <div class="text-muted small">{{ product.unit_label }}</div>
+                </div>
+                <span class="badge bg-{{ product.stock_badge_class }}">{{ product.stock_badge_label }}</span>
+              </div>
+
+              <div class="mt-3 d-flex align-items-end justify-content-between">
+                <div>
+                  <div class="text-muted small">Stock</div>
+                  <div class="fs-3 fw-bold">{{ product.quantity_in_stock }}</div>
+                </div>
+                <div class="text-end">
+                  <div class="text-muted small">Selling Price</div>
+                  <div class="fw-semibold">
+                    {% if product.selling_price != None %}
+                      MK {{ product.selling_price|floatformat:0|intcomma }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <div class="cement-card-meta text-muted mt-2">
+                Cost:
+                {% if product.cost_price != None %}
+                  MK {{ product.cost_price|floatformat:0|intcomma }}
                 {% else %}
-                {{ product.quantity_in_stock }}
+                  —
                 {% endif %}
-              </td>
-              <td class="text-end">MK {{ product.quantity_in_stock|mul:product.cost_price|floatformat:2|intcomma }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                · Value:
+                {% if product.stock_value != None %}
+                  MK {{ product.stock_value|floatformat:0|intcomma }}
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+
+              {% if product.stock_badge_label == "Out of stock" or product.stock_badge_label == "Low stock" %}
+              <div class="small text-warning mt-2">Reorder soon to keep customers moving.</div>
+              {% endif %}
+
+              {% if product.potential_profit != None %}
+              <div class="small text-success mt-1">
+                Potential profit: MK {{ product.potential_profit|floatformat:0|intcomma }}
+              </div>
+              {% endif %}
+
+              <div class="cement-card-actions mt-3 d-flex gap-2">
+                <a href="{% url 'cement:stock_in' %}" class="btn btn-outline-primary w-50">Stock In</a>
+                <a href="{% url 'cement:sell' %}?prefill_product={{ product.id }}&prefill_brand={{ product.brand_key }}"
+                   class="btn btn-primary w-50">Sell</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
       {% else %}
       <div class="text-center py-5">
