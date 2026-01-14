@@ -48,7 +48,7 @@
 {# Determine the vertical for conditional rendering #}
 {% with business_kind=request.business.business_kind|default:"phones" %}
 
-<aside class="cc-sidebar" role="navigation" aria-label="Main" data-cy="sidebar">
+<aside class="cc-sidebar" role="navigation" aria-label="Main">
   <div class="brand">
     <span class="logo">CC</span>
     <span>{{ APP_NAME|default:"Emajinet" }}</span>
@@ -67,8 +67,7 @@
   <ul class="navlist">
     <li>
       <a class="navlink{% if request.path == url_home %} active{% endif %}" 
-         href="{{ url_home|default:'/inventory/dashboard/' }}"
-         data-cy="nav-dashboard">
+         href="{{ url_home|default:'/inventory/dashboard/' }}">
         <i class="bi bi-speedometer2"></i> Dashboard
       </a>
     </li>
@@ -78,10 +77,10 @@
   {% if business_kind == "phones" %}
   <div class="menu-group">PHONES &amp; ELECTRONICS</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-phone"></i> Stock</a></li>
-    <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}" data-cy="nav-scan-in"><i class="bi bi-upc-scan"></i> Scan IN</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> Sell</a></li>
-    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-phone"></i> Stock</a></li>
+    <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}"><i class="bi bi-upc-scan"></i> Scan IN</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> Sell</a></li>
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
 
   {# Layby - phones often use layby #}
@@ -100,10 +99,10 @@
   {% if business_kind == "liquor" %}
   <div class="menu-group">LIQUOR &amp; BAR</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_liquor_dash|default:'/inventory/verticals/liquor/' }}" data-cy="nav-dashboard"><i class="bi bi-cup-straw"></i> Bar Dashboard</a></li>
-    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-box-seam"></i> Inventory</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
-    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    <li><a class="navlink" href="{{ url_liquor_dash|default:'/inventory/verticals/liquor/' }}"><i class="bi bi-cup-straw"></i> Bar Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
   {% endif %}
 
@@ -113,11 +112,11 @@
   <ul class="navlist">
     {% url 'verticals:pharmacy_hub' as url_pharmacy_hub %}
     {% url 'verticals:pharmacy_dashboard' as url_pharmacy_dashboard %}
-    <li><a class="navlink" href="{{ url_pharmacy_hub|default:'/verticals/pharmacy/hub/' }}" data-cy="nav-pharmacy-hub"><i class="bi bi-grid-3x3-gap"></i> Pharmacy & Cosmetics Hub</a></li>
-    <li><a class="navlink" href="{{ url_pharmacy_dashboard|default:'/verticals/pharmacy/dashboard/' }}" data-cy="nav-dashboard"><i class="bi bi-graph-up"></i> Dashboard</a></li>
-    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-box-seam"></i> Inventory</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> Dispense</a></li>
-    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    <li><a class="navlink" href="{{ url_pharmacy_hub|default:'/verticals/pharmacy/hub/' }}"><i class="bi bi-grid-3x3-gap"></i> Pharmacy & Cosmetics Hub</a></li>
+    <li><a class="navlink" href="{{ url_pharmacy_dashboard|default:'/verticals/pharmacy/dashboard/' }}"><i class="bi bi-graph-up"></i> Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> Dispense</a></li>
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
   {% endif %}
 
@@ -125,10 +124,10 @@
   {% if business_kind == "grocery" %}
   <div class="menu-group">GROCERY &amp; RETAIL</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-box-seam"></i> Inventory</a></li>
-    <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}" data-cy="nav-scan-in"><i class="bi bi-upc-scan"></i> Receive Stock</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
-    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
+    <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}"><i class="bi bi-upc-scan"></i> Receive Stock</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
   {% endif %}
 
@@ -136,10 +135,10 @@
   {% if business_kind == "clothing" %}
   <div class="menu-group">CLOTHING &amp; APPAREL</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_clothing_dash|default:'/inventory/verticals/clothing/' }}" data-cy="nav-dashboard"><i class="bi bi-bag"></i> Clothing Dashboard</a></li>
-    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-box-seam"></i> Inventory</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
-    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
+    <li><a class="navlink" href="{{ url_clothing_dash|default:'/inventory/verticals/clothing/' }}"><i class="bi bi-bag"></i> Clothing Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}"><i class="bi bi-box-seam"></i> Inventory</a></li>
+    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}"><i class="bi bi-cart-check"></i> POS / Sell</a></li>
+    {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
   {% endif %}
 
@@ -147,43 +146,10 @@
   {% if business_kind == "gym" %}
   <div class="menu-group">GYM &amp; FITNESS</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_gym_dash|default:'/inventory/verticals/gym/' }}" data-cy="nav-dashboard"><i class="bi bi-heart-pulse"></i> Gym Dashboard</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-members"><i class="bi bi-people"></i> Members</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-attendance"><i class="bi bi-calendar-check"></i> Attendance</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-memberships"><i class="bi bi-credit-card"></i> Memberships</a></li>
-  </ul>
-  {% endif %}
-
-  {# ================= FARM MANAGER ================= #}
-  {% if business_kind == "farm" %}
-  <div class="menu-group">FARM MANAGER</div>
-  <ul class="navlist">
-    <li><a class="navlink" href="{% url 'verticals:farm_dashboard' %}" data-cy="nav-dashboard"><i class="bi bi-house-door"></i> Dashboard</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_ledger_list' %}" data-cy="nav-farm-ledger"><i class="bi bi-journal-text"></i> Ledger</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_add_expense' %}" data-cy="nav-farm-add-expense"><i class="bi bi-dash-circle"></i> Add Expense</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_add_sale' %}" data-cy="nav-farm-add-sale"><i class="bi bi-plus-circle"></i> Add Sale</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_livestock_list' %}" data-cy="nav-farm-livestock"><i class="bi bi-piggy-bank"></i> Livestock</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_crops_list' %}" data-cy="nav-farm-crops"><i class="bi bi-flower1"></i> Crops</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_reports' %}" data-cy="nav-farm-reports"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
-  </ul>
-  <div class="menu-group">SUBSCRIPTION</div>
-  <ul class="navlist">
-    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-farm-billing"><i class="bi bi-credit-card-2-front"></i> Choose Plan</a></li>
-    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-farm-settings"><i class="bi bi-gear"></i> Business Settings</a></li>
-  </ul>
-  {% endif %}
-
-  {# ================= WELDING WORKSHOP ================= #}
-  {% if business_kind == "welding" %}
-  <div class="menu-group">WELDING WORKSHOP</div>
-  <ul class="navlist">
-    <li><a class="navlink" href="/verticals/welding/dashboard/" data-cy="nav-dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-    <li><a class="navlink" href="/verticals/welding/quotes/" data-cy="nav-welding-quotes"><i class="bi bi-file-earmark-text"></i> Quotes</a></li>
-    <li><a class="navlink" href="/verticals/welding/jobs/" data-cy="nav-welding-jobs"><i class="bi bi-clipboard-check"></i> Jobs</a></li>
-    <li><a class="navlink" href="/verticals/welding/materials/" data-cy="nav-welding-materials"><i class="bi bi-gear"></i> Materials</a></li>
-    <li><a class="navlink" href="/verticals/welding/stock-in/" data-cy="nav-welding-stock-in"><i class="bi bi-box-arrow-in-down"></i> Stock In</a></li>
-    <li><a class="navlink" href="/verticals/welding/invoices/" data-cy="nav-welding-invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
-    <li><a class="navlink" href="/verticals/welding/reports/" data-cy="nav-welding-reports"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
+    <li><a class="navlink" href="{{ url_gym_dash|default:'/inventory/verticals/gym/' }}"><i class="bi bi-heart-pulse"></i> Gym Dashboard</a></li>
+    <li><a class="navlink" href="#"><i class="bi bi-people"></i> Members</a></li>
+    <li><a class="navlink" href="#"><i class="bi bi-calendar-check"></i> Attendance</a></li>
+    <li><a class="navlink" href="#"><i class="bi bi-credit-card"></i> Memberships</a></li>
   </ul>
   {% endif %}
 
@@ -191,7 +157,7 @@
   <div class="menu-group">FINANCE</div>
   <ul class="navlist">
     <li>
-      <a class="navlink" href="{% url 'reports:home' %}" data-cy="nav-reports">
+      <a class="navlink" href="{% url 'reports:home' %}">
         <i class="bi bi-graph-up-arrow"></i> Reports
       </a>
     </li>
@@ -202,10 +168,10 @@
   <div class="menu-group">TEAM</div>
   <ul class="navlist">
     {% if url_team_agents %}
-    <li><a class="navlink" href="{{ url_team_agents }}" data-cy="nav-team-agents"><i class="bi bi-person-badge"></i> {% if business_kind == "gym" %}Trainers{% else %}Agents{% endif %}</a></li>
+    <li><a class="navlink" href="{{ url_team_agents }}"><i class="bi bi-person-badge"></i> {% if business_kind == "gym" %}Trainers{% else %}Agents{% endif %}</a></li>
     {% endif %}
     {% if url_team_locations %}
-    <li><a class="navlink" href="{{ url_team_locations }}" data-cy="nav-team-locations"><i class="bi bi-geo-alt"></i> Locations</a></li>
+    <li><a class="navlink" href="{{ url_team_locations }}"><i class="bi bi-geo-alt"></i> Locations</a></li>
     {% endif %}
   </ul>
   {% endif %}
@@ -218,13 +184,13 @@
   <div class="menu-group">ADMIN</div>
   <ul class="navlist">
     <li>
-      <a class="navlink" href="{{ url_settings_inv|default:url_settings_root|default:'/settings/' }}" data-cy="nav-settings">
+      <a class="navlink" href="{{ url_settings_inv|default:url_settings_root|default:'/settings/' }}">
         <i class="bi bi-sliders"></i> Settings
       </a>
     </li>
     {% if request.user.is_superuser %}
     <li>
-      <a class="navlink" href="{{ url_django_admin|default:'/admin/' }}" data-cy="nav-admin">
+      <a class="navlink" href="{{ url_django_admin|default:'/admin/' }}">
         <i class="bi bi-shield-lock"></i> Django Admin
       </a>
     </li>

@@ -170,7 +170,27 @@
             <small class="text-muted d-block mt-1">Bottles on hand</small>
           </div>
 
-          <!-- NOTE: Barcode workflow removed - liquor products do not require barcodes -->
+          <!-- Barcode Workflow -->
+          <div class="col-12" style="margin-top:20px;">
+            <label class="form-label fw-semibold" style="display:block;margin-bottom:8px;">Has Barcode?</label>
+            <div style="display:flex;gap:16px;margin-bottom:8px;">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
+                <span>No</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
+                <span>Yes</span>
+              </label>
+            </div>
+            <small class="text-muted d-block">If your product has a printed barcode, choose Yes and scan/type it. If not, choose No.</small>
+          </div>
+
+          <div class="col-12" id="barcode-field" style="display:none;">
+            <label class="form-label fw-semibold">Barcode <span class="text-danger">*</span></label>
+            <input type="text" name="barcode" id="barcode-input" class="form-control" placeholder="Scan or type barcode" maxlength="100">
+            <small class="text-muted d-block mt-1">Required when Has Barcode = Yes</small>
+          </div>
 
           <!-- Shot Sales Section (for Spirits/Whiskey) -->
           <div class="col-12">
@@ -472,29 +492,6 @@ function toggleGlassFields() {
   }
 }
 
-// Category-based auto-selection: auto-check has_glasses for wine, has_shots for spirits/whiskey
-function handleCategoryChange() {
-  const categorySelect = document.getElementById('id_category');
-  const hasShotsCheckbox = document.getElementById('id_has_shots');
-  const hasGlassesCheckbox = document.getElementById('id_has_glasses');
-  
-  if (!categorySelect) return;
-  
-  const category = categorySelect.value.toLowerCase();
-  
-  // Auto-check has_shots for spirits and whiskey
-  if (hasShotsCheckbox && (category === 'spirits' || category === 'whiskey')) {
-    hasShotsCheckbox.checked = true;
-    toggleShotFields();
-  }
-  
-  // Auto-check has_glasses for wine
-  if (hasGlassesCheckbox && category === 'wine') {
-    hasGlassesCheckbox.checked = true;
-    toggleGlassFields();
-  }
-}
-
 // Initialize all workflows on page load and bfcache restore
 document.addEventListener('DOMContentLoaded', function() {
   // Barcode workflow
@@ -516,14 +513,6 @@ document.addEventListener('DOMContentLoaded', function() {
   if (hasGlassesCheckbox) {
     hasGlassesCheckbox.addEventListener('change', toggleGlassFields);
     toggleGlassFields();
-  }
-  
-  // Category auto-selection workflow
-  const categorySelect = document.getElementById('id_category');
-  if (categorySelect) {
-    categorySelect.addEventListener('change', handleCategoryChange);
-    // Run once on page load in case category is pre-selected
-    handleCategoryChange();
   }
 });
 

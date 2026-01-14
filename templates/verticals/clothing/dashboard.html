@@ -229,10 +229,10 @@
     </article>
   </section>
 
-  {% comment %}Recent Sales Chart Section{% endcomment %}
+  {% comment %}Recent Sales Section with Rotating Revenue/Profit Graph{% endcomment %}
   <section class="recent-block">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0;font-size:1.1rem">📊 Sales Trend - <span id="chartModeLabel">Revenue</span></h2>
+      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales - <span id="chartModeLabel">Revenue</span></h2>
       <a class="btn btn-sm btn-primary" href="{% url 'verticals:clothing_sales_history' %}" style="border-radius:20px;padding:6px 14px;font-weight:600">View All →</a>
     </div>
     {% if sales_by_day %}
@@ -371,44 +371,7 @@
       })();
       </script>
     {% else %}
-      <p style="margin:0;color:#64748b;text-align:center;padding:40px 20px">No sales data available for the selected period.</p>
-    {% endif %}
-  </section>
-
-  {% comment %}Recent Sales Transactions List{% endcomment %}
-  <section class="recent-block">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <h2 style="margin:0;font-size:1.1rem">💰 Recent Sales</h2>
-    </div>
-    {% if recent_sales %}
-      <ul class="recent-list">
-        {% for sale in recent_sales %}
-          <li class="recent-item">
-            <div>
-              <strong>{{ sale.product.name }}</strong>
-              <small style="color:#64748b;display:block;margin-top:4px">
-                {{ sale.sold_at|date:"M d, Y H:i" }} · 
-                Qty: {{ sale.quantity }} · 
-                {{ sale.get_payment_method_display|default:sale.payment_method }} · 
-                {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}
-              </small>
-            </div>
-            <div style="text-align:right">
-              <strong style="color:#10b981;font-size:1.1rem">K {{ sale.total_price|floatformat:0 }}</strong>
-              {% if sale.profit %}
-              <small style="display:block;margin-top:2px;color:#059669;font-weight:600">
-                +K {{ sale.profit|floatformat:0 }} profit
-              </small>
-              {% endif %}
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p style="margin:0;color:#64748b;text-align:center;padding:40px 20px">
-        No recent sales yet. 
-        <a href="{% url 'verticals:clothing_sell' %}" style="color:#10b981;font-weight:600">Make your first sale</a>
-      </p>
+      <p style="margin:0;color:#64748b;text-align:center;padding:40px 20px">No recent sales to display.</p>
     {% endif %}
   </section>
 

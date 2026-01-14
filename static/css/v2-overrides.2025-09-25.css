@@ -70,7 +70,22 @@ html, body {
   --nav-drawer-w: clamp(260px, 30vw, 420px);
 }
 
-/* PHASE 1: Dark mode removed - light theme only for consistency */
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --cc-bg: #0f1115;
+    --cc-card: #141924;
+    --cc-text: #e5e7eb;
+    --cc-heading: #f8fafc;
+    --cc-border: #223049;
+    --cc-row-hover: #182131;
+    --cc-shadow-sm: 0 6px 16px rgb(0 0 0 / 40%);
+    --cc-shadow-md: 0 18px 44px rgb(0 0 0 / 55%);
+    --cc-badge-ink: #e5edff;
+    --cc-badge-bg: #10203b;
+    --cc-badge-br: #1e3356;
+  }
+}
 body.dark {
   --cc-bg: #0f1115;
   --cc-card: #141924;
@@ -722,13 +737,11 @@ button[data-action="scan-web"],
 button[data-action="feedback"],
 button[data-action="place-order"] { display:none !important; }
 
-/* REMOVED: tenant-pill hiding was causing layout issues
 a[href*="/tenants/choose_business"],
 a[href*="/tenants/switch"],
 a[href*="/locations/choose"],
 a[href*="/locations/switch"],
-.tenant-chip,.business-chip,.location-chip { display:none !important; }
-*/
+.tenant-pill,.tenant-chip,.business-chip,.location-chip { display:none !important; }
 
 /* Keep hamburger/mobile toggles visible on phones (already reinforced above) */
 
@@ -811,7 +824,7 @@ a[href*="/locations/switch"],
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-
+  
   /* Ensure proper spacing on mobile */
   .gym-table-responsive table {
     min-width: 800px; /* Force horizontal scroll on narrow screens */

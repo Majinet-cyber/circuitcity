@@ -228,54 +228,10 @@
     </div>
   </div>
   
-  <!-- Action Choice (for phone sales) -->
-  {% if can_rollback and is_phone_sale and not action %}
-  <div class="card">
-    <h2 style="margin:0 0 20px;font-size:20px;">What do you want to do?</h2>
-    
-    <div style="display:flex;gap:16px;flex-direction:column">
-      <a href="{% url 'sales:rollback_confirm' sale.id %}?action=rollback" 
-         class="action-card" 
-         style="text-decoration:none;display:block;padding:20px;border:2px solid #ef4444;border-radius:12px;background:#fef2f2;transition:all .2s">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="font-size:32px">✅</div>
-          <div style="flex:1">
-            <h3 style="margin:0 0 4px;font-size:18px;color:#991b1b">Rollback Sale</h3>
-            <p style="margin:0;color:#64748b;font-size:14px">Undo the sale and restore stock</p>
-          </div>
-          <div style="font-size:24px;color:#ef4444">→</div>
-        </div>
-      </a>
-      
-      {% if can_edit %}
-      <a href="{% url 'sales:rollback_confirm' sale.id %}?action=edit" 
-         class="action-card" 
-         style="text-decoration:none;display:block;padding:20px;border:2px solid #3b82f6;border-radius:12px;background:#eff6ff;transition:all .2s">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="font-size:32px">✏️</div>
-          <div style="flex:1">
-            <h3 style="margin:0 0 4px;font-size:18px;color:#1e40af">Correct Sale Details</h3>
-            <p style="margin:0;color:#64748b;font-size:14px">Update price and IMEI without undoing the sale</p>
-          </div>
-          <div style="font-size:24px;color:#3b82f6">→</div>
-        </div>
-      </a>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
-  
   <!-- Rollback Form -->
-  {% if can_rollback and action == "rollback" %}
+  {% if can_rollback %}
   <form method="post" class="card">
     {% csrf_token %}
-    <input type="hidden" name="action" value="rollback">
-    
-    <div style="margin-bottom:16px">
-      <a href="{% url 'sales:rollback_confirm' sale.id %}" style="color:#3b82f6;text-decoration:none;font-size:14px">
-        ← Back to action choice
-      </a>
-    </div>
     
     <h2 style="margin:0 0 20px;font-size:20px;">🔄 Rollback Details</h2>
     
@@ -360,11 +316,6 @@
       </button>
     </div>
   </form>
-  {% elif can_edit and action == "edit" %}
-  <!-- Redirect to edit page -->
-  <script>
-    window.location.href = "{% url 'sales:edit_phone_sale' sale.id %}";
-  </script>
   {% else %}
   <div class="actions">
     <a href="{% url 'sales:rollback_home' %}" class="btn btn-secondary" style="width:100%">

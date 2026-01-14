@@ -37,21 +37,20 @@
       font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;
     }
     
-    /* Layout: Mobile-first (flex column), Desktop (flex with sidebar) */
+    /* Layout: Mobile-first (flex column), Desktop (grid with sidebar) */
     .layout{display:flex;flex-direction:column;min-height:100%}
     @media (min-width:992px){
-      .layout{display:flex;flex-direction:row}
+      .layout{display:grid;grid-template-columns:250px 1fr}
     }
 
     /* Sidebar: Mobile styles handled by hq-mobile-responsive.css */
     .sidebar{
       background:#0b0f14;color:#cfe0ff;border-right:1px solid rgba(255,255,255,.06);
       padding:14px 10px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
-      flex: 0 0 260px;
     }
     /* Desktop: sticky sidebar */
     @media (min-width:992px){
-      .sidebar{position:sticky;top:0;height:100dvh;width:260px;min-width:260px}
+      .sidebar{position:sticky;top:0;height:100dvh}
     }
     .brand{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);
       box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);font-weight:700}
@@ -78,14 +77,13 @@
     .admin-link a:hover{color:#fff;text-decoration:underline}
 
     /* Content */
-    .content{padding:18px 14px 28px;flex:1;min-width:0;max-width:none !important;width:100% !important}
-    .shell{max-width:none !important;width:100% !important;padding:0}
+    .content{padding:18px 14px 28px}
+    .shell{max-width:1240px;margin:0 auto}
     .header{
       position:relative; z-index:var(--z-header); isolation:isolate;
-      display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:10px
+      display:grid;grid-template-columns:1fr;gap:10px;align-items:center;margin-bottom:10px
     }
-    @media(min-width:768px){.header{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px}}
-    @media(min-width:992px){.header{flex-wrap:nowrap}}
+    @media(min-width:980px){.header{grid-template-columns:auto 1fr auto}}
     h1{margin:0;font-size:24px;letter-spacing:.2px;display:flex;align-items:center;gap:10px}
 
     /* Online status */
@@ -95,13 +93,12 @@
     .s-off{background:#f43f5e;box-shadow:0 0 0 3px rgba(244,63,94,.15)}
 
     /* Search + suggestions */
-    .search-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+    .search-wrap{display:flex;align-items:center;gap:8px}
     .search{
       width:100%;max-width:640px;display:flex;align-items:center;gap:10px;
       padding:10px 12px;border-radius:999px;background:var(--glass);
       border:1px solid transparent;background-clip:padding-box;box-shadow:var(--shadow-1);backdrop-filter:blur(10px);position:relative;
       z-index:var(--z-pop);
-      flex:1 1 auto;
     }
     .search:before{
       content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--border-grad);
@@ -125,7 +122,7 @@
     .s-pill{font-size:11px;font-weight:800;border:1px solid var(--ring);padding:.15rem .5rem;border-radius:999px;background:#eef4ff;color:#2757d8}
 
     /* Top filter pills */
-    .filters-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 12px;justify-content:flex-end}
+    .filters-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 12px}
     .pill{
       display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:var(--glass);
       border:1px solid var(--ring);font-weight:700;cursor:pointer;user-select:none
@@ -145,7 +142,7 @@
     .date-card .apply{margin-left:8px}
 
     /* Right side header */
-    .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
+    .right{display:flex;align-items:center;gap:10px}
     .chip{padding:.25rem .6rem;border-radius:999px;background:var(--chip);border:1px solid var(--ring);color:#1e3a8a;font-weight:700;font-size:12px}
     .bell{position:relative;width:42px;height:42px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);
       border:1px solid transparent;box-shadow:var(--shadow-1);display:grid;place-items:center;cursor:pointer;user-select:none; z-index:var(--z-pop);}
@@ -175,9 +172,7 @@
 
     /* Cards */
     .cards{display:grid;gap:14px;grid-template-columns:1fr}
-    @media (min-width:576px){.cards{grid-template-columns:repeat(2,1fr)}}
-    @media (min-width:992px){.cards{grid-template-columns:repeat(3,1fr)}}
-    @media (min-width:1200px){.cards{grid-template-columns:repeat(4,1fr)}}
+    @media (min-width:1080px){.cards{grid-template-columns:repeat(4,1fr)}}
     .card{
       position:relative;background:var(--glass);backdrop-filter:blur(10px);border-radius:18px;
       padding:16px 16px 18px;box-shadow:var(--shadow-1);transition:transform .25s ease, box-shadow .25s ease
@@ -281,7 +276,7 @@
       </nav>
     </aside>
 
-    <div class="hq-main" style="flex: 1; min-width: 0;">
+    <div class="hq-main" style="flex: 1;">
       <!-- Mobile Topbar -->
       <header class="hq-topbar">
         <button id="hqSidebarToggle" class="hq-icon-btn" aria-controls="hqSidebar" aria-expanded="false" aria-label="Toggle navigation">☰</button>
@@ -290,7 +285,7 @@
       </header>
 
       <main class="content">
-      <div class="shell container-fluid px-2 px-md-4" style="max-width: none; width: 100%;">
+      <div class="shell">
         <!-- Header -->
         <div class="header reveal">
           <h1>
@@ -299,17 +294,17 @@
           </h1>
 
           <!-- Search -->
-          <div class="search-wrap" style="flex: 1 1 auto; min-width: 0;">
+          <div class="search-wrap">
             <form id="searchForm" class="search" role="search" aria-label="Global Search"
                   action="{{ businesses_url|default:'/hq/businesses/' }}" method="GET" autocomplete="off">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15.5 15.5L21 21" stroke="#5a78b0" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="6.5" stroke="#5a78b0" stroke-width="2"/></svg>
-              <input id="q" name="q" type="search" placeholder="Search businesses, invoices, agents, subscriptions…" autocomplete="off" style="flex:1;min-width:200px;max-width:100%"/>
+              <input id="q" name="q" type="search" placeholder="Search businesses, invoices, agents, subscriptions…" autocomplete="off"/>
               <button class="go" id="go" type="submit">Go</button>
               <div class="suggest" id="sugg" aria-live="polite"></div>
             </form>
           </div>
 
-          <div class="right" style="flex-shrink: 0;">
+          <div class="right">
             <!-- Time Filters -->
             <div class="filters-top">
               <div class="pill active" data-range="all" id="flt-all" tabindex="0">All time</div>
@@ -893,8 +888,7 @@
 
       async function poll(){
         try{
-          const url = (window.HQ_NOTIFICATIONS_URL || '/hq/api/notifications/') + '?since=' + encodeURIComponent(window.__since||'');
-          const r = await fetch(url, {headers:{'Accept':'application/json'}});
+          const r = await fetch('/hq/api/notifications?since=' + encodeURIComponent(window.__since||''), {headers:{'Accept':'application/json'}});
           if(r.ok){ (await r.json()).forEach(addNotif); window.__since = new Date().toISOString(); }
         }catch(_){ }
       }

@@ -1,6 +1,5 @@
 {% extends "hq/base_hq.html" %}
 {% load static %}
-{% load hq_extras %}
 
 {% block title %}Business Directory - HQ Admin{% endblock %}
 
@@ -251,13 +250,13 @@
 
 {% block content %}
 <div class="directory-header">
-    <div>
+    <div class="container">
         <h1 class="h3 fw-bold mb-1">🏢 Business Directory</h1>
         <p class="mb-0 opacity-90" style="font-size: 14px;">Global business monitoring and management console</p>
     </div>
 </div>
 
-<div>
+<div class="container">
     <!-- KPIs -->
     <div class="kpi-grid">
         <div class="kpi-card">
@@ -408,7 +407,7 @@
             <ul class="pagination">
                 {% if page_obj.has_previous %}
                 <li class="page-item">
-                    <a class="page-link" href="?{% querystring request page=page_obj.previous_page_number %}">Previous</a>
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Previous</a>
                 </li>
                 {% endif %}
                 
@@ -416,13 +415,13 @@
                 {% if page_obj.number == num %}
                 <li class="page-item active"><span class="page-link">{{ num }}</span></li>
                 {% else %}
-                <li class="page-item"><a class="page-link" href="?{% querystring request page=num %}">{{ num }}</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}">{{ num }}</a></li>
                 {% endif %}
                 {% endfor %}
                 
                 {% if page_obj.has_next %}
                 <li class="page-item">
-                    <a class="page-link" href="?{% querystring request page=page_obj.next_page_number %}">Next</a>
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}">Next</a>
                 </li>
                 {% endif %}
             </ul>

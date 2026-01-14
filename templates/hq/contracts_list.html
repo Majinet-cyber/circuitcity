@@ -1,11 +1,10 @@
 {% extends "hq/base_hq.html" %}
 {% load static %}
-{% load hq_extras %}
 
 {% block title %}Merchant Contracts - HQ{% endblock %}
 
 {% block content %}
-<div class="px-3 px-md-4 py-4">
+<div class="container-fluid px-3 px-md-4 py-4">
   <!-- Header -->
   <div class="row mb-4">
     <div class="col-12">
@@ -165,7 +164,7 @@
           <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link" href="?{% querystring request page=page_obj.previous_page_number %}">
+              <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&q={{ search_query }}">
                 <i class="bi bi-chevron-left"></i> Previous
               </a>
             </li>
@@ -179,7 +178,7 @@
             
             {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link" href="?{% querystring request page=page_obj.next_page_number %}">
+              <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&q={{ search_query }}">
                 Next <i class="bi bi-chevron-right"></i>
               </a>
             </li>

@@ -357,14 +357,14 @@
   (function rotatingInsights() {
     const canvas = d.getElementById('rotating-insights-chart');
     if (!canvas || typeof Chart === 'undefined') return;
-
+    
     const data = window.EmajinetDashboardData;
     if (!data) return;
-
+    
     const titleEl = d.getElementById('rotating-insights-title');
     const subtitleEl = d.getElementById('rotating-insights-subtitle');
     const indicatorEl = d.getElementById('rotating-insights-indicator');
-
+    
     // Define states for rotation
     const states = [
       {
@@ -396,7 +396,7 @@
         colors: ['#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
       }
     ];
-
+    
     // Filter out states with no data
     const activeStates = states.filter(s => s.data.length > 0);
     if (activeStates.length === 0) {
@@ -404,9 +404,9 @@
       if (subtitleEl) subtitleEl.textContent = 'Start making sales to see insights';
       return;
     }
-
+    
     let currentIndex = 0;
-
+    
     // Initialize chart with premium AI-generated styling
     const ctx = canvas.getContext('2d');
     const chart = new Chart(ctx, {
@@ -443,12 +443,12 @@
             backgroundColor: 'rgba(15, 23, 42, 0.95)',
             padding: 16,
             borderRadius: 12,
-            titleFont: {
-              size: 15,
+            titleFont: { 
+              size: 15, 
               weight: '700',
               family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             },
-            bodyFont: {
+            bodyFont: { 
               size: 14,
               family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
             },
@@ -534,15 +534,15 @@
         }
       }
     });
-
+    
     // Update chart with current state
     function updateChart() {
       const state = activeStates[currentIndex];
-
+      
       // Update title and subtitle
       if (titleEl) titleEl.textContent = state.title;
       if (subtitleEl) subtitleEl.textContent = state.subtitle;
-
+      
       // Update indicator dots
       if (indicatorEl) {
         const dots = indicatorEl.querySelectorAll('.rotating-insights-dot');
@@ -550,17 +550,17 @@
           dot.classList.toggle('active', i === currentIndex);
         });
       }
-
+      
       // Update chart data
       chart.data.labels = state.data.map(item => item.label);
       chart.data.datasets[0].data = state.data.map(item => item.value);
       chart.data.datasets[0].backgroundColor = state.colors.slice(0, state.data.length);
       chart.update();
     }
-
+    
     // Initial render
     updateChart();
-
+    
     // Rotate every 5 seconds
     setInterval(() => {
       currentIndex = (currentIndex + 1) % activeStates.length;
@@ -573,12 +573,6 @@
   ========================== */
   (function sw() {
     if ('serviceWorker' in navigator) {
-      // CRITICAL: Disable service worker on localhost to prevent cache poisoning
-      var hostname = window.location.hostname;
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        console.log('[DEV] Service worker disabled on localhost to prevent cache issues');
-        return;
-      }
       navigator.serviceWorker.register('/static/sw.js').catch(() => { /* no-op */ });
     }
   })();

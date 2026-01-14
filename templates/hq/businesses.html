@@ -1,6 +1,5 @@
 {% extends "hq/base_hq.html" %}
 {% load humanize %}
-{% load hq_extras %}
 {% block title %}Businesses · HQ{% endblock %}
 
 {% block content %}
@@ -82,7 +81,7 @@
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
   <nav class="pager">
     {% if page_obj.has_previous %}
-      <a href="?{% querystring request page=page_obj.previous_page_number %}">«</a>
+      <a href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">«</a>
     {% else %}
       <span>«</span>
     {% endif %}
@@ -91,12 +90,12 @@
       {% if page_obj.number == i %}
         <span class="cur">{{ i }}</span>
       {% else %}
-        <a href="?{% querystring request page=i %}">{{ i }}</a>
+        <a href="?page={{ i }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">{{ i }}</a>
       {% endif %}
     {% endfor %}
 
     {% if page_obj.has_next %}
-      <a href="?{% querystring request page=page_obj.next_page_number %}">»</a>
+      <a href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&range={{ range|urlencode }}&start={{ start|date:'Y-m-d' }}&end={{ end|date:'Y-m-d' }}">»</a>
     {% else %}
       <span>»</span>
     {% endif %}

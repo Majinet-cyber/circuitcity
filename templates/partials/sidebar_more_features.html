@@ -32,7 +32,7 @@
   {# My Wallet - Always show for authenticated users #}
   {% if request.user.is_authenticated %}
   <li>
-    <a class="navlink submenu-item" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}" data-cy="nav-wallet">
+    <a class="navlink submenu-item" href="{{ url_wallet_agent|default:url_wallet_root|default:'/wallet/' }}">
       <i class="bi bi-wallet2"></i> My Wallet
     </a>
   </li>
@@ -41,13 +41,8 @@
   {# Admin Wallet - Staff/Managers only #}
   {% if request.user.is_staff or request.user|is_manager %}
   <li>
-    <a class="navlink submenu-item" href="{{ url_wallet_admin|default:'/wallet/admin/' }}" data-cy="nav-admin-wallet">
+    <a class="navlink submenu-item" href="{{ url_wallet_admin|default:'/wallet/admin/' }}">
       <i class="bi bi-wallet"></i> Admin Wallet
-    </a>
-  </li>
-  <li>
-    <a class="navlink submenu-item" href="{% url 'wallet:admin_cost_list' %}" data-cy="nav-costs">
-      <i class="bi bi-cash-stack"></i> Costs
     </a>
   </li>
   {% endif %}
@@ -55,7 +50,7 @@
   {# Data Backup - Managers only #}
   {% if request.user.is_staff or request.user|is_manager %}
   <li>
-    <a class="navlink submenu-item" href="{{ url_backups|default:'/backups/manager/' }}" data-cy="nav-backups">
+    <a class="navlink submenu-item" href="{{ url_backups|default:'/backups/manager/' }}">
       <i class="bi bi-cloud-download"></i> Data Backup
     </a>
   </li>
@@ -64,7 +59,7 @@
   {# Simulator - Feature flag #}
   {% if FEATURES.SIMULATOR %}
   <li>
-    <a class="navlink submenu-item" href="{{ url_simulator|default:'/simulator/' }}" data-cy="nav-simulator">
+    <a class="navlink submenu-item" href="{{ url_simulator|default:'/simulator/' }}">
       <i class="bi bi-graph-up"></i> Simulator
     </a>
   </li>
@@ -74,11 +69,11 @@
   {% if request.user.is_authenticated %}
   <li>
     {% if request.user.is_staff or request.user|is_manager %}
-      <a class="navlink submenu-item" href="{{ url_layby_admin|default:'/layby/admin/' }}" data-cy="nav-layby">
+      <a class="navlink submenu-item" href="{{ url_layby_admin|default:'/layby/admin/' }}">
         <i class="bi bi-bag-check"></i> Layby
       </a>
     {% else %}
-      <a class="navlink submenu-item" href="{{ url_layby_agent|default:'/layby/agent/' }}" data-cy="nav-layby">
+      <a class="navlink submenu-item" href="{{ url_layby_agent|default:'/layby/agent/' }}">
         <i class="bi bi-bag-check"></i> Layby
       </a>
     {% endif %}
@@ -88,7 +83,7 @@
   {# Time Logs - Show for all authenticated users #}
   {% if request.user.is_authenticated %}
   <li>
-    <a class="navlink submenu-item" href="{{ url_time_logs|default:'/inventory/time/logs/' }}" data-cy="nav-time-logs">
+    <a class="navlink submenu-item" href="{{ url_time_logs|default:'/inventory/time/logs/' }}">
       <i class="bi bi-clock-history"></i> Time Logs
     </a>
   </li>

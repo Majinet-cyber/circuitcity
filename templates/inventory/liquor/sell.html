@@ -337,23 +337,19 @@
                     <input type="hidden" name="product_id" id="input-product-id">
                     <input type="hidden" name="mode" id="input-mode" value="bottle">
                     
-                    <!-- Bottle/Shot/Glass Toggle (enforced by category) -->
+                    <!-- Bottle/Shot/Glass Toggle (for products with extra units) -->
                     <div id="mode-toggle-container" class="mb-3 hidden">
                         <label class="form-label">Sell as:</label>
                         <div class="btn-group w-100" role="group" id="mode-buttons">
-                            <!-- Bottle option (for beer, cider) -->
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-bottle" value="bottle" checked>
-                            <label class="btn btn-outline-light" for="mode-bottle" id="label-bottle">Bottles</label>
+                            <label class="btn btn-outline-light" for="mode-bottle">Bottles</label>
                             
-                            <!-- Shot option (for spirits, whiskey) -->
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-shot" value="shot">
-                            <label class="btn btn-outline-light" for="mode-shot" id="label-shot">Shots</label>
+                            <label class="btn btn-outline-light" for="mode-shot">Shots</label>
                             
-                            <!-- Glass option (for wine) -->
                             <input type="radio" class="btn-check" name="mode-radio" id="mode-glass" value="glass">
-                            <label class="btn btn-outline-light" for="mode-glass" id="label-glass">Glasses</label>
+                            <label class="btn btn-outline-light" for="mode-glass">Glasses</label>
                         </div>
-                        <div class="form-text mt-2" id="unit-hint" style="font-size: 0.75rem; opacity: 0.8;"></div>
                     </div>
                     
                     <!-- Quantity -->
@@ -748,72 +744,28 @@
         confirmCategory.textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
         inputProductId.value = currentProduct.id;
         
-        // ENFORCE SERVING UNIT RULES BY CATEGORY
-        const category = currentProduct.category.toLowerCase();
-        let allowedMode = 'bottle'; // default
-        let unitHint = '';
-        
-        if (category === 'beer' || category === 'cider') {
-            // Beers and Ciders: bottles only
-            allowedMode = 'bottle';
-            unitHint = 'Beers and ciders must be sold by bottle';
-            modeToggleContainer.classList.add('hidden');
-        } else if (category === 'wine') {
-            // Wine: glasses only
-            allowedMode = 'glass';
-            unitHint = 'Wine must be sold by glass';
+        // Show/hide mode toggle and configure buttons
+        const showModeToggle = currentProduct.hasShots || currentProduct.hasGlasses;
+        if (showModeToggle) {
             modeToggleContainer.classList.remove('hidden');
-            // Hide bottle and shot options, show only glass
-            if (modeBottleRadio) modeBottleRadio.parentElement.style.display = 'none';
-            if (modeShotRadio) modeShotRadio.parentElement.style.display = 'none';
-            if (modeGlassRadio) {
-                modeGlassRadio.parentElement.style.display = '';
-                modeGlassRadio.checked = true;
-            }
-        } else if (category === 'spirits' || category === 'whiskey') {
-            // Spirits and Whiskey: shots only
-            allowedMode = 'shot';
-            unitHint = 'Spirits and whiskey must be sold by shot';
-            modeToggleContainer.classList.remove('hidden');
-            // Hide bottle and glass options, show only shot
-            if (modeBottleRadio) modeBottleRadio.parentElement.style.display = 'none';
-            if (modeGlassRadio) modeGlassRadio.parentElement.style.display = 'none';
+            
+            // Show/hide specific mode buttons
             if (modeShotRadio) {
-                modeShotRadio.parentElement.style.display = '';
-                modeShotRadio.checked = true;
+                modeShotRadio.parentElement.style.display = currentProduct.hasShots ? '' : 'none';
+            }
+            if (modeGlassRadio) {
+                modeGlassRadio.parentElement.style.display = currentProduct.hasGlasses ? '' : 'none';
             }
         } else {
-            // Other categories: show all options if product supports them
-            const showModeToggle = currentProduct.hasShots || currentProduct.hasGlasses;
-            if (showModeToggle) {
-                modeToggleContainer.classList.remove('hidden');
-                // Show/hide specific mode buttons based on product capabilities
-                if (modeShotRadio) {
-                    modeShotRadio.parentElement.style.display = currentProduct.hasShots ? '' : 'none';
-                }
-                if (modeGlassRadio) {
-                    modeGlassRadio.parentElement.style.display = currentProduct.hasGlasses ? '' : 'none';
-                }
-                if (modeBottleRadio) modeBottleRadio.parentElement.style.display = '';
-            } else {
-                modeToggleContainer.classList.add('hidden');
-            }
-        }
-        
-        // Set unit hint
-        const unitHintEl = document.getElementById('unit-hint');
-        if (unitHintEl) {
-            unitHintEl.textContent = unitHint;
+            modeToggleContainer.classList.add('hidden');
         }
         
         // Reset form and set max quantity based on stock
         inputQuantity.value = 1;
         inputQuantity.max = currentProduct.stock;
-        inputMode.value = allowedMode;
-        
-        // Update quantity label based on mode
-        const unitLabel = allowedMode === 'shot' ? 'Shots' : (allowedMode === 'glass' ? 'Glasses' : 'Bottles');
-        quantityLabel.textContent = `${unitLabel} (max: ${currentProduct.stock})`;
+        if (modeBottleRadio) modeBottleRadio.checked = true;
+        inputMode.value = 'bottle';
+        quantityLabel.textContent = `Bottles (max: ${currentProduct.stock})`;
         
         // Reset payment mix
         if (inputCashAmount) inputCashAmount.value = '0';

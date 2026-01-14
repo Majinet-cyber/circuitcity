@@ -1,25 +1,25 @@
-/* -------- Light Glass Sidebar (Consistent with App) -------- */
+/* -------- Glass Sidebar -------- */
 :root{
   --sb-bg: 255 255 255;           /* white glass */
-  --sb-ink: 15 23 42;             /* slate-900 text */
-  --sb-ink-dim: 100 116 139;      /* slate-500 dim text */
+  --sb-ink: 16 24 40;             /* dark text */
+  --sb-ink-dim: 99 115 129;       /* dim text */
   --sb-ring: 0 0 0 / .06;
-  --sb-card: 255 255 255 / .65;   /* inner glass cards */
+  --sb-card: 255 255 255 / .55;   /* inner glass cards */
 }
 
 .app-shell{
   display:grid; grid-template-columns: 260px 1fr; min-height:100vh;
-  background: #f5f8ff;
+  background: #f6f8fb;
 }
 
-/* main sidebar container - LIGHT styling to match app */
+/* main sidebar container */
 .sidebar{
   position:sticky; top:0; height:100dvh; padding:18px 16px;
-  background: rgba(var(--sb-bg) / .85);
+  background: rgba(var(--sb-bg) / .72);
   backdrop-filter: blur(14px) saturate(120%);
   -webkit-backdrop-filter: blur(14px) saturate(120%);
-  box-shadow: 0 4px 16px rgba(15,23,42,.08), inset 0 1px 0 rgba(255,255,255,.8);
-  border-right: 1px solid rgba(148,163,184,.2);
+  box-shadow: 0 10px 30px rgba(16,24,40,.06), inset 0 1px 0 rgba(255,255,255,.6);
+  border-right: 1px solid rgba(0,0,0,.06);
 }
 
 /* brand header */

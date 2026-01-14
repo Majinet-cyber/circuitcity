@@ -4,44 +4,21 @@
 
 {% block content %}
 {% url 'accounts:settings_unified' as settings_url %}
-{% url 'inventory:generic_dashboard' as generic_dashboard_url %}
 <style>
   .vertical-page{min-height:60vh;display:grid;place-items:center;padding:24px}
   .no-business-card{max-width:520px;background:#fff;border-radius:24px;padding:32px;text-align:center;box-shadow:0 20px 50px rgba(15,23,42,.1)}
   .no-business-card h1{margin:0 0 12px;font-size:clamp(24px,3vw,32px)}
   .no-business-card p{margin:0 0 18px;color:#475569}
-  .no-business-card .btn-group{display:flex;flex-direction:column;gap:12px;margin-top:24px}
-  .no-business-card a{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 18px;border-radius:999px;color:#fff;text-decoration:none;font-weight:700}
-  .no-business-card a.primary{background:#2563eb}
-  .no-business-card a.secondary{background:#64748b}
-  .no-business-card a:hover{opacity:0.9}
-  .no-business-card .info-box{margin:20px 0;padding:16px;background:#f1f5f9;border-radius:12px;font-size:14px;color:#475569}
+  .no-business-card a{display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border-radius:999px;background:#2563eb;color:#fff;text-decoration:none;font-weight:700}
 </style>
 
 <section class="vertical-page">
   <div class="no-business-card">
-    <h1>{{ hero_title|default:"Select a Business Type" }}</h1>
-    <p>{{ hero_blurb|default:"Configure your business type in settings to get started." }}</p>
-    
-    {% if business_kind %}
-    <div class="info-box">
-      <strong>Current business type:</strong> {{ business_kind }}
-    </div>
-    {% endif %}
-    
-    <div class="btn-group">
-      {% if show_generic_dashboard_link %}
-      <a href="{% url 'inventory:generic_dashboard' %}" class="primary">
-        <i class="bi bi-speedometer2"></i>Go to Dashboard
-      </a>
-      {% endif %}
-      
-      {% if show_settings_link or not show_generic_dashboard_link %}
-      <a href="{{ settings_url|default:'/accounts/settings/' }}" class="{% if show_generic_dashboard_link %}secondary{% else %}primary{% endif %}">
-        <i class="bi bi-sliders"></i>Open Business Settings
-      </a>
-      {% endif %}
-    </div>
+    <h1>{{ hero_title }}</h1>
+    <p>{{ hero_blurb }}</p>
+    <a href="{{ settings_url|default:'/accounts/settings/' }}">
+      <i class="bi bi-sliders"></i>Open business settings
+    </a>
   </div>
 </section>
 {% endblock %}

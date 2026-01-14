@@ -14,7 +14,7 @@
         currency="MWK"
     %}
 {% endcomment %}
-{% load humanize %}
+{% load numeric_filters %}
 
 <a href="{{ breakdown_url }}" class="kpi-card-glass {{ kpi_type }} no-underline" aria-label="View {{ kpi_label }} breakdown">
     <div class="kpi-label-glass">
@@ -26,7 +26,7 @@
         {% if currency %}
             {{ kpi_value|money:currency }}
         {% else %}
-            {{ kpi_value|intcomma }}
+            {{ kpi_value|intcomma_safe }}
         {% endif %}
     </div>
     

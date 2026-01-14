@@ -1,7 +1,6 @@
 {% extends "hq/base_hq.html" %}
 {% load humanize %}
 {% load static %}
-{% load hq_extras %}
 
 {% block title %}Subscriptions · Control Center{% endblock %}
 
@@ -379,7 +378,7 @@
     <nav>
       <ul style="display:flex;gap:6px;list-style:none;padding:0;margin:0">
         {% if page_obj.has_previous %}
-          <li><a class="btn-ghost" href="?{% querystring request page=page_obj.previous_page_number %}">«</a></li>
+          <li><a class="btn-ghost" href="?page={{ page_obj.previous_page_number }}&q={{ q|urlencode }}&status={{ status|urlencode }}">«</a></li>
         {% else %}
           <li><span class="btn-ghost" style="opacity:.5;pointer-events:none">«</span></li>
         {% endif %}
@@ -387,11 +386,11 @@
           {% if page_obj.number == i %}
             <li><span class="btn" style="pointer-events:none">{{ i }}</span></li>
           {% else %}
-            <li><a class="btn-ghost" href="?{% querystring request page=i %}">{{ i }}</a></li>
+            <li><a class="btn-ghost" href="?page={{ i }}&q={{ q|urlencode }}&status={{ status|urlencode }}">{{ i }}</a></li>
           {% endif %}
         {% endfor %}
         {% if page_obj.has_next %}
-          <li><a class="btn-ghost" href="?{% querystring request page=page_obj.next_page_number %}">»</a></li>
+          <li><a class="btn-ghost" href="?page={{ page_obj.next_page_number }}&q={{ q|urlencode }}&status={{ status|urlencode }}">»</a></li>
         {% else %}
           <li><span class="btn-ghost" style="opacity:.5;pointer-events:none">»</span></li>
         {% endif %}

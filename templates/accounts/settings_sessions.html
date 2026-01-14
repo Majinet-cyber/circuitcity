@@ -1,15 +1,35 @@
-{% extends "accounts/_settings_shell.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block title %}Settings · Sessions{% endblock %}
 {% block header_title %}Settings{% endblock %}
 
-{% block settings_page_title %}Account Settings{% endblock %}
+{# Hide Layby + Notifications on settings pages #}
+{% block extra_head %}
+<style>
+  .cc-header .cc-actions { display: none !important; }
+</style>
+{% endblock %}
 
-{% block settings_content %}
+{% block content %}
+<div class="container my-4">
+  <h2 class="fw-bold mb-3">Account Settings</h2>
+  {% include "accounts/_settings_nav.html" %}
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm border-0 rounded-3">
+    <div class="card-body p-4">
       <h5 class="fw-semibold mb-3"><i class="bi bi-phone me-1"></i> Active Sessions</h5>
       <p class="text-muted">
-        These are the devices where you're currently signed in.
+        These are the devices where you’re currently signed in.
         For security, you can terminate all other sessions except this one.
       </p>
 
@@ -18,35 +38,34 @@
           <table class="table align-middle">
             <thead>
               <tr>
-                <th scope="col">Device</th>
-                <th scope="col">IP Address</th>
-                <th scope="col">Login Time</th>
+                <th scope="col">Session Key</th>
+                <th scope="col">Device / Info</th>
+                <th scope="col">Expires</th>
                 <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody>
               {% for session in sessions %}
-                <tr>
-                  <td>
-                    <div class="fw-semibold">{{ session.metadata.device_info }}</div>
-                    <div class="small text-muted">Session: {{ session.session_key|truncatechars:12 }}</div>
-                  </td>
-                  <td class="text-muted">{{ session.metadata.ip_address }}</td>
-                  <td>
-                    {% if session.metadata.login_time %}
-                      {{ session.metadata.login_time|date:"M d, Y H:i" }}
-                    {% else %}
-                      <span class="text-muted">Unknown</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    {% if session.session_key == request.session.session_key %}
-                      <span class="badge bg-success">Current Session</span>
-                    {% else %}
-                      <span class="badge bg-secondary">Active</span>
-                    {% endif %}
-                  </td>
-                </tr>
+                {% with session.get_decoded as data %}
+                  <tr>
+                    <td class="small text-muted">{{ session.session_key|truncatechars:12 }}</td>
+                    <td>
+                      {% if data.user_agent %}
+                        {{ data.user_agent }}
+                      {% else %}
+                        <span class="text-muted">Unknown Device</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ session.expire_date|date:"M d, Y H:i" }}</td>
+                    <td>
+                      {% if session.session_key == request.session.session_key %}
+                        <span class="badge bg-success">Current Session</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Active</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endwith %}
               {% endfor %}
             </tbody>
           </table>
@@ -64,4 +83,7 @@
           <div>No active sessions found.</div>
         </div>
       {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

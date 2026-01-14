@@ -1,518 +1,268 @@
-{% extends "base.html" %}
+{# templates/billing/checkout.html #}
 {% load static %}
 {% load humanize %}
 {% load billing_tags %}
 
-{% block title %}Checkout · Subscriptions{% endblock %}
-
-{% block extra_css %}
-<style>
-  /* Checkout-specific styles - Light mode, Inter font inherited from base.html */
-  .checkout-wrap {
-    max-width: 1100px;
-    margin: 40px auto;
-    padding: 16px;
-  }
-
-  .checkout-grid {
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 20px;
-  }
-
-  @media (max-width: 900px) {
-    .checkout-grid {
-      grid-template-columns: 1fr;
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Checkout · Subscriptions</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    :root{
+      --bg: #0b1220;
+      --card-bg: rgba(255,255,255,.08);
+      --card-stroke: rgba(255,255,255,.16);
+      --muted: rgba(255,255,255,.65);
+      --text: #fff;
+      --accent: #60a5fa;
+      --focus: #93c5fd;
     }
-  }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:
+        radial-gradient(1200px 800px at 0% -10%, #1b2a4a 0%, transparent 60%),
+        radial-gradient(1000px 700px at 100% 110%, #143a52 0%, transparent 60%),
+        var(--bg);
+      color:var(--text);font:400 14px/1.45 Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    .wrap{max-width:1100px;margin:40px auto;padding:16px}
+    .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:20px}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    .glass{
+      background:var(--card-bg);
+      border:1px solid var(--card-stroke);
+      border-radius:18px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 10px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+    .panel{padding:18px}
+    h1{margin:0 0 6px;font-weight:700;letter-spacing:.2px}
+    .subline{color:var(--muted);margin-bottom:16px}
+    .tabs{display:flex;gap:8px;margin:8px 0 14px}
+    .tab{
+      cursor:pointer;padding:10px 12px;border-radius:12px;border:1px solid var(--card-stroke);
+      background:rgba(255,255,255,.06);color:var(--muted);font-weight:600;
+    }
+    .tab.active{background:rgba(96,165,250,.16);color:#e5f0ff;border-color:rgba(96,165,250,.35)}
+    .tab .ico{opacity:.9;margin-right:8px}
+    .section{display:none}
+    .section.active{display:block}
 
-  .checkout-card {
-    background: #ffffff;
-    border: 1px solid #e5e7eb;
-    border-radius: 18px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-    padding: 24px;
-  }
+    /* Inputs */
+    .field{margin:10px 0 12px}
+    .label{display:block;margin:0 0 6px;color:var(--muted);font-size:12px}
+    .control{
+      display:flex;align-items:center;gap:8px;
+      padding:12px 14px;border-radius:14px;
+      background:rgba(255,255,255,.06);border:1px solid var(--card-stroke);
+      color:#e8eefc;
+    }
+    .control input{
+      width:100%;background:transparent;border:0;outline:0;color:#fff;
+      font:500 14px/1.2 Inter,system-ui;
+    }
+    .control:focus-within{border-color:var(--focus);box-shadow:0 0 0 3px rgba(147,197,253,.18)}
+    .hint{font-size:12px;color:var(--muted)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .btn{
+      appearance:none;border:0;cursor:pointer;
+      border-radius:14px;padding:12px 14px;font-weight:700;
+      background:linear-gradient(180deg,#60a5fa,#3b82f6);
+      color:#041221;box-shadow:0 8px 24px rgba(59,130,246,.35);
+    }
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:10px}
+    .mini{font-size:12px;color:var(--muted)}
+    .badge{padding:6px 10px;border-radius:9999px;background:rgba(96,165,250,.2);border:1px solid rgba(96,165,250,.4)}
+    .divider{height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);margin:14px 0}
 
-  .checkout-header {
-    display: flex;
-    gap: 16px;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 24px;
-  }
-
-  .checkout-title {
-    font-size: 28px;
-    font-weight: 700;
-    margin: 0 0 8px;
-    color: #0f172a;
-  }
-
-  .checkout-subtitle {
-    color: #64748b;
-    font-size: 14px;
-    margin: 0;
-  }
-
-  /* Tabs */
-  .payment-tabs {
-    display: flex;
-    gap: 8px;
-    margin: 0 0 20px;
-    flex-wrap: wrap;
-  }
-
-  .payment-tab {
-    cursor: pointer;
-    padding: 12px 16px;
-    border-radius: 12px;
-    border: 1px solid #e5e7eb;
-    background: #f9fafb;
-    color: #64748b;
-    font-weight: 600;
-    font-size: 14px;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .payment-tab:hover {
-    background: #f1f5f9;
-    border-color: #cbd5e1;
-  }
-
-  .payment-tab.active {
-    background: #eff6ff;
-    color: #2563eb;
-    border-color: #93c5fd;
-  }
-
-  .payment-tab .icon {
-    font-size: 18px;
-  }
-
-  .payment-section {
-    display: none;
-  }
-
-  .payment-section.active {
-    display: block;
-  }
-
-  .divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
-    margin: 20px 0;
-  }
-
-  /* Form fields */
-  .form-field {
-    margin: 16px 0;
-  }
-
-  .form-label {
-    display: block;
-    margin: 0 0 8px;
-    color: #475569;
-    font-size: 13px;
-    font-weight: 500;
-  }
-
-  .form-control-wrap {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: #f9fafb;
-    border: 1px solid #e5e7eb;
-    transition: all 0.2s;
-  }
-
-  .form-control-wrap:focus-within {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-    background: #ffffff;
-  }
-
-  .form-control-wrap input {
-    width: 100%;
-    background: transparent;
-    border: 0;
-    outline: 0;
-    color: #0f172a;
-    font: 500 14px/1.4 Inter, system-ui, sans-serif;
-  }
-
-  .form-control-wrap input::placeholder {
-    color: #94a3b8;
-  }
-
-  .form-hint {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 6px;
-  }
-
-  .form-hint.test-mode {
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: #92400e;
-    margin-top: 8px;
-  }
-
-  .form-grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-
-  /* Buttons */
-  .btn-pay {
-    appearance: none;
-    border: 0;
-    cursor: pointer;
-    border-radius: 12px;
-    padding: 14px 20px;
-    font-weight: 700;
-    font-size: 15px;
-    background: linear-gradient(180deg, #3b82f6, #2563eb);
-    color: #ffffff;
-    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
-    width: 100%;
-    transition: all 0.2s;
-  }
-
-  .btn-pay:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
-  }
-
-  .btn-pay:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  .btn-ghost {
-    background: #f9fafb;
-    color: #475569;
-    border: 1px solid #e5e7eb;
-    padding: 8px 14px;
-    border-radius: 10px;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    transition: all 0.2s;
-    display: inline-block;
-  }
-
-  .btn-ghost:hover {
-    background: #f1f5f9;
-    color: #334155;
-  }
-
-  /* Footer row */
-  .checkout-footer {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 16px;
-    flex-wrap: wrap;
-  }
-
-  .checkout-footer-text {
-    font-size: 12px;
-    color: #64748b;
-  }
-
-  .plan-badge {
-    padding: 6px 12px;
-    border-radius: 9999px;
-    background: #eff6ff;
-    border: 1px solid #93c5fd;
-    color: #1e40af;
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  /* Invoice preview */
-  .invoice-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .invoice-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0;
-    color: #0f172a;
-  }
-
-  .invoice-actions {
-    display: flex;
-    gap: 8px;
-  }
-
-  .invoice-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-
-  .invoice-table th,
-  .invoice-table td {
-    padding: 10px 8px;
-    border-bottom: 1px solid #f1f5f9;
-    text-align: left;
-  }
-
-  .invoice-table th {
-    color: #64748b;
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .invoice-table td {
-    color: #334155;
-  }
-
-  .invoice-table tfoot td {
-    font-weight: 600;
-    color: #0f172a;
-  }
-
-  .invoice-meta {
-    font-size: 12px;
-    color: #64748b;
-    margin-bottom: 16px;
-  }
-
-  .empty-state {
-    text-align: center;
-    padding: 40px 20px;
-    color: #94a3b8;
-    font-size: 13px;
-  }
-</style>
-{% endblock %}
-
-{% block content %}
-<div class="checkout-wrap">
-  <div class="checkout-header">
-    <div>
-      <h1 class="checkout-title">Complete your subscription</h1>
-      <p class="checkout-subtitle">Choose a payment method to activate your plan.</p>
-    </div>
-    <div>{% subscription_badge %}</div>
-  </div>
-
-  <div class="checkout-grid">
-    <!-- LEFT: Payment Methods -->
-    <div class="checkout-card">
-      <div class="payment-tabs" role="tablist">
-        <button class="payment-tab active" data-tab="airtel" aria-selected="true">
-          <span class="icon">📱</span> Airtel Money
-        </button>
-        <button class="payment-tab" data-tab="tnm">
-          <span class="icon">💰</span> TNM Mpamba
-        </button>
-        <button class="payment-tab" data-tab="card">
-          <span class="icon">💳</span> Card
-        </button>
+    /* Invoice preview */
+    .invoice{padding:16px}
+    .invoice h3{margin:6px 0 8px}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.12)}
+    .actions{display:flex;gap:10px;margin-top:10px}
+    .ghost{background:rgba(255,255,255,.06);color:#eaf2ff;border:1px solid var(--card-stroke)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row">
+      <div>
+        <h1>Complete your subscription</h1>
+        <div class="subline">Choose a payment method to activate your plan.</div>
       </div>
-      <div class="divider"></div>
+      <div class="mini">{% subscription_badge %}</div>
+    </div>
 
-      <!-- Airtel Money -->
-      <section id="airtel" class="payment-section active" aria-labelledby="Airtel Money">
-        <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
-          {% csrf_token %}
-          <input type="hidden" name="method" value="airtel">
-          <div class="form-field">
-            <label class="form-label">Airtel Money Number</label>
-            <div class="form-control-wrap">
-              <span>🇲🇼</span>
-              <input name="phone" type="tel" placeholder="e.g. 0991 12 34 56" required>
-            </div>
-            <div class="form-hint">We'll send a push prompt to your phone to approve payment.</div>
-            {% if PAYCHANGU_MODE == 'test' %}
-            <div class="form-hint test-mode">
-              <strong>⚠️ Test Mode:</strong> Use PayChangu sandbox test numbers only (e.g. 0991000001).
-            </div>
-            {% endif %}
-          </div>
-          <button class="btn-pay" type="submit">Pay with Airtel Money</button>
-        </form>
-      </section>
+    <div class="grid">
+      <!-- LEFT: Checkout -->
+      <div class="glass panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="airtel" aria-selected="true">
+            <span class="ico">📱</span> Airtel Money
+          </button>
+          <button class="tab" data-tab="standard">
+            <span class="ico">🏦</span> Standard Bank
+          </button>
+          <button class="tab" data-tab="card">
+            <span class="ico">💳</span> Card (VISA/Mastercard)
+          </button>
+        </div>
+        <div class="divider"></div>
 
-      <!-- TNM Mpamba -->
-      <section id="tnm" class="payment-section" aria-labelledby="TNM Mpamba">
-        <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
-          {% csrf_token %}
-          <input type="hidden" name="method" value="tnm">
-          <div class="form-field">
-            <label class="form-label">TNM Mpamba Number</label>
-            <div class="form-control-wrap">
-              <span>🇲🇼</span>
-              <input name="phone" type="tel" placeholder="e.g. 0881 12 34 56" required>
+        <!-- Airtel -->
+        <section id="airtel" class="section active" aria-labelledby="Airtel Money">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="method" value="airtel">
+            <div class="field">
+              <label class="label">Wallet Number (MSISDN)</label>
+              <div class="control"><span>🇲🇼</span><input name="airtel-msisdn" placeholder="e.g. 0991 12 34 56"></div>
+              <div class="hint">We’ll send a push prompt to this Airtel wallet to confirm payment.</div>
             </div>
-            <div class="form-hint">We'll send a push prompt to your phone to approve payment.</div>
-            {% if PAYCHANGU_MODE == 'test' %}
-            <div class="form-hint test-mode">
-              <strong>⚠️ Test Mode:</strong> Use PayChangu sandbox test numbers only (e.g. 0881000001).
-            </div>
-            {% endif %}
-          </div>
-          <button class="btn-pay" type="submit">Pay with TNM Mpamba</button>
-        </form>
-      </section>
+            <button class="btn" type="submit">Pay with Airtel Money</button>
+          </form>
+        </section>
 
-      <!-- Card -->
-      <section id="card" class="payment-section" aria-labelledby="Card">
-        <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate id="cardForm">
-          {% csrf_token %}
-          <input type="hidden" name="method" value="card">
-          <div class="form-field">
-            <label class="form-label">Card number</label>
-            <div class="form-control-wrap">
-              <span>💳</span>
-              <input name="card-number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
+        <!-- Standard Bank -->
+        <section id="standard" class="section" aria-labelledby="Standard Bank">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="method" value="standard_bank">
+            <div class="field">
+              <label class="label">Bank Reference</label>
+              <div class="control"><span>🔖</span><input name="bank-reference" placeholder="Enter your transfer reference"></div>
+              <div class="hint">We’ll match your EFT to this reference and activate automatically.</div>
             </div>
-          </div>
-          <div class="form-grid-2">
-            <div class="form-field">
-              <label class="form-label">Expiry (MM / YYYY)</label>
-              <div class="form-control-wrap">
-                <span>📅</span>
-                <input name="card-exp_month" id="cardExpMonth" inputmode="numeric" placeholder="MM" maxlength="2" style="width:40px;">
-                <span>/</span>
-                <input name="card-exp_year" id="cardExpYear" inputmode="numeric" placeholder="YYYY" maxlength="4" style="width:60px;">
+            <button class="btn" type="submit">I’ve paid by EFT</button>
+          </form>
+        </section>
+
+        <!-- Card -->
+        <section id="card" class="section" aria-labelledby="Card">
+          <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate id="cardForm">
+            {% csrf_token %}
+            <input type="hidden" name="method" value="card">
+            <div class="field">
+              <label class="label">Card number</label>
+              <div class="control">
+                <span>💳</span>
+                <input name="card-number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
               </div>
             </div>
-            <div class="form-field">
-              <label class="form-label">CVV</label>
-              <div class="form-control-wrap">
-                <span>🔒</span>
-                <input name="card-cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4">
+            <div class="grid2">
+              <div class="field">
+                <label class="label">Expiry (MM / YYYY)</label>
+                <div class="control">
+                  <span>📅</span>
+                  <input name="card-exp_month" id="cardExpMonth" inputmode="numeric" placeholder="MM" maxlength="2">
+                  <input name="card-exp_year" id="cardExpYear" inputmode="numeric" placeholder="YYYY" maxlength="4">
+                </div>
+              </div>
+              <div class="field">
+                <label class="label">CVV</label>
+                <div class="control"><span>🔒</span><input name="card-cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4"></div>
               </div>
             </div>
-          </div>
-          <div class="form-hint">Your card details are transmitted securely. We never store CVV.</div>
-          <button class="btn-pay" type="submit">Pay with Card</button>
-        </form>
-      </section>
+            <div class="hint">Your card details are transmitted securely. We never store CVV.</div>
+            <button class="btn" type="submit">Pay with Card</button>
+          </form>
+        </section>
 
-      <div class="checkout-footer">
-        <div class="checkout-footer-text">By continuing you agree to our terms.</div>
-        {% if invoice and invoice.items.all.count %}
-        <span class="plan-badge">
-          {{ invoice.items.all.0.description|default:"Plan" }} ·
-          {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
-        </span>
-        {% endif %}
+        <div class="row">
+          <div class="mini">By continuing you agree to our terms.</div>
+          {% if invoice and invoice.items.all.count %}
+            <span class="badge">
+              {{ invoice.items.all.0.description|default:"Plan" }} ·
+              {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
+            </span>
+          {% endif %}
+        </div>
       </div>
-    </div>
 
-    <!-- RIGHT: Invoice Preview -->
-    <div class="checkout-card">
-      <div class="invoice-header">
-        <h3 class="invoice-title">Invoice Preview</h3>
-        {% if invoice %}
-        <div class="invoice-actions">
-          <a class="btn-ghost" href="{% url 'billing:invoice_send' invoice.id %}" title="Email & WhatsApp">
-            <i class="bi bi-send"></i> Send
-          </a>
-          <a class="btn-ghost" href="{% url 'billing:invoice_download' invoice.id %}" title="Download PDF">
-            <i class="bi bi-download"></i> Download
-          </a>
+      <!-- RIGHT: Invoice preview -->
+      <div class="glass panel">
+        <div class="row">
+          <h3 style="margin:6px 0">Invoice Preview</h3>
+          {% if invoice %}
+            <a class="btn ghost" href="{% url 'billing:invoice_send' invoice.id %}" title="Email & WhatsApp">Send</a>
+            <a class="btn ghost" href="{% url 'billing:invoice_download' invoice.id %}" title="Download PDF">Download</a>
+          {% endif %}
         </div>
-        {% endif %}
+        <div class="divider"></div>
+        <div class="invoice">
+          {% if invoice %}
+            <div class="mini">Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</div>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th align="left">Description</th>
+                  <th align="right">Qty</th>
+                  <th align="right">Unit</th>
+                  <th align="right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in invoice.items.all %}
+                <tr>
+                  <td>{{ it.description }}</td>
+                  <td align="right">{{ it.qty }}</td>
+                  <td align="right">{{ it.unit }}</td>
+                  <td align="right">{{ invoice.currency }} {{ it.line_total|floatformat:0|intcomma }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Subtotal</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.subtotal|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Tax</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.tax_total|floatformat:0|intcomma }}</td>
+                </tr>
+                <tr>
+                  <td></td><td></td>
+                  <td align="right"><strong>Total</strong></td>
+                  <td align="right">{{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</td>
+                </tr>
+              </tfoot>
+            </table>
+          {% else %}
+            <p class="mini">No invoice yet. It will appear here when created.</p>
+          {% endif %}
+        </div>
       </div>
-      <div class="divider"></div>
-      {% if invoice %}
-        <div class="invoice-meta">
-          Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
-        </div>
-        <table class="invoice-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th align="right">Qty</th>
-              <th align="right">Unit</th>
-              <th align="right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for it in invoice.items.all %}
-            <tr>
-              <td>{{ it.description }}</td>
-              <td align="right">{{ it.qty }}</td>
-              <td align="right">{{ it.unit }}</td>
-              <td align="right">{{ invoice.currency }} {{ it.line_total|floatformat:0|intcomma }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td></td><td></td>
-              <td align="right">Subtotal</td>
-              <td align="right">{{ invoice.currency }} {{ invoice.subtotal|floatformat:0|intcomma }}</td>
-            </tr>
-            <tr>
-              <td></td><td></td>
-              <td align="right">Tax</td>
-              <td align="right">{{ invoice.currency }} {{ invoice.tax_total|floatformat:0|intcomma }}</td>
-            </tr>
-            <tr>
-              <td></td><td></td>
-              <td align="right"><strong>Total</strong></td>
-              <td align="right"><strong>{{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</strong></td>
-            </tr>
-          </tfoot>
-        </table>
-      {% else %}
-        <div class="empty-state">
-          <p>No invoice yet. It will appear here when created.</p>
-        </div>
-      {% endif %}
     </div>
   </div>
-</div>
 
-<script>
-  // Tab switching
-  const tabs = document.querySelectorAll(".payment-tab");
-  const sections = document.querySelectorAll(".payment-section");
-
-  tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
-      tabs.forEach(t => t.classList.remove("active"));
+  <script>
+    // Tabs
+    const tabs = document.querySelectorAll(".tab");
+    const sections = document.querySelectorAll(".section");
+    tabs.forEach(t => t.addEventListener("click", () => {
+      tabs.forEach(x => x.classList.remove("active"));
       sections.forEach(s => s.classList.remove("active"));
-      tab.classList.add("active");
-      const id = tab.dataset.tab;
-      const section = document.getElementById(id);
-      if (section) section.classList.add("active");
-    });
-  });
+      t.classList.add("active");
+      const id = t.dataset.tab;
+      document.getElementById(id)?.classList.add("active");
+    }));
 
-  // Light card number formatting
-  const ccInput = document.getElementById("cardNumber");
-  if (ccInput) {
-    ccInput.addEventListener("input", e => {
-      let v = e.target.value.replace(/\D/g, "").slice(0, 16);
-      v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
-      e.target.value = v;
-    });
-  }
-</script>
-{% endblock %}
+    // Light formatting for card inputs
+    const cc = document.getElementById("cardNumber");
+    if (cc) {
+      cc.addEventListener("input", e => {
+        let v = e.target.value.replace(/\D/g,"").slice(0,16);
+        v = v.replace(/(\d{4})(?=\d)/g, "$1 ");
+        e.target.value = v;
+      });
+    }
+  </script>
+</body>
+</html>
