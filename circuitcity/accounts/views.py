@@ -2720,9 +2720,21 @@ def twofa_sms_enable_start(request):
             messages.error(request, "Phone number is required.")
             return redirect("accounts:settings_security")
 
+    # Normalize Malawi phone numbers to E.164 format
+    # Accept: 09xxxxxxxx, 265xxxxxxxxx, +265xxxxxxxxx
+    phone = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
+    
+    # Convert Malawi numbers to E.164
+    if phone.startswith("0") and len(phone) == 10:
+        # 09xxxxxxxx -> +2659xxxxxxxx
+        phone = "+265" + phone[1:]
+    elif phone.startswith("265") and not phone.startswith("+"):
+        # 265xxxxxxxxx -> +265xxxxxxxxx
+        phone = "+" + phone
+    
     # Basic phone validation (E.164 format)
     if not phone.startswith("+"):
-        messages.error(request, "Phone number must be in international format (e.g. +265991234567)")
+        messages.error(request, "Phone number must be in international format (e.g. +265991234567 or 0991234567)")
         return redirect("accounts:settings_security")
 
     if len(phone) < 8 or len(phone) > 20:
