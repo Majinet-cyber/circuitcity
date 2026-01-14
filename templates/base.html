@@ -438,8 +438,10 @@
     }
 
     .notif-menu{
-      /* Bootstrap dropdown handles positioning */
+      /* Bootstrap dropdown handles positioning and display */
       border-radius:12px !important;
+      z-index:1080 !important;
+      /* Don't override Bootstrap's display handling */
     }
     .notif-empty{
       padding:2rem 1rem; text-align:center; color:var(--muted);
@@ -463,6 +465,7 @@
     }
     .topbar-user .dropdown-menu{
       border-radius:12px !important;
+      z-index:1081;
     }
   </style>
 
@@ -666,16 +669,18 @@
               {# Notifications (Bootstrap dropdown) #}
               <div class="dropdown" id="ccNotifRoot"
                    data-scope="{% block notif_scope %}dashboard{% endblock %}"
-                   data-allow="{% block notif_allow %}{% endblock %}">
+                   data-allow="{% block notif_allow %}{% endblock %}"
+                   data-testid="notif-dropdown">
                 <button class="notif-btn focus-ring dropdown-toggle"
                         id="ccNotifBtn"
                         type="button"
                         data-bs-toggle="dropdown"
-                        data-bs-auto-close="outside"
+                        data-bs-auto-close="true"
                         aria-expanded="false"
                         aria-haspopup="true"
                         aria-controls="ccNotifMenu"
-                        title="Notifications">
+                        title="Notifications"
+                        data-testid="notif-toggle">
                   <i class="bi bi-bell"></i>
                   {% if unread_notifications_count %}
                     <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
@@ -689,7 +694,8 @@
                 <div class="dropdown-menu dropdown-menu-end p-0 shadow notif-menu"
                      id="ccNotifMenu"
                      aria-labelledby="ccNotifBtn"
-                     style="min-width:320px;max-height:400px;overflow-y:auto">
+                     style="min-width:320px;max-height:400px;overflow-y:auto"
+                     data-testid="notif-menu">
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
                     {% with latest_notifications|default:None as notif_list %}
@@ -741,7 +747,7 @@
                       id="userMenuBtn"
                       type="button"
                       data-bs-toggle="dropdown"
-                      data-bs-auto-close="outside"
+                      data-bs-auto-close="true"
                       aria-expanded="false"
                       aria-haspopup="true"
                       aria-controls="userMenu"
@@ -901,7 +907,7 @@
 </div>
 
 <!-- Inbox Modal (fallback) -->
-<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true" style="display:none">
   <div class="modal-dialog modal-dialog-scrollable modal-xl">
     <div class="modal-content">
       <div class="modal-header">
@@ -934,25 +940,41 @@
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
 
-<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management -->
+<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Dec 20 behavior) -->
 <script>
   /* ================================================================
-     UI CLEANUP SYSTEM
-     - Ensures no modal/dropdown/overlay state leaks across navigations
-     - Removes orphaned backdrops, modal-open class, scroll locks
-     - Runs on: DOMContentLoaded, visibilitychange, popstate, modal hide
+     UI CLEANUP SYSTEM v2 — Restores Dec 20 dropdown behavior
+     - Ensures dropdowns are CLOSED by default on page load
+     - Uses Bootstrap's API when available (not raw class manipulation)
+     - Cleans up orphaned backdrops and modal state
+     - Runs AFTER Bootstrap is loaded (uses DOMContentLoaded + setTimeout)
      ================================================================ */
   (function() {
-    // Idempotent cleanup function
+    if (window.__CC_UI_CLEANUP_V2__) return;
+    window.__CC_UI_CLEANUP_V2__ = true;
+
+    // Wait for Bootstrap to be available
+    function waitForBootstrap(callback) {
+      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        callback();
+      } else {
+        // Bootstrap loads with defer, so wait a tick
+        setTimeout(function() { waitForBootstrap(callback); }, 50);
+      }
+    }
+
+    // Cleanup function that uses Bootstrap API when available
     function cleanupUIState() {
-      // 1. Force ccInbox modal to hidden state
+      // 1. Force ccInbox modal to hidden state (if visible)
       var modal = document.getElementById("ccInbox");
-      if (modal) {
+      if (modal && modal.classList.contains("show")) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          var bsModal = bootstrap.Modal.getInstance(modal);
+          if (bsModal) bsModal.hide();
+        }
         modal.classList.remove("show");
         modal.style.display = "none";
         modal.setAttribute("aria-hidden", "true");
-        modal.removeAttribute("aria-modal");
-        modal.removeAttribute("role");
       }
 
       // 2. Remove modal-open class from body (causes layout shift)
@@ -961,10 +983,10 @@
       // 3. Remove any orphaned backdrops
       document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
 
-      // 4. Reset body styles that scroll-lock might have set
-      // Only reset if they look like scroll-lock values
+      // 4. Reset body styles only if they look like scroll-lock values
       var bodyStyle = document.body.style;
-      if (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden") {
+      var drawerOpen = document.body.getAttribute("data-drawer") === "open";
+      if (!drawerOpen && (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden")) {
         bodyStyle.position = "";
         bodyStyle.top = "";
         bodyStyle.left = "";
@@ -974,43 +996,53 @@
         bodyStyle.paddingRight = "";
       }
 
-      // 5. Ensure dropdowns are closed (Bootstrap adds "show" class)
-      var notifMenu = document.getElementById("ccNotifMenu");
-      var userMenu = document.getElementById("userMenu");
-      if (notifMenu) notifMenu.classList.remove("show");
-      if (userMenu) userMenu.classList.remove("show");
-      
-      // 6. Reset aria-expanded on dropdown toggles
-      var notifBtn = document.getElementById("ccNotifBtn");
-      var userBtn = document.getElementById("userMenuBtn");
-      if (notifBtn) notifBtn.setAttribute("aria-expanded", "false");
-      if (userBtn) userBtn.setAttribute("aria-expanded", "false");
+      // 5. Close dropdowns using Bootstrap API (cleaner than raw class manipulation)
+      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        var notifBtn = document.getElementById("ccNotifBtn");
+        var userBtn = document.getElementById("userMenuBtn");
+        
+        if (notifBtn) {
+          var notifDropdown = bootstrap.Dropdown.getInstance(notifBtn);
+          if (notifDropdown) notifDropdown.hide();
+        }
+        if (userBtn) {
+          var userDropdown = bootstrap.Dropdown.getInstance(userBtn);
+          if (userDropdown) userDropdown.hide();
+        }
+      }
+
+      // 6. Fallback: ensure no dropdown menus have .show class (catches render artifacts)
+      document.querySelectorAll(".dropdown-menu.show").forEach(function(el) {
+        // Skip if parent dropdown toggle has aria-expanded=true (user opened it)
+        var parent = el.closest(".dropdown");
+        var toggle = parent && parent.querySelector("[data-bs-toggle='dropdown']");
+        if (toggle && toggle.getAttribute("aria-expanded") === "true") return;
+        el.classList.remove("show");
+      });
     }
 
-    // Run on DOMContentLoaded
-    document.addEventListener("DOMContentLoaded", cleanupUIState);
-
-    // Run when page becomes visible (handles back/forward cache)
-    document.addEventListener("visibilitychange", function() {
-      if (document.visibilityState === "visible") cleanupUIState();
+    // Run cleanup after Bootstrap loads (on page load)
+    document.addEventListener("DOMContentLoaded", function() {
+      waitForBootstrap(cleanupUIState);
     });
 
-    // Run on popstate (browser back/forward)
-    window.addEventListener("popstate", cleanupUIState);
-
-    // Run when ccInbox modal is hidden (Bootstrap event)
-    document.addEventListener("hidden.bs.modal", function(e) {
-      if (e.target && e.target.id === "ccInbox") {
-        cleanupUIState();
+    // Run when page becomes visible (handles bfcache)
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") {
+        waitForBootstrap(cleanupUIState);
       }
     });
 
-    // Run when any dropdown is hidden (Bootstrap event)
-    document.addEventListener("hidden.bs.dropdown", function(e) {
-      // Only cleanup if it's our notification/user dropdown
-      if (e.target && (e.target.id === "ccNotifBtn" || e.target.id === "userMenuBtn")) {
-        // Remove any stray modal-open that Bootstrap might have left
+    // Run on popstate (browser back/forward)
+    window.addEventListener("popstate", function() {
+      waitForBootstrap(cleanupUIState);
+    });
+
+    // Cleanup after modal hide (Bootstrap event)
+    document.addEventListener("hidden.bs.modal", function(e) {
+      if (e.target && e.target.id === "ccInbox") {
         document.body.classList.remove("modal-open");
+        document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
       }
     });
 
@@ -1154,78 +1186,8 @@
     });
   })();
 
-  /* ----- Rock-solid mobile sidebar: single tap open/close, no flash ----- */
-  (function(){
-    if (window.__CC_SIDEBAR_V3__) return; window.__CC_SIDEBAR_V3__ = true;
-
-    const sidebar = document.querySelector('.cc-sidebar');
-    const backdrop = document.getElementById('ccBackdrop');
-    const toggleBtn = document.getElementById('sidebarOpen');
-
-    if (!sidebar || !backdrop || !toggleBtn) return;
-
-    if (!sidebar.id) sidebar.id = 'ccSidebar';
-    if (!toggleBtn.hasAttribute('aria-controls')) toggleBtn.setAttribute('aria-controls','ccSidebar');
-
-    let openState = false;
-    let busy = false;
-    let savedY = 0;
-    let lastToggleAt = 0;       // guard against double-fires
-
-    function lockScroll(){
-      savedY = window.scrollY || 0;
-      Object.assign(document.body.style,{position:'fixed',top:`-${savedY}px`,left:'0',right:'0',width:'100%',overflow:'hidden'});
-    }
-    function unlockScroll(){
-      Object.assign(document.body.style,{position:'',top:'',left:'',right:'',width:'',overflow:''});
-      window.scrollTo(0, savedY||0);
-    }
-    function applyState(){
-      if (openState){
-        document.body.setAttribute('data-drawer','open');
-        toggleBtn.setAttribute('aria-expanded','true');
-        backdrop.classList.add('show');
-        lockScroll();
-      } else {
-        document.body.removeAttribute('data-drawer');
-        toggleBtn.setAttribute('aria-expanded','false');
-        backdrop.classList.remove('show');
-        unlockScroll();
-      }
-    }
-    function toggle(){
-      if (busy) return;
-      const now = performance.now();
-      if (now - lastToggleAt < 300) return; // 300ms guard to stop "blink"
-      lastToggleAt = now;
-
-      busy = true;
-      openState = !openState;
-      applyState();
-      setTimeout(()=>busy=false, 260); // match .26s CSS transition
-    }
-    function close(){ if (openState){ openState=false; applyState(); } }
-
-    // SINGLE handler: pointerup only (no click/touchend duplicates)
-    toggleBtn.addEventListener('pointerup', (e)=>{ e.preventDefault(); e.stopPropagation(); toggle(); }, {passive:false});
-
-    // Prevent sidebar content from closing the drawer by bubbling
-    ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
-      sidebar.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
-    });
-
-    backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
-    document.addEventListener('keydown', ()=>{ /* esc handled below in hotfix too */ }, {passive:true});
-
-    // DETERMINISTIC: Close sidebar on ANY link click AND navigate
-    sidebar.addEventListener('click', (e) => {
-      const a = e.target.closest('a[href]');
-      if (!a) return;
-      close(); // close drawer immediately, navigation proceeds naturally
-    }, {passive:true});
-
-    new MutationObserver(()=>{}).observe(document.body, {attributes:true,attributeFilter:['data-drawer']});
-  })();
+  /* ----- Rock-solid mobile sidebar: handled by CC Drawer Hotfix below ----- */
+  /* This section intentionally empty — sidebar logic consolidated in CC Drawer Hotfix v4 */
 
   /* ===== Tenant menu: clean toggle ===== */
   (function(){
@@ -1365,22 +1327,31 @@
   /* ===================== /MENU RESCUE (JS) ===================== */
 </script>
 
-{# ===== CC Drawer Hotfix v3.2 — kill double-toggles & blink (non-destructive) ===== #}
+{# ===== CC Drawer Hotfix v4 — Single source of truth for mobile sidebar (Dec 20 behavior) ===== #}
 <script>
 (function(){
+  // Guard: only run once
+  if (window.__CC_DRAWER_V4__) return;
+  window.__CC_DRAWER_V4__ = true;
+
   const sidebarEl   = document.querySelector('.cc-sidebar');
   const oldBtn      = document.getElementById('sidebarOpen');
   const oldBackdrop = document.getElementById('ccBackdrop');
   if (!sidebarEl || !oldBtn || !oldBackdrop) return;
 
-  // Replace button & backdrop to drop any previously-attached listeners from other scripts
+  // Replace button & backdrop to drop any previously-attached listeners
   const btn = oldBtn.cloneNode(true);
   btn.id = oldBtn.id;
+  btn.setAttribute('data-bound', '1'); // Mark as bound to prevent future handlers
   oldBtn.replaceWith(btn);
 
   const backdrop = oldBackdrop.cloneNode(true);
   backdrop.id = oldBackdrop.id;
+  backdrop.setAttribute('data-bound', '1');
   oldBackdrop.replaceWith(backdrop);
+
+  // Mark sidebar as bound too
+  sidebarEl.setAttribute('data-bound', '1');
 
   // Single source of truth state
   let open = document.body.getAttribute('data-drawer') === 'open';
@@ -1417,16 +1388,16 @@
   }
   function toggle(){ set(!open); }
 
-  // Swallow duplicate events from legacy handlers (capture-phase)
+  // Swallow duplicate events from any legacy handlers (capture-phase)
   const swallow = (e)=>{ e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); };
 
   btn.addEventListener('click', swallow, {capture:true});
   btn.addEventListener('touchend', swallow, {capture:true});
 
-  // Primary handler (pointerup only)
+  // Primary handler (pointerup only — single event type = no double-toggle)
   btn.addEventListener('pointerup', (e)=>{ swallow(e); toggle(); }, {passive:false});
 
-  // Sidebar should not close when tapping inside
+  // Sidebar should not close when tapping inside (stop propagation)
   ['click','pointerdown','touchstart','mousedown'].forEach(ev=>{
     sidebarEl.addEventListener(ev, e=>e.stopPropagation(), {passive:true});
   });
@@ -1435,18 +1406,19 @@
   backdrop.addEventListener('click', (e)=>{ swallow(e); set(false); }, {passive:false});
   document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') set(false); }, {passive:true});
 
-  // DETERMINISTIC: Close on nav inside sidebar via event delegation
+  // Close on nav inside sidebar via event delegation
   sidebarEl.addEventListener('click', (e) => {
     const a = e.target.closest('a[href]');
     if (!a) return;
     set(false); // close drawer immediately
   }, {passive:true});
 
-  // Ensure we start closed
+  // Ensure we start CLOSED (Dec 20 behavior)
   set(false);
 
-  // Expose for quick console testing
+  // Expose API for bottom nav "Menu" button and debugging
   window.ccDrawer = { open: ()=>set(true), close: ()=>set(false), toggle };
+  window.CC_SIDEBAR = window.ccDrawer; // Compatibility with mobile nav
 })();
 </script>
 

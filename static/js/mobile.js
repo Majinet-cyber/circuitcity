@@ -1,7 +1,7 @@
 /* =========================================================
- * Circuit City · Mobile UX helpers (v3.2.0)
- * Drawer (single source of truth), dock sizing, active tab,
- * focus/keyboard niceties. Idempotent.
+ * Circuit City · Mobile UX helpers (v3.3.0)
+ * Dock sizing, active tab, focus/keyboard niceties.
+ * Drawer logic is handled by base.html CC Drawer Hotfix v4.
  * ========================================================= */
 
 (() => {
@@ -30,32 +30,46 @@
     if (h) root.style.setProperty('--cc-nav-h', `${h}px`);
   }
 
-  // -------- Scroll lock helpers --------
-  let savedScrollY = 0;
-  function lockScroll() {
-    savedScrollY = window.scrollY || 0;
-    Object.assign(document.body.style, {
-      position: 'fixed', top: `-${savedScrollY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden'
-    });
-  }
-  function unlockScroll() {
-    Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '', overflow: '' });
-    window.scrollTo(0, savedScrollY || 0);
-  }
-
-  // -------- Drawer (body[data-drawer] drives CSS) --------
+  // -------- Drawer (SKIP if already bound by base.html) --------
   function setupDrawer() {
     const sidebar  = $(SEL.sidebar);
     const openBtn  = $(SEL.openBtn);
     const backdrop = $(SEL.backdrop);
     if (!sidebar || !openBtn || !backdrop) return;
 
+    // CRITICAL: Check if already handled by base.html CC Drawer Hotfix
+    // If data-bound="1" is set, another script has already configured these elements
+    if (openBtn.getAttribute('data-bound') === '1') {
+      // Already bound — just ensure CC_SIDEBAR is exposed
+      if (!window.CC_SIDEBAR && window.ccDrawer) {
+        window.CC_SIDEBAR = window.ccDrawer;
+      }
+      return;
+    }
+
+    // Mark as bound to prevent future duplicate handlers
+    openBtn.setAttribute('data-bound', '1');
+    backdrop.setAttribute('data-bound', '1');
+    sidebar.setAttribute('data-bound', '1');
+
     // Ensure clean starting state
     document.body.removeAttribute('data-drawer');
     backdrop.classList.remove('show');
     sidebar.classList.remove('open', 'is-open');
 
+    let savedScrollY = 0;
     let openedAt = 0; // debounce close-after-open taps
+
+    function lockScroll() {
+      savedScrollY = window.scrollY || 0;
+      Object.assign(document.body.style, {
+        position: 'fixed', top: `-${savedScrollY}px`, left: '0', right: '0', width: '100%', overflow: 'hidden'
+      });
+    }
+    function unlockScroll() {
+      Object.assign(document.body.style, { position: '', top: '', left: '', right: '', width: '', overflow: '' });
+      window.scrollTo(0, savedScrollY || 0);
+    }
 
     const open = () => {
       if (!isMobile()) return;
@@ -80,17 +94,15 @@
       (document.body.getAttribute('data-drawer') === 'open') ? close() : open();
     };
 
-    // Make the hamburger extremely “sticky” to taps
-    ['pointerdown', 'touchstart', 'click'].forEach(ev => {
-      openBtn.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); toggle(); }, { passive: false });
-    });
+    // Single event type to prevent double-toggle (pointerup only)
+    openBtn.addEventListener('pointerup', (e) => { e.preventDefault(); e.stopPropagation(); toggle(); }, { passive: false });
 
     // Stop events inside the sidebar from bubbling out and triggering a close
     ['pointerdown', 'touchstart', 'click'].forEach(ev => {
       sidebar.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
     });
 
-    // Backdrop to close (with tiny debounce so open→blur doesn’t immediately close)
+    // Backdrop to close (with tiny debounce so open→blur doesn't immediately close)
     backdrop.addEventListener('click', () => {
       if (Date.now() - openedAt < 250) return;
       close();
@@ -115,6 +127,7 @@
 
     // Minimal API
     window.CC_SIDEBAR = { open, close, toggle };
+    window.ccDrawer = window.CC_SIDEBAR; // Compatibility
   }
 
   // -------- Active state for bottom dock tabs --------

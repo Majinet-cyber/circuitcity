@@ -74,13 +74,29 @@
 
   /* =========================
      SIDEBAR TOGGLE (mobile)
-     - Supports new (#ccBurger/#ccSidebar/#ccOverlay)
-       and legacy (#sidebarToggle/#sidebar)
+     - Now handled by base.html CC Drawer Hotfix v4
+     - This section only sets up legacy IDs if they exist
   ========================== */
   (function sidebarInit() {
+    // Skip if already handled by CC Drawer system
+    const sidebarOpen = d.getElementById('sidebarOpen');
+    if (sidebarOpen && sidebarOpen.getAttribute('data-bound') === '1') {
+      // Already bound by CC Drawer Hotfix — just expose compatibility functions
+      window.ccOpenSidebar = () => { if (window.ccDrawer) window.ccDrawer.open(); };
+      window.ccCloseSidebar = () => { if (window.ccDrawer) window.ccDrawer.close(); };
+      return;
+    }
+
+    // Legacy sidebar support for pages using #ccBurger/#ccSidebar/#ccOverlay
     const burger = d.getElementById('ccBurger') || d.getElementById('sidebarToggle');
     const sidebar = d.getElementById('ccSidebar') || d.getElementById('sidebar');
     const overlay = d.getElementById('ccOverlay'); // may be null
+
+    if (!burger || !sidebar) return;
+
+    // Check if already bound
+    if (burger.getAttribute('data-bound') === '1') return;
+    burger.setAttribute('data-bound', '1');
 
     function openSidebar() {
       if (!sidebar) return;
@@ -100,34 +116,33 @@
       sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
     }
 
-    if (burger && sidebar) {
-      burger.addEventListener('click', toggleSidebar);
-      if (overlay) overlay.addEventListener('click', closeSidebar);
-      // Close on Escape
-      d.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
-      // Close if layout switches to desktop
-      const mq = window.matchMedia('(min-width: 1025px)');
-      mq.addEventListener('change', closeSidebar);
-    }
+    burger.addEventListener('click', toggleSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+    // Close on Escape
+    d.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+    // Close if layout switches to desktop
+    const mq = window.matchMedia('(min-width: 1025px)');
+    mq.addEventListener('change', closeSidebar);
 
-    // Edge-swipe to open (mobile)
-    (function swipeToOpen() {
-      if (!sidebar) return;
-      let startX = null, startY = null, t0 = 0;
-      const EDGE = 24, MIN = 60, MAX_ANGLE = 25; // px, px, degrees
-      window.addEventListener('touchstart', (e) => {
-        const t = e.touches[0]; if (!t) return;
-        if (t.clientX <= EDGE) { startX = t.clientX; startY = t.clientY; t0 = Date.now(); }
-      }, { passive: true });
-      window.addEventListener('touchend', (e) => {
-        if (startX == null) return;
-        const t = e.changedTouches[0]; if (!t) return;
-        const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
-        const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
-        if (dx > MIN && angle < MAX_ANGLE && (Date.now() - t0) < 600) openSidebar();
-        startX = startY = null;
-      }, { passive: true });
-    })();
+    // Edge-swipe to open (mobile) — skip if CC Drawer handles it
+    if (!window.__CC_DRAWER_V4__) {
+      (function swipeToOpen() {
+        let startX = null, startY = null, t0 = 0;
+        const EDGE = 24, MIN = 60, MAX_ANGLE = 25; // px, px, degrees
+        window.addEventListener('touchstart', (e) => {
+          const t = e.touches[0]; if (!t) return;
+          if (t.clientX <= EDGE) { startX = t.clientX; startY = t.clientY; t0 = Date.now(); }
+        }, { passive: true });
+        window.addEventListener('touchend', (e) => {
+          if (startX == null) return;
+          const t = e.changedTouches[0]; if (!t) return;
+          const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
+          const angle = Math.atan2(dy, Math.abs(dx)) * 180 / Math.PI;
+          if (dx > MIN && angle < MAX_ANGLE && (Date.now() - t0) < 600) openSidebar();
+          startX = startY = null;
+        }, { passive: true });
+      })();
+    }
 
     // Expose to other scripts if needed
     window.ccOpenSidebar = openSidebar;
@@ -589,11 +604,12 @@
      - Auto-hide simple .toast blocks (already enhanced above)
   ========================== */
 
-  // Legacy Sidebar toggle for #sidebarToggle/#sidebar (kept; safe no-op if handled above)
+  // Legacy Sidebar toggle for #sidebarToggle/#sidebar (skip if already bound)
   (function () {
     const toggle = d.getElementById('sidebarToggle');
     const sidebar = d.getElementById('sidebar');
-    if (toggle && sidebar) {
+    if (toggle && sidebar && toggle.getAttribute('data-bound') !== '1') {
+      toggle.setAttribute('data-bound', '1');
       const setState = (open) => { sidebar.classList.toggle('open', open); toggle.setAttribute('aria-expanded', String(open)); };
       toggle.addEventListener('click', () => setState(!sidebar.classList.contains('open')));
       d.addEventListener('keydown', (e) => { if (e.key === 'Escape') setState(false); });
