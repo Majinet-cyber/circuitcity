@@ -161,8 +161,8 @@
       --safe-bottom: max(env(safe-area-inset-bottom), 0px);
       --dock-h: 64px;
 
-      /* Mobile drawer width: Reduced to ~28-30% of viewport for lighter feel (60% reduction) */
-      --nav-drawer-w: clamp(180px, 28vw, 280px);
+      /* Mobile drawer width: FULL open per Dec 25 behavior */
+      --nav-drawer-w: 260px;
 
       /* VISUAL PROOF: Sidebar width reduction active */
       --proof-sidebar-reduced: true;
@@ -236,9 +236,8 @@
         transition: transform .26s var(--elevate);
         box-shadow: 0 20px 60px rgba(0,0,0,.35);
 
-        /* Reduced width (~28-30vw) for lighter, less obstructive feel */
+        /* FULL width per Dec 25 behavior */
         width: var(--nav-drawer-w) !important;
-        max-width: 75vw !important;
 
         /* Keep dark sidebar theme on mobile (matches sidebar.html styling) */
         background: linear-gradient(180deg, #0f172a 0%, #0b1324 100%) !important;
@@ -252,13 +251,13 @@
       }
       body[data-drawer="open"] .cc-sidebar{ transform:translateX(0) !important; }
 
-      /* Semi-transparent overlay on the remaining 30-40% */
+      /* Transparent overlay (no dim, no blur) - Dec 25 behavior */
       .cc-backdrop{
         position:fixed;
         inset:0;
-        background:rgba(2,6,23,.50);
-        backdrop-filter:blur(3px);
-        -webkit-backdrop-filter:blur(3px);
+        background:transparent !important;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
         display:none;
         z-index:1035;
         cursor: pointer;
@@ -1151,10 +1150,12 @@
     backdrop.addEventListener('click', (e)=>{ e.preventDefault(); close(); }, {passive:false});
     document.addEventListener('keydown', ()=>{ /* esc handled below in hotfix too */ }, {passive:true});
 
-    // Close when navigating
-    sidebar.querySelectorAll('a[href]').forEach(a=>{
-      a.addEventListener('click', ()=> close(), {passive:true});
-    });
+    // DETERMINISTIC: Close sidebar on ANY link click AND navigate
+    sidebar.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href]');
+      if (!a) return;
+      close(); // close drawer immediately, navigation proceeds naturally
+    }, {passive:true});
 
     new MutationObserver(()=>{}).observe(document.body, {attributes:true,attributeFilter:['data-drawer']});
   })();
@@ -1367,10 +1368,12 @@
   backdrop.addEventListener('click', (e)=>{ swallow(e); set(false); }, {passive:false});
   document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') set(false); }, {passive:true});
 
-  // Close on nav inside sidebar
-  sidebarEl.querySelectorAll('a[href]').forEach(a=>{
-    a.addEventListener('click', ()=> set(false), {passive:true});
-  });
+  // DETERMINISTIC: Close on nav inside sidebar via event delegation
+  sidebarEl.addEventListener('click', (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    set(false); // close drawer immediately
+  }, {passive:true});
 
   // Ensure we start closed
   set(false);

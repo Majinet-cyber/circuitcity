@@ -164,15 +164,14 @@
     overflow-x: hidden;
   }
   
-  /* Sidebar becomes an off-canvas overlay on mobile - Reduced width by ~60% for lighter feel */
+  /* Sidebar becomes an off-canvas overlay on mobile - FULL width per Dec 25 behavior */
   .cc-sidebar {
     position: fixed !important;
     left: 0;
     top: 0;
     bottom: 0;
     height: 100dvh;
-    width: clamp(180px, 28vw, 280px) !important;
-    max-width: 75vw !important;
+    width: 260px !important;
     transform: translateX(-100%);
     transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
     z-index: 2000;
@@ -185,11 +184,13 @@
     transform: translateX(0) !important;
   }
   
-  /* Backdrop for sidebar overlay - DIM ONLY, NO BLUR */
+  /* Backdrop for sidebar overlay - TRANSPARENT (no dim, no blur) per Dec 25 behavior */
   .cc-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.35);
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     z-index: 1990;
     opacity: 0;
     pointer-events: none;

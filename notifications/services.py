@@ -28,6 +28,8 @@ TRANSACTIONAL_EVENTS = {
     "OTP_CODE",  # All OTP emails are transactional
     "WELCOME_MANAGER",
     "WELCOME_AGENT",
+    "SALE_INSTANT",  # Managers MUST receive sale emails - no preference blocking
+    "SALE_BATCH",    # Managers MUST receive sale emails - no preference blocking
 }
 
 
