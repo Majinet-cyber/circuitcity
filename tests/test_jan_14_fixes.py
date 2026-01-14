@@ -799,4 +799,3 @@ class TestSidebarLinksClickable(TestCase):
         # Sidebar should have pointer-events: auto
         assert "pointer-events: auto" in content, \
             "mobile.css sidebar must have pointer-events: auto"
-
