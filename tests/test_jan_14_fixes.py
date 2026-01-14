@@ -314,6 +314,123 @@ class TestMobileCSSNoDim(TestCase):
 
 
 @pytest.mark.django_db
+class TestNotificationsDropdownHiddenByDefault(TestCase):
+    """Test that notifications dropdown is hidden by default and doesn't cause blur/warp."""
+
+    def setUp(self):
+        from circuitcity.accounts.models import Profile
+        from tenants.models import Business, Membership
+        from inventory.business_kinds import BusinessKind
+
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="notiftest",
+            email="notiftest@example.com",
+            password="testpass123"
+        )
+        Profile.objects.get_or_create(user=self.user, defaults={"display_name": "Notif Test"})
+        
+        self.business = Business.objects.create(
+            name="Notif Test Business",
+            kind=BusinessKind.PHONES,
+            owner=self.user,
+            status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client.login(username="notiftest", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+
+    def test_notification_dropdown_not_shown_by_default(self):
+        """Notification dropdown menu should NOT have 'show' class on initial load."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # The dropdown menu should exist
+        assert 'id="ccNotifMenu"' in content
+        
+        # It should NOT have "show" class in the initial HTML
+        # Check that dropdown-menu does not include "show" in its class attribute
+        import re
+        notif_menu_match = re.search(r'id="ccNotifMenu"[^>]*class="([^"]*)"', content)
+        if notif_menu_match:
+            classes = notif_menu_match.group(1)
+            assert "show" not in classes.split(), \
+                "Notification dropdown should NOT have 'show' class by default"
+
+    def test_user_menu_dropdown_not_shown_by_default(self):
+        """User menu dropdown should NOT have 'show' class on initial load."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # The user menu should exist
+        assert 'id="userMenu"' in content
+        
+        # Check aria-expanded on user button is false
+        assert 'id="userMenuBtn"' in content
+        import re
+        user_btn_match = re.search(r'id="userMenuBtn"[^>]*aria-expanded="([^"]*)"', content)
+        if user_btn_match:
+            expanded = user_btn_match.group(1)
+            assert expanded == "false", \
+                "User menu button should have aria-expanded='false' by default"
+
+    def test_ccInbox_modal_hidden_by_default(self):
+        """ccInbox modal should have aria-hidden='true' on initial load."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Modal should exist with aria-hidden="true"
+        assert 'id="ccInbox"' in content
+        assert 'aria-hidden="true"' in content
+
+    def test_no_modal_open_class_in_rendered_html(self):
+        """Body should NOT have modal-open class in server-rendered HTML."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Server-rendered HTML should never include modal-open on body
+        # (This would indicate a template bug)
+        assert 'class="modal-open"' not in content
+        assert "modal-open" not in content.split("<body")[1].split(">")[0] if "<body" in content else True
+
+    def test_no_modal_backdrop_in_rendered_html(self):
+        """No modal-backdrop div should exist in server-rendered HTML."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Backdrops are added by JS, should never be in initial HTML
+        assert 'class="modal-backdrop' not in content
+
+    def test_cleanup_script_exists(self):
+        """Cleanup script for modal/dropdown state should exist."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Should have the cleanup function
+        assert "CC_UI_CLEANUP" in content or "cleanupUIState" in content
+        
+        # Should clean up modal-open
+        assert 'classList.remove("modal-open")' in content
+        
+        # Should remove backdrops
+        assert 'modal-backdrop' in content and '.remove()' in content
+
+
+@pytest.mark.django_db
 class TestSidebarLinksClickable(TestCase):
     """Test that sidebar links are clickable (z-index and pointer-events correct)."""
 

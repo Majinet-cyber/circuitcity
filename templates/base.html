@@ -934,28 +934,89 @@
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
 
-<!-- FORCE NOTIFICATIONS MODAL CLOSED ON LOAD (belt and suspenders) -->
+<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management -->
 <script>
-  /* Ensure ccInbox modal is not shown on initial page load.
-     Bootstrap modals should be hidden by default, but this guards against
-     any edge case where server-side rendering or CSS might show it. */
-  document.addEventListener("DOMContentLoaded", function() {
-    const modal = document.getElementById("ccInbox");
-    if (!modal) return;
-    
-    // Force modal to closed state
-    modal.classList.remove("show");
-    modal.style.display = "none";
-    modal.setAttribute("aria-hidden", "true");
-    
-    // Remove any leftover modal-open class from body
-    document.body.classList.remove("modal-open");
-    
-    // Remove any orphaned backdrops
-    document.querySelectorAll(".modal-backdrop").forEach(function(backdrop) {
-      backdrop.remove();
+  /* ================================================================
+     UI CLEANUP SYSTEM
+     - Ensures no modal/dropdown/overlay state leaks across navigations
+     - Removes orphaned backdrops, modal-open class, scroll locks
+     - Runs on: DOMContentLoaded, visibilitychange, popstate, modal hide
+     ================================================================ */
+  (function() {
+    // Idempotent cleanup function
+    function cleanupUIState() {
+      // 1. Force ccInbox modal to hidden state
+      var modal = document.getElementById("ccInbox");
+      if (modal) {
+        modal.classList.remove("show");
+        modal.style.display = "none";
+        modal.setAttribute("aria-hidden", "true");
+        modal.removeAttribute("aria-modal");
+        modal.removeAttribute("role");
+      }
+
+      // 2. Remove modal-open class from body (causes layout shift)
+      document.body.classList.remove("modal-open");
+
+      // 3. Remove any orphaned backdrops
+      document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
+
+      // 4. Reset body styles that scroll-lock might have set
+      // Only reset if they look like scroll-lock values
+      var bodyStyle = document.body.style;
+      if (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden") {
+        bodyStyle.position = "";
+        bodyStyle.top = "";
+        bodyStyle.left = "";
+        bodyStyle.right = "";
+        bodyStyle.width = "";
+        bodyStyle.overflow = "";
+        bodyStyle.paddingRight = "";
+      }
+
+      // 5. Ensure dropdowns are closed (Bootstrap adds "show" class)
+      var notifMenu = document.getElementById("ccNotifMenu");
+      var userMenu = document.getElementById("userMenu");
+      if (notifMenu) notifMenu.classList.remove("show");
+      if (userMenu) userMenu.classList.remove("show");
+      
+      // 6. Reset aria-expanded on dropdown toggles
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      if (notifBtn) notifBtn.setAttribute("aria-expanded", "false");
+      if (userBtn) userBtn.setAttribute("aria-expanded", "false");
+    }
+
+    // Run on DOMContentLoaded
+    document.addEventListener("DOMContentLoaded", cleanupUIState);
+
+    // Run when page becomes visible (handles back/forward cache)
+    document.addEventListener("visibilitychange", function() {
+      if (document.visibilityState === "visible") cleanupUIState();
     });
-  });
+
+    // Run on popstate (browser back/forward)
+    window.addEventListener("popstate", cleanupUIState);
+
+    // Run when ccInbox modal is hidden (Bootstrap event)
+    document.addEventListener("hidden.bs.modal", function(e) {
+      if (e.target && e.target.id === "ccInbox") {
+        cleanupUIState();
+      }
+    });
+
+    // Run when any dropdown is hidden (Bootstrap event)
+    document.addEventListener("hidden.bs.dropdown", function(e) {
+      // Only cleanup if it's our notification/user dropdown
+      if (e.target && (e.target.id === "ccNotifBtn" || e.target.id === "userMenuBtn")) {
+        // Remove any stray modal-open that Bootstrap might have left
+        document.body.classList.remove("modal-open");
+      }
+    });
+
+    // Expose for debugging
+    window.CC_UI_CLEANUP = cleanupUIState;
+  })();
 </script>
 
 <script>
