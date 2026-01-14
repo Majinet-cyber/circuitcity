@@ -312,3 +312,91 @@ class TestMobileCSSNoDim(TestCase):
         assert "backdrop-filter: none" in content or "backdrop-filter:none" in content, \
             "mobile.css cc-backdrop should have backdrop-filter: none"
 
+
+@pytest.mark.django_db
+class TestSidebarLinksClickable(TestCase):
+    """Test that sidebar links are clickable (z-index and pointer-events correct)."""
+
+    def setUp(self):
+        from circuitcity.accounts.models import Profile
+        from tenants.models import Business, Membership
+        from inventory.business_kinds import BusinessKind
+
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="linktest",
+            email="linktest@example.com",
+            password="testpass123"
+        )
+        Profile.objects.get_or_create(user=self.user, defaults={"display_name": "Link Test"})
+        
+        self.business = Business.objects.create(
+            name="Link Test Business",
+            kind=BusinessKind.PHONES,
+            owner=self.user,
+            status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client.login(username="linktest", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+
+    def test_sidebar_z_index_above_backdrop(self):
+        """Sidebar z-index must be higher than backdrop z-index."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Sidebar should have z-index: 2000
+        assert "z-index: 2000" in content or "z-index:2000" in content, \
+            "Sidebar must have z-index: 2000"
+        
+        # Backdrop should have z-index: 1990 (lower than sidebar)
+        assert "z-index: 1990" in content or "z-index:1990" in content, \
+            "Backdrop must have z-index: 1990"
+
+    def test_sidebar_has_pointer_events_auto(self):
+        """Sidebar must have pointer-events: auto to receive clicks."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Sidebar should have pointer-events: auto
+        assert "pointer-events: auto" in content or "pointer-events:auto" in content, \
+            "Sidebar must have pointer-events: auto"
+
+    def test_sidebar_links_exist_and_have_href(self):
+        """Sidebar must contain real anchor links with href attributes."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Should have sidebar with links
+        assert "cc-sidebar" in content, "Page must have sidebar"
+        assert '<a class="navlink"' in content or '<a href="' in content, \
+            "Sidebar must contain anchor links"
+
+    def test_mobile_css_sidebar_z_index_correct(self):
+        """mobile.css must have sidebar z-index above backdrop."""
+        import os
+        from django.conf import settings
+        
+        css_path = os.path.join(settings.BASE_DIR, "static", "css", "mobile.css")
+        with open(css_path, "r") as f:
+            content = f.read()
+        
+        # Sidebar z-index should be 2000
+        assert "z-index: 2000" in content, \
+            "mobile.css sidebar must have z-index: 2000"
+        
+        # Sidebar should have pointer-events: auto
+        assert "pointer-events: auto" in content, \
+            "mobile.css sidebar must have pointer-events: auto"
+
