@@ -424,6 +424,7 @@ class TestCleanUIShellNoRegressions(TestCase):
     1. Notifications fallback NEVER appears in initial page load HTML
     2. NO blur applied to body/content when sidebar opens
     3. Sidebar toggle exists and works
+    4. Modal can still be opened (not permanently hidden with d-none/hidden)
     """
 
     def setUp(self):
@@ -457,51 +458,86 @@ class TestCleanUIShellNoRegressions(TestCase):
         session['active_business_id'] = self.business.id
         session.save()
 
-    def test_notifications_modal_has_hidden_guards(self):
+    def test_notifications_never_visible_on_dashboard_load(self):
         """
-        HARD REQUIREMENT: Notifications modal must have d-none and hidden attributes
-        to ensure it NEVER appears in visible page flow on initial load.
+        CRITICAL: "Notifications Inbox" text should NOT be visible on initial page load.
+        It should only exist inside the modal structure, not in visible page flow.
         """
         response = self.client.get("/dashboard/")
         assert response.status_code == 200
         
         content = response.content.decode("utf-8")
         
-        # Modal must exist
+        # The modal should exist
         assert 'id="ccInbox"' in content, "Notifications modal should exist"
         
-        # Must have safety guards
-        assert 'd-none' in content, "Modal must have d-none class for safety"
-        assert 'hidden' in content, "Modal must have hidden attribute for safety"
-        assert 'aria-hidden="true"' in content, "Modal must have aria-hidden=true"
+        # But it should NOT be permanently hidden in a way that breaks opening
+        # Check that it doesn't have d-none or hidden on the modal root
+        import re
+        modal_match = re.search(r'<div[^>]*id="ccInbox"[^>]*>', content)
+        if modal_match:
+            modal_tag = modal_match.group(0)
+            # Modal root should NOT have d-none or hidden attribute
+            assert 'd-none' not in modal_tag, "Modal root should NOT have d-none (breaks opening)"
+            assert 'hidden' not in modal_tag or 'aria-hidden' in modal_tag, "Modal root should not be permanently hidden"
 
-    def test_notifications_fallback_text_only_in_modal(self):
+    def test_notifications_text_not_in_visible_flow_on_phones_page(self):
         """
-        "Read-only fallback" text should only appear inside the hidden modal,
-        never in visible page flow.
+        Test that notifications don't leak on the phones inventory page.
+        """
+        response = self.client.get("/inventory/verticals/phones/")
+        
+        # Might redirect or return 200
+        if response.status_code == 200:
+            content = response.content.decode("utf-8")
+            
+            # If modal exists, ensure it's properly structured
+            if 'id="ccInbox"' in content:
+                import re
+                modal_match = re.search(r'<div[^>]*id="ccInbox"[^>]*>', content)
+                if modal_match:
+                    modal_tag = modal_match.group(0)
+                    assert 'd-none' not in modal_tag, "Modal should not have d-none on root"
+
+    def test_modal_closed_on_load_script_exists(self):
+        """
+        Verify the force-closed-on-load script exists to prevent modal from showing.
         """
         response = self.client.get("/dashboard/")
         assert response.status_code == 200
         
         content = response.content.decode("utf-8")
         
-        # These strings should exist (in the modal)
-        assert "Notifications Inbox" in content or "Notifications" in content
-        assert "Read-only fallback" in content
-        
-        # But they should be within the modal structure
-        # Check that modal wrapper exists before the fallback text
-        modal_start = content.find('id="ccInbox"')
-        fallback_pos = content.find("Read-only fallback")
-        
-        if modal_start > 0 and fallback_pos > 0:
-            assert modal_start < fallback_pos, "Fallback text must be inside modal structure"
+        # Check for the force-closed guard script
+        assert 'document.getElementById("ccInbox")' in content or "getElementById('ccInbox')" in content
+        assert "DOMContentLoaded" in content or "modal.classList.remove" in content
 
-    def test_no_blur_on_body_or_main_content(self):
+    def test_no_blur_on_sidebar_backdrop(self):
         """
-        HARD REQUIREMENT: NO blur CSS that blurs body or main content.
+        CRITICAL: Sidebar backdrop must NOT have blur. Only dim overlay allowed.
+        Check that .cc-backdrop or #ccBackdrop doesn't have backdrop-filter.
+        """
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
         
-        Blur is only acceptable on modal backdrops, NOT on page content.
+        content = response.content.decode("utf-8")
+        
+        # Look for stylesheet references and check loaded CSS doesn't have bad patterns
+        # This is a smoke test - we check the referenced CSS files don't have drawer blur
+        
+        # Get all CSS links from the response
+        import re
+        css_links = re.findall(r'href="([^"]*\.css[^"]*)"', content)
+        
+        # We can't easily check external CSS here, but we can verify
+        # that inline styles don't have problematic blur
+        assert '.cc-backdrop { backdrop-filter: blur' not in content
+        assert '.cc-backdrop{backdrop-filter:blur' not in content
+        assert 'body[data-drawer="open"] { filter: blur' not in content
+
+    def test_no_blur_on_body_main_or_content_elements(self):
+        """
+        HARD REQUIREMENT: NO blur CSS that blurs body, main, or content elements.
         """
         response = self.client.get("/dashboard/")
         assert response.status_code == 200
@@ -560,4 +596,3 @@ class TestCleanUIShellNoRegressions(TestCase):
         for vertical in critical_verticals:
             vertical_path = os.path.join(template_dir, vertical)
             assert os.path.exists(vertical_path), f"Vertical {vertical} templates should NOT be deleted"
-

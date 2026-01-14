@@ -895,8 +895,8 @@
   </div>
 </div>
 
-<!-- Inbox Modal (fallback) - HIDDEN BY DEFAULT -->
-<div class="modal fade d-none" id="ccInbox" tabindex="-1" aria-hidden="true" hidden>
+<!-- Inbox Modal (fallback) -->
+<div class="modal fade" id="ccInbox" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable modal-xl">
     <div class="modal-content">
       <div class="modal-header">
@@ -928,6 +928,30 @@
 
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
+
+<!-- FORCE NOTIFICATIONS MODAL CLOSED ON LOAD (belt and suspenders) -->
+<script>
+  /* Ensure ccInbox modal is not shown on initial page load.
+     Bootstrap modals should be hidden by default, but this guards against
+     any edge case where server-side rendering or CSS might show it. */
+  document.addEventListener("DOMContentLoaded", function() {
+    const modal = document.getElementById("ccInbox");
+    if (!modal) return;
+    
+    // Force modal to closed state
+    modal.classList.remove("show");
+    modal.style.display = "none";
+    modal.setAttribute("aria-hidden", "true");
+    
+    // Remove any leftover modal-open class from body
+    document.body.classList.remove("modal-open");
+    
+    // Remove any orphaned backdrops
+    document.querySelectorAll(".modal-backdrop").forEach(function(backdrop) {
+      backdrop.remove();
+    });
+  });
+</script>
 
 <script>
   /* ============================================================
