@@ -1535,6 +1535,17 @@
   }
 
   window.addEventListener('load', function() {
+    // Reload-once guard to prevent infinite reload loops
+    const SW_RELOAD_KEY = 'cc_sw_reloaded';
+    function reloadOnce() {
+      if (sessionStorage.getItem(SW_RELOAD_KEY) === '1') {
+        console.log('SW update: already reloaded this session, skipping');
+        return;
+      }
+      sessionStorage.setItem(SW_RELOAD_KEY, '1');
+      window.location.reload();
+    }
+
     navigator.serviceWorker.register('/sw.js', { scope: '/' })
       .then(function(registration) {
         console.log('ServiceWorker registered: ', registration.scope);
@@ -1542,12 +1553,12 @@
         // Force check for updates on every load (critical for deploys)
         registration.update();
 
-        // Auto-activate waiting service worker and reload
+        // Auto-activate waiting service worker and reload (once per session)
         function activateWaitingSW() {
           if (registration.waiting) {
             registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // Reload once to get new SW
-            window.location.reload();
+            // Reload once to get new SW (session-guarded)
+            reloadOnce();
           }
         }
 
@@ -1577,7 +1588,7 @@
 
         // Listen for SW taking control (after skipWaiting)
         navigator.serviceWorker.addEventListener('controllerchange', function() {
-          // New SW has taken control, page will reload above
+          // New SW has taken control
           console.log('New service worker activated');
         });
       })

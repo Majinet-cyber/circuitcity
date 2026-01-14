@@ -469,6 +469,19 @@ def feature_unavailable(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 # ==============================================================================
 # PWA: Service Worker
 # ==============================================================================
+
+# Stable BUILD_ID computed once at module import (prevents changing per request)
+# Priority: Render git commit > env GIT_SHA > settings > timestamp fallback
+import os
+_BUILD_ID = (
+    os.getenv("RENDER_GIT_COMMIT") or 
+    os.getenv("GIT_SHA") or 
+    getattr(settings, 'BUILD_ID', None) or 
+    getattr(settings, 'STATIC_VERSION', None) or
+    datetime.now().strftime("%Y%m%d%H%M%S")
+)
+
+
 @require_GET
 def sw_js(request: HttpRequest) -> HttpResponse:
     """
@@ -503,16 +516,8 @@ def sw_js(request: HttpRequest) -> HttpResponse:
             with open(sw_path, "r", encoding="utf-8") as f:
                 content = f.read()
             
-            # Inject BUILD_ID for cache busting (fixes "warped until hard refresh")
-            # Priority: Render git commit > env GIT_SHA > BUILD_ID setting > timestamp
-            build_id = (
-                os.getenv("RENDER_GIT_COMMIT") or 
-                os.getenv("GIT_SHA") or 
-                getattr(settings, 'BUILD_ID', None) or 
-                getattr(settings, 'STATIC_VERSION', None) or
-                datetime.now().strftime("%Y%m%d%H%M%S")
-            )
-            content = content.replace('BUILD_ID_PLACEHOLDER', str(build_id))
+            # Inject BUILD_ID for cache busting (computed once at module load)
+            content = content.replace('BUILD_ID_PLACEHOLDER', str(_BUILD_ID))
         except (IOError, OSError):
             # Return minimal service worker if file read fails
             content = "// Service worker file not found\nself.skipWaiting();"
@@ -521,7 +526,9 @@ def sw_js(request: HttpRequest) -> HttpResponse:
         content = "// Service worker file not found\nself.skipWaiting();"
 
     response = HttpResponse(content, content_type="application/javascript")
-    # Critical headers for service worker scope
+    # Critical headers for service worker scope and cache control
     response["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
     response["Service-Worker-Allowed"] = "/"
     return response
