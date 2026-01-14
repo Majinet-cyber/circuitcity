@@ -215,7 +215,7 @@
 
     <div class="plans">
       {% for p in plans %}
-        <div class="plan-card {% if paid_plan_id and paid_plan_id == p.id %}current-plan-highlight{% endif %}" data-plan="{{ p.id }}">
+        <div class="plan-card {% if paid_plan_id and paid_plan_id == p.id %}current-plan-highlight{% endif %}" data-plan="{{ p.id }}" data-plan-code="{{ p.code|default:p.name|slugify }}">
           <div>
             <h3>
               {{ p.name }}

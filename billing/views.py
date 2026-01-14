@@ -175,6 +175,23 @@ def _send_invoice_whatsapp(inv: Invoice) -> None:
         pass
 
 
+def _dedupe_plans(plans):
+    """
+    Dedupe plans list by a stable key (code/slug/name).
+    Prevents duplicate plan cards if DB has bad data or joins duplicate rows.
+    Works on SQLite + Postgres.
+    """
+    seen = set()
+    out = []
+    for p in plans:
+        key = getattr(p, "code", None) or getattr(p, "slug", None) or getattr(p, "name", str(p)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+    return out
+
+
 # ------------------------------------------------------------------------------
 # Public/tenant views
 # ------------------------------------------------------------------------------
@@ -189,7 +206,7 @@ def subscribe(request: HttpRequest) -> HttpResponse:
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount", "name")
+    plans = _dedupe_plans(SubscriptionPlan.objects.filter(is_active=True).order_by("amount", "name"))
 
     # Backward compatibility: still accept POST if old template submits here.
     if request.method == "POST":
@@ -987,7 +1004,7 @@ def paywall(request: HttpRequest) -> HttpResponse:
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
+    plans = _dedupe_plans(SubscriptionPlan.objects.filter(is_active=True).order_by("amount"))
     return render(request, "billing/paywall.html", {"sub": sub, "plans": plans, "sub_badge": _sub_badge(sub)})
 
 
@@ -1018,7 +1035,7 @@ def manage(request: HttpRequest) -> HttpResponse:
     """
     biz: Business = request.business
     sub = _ensure_trial_subscription(biz)
-    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("amount")
+    plans = _dedupe_plans(SubscriptionPlan.objects.filter(is_active=True).order_by("amount"))
 
     # Determine if subscription is truly paid/active (not just trial with plan assigned)
     is_paid_active = sub.status == BusinessSubscription.Status.ACTIVE

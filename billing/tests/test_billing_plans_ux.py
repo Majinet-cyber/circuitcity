@@ -2,6 +2,7 @@
 Tests for billing plans UX bug fix:
 Trial users should NOT see "CURRENT" on any plan until they complete payment.
 """
+import re
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -148,4 +149,83 @@ class BillingPlansTrialUXTest(TestCase):
         self.assertContains(response, "CURRENT")
         # Should show Upgrade button for Growth
         self.assertContains(response, "Upgrade to Growth")
+
+
+class BillingPlansNoDuplicatesTest(TestCase):
+    """Test that no duplicate plan cards appear on the billing plans page"""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testuser_nodup", email="test_nodup@example.com", password="testpass123"
+        )
+        self.business = Business.objects.create(
+            name="Test Business No Dup", slug="test-business-no-dup", status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=self.user, business=self.business, role="MANAGER", status="ACTIVE"
+        )
+        # Ensure starter plan exists
+        self.starter_plan, _ = SubscriptionPlan.objects.get_or_create(
+            code="starter",
+            defaults={
+                "name": "Starter",
+                "amount": Decimal("10000.00"),
+                "currency": "MWK",
+                "interval": "month",
+                "is_active": True,
+            },
+        )
+
+    def test_no_duplicate_plan_cards(self):
+        """
+        Ensure each plan code appears exactly once on the billing plans page.
+        Uses data-plan-code attribute for reliable detection.
+        """
+        # Create trial subscription
+        BusinessSubscription.start_trial(business=self.business, plan=self.starter_plan, days=30)
+
+        self.client.login(username="testuser_nodup", password="testpass123")
+        response = self.client.get(reverse("billing:plans"))
+
+        # Parse all data-plan-code values from the response
+        content = response.content.decode("utf-8")
+        plan_codes = re.findall(r'data-plan-code="([^"]+)"', content)
+
+        # Ensure we have at least one plan
+        self.assertGreater(len(plan_codes), 0, "Expected at least one plan card on the page")
+
+        # Check for duplicates - each code should appear exactly once
+        seen = set()
+        duplicates = []
+        for code in plan_codes:
+            if code in seen:
+                duplicates.append(code)
+            seen.add(code)
+
+        self.assertEqual(
+            duplicates,
+            [],
+            f"Duplicate plan cards detected: {duplicates}. All codes: {plan_codes}",
+        )
+
+    def test_starter_appears_exactly_once(self):
+        """
+        Specifically verify that 'starter' plan appears exactly once.
+        This is the specific regression test for the duplicate Starter bug.
+        """
+        # Create trial subscription
+        BusinessSubscription.start_trial(business=self.business, plan=self.starter_plan, days=30)
+
+        self.client.login(username="testuser_nodup", password="testpass123")
+        response = self.client.get(reverse("billing:plans"))
+
+        content = response.content.decode("utf-8")
+        starter_count = content.count('data-plan-code="starter"')
+
+        self.assertEqual(
+            starter_count,
+            1,
+            f"Expected exactly 1 Starter plan card, found {starter_count}",
+        )
 
