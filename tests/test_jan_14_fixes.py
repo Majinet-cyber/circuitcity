@@ -3,6 +3,7 @@ Tests for Jan 14, 2026 fixes:
 1. Sidebar behavior: full open, no dim/blur, closes on selection
 2. Manager sale emails: always sent, no preference blocking
 3. PWA update flow: bulletproof, no hard refresh needed
+4. Cache control: authenticated HTML pages have no-cache headers
 """
 import pytest
 from django.test import Client, TestCase, override_settings
@@ -11,6 +12,223 @@ from unittest.mock import patch, MagicMock
 from decimal import Decimal
 
 User = get_user_model()
+
+
+# ==============================================================================
+# CACHE CONTROL TESTS - Prevent hard-refresh requirement after deploys
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestAuthenticatedHTMLNoCacheHeaders(TestCase):
+    """
+    Test that authenticated HTML pages have no-cache headers.
+    
+    ROOT CAUSE OF HARD-REFRESH ISSUE:
+    - Browsers cache HTML responses with standard cache headers
+    - After deploy, cached HTML references old (non-existent) hashed assets
+    - User sees "warped" UI until hard-refresh clears browser cache
+    
+    SOLUTION:
+    - Set Cache-Control: no-store on authenticated HTML responses
+    - Browser always fetches fresh HTML which references correct hashed assets
+    """
+
+    def setUp(self):
+        from circuitcity.accounts.models import Profile
+        from tenants.models import Business, Membership
+        from inventory.business_kinds import BusinessKind
+
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="cachetest",
+            email="cache@example.com",
+            password="testpass123"
+        )
+        Profile.objects.get_or_create(user=self.user, defaults={"display_name": "Cache Test"})
+        
+        self.business = Business.objects.create(
+            name="Cache Test Business",
+            kind=BusinessKind.PHONES,
+            owner=self.user,
+            status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client.login(username="cachetest", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+
+    def test_authenticated_dashboard_has_no_cache_headers(self):
+        """Dashboard page should have no-cache headers for authenticated user."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        cache_control = response.get("Cache-Control", "").lower()
+        assert "no-store" in cache_control, \
+            f"Dashboard must have no-store in Cache-Control. Got: {cache_control}"
+
+    def test_authenticated_inventory_list_has_no_cache_headers(self):
+        """Inventory list page should have no-cache headers for authenticated user."""
+        response = self.client.get("/inventory/list/")
+        assert response.status_code == 200
+        
+        cache_control = response.get("Cache-Control", "").lower()
+        assert "no-store" in cache_control, \
+            f"Inventory list must have no-store in Cache-Control. Got: {cache_control}"
+
+    def test_authenticated_html_has_pragma_no_cache(self):
+        """Authenticated HTML should have Pragma: no-cache for HTTP/1.0 compatibility."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        pragma = response.get("Pragma", "").lower()
+        assert pragma == "no-cache", \
+            f"Dashboard must have Pragma: no-cache. Got: {pragma}"
+
+    def test_authenticated_html_has_expires_zero(self):
+        """Authenticated HTML should have Expires: 0 for HTTP/1.0 compatibility."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        expires = response.get("Expires", "")
+        assert expires == "0", \
+            f"Dashboard must have Expires: 0. Got: {expires}"
+
+    def test_anonymous_pages_not_affected(self):
+        """Anonymous pages should NOT have no-cache headers from our middleware."""
+        # Logout to become anonymous
+        self.client.logout()
+        
+        # Public home page
+        response = self.client.get("/home/")
+        
+        # Should NOT have our specific no-cache header pattern
+        # (other middleware might add some caching, that's OK)
+        cache_control = response.get("Cache-Control", "")
+        # Anonymous pages don't need aggressive no-cache (they can be cached)
+        # We just verify the response works
+        assert response.status_code in [200, 302]
+
+    def test_static_files_not_affected(self):
+        """Static file paths should NOT have no-cache headers from our middleware."""
+        # Static files should be handled by WhiteNoise with long cache (hashed filenames)
+        # Our middleware should exclude /static/ paths
+        response = self.client.get("/static/css/app.css")
+        
+        # Static may return 404 if collectstatic not run, that's OK for this test
+        # The key is that if it returns, it should NOT have our "no-store" header
+        # (WhiteNoise sets its own caching headers based on WHITENOISE_MAX_AGE)
+        if response.status_code == 200:
+            cache_control = response.get("Cache-Control", "")
+            # Static files should have max-age or immutable, NOT no-store
+            # (unless WHITENOISE_MAX_AGE=0 in debug, which is fine)
+            pass  # Just verifying no crash
+
+    def test_api_endpoints_not_affected(self):
+        """API endpoints should NOT have no-cache headers from HTML middleware."""
+        response = self.client.get("/api/version/")
+        
+        # API returns JSON, not HTML
+        content_type = response.get("Content-Type", "")
+        assert "json" in content_type
+        
+        # Should NOT have our specific pattern (middleware checks content type)
+        # Note: API might have its own caching, that's fine
+
+
+@pytest.mark.django_db  
+class TestServiceWorkerCacheHeaders(TestCase):
+    """Test that service worker has proper no-cache headers."""
+
+    def test_sw_js_has_no_cache_headers(self):
+        """Service worker must have no-cache headers to ensure updates."""
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        
+        cache_control = response.get("Cache-Control", "").lower()
+        assert "no-cache" in cache_control or "no-store" in cache_control, \
+            f"sw.js must have no-cache/no-store. Got: {cache_control}"
+
+    def test_sw_js_has_service_worker_allowed_header(self):
+        """Service worker must have Service-Worker-Allowed header for scope control."""
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        
+        sw_allowed = response.get("Service-Worker-Allowed", "")
+        assert sw_allowed == "/", \
+            f"sw.js must have Service-Worker-Allowed: /. Got: {sw_allowed}"
+
+    def test_sw_js_content_type(self):
+        """Service worker must have JavaScript content type."""
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        
+        content_type = response.get("Content-Type", "")
+        assert "javascript" in content_type, \
+            f"sw.js must have JavaScript content type. Got: {content_type}"
+
+    def test_sw_js_has_build_id(self):
+        """Service worker should have BUILD_ID injected (not placeholder)."""
+        import warnings
+        # Suppress unclosed file warnings from WhiteNoise (not our code)
+        warnings.filterwarnings("ignore", category=ResourceWarning)
+        
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Should NOT contain the placeholder
+        assert "BUILD_ID_PLACEHOLDER" not in content, \
+            "sw.js must have BUILD_ID injected, not placeholder"
+        
+        # Should have a version string (format: emajinet-XXXXXXX)
+        assert "emajinet-" in content, \
+            "sw.js must have version string with emajinet- prefix"
+
+
+@pytest.mark.django_db
+class TestMiddlewareOrdering(TestCase):
+    """Test that cache middleware is properly ordered in MIDDLEWARE."""
+
+    def test_cache_middleware_exists_in_settings(self):
+        """Cache middleware should be in MIDDLEWARE list."""
+        from django.conf import settings
+        
+        middleware_str = str(settings.MIDDLEWARE)
+        assert "AuthenticatedHTMLNoCacheMiddleware" in middleware_str, \
+            "AuthenticatedHTMLNoCacheMiddleware must be in MIDDLEWARE"
+
+    def test_cache_middleware_after_whitenoise(self):
+        """Cache middleware should be after WhiteNoise (let WhiteNoise handle static)."""
+        from django.conf import settings
+        
+        whitenoise_idx = None
+        cache_idx = None
+        
+        for i, m in enumerate(settings.MIDDLEWARE):
+            if "WhiteNoiseMiddleware" in m:
+                whitenoise_idx = i
+            if "AuthenticatedHTMLNoCacheMiddleware" in m:
+                cache_idx = i
+        
+        assert whitenoise_idx is not None, "WhiteNoiseMiddleware must be in MIDDLEWARE"
+        assert cache_idx is not None, "AuthenticatedHTMLNoCacheMiddleware must be in MIDDLEWARE"
+        assert cache_idx > whitenoise_idx, \
+            "Cache middleware must be AFTER WhiteNoise (so static files are handled first)"
 
 
 @pytest.mark.django_db

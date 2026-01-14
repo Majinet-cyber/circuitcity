@@ -276,6 +276,9 @@ print("[cc.settings] Final INSTALLED_APPS:", INSTALLED_APPS)
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # must be right after SecurityMiddleware
+    # ✅ CACHE CONTROL: Prevent caching of authenticated HTML pages
+    # This fixes "need hard refresh after deploy" by ensuring browsers always fetch fresh HTML
+    "cc.middleware_cache.AuthenticatedHTMLNoCacheMiddleware",
     # ✅ SECURITY: Remove framework fingerprints (Server, X-Powered-By headers)
     "cc.middleware_security.RemoveServerHeaderMiddleware",
     # ✅ SECURITY: Add strict security headers (CSP, Permissions-Policy, etc.)

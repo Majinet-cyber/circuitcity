@@ -24,7 +24,9 @@ DATABASES = {"default": dj_database_url.config(conn_max_age=600, ssl_require=Tru
 # Static files via WhiteNoise (no code changes needed)
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# NOTE: Static storage is configured in settings.py using STORAGES (Django 4.2+ API)
+# STATICFILES_STORAGE is deprecated. The base settings.py uses:
+# STORAGES = {"staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
 
 # WhiteNoise safety: Don't hard-fail on missing static files in manifest
 # This prevents 500 errors from missing brand icons or other static files
