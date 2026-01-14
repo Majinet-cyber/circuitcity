@@ -414,3 +414,150 @@ class TestNoRegressionSmoke(TestCase):
         # Might redirect to setup, but should not 500
         assert response.status_code in [200, 302, 403, 404]
 
+
+@pytest.mark.django_db
+class TestCleanUIShellNoRegressions(TestCase):
+    """
+    Tests to ensure the clean UI behavior is maintained WITHOUT deleting any files.
+    
+    HARD requirements (selective fixes only):
+    1. Notifications fallback NEVER appears in initial page load HTML
+    2. NO blur applied to body/content when sidebar opens
+    3. Sidebar toggle exists and works
+    """
+
+    def setUp(self):
+        """Set up user with business and active session."""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testuser",
+            email="test@example.com",
+            password="testpass123"
+        )
+        Profile.objects.get_or_create(user=self.user, defaults={"display_name": "Test User"})
+        
+        # Create business and membership
+        self.business = Business.objects.create(
+            name="Test Business",
+            kind=BusinessKind.PHONES,
+            owner=self.user,
+            status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        self.client.login(username="testuser", password="testpass123")
+        
+        # Set active business in session
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+
+    def test_notifications_modal_has_hidden_guards(self):
+        """
+        HARD REQUIREMENT: Notifications modal must have d-none and hidden attributes
+        to ensure it NEVER appears in visible page flow on initial load.
+        """
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        
+        # Modal must exist
+        assert 'id="ccInbox"' in content, "Notifications modal should exist"
+        
+        # Must have safety guards
+        assert 'd-none' in content, "Modal must have d-none class for safety"
+        assert 'hidden' in content, "Modal must have hidden attribute for safety"
+        assert 'aria-hidden="true"' in content, "Modal must have aria-hidden=true"
+
+    def test_notifications_fallback_text_only_in_modal(self):
+        """
+        "Read-only fallback" text should only appear inside the hidden modal,
+        never in visible page flow.
+        """
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        
+        # These strings should exist (in the modal)
+        assert "Notifications Inbox" in content or "Notifications" in content
+        assert "Read-only fallback" in content
+        
+        # But they should be within the modal structure
+        # Check that modal wrapper exists before the fallback text
+        modal_start = content.find('id="ccInbox"')
+        fallback_pos = content.find("Read-only fallback")
+        
+        if modal_start > 0 and fallback_pos > 0:
+            assert modal_start < fallback_pos, "Fallback text must be inside modal structure"
+
+    def test_no_blur_on_body_or_main_content(self):
+        """
+        HARD REQUIREMENT: NO blur CSS that blurs body or main content.
+        
+        Blur is only acceptable on modal backdrops, NOT on page content.
+        """
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        
+        # These patterns would indicate problematic blur on main content
+        forbidden_patterns = [
+            "body.cc-drawer-open { filter: blur",
+            "body.cc-drawer-open{filter:blur",
+            'body[data-drawer="open"] { filter: blur',
+            "body.no-scroll { filter: blur",
+            "body.no-scroll{filter:blur",
+            ".main { filter: blur",
+            ".main{filter:blur",
+            ".content { filter: blur",
+            ".content{filter:blur",
+            ".page { filter: blur",
+            ".page{filter:blur",
+        ]
+        
+        for pattern in forbidden_patterns:
+            assert pattern not in content, f"Forbidden blur pattern found: {pattern}"
+
+    def test_sidebar_toggle_exists(self):
+        """Sidebar toggle button should exist for mobile users."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        
+        # Check for sidebar toggle elements (various possible IDs)
+        has_toggle = (
+            'id="ccBurger"' in content or
+            'id="sidebarToggle"' in content or
+            'window.CC_SIDEBAR' in content or
+            'bi-list' in content  # Menu icon
+        )
+        
+        assert has_toggle, "Sidebar toggle should exist"
+
+    def test_all_vertical_templates_exist_not_deleted(self):
+        """
+        CRITICAL: Ensure we didn't delete vertical templates.
+        This test verifies key vertical templates are NOT deleted.
+        """
+        import os
+        from django.conf import settings
+        
+        # Check that vertical directories still exist
+        template_dir = os.path.join(settings.BASE_DIR, 'templates', 'verticals')
+        
+        # These should exist (were being deleted in bad revert)
+        critical_verticals = ['farm', 'welding', 'groceries', 'cement', 'pharmacy', 'liquor']
+        
+        for vertical in critical_verticals:
+            vertical_path = os.path.join(template_dir, vertical)
+            assert os.path.exists(vertical_path), f"Vertical {vertical} templates should NOT be deleted"
+
