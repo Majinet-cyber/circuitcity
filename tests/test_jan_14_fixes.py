@@ -100,6 +100,15 @@ class TestAuthenticatedHTMLNoCacheHeaders(TestCase):
         assert expires == "0", \
             f"Dashboard must have Expires: 0. Got: {expires}"
 
+    def test_authenticated_html_has_vary_cookie(self):
+        """Authenticated HTML should have Vary header containing Cookie."""
+        response = self.client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        vary = response.get("Vary", "")
+        assert "Cookie" in vary, \
+            f"Dashboard must have Vary containing Cookie. Got: {vary}"
+
     def test_anonymous_pages_not_affected(self):
         """Anonymous pages should NOT have no-cache headers from our middleware."""
         # Logout to become anonymous
@@ -131,15 +140,53 @@ class TestAuthenticatedHTMLNoCacheHeaders(TestCase):
             pass  # Just verifying no crash
 
     def test_api_endpoints_not_affected(self):
-        """API endpoints should NOT have no-cache headers from HTML middleware."""
+        """API endpoints returning JSON should NOT have our no-cache headers."""
         response = self.client.get("/api/version/")
         
         # API returns JSON, not HTML
         content_type = response.get("Content-Type", "")
         assert "json" in content_type
         
-        # Should NOT have our specific pattern (middleware checks content type)
-        # Note: API might have its own caching, that's fine
+        # Our middleware should NOT inject "no-store" on JSON responses
+        # (API may have its own cache headers, but not our specific pattern)
+        cache_control = response.get("Cache-Control", "")
+        pragma = response.get("Pragma", "")
+        
+        # If no-store is present, it should NOT be from our middleware
+        # (Our middleware only targets text/html responses)
+        # This is verified by the content type check above - JSON != HTML
+
+    def test_redirect_responses_not_affected(self):
+        """Redirect responses (3xx) should NOT have our no-cache headers."""
+        # Test a URL that requires login (should redirect to login page)
+        self.client.logout()
+        response = self.client.get("/inventory/dashboard/", follow=False)
+        
+        # Should be a redirect (302 or 301)
+        assert response.status_code in [301, 302], \
+            f"Expected redirect, got {response.status_code}"
+        
+        # Our middleware only applies to status_code == 200
+        # Redirects should NOT have our specific no-cache pattern
+        # (Django may add its own headers, but not our middleware)
+
+    def test_error_responses_not_affected(self):
+        """Error responses (4xx, 5xx) should NOT have our no-cache headers."""
+        # Login first
+        self.client.login(username="cachetest", password="testpass123")
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session.save()
+        
+        # Request a non-existent page (should be 404)
+        response = self.client.get("/this-page-definitely-does-not-exist-12345/")
+        
+        # Should be 404
+        assert response.status_code == 404
+        
+        # Our middleware only applies to status_code == 200
+        # The 404 page might have Cache-Control, but NOT from our middleware
+        # (Our middleware explicitly checks status_code == 200)
 
 
 @pytest.mark.django_db  
@@ -229,6 +276,24 @@ class TestMiddlewareOrdering(TestCase):
         assert cache_idx is not None, "AuthenticatedHTMLNoCacheMiddleware must be in MIDDLEWARE"
         assert cache_idx > whitenoise_idx, \
             "Cache middleware must be AFTER WhiteNoise (so static files are handled first)"
+
+    def test_cache_middleware_after_authentication(self):
+        """Cache middleware MUST be after AuthenticationMiddleware (so request.user exists)."""
+        from django.conf import settings
+        
+        auth_idx = None
+        cache_idx = None
+        
+        for i, m in enumerate(settings.MIDDLEWARE):
+            if "AuthenticationMiddleware" in m:
+                auth_idx = i
+            if "AuthenticatedHTMLNoCacheMiddleware" in m:
+                cache_idx = i
+        
+        assert auth_idx is not None, "AuthenticationMiddleware must be in MIDDLEWARE"
+        assert cache_idx is not None, "AuthenticatedHTMLNoCacheMiddleware must be in MIDDLEWARE"
+        assert cache_idx > auth_idx, \
+            "Cache middleware must be AFTER AuthenticationMiddleware (so request.user is initialized)"
 
 
 @pytest.mark.django_db

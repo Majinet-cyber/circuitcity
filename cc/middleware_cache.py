@@ -11,15 +11,25 @@ Set Cache-Control: no-store, no-cache, must-revalidate on all authenticated
 HTML responses. This ensures the browser always fetches fresh HTML from the
 server, which then references the correct hashed static assets.
 
-The middleware is surgical:
-- Only applies to authenticated users
-- Only applies to text/html responses
-- Does NOT apply to static files (those use WhiteNoise with proper hashing)
-- Does NOT apply to downloads or API responses
+The middleware is surgical - applies ONLY when ALL conditions are true:
+- request.user exists and is authenticated
+- response.status_code == 200 (OK)
+- Content-Type starts with text/html
+- request.path is NOT /static/*, /media/*, or /sw.js
+- Response is NOT a download (Content-Disposition: attachment)
+
+Headers set:
+- Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+- Pragma: no-cache (HTTP/1.0 compatibility)
+- Expires: 0 (HTTP/1.0 compatibility)
+- Vary: Cookie (appended safely, for proper cache key discrimination)
+
+IMPORTANT: This middleware MUST be positioned AFTER AuthenticationMiddleware
+in settings.MIDDLEWARE so that request.user is properly initialized.
 """
 from __future__ import annotations
 
-import re
+from django.utils.cache import patch_vary_headers
 
 
 class AuthenticatedHTMLNoCacheMiddleware:
@@ -30,13 +40,23 @@ class AuthenticatedHTMLNoCacheMiddleware:
     ensuring users always get the latest templates with correct static
     asset references after deployments.
 
+    Applies ONLY when ALL conditions are true:
+    - request.user exists and is authenticated
+    - response.status_code == 200 (success, not redirect/error)
+    - Content-Type starts with text/html
+    - request.path is NOT excluded (static, media, sw.js, etc.)
+    - Response is NOT a download (Content-Disposition: attachment)
+
     Headers set:
     - Cache-Control: no-store, no-cache, must-revalidate, max-age=0
     - Pragma: no-cache (HTTP/1.0 compatibility)
     - Expires: 0 (HTTP/1.0 compatibility)
+    - Vary: Cookie (appended for correct cache discrimination)
+
+    IMPORTANT: Must be positioned AFTER AuthenticationMiddleware in MIDDLEWARE.
     """
 
-    # Paths to exclude from no-cache headers (static assets, downloads)
+    # Paths to exclude from no-cache headers (static assets, service worker)
     EXCLUDE_PATH_PREFIXES = (
         "/static/",
         "/media/",
@@ -44,7 +64,11 @@ class AuthenticatedHTMLNoCacheMiddleware:
         "/_/",  # Health checks
         "/api/",  # API endpoints (JSON, not HTML)
         "/admin/jsi18n/",  # Django admin JS
-        "/sw.js",  # Service worker
+    )
+
+    # Exact paths to exclude (not just prefixes)
+    EXCLUDE_EXACT_PATHS = (
+        "/sw.js",  # Service worker (has its own cache headers)
     )
 
     # Content types that should get no-cache headers
@@ -63,9 +87,17 @@ class AuthenticatedHTMLNoCacheMiddleware:
         if not self._is_authenticated(request):
             return response
 
-        # Skip excluded paths
+        # Skip non-200 responses (redirects, errors, etc.)
+        if response.status_code != 200:
+            return response
+
+        # Skip excluded path prefixes
         path = request.path
         if path.startswith(self.EXCLUDE_PATH_PREFIXES):
+            return response
+
+        # Skip exact excluded paths (like /sw.js)
+        if path in self.EXCLUDE_EXACT_PATHS:
             return response
 
         # Skip if not HTML content type
@@ -77,10 +109,17 @@ class AuthenticatedHTMLNoCacheMiddleware:
         if "attachment" in response.get("Content-Disposition", ""):
             return response
 
+        # Skip streaming responses (no body modification possible)
+        if getattr(response, "streaming", False):
+            return response
+
         # Set strict no-cache headers
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"
+
+        # Add Vary: Cookie for proper cache discrimination (append, don't overwrite)
+        patch_vary_headers(response, ["Cookie"])
 
         return response
 
