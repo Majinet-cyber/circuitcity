@@ -1,0 +1,38 @@
+PAYMENT CONFIRMED!
+================
+
+Hi{% if business %} {{ business.name }}{% endif %},
+
+Thank you for your payment! We've successfully processed your subscription payment 
+and your account is now active.
+
+INVOICE DETAILS
+--------------
+Invoice Number: {{ invoice.number }}
+Payment Date: {{ invoice.paid_at|date:"F d, Y" }}
+{% if invoice.billing_period_start and invoice.billing_period_end %}Billing Period: {{ invoice.billing_period_start|date:"M d" }} - {{ invoice.billing_period_end|date:"M d, Y" }}
+{% endif %}Payment Method: {{ payment_method|default:"Mobile Money" }}
+{% if provider_reference %}Reference: {{ provider_reference }}
+{% endif %}
+Amount Paid: {{ invoice.currency }} {{ invoice.total|floatformat:2 }}
+
+{% if download_url %}
+DOWNLOAD INVOICE
+---------------
+{{ download_url }}
+{% endif %}
+
+Your subscription will remain active until {{ next_billing_date|date:"F d, Y" }}.
+{% if next_billing_date %}You'll be billed again on that date unless you cancel.{% endif %}
+
+If you have any questions or concerns, please don't hesitate to contact our support team.
+
+--
+Emajinet / Circuit City
+Business Management Platform
+
+Dashboard: {{ dashboard_url|default:"https://emajinet.com/app/" }}
+Support: {{ support_url|default:"support@emajinet.com" }}
+
+Invoice ID: {{ invoice.id }}
+

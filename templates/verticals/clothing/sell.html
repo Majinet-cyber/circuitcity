@@ -48,6 +48,14 @@
   .profit-badge{display:inline-block;padding:4px 12px;border-radius:999px;font-size:.85rem;font-weight:700;background:#dcfce7;color:#15803d}
   .step-indicator{text-align:center;margin-bottom:24px;font-size:.9rem;color:#64748b;font-weight:600}
   .hidden{display:none!important}
+  
+  /* Payment Method Cards */
+  .payment-card{background:#fff;border:3px solid #e2e8f0;border-radius:16px;padding:16px;text-align:center;cursor:pointer;transition:all .3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
+  .payment-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#10b981,#059669);opacity:0;transition:opacity .3s}
+  .payment-card:hover{border-color:#10b981;box-shadow:0 8px 24px rgba(16,185,129,.15);transform:translateY(-4px)}
+  .payment-card.active{border-color:#10b981;background:linear-gradient(135deg,#f0fdf4,#dcfce7);box-shadow:0 12px 32px rgba(16,185,129,.25);transform:translateY(-2px)}
+  .payment-card.active::before{opacity:1}
+  .payment-card small{display:block;font-size:.8rem;margin-top:4px}
 </style>
 
 <div class="sell-page">
@@ -132,10 +140,34 @@
     </div>
 
     <div class="form-step">
-      <label for="id_payment_method">Payment Method</label>
-      {{ form.payment_method }}
+      <label style="display:block;margin-bottom:12px;font-weight:700">💳 Payment Method</label>
+      
+      <!-- Hidden input for form submission (lowercase values match PaymentMethod enum) -->
+      <input type="hidden" name="payment_method" id="payment_method_value" value="cash">
+      
+      <!-- Gamified payment method cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">
+        <div class="payment-card" data-method="cash" onclick="selectPaymentMethod(this)">
+          <div style="font-size:2rem;margin-bottom:8px">💵</div>
+          <div style="font-weight:700;color:#0f172a">Cash</div>
+          <small style="color:#64748b">Immediate payment</small>
+        </div>
+        
+        <div class="payment-card" data-method="mobile_money" onclick="selectPaymentMethod(this)">
+          <div style="font-size:2rem;margin-bottom:8px">📱</div>
+          <div style="font-weight:700;color:#0f172a">Mobile Money</div>
+          <small style="color:#64748b">Airtel/TNM</small>
+        </div>
+        
+        <div class="payment-card" data-method="bank" onclick="selectPaymentMethod(this)">
+          <div style="font-size:2rem;margin-bottom:8px">🏦</div>
+          <div style="font-weight:700;color:#0f172a">Bank Transfer</div>
+          <small style="color:#64748b">Electronic</small>
+        </div>
+      </div>
+      
       {% if form.payment_method.errors %}
-        <small style="color:#dc2626">{{ form.payment_method.errors.0 }}</small>
+        <small style="color:#dc2626;display:block;margin-top:8px">{{ form.payment_method.errors.0 }}</small>
       {% endif %}
     </div>
 
@@ -281,6 +313,19 @@ function updateSummary() {
   }
 }
 
+// Payment method selection
+function selectPaymentMethod(card) {
+  // Remove active class from all cards
+  document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('active'));
+  
+  // Mark selected card as active
+  card.classList.add('active');
+  
+  // Update hidden input value
+  const method = card.dataset.method;
+  document.getElementById('payment_method_value').value = method;
+}
+
 // Auto-update summary when values change
 document.addEventListener('DOMContentLoaded', function() {
   const quantityInput = document.getElementById('id_quantity');
@@ -288,6 +333,12 @@ document.addEventListener('DOMContentLoaded', function() {
   
   if (quantityInput) quantityInput.addEventListener('input', updateSummary);
   if (priceInput) priceInput.addEventListener('input', updateSummary);
+  
+  // Set default payment method (Cash) as active
+  const defaultPaymentCard = document.querySelector('.payment-card[data-method="cash"]');
+  if (defaultPaymentCard) {
+    defaultPaymentCard.classList.add('active');
+  }
 });
 </script>
 

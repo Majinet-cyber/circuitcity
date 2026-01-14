@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Archive Complete · Step 4 of 4{% endblock %}
+
+{% block extra_css %}
+<style>
+  .archive-step-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto 2rem;
+    position: relative;
+  }
+  
+  .archive-step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 0;
+  }
+  
+  .archive-step {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .archive-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+  }
+  
+  .archive-step.completed .archive-step-circle {
+    background: #10b981;
+    color: white;
+  }
+  
+  .archive-step.completed .archive-step-circle::after {
+    content: '✓';
+    font-size: 1.2rem;
+  }
+  
+  .archive-step-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-align: center;
+  }
+  
+  .success-animation {
+    text-align: center;
+    margin: 2rem 0;
+  }
+  
+  .success-icon {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #10b981, #34d399);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 4rem;
+    color: white;
+    animation: scaleIn 0.5s cubic-bezier(0.17, 0.67, 0.25, 1.35) both;
+    box-shadow: 0 20px 40px rgba(16, 185, 129, 0.3);
+  }
+  
+  @keyframes scaleIn {
+    from {
+      transform: scale(0);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  .success-message {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #10b981;
+    margin-top: 1.5rem;
+    animation: fadeInUp 0.5s ease both 0.2s;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .archived-summary {
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+  
+  .summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  }
+  
+  .summary-item:last-child {
+    border-bottom: none;
+  }
+  
+  .summary-label {
+    color: #64748b;
+    font-weight: 600;
+  }
+  
+  .summary-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #10b981;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 2rem auto; padding: 1rem;">
+  <!-- Step Indicator -->
+  <div class="archive-step-indicator">
+    <div class="archive-step completed">
+      <div class="archive-step-circle">1</div>
+      <div class="archive-step-label">Choose Scope</div>
+    </div>
+    <div class="archive-step completed">
+      <div class="archive-step-circle">2</div>
+      <div class="archive-step-label">Summary</div>
+    </div>
+    <div class="archive-step completed">
+      <div class="archive-step-circle">3</div>
+      <div class="archive-step-label">Confirm</div>
+    </div>
+    <div class="archive-step completed">
+      <div class="archive-step-circle">4</div>
+      <div class="archive-step-label">Complete</div>
+    </div>
+  </div>
+  
+  <!-- Main Card -->
+  <div class="glass-card">
+    <!-- Success Animation -->
+    <div class="success-animation">
+      <div class="success-icon">✓</div>
+      <div class="success-message">Archive Complete!</div>
+    </div>
+    
+    <!-- Summary -->
+    <div class="archived-summary">
+      <h4 class="mb-3">📊 Archive Summary</h4>
+      <div class="summary-item">
+        <span class="summary-label">Products Archived</span>
+        <span class="summary-value">{{ archived_counts.products|default:0 }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Stock Items Archived</span>
+        <span class="summary-value">{{ archived_counts.stock_items|default:0 }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Barcodes Archived</span>
+        <span class="summary-value">{{ archived_counts.barcodes|default:0 }}</span>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">Laptop Serials Archived</span>
+        <span class="summary-value">{{ archived_counts.laptop_serials|default:0 }}</span>
+      </div>
+    </div>
+    
+    <!-- Info -->
+    <div class="alert alert-success">
+      <div class="d-flex align-items-start">
+        <i class="bi bi-check-circle me-2" style="font-size: 1.25rem;"></i>
+        <div>
+          <strong>Archive completed successfully!</strong>
+          <p class="mb-0 mt-2">
+            All selected items have been archived and are now hidden from dashboards and stock lists. 
+            You can restore them later if needed.
+          </p>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Archive Batch Info -->
+    {% if archive_batch %}
+    <div class="alert alert-info">
+      <div class="d-flex align-items-start">
+        <i class="bi bi-info-circle me-2" style="font-size: 1.25rem;"></i>
+        <div>
+          <strong>Archive Batch #{{ archive_batch.id }}</strong>
+          <p class="mb-0 mt-1 small">
+            Created: {{ archive_batch.created_at|date:"F d, Y H:i" }}<br>
+            {% if archive_batch.reason %}
+            Reason: {{ archive_batch.reason }}
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    
+    <!-- Actions -->
+    <div class="d-flex gap-2 justify-content-center mt-4">
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-primary">
+        <i class="bi bi-house me-1"></i> Go to Dashboard
+      </a>
+      <a href="{% url 'inventory:stock_list' %}" class="btn btn-outline-primary">
+        <i class="bi bi-list-ul me-1"></i> View Stock List
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+// Auto-redirect after 5 seconds (optional)
+setTimeout(function() {
+  // Optional: Show a countdown or just let user click
+}, 5000);
+</script>
+{% endblock %}
+

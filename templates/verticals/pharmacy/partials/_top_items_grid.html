@@ -1,0 +1,187 @@
+{% comment %}
+Top Items Grid for Pharmacy (most stocked/sold products)
+Usage: {% include "verticals/pharmacy/partials/_top_items_grid.html" with products=top_products action="stock"|"sell" %}
+{% endcomment %}
+
+{% if products %}
+<div class="top-items-section">
+  <h3 class="section-title">
+    <i class="fas fa-fire"></i>
+    {% if action == "sell" %}
+      Top Selling
+    {% else %}
+      Recently Stocked
+    {% endif %}
+  </h3>
+  
+  <div class="top-items-grid">
+    {% for product in products %}
+    <button 
+      type="button" 
+      class="top-item-card" 
+      data-product-id="{{ product.id }}"
+      data-product-name="{{ product.name }}"
+      data-base-unit="{{ product.base_unit_label|default:product.unit|default:'piece' }}"
+      data-has-strip="{% if product.strip_size %}true{% else %}false{% endif %}"
+      data-has-box="{% if product.box_size or product.tablets_per_box %}true{% else %}false{% endif %}"
+      data-strip-size="{{ product.strip_size|default:'' }}"
+      data-box-size="{{ product.box_size|default:'' }}"
+      data-stock="{{ product.quantity_in_stock|default:0 }}"
+      data-price="{{ product.price|default:0 }}"
+      onclick="handleTopItemClick(this, '{{ action|default:"stock" }}')"
+    >
+      <div class="item-icon">
+        {% if product.category == 'TABLETS_CAPSULES' %}
+          💊
+        {% elif product.category == 'SYRUPS' %}
+          🧪
+        {% elif product.category == 'OINTMENTS_CREAMS' %}
+          🧴
+        {% elif product.category == 'DROPS' %}
+          💧
+        {% elif product.category == 'COSMETICS' %}
+          💄
+        {% else %}
+          📦
+        {% endif %}
+      </div>
+      <div class="item-name">{{ product.name|truncatewords:4 }}</div>
+      <div class="item-meta">
+        <span class="item-unit">{{ product.base_unit_label|default:product.unit|default:'piece' }}</span>
+        {% if action == "sell" %}
+          <span class="item-stock {% if product.quantity_in_stock < 10 %}low-stock{% endif %}">
+            {{ product.quantity_in_stock|default:0 }}
+          </span>
+        {% endif %}
+      </div>
+    </button>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<style>
+.top-items-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-title i {
+  color: #f59e0b;
+}
+
+.top-items-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .top-items-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.top-item-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 120px;
+  position: relative;
+}
+
+.top-item-card:hover {
+  border-color: #10b981;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.15);
+}
+
+.top-item-card:active {
+  transform: translateY(-1px);
+}
+
+.item-icon {
+  font-size: 2.5rem;
+  margin-bottom: 4px;
+}
+
+.item-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+  word-break: break-word;
+  flex: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  margin-top: auto;
+}
+
+.item-unit {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.item-stock {
+  background: #dcfce7;
+  color: #166534;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.item-stock.low-stock {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+@media (max-width: 480px) {
+  .top-items-grid {
+    gap: 10px;
+  }
+  
+  .top-item-card {
+    padding: 12px 8px;
+    min-height: 110px;
+  }
+  
+  .item-icon {
+    font-size: 2rem;
+  }
+  
+  .item-name {
+    font-size: 0.85rem;
+  }
+}
+</style>
+

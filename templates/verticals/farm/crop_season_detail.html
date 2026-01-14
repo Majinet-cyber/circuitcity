@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ season.name }} - Farm Manager{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/verticals/farm/crops/">Crops</a></li>
+            <li class="breadcrumb-item active">{{ season.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Season Header -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4 class="mb-1">{{ season.name }}</h4>
+                    <p class="text-muted mb-0">
+                        {{ season.get_crop_type_display }} · {{ season.area_value }} {{ season.get_area_unit_display }}
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <span class="badge fs-6 bg-{% if season.status == 'active' %}success{% elif season.status == 'harvested' %}info{% elif season.status == 'closed' %}secondary{% else %}warning{% endif %}">
+                        {{ season.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Projections vs Actuals -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100 bg-light">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0">📊 Projected</h6>
+                </div>
+                <div class="card-body">
+                    {% if season.projected_yield %}
+                    <p class="mb-2">
+                        <strong>Yield:</strong> {{ season.projected_yield }} {{ season.get_yield_unit_display }}
+                    </p>
+                    {% endif %}
+                    {% if season.projected_price_per_unit_mwk %}
+                    <p class="mb-2">
+                        <strong>Price:</strong> MWK {{ season.projected_price_per_unit_mwk|intcomma }}/{{ season.get_yield_unit_display }}
+                    </p>
+                    {% endif %}
+                    {% if season.projected_income_mwk %}
+                    <p class="h5 text-success mb-0">
+                        <strong>Income:</strong> MWK {{ season.projected_income_mwk|floatformat:0|intcomma }}
+                    </p>
+                    {% else %}
+                    <p class="text-muted mb-0">No projections set</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent">
+                    <h6 class="mb-0">✅ Actual</h6>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Income:</strong> MWK {{ actual_income|floatformat:0|intcomma }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Expenses:</strong> MWK {{ actual_expenses|floatformat:0|intcomma }}
+                    </p>
+                    <p class="h5 {% if actual_profit >= 0 %}text-success{% else %}text-danger{% endif %} mb-0">
+                        <strong>Profit:</strong> MWK {{ actual_profit|floatformat:0|intcomma }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Linked Ledger Entries -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">📒 Season Transactions</h6>
+            <a href="/verticals/farm/ledger/add-expense/?season={{ season.id }}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-plus"></i> Add Entry
+            </a>
+        </div>
+        <div class="card-body p-0">
+            {% if ledger_entries %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Description</th>
+                            <th class="text-end">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in ledger_entries %}
+                        <tr>
+                            <td>{{ entry.date|date:"M d, Y" }}</td>
+                            <td>
+                                {% if entry.entry_type == 'expense' %}
+                                <span class="badge bg-danger">Expense</span>
+                                {% else %}
+                                <span class="badge bg-success">Sale</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ entry.description|default:entry.get_category_display }}</td>
+                            <td class="text-end fw-bold {% if entry.entry_type == 'expense' %}text-danger{% else %}text-success{% endif %}">
+                                {% if entry.entry_type == 'expense' %}-{% endif %}MWK {{ entry.amount_mwk|floatformat:0|intcomma }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+                <p class="mb-0">No transactions linked to this season yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="mt-4">
+        <a href="/verticals/farm/crops/" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Seasons
+        </a>
+    </div>
+</div>
+{% endblock %}
+

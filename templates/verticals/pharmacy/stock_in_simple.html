@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In · Pharmacy{% endblock %}
+
+{% block content %}
+
+<style>
+.stock-in-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 24px 28px;
+  border-radius: 20px;
+  margin-bottom: 32px;
+  box-shadow: 0 12px 40px rgba(59, 130, 246, 0.25);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+  font-weight: 800;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  opacity: 0.95;
+  font-size: 1rem;
+}
+
+.back-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 10px 20px;
+  border-radius: 12px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.search-results {
+  margin-bottom: 24px;
+}
+
+.results-header {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.no-results {
+  background: #f8fafc;
+  border: 2px dashed #cbd5e1;
+  border-radius: 16px;
+  padding: 40px 24px;
+  text-align: center;
+  color: #64748b;
+}
+
+.no-results i {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.no-results h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #475569;
+  margin: 0 0 8px;
+}
+
+.no-results p {
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+}
+
+.quick-add-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quick-add-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+@media (max-width: 480px) {
+  .stock-in-container {
+    padding: 16px;
+  }
+  
+  .page-header {
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  
+  .page-header h1 {
+    font-size: 1.5rem;
+  }
+}
+</style>
+
+<div class="stock-in-container">
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>📦 Stock In</h1>
+      <p>Add inventory to your pharmacy</p>
+    </div>
+    <a href="{% url 'pharmacy:dashboard' %}" class="back-btn">
+      <i class="fas fa-arrow-left"></i> Back
+    </a>
+  </div>
+  
+  <!-- Search Bar -->
+  {% include "verticals/pharmacy/partials/_search_bar.html" with placeholder="Search products to stock..." autofocus=True %}
+  
+  <!-- Top Items Grid -->
+  {% if top_products %}
+    {% include "verticals/pharmacy/partials/_top_items_grid.html" with products=top_products action="stock" %}
+  {% endif %}
+  
+  <!-- Search Results -->
+  <div class="search-results" id="search-results">
+    {% if search_query %}
+      <div class="results-header">
+        {% if products %}
+          Found {{ products|length }} product{{ products|pluralize }}
+        {% else %}
+          No products found for "{{ search_query }}"
+        {% endif %}
+      </div>
+      
+      {% if products %}
+        {% for product in products %}
+          {% include "verticals/pharmacy/partials/_product_row.html" with product=product action="stock" %}
+        {% endfor %}
+      {% else %}
+        <div class="no-results">
+          <i class="fas fa-search"></i>
+          <h3>No products found</h3>
+          <p>Try a different search or add a new product</p>
+          <a href="{% url 'pharmacy:stock_in_wizard' %}" class="quick-add-btn">
+            <i class="fas fa-plus"></i> Add New Product
+          </a>
+        </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Qty Modal -->
+{% include "verticals/pharmacy/partials/_qty_modal.html" %}
+
+<!-- Toast Notifications -->
+{% include "verticals/pharmacy/partials/_toast.html" %}
+
+<script>
+// Live search functionality
+(function() {
+  const searchInput = document.getElementById('product-search');
+  const searchResults = document.getElementById('search-results');
+  let searchTimeout;
+  
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      clearTimeout(searchTimeout);
+      const query = this.value.trim();
+      
+      if (query.length < 2) {
+        searchResults.innerHTML = '';
+        return;
+      }
+      
+      // Debounce search
+      searchTimeout = setTimeout(() => {
+        performSearch(query);
+      }, 300);
+    });
+  }
+  
+  function performSearch(query) {
+    // Show loading state
+    searchResults.innerHTML = '<div class="results-header">Searching...</div>';
+    
+    // Fetch search results
+    fetch(`{% url 'pharmacy:api_product_search' %}?q=${encodeURIComponent(query)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.products && data.products.length > 0) {
+          let html = `<div class="results-header">Found ${data.products.length} product${data.products.length !== 1 ? 's' : ''}</div>`;
+          
+          data.products.forEach(product => {
+            html += renderProductRow(product);
+          });
+          
+          searchResults.innerHTML = html;
+        } else {
+          searchResults.innerHTML = `
+            <div class="no-results">
+              <i class="fas fa-search"></i>
+              <h3>No products found</h3>
+              <p>Try a different search or add a new product</p>
+              <a href="/pharmacy/stock-in-wizard/" class="quick-add-btn">
+                <i class="fas fa-plus"></i> Add New Product
+              </a>
+            </div>
+          `;
+        }
+      })
+      .catch(error => {
+        console.error('Search error:', error);
+        searchResults.innerHTML = '<div class="results-header" style="color: #ef4444;">Search failed. Please try again.</div>';
+      });
+  }
+  
+  function renderProductRow(product) {
+    const icon = getCategoryIcon(product.category);
+    const baseUnit = product.base_unit_label || product.unit || 'piece';
+    
+    let metaBadges = `<span class="meta-badge">${baseUnit}</span>`;
+    if (product.strip_size) {
+      metaBadges += `<span class="meta-badge">Strip: ${product.strip_size}</span>`;
+    }
+    if (product.box_size || product.tablets_per_box) {
+      metaBadges += `<span class="meta-badge">Box: ${product.box_size || product.tablets_per_box}</span>`;
+    }
+    
+    return `
+      <div class="product-row" 
+           data-product-id="${product.id}"
+           data-product-name="${product.name}"
+           data-base-unit="${baseUnit}"
+           data-has-strip="${product.strip_size ? 'true' : 'false'}"
+           data-has-box="${product.box_size || product.tablets_per_box ? 'true' : 'false'}"
+           data-strip-size="${product.strip_size || ''}"
+           data-box-size="${product.box_size || product.tablets_per_box || ''}"
+           data-stock="${product.quantity_in_stock || 0}"
+           data-price="${product.price || 0}">
+        <div class="product-row-icon">${icon}</div>
+        <div class="product-row-info">
+          <div class="product-row-name">${product.name}</div>
+          <div class="product-row-meta">${metaBadges}</div>
+        </div>
+        <button type="button" class="product-row-action-btn" onclick="handleProductRowClick(this, 'stock')">
+          <i class="fas fa-box"></i> Stock
+        </button>
+      </div>
+    `;
+  }
+  
+  function getCategoryIcon(category) {
+    const icons = {
+      'TABLETS_CAPSULES': '💊',
+      'SYRUPS': '🧪',
+      'OINTMENTS_CREAMS': '🧴',
+      'DROPS': '💧',
+      'COSMETICS': '💄'
+    };
+    return icons[category] || '📦';
+  }
+})();
+
+// Update qty modal form action and add AJAX submission
+document.addEventListener('DOMContentLoaded', function() {
+  const qtyForm = document.getElementById('qtyForm');
+  if (qtyForm) {
+    // Set form action to stock-in endpoint
+    qtyForm.action = '{% url "pharmacy:api_stock_in" %}';
+    
+    // Override form submission with AJAX
+    qtyForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('modal-submit-btn');
+      const submitText = document.getElementById('modal-submit-text');
+      const spinner = document.getElementById('modal-spinner');
+      const errorDiv = document.getElementById('modal-error');
+      
+      // Show loading state
+      submitBtn.disabled = true;
+      submitText.style.display = 'none';
+      spinner.style.display = 'inline-block';
+      errorDiv.style.display = 'none';
+      
+      // Gather form data
+      const formData = {
+        product_id: document.getElementById('modal-product-id').value,
+        quantity: parseInt(document.getElementById('modal-quantity').value),
+        unit: document.getElementById('modal-unit').value,
+        expiry_date: document.getElementById('modal-expiry').value || null,
+        batch_number: document.getElementById('modal-batch').value || null,
+      };
+      
+      // Submit via AJAX
+      fetch('{% url "pharmacy:api_stock_in" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(formData)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Close modal
+          const modal = bootstrap.Modal.getInstance(document.getElementById('qtyModal'));
+          modal.hide();
+          
+          // Show success toast
+          showPharmacyToast(data.message || 'Stock added successfully!', 'success');
+          
+          // Reset form
+          qtyForm.reset();
+          
+          // Refocus search
+          setTimeout(() => {
+            document.getElementById('product-search').focus();
+          }, 300);
+        } else {
+          // Show error in modal
+          errorDiv.textContent = data.error || 'Stock-in failed';
+          errorDiv.style.display = 'block';
+        }
+      })
+      .catch(error => {
+        console.error('Stock-in error:', error);
+        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.style.display = 'block';
+      })
+      .finally(() => {
+        // Reset loading state
+        submitBtn.disabled = false;
+        submitText.style.display = 'inline';
+        spinner.style.display = 'none';
+      });
+    });
+  }
+});
+</script>
+
+{% endblock %}
+

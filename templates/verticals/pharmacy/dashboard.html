@@ -6,594 +6,425 @@
 {% block content %}
 
 <style>
-  /* Premium Dashboard Styling */
-  .pharmacy-dashboard{padding:20px;display:flex;flex-direction:column;gap:20px}
+  /* Mobile-First Pharmacy Dashboard */
+  .pharmacy-dashboard {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+  }
   
-  /* Header with gradient */
-  .pharm-header{
-    background:linear-gradient(120deg,#06b6d4 0%,#3b82f6 100%);
-    padding:28px;
-    border-radius:20px;
-    color:#fff;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:16px
+  /* Header */
+  .dashboard-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    padding: 28px;
+    border-radius: 20px;
+    color: #fff;
+    margin-bottom: 32px;
+    box-shadow: 0 12px 40px rgba(16, 185, 129, 0.25);
   }
-  .pharm-header h1{margin:0;font-size:clamp(24px,4vw,36px);font-weight:800}
-  .pharm-header p{margin:8px 0 0;opacity:.9;font-size:1rem}
-  .pharm-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .pharm-actions a{
-    padding:10px 20px;
-    border-radius:999px;
-    font-weight:700;
-    text-decoration:none;
-    transition:all .2s
-  }
-  .pharm-actions .primary{background:#fff;color:#0ea5e9}
-  .pharm-actions .ghost{border:2px solid rgba(255,255,255,.7);color:#fff}
-  .pharm-actions a:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(0,0,0,.15)}
   
-  /* Period Selector */
-  .period-selector{
-    background:#fff;
-    border-radius:18px;
-    padding:18px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08);
-    display:flex;
-    gap:12px;
-    align-items:center;
-    flex-wrap:wrap
+  .dashboard-header h1 {
+    margin: 0;
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
   }
-  .period-selector label{font-weight:700;color:#475569}
-  .period-btn{
-    padding:8px 18px;
-    border-radius:12px;
-    border:2px solid #e2e8f0;
-    background:#fff;
-    color:#475569;
-    font-weight:600;
-    cursor:pointer;
-    text-decoration:none;
-    transition:all .2s
+  
+  .dashboard-header p {
+    margin: 8px 0 0;
+    opacity: 0.95;
+    font-size: 1.05rem;
   }
-  .period-btn:hover{background:#f8fafc;border-color:#cbd5e1}
-  .period-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+  
+  /* BIG ACTION BUTTONS (Primary Focus) */
+  .primary-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 40px;
+  }
+  
+  @media (min-width: 640px) {
+    .primary-actions {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+  
+  .action-card {
+    background: linear-gradient(135deg, #fff 0%, #f8fafc 100%);
+    border: 3px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 28px 24px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    min-height: 160px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+  
+  .action-card:hover {
+    border-color: #10b981;
+    transform: translateY(-6px);
+    box-shadow: 0 16px 48px rgba(16, 185, 129, 0.2);
+  }
+  
+  .action-card.add-product {
+    border-color: #10b981;
+    background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+  }
+  
+  .action-card.add-product:hover {
+    border-color: #059669;
+    background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  }
+  
+  .action-card.stock-in {
+    border-color: #3b82f6;
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  }
+  
+  .action-card.stock-in:hover {
+    border-color: #2563eb;
+    background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+  }
+  
+  .action-card.sell {
+    border-color: #8b5cf6;
+    background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  }
+  
+  .action-card.sell:hover {
+    border-color: #7c3aed;
+    background: linear-gradient(135deg, #ddd6fe 0%, #c4b5fd 100%);
+  }
+  
+  .action-icon {
+    font-size: 3.5rem;
+    margin-bottom: 4px;
+  }
+  
+  .action-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+  
+  .action-subtitle {
+    font-size: 0.95rem;
+    color: #64748b;
+    margin: 0;
+    font-weight: 600;
+  }
+  
+  /* Secondary Actions */
+  .secondary-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+  
+  .secondary-btn {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 16px 12px;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.2s;
+    font-weight: 700;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .secondary-btn:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    transform: translateY(-2px);
+  }
+  
+  .secondary-btn i {
+    font-size: 1.2rem;
+  }
   
   /* KPI Cards Grid */
-  .kpi-grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:18px
-  }
-  .kpi-card{
-    background:#fff;
-    border-radius:18px;
-    padding:20px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08);
-    transition:all .2s;
-    position:relative;
-    overflow:hidden
-  }
-  .kpi-card:hover{transform:translateY(-4px);box-shadow:0 15px 40px rgba(15,23,42,.12)}
-  .kpi-card::before{
-    content:'';
-    position:absolute;
-    top:0;
-    left:0;
-    width:100%;
-    height:4px;
-    background:linear-gradient(90deg,#06b6d4,#3b82f6);
-    opacity:0;
-    transition:opacity .2s
-  }
-  .kpi-card:hover::before{opacity:1}
-  .kpi-label{
-    font-size:.9rem;
-    color:#64748b;
-    font-weight:600;
-    margin:0 0 8px;
-    text-transform:uppercase;
-    letter-spacing:.5px
-  }
-  .kpi-value{
-    font-size:clamp(1.4rem,3vw,2rem);
-    font-weight:800;
-    color:#0f172a;
-    margin:0;
-    line-height:1.2;
-    word-wrap:break-word;
-    overflow-wrap:break-word;
-    word-wrap:break-word;
-    overflow-wrap:break-word;
-    white-space:normal;
-    overflow:visible;
-    text-overflow:clip
-  }
-  .kpi-sublabel{
-    font-size:.85rem;
-    color:#94a3b8;
-    margin-top:6px
+  .kpi-section {
+    margin-bottom: 32px;
   }
   
-  /* Badges Section */
-  .badges-section{
-    background:#fff;
-    border-radius:18px;
-    padding:24px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08)
-  }
-  .badges-section h2{margin:0 0 16px;color:#0f172a;font-size:1.4rem}
-  .badges-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
-  .badge-card{
-    padding:16px;
-    border-radius:14px;
-    border:2px solid #e2e8f0;
-    display:flex;
-    align-items:center;
-    gap:12px;
-    transition:all .2s
-  }
-  .badge-card.earned{
-    background:linear-gradient(120deg,#dcfce7,#d1fae5);
-    border-color:#86efac
-  }
-  .badge-card.locked{opacity:.5}
-  .badge-icon{font-size:2rem}
-  .badge-info h3{margin:0;font-size:1rem;color:#0f172a}
-  .badge-info p{margin:4px 0 0;font-size:.85rem;color:#64748b}
-  
-  /* Cosmetics Highlights */
-  .cosmetics-section{
-    background:#fff;
-    border-radius:18px;
-    padding:24px;
-    box-shadow:0 10px 30px rgba(15,23,42,.08)
-  }
-  .cosmetics-section h2{
-    margin:0 0 16px;
-    color:#0f172a;
-    font-size:1.4rem;
-    display:flex;
-    align-items:center;
-    gap:10px
-  }
-  .cosmetics-mix{
-    display:flex;
-    gap:12px;
-    margin-top:16px;
-    flex-wrap:wrap
-  }
-  .mix-item{
-    flex:1;
-    min-width:180px;
-    padding:16px;
-    border-radius:12px;
-    background:linear-gradient(120deg,#fef3c7,#fde68a);
-    border:2px solid #fbbf24
-  }
-  .mix-item h4{margin:0;color:#92400e;font-size:.9rem;text-transform:uppercase}
-  .mix-item .value{font-size:1.6rem;font-weight:800;color:#78350f;margin-top:4px}
-  
-  /* Alerts */
-  .alerts-section{display:flex;flex-direction:column;gap:14px}
-  .alert-card{
-    background:#fff;
-    border-radius:14px;
-    padding:18px;
-    box-shadow:0 8px 20px rgba(15,23,42,.06);
-    border-left:4px solid;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:12px
-  }
-  .alert-card.warning{border-color:#f59e0b;background:linear-gradient(120deg,#fffbeb,#fef3c7)}
-  .alert-card.danger{border-color:#ef4444;background:linear-gradient(120deg,#fef2f2,#fee2e2)}
-  .alert-card h4{margin:0;color:#0f172a;font-size:1.1rem}
-  .alert-card p{margin:6px 0 0;color:#64748b;font-size:.9rem}
-  .alert-card a{
-    padding:8px 16px;
-    background:#3b82f6;
-    color:#fff;
-    border-radius:8px;
-    text-decoration:none;
-    font-weight:700;
-    font-size:.9rem
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 16px 0;
   }
   
-  @media (max-width:768px){
-    .pharm-header{flex-direction:column;text-align:center}
-    .kpi-grid{grid-template-columns:1fr}
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+  
+  .kpi-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    transition: all 0.2s;
+    border: 2px solid transparent;
+  }
+  
+  .kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    border-color: #e2e8f0;
+  }
+  
+  .kpi-label {
+    font-size: 0.9rem;
+    color: #64748b;
+    font-weight: 600;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .kpi-value {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+    line-height: 1.2;
+  }
+  
+  .kpi-sublabel {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+  
+  /* Alerts Section */
+  .alerts-section {
+    margin-bottom: 32px;
+  }
+  
+  .alert-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    border-left: 4px solid;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .alert-card.warning {
+    border-color: #f59e0b;
+    background: linear-gradient(120deg, #fffbeb, #fef3c7);
+  }
+  
+  .alert-card.danger {
+    border-color: #ef4444;
+    background: linear-gradient(120deg, #fef2f2, #fee2e2);
+  }
+  
+  .alert-info h4 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  
+  .alert-info p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+  }
+  
+  .alert-action {
+    padding: 8px 16px;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  
+  .alert-action:hover {
+    background: #2563eb;
+    color: #fff;
+    transform: translateY(-2px);
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 480px) {
+    .pharmacy-dashboard {
+      padding: 16px;
+    }
+    
+    .dashboard-header {
+      padding: 24px 20px;
+      margin-bottom: 24px;
+    }
+    
+    .primary-actions {
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+    
+    .action-card {
+      padding: 24px 20px;
+      min-height: 140px;
+    }
+    
+    .action-icon {
+      font-size: 3rem;
+    }
+    
+    .action-title {
+      font-size: 1.25rem;
+    }
+    
+    .kpi-grid {
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
   }
 </style>
 
 <div class="pharmacy-dashboard">
   <!-- Header -->
-  <div class="pharm-header">
-    <div>
-      <h1>💊 Pharmacy & Cosmetics</h1>
-      <p>Premium stock and sales management</p>
-    </div>
-    <div class="pharm-actions">
-      <a href="{% url 'pharmacy:stock_in' %}" class="primary">+ Add Stock</a>
-      <a href="{% url 'pharmacy:batch_list' %}" class="ghost">View Batches</a>
-      <a href="{% url 'pharmacy:sell' %}" class="ghost">Record Sale</a>
-      {% include "partials/vertical_more_dropdown.html" %}
-    </div>
+  <div class="dashboard-header">
+    <h1>💊 Pharmacy & Cosmetics</h1>
+    <p>{{ active_business.name }} · {{ active_location.name }}</p>
   </div>
   
-  <!-- Period Selector (Single Button) -->
-  <div class="period-selector">
-    <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap">
-      <div style="display:flex;gap:12px;align-items:center">
-        <label>Period:</label>
-        {% include "partials/date_filter_unified.html" with range_key=range_param start_date=start_date end_date=end_date range_label=period_label %}
-      </div>
-      <span style="color:#94a3b8;font-size:.9rem"><strong>Showing:</strong> {{ period_label }}</span>
-    </div>
-  </div>
-  
-  <!-- Quick Actions (moved above KPIs for better UX) -->
-  <div style="background:linear-gradient(120deg,#f8fafc,#f1f5f9);border-radius:18px;padding:20px;border:2px solid #e2e8f0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
-      <h3 style="margin:0;color:#475569;font-size:1.2rem;display:flex;align-items:center;gap:8px">
-        <span>⚡</span> Quick Actions
-      </h3>
-      <small style="color:#64748b;font-weight:600">Jump to key tasks</small>
-    </div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap">
-      <a href="{% url 'pharmacy:stock_in' %}" style="padding:12px 20px;background:#3b82f6;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-        <span>📦</span> Stock In
-      </a>
-      <a href="{% url 'pharmacy:sell' %}" style="padding:12px 20px;background:#10b981;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-        <span>💰</span> Sell
-      </a>
-      <a href="{% url 'pharmacy:batch_list' %}" style="padding:12px 20px;background:#6366f1;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-        <span>📋</span> Batches
-      </a>
-      <a href="{% url 'pharmacy:low_stock' %}" style="padding:12px 20px;background:#f59e0b;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-        <span>📉</span> Low Stock
-      </a>
-      <a href="{% url 'pharmacy:near_expiry' %}" style="padding:12px 20px;background:#ef4444;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;display:flex;align-items:center;gap:8px;transition:transform .2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-        <span>⏰</span> Near Expiry
-      </a>
-    </div>
-  </div>
-  
-  <!-- Stock Health Insights Panel (Gamified) -->
-  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08)">
-    <h2 style="margin:0 0 16px;color:#0f172a;font-size:1.4rem;display:flex;align-items:center;gap:10px">
-      <span>🎯</span> Stock Health Insights
-    </h2>
+  <!-- PRIMARY ACTIONS (Big 3 Buttons) -->
+  <div class="primary-actions">
+    <a href="{% url 'pharmacy:stock_in_wizard' %}" class="action-card add-product">
+      <div class="action-icon">➕</div>
+      <h2 class="action-title">Add Product</h2>
+      <p class="action-subtitle">Quick product setup</p>
+    </a>
     
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
-      <!-- Expiry Risk Gauge -->
-      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if near_expiry_count > 0 %}#fef3c7,#fde68a{% else %}#d1fae5,#a7f3d0{% endif %});border:2px solid {% if near_expiry_count > 0 %}#fbbf24{% else %}#86efac{% endif %}">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:1.8rem">{% if near_expiry_count > 0 %}⚠️{% else %}✅{% endif %}</span>
-          <div>
-            <h4 style="margin:0;font-size:.9rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %}">Expiry Risk</h4>
-            <p style="margin:4px 0 0;font-size:.85rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %};opacity:.8">Next 30 days</p>
-          </div>
-        </div>
-        <div style="font-size:2rem;font-weight:800;color:{% if near_expiry_count > 0 %}#78350f{% else %}#064e3b{% endif %};margin-top:8px">
-          {{ near_expiry_count }}
-        </div>
-        <p style="margin:6px 0 0;font-size:.85rem;color:{% if near_expiry_count > 0 %}#92400e{% else %}#065f46{% endif %}">
-          {% if near_expiry_count > 0 %}
-            batch{{ near_expiry_count|pluralize:"es" }} expiring soon
-          {% else %}
-            All batches fresh!
-          {% endif %}
-        </p>
-      </div>
-      
-      <!-- Low Stock Mission -->
-      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if low_stock_count > 0 %}#fee2e2,#fecaca{% else %}#dbeafe,#bfdbfe{% endif %});border:2px solid {% if low_stock_count > 0 %}#f87171{% else %}#60a5fa{% endif %}">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:1.8rem">{% if low_stock_count > 0 %}📦{% else %}✨{% endif %}</span>
-          <div>
-            <h4 style="margin:0;font-size:.9rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %}">Stock Mission</h4>
-            <p style="margin:4px 0 0;font-size:.85rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %};opacity:.8">Reorder needed</p>
-          </div>
-        </div>
-        <div style="font-size:2rem;font-weight:800;color:{% if low_stock_count > 0 %}#991b1b{% else %}#1e3a8a{% endif %};margin-top:8px">
-          {{ low_stock_count }}
-        </div>
-        <p style="margin:6px 0 0;font-size:.85rem;color:{% if low_stock_count > 0 %}#7f1d1d{% else %}#1e40af{% endif %}">
-          {% if low_stock_count > 0 %}
-            item{{ low_stock_count|pluralize }} below reorder level
-          {% else %}
-            Stock levels optimal!
-          {% endif %}
-        </p>
-      </div>
-      
-      <!-- Expired Items Alert -->
-      <div style="padding:16px;border-radius:14px;background:linear-gradient(120deg,{% if expired_count > 0 %}#fecaca,#fca5a5{% else %}#e0e7ff,#c7d2fe{% endif %});border:2px solid {% if expired_count > 0 %}#ef4444{% else %}#a5b4fc{% endif %}">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-          <span style="font-size:1.8rem">{% if expired_count > 0 %}🚨{% else %}🎉{% endif %}</span>
-          <div>
-            <h4 style="margin:0;font-size:.9rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %}">Expired Items</h4>
-            <p style="margin:4px 0 0;font-size:.85rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %};opacity:.8">Needs attention</p>
-          </div>
-        </div>
-        <div style="font-size:2rem;font-weight:800;color:{% if expired_count > 0 %}#991b1b{% else %}#4338ca{% endif %};margin-top:8px">
-          {{ expired_count }}
-        </div>
-        <p style="margin:6px 0 0;font-size:.85rem;color:{% if expired_count > 0 %}#7f1d1d{% else %}#3730a3{% endif %}">
-          {% if expired_count > 0 %}
-            batch{{ expired_count|pluralize:"es" }} past expiry
-          {% else %}
-            No expired batches!
-          {% endif %}
-        </p>
-      </div>
-    </div>
+    <a href="{% url 'pharmacy:stock_in_simple' %}" class="action-card stock-in">
+      <div class="action-icon">📦</div>
+      <h2 class="action-title">Stock In</h2>
+      <p class="action-subtitle">Receive inventory</p>
+    </a>
     
-    <!-- Stock Health Score (simple text indicator) -->
-    {% if near_expiry_count == 0 and low_stock_count == 0 and expired_count == 0 %}
-    <div style="margin-top:16px;padding:16px;background:linear-gradient(120deg,#d1fae5,#a7f3d0);border:2px solid #86efac;border-radius:14px;text-align:center">
-      <span style="font-size:2rem;display:block;margin-bottom:8px">🏆</span>
-      <h3 style="margin:0;color:#065f46;font-size:1.1rem">Perfect Stock Health!</h3>
-      <p style="margin:6px 0 0;color:#047857;font-size:.9rem">Your pharmacy inventory is in excellent condition. Keep it up!</p>
-    </div>
-    {% endif %}
+    <a href="{% url 'pharmacy:fast_sell' %}" class="action-card sell">
+      <div class="action-icon">⚡</div>
+      <h2 class="action-title">Sell</h2>
+      <p class="action-subtitle">Fast checkout</p>
+    </a>
   </div>
   
-  <!-- KPI Cards (Global Color Standard) -->
-  <div class="kpi-grid">
-    <div class="kpi-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:none">
-      <p class="kpi-label" style="color:rgba(255,255,255,.9)">💰 Revenue ({{ period_label }})</p>
-      <h3 class="kpi-value" style="color:#fff">MWK {{ period_revenue|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">{{ period_sales_count }} sales</p>
-    </div>
-    
-    <div class="kpi-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none">
-      <p class="kpi-label" style="color:rgba(255,255,255,.9)">📈 Profit ({{ period_label }})</p>
-      <h3 class="kpi-value" style="color:#fff">MWK {{ period_profit|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">Gross margin</p>
-    </div>
-    
-    <div class="kpi-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;border:none">
-      <p class="kpi-label" style="color:rgba(255,255,255,.9)">💸 Total Costs ({{ period_label }})</p>
-      <h3 class="kpi-value" style="color:#fff">MWK {{ period_costs|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">COGS + Admin</p>
-    </div>
-    
-    <div class="kpi-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff;border:none">
-      <p class="kpi-label" style="color:rgba(255,255,255,.9)">📦 Stock Value</p>
-      <h3 class="kpi-value" style="color:#fff;font-size:clamp(1.4rem,3vw,2rem);word-wrap:break-word">MWK {{ total_stock_value|floatformat:0|intcomma }}</h3>
-      <p class="kpi-sublabel" style="color:rgba(255,255,255,.8)">At selling price</p>
-    </div>
+  <!-- Secondary Actions -->
+  <div class="secondary-actions">
+    <a href="{% url 'pharmacy:batch_list' %}" class="secondary-btn">
+      <i class="fas fa-boxes"></i> Batches
+    </a>
+    <a href="{% url 'pharmacy:sale_list' %}" class="secondary-btn">
+      <i class="fas fa-history"></i> Sales
+    </a>
+    <a href="{% url 'pharmacy:near_expiry' %}" class="secondary-btn">
+      <i class="fas fa-exclamation-triangle"></i> Expiring
+    </a>
+    <a href="{% url 'pharmacy:low_stock' %}" class="secondary-btn">
+      <i class="fas fa-arrow-down"></i> Low Stock
+    </a>
   </div>
   
-  <!-- Badges (Gamification) -->
-  {% if badges %}
-  <div class="badges-section">
-    <h2>🏆 Your Achievements</h2>
-    <div class="badges-grid">
-      {% for badge in badges %}
-        <div class="badge-card {% if badge.earned %}earned{% else %}locked{% endif %}">
-          <div class="badge-icon">{{ badge.icon }}</div>
-          <div class="badge-info">
-            <h3>{{ badge.name }}</h3>
-            <p>{{ badge.description }}</p>
-          </div>
-        </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-  
-  <!-- Cosmetics Highlights -->
-  {% if cosmetics_revenue or cosmetics_products %}
-  <div class="cosmetics-section">
-    <h2><span>💄</span> Cosmetics Highlights ({{ period_label }})</h2>
-    <div class="cosmetics-mix">
-      <div class="mix-item">
-        <h4>Cosmetics Revenue</h4>
-        <div class="value">MWK {{ cosmetics_revenue|floatformat:0|intcomma }}</div>
-        <p style="margin-top:6px;color:#92400e;font-size:.85rem">
-          {{ cosmetics_revenue_pct|floatformat:1 }}% of total
-        </p>
-      </div>
-      <div class="mix-item" style="background:linear-gradient(120deg,#dbeafe,#bfdbfe);border-color:#3b82f6">
-        <h4 style="color:#1e40af">Cosmetics Products</h4>
-        <div class="value" style="color:#1e3a8a">{{ cosmetics_products }}</div>
-        <p style="margin-top:6px;color:#1e40af;font-size:.85rem">In stock</p>
-      </div>
-    </div>
-    
-    {% if top_cosmetics_brands %}
-    <div style="margin-top:20px">
-      <h3 style="margin:0 0 12px;color:#475569;font-size:1.1rem">Top Brands This Period</h3>
-      <div style="display:flex;gap:10px;flex-wrap:wrap">
-        {% for brand in top_cosmetics_brands %}
-          <span style="padding:8px 14px;background:#f1f5f9;border-radius:20px;font-weight:600;color:#475569">
-            {{ brand.name }} (MWK {{ brand.revenue|floatformat:0|intcomma }})
-          </span>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-  
-  <!-- Alerts Summary -->
+  <!-- Alerts (if any) -->
+  {% if low_stock_count or near_expiry_count or expired_count %}
   <div class="alerts-section">
-    {% if near_expiry_count > 0 %}
-    <div class="alert-card warning">
-      <div>
-        <h4>⚠️ Near-Expiry Batches</h4>
-        <p>{{ near_expiry_count }} batch{{ near_expiry_count|pluralize:"es" }} expiring within 30 days</p>
-      </div>
-      <a href="{% url 'pharmacy:near_expiry' %}">View Details</a>
-    </div>
-    {% endif %}
+    <h2 class="section-title">⚠️ Alerts</h2>
     
-    {% if expired_count > 0 %}
+    {% if expired_count %}
     <div class="alert-card danger">
-      <div>
-        <h4>🚨 Expired Batches</h4>
-        <p>{{ expired_count }} batch{{ expired_count|pluralize:"es" }} past expiry date</p>
+      <div class="alert-info">
+        <h4>{{ expired_count }} Expired Batch{{ expired_count|pluralize:"es" }}</h4>
+        <p>Remove from stock immediately</p>
       </div>
-      <a href="{% url 'pharmacy:expired' %}">View Details</a>
+      <a href="{% url 'pharmacy:expired' %}" class="alert-action">View</a>
     </div>
     {% endif %}
     
-    {% if low_stock_count > 0 %}
+    {% if near_expiry_count %}
     <div class="alert-card warning">
-      <div>
-        <h4>📉 Low Stock</h4>
-        <p>{{ low_stock_count }} batch{{ low_stock_count|pluralize:"es" }} at or below reorder level</p>
+      <div class="alert-info">
+        <h4>{{ near_expiry_count }} Near Expiry</h4>
+        <p>Expiring in next 30 days</p>
       </div>
-      <a href="{% url 'pharmacy:low_stock' %}">View Details</a>
+      <a href="{% url 'pharmacy:near_expiry' %}" class="alert-action">View</a>
     </div>
     {% endif %}
     
-    {% if near_expiry_count == 0 and expired_count == 0 and low_stock_count == 0 %}
-    <div class="alert-card" style="border-color:#10b981;background:linear-gradient(120deg,#d1fae5,#a7f3d0)">
-      <div>
-        <h4>✅ All Systems Go!</h4>
-        <p>No alerts. Your pharmacy inventory is in great shape.</p>
+    {% if low_stock_count %}
+    <div class="alert-card warning">
+      <div class="alert-info">
+        <h4>{{ low_stock_count }} Low Stock Item{{ low_stock_count|pluralize }}</h4>
+        <p>Stock below minimum level</p>
+      </div>
+      <a href="{% url 'pharmacy:low_stock' %}" class="alert-action">View</a>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  
+  <!-- KPI Section -->
+  <div class="kpi-section">
+    <h2 class="section-title">📊 Overview</h2>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <p class="kpi-label">Total Products</p>
+        <h3 class="kpi-value">{{ total_products|default:0|intcomma }}</h3>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">Active Batches</p>
+        <h3 class="kpi-value">{{ active_batches|default:0|intcomma }}</h3>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">Today's Sales</p>
+        <h3 class="kpi-value">MWK {{ today_sales|default:0|floatformat:0|intcomma }}</h3>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">This Month</p>
+        <h3 class="kpi-value">MWK {{ month_sales|default:0|floatformat:0|intcomma }}</h3>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">Stock Value</p>
+        <h3 class="kpi-value">MWK {{ stock_value|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">At cost price</p>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">Potential Revenue</p>
+        <h3 class="kpi-value">MWK {{ potential_revenue|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">At selling price</p>
       </div>
     </div>
-    {% endif %}
   </div>
-  
-  <!-- Near-Expiry Details (Top 5) -->
-  {% if near_expiry_batches %}
-  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-top:20px">
-    <h2 style="margin:0 0 16px;color:#0f172a;font-size:1.4rem;display:flex;align-items:center;gap:10px">
-      <span>⏰</span> Soonest Expiring Batches
-    </h2>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:2px solid #e2e8f0">
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Product</th>
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Batch Code</th>
-            <th style="padding:12px;text-align:right;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Quantity</th>
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Expiry Date</th>
-            <th style="padding:12px;text-align:right;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Days Left</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for batch in near_expiry_batches|slice:":5" %}
-          <tr style="border-bottom:1px solid #f1f5f9">
-            <td style="padding:12px;font-weight:600;color:#0f172a">{{ batch.merch_product.name }}</td>
-            <td style="padding:12px;color:#64748b;font-family:monospace;font-size:.9rem">{{ batch.batch_number }}</td>
-            <td style="padding:12px;text-align:right;font-weight:600;color:#0f172a">{{ batch.quantity }}</td>
-            <td style="padding:12px;color:#64748b">{{ batch.expiry_date|date:"Y-m-d" }}</td>
-            <td style="padding:12px;text-align:right">
-              <span style="padding:4px 10px;background:#fef3c7;color:#92400e;border-radius:12px;font-weight:600;font-size:.85rem">
-                {{ batch.days_to_expiry }} days
-              </span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if near_expiry_count > 5 %}
-    <div style="margin-top:16px;text-align:center">
-      <a href="{% url 'pharmacy:near_expiry' %}" style="color:#3b82f6;font-weight:600;text-decoration:none">
-        View all {{ near_expiry_count }} near-expiry batches →
-      </a>
-    </div>
-    {% endif %}
-  </div>
-  {% else %}
-  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-top:20px;text-align:center">
-    <div style="font-size:3rem;margin-bottom:12px">🎉</div>
-    <h3 style="margin:0 0 8px;color:#0f172a">No Batches Near Expiry</h3>
-    <p style="margin:0;color:#64748b">All products have healthy expiry dates</p>
-  </div>
-  {% endif %}
-  
-  <!-- Expired Batches (if any) -->
-  {% if expired_batches %}
-  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-top:20px;border-left:4px solid #ef4444">
-    <h2 style="margin:0 0 16px;color:#0f172a;font-size:1.4rem;display:flex;align-items:center;gap:10px">
-      <span>🚨</span> Expired Batches Requiring Attention
-    </h2>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:2px solid #e2e8f0">
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Product</th>
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Batch Code</th>
-            <th style="padding:12px;text-align:right;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Quantity</th>
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Expired On</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for batch in expired_batches|slice:":5" %}
-          <tr style="border-bottom:1px solid #f1f5f9">
-            <td style="padding:12px;font-weight:600;color:#0f172a">{{ batch.merch_product.name }}</td>
-            <td style="padding:12px;color:#64748b;font-family:monospace;font-size:.9rem">{{ batch.batch_number }}</td>
-            <td style="padding:12px;text-align:right;font-weight:600;color:#ef4444">{{ batch.quantity }}</td>
-            <td style="padding:12px;color:#ef4444">{{ batch.expiry_date|date:"Y-m-d" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if expired_count > 5 %}
-    <div style="margin-top:16px;text-align:center">
-      <a href="{% url 'pharmacy:expired' %}" style="color:#ef4444;font-weight:600;text-decoration:none">
-        View all {{ expired_count }} expired batches →
-      </a>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-  
-  <!-- Low Stock Batches -->
-  {% if low_stock_batches %}
-  <div style="background:#fff;border-radius:18px;padding:24px;box-shadow:0 10px 30px rgba(15,23,42,.08);margin-top:20px">
-    <h2 style="margin:0 0 16px;color:#0f172a;font-size:1.4rem;display:flex;align-items:center;gap:10px">
-      <span>📉</span> Low Stock Items
-    </h2>
-    <div style="overflow-x:auto">
-      <table style="width:100%;border-collapse:collapse">
-        <thead>
-          <tr style="border-bottom:2px solid #e2e8f0">
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Product</th>
-            <th style="padding:12px;text-align:left;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Batch Code</th>
-            <th style="padding:12px;text-align:right;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Current</th>
-            <th style="padding:12px;text-align:right;font-size:.85rem;color:#64748b;font-weight:600;text-transform:uppercase">Reorder Level</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for batch in low_stock_batches|slice:":5" %}
-          <tr style="border-bottom:1px solid #f1f5f9">
-            <td style="padding:12px;font-weight:600;color:#0f172a">{{ batch.merch_product.name }}</td>
-            <td style="padding:12px;color:#64748b;font-family:monospace;font-size:.9rem">{{ batch.batch_number }}</td>
-            <td style="padding:12px;text-align:right;font-weight:600;color:#f59e0b">{{ batch.quantity }}</td>
-            <td style="padding:12px;text-align:right;color:#64748b">{{ batch.reorder_level }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% if low_stock_count > 5 %}
-    <div style="margin-top:16px;text-align:center">
-      <a href="{% url 'pharmacy:low_stock' %}" style="color:#3b82f6;font-weight:600;text-decoration:none">
-        View all {{ low_stock_count }} low stock batches →
-      </a>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-  
-  <!-- Payment Mix (for selected period) - Using standardized component -->
-  {% include "partials/payment_mix_bar_standard.html" with payment_mix=payment_mix range_label=period_label %}
-  
 </div>
 
 {% endblock %}

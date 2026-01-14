@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Stock In Materials - Welding Workshop{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item active">Stock In</li>
+        </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Stock In Materials</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" data-testid="welding-stock-in-form">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="material_id" class="form-label">Material *</label>
+                    <select class="form-select form-select-lg" id="material_id" name="material_id" required autofocus>
+                        <option value="">Select material...</option>
+                        {% for material in materials %}
+                        <option value="{{ material.id }}">
+                            {{ material.name }} ({{ material.get_category_display }}) - Stock: {{ material.quantity_in_stock }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <label for="quantity" class="form-label">Quantity *</label>
+                        <input type="number" class="form-control form-control-lg" id="quantity" name="quantity" 
+                               min="0.01" step="0.01" required>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <label for="unit_cost" class="form-label">Cost per Unit (MWK)</label>
+                        <input type="number" class="form-control" id="unit_cost" name="unit_cost" 
+                               min="0" step="0.01" placeholder="Purchase price">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="date" class="form-label">Date</label>
+                    <input type="date" class="form-control" id="date" name="date">
+                </div>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="2" 
+                              placeholder="e.g., Supplier name, invoice number"></textarea>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" id="add_another" name="add_another">
+                    <label class="form-check-label" for="add_another">Add another item after this</label>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg" data-testid="welding-stock-in-submit">
+                        <i class="bi bi-check-circle"></i> Stock In
+                    </button>
+                    <a href="/verticals/welding/dashboard/" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Barcode Scanner Tip -->
+    <div class="alert alert-info mt-4">
+        <i class="bi bi-upc-scan"></i>
+        <strong>Tip:</strong> If your materials have barcodes, you can scan them to quickly find the right material.
+    </div>
+</div>
+{% endblock %}
+

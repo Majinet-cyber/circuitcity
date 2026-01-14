@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reconciliation · Liquor · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .liquor-recon-page{max-width:1200px;margin:0 auto;padding:12px;display:flex;flex-direction:column;gap:20px}
+  
+  /* Header */
+  .lr-header{background:linear-gradient(135deg,#f59e0b,#d97706);padding:24px;border-radius:20px;color:#fff;box-shadow:0 8px 24px rgba(245,158,11,0.2)}
+  .lr-header h1{margin:0 0 8px;font-size:clamp(24px,5vw,32px);font-weight:800}
+  .lr-header p{margin:0;opacity:0.95;font-size:14px}
+  
+  /* Date Picker */
+  .lr-date{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);display:flex;gap:12px;align-items:center}
+  .lr-date input{padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px}
+  .lr-date button{padding:10px 20px;background:#f59e0b;color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer}
+  
+  /* Summary */
+  .lr-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .lr-summary-card{background:#fff;border-radius:16px;padding:16px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0}
+  .lr-summary-card .label{font-size:11px;text-transform:uppercase;color:#64748b;font-weight:600;margin-bottom:6px}
+  .lr-summary-card .value{font-size:28px;font-weight:800;color:#0f172a}
+  .lr-summary-card .value.success{color:#10b981}
+  
+  /* Agent Cards */
+  .lr-agent-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 4px 12px rgba(15,23,42,0.08);border:2px solid #e2e8f0}
+  .lr-agent-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+  .lr-agent-name{font-size:20px;font-weight:800;color:#0f172a}
+  .lr-agent-status{padding:8px 14px;border-radius:10px;font-size:12px;font-weight:700}
+  .lr-agent-status-pending{background:#fef3c7;color:#92400e}
+  .lr-agent-status-done{background:#dcfce7;color:#166534}
+  
+  .lr-agent-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .lr-stat{background:#f8fafc;padding:12px;border-radius:12px;text-align:center}
+  .lr-stat .label{font-size:10px;text-transform:uppercase;color:#64748b;margin-bottom:4px}
+  .lr-stat .value{font-size:20px;font-weight:800;color:#0f172a}
+  
+  /* Assignment List */
+  .lr-assignments{background:#f8fafc;padding:12px;border-radius:12px;margin-bottom:16px}
+  .lr-assignment-item{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e2e8f0}
+  .lr-assignment-item:last-child{border-bottom:0}
+  .lr-assignment-name{font-weight:600;color:#0f172a}
+  .lr-assignment-bottles{color:#64748b;font-size:13px}
+  
+  /* Action Button */
+  .lr-finalize-btn{width:100%;padding:14px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:12px;font-weight:700;cursor:pointer;font-size:15px}
+  .lr-finalize-btn:hover{transform:translateY(-2px)}
+  .lr-finalize-btn:disabled{opacity:0.5;cursor:not-allowed}
+  
+  @media (max-width:640px){
+    .lr-agent-stats{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="liquor-recon-page">
+  <!-- Header -->
+  <header class="lr-header">
+    <h1>📊 Daily Reconciliation</h1>
+    <p>Review agent performance and finalize assignments</p>
+  </header>
+  
+  <!-- Date Picker -->
+  <form method="get" class="lr-date">
+    <label style="font-weight:700;color:#64748b">Date:</label>
+    <input type="date" name="date" value="{{ date|date:'Y-m-d' }}">
+    <button type="submit">Load</button>
+  </form>
+  
+  <!-- Summary -->
+  <div class="lr-summary">
+    <div class="lr-summary-card">
+      <div class="label">Total Assigned</div>
+      <div class="value">{{ total_assigned }}</div>
+    </div>
+    <div class="lr-summary-card">
+      <div class="label">Total Sold</div>
+      <div class="value success">{{ total_sold }}</div>
+    </div>
+    <div class="lr-summary-card">
+      <div class="label">Total Revenue</div>
+      <div class="value success">K{{ total_revenue|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="lr-summary-card">
+      <div class="label">Agents</div>
+      <div class="value">{{ reconciliations|length }}</div>
+    </div>
+  </div>
+  
+  <!-- Agent Reconciliations -->
+  {% for item in reconciliations %}
+  <div class="lr-agent-card">
+    <div class="lr-agent-header">
+      <div class="lr-agent-name">{{ item.agent.username }}</div>
+      {% if item.recon.is_reconciled %}
+      <span class="lr-agent-status lr-agent-status-done">✅ Reconciled</span>
+      {% else %}
+      <span class="lr-agent-status lr-agent-status-pending">⏳ Pending</span>
+      {% endif %}
+    </div>
+    
+    <div class="lr-agent-stats">
+      <div class="lr-stat">
+        <div class="label">Assigned</div>
+        <div class="value">{{ item.recon.total_bottles_assigned }}</div>
+      </div>
+      <div class="lr-stat">
+        <div class="label">Sold</div>
+        <div class="value" style="color:#10b981">{{ item.recon.total_bottles_sold }}</div>
+      </div>
+      <div class="lr-stat">
+        <div class="label">Revenue</div>
+        <div class="value" style="color:#10b981;font-size:16px">K{{ item.recon.total_revenue|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="lr-stat">
+        <div class="label">Sell-Through</div>
+        <div class="value" style="font-size:16px">{{ item.recon.sell_through_rate|floatformat:0 }}%</div>
+      </div>
+    </div>
+    
+    <!-- Assignment Details -->
+    <div class="lr-assignments">
+      {% for assignment in item.assignments %}
+      <div class="lr-assignment-item">
+        <div>
+          <div class="lr-assignment-name">{{ assignment.product.name }}</div>
+          <div class="lr-assignment-bottles">
+            {{ assignment.bottles_assigned }} assigned • {{ assignment.bottles_sold }} sold • {{ assignment.bottles_remaining }} remaining
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    
+    <!-- Finalize Button -->
+    {% if not item.recon.is_reconciled %}
+    <form method="post" action="{% url 'verticals:liquor_finalize_reconciliation' item.recon.id %}">
+      {% csrf_token %}
+      <button type="submit" class="lr-finalize-btn">✅ Finalize Reconciliation</button>
+    </form>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div style="text-align:center;padding:48px;background:#fff;border-radius:16px;color:#94a3b8">
+    <div style="font-size:64px;margin-bottom:16px">📊</div>
+    <p style="margin:0;font-weight:600;font-size:16px">No assignments for this date</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+

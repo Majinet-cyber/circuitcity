@@ -143,8 +143,8 @@
           class="form"
           data-validate
           aria-describedby="imeiHelp"
-          data-default-location-id="{{ default_location.id|default:request.user.agent_profile.location.id|default:'' }}"
-          data-default-location-name="{{ default_location.name|default:request.user.agent_profile.location.name|default:'' }}"
+          data-default-location-id="{{ default_location_id|default:'' }}"
+          data-default-location-name="{{ default_location_name|default:'' }}"
           {# Optional: have your view set this to "1" for agents to lock their store #}
           data-lock-location="{{ lock_location|default:'' }}">
       {% csrf_token %}
@@ -174,7 +174,8 @@
             autocomplete="off"
             placeholder="Enter or scan 15-digit IMEI"
             aria-required="true"
-            aria-invalid="false">
+            aria-invalid="false"
+            data-testid="imei-input">
           <span id="imeiLen" class="badge badge-warn" style="margin-left:8px">0/15</span>
         </div>
         
@@ -268,7 +269,7 @@
 
       <!-- Actions -->
       <div class="hstack" style="margin-top:.25rem">
-        <button type="submit" id="submitBtn" class="btn btn-primary" disabled>Save</button>
+        <button type="submit" id="submitBtn" class="btn btn-primary" disabled data-testid="scan-in-submit">Save</button>
         <a class="btn btn-secondary" href="{{ stock_url|default:'/inventory/' }}">Cancel</a>
       </div>
     </form>

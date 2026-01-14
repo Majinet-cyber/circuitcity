@@ -13,7 +13,7 @@
         margin-bottom: 1.5rem;
         box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
     }
-    
+
     .premium-filter-card {
         background: white;
         border-radius: 12px;
@@ -21,11 +21,11 @@
         border: 1px solid #e2e8f0;
         transition: all 0.3s ease;
     }
-    
+
     .premium-filter-card:hover {
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     }
-    
+
     .premium-table-container {
         background: white;
         border-radius: 16px;
@@ -33,11 +33,11 @@
         overflow: hidden;
         border: 1px solid #e2e8f0;
     }
-    
+
     .premium-table {
         margin-bottom: 0;
     }
-    
+
     .premium-table thead th {
         background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
         color: #475569;
@@ -48,28 +48,28 @@
         padding: 1.25rem 1rem;
         border: none;
     }
-    
+
     .premium-table tbody tr {
         border-bottom: 1px solid #f1f5f9;
         transition: all 0.2s ease;
     }
-    
+
     .premium-table tbody tr:hover {
         background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
         transform: scale(1.005);
         box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
     }
-    
+
     .premium-table tbody tr:last-child {
         border-bottom: none;
     }
-    
+
     .premium-table tbody td {
         padding: 1.25rem 1rem;
         vertical-align: middle;
         border: none;
     }
-    
+
     .status-badge-premium {
         padding: 0.5rem 1rem;
         border-radius: 50px;
@@ -80,7 +80,7 @@
         gap: 0.375rem;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
-    
+
     .trainer-badge {
         background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
         color: white;
@@ -93,12 +93,12 @@
         gap: 0.25rem;
         box-shadow: 0 2px 6px rgba(6, 182, 212, 0.3);
     }
-    
+
     .action-btn-group {
         display: flex;
         gap: 0.5rem;
     }
-    
+
     .action-btn {
         padding: 0.5rem 1rem;
         border-radius: 8px;
@@ -107,48 +107,48 @@
         transition: all 0.3s ease;
         border: none;
     }
-    
+
     .action-btn-view {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
     }
-    
+
     .action-btn-view:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         color: white;
     }
-    
+
     .action-btn-pay {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
         box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
     }
-    
+
     .action-btn-pay:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
         color: white;
     }
-    
+
     .action-btn-checkin {
         background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
         color: white;
         box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3);
     }
-    
+
     .action-btn-checkin:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
         color: white;
     }
-    
+
     .empty-state-premium {
         text-align: center;
         padding: 4rem 2rem;
     }
-    
+
     .empty-state-icon {
         font-size: 4rem;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -205,6 +205,8 @@
                             <th>Phone</th>
                             <th>Trainer</th>
                             <th>Status</th>
+                            <th>Streak</th>
+                            <th>Level</th>
                             <th>Days Left</th>
                             <th>Next Payment</th>
                             <th>Actions</th>
@@ -214,7 +216,7 @@
                         {% for member in members %}
                         <tr>
                             <td>
-                                <div class="fw-semibold">{{ member.name }}</div>
+                                <a href="{% url 'gym:member_detail' member.id %}" class="fw-semibold text-decoration-none text-primary">{{ member.name }}</a>
                             </td>
                             <td>{{ member.phone|default:"-" }}</td>
                             <td>
@@ -255,6 +257,22 @@
                                 {% endif %}
                             </td>
                             <td>
+                                {% if member.streak_days > 0 %}
+                                    <span style="color: #f59e0b; font-weight: 600;">
+                                        <i class="bi bi-fire"></i> {{ member.streak_days }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% with level=member.get_level_display %}
+                                    <span class="badge bg-{{ level.color }}" title="{{ level.name }} Level">
+                                        {{ level.icon }} {{ level.name }}
+                                    </span>
+                                {% endwith %}
+                            </td>
+                            <td>
                                 {% if member.is_archived %}
                                     -
                                 {% elif member.membership_end %}
@@ -267,7 +285,7 @@
                                 {% if member.membership_end %}
                                     <div>{{ member.membership_end|date:"d M Y" }}</div>
                                     <div class="small text-muted">
-                                        <i class="bi bi-calendar-event"></i> 
+                                        <i class="bi bi-calendar-event"></i>
                                         {% if member.membership_start %}{{ member.days_attended }} days attended{% endif %}
                                     </div>
                                 {% else %}
@@ -327,4 +345,3 @@
     </div>
 </div>
 {% endblock %}
-

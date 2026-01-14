@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Farm Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">📊 Farm Reports</h1>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-journal-text text-primary h1"></i>
+                    <h5 class="mt-3">Profit & Loss</h5>
+                    <p class="text-muted">Monthly income and expense summary</p>
+                    <a href="#" class="btn btn-outline-primary">Generate</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-piggy-bank text-success h1"></i>
+                    <h5 class="mt-3">Livestock Report</h5>
+                    <p class="text-muted">Batch counts, events, and valuation</p>
+                    <a href="#" class="btn btn-outline-success">Generate</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-flower1 text-warning h1"></i>
+                    <h5 class="mt-3">Crop Season Report</h5>
+                    <p class="text-muted">Season projections vs actuals</p>
+                    <a href="#" class="btn btn-outline-warning">Generate</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0">Export Data</h6>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <a href="#" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Ledger (CSV)
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <a href="#" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Livestock (CSV)
+                    </a>
+                </div>
+                <div class="col-md-4">
+                    <a href="#" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Crops (CSV)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <i class="bi bi-info-circle"></i>
+        <strong>Coming Soon:</strong> AI-powered recommendations based on your farm data.
+    </div>
+</div>
+{% endblock %}
+

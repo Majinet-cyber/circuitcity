@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
+{% load humanize %}
+{% load money %}
 
 {% block title %}Gym Dashboard - {{ business.name }}{% endblock %}
 
@@ -41,7 +43,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Total Members</p>
-                        <h3 class="mb-0">{{ total_members|default:0 }}</h3>
+                        <h3 class="mb-0">{{ total_members|default:0|intcomma }}</h3>
                     </div>
                     <div class="text-primary" style="font-size: 2rem; opacity: 0.3;">
                         <i class="bi bi-people"></i>
@@ -55,7 +57,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Pending Payments</p>
-                        <h3 class="mb-0 text-warning">{{ pending_count|default:0 }}</h3>
+                        <h3 class="mb-0 text-warning">{{ pending_count|default:0|intcomma }}</h3>
                         <small class="text-muted">Not yet paid</small>
                     </div>
                     <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
@@ -70,7 +72,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Active Members</p>
-                        <h3 class="mb-0 text-success">{{ active_count|default:0 }}</h3>
+                        <h3 class="mb-0 text-success">{{ active_count|default:0|intcomma }}</h3>
                         <small class="text-muted">Membership valid</small>
                     </div>
                     <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
@@ -85,7 +87,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Behind Schedule</p>
-                        <h3 class="mb-0 text-danger">{{ behind_schedule_count|default:0 }}</h3>
+                        <h3 class="mb-0 text-danger">{{ behind_schedule_count|default:0|intcomma }}</h3>
                         <small class="text-muted">Membership expired</small>
                     </div>
                     <div class="text-danger" style="font-size: 2rem; opacity: 0.3;">
@@ -103,7 +105,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">New This Month</p>
-                        <h3 class="mb-0 text-info">{{ new_members_this_month|default:0 }}</h3>
+                        <h3 class="mb-0 text-info">{{ new_members_this_month|default:0|intcomma }}</h3>
                         <small class="text-muted">New members joined</small>
                     </div>
                     <div class="text-info" style="font-size: 2rem; opacity: 0.3;">
@@ -118,7 +120,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Expiring Soon</p>
-                        <h3 class="mb-0 text-warning">{{ expiring_soon|default:0 }}</h3>
+                        <h3 class="mb-0 text-warning">{{ expiring_soon|default:0|intcomma }}</h3>
                         <small class="text-muted">Next 7 days</small>
                     </div>
                     <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
@@ -133,7 +135,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Revenue (Month)</p>
-                        <h3 class="mb-0 text-success">{{ revenue_this_month|floatformat:0|default:0 }}</h3>
+                        <h3 class="mb-0 text-success">{{ revenue_this_month|floatformat:0|intcomma|default:0 }}</h3>
                         <small class="text-muted">MWK</small>
                     </div>
                     <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
@@ -148,7 +150,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">MRR</p>
-                        <h3 class="mb-0 text-primary">{{ mrr|floatformat:0|default:0 }}</h3>
+                        <h3 class="mb-0 text-primary">{{ mrr|floatformat:0|intcomma|default:0 }}</h3>
                         <small class="text-muted">Monthly Recurring</small>
                     </div>
                     <div class="text-primary" style="font-size: 2rem; opacity: 0.3;">
@@ -170,30 +172,30 @@
                 </div>
                 <div class="row g-3">
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total membership payments recorded in selected range">
                             <p class="text-muted mb-1 small text-uppercase">Revenue</p>
-                            <h4 class="mb-0 fw-bold text-success">MWK {{ revenue_this_month|floatformat:2|default:"0.00" }}</h4>
-                            <small class="text-muted">{{ payment_count_month|default:0 }} payment{{ payment_count_month|pluralize }}</small>
+                            <h4 class="mb-0 fw-bold text-success">{{ revenue_this_month|money }}</h4>
+                            <small class="text-muted">{{ payment_count_month|default:0|intcomma }} payment{{ payment_count_month|pluralize }}</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Costs recorded in Admin Wallet for selected range">
                             <p class="text-muted mb-1 small text-uppercase">Costs</p>
-                            <h4 class="mb-0 fw-bold text-danger">MWK {{ costs_this_month|floatformat:2|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold text-danger">{{ costs_this_month|money }}</h4>
                             <small class="text-muted">From admin wallet</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Revenue minus Costs">
                             <p class="text-muted mb-1 small text-uppercase">Profit</p>
-                            <h4 class="mb-0 fw-bold {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">MWK {{ profit_this_month|floatformat:2|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold {% if profit_this_month < 0 %}text-danger{% else %}text-success{% endif %}">{{ profit_this_month|money }}</h4>
                             <small class="text-muted">Revenue - Costs</small>
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
+                        <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;" data-bs-toggle="tooltip" data-bs-placement="top" title="Monthly recurring revenue estimate for selected range">
                             <p class="text-muted mb-1 small text-uppercase">MRR</p>
-                            <h4 class="mb-0 fw-bold text-primary">MWK {{ mrr|floatformat:2|default:"0.00" }}</h4>
+                            <h4 class="mb-0 fw-bold text-primary">{{ mrr|money }}</h4>
                             <small class="text-muted">Monthly Recurring Revenue</small>
                         </div>
                     </div>
@@ -209,7 +211,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Check-ins Today</p>
-                        <h3 class="mb-0">{{ total_checkins|default:0 }}</h3>
+                        <h3 class="mb-0">{{ total_checkins|default:0|intcomma }}</h3>
                     </div>
                     <div class="text-info" style="font-size: 2rem; opacity: 0.3;">
                         <i class="bi bi-box-arrow-in-right"></i>
@@ -223,7 +225,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Paid Members Checked In</p>
-                        <h3 class="mb-0 text-success">{{ paid_checkins|default:0 }}</h3>
+                        <h3 class="mb-0 text-success">{{ paid_checkins|default:0|intcomma }}</h3>
                         <small class="text-muted">{{ conversion_percentage|default:0 }}% of total</small>
                     </div>
                     <div class="text-success" style="font-size: 2rem; opacity: 0.3;">
@@ -238,7 +240,7 @@
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <p class="text-muted mb-1 small text-uppercase">Unpaid Checked In</p>
-                        <h3 class="mb-0 text-warning">{{ unpaid_checkins|default:0 }}</h3>
+                        <h3 class="mb-0 text-warning">{{ unpaid_checkins|default:0|intcomma }}</h3>
                         <small class="text-muted">Potential conversions</small>
                     </div>
                     <div class="text-warning" style="font-size: 2rem; opacity: 0.3;">
@@ -264,7 +266,7 @@
                     <div class="col-12 col-md-4">
                         <div class="text-center p-3" style="background: #f8f9fa; border-radius: 12px;">
                             <p class="text-muted mb-1 small text-uppercase">{{ method_data.label }}</p>
-                            <h4 class="mb-0 fw-bold">MWK {{ method_data.total|floatformat:2 }}</h4>
+                            <h4 class="mb-0 fw-bold">{{ method_data.total|money }}</h4>
                         </div>
                     </div>
                     {% endfor %}
@@ -298,7 +300,7 @@
                         <tbody>
                             {% for member in pending_members %}
                             <tr>
-                                <td>{{ member.name }}</td>
+                                <td><a href="{% url 'gym:member_detail' member.id %}" class="text-decoration-none text-primary">{{ member.name }}</a></td>
                                 <td>{{ member.phone|default:"-" }}</td>
                                 <td>
                                     <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
@@ -342,7 +344,7 @@
                         <tbody>
                             {% for member in behind_schedule_members %}
                             <tr>
-                                <td>{{ member.name }}</td>
+                                <td><a href="{% url 'gym:member_detail' member.id %}" class="text-decoration-none text-primary">{{ member.name }}</a></td>
                                 <td>{{ member.phone|default:"-" }}</td>
                                 <td>
                                     <a href="{% url 'gym:member_detail' member.id %}" class="btn btn-sm btn-outline-primary">
@@ -405,12 +407,12 @@
                                     {% endif %}
                                 </td>
                                 <td class="fw-semibold">{{ stat.trainer.name }}</td>
-                                <td class="fw-semibold text-success">MWK {{ stat.trainer_fees|floatformat:2 }}</td>
+                                <td class="fw-semibold text-success">{{ stat.trainer_fees|money }}</td>
                                 <td>
-                                    <span class="badge bg-primary-subtle text-primary">{{ stat.payment_count }} session{{ stat.payment_count|pluralize }}</span>
+                                    <span class="badge bg-primary-subtle text-primary">{{ stat.payment_count|intcomma }} session{{ stat.payment_count|pluralize }}</span>
                                 </td>
                                 <td>
-                                    <span class="badge bg-success-subtle text-success">{{ stat.active_members }} active</span>
+                                    <span class="badge bg-success-subtle text-success">{{ stat.active_members|intcomma }} active</span>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -514,7 +516,7 @@
                                             {{ payment.member.name }}
                                         </a>
                                     </td>
-                                    <td class="fw-semibold">MWK {{ payment.amount|floatformat:2 }}</td>
+                                    <td class="fw-semibold">{{ payment.amount|money }}</td>
                                     <td>
                                         {{ payment.start_date|date:"d M" }} - {{ payment.end_date|date:"d M Y" }}
                                         <span class="badge bg-info-subtle text-info ms-1">30 days</span>
@@ -571,4 +573,15 @@
     overflow: visible;
 }
 </style>
+
+<script>
+// Initialize Bootstrap tooltips
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize tooltips (Bootstrap 5)
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+});
+</script>
 {% endblock %}

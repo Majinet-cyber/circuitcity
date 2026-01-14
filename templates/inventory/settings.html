@@ -3,103 +3,153 @@
 
 {% block title %}Settings · Emajinet{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Clean white settings shell - SSOT styling */
+  .settings-page {
+    background: #ffffff;
+    min-height: 100vh;
+    padding-bottom: 2rem;
+  }
+  .settings-page .page {
+    background: #ffffff;
+  }
+  .settings-page .card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+  }
+  .settings-page .panel-soft {
+    background: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+  }
+  /* Override any blue backgrounds in settings */
+  .settings-page .bg-primary,
+  .settings-page .bg-blue-500,
+  .settings-page [style*="background:var(--cc-accent)"] {
+    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+  }
+  /* Clean checkbox styling */
+  .settings-page input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+    cursor: pointer;
+  }
+  .settings-page .btn-primary {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #fff;
+  }
+  .settings-page .btn-primary:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="page maxw-1200">
-  <h1 style="font-size:var(--fs-32); font-weight:900; line-height:1; margin-bottom:var(--sp-6);">
-    Settings
-  </h1>
+<div class="settings-page">
+  <div class="page maxw-1200">
+    <h1 style="font-size:var(--fs-32); font-weight:900; line-height:1; margin-bottom:var(--sp-6); color:#111827;">
+      Settings
+    </h1>
 
-  <!-- Profile & Security -->
-  <div class="vstack">
-    <div class="card pad">
-      <div class="hstack" style="align-items:flex-start;">
-        <!-- Avatar image (actual image URL) -->
-        <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
-             style="border-radius:16px; box-shadow:var(--shadow-sm); object-fit:cover;">
-
-        <!-- User Info -->
-        <div class="vstack" style="gap:6px; min-width:260px;">
-          <div style="font-weight:800; font-size:var(--fs-20);">{{ user_full_name }}</div>
-          <div class="text-muted">@{{ user_username }}</div>
-          <div class="text-muted">{{ user_email }}</div>
-
-          <div class="hstack" style="gap:8px; margin-top:6px;">
-            {% if upload_avatar_url %}
-              <!-- POST upload (shows file picker, then auto-submits) -->
-              <form action="{{ upload_avatar_url }}" method="post" enctype="multipart/form-data" style="display:inline;">
-                {% csrf_token %}
-                <input type="file" name="avatar" id="id_avatar" style="display:none" accept="image/*" onchange="this.form.submit()">
-                <label for="id_avatar" class="btn btn-muted btn-icon" style="cursor:pointer;">Change avatar</label>
-              </form>
-            {% else %}
-              <a href="https://gravatar.com" target="_blank" class="btn btn-muted btn-icon">Change avatar</a>
-            {% endif %}
-
-            {% if change_password_url %}
-              <a href="{{ change_password_url }}" class="btn">Change password</a>
-            {% endif %}
-          </div>
-        </div>
-
-        <!-- Two-Factor Authentication -->
-        <div class="panel-soft pad-sm round" style="margin-left:auto; min-width:min(420px, 100%);">
-          <div class="hstack" style="justify-content:space-between;">
-            <div>
-              <div style="font-weight:900; font-size:var(--fs-18);">Two-Factor Authentication</div>
-              <div class="text-muted">Status: {{ twofa_status }}</div>
+    <!-- Profile & Security -->
+    <div class="vstack">
+      <div class="card pad">
+        <div class="hstack" style="align-items:flex-start;">
+          <!-- Avatar: uploaded image OR initials placeholder -->
+          {% if avatar_img_url %}
+            <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
+                 style="border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.08); object-fit:cover;">
+          {% else %}
+            <div style="width:96px; height:96px; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.08);
+                        background:linear-gradient(135deg, #3b82f6, #6366f1);
+                        color:#fff; display:flex; align-items:center; justify-content:center;
+                        font-size:2.5rem; font-weight:800;">
+              {% load account_extras %}
+              {{ user|initials }}
             </div>
-            <div class="hstack" style="gap:8px;">
-              {% if twofa_manage_url %}
-                <a href="{{ twofa_manage_url }}" class="btn {% if not twofa_enabled %}btn-primary{% endif %}">
-                  {% if twofa_enabled %}Manage 2FA{% else %}Set up 2FA{% endif %}
-                </a>
+          {% endif %}
+
+          <!-- User Info -->
+          <div class="vstack" style="gap:6px; min-width:260px;">
+            <div style="font-weight:800; font-size:var(--fs-20); color:#111827;">{{ user_full_name }}</div>
+            <div class="text-muted" style="color:#6b7280;">@{{ user_username }}</div>
+            <div class="text-muted" style="color:#6b7280;">{{ user_email }}</div>
+
+            <div class="hstack" style="gap:8px; margin-top:6px;">
+              {% if upload_avatar_url %}
+                <!-- POST upload (shows file picker, then auto-submits) -->
+                <form action="{{ upload_avatar_url }}" method="post" enctype="multipart/form-data" style="display:inline;">
+                  {% csrf_token %}
+                  <input type="file" name="avatar" id="id_avatar" style="display:none" accept="image/*" onchange="this.form.submit()">
+                  <label for="id_avatar" class="btn btn-muted btn-icon" style="cursor:pointer;">Change avatar</label>
+                </form>
               {% else %}
-                <button class="btn" disabled title="Two-factor app not installed">Unavailable</button>
+                <a href="https://gravatar.com" target="_blank" class="btn btn-muted btn-icon">Change avatar</a>
+              {% endif %}
+
+              {% if change_password_url %}
+                <a href="{{ change_password_url }}" class="btn">Change password</a>
               {% endif %}
             </div>
           </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Notifications (placeholder switches) -->
-    <div class="card pad">
-      <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4);">Notifications</h2>
-
-      <div class="hstack" style="align-items:flex-start;">
-        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
-          <div style="font-weight:800; margin-bottom:6px;">Dashboard notifications</div>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Payments
-          </label>
-          <label class="hstack" style="gap:8px;">
-            <input type="checkbox" class="input-compact"> Wallet events
-          </label>
-          <p class="text-muted" style="margin-top:8px;">
-            General business notifications (e.g., payments, wallet top-ups/deductions).
-          </p>
-        </div>
-
-        <div class="panel-soft pad round" style="flex:1; min-width:280px;">
-          <div style="font-weight:800; margin-bottom:6px;">Inventory notifications</div>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Stock IN
-          </label>
-          <label class="hstack" style="gap:8px; margin-bottom:8px;">
-            <input type="checkbox" class="input-compact"> Sold
-          </label>
-          <label class="hstack" style="gap:8px;">
-            <input type="checkbox" class="input-compact"> Low stock
-          </label>
-          <p class="text-muted" style="margin-top:8px;">
-            These show on Inventory pages; the dashboard shows broader alerts.
-          </p>
+          <!-- Two-Factor Authentication (SMS OTP) -->
+          {% include "accounts/_twofa_sms_card.html" %}
         </div>
       </div>
 
-      <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5);">
-        <button class="btn btn-primary">Save settings</button>
-        <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-muted">Back to dashboard</a>
+      <!-- Notifications (wired to NotificationPreference model, default-checked) -->
+      <div class="card pad">
+        <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4); color:#111827;">Notification Preferences</h2>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="save_notifications" value="1">
+
+          <div class="vstack" style="gap:var(--sp-4);">
+            <div class="panel-soft pad round">
+              <div style="font-weight:800; margin-bottom:12px; color:#374151;">Email Notifications</div>
+              
+              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+                <input type="checkbox" name="instant_sale_email" {% if notif_pref.instant_sale_email|default:True %}checked{% endif %}>
+                <span style="color:#374151;">Instant sale alerts</span>
+              </label>
+
+              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+                <input type="checkbox" name="daily_summary_email" {% if notif_pref.daily_summary_email|default:True %}checked{% endif %}>
+                <span style="color:#374151;">Daily sales summary</span>
+              </label>
+
+              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+                <input type="checkbox" name="weekly_digest_enabled" {% if notif_pref.weekly_digest_enabled|default:True %}checked{% endif %}>
+                <span style="color:#374151;">Weekly digest (every Friday)</span>
+              </label>
+
+              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
+                <input type="checkbox" name="high_sales_alerts" {% if notif_pref.high_sales_alerts|default:True %}checked{% endif %}>
+                <span style="color:#374151;">High sales spike alerts</span>
+              </label>
+
+              <label class="hstack" style="gap:10px; cursor:pointer;">
+                <input type="checkbox" name="important_alerts_email" {% if notif_pref.important_alerts_email|default:True %}checked{% endif %}>
+                <span style="color:#374151;">Important system alerts</span>
+              </label>
+
+              <p class="text-muted" style="margin-top:12px; font-size:var(--fs-14); color:#6b7280;">
+                All notifications default to ON for new users. Uncheck to disable.
+              </p>
+            </div>
+          </div>
+
+          <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5); gap:var(--sp-3);">
+            <button type="submit" class="btn btn-primary">Save notification settings</button>
+            <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-ghost">Back to dashboard</a>
+          </div>
+        </form>
       </div>
     </div>
   </div>

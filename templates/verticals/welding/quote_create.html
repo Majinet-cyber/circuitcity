@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Create Quote - Welding Workshop{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="/verticals/welding/quotes/">Quotes</a></li>
+            <li class="breadcrumb-item active">Create Quote</li>
+        </ol>
+    </nav>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-file-earmark-plus"></i> Create Quote</h5>
+        </div>
+        <div class="card-body">
+            <form method="post" data-testid="welding-quote-form">
+                {% csrf_token %}
+
+                <h6 class="text-muted mb-3">Customer Details</h6>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="customer_name" class="form-label">Customer Name *</label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required autofocus>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="customer_phone" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="customer_phone" name="customer_phone" placeholder="0999...">
+                    </div>
+                </div>
+
+                <hr>
+                <h6 class="text-muted mb-3">Product Selection</h6>
+
+                <div class="mb-3">
+                    <label for="template_code" class="form-label">Product Template *</label>
+                    <select class="form-select form-select-lg" id="template_code" name="template_code" required>
+                        <option value="">Select a product...</option>
+                        {% for template in templates %}
+                        <option value="{{ template.code }}">{{ template.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <hr>
+                <h6 class="text-muted mb-3">Pricing Configuration</h6>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label for="labour_rate" class="form-label">Labour Rate/Hour (MWK)</label>
+                        <input type="number" class="form-control" id="labour_rate" name="labour_rate" 
+                               value="5000" min="0" step="100">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="overhead_pct" class="form-label">Overhead %</label>
+                        <input type="number" class="form-control" id="overhead_pct" name="overhead_pct" 
+                               value="10" min="0" max="50" step="1">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label for="margin_pct" class="form-label">Profit Margin %</label>
+                        <input type="number" class="form-control" id="margin_pct" name="margin_pct" 
+                               value="25" min="0" max="100" step="1">
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    The system will automatically calculate material quantities and pricing based on your catalog prices.
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg" data-testid="welding-quote-submit">
+                        <i class="bi bi-calculator"></i> Generate Quote
+                    </button>
+                    <a href="/verticals/welding/quotes/" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

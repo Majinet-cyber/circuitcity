@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Crop Seasons - Farm Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">🌱 Crop Seasons</h1>
+        <a href="/verticals/farm/crops/create/" class="btn btn-success" data-testid="farm-season-create">
+            <i class="bi bi-plus-circle"></i> New Season
+        </a>
+    </div>
+
+    <div class="row g-4">
+        {% for season in seasons %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">{{ season.name }}</h5>
+                    <span class="badge bg-{% if season.status == 'active' %}success{% elif season.status == 'harvested' %}info{% elif season.status == 'closed' %}secondary{% else %}warning{% endif %}">
+                        {{ season.get_status_display }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <strong>Crop:</strong> {{ season.get_crop_type_display }}<br>
+                        <strong>Area:</strong> {{ season.area_value }} {{ season.get_area_unit_display }}
+                    </p>
+                    <p class="mb-2">
+                        <strong>Period:</strong> {{ season.start_date|date:"M Y" }}
+                        {% if season.end_date %} - {{ season.end_date|date:"M Y" }}{% endif %}
+                    </p>
+                    
+                    {% if season.projected_yield %}
+                    <p class="mb-2">
+                        <strong>Projected Yield:</strong> {{ season.projected_yield }} {{ season.get_yield_unit_display }}
+                        {% if season.projected_price_per_unit_mwk %}
+                        @ MWK {{ season.projected_price_per_unit_mwk|intcomma }}
+                        {% endif %}
+                    </p>
+                    {% endif %}
+                    
+                    {% if season.projected_income_mwk %}
+                    <p class="mb-0 text-success">
+                        <strong>Projected Income:</strong> MWK {{ season.projected_income_mwk|floatformat:0|intcomma }}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="/verticals/farm/crops/{{ season.id }}/" class="btn btn-sm btn-outline-primary">
+                        View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted">
+            <i class="bi bi-flower1 h1"></i>
+            <p class="mb-2">No crop seasons yet.</p>
+            <a href="/verticals/farm/crops/create/" class="btn btn-primary">Add Your First Season</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,169 @@
+/*
+ * SSOT Settings CSS
+ * Clean white UI for all settings pages across all verticals
+ * Ensures consistency and overrides any blue/mixed panel styling
+ */
+
+/* Root container for settings - enforce white background */
+.settings-root {
+  background-color: #ffffff;
+  min-height: 100vh;
+}
+
+/* Settings page title */
+.settings-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 1.5rem;
+}
+
+/* Settings card - clean white with subtle shadow */
+.settings-card {
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1) !important;
+  margin-bottom: 1.5rem;
+}
+
+.settings-card .card-body {
+  background-color: #ffffff;
+  padding: 2rem;
+}
+
+/* Settings navigation tabs - ensure white background */
+.nav-tabs {
+  background-color: transparent;
+  border-bottom: 2px solid #e5e7eb;
+  margin-bottom: 1.5rem;
+}
+
+.nav-tabs .nav-link {
+  background-color: transparent;
+  border: none;
+  color: #6b7280;
+  padding: 0.75rem 1.25rem;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+  color: #1f2937;
+  border-bottom-color: #d1d5db;
+  background-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+  color: #2563eb;
+  background-color: transparent;
+  border-bottom: 2px solid #2563eb;
+}
+
+/* Override any blue panel backgrounds */
+.settings-root .card,
+.settings-root .card-body,
+.settings-root .container {
+  background-color: #ffffff !important;
+}
+
+/* Ensure form inputs are styled consistently */
+.settings-card .form-control,
+.settings-card .form-select {
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.settings-card .form-control:focus,
+.settings-card .form-select:focus {
+  background-color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+}
+
+/* Form labels */
+.settings-card .form-label {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 0.9375rem;
+}
+
+/* Section headings within settings */
+.settings-card h5 {
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+}
+
+/* Messages */
+.settings-messages .alert {
+  border-radius: 0.5rem;
+  border: 1px solid;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .settings-card .card-body {
+    padding: 1.25rem;
+  }
+
+  .settings-title {
+    font-size: 1.5rem;
+  }
+
+  .nav-tabs .nav-link {
+    padding: 0.625rem 1rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Ensure checkboxes have proper spacing */
+.settings-card .form-check {
+  margin-bottom: 0.75rem;
+  padding-left: 1.75rem;
+}
+
+.settings-card .form-check-input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  cursor: pointer;
+}
+
+.settings-card .form-check-label {
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+/* Avatar/profile image styling */
+.settings-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove any lingering blue tints */
+.settings-root *:not(.btn):not(.badge):not(.alert):not(.nav-link.active) {
+  background-color: inherit;
+}
+
+/* Override any Bootstrap default blue backgrounds */
+.settings-root .bg-primary,
+.settings-root .bg-info,
+.settings-root .bg-light {
+  background-color: #ffffff !important;
+}
+

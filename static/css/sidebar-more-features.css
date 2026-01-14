@@ -148,22 +148,5 @@
   transition: max-height 0.3s ease, opacity 0.2s ease;
 }
 
-/* Dark mode adjustments (if applicable) */
-@media (prefers-color-scheme: dark) {
-  .more-features-toggle {
-    background: rgba(255, 255, 255, 0.08);
-  }
-  
-  .more-features-toggle:hover {
-    background: rgba(255, 255, 255, 0.12);
-  }
-  
-  .more-features-submenu .submenu-item {
-    background: rgba(255, 255, 255, 0.05);
-  }
-  
-  .more-features-submenu .submenu-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-}
+/* PHASE 1: Dark mode removed - light theme only */
 

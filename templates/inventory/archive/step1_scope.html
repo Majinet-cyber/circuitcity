@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Archive Stock · Step 1 of 4{% endblock %}
+
+{% block extra_css %}
+<style>
+  .archive-step-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto 2rem;
+    position: relative;
+  }
+  
+  .archive-step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #e5e7eb;
+    z-index: 0;
+  }
+  
+  .archive-step {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .archive-step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e5e7eb;
+    color: #9ca3af;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+  }
+  
+  .archive-step.active .archive-step-circle {
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    color: white;
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+    transform: scale(1.1);
+  }
+  
+  .archive-step.completed .archive-step-circle {
+    background: #10b981;
+    color: white;
+  }
+  
+  .archive-step.completed .archive-step-circle::after {
+    content: '✓';
+    font-size: 1.2rem;
+  }
+  
+  .archive-step-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-align: center;
+  }
+  
+  .archive-step.active .archive-step-label {
+    color: #3b82f6;
+    font-weight: 700;
+  }
+  
+  .scope-option-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 1rem;
+  }
+  
+  .scope-option-card:hover {
+    border-color: #3b82f6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  }
+  
+  .scope-option-card.selected {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+  }
+  
+  .scope-option-card input[type="radio"] {
+    margin-right: 0.75rem;
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+  }
+  
+  .location-select {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    width: 100%;
+    font-size: 1rem;
+    background: white;
+    transition: border-color 0.3s ease;
+  }
+  
+  .location-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin: 2rem auto; padding: 1rem;">
+  <!-- Step Indicator -->
+  <div class="archive-step-indicator">
+    <div class="archive-step active">
+      <div class="archive-step-circle">1</div>
+      <div class="archive-step-label">Choose Scope</div>
+    </div>
+    <div class="archive-step">
+      <div class="archive-step-circle">2</div>
+      <div class="archive-step-label">Summary</div>
+    </div>
+    <div class="archive-step">
+      <div class="archive-step-circle">3</div>
+      <div class="archive-step-label">Confirm</div>
+    </div>
+    <div class="archive-step">
+      <div class="archive-step-circle">4</div>
+      <div class="archive-step-label">Complete</div>
+    </div>
+  </div>
+  
+  <!-- Main Card -->
+  <div class="glass-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <div class="badge bg-danger-subtle text-danger fw-semibold mb-2">⚠️ Danger Zone</div>
+        <h2 class="mb-0">Step 1: Choose Archive Scope</h2>
+        <p class="text-muted small mb-0">Select what you want to archive</p>
+      </div>
+    </div>
+    
+    <form method="post" id="archive-scope-form">
+      {% csrf_token %}
+      
+      <div class="mb-4">
+        <label class="form-label fw-semibold mb-3">What would you like to archive?</label>
+        
+        <!-- Option 1: Entire Business -->
+        <div class="scope-option-card" onclick="selectScope('business')">
+          <label style="cursor: pointer; display: flex; align-items: center; margin: 0;">
+            <input type="radio" name="scope" value="business" id="scope_business" required>
+            <div style="flex: 1;">
+              <div class="fw-bold mb-1">📦 Entire Business</div>
+              <div class="text-muted small">Archive all stock, products, and barcodes across all locations</div>
+            </div>
+          </label>
+        </div>
+        
+        <!-- Option 2: This Location Only -->
+        <div class="scope-option-card" onclick="selectScope('location')">
+          <label style="cursor: pointer; display: flex; align-items: center; margin: 0;">
+            <input type="radio" name="scope" value="location" id="scope_location" required>
+            <div style="flex: 1;">
+              <div class="fw-bold mb-1">🏪 This Location Only</div>
+              <div class="text-muted small">Archive stock and products for a specific location</div>
+            </div>
+          </label>
+        </div>
+        
+        <!-- Location Selector (shown when location option selected) -->
+        <div id="location-selector" style="display: none; margin-top: 1rem;">
+          <label class="form-label fw-semibold">Select Location</label>
+          <select name="location_id" id="location_id" class="location-select">
+            <option value="">Choose a location...</option>
+            {% for location in locations %}
+            <option value="{{ location.id }}">{{ location.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      
+      <div class="d-flex gap-2 justify-content-end">
+        <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary" id="continue-btn" disabled>
+          Continue to Summary <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  const form = document.getElementById('archive-scope-form');
+  const locationSelector = document.getElementById('location-selector');
+  const locationSelect = document.getElementById('location_id');
+  const continueBtn = document.getElementById('continue-btn');
+  const scopeBusiness = document.getElementById('scope_business');
+  const scopeLocation = document.getElementById('scope_location');
+  
+  function selectScope(scope) {
+    if (scope === 'location') {
+      locationSelector.style.display = 'block';
+      locationSelect.required = true;
+    } else {
+      locationSelector.style.display = 'none';
+      locationSelect.required = false;
+      locationSelect.value = '';
+    }
+    updateContinueButton();
+  }
+  
+  function updateContinueButton() {
+    const scopeSelected = scopeBusiness.checked || scopeLocation.checked;
+    const locationValid = !scopeLocation.checked || locationSelect.value;
+    continueBtn.disabled = !(scopeSelected && locationValid);
+  }
+  
+  scopeBusiness.addEventListener('change', function() {
+    if (this.checked) {
+      document.querySelector('.scope-option-card:first-child').classList.add('selected');
+      document.querySelector('.scope-option-card:last-child').classList.remove('selected');
+      selectScope('business');
+    }
+  });
+  
+  scopeLocation.addEventListener('change', function() {
+    if (this.checked) {
+      document.querySelector('.scope-option-card:first-child').classList.remove('selected');
+      document.querySelector('.scope-option-card:last-child').classList.add('selected');
+      selectScope('location');
+    }
+  });
+  
+  locationSelect.addEventListener('change', updateContinueButton);
+  
+  // Update card selection on click
+  document.querySelectorAll('.scope-option-card').forEach(card => {
+    card.addEventListener('click', function(e) {
+      if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL') {
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change'));
+        }
+      }
+    });
+  });
+})();
+</script>
+{% endblock %}
+

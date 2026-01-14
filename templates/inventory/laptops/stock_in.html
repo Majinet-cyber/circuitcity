@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In Laptop · Inventory{% endblock %}
+{% block header_title %}💻 Stock In Laptop{% endblock %}
+
+{% block extra_css %}
+<style>
+  .laptop-stock-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+  
+  .brand-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  
+  .brand-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 2px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .brand-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  }
+  
+  .brand-card.selected {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+  }
+  
+  .brand-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .brand-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #1f2937;
+  }
+  
+  .form-section {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .form-section h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #1f2937;
+  }
+  
+  .spec-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+  }
+  
+  .spec-card {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .spec-card:hover {
+    border-color: #3b82f6;
+    transform: scale(1.05);
+  }
+  
+  .spec-card.selected {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.05);
+  }
+  
+  .spec-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+  }
+  
+  .spec-value {
+    font-weight: 700;
+    color: #1f2937;
+  }
+  
+  .form-control, .form-select {
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 0.75rem;
+    transition: all 0.3s ease;
+  }
+  
+  .form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 2rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+  }
+  
+  .existing-products {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 0.75rem;
+  }
+  
+  .product-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  
+  .product-item:hover {
+    background: rgba(59, 130, 246, 0.05);
+  }
+  
+  .product-item:last-child {
+    border-bottom: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="laptop-stock-container">
+  <div class="glass-card mb-4">
+    <h2 class="mb-2">💻 Stock In Laptop</h2>
+    <p class="text-muted mb-0">Add a new laptop to your inventory by serial number</p>
+  </div>
+  
+  <form method="post" id="laptop-stock-form">
+    {% csrf_token %}
+    
+    <!-- Step 1: Brand Selection -->
+    <div class="form-section">
+      <h3>1. Select Brand</h3>
+      <div class="brand-grid">
+        {% for brand_value, brand_label in brands %}
+        <div class="brand-card" data-brand="{{ brand_value }}" onclick="selectBrand('{{ brand_value }}')">
+          <div class="brand-icon">💻</div>
+          <div class="brand-name">{{ brand_label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <input type="hidden" name="brand" id="brand-input" required>
+    </div>
+    
+    <!-- Step 2: Model & Specs -->
+    <div class="form-section" id="model-section" style="display: none;">
+      <h3>2. Model & Specifications</h3>
+      
+      <!-- Model Name -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Model Name <span class="text-muted">(optional)</span></label>
+        <input type="text" name="model_name" class="form-control" placeholder="e.g., ThinkPad X1, MacBook Pro 13">
+      </div>
+      
+      <!-- Quick Select Existing Product -->
+      {% if products_by_brand %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Or select existing product:</label>
+        <div class="existing-products">
+          {% for brand, products in products_by_brand.items %}
+            {% for product in products %}
+            <div class="product-item" onclick="selectExistingProduct('{{ product.brand }}', '{{ product.model_name }}', '{{ product.ram }}', '{{ product.storage }}', '{{ product.battery_life }}')">
+              <strong>{{ product.display_name }}</strong>
+              <small class="text-muted d-block">{{ product.ram }} RAM, {{ product.storage }}</small>
+            </div>
+            {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      
+      <!-- RAM -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">RAM</label>
+        <div class="spec-cards">
+          <div class="spec-card" onclick="selectSpec('ram', '8GB')">
+            <div class="spec-label">8GB</div>
+            <div class="spec-value">8GB</div>
+          </div>
+          <div class="spec-card" onclick="selectSpec('ram', '16GB')">
+            <div class="spec-label">16GB</div>
+            <div class="spec-value">16GB</div>
+          </div>
+          <div class="spec-card" onclick="selectSpec('ram', '32GB')">
+            <div class="spec-label">32GB</div>
+            <div class="spec-value">32GB</div>
+          </div>
+        </div>
+        <input type="text" name="ram" id="ram-input" class="form-control mt-2" placeholder="Or enter custom RAM (e.g., 8GB DDR4)">
+      </div>
+      
+      <!-- Storage -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Storage</label>
+        <div class="spec-cards">
+          <div class="spec-card" onclick="selectSpec('storage', '256GB SSD')">
+            <div class="spec-label">256GB</div>
+            <div class="spec-value">256GB SSD</div>
+          </div>
+          <div class="spec-card" onclick="selectSpec('storage', '512GB SSD')">
+            <div class="spec-label">512GB</div>
+            <div class="spec-value">512GB SSD</div>
+          </div>
+          <div class="spec-card" onclick="selectSpec('storage', '1TB SSD')">
+            <div class="spec-label">1TB</div>
+            <div class="spec-value">1TB SSD</div>
+          </div>
+        </div>
+        <input type="text" name="storage" id="storage-input" class="form-control mt-2" placeholder="Or enter custom storage (e.g., 1TB HDD)">
+      </div>
+      
+      <!-- Battery Life -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Battery Life <span class="text-muted">(optional)</span></label>
+        <input type="text" name="battery_life" class="form-control" placeholder="e.g., 8 hours, 12 hours">
+      </div>
+    </div>
+    
+    <!-- Step 3: Serial & Pricing -->
+    <div class="form-section" id="serial-section" style="display: none;">
+      <h3>3. Serial Number & Pricing</h3>
+      
+      <!-- Serial Number -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Serial Number <span class="text-danger">*</span></label>
+        <input type="text" name="serial" id="serial-input" class="form-control" placeholder="Enter laptop serial number" required>
+        <div class="form-text">Serial number must be unique per business</div>
+      </div>
+      
+      <!-- Order Price -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Order Price (Cost)</label>
+        <input type="number" name="order_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+      </div>
+      
+      <!-- Selling Price -->
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Selling Price</label>
+        <input type="number" name="selling_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+      </div>
+    </div>
+    
+    <!-- Submit Button -->
+    <div class="d-flex gap-2 justify-content-end">
+      <a href="{% url 'inventory:dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-primary" id="submit-btn" disabled>
+        <i class="bi bi-check-circle me-1"></i> Stock In Laptop
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+  const brandInput = document.getElementById('brand-input');
+  const modelSection = document.getElementById('model-section');
+  const serialSection = document.getElementById('serial-section');
+  const submitBtn = document.getElementById('submit-btn');
+  const serialInput = document.getElementById('serial-input');
+  
+  function selectBrand(brand) {
+    // Update hidden input
+    brandInput.value = brand;
+    
+    // Update UI
+    document.querySelectorAll('.brand-card').forEach(card => {
+      card.classList.remove('selected');
+    });
+    document.querySelector(`[data-brand="${brand}"]`).classList.add('selected');
+    
+    // Show next section
+    modelSection.style.display = 'block';
+    updateSubmitButton();
+  }
+  
+  function selectSpec(type, value) {
+    const input = document.getElementById(`${type}-input`);
+    input.value = value;
+    
+    // Update UI
+    const cards = event.target.closest('.spec-cards').querySelectorAll('.spec-card');
+    cards.forEach(card => {
+      if (card.textContent.includes(value)) {
+        card.classList.add('selected');
+      } else {
+        card.classList.remove('selected');
+      }
+    });
+    
+    // Show serial section if both RAM and storage are filled
+    if (document.getElementById('ram-input').value && document.getElementById('storage-input').value) {
+      serialSection.style.display = 'block';
+    }
+    updateSubmitButton();
+  }
+  
+  function selectExistingProduct(brand, model, ram, storage, battery) {
+    // Set brand
+    selectBrand(brand);
+    
+    // Set model and specs
+    document.querySelector('input[name="model_name"]').value = model;
+    document.getElementById('ram-input').value = ram;
+    document.getElementById('storage-input').value = storage;
+    if (battery) {
+      document.querySelector('input[name="battery_life"]').value = battery;
+    }
+    
+    // Show serial section
+    serialSection.style.display = 'block';
+    updateSubmitButton();
+  }
+  
+  function updateSubmitButton() {
+    const brand = brandInput.value;
+    const ram = document.getElementById('ram-input').value;
+    const storage = document.getElementById('storage-input').value;
+    const serial = serialInput.value.trim();
+    
+    submitBtn.disabled = !(brand && ram && storage && serial);
+  }
+  
+  // Listen for serial input
+  serialInput.addEventListener('input', function() {
+    updateSubmitButton();
+  });
+  
+  // Listen for RAM/Storage changes
+  document.getElementById('ram-input').addEventListener('input', function() {
+    if (this.value && document.getElementById('storage-input').value) {
+      serialSection.style.display = 'block';
+    }
+    updateSubmitButton();
+  });
+  
+  document.getElementById('storage-input').addEventListener('input', function() {
+    if (this.value && document.getElementById('ram-input').value) {
+      serialSection.style.display = 'block';
+    }
+    updateSubmitButton();
+  });
+  
+  // Expose to global scope for onclick handlers
+  window.selectBrand = selectBrand;
+  window.selectSpec = selectSpec;
+  window.selectExistingProduct = selectExistingProduct;
+})();
+</script>
+{% endblock %}
+

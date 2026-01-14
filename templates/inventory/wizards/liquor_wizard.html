@@ -29,128 +29,238 @@
 <script src="{% static 'js/wizard-engine.js' %}"></script>
 <script>
 (function() {
-  // Liquor categories
+  // SIMPLIFIED: Only main liquor kinds (following real-world rules)
   const categories = [
-    { value: 'beer', label: 'Beer', icon: '🍺' },
-    { value: 'cider', label: 'Cider', icon: '🍎' },
-    { value: 'wine', label: 'Wine', icon: '🍷' },
-    { value: 'spirits', label: 'Spirits', icon: '🥃' },
-    { value: 'whiskey', label: 'Whiskey', icon: '🥃' },
-    { value: 'gin', label: 'Gin', icon: '🍸' },
-    { value: 'vodka', label: 'Vodka', icon: '🧊' },
-    { value: 'rum', label: 'Rum', icon: '🏝️' },
-    { value: 'brandy', label: 'Brandy', icon: '🍇' },
-    { value: 'tequila', label: 'Tequila', icon: '🌵' },
-    { value: 'mixers', label: 'Mixers', icon: '🧃' },
-    { value: 'energy', label: 'Energy Drinks', icon: '⚡' },
-    { value: 'water', label: 'Water', icon: '💧' },
-    { value: 'other', label: 'Other', icon: '📦' }
+    { value: 'beer', label: 'Beer', icon: '🍺', description: 'Sold by bottle/can or crate (20)' },
+    { value: 'cider', label: 'Cider', icon: '🍎', description: 'Sold by bottle/can or 6-pack' },
+    { value: 'wine', label: 'Wine', icon: '🍷', description: 'Sold by glass (5 per bottle)' },
+    { value: 'spirits', label: 'Spirits', icon: '🥃', description: 'Sold by shot (30 per bottle)' },
+    { value: 'whiskey', label: 'Whisky', icon: '🥃', description: 'Sold by shot (30 per bottle)' }
   ];
 
   // Popular liquor names by category (loaded from single source of truth)
   const popularNames = {{ liquor_suggestions_json|safe }};
 
-  // Selling modes
-  const sellingModes = [
-    { value: 'bottle', label: 'Bottle Only', icon: '🍾', description: 'Sell full bottles' },
-    { value: 'shot', label: 'Shots Only', icon: '🥃', description: 'Sell individual shots' },
-    { value: 'both', label: 'Both', icon: '🎯', description: 'Bottle & shot sales', featured: true }
-  ];
+  // Malawi defaults (from liquor_config.py)
+  const malawiDefaults = {
+    beer: { 
+      pack_label: 'Crate', 
+      pack_size: 20, 
+      pack_enabled: true,
+      base_unit: 'bottle'
+    },
+    cider: { 
+      pack_label: '6-Pack', 
+      pack_size: 6, 
+      pack_enabled: true,
+      base_unit: 'bottle'
+    },
+    wine: { 
+      glasses_per_bottle: 5,
+      base_unit: 'glass'
+    },
+    spirits: { 
+      shots_per_bottle: 30,
+      barman_reserved: 2,
+      base_unit: 'shot'
+    },
+    whiskey: { 
+      shots_per_bottle: 30,
+      barman_reserved: 2,
+      base_unit: 'shot'
+    }
+  };
 
-  // Barcode options
-  const barcodeOptions = [
-    { value: 'yes', label: 'Yes, has barcode', icon: '📱' },
-    { value: 'no', label: 'No barcode', icon: '✋' }
-  ];
-
-  // Wizard configuration
+  // SIMPLIFIED: 2-step wizard configuration
   wizard = new WizardEngine('wizard-container', {
     steps: [
-      // Step 1: Category
+      // Step 1: Choose liquor kind (BIG BUTTONS)
       {
         type: 'cards',
         key: 'category',
-        title: 'Choose Category',
-        subtitle: 'What type of liquor are you adding?',
+        title: '🍾 Step 1: Choose Liquor Type',
+        subtitle: 'Select what you\'re adding',
         options: categories,
         columns: 'auto'
       },
       
-      // Step 2: Product Name
-      {
-        type: 'cards',
-        key: 'product_name',
-        title: 'Product Name',
-        subtitle: 'Select a popular product or enter custom name',
-        options: (data) => {
-          const cat = data.category;
-          const names = popularNames[cat] || [];
-          return names.map(name => ({ value: name, label: name, icon: '🏷️' }));
-        },
-        allowCustom: true,
-        customPlaceholder: 'Enter product name',
-        searchable: true
-      },
-      
-      // Step 3: Selling Mode
-      {
-        type: 'cards',
-        key: 'selling_mode',
-        title: 'Selling Mode',
-        subtitle: 'How will you sell this product?',
-        options: sellingModes,
-        columns: 'auto'
-      },
-      
-      // Step 4: Pricing
+      // Step 2: Minimal form with smart defaults
       {
         type: 'multi-input',
-        key: 'pricing',
-        title: 'Pricing',
-        subtitle: 'Set your prices',
+        key: 'details',
+        title: (data) => {
+          const cat = data.category;
+          const icons = {beer: '🍺', cider: '🍎', wine: '🍷', spirits: '🥃', whiskey: '🥃'};
+          return `${icons[cat] || '🍾'} Step 2: ${cat.charAt(0).toUpperCase() + cat.slice(1)} Details`;
+        },
+        subtitle: (data) => {
+          const defaults = malawiDefaults[data.category] || {};
+          if (data.category === 'beer') {
+            return `📦 Crate size: ${defaults.pack_size} bottles (Malawi default, editable below)`;
+          } else if (data.category === 'cider') {
+            return `📦 6-Pack size: ${defaults.pack_size} bottles (Malawi default, editable below)`;
+          } else if (data.category === 'wine') {
+            return `🍷 Sold by glass: ${defaults.glasses_per_bottle} glasses per bottle (Malawi default)`;
+          } else if (data.category === 'spirits' || data.category === 'whiskey') {
+            return `🥃 Sold by shot: ${defaults.shots_per_bottle} shots per bottle (Malawi default)`;
+          }
+          return 'Enter product details';
+        },
         fields: (data) => {
+          const cat = data.category;
+          const defaults = malawiDefaults[cat] || {};
           const fields = [];
           
-          if (data.selling_mode === 'bottle' || data.selling_mode === 'both') {
+          // ALWAYS REQUIRED: Name, Cost, Sell Price
+          fields.push(
+            { 
+              key: 'product_name', 
+              label: 'Product Name', 
+              type: 'text', 
+              required: true,
+              placeholder: 'e.g., Castle Lager, Hunter\'s Dry, 4th Street',
+              suggestions: popularNames[cat] || []
+            },
+            { 
+              key: 'cost_per_bottle', 
+              label: `Cost per ${defaults.base_unit || 'Bottle'} (MWK)`, 
+              type: 'number', 
+              min: 0, 
+              step: '0.01',
+              placeholder: '500.00'
+            },
+            { 
+              key: 'sell_per_bottle', 
+              label: `Sell per ${defaults.base_unit || 'Bottle'} (MWK)`, 
+              type: 'number', 
+              min: 0, 
+              step: '0.01', 
+              required: true,
+              placeholder: '800.00'
+            }
+          );
+          
+          // CATEGORY-SPECIFIC FIELDS (show only relevant toggles)
+          
+          if (cat === 'beer') {
+            // Beer: Enable Crate toggle + size
             fields.push(
-              { key: 'price_per_bottle', label: 'Price per Bottle (MWK)', type: 'number', min: 0, step: '0.01', required: true },
-              { key: 'cost_per_bottle', label: 'Cost per Bottle (MWK) - Optional', type: 'number', min: 0, step: '0.01' }
+              { 
+                key: 'enable_crate', 
+                label: 'Enable Crate Sales', 
+                type: 'checkbox', 
+                value: true,
+                help: 'Allow selling by crate (recommended for wholesale)'
+              },
+              { 
+                key: 'crate_size', 
+                label: 'Bottles per Crate', 
+                type: 'number', 
+                min: 1, 
+                value: defaults.pack_size,
+                help: 'Malawi default is 20'
+              },
+              { 
+                key: 'sell_per_crate', 
+                label: 'Sell per Crate (MWK) - Optional Discount', 
+                type: 'number', 
+                min: 0, 
+                step: '0.01',
+                placeholder: 'Leave empty to calculate from bottle price'
+              }
+            );
+          } 
+          else if (cat === 'cider') {
+            // Cider: Enable 6-Pack toggle + size
+            fields.push(
+              { 
+                key: 'enable_6pack', 
+                label: 'Enable 6-Pack Sales', 
+                type: 'checkbox', 
+                value: true,
+                help: 'Allow selling by 6-pack'
+              },
+              { 
+                key: 'pack_size', 
+                label: 'Bottles per 6-Pack', 
+                type: 'number', 
+                min: 1, 
+                value: defaults.pack_size,
+                help: 'Malawi default is 6'
+              },
+              { 
+                key: 'sell_per_pack', 
+                label: 'Sell per 6-Pack (MWK) - Optional Discount', 
+                type: 'number', 
+                min: 0, 
+                step: '0.01',
+                placeholder: 'Leave empty to calculate from bottle price'
+              }
             );
           }
-          
-          if (data.selling_mode === 'shot' || data.selling_mode === 'both') {
+          else if (cat === 'wine') {
+            // Wine: Enable glass selling toggle
             fields.push(
-              { key: 'shots_per_bottle', label: 'Shots per Bottle', type: 'number', min: 1, required: true },
-              { key: 'price_per_shot', label: 'Price per Shot (MWK)', type: 'number', min: 0, step: '0.01', required: true },
-              { key: 'barman_reserved', label: 'Barman Reserved Shots', type: 'number', min: 0, value: 2 }
+              { 
+                key: 'enable_glass', 
+                label: 'Enable Glass Sales', 
+                type: 'checkbox', 
+                value: true,
+                help: 'Sell wine by the glass (recommended)'
+              },
+              { 
+                key: 'glasses_per_bottle', 
+                label: 'Glasses per Bottle', 
+                type: 'number', 
+                min: 1, 
+                value: defaults.glasses_per_bottle,
+                help: 'Malawi default is 5'
+              },
+              { 
+                key: 'sell_per_glass', 
+                label: 'Sell per Glass (MWK)', 
+                type: 'number', 
+                min: 0, 
+                step: '0.01',
+                placeholder: 'Leave empty to calculate from bottle price'
+              }
+            );
+          }
+          else if (cat === 'spirits' || cat === 'whiskey') {
+            // Spirits/Whisky: Enable shot selling toggle
+            fields.push(
+              { 
+                key: 'enable_shot', 
+                label: 'Enable Shot Sales', 
+                type: 'checkbox', 
+                value: true,
+                help: 'Sell by shot (recommended for bars)'
+              },
+              { 
+                key: 'shots_per_bottle', 
+                label: 'Shots per Bottle', 
+                type: 'number', 
+                min: 1, 
+                value: defaults.shots_per_bottle,
+                help: 'Malawi default is 30 (750ml bottle / 25ml shot)'
+              },
+              { 
+                key: 'sell_per_shot', 
+                label: 'Sell per Shot (MWK)', 
+                type: 'number', 
+                min: 0, 
+                step: '0.01',
+                placeholder: 'Leave empty to calculate from bottle price'
+              }
             );
           }
           
           return fields;
         }
-      },
-      
-      // Step 5: Barcode
-      {
-        type: 'cards',
-        key: 'has_barcode',
-        title: 'Barcode',
-        subtitle: 'Does this product have a barcode?',
-        options: barcodeOptions,
-        columns: 'two-col'
-      },
-      
-      // Step 6: Barcode Entry (conditional)
-      {
-        type: 'input',
-        key: 'barcode',
-        title: 'Scan or Enter Barcode',
-        subtitle: 'Use camera to scan or type manually',
-        inputType: 'text',
-        placeholder: 'Barcode number',
-        required: true,
-        skip: (data) => data.has_barcode !== 'yes'
       }
+      
+      // DONE! Just 2 steps: Category → Form with smart defaults
+      // NO barcode, NO complicated selling modes, NO extra steps
     ],
     
     onComplete: async (data) => {

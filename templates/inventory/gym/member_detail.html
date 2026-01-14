@@ -5,7 +5,7 @@
 
 {% block extra_css %}
 <style>
-    /* Premium Gym Member Detail Styling */
+    /* Premium Gym Member Detail Styling - MOBILE-FIRST */
     .premium-card {
         background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
         border-radius: 16px;
@@ -14,12 +14,14 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         overflow: hidden;
     }
-    
-    .premium-card:hover {
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
-        transform: translateY(-2px);
+
+    @media (min-width: 768px) {
+        .premium-card:hover {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+            transform: translateY(-2px);
+        }
     }
-    
+
     .premium-header {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 2rem;
@@ -27,7 +29,7 @@
         position: relative;
         overflow: hidden;
     }
-    
+
     .premium-header::before {
         content: '';
         position: absolute;
@@ -38,12 +40,12 @@
         background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
         animation: pulse 3s ease-in-out infinite;
     }
-    
+
     @keyframes pulse {
         0%, 100% { transform: scale(1); opacity: 0.5; }
         50% { transform: scale(1.1); opacity: 0.8; }
     }
-    
+
     .status-badge {
         padding: 0.5rem 1rem;
         border-radius: 50px;
@@ -54,7 +56,7 @@
         gap: 0.5rem;
         animation: fadeInUp 0.5s ease-out;
     }
-    
+
     @keyframes fadeInUp {
         from {
             opacity: 0;
@@ -65,25 +67,25 @@
             transform: translateY(0);
         }
     }
-    
+
     .status-active {
         background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         color: white;
         box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
     }
-    
+
     .status-arrears {
         background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         color: white;
         box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     }
-    
+
     .status-pending {
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
         color: white;
         box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
     }
-    
+
     .info-label {
         font-size: 0.75rem;
         font-weight: 600;
@@ -92,13 +94,13 @@
         color: #64748b;
         margin-bottom: 0.5rem;
     }
-    
+
     .info-value {
         font-size: 1.125rem;
         font-weight: 600;
         color: #1e293b;
     }
-    
+
     .qr-container {
         background: white;
         padding: 1.5rem;
@@ -106,17 +108,17 @@
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
         transition: transform 0.3s ease;
     }
-    
+
     .qr-container:hover {
         transform: scale(1.05);
     }
-    
+
     .payment-table {
         background: white;
         border-radius: 12px;
         overflow: hidden;
     }
-    
+
     .payment-table th {
         background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
         font-weight: 600;
@@ -126,20 +128,20 @@
         color: #475569;
         padding: 1rem;
     }
-    
+
     .payment-table td {
         padding: 1rem;
         border-bottom: 1px solid #f1f5f9;
     }
-    
+
     .payment-table tr:last-child td {
         border-bottom: none;
     }
-    
+
     .payment-table tr:hover {
         background: #f8fafc;
     }
-    
+
     .premium-btn {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border: none;
@@ -150,18 +152,18 @@
         transition: all 0.3s ease;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
     }
-    
+
     .premium-btn:hover {
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         color: white;
     }
-    
+
     .activity-log {
         position: relative;
         padding-left: 2rem;
     }
-    
+
     .activity-log::before {
         content: '';
         position: absolute;
@@ -171,7 +173,7 @@
         width: 2px;
         background: linear-gradient(to bottom, #667eea, #764ba2);
     }
-    
+
     .activity-item {
         position: relative;
         padding: 1rem;
@@ -181,12 +183,12 @@
         border: 1px solid #e2e8f0;
         transition: all 0.3s ease;
     }
-    
+
     .activity-item:hover {
         border-color: #667eea;
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
     }
-    
+
     .activity-item::before {
         content: '';
         position: absolute;
@@ -197,6 +199,96 @@
         background: #667eea;
         border-radius: 50%;
         box-shadow: 0 0 0 4px white, 0 0 0 6px #667eea33;
+    }
+
+    /* ========== MOBILE: STICKY BOTTOM ACTIONS ========== */
+    .gym-member-mobile-actions {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 1rem;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+        display: flex;
+        gap: 0.5rem;
+        z-index: 1000;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    @media (min-width: 768px) {
+        .gym-member-mobile-actions {
+            display: none; /* Hide on desktop */
+        }
+    }
+
+    .gym-member-mobile-actions .btn {
+        flex: 1;
+        padding: 0.875rem;
+        font-weight: 700;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .gym-member-mobile-actions .btn-primary {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .gym-member-mobile-actions .btn-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        border: none;
+        color: white;
+    }
+
+    /* Add padding to body on mobile to account for fixed bottom bar */
+    @media (max-width: 767px) {
+        .container-fluid {
+            padding-bottom: 5rem;
+        }
+    }
+
+    /* QR Code: Make it tap to enlarge on mobile */
+    .qr-container img {
+        cursor: pointer;
+    }
+
+    @media (max-width: 767px) {
+        .qr-container {
+            max-width: 100% !important;
+        }
+
+        .qr-container img {
+            max-width: 200px;
+        }
+    }
+
+    /* Mobile: Simplify header */
+    @media (max-width: 767px) {
+        .premium-card {
+            border-radius: 12px;
+        }
+
+        .premium-header {
+            padding: 1.5rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+        }
+    }
+
+    /* Hide desktop actions on mobile */
+    @media (max-width: 767px) {
+        .gym-desktop-actions {
+            display: none;
+        }
     }
 </style>
 {% endblock %}
@@ -212,27 +304,27 @@
                         <i class="bi bi-arrow-left"></i>
                     </a>
                     <div>
-                        <h2>{{ member.name }}</h2>
-                        <p class="text-muted mb-0">Member Details</p>
+                        <h2 class="h4 h2-md mb-0 mb-md-1">{{ member.name }}</h2>
+                        <p class="text-muted mb-0 small">Member Details</p>
                     </div>
                 </div>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 gym-desktop-actions">
                     <a href="{% url 'gym:member_edit' member.id %}" class="btn btn-outline-primary">
-                        <i class="bi bi-pencil"></i> Edit
+                        <i class="bi bi-pencil"></i> <span class="d-none d-lg-inline">Edit</span>
                     </a>
                     {% if not member.is_archived %}
-                    <form method="post" action="{% url 'gym:member_archive' member.id %}" class="d-inline" 
+                    <form method="post" action="{% url 'gym:member_archive' member.id %}" class="d-inline"
                           onsubmit="return confirm('Archive this member? They can be restored later.')">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline-danger">
-                            <i class="bi bi-archive"></i> Archive
+                            <i class="bi bi-archive"></i> <span class="d-none d-lg-inline">Archive</span>
                         </button>
                     </form>
                     {% else %}
                     <form method="post" action="{% url 'gym:member_restore' member.id %}" class="d-inline">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-outline-success">
-                            <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            <i class="bi bi-arrow-counterclockwise"></i> <span class="d-none d-lg-inline">Restore</span>
                         </button>
                     </form>
                     {% endif %}
@@ -259,7 +351,13 @@
                 </div>
                 <div class="mb-3">
                     <div class="info-label">Joined</div>
-                    <div class="info-value">{{ member.joined_at|date:"d M Y" }}</div>
+                    <div class="info-value">
+                        {% if member_joined_at %}
+                            {{ member_joined_at|date:"d M Y" }}
+                        {% else %}
+                            <span class="text-muted">Not set</span>
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="mb-3">
                     <div class="info-label">Membership Status</div>
@@ -268,9 +366,9 @@
                             <span class="status-badge" style="background: #64748b; color: white;">
                                 <i class="bi bi-archive"></i> Archived
                             </span>
-                        {% elif member.membership_end %}
+                        {% elif member_membership_end %}
                             {% now "Y-m-d" as today_str %}
-                            {% if member.membership_end|date:"Y-m-d" >= today_str %}
+                            {% if member_membership_end|date:"Y-m-d" >= today_str %}
                                 <span class="status-badge status-active">
                                     <i class="bi bi-check-circle"></i> Active
                                 </span>
@@ -289,22 +387,26 @@
                 <div class="mb-3">
                     <label class="text-muted small">Days Left</label>
                     <div>
-                        {% if member.membership_end %}
-                            {% if member.days_left > 0 %}
-                                <span class="fw-semibold">{{ member.days_left }} / {{ member.duration_days }} days</span>
+                        {% if member_membership_end %}
+                            {% if member_days_left > 0 %}
+                                <span class="fw-semibold">{{ member_days_left }} / {{ member_duration_days }} days</span>
                             {% else %}
-                                <span class="text-danger">{{ member.days_left }} / {{ member.duration_days }} days</span>
+                                <span class="text-danger">{{ member_days_left }} / {{ member_duration_days }} days</span>
                             {% endif %}
                         {% else %}
                             <span class="text-muted">No active membership</span>
                         {% endif %}
                     </div>
                 </div>
-                {% if member.trainer %}
+                {% if member_trainer %}
                 <div class="mb-3">
                     <label class="text-muted small">Trainer</label>
                     <div>
-                        {{ member.trainer.name }}
+                        {% if member_trainer.name %}
+                            {{ member_trainer.name }}
+                        {% else %}
+                            {{ member_trainer }}
+                        {% endif %}
                         {% if trainer_fee_missing %}
                             <span class="badge bg-warning-subtle text-warning ms-2" title="Trainer fee not recorded for current period">
                                 <i class="bi bi-exclamation-triangle"></i> Fee not recorded
@@ -316,23 +418,52 @@
                 <div class="mb-3">
                     <label class="text-muted small">Next Payment</label>
                     <div>
-                        {% if member.next_payment_date_property %}
-                            {{ member.next_payment_date_property|date:"d M Y" }}
+                        {% if member_next_payment_date %}
+                            {{ member_next_payment_date|date:"d M Y" }}
                         {% else %}
                             <span class="text-muted">Not set</span>
                         {% endif %}
                     </div>
                 </div>
-                {% if member.is_active_membership %}
+                {% if member_is_active %}
                 <div class="mb-3">
-                    <label class="text-muted small">Days Attended (Current Period)</label>
+                    <label class="text-muted small">Attendance Progress (Current Period)</label>
                     <div>
+                        {% if member_duration_days > 0 %}
+                        {% widthratio member_days_attended member_duration_days 100 as progress_percent %}
+                        <div class="progress" style="height: 24px; border-radius: 12px; background: #f1f5f9;">
+                            <div class="progress-bar bg-primary" role="progressbar"
+                                 style="width: {{ progress_percent }}%; border-radius: 12px;"
+                                 aria-valuenow="{{ progress_percent }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                {{ member_days_attended }} / {{ member_duration_days }} days
+                            </div>
+                        </div>
+                        {% else %}
                         <span class="badge bg-primary-subtle text-primary">
-                            {{ member.days_attended }} / {{ member.duration_days }} days
+                            {{ member_days_attended }} days attended
                         </span>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
+
+                <!-- Gamification Badges -->
+                {% with badges=member.get_gamification_badges %}
+                {% if badges %}
+                <div class="mb-3">
+                    <label class="text-muted small">Achievements</label>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for badge in badges %}
+                        <span class="badge bg-{{ badge.color }}-subtle text-{{ badge.color }}" title="{{ badge.description }}">
+                            {{ badge.icon }} {{ badge.name }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
                 {% if member.notes %}
                 <div>
                     <label class="text-muted small">Notes</label>
@@ -340,7 +471,7 @@
                 </div>
                 {% endif %}
             </div>
-            
+
             <!-- QR Code Card -->
             <div class="premium-card p-4 mt-3">
                 <h5 class="mb-4 text-center" style="font-weight: 700; color: #1e293b;">
@@ -348,25 +479,71 @@
                     Member QR Code
                 </h5>
                 <div class="text-center">
-                    {% if member.member_code %}
-                        <div class="qr-container mx-auto" style="max-width: 220px;">
-                            <img src="{{ member.get_qr_code_data_url }}" 
-                                 alt="QR Code for {{ member.name }}" 
-                                 style="width: 100%; height: auto; border-radius: 8px;">
+                    {% if member.qr_uuid %}
+                        <div class="qr-container mx-auto" style="max-width: 320px; margin-bottom: 20px;" onclick="enlargeQR()">
+                            <img src="{% url 'gym:member_qr_png' qr_uuid=member.qr_uuid %}"
+                                 id="memberQR"
+                                 alt="QR Code for {{ member.full_name|default:member.name }}"
+                                 width="280" height="280"
+                                 style="image-rendering: pixelated; border-radius: 14px;">
                         </div>
                         <div class="mt-3 fw-semibold" style="color: #667eea; font-size: 1.125rem; letter-spacing: 0.05em;">
-                            {{ member.member_code }}
+                            {{ member.member_number|default:member.member_code|default:"N/A" }}
+                        </div>
+                        <div class="mt-3 d-flex gap-2 justify-content-center flex-wrap">
+                            <a href="{% url 'gym:member_qr_card_pdf' member.qr_uuid %}" class="premium-btn btn-sm">
+                                <i class="bi bi-download me-2"></i> Download PDF
+                            </a>
+                            <a href="{% url 'gym:member_qr_print' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-printer me-2"></i> Print QR
+                            </a>
+                        </div>
+                        <div class="mt-2">
+                            <a href="{% url 'gym:member_qr_status_public' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-eye me-2"></i> View Public Status Page
+                            </a>
+                        </div>
+                    {% elif member_code %}
+                        <!-- Fallback for legacy members without qr_uuid -->
+                        {% if member_qr_code %}
+                            <div class="qr-container mx-auto" style="max-width: 220px;" onclick="enlargeQR()">
+                                <img src="{{ member_qr_code }}"
+                                     id="memberQR"
+                                     alt="QR Code for {{ member.name }}"
+                                     style="width: 100%; height: auto; border-radius: 8px;">
+                            </div>
+                        {% endif %}
+                        <div class="mt-3 fw-semibold" style="color: #667eea; font-size: 1.125rem; letter-spacing: 0.05em;">
+                            {{ member_code }}
                         </div>
                         <div class="mt-3">
-                            <button class="premium-btn" onclick="printQR()">
-                                <i class="bi bi-printer me-2"></i> Print QR Code
+                            <button class="premium-btn btn-sm" onclick="printQR()">
+                                <i class="bi bi-printer me-2"></i> Print QR
                             </button>
+                        </div>
+                        <div class="mt-2 text-warning small">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            Legacy QR code. Please refresh page to generate new QR.
                         </div>
                     {% else %}
                         <div class="text-muted small">No QR code generated yet</div>
                     {% endif %}
                 </div>
             </div>
+
+            <!-- Recent Check-ins (Mobile friendly) -->
+            {% if member_is_active %}
+            <div class="premium-card p-4 mt-3">
+                <h6 class="mb-3" style="font-weight: 700; color: #1e293b;">
+                    <i class="bi bi-calendar-check me-2" style="color: #667eea;"></i>
+                    Recent Check-ins
+                </h6>
+                <div class="d-flex flex-column gap-2">
+                    <!-- This would be populated by a view query - placeholder for now -->
+                    <small class="text-muted">Last 7 check-ins will appear here</small>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- Payment History -->
@@ -453,18 +630,81 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- MOBILE: Sticky Bottom Actions -->
+    <div class="gym-member-mobile-actions">
+        {% if member_is_active and not member.is_archived %}
+            <!-- Check In Button -->
+            <form method="post" action="{% url 'gym:member_checkin' member.id %}" style="flex: 1;">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{% url 'gym:member_detail' member.id %}">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-box-arrow-in-right"></i> Check In
+                </button>
+            </form>
+        {% elif not member_is_active and not member.is_archived %}
+            <!-- Renew Button -->
+            <a href="{% url 'gym:add_payment' %}?member={{ member.id }}" class="btn btn-warning" style="flex: 1;">
+                <i class="bi bi-credit-card"></i> Renew
+            </a>
+        {% endif %}
+
+        <!-- Edit Button (always show) -->
+        <a href="{% url 'gym:member_edit' member.id %}" class="btn btn-outline-secondary">
+            <i class="bi bi-pencil"></i>
+        </a>
+    </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
+// Enlarge QR on mobile tap
+function enlargeQR() {
+    if (window.innerWidth < 768) {
+        const qrImg = document.getElementById('memberQR');
+        if (!qrImg) return;
+
+        // Create fullscreen overlay
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        `;
+
+        const largeImg = document.createElement('img');
+        largeImg.src = qrImg.src;
+        largeImg.style.cssText = `
+            max-width: 90%;
+            max-height: 90%;
+            border-radius: 12px;
+            background: white;
+            padding: 1rem;
+        `;
+
+        overlay.appendChild(largeImg);
+        overlay.onclick = () => overlay.remove();
+        document.body.appendChild(overlay);
+    }
+}
+
 function printQR() {
     // Create a print-friendly window with just the QR code
     const qrImg = document.querySelector('.glass-card img[alt*="QR Code"]');
     const memberCode = '{{ member.member_code }}';
     const memberName = '{{ member.name }}';
-    
+
     if (!qrImg) return;
-    
+
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
         <!DOCTYPE html>
@@ -506,4 +746,3 @@ function printQR() {
 }
 </script>
 {% endblock %}
-

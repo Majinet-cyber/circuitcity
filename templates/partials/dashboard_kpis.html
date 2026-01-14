@@ -18,8 +18,8 @@
     Usage:
     {% include "partials/dashboard_kpis.html" with kpi_revenue=total_revenue kpi_cogs=total_cogs kpi_profit=total_profit kpi_stock_value=stock_value selected_date_range=date_range %}
 {% endcomment %}
+{% load static %}
 {% load humanize %}
-{% load numeric_filters %}
 
 <link rel="stylesheet" href="{% static 'css/numeric-display.css' %}">
 <link rel="stylesheet" href="{% static 'css/glassmorphic-design-system.css' %}">
