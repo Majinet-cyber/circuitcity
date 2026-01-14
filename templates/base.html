@@ -1539,17 +1539,46 @@
       .then(function(registration) {
         console.log('ServiceWorker registered: ', registration.scope);
 
-        // Check for updates periodically
+        // Force check for updates on every load (critical for deploys)
+        registration.update();
+
+        // Auto-activate waiting service worker and reload
+        function activateWaitingSW() {
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+            // Reload once to get new SW
+            window.location.reload();
+          }
+        }
+
+        // If SW is already waiting, activate it immediately
+        if (registration.waiting) {
+          activateWaitingSW();
+        }
+
+        // Watch for new SW installing
         registration.addEventListener('updatefound', function() {
           const newWorker = registration.installing;
           if (!newWorker) return;
 
           newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker available, could show update notification
-              console.log('New content available; refresh to update.');
+            if (newWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                // New SW available, activate it immediately
+                console.log('New content available; activating now.');
+                activateWaitingSW();
+              } else {
+                // First SW install
+                console.log('Content cached for offline use.');
+              }
             }
           });
+        });
+
+        // Listen for SW taking control (after skipWaiting)
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          // New SW has taken control, page will reload above
+          console.log('New service worker activated');
         });
       })
       .catch(function(error) {

@@ -596,3 +596,147 @@ class TestCleanUIShellNoRegressions(TestCase):
         for vertical in critical_verticals:
             vertical_path = os.path.join(template_dir, vertical)
             assert os.path.exists(vertical_path), f"Vertical {vertical} templates should NOT be deleted"
+
+
+@pytest.mark.django_db
+class TestPWACachingNoHardRefresh(TestCase):
+    """
+    Tests to ensure PWA caching works correctly and NO hard refresh is needed after deploys.
+    
+    Critical requirements:
+    1. /sw.js is served dynamically with no-cache headers
+    2. /sw.js contains BUILD_ID (auto-updates on deploy)
+    3. SW registration includes auto-update logic
+    """
+
+    def test_sw_js_endpoint_exists_and_returns_js(self):
+        """
+        /sw.js must be accessible (public, no auth) and return JavaScript.
+        """
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200, "Service worker endpoint must be accessible"
+        assert "application/javascript" in response["Content-Type"], "Must return JavaScript"
+
+    def test_sw_js_has_no_cache_headers(self):
+        """
+        CRITICAL: /sw.js must have Cache-Control: no-cache to ensure browsers always check for updates.
+        """
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        
+        cache_control = response.get("Cache-Control", "").lower()
+        # Must have no-cache or no-store (either is acceptable)
+        assert "no-cache" in cache_control or "no-store" in cache_control, \
+            f"Service worker must have no-cache/no-store headers, got: {cache_control}"
+
+    def test_sw_js_contains_dynamic_version(self):
+        """
+        /sw.js must contain a dynamic VERSION with BUILD_ID, not a hardcoded date.
+        This ensures the SW version changes on every deploy.
+        """
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Check that VERSION is defined
+        assert "const VERSION" in content or "let VERSION" in content or "var VERSION" in content, \
+            "Service worker must define VERSION constant"
+        
+        # Check that it's not the old hardcoded placeholder
+        assert "BUILD_ID_PLACEHOLDER" not in content, \
+            "BUILD_ID_PLACEHOLDER should be replaced with actual build ID"
+        
+        # Check that VERSION uses emajinet prefix (our format)
+        assert "emajinet-" in content, "VERSION should use emajinet- prefix"
+
+    def test_sw_has_skip_waiting_message_handler(self):
+        """
+        SW must have message handler for SKIP_WAITING to enable auto-activation.
+        """
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Check for message event listener
+        assert "addEventListener('message'" in content or 'addEventListener("message"' in content, \
+            "Service worker must listen for messages"
+        
+        # Check for SKIP_WAITING handling
+        assert "SKIP_WAITING" in content, "Service worker must handle SKIP_WAITING message"
+        assert "skipWaiting" in content, "Service worker must call skipWaiting()"
+
+    def test_sw_has_stale_while_revalidate_strategy(self):
+        """
+        SW must use stale-while-revalidate for non-hashed assets to prevent hard refresh.
+        """
+        client = Client()
+        response = client.get("/sw.js")
+        
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        
+        # Check for SWR implementation
+        assert "swr" in content.lower() or "stale" in content.lower(), \
+            "Service worker should implement stale-while-revalidate"
+
+    def test_base_template_has_auto_update_sw_registration(self):
+        """
+        Base template must include SW registration with auto-update logic.
+        """
+        # Create test user and business for authenticated page
+        from django.contrib.auth import get_user_model
+        from tenants.models import Business, Membership
+        from circuitcity.accounts.models import Profile
+        from inventory.business_kinds import BusinessKind
+        
+        User = get_user_model()
+        client = Client()
+        user = User.objects.create_user(username="testuser", password="testpass123")
+        Profile.objects.get_or_create(user=user, defaults={"display_name": "Test User"})
+        
+        business = Business.objects.create(
+            name="Test Business",
+            kind=BusinessKind.PHONES,
+            owner=user,
+            status="ACTIVE"
+        )
+        Membership.objects.create(
+            user=user,
+            business=business,
+            role="MANAGER",
+            status="ACTIVE"
+        )
+        
+        client.login(username="testuser", password="testpass123")
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+        
+        response = client.get("/dashboard/")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        
+        # Check for SW registration
+        assert "navigator.serviceWorker.register" in content, \
+            "Page must register service worker"
+        
+        # Check for auto-update logic
+        assert "registration.update()" in content, \
+            "SW registration must call update() to check for new SW"
+        
+        # Check for SKIP_WAITING message sending
+        assert "postMessage" in content and "SKIP_WAITING" in content, \
+            "SW registration must send SKIP_WAITING message to activate new SW"
+        
+        # Check for reload on update
+        assert "reload()" in content, \
+            "SW registration must reload page when new SW is available"

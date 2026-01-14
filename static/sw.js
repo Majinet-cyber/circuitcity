@@ -3,12 +3,14 @@
 // HTML always goes to network (no cache fallback)
 // This prevents stale templates from persisting after deploys
 // 
-// Static assets use Stale-While-Revalidate for performance
+// Static assets use intelligent caching:
+// - Hashed files (immutable): cache-first
+// - Non-hashed files: stale-while-revalidate (always fresh on next load)
 //
-// VERSION changes on each deploy to bust old caches
-const VERSION = 'emajinet-v2-20260114';
-const STATIC_CACHE = `${VERSION}-static`;
-const CDN_CACHE    = `${VERSION}-cdn`;
+// VERSION is injected dynamically per deploy (BUILD_ID_PLACEHOLDER)
+const VERSION = 'emajinet-BUILD_ID_PLACEHOLDER';
+const STATIC_CACHE = `static-${VERSION}`;
+const CDN_CACHE = `cdn-${VERSION}`;
 const OFFLINE_PAGE = '/offline/';
 
 const PRECACHE_ASSETS = [
@@ -35,6 +37,10 @@ const isDoc = (req) =>
 const isStatic = (url) => sameOrigin(url) && url.pathname.startsWith('/static/');
 const isCDN = (url) => /(^|\.)(?:jsdelivr\.net|gstatic\.com|googleapis\.com|unpkg\.com|bootstrapcdn\.com)$/.test(url.hostname);
 
+// Check if asset is hashed (immutable) - Django's ManifestStaticFilesStorage adds 12-char hash
+// Example: app.a1b2c3d4e5f6.js or style.123abc456def.css
+const isHashedAsset = (url) => /\.[a-f0-9]{8,}\.(?:js|css|png|jpg|jpeg|gif|svg|woff2?|ttf|eot)$/i.test(url.pathname);
+
 // Put response in cache (ok or opaque)
 async function cachePut(cacheName, request, response) {
   try {
@@ -59,6 +65,22 @@ async function swr(cacheName, request) {
 
   // Return cached immediately if present, else wait for network
   return cached || (await fetchPromise) || cached || Response.error();
+}
+
+// Cache-First for hashed/immutable assets
+async function cacheFirst(cacheName, request) {
+  const cache = await caches.open(cacheName);
+  const cached = await cache.match(request, { ignoreVary: true });
+  if (cached) return cached;
+  
+  // Not in cache, fetch and cache
+  try {
+    const res = await fetch(request);
+    await cachePut(cacheName, request, res);
+    return res.clone();
+  } catch (err) {
+    return Response.error();
+  }
 }
 
 // Network-Only for HTML (NEVER cache HTML to prevent stale templates)
@@ -120,6 +142,13 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Message handler: allows client to trigger immediate activation
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // Fetch strategy router
 self.addEventListener('fetch', (event) => {
   const { request } = event;
@@ -134,7 +163,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin static -> SWR (fast with background refresh)
+  // Hashed static assets (immutable) -> CACHE-FIRST (safe, fast)
+  if (isStatic(url) && isHashedAsset(url)) {
+    event.respondWith(cacheFirst(STATIC_CACHE, request));
+    return;
+  }
+
+  // Non-hashed same-origin static -> SWR (always fresh on next load)
   if (isStatic(url)) {
     event.respondWith(swr(STATIC_CACHE, request));
     return;

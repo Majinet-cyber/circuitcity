@@ -504,8 +504,15 @@ def sw_js(request: HttpRequest) -> HttpResponse:
                 content = f.read()
             
             # Inject BUILD_ID for cache busting (fixes "warped until hard refresh")
-            build_id = getattr(settings, 'BUILD_ID', getattr(settings, 'STATIC_VERSION', '1'))
-            content = content.replace('BUILD_ID_PLACEHOLDER', build_id)
+            # Priority: Render git commit > env GIT_SHA > BUILD_ID setting > timestamp
+            build_id = (
+                os.getenv("RENDER_GIT_COMMIT") or 
+                os.getenv("GIT_SHA") or 
+                getattr(settings, 'BUILD_ID', None) or 
+                getattr(settings, 'STATIC_VERSION', None) or
+                datetime.now().strftime("%Y%m%d%H%M%S")
+            )
+            content = content.replace('BUILD_ID_PLACEHOLDER', str(build_id))
         except (IOError, OSError):
             # Return minimal service worker if file read fails
             content = "// Service worker file not found\nself.skipWaiting();"
