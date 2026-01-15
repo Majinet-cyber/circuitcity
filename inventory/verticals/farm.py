@@ -209,11 +209,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "alerts_count": len(snapshot.alerts),
         "critical_alerts_count": snapshot.critical_alerts_count,
         
-        # Quick action URLs (use reverse for SSOT) - NOTE: Quick action buttons removed from template
-        "url_add_expense": reverse("verticals:farm_expenses_record"),
-        "url_add_sale": reverse("verticals:farm_sales_record"),
-        "url_livestock_add_event": reverse("verticals:farm_livestock_add_event"),
-        "url_season_create": reverse("verticals:farm_add_season"),
+        # NOTE: Quick action buttons (Add Expense, Add Sale, Livestock Event, New Season)
+        # were REMOVED from dashboard per Jan 2026 redesign. These actions are accessible
+        # via sidebar navigation to their respective pages (Expenses, Sales, Livestock, Seasons).
     })
     
     return render(request, "verticals/farm/dashboard.html", ctx)
@@ -536,7 +534,8 @@ def crops_list(request: HttpRequest) -> HttpResponse:
 @require_business_kind(BusinessKind.FARM)
 @require_http_methods(["GET", "POST"])
 def crop_season_create(request: HttpRequest) -> HttpResponse:
-    """Create a new crop season."""
+    """Create a new crop season with Smart Agronomy integration."""
+    import json
     ctx = base.base_context(request)
     business = ctx.get("business")
     
@@ -557,16 +556,62 @@ def crop_season_create(request: HttpRequest) -> HttpResponse:
                 notes=request.POST.get("notes", ""),
                 created_by=request.user,
             )
+            
+            # Handle agronomy recommendations if applied
+            apply_rec = request.POST.get("apply_recommendations", "")
+            if apply_rec == "true":
+                # Create draft expense items for fertiliser
+                from inventory.services.farm_agronomy import create_draft_expense_items
+                try:
+                    draft_items = create_draft_expense_items(
+                        season.crop_type,
+                        season.area_value,
+                        use_high_estimate=False  # Conservative
+                    )
+                    # Create actual expense entries
+                    for item in draft_items:
+                        FarmLedgerEntry.objects.create(
+                            business=business,
+                            date=season.start_date,
+                            entry_type=FarmEntryType.EXPENSE,
+                            enterprise_type="crop",
+                            category=item["category"],
+                            description=item["description"],
+                            amount_mwk=Decimal("0"),  # User can fill in actual cost later
+                            quantity=Decimal(str(item["quantity"])),
+                            unit=item["unit"],
+                            notes=f"[Auto-generated from Smart Agronomy] {item['notes']}",
+                            crop_season=season,
+                            created_by=request.user,
+                        )
+                    messages.info(request, "Smart Agronomy fertiliser plan added as draft expenses.")
+                except Exception as e:
+                    # Don't fail season creation if agronomy fails
+                    pass
+            
             messages.success(request, f"Season '{season.name}' created successfully.")
             return redirect("/verticals/farm/crops/")
         except Exception as e:
             messages.error(request, f"Error creating season: {e}")
+    
+    # Handle crop prefill from query param (from crops index cards)
+    prefill_crop = request.GET.get("crop", "")
+    prefill_name = ""
+    if prefill_crop:
+        # Generate default name
+        from datetime import datetime
+        year = datetime.now().year
+        crop_label = prefill_crop.replace("_", " ").title()
+        prefill_name = f"{crop_label} {year} Season"
     
     from inventory.models_farm import FarmCropType
     ctx.update({
         "active_tab": "crops",
         "crop_types": FarmCropType.choices,
         "status_choices": FarmSeasonStatus.choices,
+        "prefill_crop": prefill_crop,
+        "prefill_name": prefill_name,
+        "agronomy_data": json.dumps({}),  # Placeholder for server-side agronomy data
     })
     
     return render(request, "verticals/farm/crop_season_form.html", ctx)

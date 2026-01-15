@@ -2,8 +2,200 @@
 
 {% block title %}New Crop Season - Farm Manager{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Premium Form Styles ===== */
+.farm-season-form {
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+}
+
+/* Card Selection UI */
+.card-selector {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 576px) {
+    .card-selector {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.card-selector.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.card-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.card-option:hover {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+}
+
+.card-option.selected {
+    border-color: var(--farm-green);
+    background: var(--farm-green-light);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.2);
+}
+
+.card-option input[type="radio"] {
+    display: none;
+}
+
+.card-option .emoji {
+    font-size: 1.5rem;
+}
+
+.card-option .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.card-option .sublabel {
+    font-size: 0.625rem;
+    color: var(--muted);
+}
+
+/* Smart Agronomy Panel */
+.agronomy-panel {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border: 2px solid var(--farm-green);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    display: none;
+}
+
+.agronomy-panel.visible {
+    display: block;
+}
+
+.agronomy-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.agronomy-header h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--farm-green);
+    margin: 0;
+}
+
+.agronomy-header .badge {
+    font-size: 0.625rem;
+    background: var(--farm-green);
+}
+
+.agronomy-estimate {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px dashed rgba(22, 163, 74, 0.3);
+}
+
+.agronomy-estimate:last-child {
+    border-bottom: none;
+}
+
+.agronomy-estimate .label {
+    color: #166534;
+    font-size: 0.8125rem;
+}
+
+.agronomy-estimate .value {
+    font-weight: 700;
+    color: #166534;
+    font-size: 0.8125rem;
+}
+
+.agronomy-disclaimer {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 6px;
+    font-size: 0.6875rem;
+    color: #166534;
+}
+
+.agronomy-disclaimer i {
+    color: var(--farm-green);
+}
+
+/* Variety Cards */
+.variety-section {
+    margin-bottom: 1.5rem;
+    display: none;
+}
+
+.variety-section.visible {
+    display: block;
+}
+
+.variety-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    min-height: 80px;
+}
+
+.variety-card:hover {
+    border-color: #2563eb;
+    background: #dbeafe;
+}
+
+.variety-card.selected {
+    border-color: #2563eb;
+    background: #dbeafe;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.variety-card .icon {
+    font-size: 1.25rem;
+}
+
+.variety-card .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.variety-card .sublabel {
+    font-size: 0.625rem;
+    color: var(--muted);
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4" style="max-width: 600px;">
+<div class="farm-season-form container py-4" style="max-width: 640px;" data-testid="farm-season-form-page">
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
@@ -14,25 +206,66 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-flower1"></i> Create Crop Season</h5>
+            <h5 class="mb-0"><i class="bi bi-flower1 me-2"></i> Create Crop Season</h5>
         </div>
         <div class="card-body">
-            <form method="post" data-testid="farm-season-form">
+            <form method="post" id="seasonForm" data-testid="farm-season-form">
                 {% csrf_token %}
 
                 <div class="mb-3">
                     <label for="name" class="form-label">Season Name *</label>
                     <input type="text" class="form-control" id="name" name="name" 
-                           placeholder="e.g., Maize 2026 Main Season" required autofocus>
+                           placeholder="e.g., Maize 2026 Main Season" required autofocus
+                           value="{{ prefill_name|default:'' }}">
                 </div>
 
-                <div class="mb-3">
-                    <label for="crop_type" class="form-label">Crop Type *</label>
-                    <select class="form-select" id="crop_type" name="crop_type" required>
+                <!-- Crop Type Selection (Premium Cards) -->
+                <div class="mb-4">
+                    <label class="form-label">Crop Type *</label>
+                    <div class="card-selector" data-testid="crop-type-selector">
                         {% for value, label in crop_types %}
-                        <option value="{{ value }}">{{ label }}</option>
+                        <label class="card-option{% if prefill_crop == value %} selected{% endif %}" data-value="{{ value }}">
+                            <input type="radio" name="crop_type" value="{{ value }}" {% if prefill_crop == value %}checked{% endif %} required>
+                            <span class="emoji">
+                                {% if value == 'maize' %}🌽{% elif value == 'soya' %}🫘{% elif value == 'groundnuts' %}🥜{% elif value == 'tobacco' %}🍂{% elif value == 'cotton' %}☁️{% elif value == 'rice' %}🍚{% elif value == 'beans' %}🫘{% elif value == 'cassava' %}🥔{% elif value == 'sweet_potato' %}🍠{% elif value == 'vegetables' %}🥬{% else %}🌱{% endif %}
+                            </span>
+                            <span class="label">{{ label }}</span>
+                        </label>
                         {% endfor %}
-                    </select>
+                    </div>
+                </div>
+
+                <!-- Maize Variety Selection (shows only when maize is selected) -->
+                <div class="variety-section" id="varietySection" data-testid="variety-selector">
+                    <label class="form-label">Seed Variety (Optional)</label>
+                    <div class="card-selector cols-2" data-testid="variety-cards">
+                        <label class="variety-card" data-value="seedco">
+                            <input type="radio" name="variety" value="seedco">
+                            <span class="icon">🌱</span>
+                            <span class="label">SeedCo Hybrid</span>
+                            <span class="sublabel">SC719, SC627</span>
+                        </label>
+                        <label class="variety-card" data-value="dekalb">
+                            <input type="radio" name="variety" value="dekalb">
+                            <span class="icon">🌾</span>
+                            <span class="label">DK / Dekalb</span>
+                            <span class="sublabel">DK8031, DK8053</span>
+                        </label>
+                        <label class="variety-card" data-value="pannar">
+                            <input type="radio" name="variety" value="pannar">
+                            <span class="icon">🌽</span>
+                            <span class="label">Pannar</span>
+                            <span class="sublabel">PAN53, PAN4M-21</span>
+                        </label>
+                        <label class="variety-card" data-value="opv">
+                            <input type="radio" name="variety" value="opv">
+                            <span class="icon">🏡</span>
+                            <span class="label">Local / OPV</span>
+                            <span class="sublabel">Open-pollinated</span>
+                        </label>
+                    </div>
+                    <input type="text" class="form-control mt-2" name="variety_custom" 
+                           placeholder="Or enter custom variety name">
                 </div>
 
                 <div class="row">
@@ -48,27 +281,52 @@
 
                 <div class="row">
                     <div class="col-6 mb-3">
-                        <label for="area_value" class="form-label">Area *</label>
+                        <label for="area_value" class="form-label">Area (Acres) *</label>
                         <input type="number" class="form-control" id="area_value" name="area_value" 
-                               step="0.01" min="0.01" required>
+                               step="0.01" min="0.01" required placeholder="e.g., 2.5">
                     </div>
                     <div class="col-6 mb-3">
                         <label for="area_unit" class="form-label">Unit</label>
                         <select class="form-select" id="area_unit" name="area_unit">
-                            <option value="acre">Acres</option>
+                            <option value="acre" selected>Acres</option>
                             <option value="ha">Hectares</option>
                         </select>
                     </div>
                 </div>
 
+                <!-- Smart Agronomy Panel -->
+                <div class="agronomy-panel" id="agronomyPanel" data-testid="smart-agronomy-panel">
+                    <div class="agronomy-header">
+                        <i class="bi bi-lightbulb-fill text-warning"></i>
+                        <h4>Smart Agronomy Estimates</h4>
+                        <span class="badge">BETA</span>
+                    </div>
+                    <div id="agronomyContent">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    <div class="agronomy-disclaimer">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>Disclaimer:</strong> These are estimates for planning purposes only. 
+                        Actual results vary based on weather, soil conditions, and farm management practices.
+                    </div>
+                    <div class="mt-3 d-flex gap-2">
+                        <button type="button" class="btn btn-success btn-sm" id="applyRecommendations" data-testid="apply-recommendations-btn">
+                            <i class="bi bi-check-circle me-1"></i> Apply Recommendations
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="saveAsSuggestion">
+                            Save as Suggestion Only
+                        </button>
+                    </div>
+                </div>
+
                 <hr>
-                <h6 class="text-muted mb-3">Projections (Optional)</h6>
+                <h6 class="text-muted mb-3">Projections</h6>
 
                 <div class="row">
                     <div class="col-6 mb-3">
                         <label for="projected_yield" class="form-label">Expected Yield</label>
                         <input type="number" class="form-control" id="projected_yield" name="projected_yield" 
-                               step="0.01" min="0">
+                               step="0.01" min="0" placeholder="e.g., 20">
                     </div>
                     <div class="col-6 mb-3">
                         <label for="yield_unit" class="form-label">Yield Unit</label>
@@ -85,23 +343,46 @@
                            step="0.01" min="0" placeholder="e.g., 25000">
                 </div>
 
-                <div class="mb-3">
-                    <label for="status" class="form-label">Status</label>
-                    <select class="form-select" id="status" name="status">
-                        {% for value, label in status_choices %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                <!-- Status Selection (Premium Cards) -->
+                <div class="mb-4">
+                    <label class="form-label">Season Status</label>
+                    <div class="card-selector cols-2" data-testid="status-card-selector">
+                        <label class="card-option selected" data-value="planning">
+                            <input type="radio" name="status" value="planning" checked>
+                            <span class="emoji">📋</span>
+                            <span class="label">Planning</span>
+                        </label>
+                        <label class="card-option" data-value="active">
+                            <input type="radio" name="status" value="active">
+                            <span class="emoji">🌱</span>
+                            <span class="label">Active</span>
+                            <span class="sublabel">Growing</span>
+                        </label>
+                        <label class="card-option" data-value="harvested">
+                            <input type="radio" name="status" value="harvested">
+                            <span class="emoji">🌾</span>
+                            <span class="label">Harvested</span>
+                        </label>
+                        <label class="card-option" data-value="closed">
+                            <input type="radio" name="status" value="closed">
+                            <span class="emoji">✅</span>
+                            <span class="label">Closed</span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="mb-3">
                     <label for="notes" class="form-label">Notes</label>
-                    <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                    <textarea class="form-control" id="notes" name="notes" rows="2" 
+                              placeholder="Any additional notes about this season"></textarea>
                 </div>
+
+                <!-- Hidden field for applying recommendations -->
+                <input type="hidden" name="apply_recommendations" id="applyRecommendationsField" value="">
 
                 <div class="d-grid gap-2">
                     <button type="submit" class="btn btn-success btn-lg">
-                        <i class="bi bi-check-circle"></i> Create Season
+                        <i class="bi bi-check-circle me-1"></i> Create Season
                     </button>
                     <a href="/verticals/farm/crops/" class="btn btn-outline-secondary">Cancel</a>
                 </div>
@@ -111,3 +392,137 @@
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Card selection UI
+    document.querySelectorAll('.card-option, .variety-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            const container = this.closest('.card-selector');
+            container.querySelectorAll('.card-option, .variety-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+            
+            // Trigger crop type change handler
+            if (this.querySelector('input[name="crop_type"]')) {
+                updateVarietySection();
+                updateAgronomy();
+            }
+        });
+    });
+
+    // Show variety section for maize
+    function updateVarietySection() {
+        const cropType = document.querySelector('input[name="crop_type"]:checked');
+        const varietySection = document.getElementById('varietySection');
+        if (cropType && cropType.value === 'maize') {
+            varietySection.classList.add('visible');
+        } else {
+            varietySection.classList.remove('visible');
+        }
+    }
+
+    // Smart Agronomy estimates
+    const agronomyData = {{ agronomy_data|safe|default:'{}' }};
+    
+    function updateAgronomy() {
+        const cropType = document.querySelector('input[name="crop_type"]:checked');
+        const areaInput = document.getElementById('area_value');
+        const panel = document.getElementById('agronomyPanel');
+        const content = document.getElementById('agronomyContent');
+        
+        if (!cropType || !areaInput.value || parseFloat(areaInput.value) <= 0) {
+            panel.classList.remove('visible');
+            return;
+        }
+        
+        const crop = cropType.value;
+        const acres = parseFloat(areaInput.value);
+        
+        // Simple client-side estimates (fallback if no server data)
+        const estimates = getEstimates(crop, acres);
+        
+        content.innerHTML = `
+            <div class="agronomy-estimate">
+                <span class="label">Expected Yield (Good Conditions)</span>
+                <span class="value">${estimates.yieldLow} - ${estimates.yieldHigh} bags</span>
+            </div>
+            <div class="agronomy-estimate">
+                <span class="label">Basal Fertiliser (NPK)</span>
+                <span class="value">${estimates.basalLow} - ${estimates.basalHigh} kg</span>
+            </div>
+            <div class="agronomy-estimate">
+                <span class="label">Top-dressing (Urea)</span>
+                <span class="value">${estimates.topLow} - ${estimates.topHigh} kg</span>
+            </div>
+        `;
+        
+        panel.classList.add('visible');
+    }
+    
+    function getEstimates(crop, acres) {
+        // Simple estimates table (conservative)
+        const data = {
+            'maize': { yieldLow: 8, yieldHigh: 20, basalLow: 40, basalHigh: 60, topLow: 30, topHigh: 60 },
+            'soya': { yieldLow: 6, yieldHigh: 12, basalLow: 20, basalHigh: 40, topLow: 0, topHigh: 0 },
+            'groundnuts': { yieldLow: 6, yieldHigh: 15, basalLow: 40, basalHigh: 60, topLow: 0, topHigh: 0 },
+            'tobacco': { yieldLow: 8, yieldHigh: 16, basalLow: 80, basalHigh: 100, topLow: 60, topHigh: 80 },
+            'rice': { yieldLow: 10, yieldHigh: 25, basalLow: 40, basalHigh: 60, topLow: 40, topHigh: 60 },
+            'beans': { yieldLow: 4, yieldHigh: 10, basalLow: 20, basalHigh: 40, topLow: 0, topHigh: 0 },
+            'cassava': { yieldLow: 80, yieldHigh: 160, basalLow: 20, basalHigh: 40, topLow: 0, topHigh: 0 },
+            'sweet_potato': { yieldLow: 40, yieldHigh: 100, basalLow: 20, basalHigh: 40, topLow: 0, topHigh: 0 },
+            'vegetables': { yieldLow: 50, yieldHigh: 200, basalLow: 40, basalHigh: 80, topLow: 20, topHigh: 40 },
+        };
+        
+        const d = data[crop] || { yieldLow: 5, yieldHigh: 20, basalLow: 30, basalHigh: 50, topLow: 20, topHigh: 40 };
+        
+        return {
+            yieldLow: Math.round(d.yieldLow * acres),
+            yieldHigh: Math.round(d.yieldHigh * acres),
+            basalLow: Math.round(d.basalLow * acres),
+            basalHigh: Math.round(d.basalHigh * acres),
+            topLow: Math.round(d.topLow * acres),
+            topHigh: Math.round(d.topHigh * acres),
+        };
+    }
+    
+    // Area input triggers agronomy update
+    document.getElementById('area_value').addEventListener('input', updateAgronomy);
+    
+    // Apply recommendations button
+    document.getElementById('applyRecommendations').addEventListener('click', function() {
+        const cropType = document.querySelector('input[name="crop_type"]:checked');
+        const areaInput = document.getElementById('area_value');
+        
+        if (cropType && areaInput.value) {
+            const crop = cropType.value;
+            const acres = parseFloat(areaInput.value);
+            const estimates = getEstimates(crop, acres);
+            
+            // Prefill projected yield with conservative (low) estimate
+            document.getElementById('projected_yield').value = estimates.yieldLow;
+            
+            // Mark that recommendations were applied
+            document.getElementById('applyRecommendationsField').value = 'true';
+            
+            // Show success message
+            this.innerHTML = '<i class="bi bi-check-circle me-1"></i> Applied!';
+            this.classList.remove('btn-success');
+            this.classList.add('btn-outline-success');
+        }
+    });
+    
+    // Save as suggestion only
+    document.getElementById('saveAsSuggestion').addEventListener('click', function() {
+        document.getElementById('applyRecommendationsField').value = 'suggestion_only';
+        this.innerHTML = '<i class="bi bi-check me-1"></i> Saved';
+    });
+    
+    // Initialize
+    updateVarietySection();
+    if (document.getElementById('area_value').value) {
+        updateAgronomy();
+    }
+});
+</script>
+{% endblock %}
