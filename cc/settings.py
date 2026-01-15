@@ -150,12 +150,12 @@ SECURE_HSTS_SECONDS = 0 if DEBUG else env_int("SECURE_HSTS_SECONDS", 31536000)
 SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG and env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
 SECURE_HSTS_PRELOAD = not DEBUG and env_bool("SECURE_HSTS_PRELOAD", True)
 
-# Behind a proxy (Render/NGINX) - only in production
-# These settings tell Django to trust the X-Forwarded-Proto header from the proxy
+# Behind a proxy (Render/NGINX) - CRITICAL for preventing redirect loops
+# These settings tell Django to trust the X-Forwarded-Proto and X-Forwarded-Host headers
 # Without this, Django doesn't detect HTTPS behind the proxy, causing redirect loops
-# In production (DEBUG=False), we're behind Render's proxy, so we need these settings
-# In development (DEBUG=True), we're not behind a proxy, so we don't use these settings
-if not DEBUG:
+# Enable in production (when not DEBUG, not CI, not TESTING, not RUNSERVER)
+# This MUST be enabled on Render to prevent ERR_TOO_MANY_REDIRECTS
+if not DEBUG and not IS_RUNSERVER:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     USE_X_FORWARDED_HOST = True
 else:
@@ -185,6 +185,7 @@ if IS_RUNSERVER:
 # 🧪 CI/TESTING: disable SSL redirect and secure cookies even when DEBUG=False
 # This ensures tests can run on http://testserver without redirect/cookie issues.
 # Production protection remains intact when CI and TESTING are both falsy.
+# NOTE: Proxy headers are still disabled in CI/tests to prevent issues
 if CI or TESTING:
     USE_SSL = False
     FORCE_SSL = False
@@ -199,11 +200,12 @@ if CI or TESTING:
     USE_X_FORWARDED_HOST = False
 
 # --------------------------- canonical host (SEO) ---------------------------
-# Canonical host for production: emajinet.africa (apex, NOT www)
-# This is used by CanonicalHostMiddleware to enforce one canonical domain.
-# Only set in production to avoid redirects in development/staging.
-# NOTE: We use apex as canonical; www redirects to apex (one-way only).
-CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "emajinet.africa" if not DEBUG else "")
+# DISABLED: Canonical host redirect disabled to fix redirect loops.
+# Render handles apex<->www canonicalization at the proxy level.
+# Both domains (emajinet.africa and www.emajinet.africa) are allowed in ALLOWED_HOSTS.
+# We do NOT redirect between them in Django to avoid fighting with Render's proxy.
+# SEO canonical URLs are handled via <link rel="canonical"> in templates.
+CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "")
 
 # Site base URL for building absolute URLs in emails (without trailing slash)
 # Used for gym member status links, QR codes, etc.
@@ -324,9 +326,11 @@ MIDDLEWARE = [
     "billing.middleware_subscription_gate.SubscriptionGateMiddleware",
     # ✅ SEO: noindex headers for private pages (Search Console indexing fix)
     "cc.middleware_seo.SEONoIndexMiddleware",
-    # ✅ SEO: canonical domain enforcement (www → apex redirect, one-way only)
-    # This replaces the old CanonicalURLMiddleware to fix redirect loops
-    "cc.middleware_canonical_host.CanonicalHostMiddleware",
+    # ✅ DISABLED: Canonical host redirect middleware disabled to fix redirect loops.
+    # Render handles apex<->www canonicalization. We allow both domains in ALLOWED_HOSTS
+    # and do NOT redirect between them to avoid fighting with Render's proxy.
+    # SEO canonical URLs are handled via <link rel="canonical"> in templates.
+    # "cc.middleware_canonical_host.CanonicalHostMiddleware",
     # ✅ SEO: UTM tracking parameter cleanup (2025-12-25)
     "cc.middleware_seo.PublicQueryCleanupMiddleware",
     # ✅ Two-Factor Authentication enforcement (after auth)

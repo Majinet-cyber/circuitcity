@@ -43,8 +43,11 @@ if "whitenoise.middleware.WhiteNoiseMiddleware" not in MIDDLEWARE:
         idx = 0
     MIDDLEWARE.insert(idx, "whitenoise.middleware.WhiteNoiseMiddleware")
 
-# Render runs behind a proxy
+# Render runs behind a proxy - CRITICAL for preventing redirect loops
+# These settings are already in base settings.py but we ensure they're set here too
+# Without these, Django can't detect HTTPS behind the proxy, causing ERR_TOO_MANY_REDIRECTS
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
 # Basic prod logging to console (so Render logs show errors)
 LOGGING = {
