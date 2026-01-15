@@ -202,14 +202,28 @@
     <a href="{% url 'verticals:clothing_dashboard_v2' %}" class="back-btn">← Dashboard</a>
   </div>
 
+  <!-- CSRF Token -->
+  <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+  <!-- Barcode Scanner Input -->
+  <div class="search-box">
+    <input 
+      type="text" 
+      class="search-input" 
+      id="barcodeInput" 
+      placeholder="📷 Scan barcode or type & press Enter for instant sale..." 
+      style="border-color: #10b981; background: linear-gradient(to right, #f0fdf4, white);"
+    >
+    <small style="display: block; margin-top: 4px; color: #10b981; font-weight: 600;">⚡ Scan/type barcode → Enter = Instant sale</small>
+  </div>
+
   <!-- Search Box -->
   <div class="search-box">
     <input 
       type="text" 
       class="search-input" 
       id="searchInput" 
-      placeholder="🔍 Search by name, brand, SKU, or barcode..." 
-      autofocus
+      placeholder="🔍 Search by name, brand, SKU..." 
     >
   </div>
 
@@ -325,26 +339,86 @@ function clearCart() {
   }
 }
 
-function checkout() {
+async function checkout() {
   if (cart.length === 0) {
     alert('Cart is empty');
     return;
   }
   
-  // TODO: Implement checkout flow
-  // For now, show summary
-  let summary = 'Checkout Summary:\n\n';
+  // Confirm checkout
+  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  let summary = 'Complete Sale?\n\n';
   cart.forEach(item => {
     summary += `${item.name} x ${item.quantity} = K ${(item.price * item.quantity).toFixed(2)}\n`;
   });
-  summary += `\nTotal: K ${cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toFixed(2)}`;
+  summary += `\nTotal: K ${total.toFixed(2)}`;
   
-  alert(summary);
+  if (!confirm(summary)) return;
   
-  // TODO: Call API to process sale
-  // After successful sale, clear cart
-  // cart = [];
-  // updateCartDisplay();
+  // Process each item in cart via API
+  const checkoutBtn = document.querySelector('.checkout-btn');
+  checkoutBtn.disabled = true;
+  checkoutBtn.textContent = 'Processing...';
+  
+  let successCount = 0;
+  let errorMessages = [];
+  
+  for (const item of cart) {
+    try {
+      const response = await fetch('{% url "verticals:clothing_fast_sell_create_api" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCsrfToken()
+        },
+        body: JSON.stringify({
+          product_id: item.id,
+          quantity: item.quantity,
+          selling_price: item.price,
+          payment_method: 'cash'
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (result.ok) {
+        successCount++;
+      } else {
+        errorMessages.push(`${item.name}: ${result.error || 'Failed'}`);
+      }
+    } catch (e) {
+      errorMessages.push(`${item.name}: Network error`);
+    }
+  }
+  
+  // Show results
+  if (successCount === cart.length) {
+    alert(`✅ Sale complete! ${successCount} item(s) sold for K ${total.toFixed(2)}`);
+    cart = [];
+    updateCartDisplay();
+    // Reload page to refresh stock counts
+    location.reload();
+  } else if (successCount > 0) {
+    alert(`⚠️ Partial sale: ${successCount}/${cart.length} items sold.\n\nErrors:\n${errorMessages.join('\n')}`);
+    location.reload();
+  } else {
+    alert(`❌ Sale failed:\n${errorMessages.join('\n')}`);
+  }
+  
+  checkoutBtn.disabled = false;
+  checkoutBtn.textContent = 'Checkout →';
+}
+
+// Get CSRF token helper
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) return meta.getAttribute('content');
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'csrftoken' || name === 'cc_csrftoken') return value;
+  }
+  return '';
 }
 
 // Search functionality
@@ -361,6 +435,92 @@ document.getElementById('searchInput').addEventListener('input', function(e) {
     }
   });
 });
+
+// Barcode instant sale functionality
+document.getElementById('barcodeInput').addEventListener('keydown', async function(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  
+  const barcode = e.target.value.trim();
+  if (!barcode) return;
+  
+  // Visual feedback
+  e.target.style.background = '#fef3c7';
+  e.target.disabled = true;
+  
+  try {
+    const response = await fetch('{% url "verticals:clothing_fast_sell_create_api" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({
+        barcode: barcode,
+        quantity: 1,
+        payment_method: 'cash'
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      // Success toast
+      showToast('success', `✅ Sold! ${result.message || 'Sale complete'}`);
+      e.target.value = '';
+      // Refresh page after short delay
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('error', `❌ ${result.error || 'Sale failed'}`);
+    }
+  } catch (err) {
+    showToast('error', '❌ Network error');
+  }
+  
+  e.target.style.background = '';
+  e.target.disabled = false;
+  e.target.focus();
+});
+
+// Toast notification helper
+function showToast(type, message) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  `;
+  toast.style.background = type === 'success' ? '#10b981' : '#ef4444';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// Add slideIn animation
+if (!document.getElementById('toastStyles')) {
+  const style = document.createElement('style');
+  style.id = 'toastStyles';
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
 </script>
 
 {% endblock %}

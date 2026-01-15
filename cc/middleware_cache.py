@@ -8,13 +8,13 @@ Normal reload (F5) shows stale cached content from browser or proxy cache.
 
 SOLUTION:
 Set Cache-Control: no-store, no-cache, must-revalidate on all authenticated
-HTML responses. This ensures the browser always fetches fresh HTML from the
-server, which then references the correct hashed static assets.
+HTML responses AND redirects. This ensures the browser always fetches fresh
+HTML from the server, which then references the correct hashed static assets.
 
 The middleware is surgical - applies ONLY when ALL conditions are true:
 - request.user exists and is authenticated
-- response.status_code == 200 (OK)
-- Content-Type starts with text/html
+- response.status_code is 200 (HTML) OR 301/302 (redirects)
+- For 200: Content-Type starts with text/html
 - request.path is NOT /static/*, /media/*, or /sw.js
 - Response is NOT a download (Content-Disposition: attachment)
 
@@ -26,6 +26,9 @@ Headers set:
 
 IMPORTANT: This middleware MUST be positioned AFTER AuthenticationMiddleware
 in settings.MIDDLEWARE so that request.user is properly initialized.
+
+Updated: 2026-01-15 - Added redirect (301/302) coverage to prevent cached
+redirects from causing stale UI after deploys.
 """
 from __future__ import annotations
 
@@ -34,18 +37,24 @@ from django.utils.cache import patch_vary_headers
 
 class AuthenticatedHTMLNoCacheMiddleware:
     """
-    Sets strict no-cache headers on HTML responses for authenticated users.
+    Sets strict no-cache headers on HTML responses AND redirects for authenticated users.
 
     This prevents browsers and proxies from caching authenticated pages,
     ensuring users always get the latest templates with correct static
     asset references after deployments.
 
-    Applies ONLY when ALL conditions are true:
+    Applies when ALL conditions are true:
+    For HTML (200):
     - request.user exists and is authenticated
-    - response.status_code == 200 (success, not redirect/error)
+    - response.status_code == 200
     - Content-Type starts with text/html
     - request.path is NOT excluded (static, media, sw.js, etc.)
     - Response is NOT a download (Content-Disposition: attachment)
+
+    For Redirects (301/302):
+    - request.user exists and is authenticated
+    - response.status_code is 301 or 302
+    - request.path is NOT excluded
 
     Headers set:
     - Cache-Control: no-store, no-cache, must-revalidate, max-age=0
@@ -77,6 +86,9 @@ class AuthenticatedHTMLNoCacheMiddleware:
         "application/xhtml+xml",
     )
 
+    # Status codes that should get no-cache headers for authenticated users
+    CACHEABLE_STATUS_CODES = (200, 301, 302)
+
     def __init__(self, get_response):
         self.get_response = get_response
 
@@ -87,8 +99,8 @@ class AuthenticatedHTMLNoCacheMiddleware:
         if not self._is_authenticated(request):
             return response
 
-        # Skip non-200 responses (redirects, errors, etc.)
-        if response.status_code != 200:
+        # Only process specific status codes (200, 301, 302)
+        if response.status_code not in self.CACHEABLE_STATUS_CODES:
             return response
 
         # Skip excluded path prefixes
@@ -100,20 +112,22 @@ class AuthenticatedHTMLNoCacheMiddleware:
         if path in self.EXCLUDE_EXACT_PATHS:
             return response
 
-        # Skip if not HTML content type
-        content_type = response.get("Content-Type", "")
-        if not self._is_html_content_type(content_type):
-            return response
+        # For 200 responses, check content type
+        if response.status_code == 200:
+            # Skip if not HTML content type
+            content_type = response.get("Content-Type", "")
+            if not self._is_html_content_type(content_type):
+                return response
 
-        # Skip download responses (Content-Disposition: attachment)
-        if "attachment" in response.get("Content-Disposition", ""):
-            return response
+            # Skip download responses (Content-Disposition: attachment)
+            if "attachment" in response.get("Content-Disposition", ""):
+                return response
 
-        # Skip streaming responses (no body modification possible)
-        if getattr(response, "streaming", False):
-            return response
+            # Skip streaming responses (no body modification possible)
+            if getattr(response, "streaming", False):
+                return response
 
-        # Set strict no-cache headers
+        # Set strict no-cache headers (applies to 200, 301, 302)
         response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"

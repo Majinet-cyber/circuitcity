@@ -262,16 +262,34 @@
     </div>
   </div>
 
+  <!-- Empty State: No stock -->
+  {% if step == 'empty' %}
+  <div class="form-section text-center py-5">
+    <div style="font-size: 4rem; margin-bottom: 1rem;">📦</div>
+    <h2 class="mb-3" style="font-weight: 800;">No Cement Stock Found</h2>
+    <p class="text-muted mb-4">You need to stock in cement products before you can sell.</p>
+    <div class="d-flex gap-2 justify-content-center">
+      <a href="{% url 'cement:stock_in' %}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-lg"></i> Stock In Now
+      </a>
+      <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary btn-lg">
+        Dashboard
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Step 1: Brand Selection -->
   {% if step == '1' %}
   <div class="form-section">
     <h2 class="mb-4" style="font-weight: 800;">Step 1: Select Brand</h2>
-    <p class="text-muted mb-4">Choose a cement brand</p>
+    <p class="text-muted mb-4">Choose a cement brand from your stocked products</p>
     
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="step" value="1">
       
+      {% if brands %}
       <div class="brand-grid">
         {% for brand in brands %}
         <div class="premium-card brand-card" onclick="selectBrand('{{ brand.key }}')">
@@ -281,6 +299,12 @@
         </div>
         {% endfor %}
       </div>
+      {% else %}
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> No cement brands in stock. 
+        <a href="{% url 'cement:stock_in' %}">Stock in products</a> first.
+      </div>
+      {% endif %}
       
       <div class="d-flex gap-2 mt-4">
         <button type="submit" class="btn btn-primary" id="continue-btn" disabled>Continue →</button>

@@ -1023,9 +1023,11 @@ def fast_sell_lookup_api(request):
 @require_business
 @require_business_kind(BusinessKind.CLOTHING)
 def fast_sell_create_api(request):
-    """API: Create a fast sale"""
+    """API: Create a fast sale - supports both product_id and barcode"""
     from django.http import JsonResponse
+    from django.db import transaction
     from inventory.services.fast_sell import create_fast_sell
+    from inventory.models_verticals import PaymentMethod
     import json
 
     if request.method != "POST":
@@ -1038,6 +1040,8 @@ def fast_sell_create_api(request):
     except json.JSONDecodeError:
         return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
 
+    # Support both product_id (from cart) and barcode (from scanner)
+    product_id = data.get("product_id")
     barcode = data.get("barcode", "").strip()
     quantity = int(data.get("quantity", 1))
     payment_method = data.get("payment_method", "cash")
@@ -1049,6 +1053,75 @@ def fast_sell_create_api(request):
             selling_price = Decimal(str(selling_price_str))
         except:
             return JsonResponse({"ok": False, "error": "Invalid price"}, status=400)
+
+    # If product_id is provided, create sale directly (fast cart checkout)
+    if product_id:
+        try:
+            with transaction.atomic():
+                product = MerchProduct.objects.select_for_update().get(
+                    pk=product_id,
+                    business=business,
+                    kind=BusinessKind.CLOTHING,
+                    is_active=True,
+                )
+                
+                current_stock = product.quantity_in_stock or 0
+                if current_stock < quantity:
+                    return JsonResponse({
+                        "ok": False,
+                        "error": f"Insufficient stock. Only {current_stock} available."
+                    }, status=400)
+                
+                # Use selling price from request or product default
+                unit_price = selling_price if selling_price else (product.selling_price or Decimal("0.00"))
+                unit_cost = product.cost_price or Decimal("0.00")
+                total_price = unit_price * quantity
+                total_cost = unit_cost * quantity
+                
+                # Decrease stock
+                product.quantity_in_stock = current_stock - quantity
+                product.save(update_fields=["quantity_in_stock"])
+                
+                # Normalize payment method
+                payment_map = {
+                    "cash": PaymentMethod.CASH,
+                    "bank": PaymentMethod.BANK,
+                    "mobile_money": PaymentMethod.MOBILE_MONEY,
+                    "mobile": PaymentMethod.MOBILE_MONEY,
+                }
+                pm = payment_map.get(payment_method.lower(), PaymentMethod.CASH)
+                
+                # Create sale record
+                sale = ClothingSale.objects.create(
+                    business=business,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price,
+                    unit_cost=unit_cost,
+                    total_cost=total_cost,
+                    payment_method=pm,
+                    sold_by=request.user,
+                    notes="Fast Sell checkout",
+                )
+                
+                profit = total_price - total_cost
+                return JsonResponse({
+                    "ok": True,
+                    "sale_id": sale.id,
+                    "message": f"Sold {quantity} × {product.name}",
+                    "revenue": float(total_price),
+                    "profit": float(profit),
+                })
+                
+        except MerchProduct.DoesNotExist:
+            return JsonResponse({"ok": False, "error": "Product not found"}, status=404)
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=500)
+    
+    # Otherwise use barcode flow (original behavior)
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "Product ID or barcode required"}, status=400)
 
     result = create_fast_sell(
         business=business,

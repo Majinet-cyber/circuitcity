@@ -3,7 +3,31 @@
 
 {% block title %}Hardware & General Dealers Dashboard · {{ business.name }}{% endblock %}
 
+{% block extra_head %}
+<style>
+  /* Cement/Hardware vertical: Premium blue theme (2026-01-14) */
+  .vertical-cement .vertical-hero {
+    background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #60a5fa 100%) !important;
+    box-shadow: 0 20px 60px rgba(14, 165, 233, 0.2) !important;
+  }
+  
+  .vertical-cement .metric-card:hover {
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+  
+  .vertical-cement .section-title i {
+    color: #0ea5e9;
+  }
+  
+  /* Card hover effects */
+  .vertical-cement .card:hover {
+    box-shadow: 0 8px 30px rgba(14, 165, 233, 0.1);
+  }
+</style>
+{% endblock %}
+
 {% block content %}
+<div class="vertical-cement">
 {% comment %}Premium: Branded header with greeting{% endcomment %}
 {% include "partials/dashboard_brand_header.html" %}
 
@@ -15,7 +39,7 @@
 MIGRATED TO SHARED DASHBOARD SHELL (2026-01-08)
 =============================================================================
 Now using templates/verticals/_dashboard_shell.html for consistent structure.
-Cement/hardware vertical maintains its own colors (brown/amber gradient).
+Cement/hardware vertical now uses blue gradient theme (like Clothing) - 2026-01-14.
 =============================================================================
 {% endcomment %}
 
@@ -128,6 +152,7 @@ Cement/hardware vertical maintains its own colors (brown/amber gradient).
                   <th>Payment</th>
                   <th>Date</th>
                   <th>Sold By</th>
+                  <th class="text-end">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,6 +165,13 @@ Cement/hardware vertical maintains its own colors (brown/amber gradient).
                   <td><span class="badge bg-secondary">{{ sale.payment_method }}</span></td>
                   <td><small>{{ sale.sold_at|date:"M d, H:i" }}</small></td>
                   <td><small>{{ sale.sold_by.username|default:"—" }}</small></td>
+                  <td class="text-end">
+                    {% if membership and membership.role in 'MANAGER,OWNER,ADMIN,HQ_ADMIN' %}
+                    <a href="{% url 'cement:edit_sale' sale.id %}" class="btn btn-sm btn-outline-primary" title="Edit Sale">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    {% endif %}
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -156,6 +188,7 @@ Cement/hardware vertical maintains its own colors (brown/amber gradient).
     </div>
   </div>
 </div>
+</div><!-- /.vertical-cement -->
 
 <!-- Custom Date Range Modal -->
 <div class="modal fade" id="customDateModal" tabindex="-1">

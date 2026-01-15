@@ -132,6 +132,12 @@ def build_unit_label(product: MerchProduct) -> str:
 
 
 def build_cement_brand_choices(business, in_stock_only: bool = True) -> list[dict]:
+    """
+    Build list of cement brands from stocked products.
+    
+    FIX (Jan 2026): Filter out generic "Cement" placeholder entries.
+    Only show actual brand names like "Dangote", "Akshar", etc.
+    """
     products = MerchProduct.objects.filter(business=business, kind=BusinessKind.CEMENT, is_active=True)
     if in_stock_only:
         products = products.filter(quantity_in_stock__gt=0)
@@ -139,10 +145,17 @@ def build_cement_brand_choices(business, in_stock_only: bool = True) -> list[dic
     brand_icon_map = {
         normalize_label(b["name"]).lower(): b.get("icon", "🏗️") for b in get_cement_brands_list()
     }
+    
+    # Generic/placeholder brand names to exclude
+    EXCLUDED_BRANDS = {"cement", "cements", "construction", "materials", "general", "other"}
+    
     seen = {}
     for product in products:
         label = get_brand_label_for_product(product)
         if not label:
+            continue
+        # FIX: Skip generic placeholder brand names
+        if label.lower() in EXCLUDED_BRANDS:
             continue
         key = label.lower().replace(" ", "_")
         if key not in seen:
@@ -387,9 +400,9 @@ def dashboard(request):
         'vertical_title': 'Hardware & General Dealers',
         'vertical_subtitle': 'Track sales, inventory, and profits',
         'eyebrow_text': f'{business.name} · {date_label}',
-        'hero_gradient_classes': 'linear-gradient(120deg,#92400e,#d97706)',  # Brown/amber gradient
-        'hero_gradient_shadow': 'rgba(217,119,6,0.3)',
-        'hero_primary_text_color': '#92400e',
+        'hero_gradient_classes': 'linear-gradient(135deg,#0ea5e9 0%,#38bdf8 50%,#60a5fa 100%)',  # Blue gradient like clothing
+        'hero_gradient_shadow': 'rgba(14,165,233,0.2)',
+        'hero_primary_text_color': '#0284c7',
         'primary_actions': [
             {
                 'label': 'Stock In',
@@ -927,17 +940,20 @@ def sell(request):
                     messages.error(request, "Quantity must be greater than 0")
                     return redirect(f"{reverse('cement:sell')}?step=3")
 
-                product = MerchProduct.objects.select_for_update().get(
-                    pk=product_id, business=business, kind=BusinessKind.CEMENT, is_active=True
-                )
-
-                if product.quantity_in_stock < quantity:
-                    messages.error(
-                        request, f"Insufficient stock. Available: {product.quantity_in_stock}, Requested: {quantity}"
-                    )
-                    return redirect(f"{reverse('cement:sell')}?step=3")
-
+                # FIX: select_for_update MUST be inside transaction.atomic()
+                # Otherwise: "select_for_update cannot be used outside of a transaction"
                 with transaction.atomic():
+                    # Lock product row for atomic update
+                    product = MerchProduct.objects.select_for_update().get(
+                        pk=product_id, business=business, kind=BusinessKind.CEMENT, is_active=True
+                    )
+
+                    if product.quantity_in_stock < quantity:
+                        messages.error(
+                            request, f"Insufficient stock. Available: {product.quantity_in_stock}, Requested: {quantity}"
+                        )
+                        return redirect(f"{reverse('cement:sell')}?step=3")
+
                     # Calculate totals
                     unit_cost = product.cost_price or Decimal("0")
                     unit_price = product.selling_price or Decimal("0")
@@ -945,7 +961,7 @@ def sell(request):
                     total_revenue = unit_price * quantity
                     profit = total_revenue - total_cost
 
-                    # Decrease stock
+                    # Decrease stock atomically
                     product.quantity_in_stock -= quantity
                     product.save(update_fields=["quantity_in_stock"])
 
@@ -987,6 +1003,25 @@ def sell(request):
 
     # GET: Show appropriate step
     all_brands = build_cement_brand_choices(business, in_stock_only=True)
+    
+    # FIX: Handle empty state - no cement products in stock
+    if not all_brands and step == "1":
+        messages.info(request, "No cement stock found. Stock in products first.")
+        context = {
+            "business": business,
+            "step": "empty",
+            "brands": [],
+            "active_tab": "sell",
+        }
+        return render(request, "verticals/cement/sell.html", context)
+    
+    # FIX: Auto-skip step 1 if only one brand exists
+    if len(all_brands) == 1 and step == "1":
+        brand = all_brands[0]
+        request.session["cement_sell_brand"] = brand["name"]
+        request.session["cement_sell_brand_label"] = brand["name"]
+        request.session["cement_sell_brand_key"] = brand["key"]
+        return redirect(f"{reverse('cement:sell')}?step=2")
 
     context = {
         "business": business,
@@ -1115,6 +1150,7 @@ def costs(request):
         "total_costs": total_costs,
         "categories": categories,
         "active_tab": "costs",
+        "today": timezone.now().date(),
     }
 
     return render(request, "verticals/cement/costs.html", context)
@@ -1342,6 +1378,127 @@ def undo_sale(request, sale_id: int):
     }
 
     return render(request, "verticals/cement/undo_sale_confirm.html", context)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CEMENT)
+@manager_required
+def edit_sale(request, sale_id: int):
+    """
+    Edit a cement sale (manager only).
+    Allows correcting quantity, price, payment method, and notes.
+    Automatically adjusts stock and recalculates profit.
+    """
+    business = get_active_business(request)
+
+    try:
+        sale = CementSale.objects.select_related("product").get(
+            pk=sale_id,
+            business=business,
+        )
+    except CementSale.DoesNotExist:
+        messages.error(request, "Sale not found")
+        return redirect("cement:dashboard")
+
+    # Check if already undone/void
+    if sale.is_void:
+        messages.error(request, "Cannot edit a voided sale. Create a new sale instead.")
+        return redirect("cement:dashboard")
+
+    # Store original values for stock delta calculation
+    original_quantity = sale.quantity
+    original_unit_price = sale.unit_price
+
+    if request.method == "POST":
+        try:
+            new_quantity = int(request.POST.get("quantity", original_quantity))
+            new_unit_price = Decimal(request.POST.get("unit_price", str(original_unit_price)))
+            new_payment_method = request.POST.get("payment_method", sale.payment_method)
+            new_notes = request.POST.get("notes", sale.notes or "")
+
+            if new_quantity <= 0:
+                messages.error(request, "Quantity must be greater than 0")
+                return redirect("cement:edit_sale", sale_id=sale_id)
+
+            if new_unit_price < Decimal("0"):
+                messages.error(request, "Price cannot be negative")
+                return redirect("cement:edit_sale", sale_id=sale_id)
+
+            # Calculate stock delta
+            stock_delta = original_quantity - new_quantity  # Positive = return to stock, Negative = take from stock
+
+            with transaction.atomic():
+                # Update stock
+                product = MerchProduct.objects.select_for_update().get(pk=sale.product.pk)
+
+                # Check if we have enough stock if quantity increased
+                if stock_delta < 0:  # Need more stock
+                    needed = abs(stock_delta)
+                    if product.quantity_in_stock < needed:
+                        messages.error(
+                            request,
+                            f"Insufficient stock. Available: {product.quantity_in_stock}, "
+                            f"Additional needed: {needed}"
+                        )
+                        return redirect("cement:edit_sale", sale_id=sale_id)
+                
+                # Apply stock delta
+                product.quantity_in_stock += stock_delta
+                product.save(update_fields=["quantity_in_stock"])
+
+                # Update sale record
+                sale.quantity = new_quantity
+                sale.unit_price = new_unit_price
+                sale.payment_method = new_payment_method
+                sale.notes = new_notes
+                # total_price and total_cost are auto-calculated in save()
+                sale.save()
+
+                # Prepare stock change message
+                if stock_delta > 0:
+                    stock_msg = f"Stock increased by {stock_delta} {product.base_unit}"
+                elif stock_delta < 0:
+                    stock_msg = f"Stock decreased by {abs(stock_delta)} {product.base_unit}"
+                else:
+                    stock_msg = "Stock unchanged"
+
+                messages.success(
+                    request,
+                    f"✅ Sale updated: {sale.product.name} - "
+                    f"Qty: {new_quantity}, Price: MK {new_unit_price:,.0f}, "
+                    f"Total: MK {sale.total_price:,.0f}. {stock_msg}"
+                )
+                return redirect("cement:dashboard")
+
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Invalid input: {e}")
+            return redirect("cement:edit_sale", sale_id=sale_id)
+        except Exception as e:
+            messages.error(request, f"Error updating sale: {e}")
+            return redirect("cement:edit_sale", sale_id=sale_id)
+
+    # GET: Show edit form
+    # Calculate impact preview data
+    payment_methods = [
+        ("CASH", "Cash"),
+        ("BANK", "Bank Transfer"),
+        ("MOBILE_MONEY", "Mobile Money"),
+    ]
+
+    context = {
+        "business": business,
+        "sale": sale,
+        "product": sale.product,
+        "original_quantity": original_quantity,
+        "original_unit_price": original_unit_price,
+        "original_total": sale.total_price,
+        "original_profit": sale.profit,
+        "payment_methods": payment_methods,
+        "active_tab": "dashboard",
+    }
+
+    return render(request, "verticals/cement/sale_edit.html", context)
 
 
 # ============================================================

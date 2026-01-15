@@ -443,6 +443,63 @@
       z-index:1080 !important;
       /* Don't override Bootstrap's display handling */
     }
+
+    /* ========= Mobile-First Dropdown Fixes (Jan 2026) ========= */
+    @media (max-width: 576px) {
+      /* Notifications dropdown: constrain to viewport */
+      #ccNotifMenu.dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        left: 8px !important;
+        right: 8px !important;
+        width: calc(100vw - 16px) !important;
+        max-width: 100vw !important;
+        min-width: unset !important;
+        max-height: 60vh !important;
+        overflow-y: auto !important;
+        transform: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important;
+        z-index: 1090 !important;
+      }
+      
+      /* User menu dropdown: constrain to viewport */
+      #userMenu.dropdown-menu {
+        position: fixed !important;
+        top: 60px !important;
+        right: 8px !important;
+        left: auto !important;
+        width: min(280px, calc(100vw - 16px)) !important;
+        min-width: unset !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+        transform: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25) !important;
+        z-index: 1091 !important;
+      }
+      
+      /* Ensure dropdowns don't overlap with trial banners */
+      .msg + .dropdown-menu,
+      [data-testid="subscription-actions"] ~ .dropdown-menu {
+        top: 120px !important;
+      }
+    }
+    
+    /* Tablet: moderate constraints */
+    @media (min-width: 577px) and (max-width: 768px) {
+      #ccNotifMenu.dropdown-menu {
+        min-width: 340px !important;
+        max-width: min(92vw, 400px) !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+      }
+      #userMenu.dropdown-menu {
+        min-width: 260px !important;
+        max-height: 70vh !important;
+        overflow-y: auto !important;
+      }
+    }
     .notif-empty{
       padding:2rem 1rem; text-align:center; color:var(--muted);
     }
@@ -943,15 +1000,17 @@
 <!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Dec 20 behavior) -->
 <script>
   /* ================================================================
-     UI CLEANUP SYSTEM v2 — Restores Dec 20 dropdown behavior
-     - Ensures dropdowns are CLOSED by default on page load
+     UI CLEANUP SYSTEM v3 — Fixed dropdown auto-open + mobile issues
+     - Ensures dropdowns are ALWAYS CLOSED by default on page load
      - Uses Bootstrap's API when available (not raw class manipulation)
      - Cleans up orphaned backdrops and modal state
      - Runs AFTER Bootstrap is loaded (uses DOMContentLoaded + setTimeout)
+     - MUTUAL EXCLUSION: Only one dropdown open at a time
+     - CLICK OUTSIDE: Closes dropdowns when clicking outside
      ================================================================ */
   (function() {
-    if (window.__CC_UI_CLEANUP_V2__) return;
-    window.__CC_UI_CLEANUP_V2__ = true;
+    if (window.__CC_UI_CLEANUP_V3__) return;
+    window.__CC_UI_CLEANUP_V3__ = true;
 
     // Wait for Bootstrap to be available
     function waitForBootstrap(callback) {
@@ -960,6 +1019,23 @@
       } else {
         // Bootstrap loads with defer, so wait a tick
         setTimeout(function() { waitForBootstrap(callback); }, 50);
+      }
+    }
+
+    // Force close a Bootstrap dropdown by element
+    function forceCloseDropdown(el) {
+      if (!el) return;
+      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        var instance = bootstrap.Dropdown.getInstance(el);
+        if (instance) {
+          try { instance.hide(); } catch(e) {}
+        }
+      }
+      // Also remove classes directly as fallback
+      el.setAttribute('aria-expanded', 'false');
+      var menu = el.nextElementSibling;
+      if (menu && menu.classList.contains('dropdown-menu')) {
+        menu.classList.remove('show');
       }
     }
 
@@ -996,34 +1072,46 @@
         bodyStyle.paddingRight = "";
       }
 
-      // 5. Close dropdowns using Bootstrap API (cleaner than raw class manipulation)
-      if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
-        var notifBtn = document.getElementById("ccNotifBtn");
-        var userBtn = document.getElementById("userMenuBtn");
-        
-        if (notifBtn) {
-          var notifDropdown = bootstrap.Dropdown.getInstance(notifBtn);
-          if (notifDropdown) notifDropdown.hide();
-        }
-        if (userBtn) {
-          var userDropdown = bootstrap.Dropdown.getInstance(userBtn);
-          if (userDropdown) userDropdown.hide();
-        }
-      }
+      // 5. FORCE CLOSE ALL DROPDOWNS on page load (critical fix)
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      forceCloseDropdown(notifBtn);
+      forceCloseDropdown(userBtn);
 
       // 6. Fallback: ensure no dropdown menus have .show class (catches render artifacts)
       document.querySelectorAll(".dropdown-menu.show").forEach(function(el) {
-        // Skip if parent dropdown toggle has aria-expanded=true (user opened it)
-        var parent = el.closest(".dropdown");
-        var toggle = parent && parent.querySelector("[data-bs-toggle='dropdown']");
-        if (toggle && toggle.getAttribute("aria-expanded") === "true") return;
         el.classList.remove("show");
       });
+      document.querySelectorAll("[aria-expanded='true']").forEach(function(el) {
+        if (el.hasAttribute('data-bs-toggle') && el.getAttribute('data-bs-toggle') === 'dropdown') {
+          el.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // MUTUAL EXCLUSION: When one dropdown opens, close the other
+    function setupMutualExclusion() {
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      
+      if (notifBtn) {
+        notifBtn.addEventListener('show.bs.dropdown', function() {
+          forceCloseDropdown(userBtn);
+        });
+      }
+      if (userBtn) {
+        userBtn.addEventListener('show.bs.dropdown', function() {
+          forceCloseDropdown(notifBtn);
+        });
+      }
     }
 
     // Run cleanup after Bootstrap loads (on page load)
     document.addEventListener("DOMContentLoaded", function() {
-      waitForBootstrap(cleanupUIState);
+      waitForBootstrap(function() {
+        cleanupUIState();
+        setupMutualExclusion();
+      });
     });
 
     // Run when page becomes visible (handles bfcache)

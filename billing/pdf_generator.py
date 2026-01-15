@@ -47,6 +47,24 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
         logger.error("ReportLab not installed. Cannot generate PDF.")
         return None
 
+    # FIX (Jan 2026): Ensure required fields have defaults to prevent AttributeError/NoneType errors
+    # Handle None values defensively without modifying the invoice instance
+    issue_date = getattr(invoice, 'issue_date', None) or timezone.localdate()
+    subtotal = getattr(invoice, 'subtotal', None) or Decimal("0.00")
+    total = getattr(invoice, 'total', None) or Decimal("0.00")
+    tax_amount = getattr(invoice, 'tax_amount', None) or Decimal("0.00")
+    currency = getattr(invoice, 'currency', None) or "MWK"
+    due_date = getattr(invoice, 'due_date', None)
+    notes = getattr(invoice, 'notes', None) or ""
+    paid_at = getattr(invoice, 'paid_at', None)
+    provider_reference = getattr(invoice, 'provider_reference', None) or ""
+    invoice_number = getattr(invoice, 'number', None) or "DRAFT"
+    billing_period_start = getattr(invoice, 'billing_period_start', None)
+    billing_period_end = getattr(invoice, 'billing_period_end', None)
+    
+    # Get business safely
+    business = getattr(invoice, 'business', None)
+
     # Create PDF buffer
     if output_path:
         buffer = open(output_path, "wb")
@@ -107,40 +125,45 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
 
     # Invoice Title and Number
     story.append(Paragraph(f"<b>INVOICE</b>", heading_style))
-    story.append(Paragraph(f"Invoice Number: {invoice.number}", normal_style))
-    story.append(Paragraph(f"Issue Date: {invoice.issue_date.strftime('%B %d, %Y')}", normal_style))
+    story.append(Paragraph(f"Invoice Number: {invoice_number}", normal_style))
+    story.append(Paragraph(f"Issue Date: {issue_date.strftime('%B %d, %Y')}", normal_style))
 
-    if invoice.due_date:
-        story.append(Paragraph(f"Due Date: {invoice.due_date.strftime('%B %d, %Y')}", normal_style))
+    if due_date:
+        story.append(Paragraph(f"Due Date: {due_date.strftime('%B %d, %Y')}", normal_style))
 
     story.append(Spacer(1, 0.5 * cm))
 
     # Bill To Section
     story.append(Paragraph("<b>Bill To:</b>", heading_style))
 
-    if invoice.business:
-        story.append(Paragraph(invoice.business.name, normal_style))
+    if business:
+        business_name = getattr(business, 'name', '') or 'N/A'
+        story.append(Paragraph(business_name, normal_style))
 
         # Business contact info
-        if hasattr(invoice.business, "email") and invoice.business.email:
-            story.append(Paragraph(invoice.business.email, small_style))
-        if hasattr(invoice.business, "phone") and invoice.business.phone:
-            story.append(Paragraph(invoice.business.phone, small_style))
+        business_email = getattr(business, "email", None)
+        business_phone = getattr(business, "phone", None)
+        if business_email:
+            story.append(Paragraph(business_email, small_style))
+        if business_phone:
+            story.append(Paragraph(business_phone, small_style))
 
-    if invoice.to_name:
-        story.append(Paragraph(invoice.to_name, normal_style))
-    if invoice.to_email:
-        story.append(Paragraph(invoice.to_email, small_style))
+    to_name = getattr(invoice, 'to_name', None) or ""
+    to_email = getattr(invoice, 'to_email', None) or ""
+    if to_name:
+        story.append(Paragraph(to_name, normal_style))
+    if to_email:
+        story.append(Paragraph(to_email, small_style))
 
     story.append(Spacer(1, 0.5 * cm))
 
     # Billing Period (if applicable)
-    if invoice.billing_period_start and invoice.billing_period_end:
+    if billing_period_start and billing_period_end:
         story.append(Paragraph("<b>Billing Period:</b>", heading_style))
         story.append(
             Paragraph(
-                f"{invoice.billing_period_start.strftime('%B %d, %Y')} - "
-                f"{invoice.billing_period_end.strftime('%B %d, %Y')}",
+                f"{billing_period_start.strftime('%B %d, %Y')} - "
+                f"{billing_period_end.strftime('%B %d, %Y')}",
                 normal_style,
             )
         )
@@ -149,16 +172,29 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
     # Line Items Table
     table_data = [["Description", "Qty", "Unit", "Unit Price", "Amount"]]
 
-    for item in invoice.items.all():
-        table_data.append(
-            [
-                item.description,
-                str(item.qty),
-                item.unit,
-                f"{invoice.currency} {item.unit_price:,.2f}",
-                f"{invoice.currency} {item.line_total:,.2f}",
-            ]
-        )
+    # Safely get items - handle case where invoice has no items
+    items_queryset = getattr(invoice, 'items', None)
+    items_list = list(items_queryset.all()) if items_queryset else []
+    
+    if items_list:
+        for item in items_list:
+            item_description = getattr(item, 'description', '') or 'Item'
+            item_qty = getattr(item, 'qty', 1) or 1
+            item_unit = getattr(item, 'unit', 'ea') or 'ea'
+            item_unit_price = getattr(item, 'unit_price', Decimal("0.00")) or Decimal("0.00")
+            item_line_total = getattr(item, 'line_total', Decimal("0.00")) or Decimal("0.00")
+            table_data.append(
+                [
+                    item_description,
+                    str(item_qty),
+                    item_unit,
+                    f"{currency} {item_unit_price:,.2f}",
+                    f"{currency} {item_line_total:,.2f}",
+                ]
+            )
+    else:
+        # Add a placeholder row if no items
+        table_data.append(["Subscription charge", "1", "mo", f"{currency} {total:,.2f}", f"{currency} {total:,.2f}"])
 
     # Create table
     table = Table(table_data, colWidths=[8 * cm, 2 * cm, 2 * cm, 3 * cm, 3 * cm])
@@ -191,13 +227,13 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
 
     # Totals Table (right-aligned)
     totals_data = [
-        ["Subtotal:", f"{invoice.currency} {invoice.subtotal:,.2f}"],
+        ["Subtotal:", f"{currency} {subtotal:,.2f}"],
     ]
 
-    if invoice.tax_amount > 0:
-        totals_data.append(["Tax:", f"{invoice.currency} {invoice.tax_amount:,.2f}"])
+    if tax_amount > 0:
+        totals_data.append(["Tax:", f"{currency} {tax_amount:,.2f}"])
 
-    totals_data.append(["<b>Total:</b>", f"<b>{invoice.currency} {invoice.total:,.2f}</b>"])
+    totals_data.append(["<b>Total:</b>", f"<b>{currency} {total:,.2f}</b>"])
 
     totals_table = Table(totals_data, colWidths=[10 * cm, 8 * cm])
     totals_table.setStyle(
@@ -221,22 +257,28 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
     story.append(Spacer(1, 1 * cm))
 
     # Payment Status
-    status_text = f"<b>Status:</b> {invoice.get_status_display()}"
-    if invoice.paid_at:
-        status_text += f" (Paid on {invoice.paid_at.strftime('%B %d, %Y')})"
+    status_display = "Draft"
+    if hasattr(invoice, 'get_status_display'):
+        try:
+            status_display = invoice.get_status_display()
+        except Exception:
+            pass
+    status_text = f"<b>Status:</b> {status_display}"
+    if paid_at:
+        status_text += f" (Paid on {paid_at.strftime('%B %d, %Y')})"
 
     story.append(Paragraph(status_text, normal_style))
 
     # Payment Reference (if available)
-    if invoice.provider_reference:
-        story.append(Paragraph(f"Payment Reference: {invoice.provider_reference}", small_style))
+    if provider_reference:
+        story.append(Paragraph(f"Payment Reference: {provider_reference}", small_style))
 
     story.append(Spacer(1, 1 * cm))
 
     # Notes (if any)
-    if invoice.notes:
+    if notes:
         story.append(Paragraph("<b>Notes:</b>", heading_style))
-        story.append(Paragraph(invoice.notes, small_style))
+        story.append(Paragraph(notes, small_style))
         story.append(Spacer(1, 0.5 * cm))
 
     # Footer
@@ -250,16 +292,16 @@ def generate_invoice_pdf(invoice, output_path: Optional[str] = None) -> Optional
 
         if output_path:
             buffer.close()
-            logger.info(f"Invoice PDF generated: {invoice.number} -> {output_path}")
+            logger.info(f"Invoice PDF generated: {invoice_number} -> {output_path}")
             return None
         else:
             pdf_bytes = buffer.getvalue()
             buffer.close()
-            logger.info(f"Invoice PDF generated: {invoice.number} ({len(pdf_bytes)} bytes)")
+            logger.info(f"Invoice PDF generated: {invoice_number} ({len(pdf_bytes)} bytes)")
             return pdf_bytes
 
     except Exception as e:
-        logger.error(f"Error generating PDF for invoice {invoice.number}: {e}", exc_info=True)
+        logger.error(f"Error generating PDF for invoice {invoice_number}: {e}", exc_info=True)
         if not output_path:
             buffer.close()
         return None

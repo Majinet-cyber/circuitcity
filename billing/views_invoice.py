@@ -53,28 +53,49 @@ def invoice_download(request: HttpRequest, pk) -> HttpResponse:
 
     # Get invoice (scoped to business for security)
     invoice = get_object_or_404(Invoice, pk=pk, business=business)
+    invoice_number = getattr(invoice, 'number', pk) or pk
 
     # Generate PDF if not already generated or if file missing
-    if not invoice.pdf_file or not invoice.pdf_generated_at:
-        from . import pdf_generator
-
-        success = pdf_generator.generate_and_save_invoice_pdf(invoice)
-
-        if not success:
-            messages.error(request, "Failed to generate PDF. Please try again or contact support.")
-            return redirect("billing:invoices")
-
-    # Serve PDF file
     try:
+        needs_generation = not getattr(invoice, 'pdf_file', None) or not getattr(invoice, 'pdf_generated_at', None)
+        
+        # Also regenerate if file doesn't exist on storage
+        pdf_file = getattr(invoice, 'pdf_file', None)
+        if pdf_file:
+            try:
+                pdf_file.open("rb").close()
+            except Exception:
+                needs_generation = True
+        
+        if needs_generation:
+            from . import pdf_generator
+
+            success = pdf_generator.generate_and_save_invoice_pdf(invoice)
+
+            if not success:
+                logger.error(f"Failed to generate PDF for invoice {invoice_number}")
+                messages.error(request, "Failed to generate PDF. Please try again or contact support.")
+                return redirect("billing:invoices")
+            
+            # Refresh the invoice to get the updated pdf_file
+            invoice.refresh_from_db()
+
+        # Serve PDF file
+        pdf_file = getattr(invoice, 'pdf_file', None)
+        if not pdf_file:
+            logger.error(f"PDF file missing after generation for invoice {invoice_number}")
+            messages.error(request, "Failed to generate PDF. Please try again.")
+            return redirect("billing:invoices")
+            
         response = FileResponse(
-            invoice.pdf_file.open("rb"),
+            pdf_file.open("rb"),
             content_type="application/pdf",
         )
-        response["Content-Disposition"] = f'attachment; filename="invoice_{invoice.number}.pdf"'
+        response["Content-Disposition"] = f'attachment; filename="invoice_{invoice_number}.pdf"'
         return response
 
     except Exception as e:
-        logger.error(f"Error serving invoice PDF {invoice.number}: {e}", exc_info=True)
+        logger.error(f"Error serving invoice PDF {invoice_number}: {e}", exc_info=True)
         messages.error(request, "Failed to download invoice. Please try again.")
         return redirect("billing:invoices")
 
