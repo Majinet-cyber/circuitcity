@@ -79,10 +79,10 @@
   {% endif %}
   
   <div class="wizard-actions">
-    <a href="{% url 'accounts:signup_wizard_step' step=3 %}" class="btn btn-secondary">
+    <a href="{% url 'accounts:signup_wizard_step' step=3 %}" class="btn btn-secondary" data-testid="signup-step4-back">
       ← Back
     </a>
-    <button type="submit" class="btn btn-primary" id="launchBtn">
+    <button type="submit" class="btn btn-primary" id="launchBtn" data-testid="signup-finish">
       🚀 Launch My Dashboard
     </button>
   </div>

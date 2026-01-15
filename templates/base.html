@@ -737,7 +737,7 @@
                         aria-haspopup="true"
                         aria-controls="ccNotifMenu"
                         title="Notifications"
-                        data-testid="notif-toggle">
+                        data-testid="nav-notifications">
                   <i class="bi bi-bell"></i>
                   {% if unread_notifications_count %}
                     <span class="notif-dot" id="ccNotifDot" aria-hidden="true"></span>
@@ -752,7 +752,7 @@
                      id="ccNotifMenu"
                      aria-labelledby="ccNotifBtn"
                      style="min-width:320px;max-height:400px;overflow-y:auto"
-                     data-testid="notif-menu">
+                     data-testid="notifications-panel">
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
                     {% with latest_notifications|default:None as notif_list %}
@@ -808,7 +808,8 @@
                       aria-expanded="false"
                       aria-haspopup="true"
                       aria-controls="userMenu"
-                      title="Account">
+                      title="Account"
+                      data-testid="nav-avatar">
                 <span class="avatar">
                   {% if request.user.is_authenticated %}
                     {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
@@ -818,7 +819,7 @@
                 </span>
                 <span class="presence-dot" aria-hidden="true"></span>
               </button>
-              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px">
+              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px" data-testid="avatar-menu">
                 <div class="px-3 py-2 text-muted">
                   {% if request.user.is_authenticated %}
                     <div class="fw-bold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
@@ -828,14 +829,14 @@
                   {% endif %}
                 </div>
                 <div class="border-top"></div>
-                <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item">
+                <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item" data-testid="avatar-settings">
                   <i class="bi bi-gear me-2"></i> Profile &amp; Settings
                 </a>
                 <a href="{{ url_feedback_form|default:'/feedback/' }}" class="dropdown-item">
                   <i class="bi bi-chat-left-text me-2"></i> Feedback
                 </a>
                 {% if request.user.is_authenticated %}
-                  <a href="{{ url_logout|default:'/accounts/logout/' }}" class="dropdown-item text-danger">
+                  <a href="{{ url_logout|default:'/accounts/logout/' }}" class="dropdown-item text-danger" data-testid="avatar-logout">
                     <i class="bi bi-box-arrow-right me-2"></i> Logout
                   </a>
                 {% endif %}
@@ -1413,6 +1414,21 @@
     window.addEventListener('resize', revive, {passive:true});
   })();
   /* ===================== /MENU RESCUE (JS) ===================== */
+</script>
+
+{# ===== GLOBAL UI INITIALIZATION GUARD ===== #}
+<script>
+(function(){
+  // CRITICAL: Prevent double initialization of all UI components
+  // This guard ensures dropdowns, sidebar, and all interactive elements
+  // only initialize once, even if scripts run multiple times.
+  if (window.__cc_ui_initialized) {
+    console.log('[CC] UI already initialized, skipping duplicate init');
+    return;
+  }
+  window.__cc_ui_initialized = true;
+  console.log('[CC] Initializing UI components...');
+})();
 </script>
 
 {# ===== CC Drawer Hotfix v4 — Single source of truth for mobile sidebar (Dec 20 behavior) ===== #}

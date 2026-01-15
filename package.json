@@ -1,7 +1,7 @@
 {
   "name": "circuitcity_clean",
   "version": "1.0.0",
-  "description": "- minor update",
+  "description": "CircuitCity / Emajinet - E2E Test Suite",
   "main": "index.js",
   "directories": {
     "test": "tests"
@@ -10,7 +10,19 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "cypress:open": "cypress open",
     "cypress:run": "cypress run",
-    "cypress:phone": "cypress run --spec 'cypress/e2e/phone_manager_flow.cy.js,cypress/e2e/phone_reports_flow.cy.js'",
+    "e2e:smoke": "cypress run --spec 'cypress/e2e/smoke/**/*.cy.js'",
+    "e2e:journeys": "cypress run --spec 'cypress/e2e/journeys/**/*.cy.js'",
+    "e2e:all": "cypress run",
+    "e2e:phones": "cypress run --spec 'cypress/e2e/**/phones.*.cy.js'",
+    "e2e:clothing": "cypress run --spec 'cypress/e2e/**/clothing.*.cy.js'",
+    "e2e:liquor": "cypress run --spec 'cypress/e2e/**/liquor.*.cy.js'",
+    "e2e:gym": "cypress run --spec 'cypress/e2e/**/gym.*.cy.js'",
+    "e2e:pharmacy": "cypress run --spec 'cypress/e2e/**/pharmacy.*.cy.js'",
+    "e2e:grocery": "cypress run --spec 'cypress/e2e/**/grocery.*.cy.js'",
+    "e2e:farm": "cypress run --spec 'cypress/e2e/**/farm.*.cy.js'",
+    "e2e:cement": "cypress run --spec 'cypress/e2e/**/cement.*.cy.js'",
+    "e2e:welding": "cypress run --spec 'cypress/e2e/**/welding.*.cy.js'",
+    "e2e:hardware": "cypress run --spec 'cypress/e2e/**/hardware.*.cy.js'",
     "pytest:all": "node scripts/run_pytests_and_summarize.mjs",
     "test:all": "node scripts/run_all_tests.mjs"
   },

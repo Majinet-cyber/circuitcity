@@ -4,55 +4,339 @@
 {% block title %}Costs · Cement · {{ business.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="row mb-4">
-    <div class="col">
-      <h1 class="h3 mb-0">💰 Costs Management</h1>
-      <p class="text-muted">{{ business.name }}</p>
-    </div>
-  </div>
+<style>
+  .costs-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(12px, 3vw, 24px);
+  }
+  
+  .costs-header {
+    background: linear-gradient(135deg, #0ea5e9, #3b82f6);
+    padding: 24px;
+    border-radius: 20px;
+    color: #fff;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .costs-header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -30%;
+    width: 100%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  
+  .costs-header h1 {
+    margin: 0;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 800;
+  }
+  
+  .costs-header p {
+    margin: 8px 0 0;
+    opacity: 0.9;
+  }
+  
+  .costs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 24px;
+  }
+  
+  @media (max-width: 900px) {
+    .costs-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .panel-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    border: 1px solid rgba(226, 232, 240, 0.5);
+    overflow: hidden;
+  }
+  
+  .panel-card__header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .panel-card__header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  
+  .panel-card__body {
+    padding: 24px;
+  }
+  
+  /* Form styling */
+  .form-field {
+    margin-bottom: 20px;
+  }
+  
+  .form-field__label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #334155;
+    margin-bottom: 8px;
+  }
+  
+  .form-field__label .required {
+    color: #ef4444;
+  }
+  
+  .form-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    font-size: 1rem;
+    transition: all 0.2s;
+    background: #fff;
+  }
+  
+  .form-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  
+  .form-textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+  
+  .btn-submit {
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  
+  .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+  
+  /* Summary card */
+  .summary-card {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-radius: 16px;
+    padding: 20px;
+    color: #fff;
+    margin-top: 16px;
+  }
+  
+  .summary-card__label {
+    font-size: 0.85rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  
+  .summary-card__value {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-top: 6px;
+  }
+  
+  /* Cost entry cards */
+  .cost-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 600px;
+    overflow-y: auto;
+  }
+  
+  .cost-entry-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: linear-gradient(135deg, #f8fafc, #fff);
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s;
+  }
+  
+  .cost-entry-card:hover {
+    border-color: #cbd5e1;
+    transform: translateX(4px);
+  }
+  
+  .cost-entry-card__icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+  }
+  
+  .cost-entry-card__content {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .cost-entry-card__title {
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .cost-entry-card__meta {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .cost-entry-card__amount {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+  
+  .category-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    text-transform: capitalize;
+  }
+  
+  .category-badge--transport { background: #dbeafe; color: #1e40af; }
+  .category-badge--labor { background: #fef3c7; color: #92400e; }
+  .category-badge--rent { background: #dcfce7; color: #166534; }
+  .category-badge--utilities { background: #fae8ff; color: #86198f; }
+  .category-badge--other { background: #f1f5f9; color: #475569; }
+  
+  /* Category totals grid */
+  .category-totals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .category-total-item {
+    padding: 16px;
+    background: linear-gradient(135deg, #f8fafc, #fff);
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+  }
+  
+  .category-total-item__label {
+    font-size: 0.85rem;
+    color: #64748b;
+    text-transform: capitalize;
+    font-weight: 600;
+  }
+  
+  .category-total-item__value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-top: 6px;
+  }
+  
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #64748b;
+  }
+  
+  .empty-state__icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+  }
+  
+  .empty-state__text {
+    font-size: 1rem;
+  }
+</style>
 
-  <div class="row">
-    <!-- Add Cost Form -->
-    <div class="col-md-4 mb-4">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">Add Cost Entry</h5>
+<div class="costs-page">
+  <!-- Header -->
+  <header class="costs-header">
+    <h1>💰 Costs Management</h1>
+    <p>{{ business.name }}</p>
+  </header>
+
+  <div class="costs-grid">
+    <!-- Left Column: Add Cost Form -->
+    <div>
+      <div class="panel-card">
+        <div class="panel-card__header">
+          <i class="bi bi-plus-circle-fill" style="color:#3b82f6"></i>
+          <h2>Add Cost Entry</h2>
         </div>
-        <div class="card-body">
+        <div class="panel-card__body">
           <form method="post">
             {% csrf_token %}
             
-            <div class="mb-3">
-              <label class="form-label">Category *</label>
-              <select class="form-select" name="category" required>
-                {% for value, label in categories %}
-                <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-              </select>
+            <!-- Category Card Radio -->
+            <div class="form-field">
+              <label class="form-field__label">Category <span class="required">*</span></label>
+              {% include "components/category_card_radio.html" with name="category" categories=categories selected="" required=True %}
             </div>
             
-            <div class="mb-3">
-              <label class="form-label">Description *</label>
-              <input type="text" class="form-control" name="description" required placeholder="e.g., Fuel for delivery truck">
+            <div class="form-field">
+              <label class="form-field__label">Description <span class="required">*</span></label>
+              <input type="text" class="form-input" name="description" required placeholder="e.g., Fuel for delivery truck">
             </div>
             
-            <div class="mb-3">
-              <label class="form-label">Amount (MK) *</label>
-              <input type="number" class="form-control" name="amount" required step="0.01" min="0" placeholder="0.00">
+            <div class="form-field">
+              <label class="form-field__label">Amount (MK) <span class="required">*</span></label>
+              <input type="number" class="form-input" name="amount" required step="0.01" min="0.01" placeholder="0.00">
             </div>
             
-            <div class="mb-3">
-              <label class="form-label">Date *</label>
-              <input type="date" class="form-control" name="cost_date" value="{{ today|date:'Y-m-d' }}" required>
+            <div class="form-field">
+              <label class="form-field__label">Date <span class="required">*</span></label>
+              <input type="date" class="form-input" name="cost_date" value="{{ today|date:'Y-m-d' }}" required>
             </div>
             
-            <div class="mb-3">
-              <label class="form-label">Notes (optional)</label>
-              <textarea class="form-control" name="notes" rows="2"></textarea>
+            <div class="form-field">
+              <label class="form-field__label">Notes (optional)</label>
+              <textarea class="form-input form-textarea" name="notes" rows="2" placeholder="Additional details..."></textarea>
             </div>
             
-            <button type="submit" class="btn btn-primary w-100">
+            <button type="submit" class="btn-submit">
               <i class="bi bi-plus-circle"></i> Add Cost
             </button>
           </form>
@@ -60,72 +344,58 @@
       </div>
       
       <!-- Summary Card -->
-      <div class="card mt-3">
-        <div class="card-body">
-          <h6 class="card-subtitle mb-2 text-muted">Total Costs</h6>
-          <h3 class="card-title mb-0">MK {{ total_costs|floatformat:2|intcomma }}</h3>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Costs List -->
-    <div class="col-md-8">
-      <div class="card">
-        <div class="card-header">
-          <h5 class="mb-0">Recent Cost Entries</h5>
-        </div>
-        <div class="card-body">
-          {% if costs %}
-          <div class="table-responsive">
-            <table class="table table-hover">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Category</th>
-                  <th>Description</th>
-                  <th class="text-end">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for cost in costs %}
-                <tr>
-                  <td>{{ cost.cost_date|date:"M j, Y" }}</td>
-                  <td><span class="badge bg-secondary">{{ cost.get_category_display }}</span></td>
-                  <td>{{ cost.description }}</td>
-                  <td class="text-end">MK {{ cost.amount|floatformat:2|intcomma }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <p class="text-muted text-center py-4">No cost entries yet. Add your first cost above.</p>
-          {% endif %}
-        </div>
+      <div class="summary-card">
+        <div class="summary-card__label">Total Costs</div>
+        <div class="summary-card__value">MK {{ total_costs|floatformat:0|intcomma }}</div>
       </div>
       
       <!-- Category Totals -->
       {% if category_totals %}
-      <div class="card mt-3">
-        <div class="card-header">
-          <h5 class="mb-0">Totals by Category</h5>
+      <div class="category-totals-grid">
+        {% for item in category_totals %}
+        <div class="category-total-item">
+          <div class="category-total-item__label">{{ item.category }}</div>
+          <div class="category-total-item__value">MK {{ item.total|floatformat:0|intcomma }}</div>
         </div>
-        <div class="card-body">
-          <div class="row">
-            {% for item in category_totals %}
-            <div class="col-md-6 mb-2">
-              <div class="d-flex justify-content-between">
-                <span>{{ item.category|title }}:</span>
-                <strong>MK {{ item.total|floatformat:2|intcomma }}</strong>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
+        {% endfor %}
       </div>
       {% endif %}
+    </div>
+    
+    <!-- Right Column: Recent Cost Entries -->
+    <div class="panel-card">
+      <div class="panel-card__header">
+        <i class="bi bi-clock-history" style="color:#3b82f6"></i>
+        <h2>Recent Cost Entries</h2>
+      </div>
+      <div class="panel-card__body">
+        {% if costs %}
+        <div class="cost-entries">
+          {% for cost in costs %}
+          <div class="cost-entry-card">
+            <div class="cost-entry-card__icon">
+              {% if cost.category == "transport" %}🚚{% elif cost.category == "labor" %}👷{% elif cost.category == "rent" %}🏠{% elif cost.category == "utilities" %}💡{% else %}📦{% endif %}
+            </div>
+            <div class="cost-entry-card__content">
+              <h4 class="cost-entry-card__title">{{ cost.description }}</h4>
+              <div class="cost-entry-card__meta">
+                <span class="category-badge category-badge--{{ cost.category }}">{{ cost.get_category_display }}</span>
+                <span>{{ cost.cost_date|date:"M j, Y" }}</span>
+                {% if cost.notes %}<span title="{{ cost.notes }}">📝</span>{% endif %}
+              </div>
+            </div>
+            <div class="cost-entry-card__amount">MK {{ cost.amount|floatformat:0|intcomma }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+          <div class="empty-state__icon">📋</div>
+          <p class="empty-state__text">No cost entries yet. Add your first cost above.</p>
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
 {% endblock %}
-

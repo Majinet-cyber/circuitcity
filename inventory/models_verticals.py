@@ -724,6 +724,16 @@ class GymMember(models.Model):
 
     notes = models.TextField(blank=True, default="")
 
+    # Public token for short, non-guessable status links (22 chars)
+    public_token = models.CharField(
+        max_length=22,
+        unique=True,
+        db_index=True,
+        blank=True,
+        default="",
+        help_text="Non-guessable token for public member status page (URL-safe)",
+    )
+
     # Gamification fields
     streak_days = models.IntegerField(default=0, help_text="Current check-in streak (consecutive days)")
     last_checkin_date = models.DateField(
@@ -761,7 +771,7 @@ class GymMember(models.Model):
         return f"{self.name} ({self.phone})"
 
     def save(self, *args, **kwargs):
-        """Auto-generate member_number, qr_token, qr_uuid, and legacy member_code if not present"""
+        """Auto-generate member_number, qr_token, qr_uuid, public_token, and legacy member_code if not present"""
         if not self.member_number and self.business_id:
             self.member_number = self._generate_unique_member_number()
         if not self.qr_token:
@@ -784,10 +794,27 @@ class GymMember(models.Model):
                 # Generate new UUID
                 self.qr_uuid = uuid.uuid4()
                 self.qr_token = str(self.qr_uuid)
+        # Generate public_token for short, non-guessable public status links
+        if not self.public_token:
+            self.public_token = self._generate_unique_public_token()
         # Legacy: also generate member_code for backward compatibility
         if not self.member_code and self.business_id:
             self.member_code = self._generate_unique_member_code()
         super().save(*args, **kwargs)
+
+    def _generate_unique_public_token(self) -> str:
+        """
+        Generate a unique, non-guessable public token for member status pages.
+        Uses secrets.token_urlsafe(16) which generates 22 characters (URL-safe base64).
+        """
+        import secrets
+
+        for _ in range(10):  # Retry up to 10 times for uniqueness
+            token = secrets.token_urlsafe(16)[:22]  # ~128 bits entropy, 22 chars
+            if not GymMember.objects.filter(public_token=token).exists():
+                return token
+        # Fallback: use qr_uuid-based token if collisions persist (extremely rare)
+        return secrets.token_urlsafe(16)[:22]
 
     def _generate_unique_member_number(self) -> str:
         """

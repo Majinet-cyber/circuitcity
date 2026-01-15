@@ -76,7 +76,22 @@ class TestCementStockInWizard(TestCase):
         assert b"Cement" in response.content or b"Paint" in response.content
 
     def test_stock_in_step3_skipped_for_cement(self):
-        """Step 3 is SKIPPED for cement (redirects to step 4) - cement always BAG 50KG"""
+        """Step 3 shows cement brand product selection (not skipped anymore)"""
+        # Create a cement product first
+        dangote = MerchProduct.objects.create(
+            business=self.business,
+            name='Dangote Cement BAG (50KG)',
+            kind=BusinessKind.CEMENT,
+            category='cement',
+            spec_label='',
+            cost_price=25000,
+            selling_price=28000,
+            quantity_in_stock=10,
+            base_unit='bag',
+            is_active=True,
+            track_inventory=True
+        )
+        
         # Simulate selections in session
         session = self.client.session
         session["cement_stock_in_category"] = "construction-materials"
@@ -84,9 +99,11 @@ class TestCementStockInWizard(TestCase):
         session.save()
 
         response = self.client.get(reverse("cement:stock_in") + "?step=3")
-        # Should redirect to step 4 (pricing) for cement
-        assert response.status_code == 302
-        assert "step=4" in response.url, "Cement should skip step 3 and go to step 4"
+        # Should show step 3 (brand selection) for cement
+        assert response.status_code == 200
+        # Should contain brand product
+        content = response.content.decode('utf-8')
+        assert 'Dangote' in content
 
     def test_stock_in_step3_variant_renders_paint(self):
         """Step 3 (Variant selection) renders for paint with correct sizes"""
@@ -127,6 +144,21 @@ class TestCementStockInWizard(TestCase):
 
     def test_stock_in_complete_flow_cement(self):
         """Complete Stock-In flow creates cement product"""
+        # Create existing Dangote product first (our new flow requires existing products)
+        dangote = MerchProduct.objects.create(
+            business=self.business,
+            name='Dangote Cement BAG (50KG)',
+            kind=BusinessKind.CEMENT,
+            category='cement',
+            spec_label='',
+            cost_price=25000,
+            selling_price=28000,
+            quantity_in_stock=0,  # Start with 0
+            base_unit='bag',
+            is_active=True,
+            track_inventory=True
+        )
+        
         # Step 1: POST category
         response = self.client.post(
             reverse("cement:stock_in") + "?step=1",
@@ -141,10 +173,10 @@ class TestCementStockInWizard(TestCase):
         )
         assert response.status_code == 302  # Redirect to step 3
 
-        # Step 3: POST variants (brand + size)
+        # Step 3: POST product_id (select existing Dangote product)
         response = self.client.post(
             reverse("cement:stock_in") + "?step=3",
-            {"step": "3", "brand": "Dangote", "size": "50kg"},
+            {"step": "3", "product_id": str(dangote.id)},
         )
         assert response.status_code == 302  # Redirect to step 4
 
@@ -160,22 +192,13 @@ class TestCementStockInWizard(TestCase):
         )
         assert response.status_code == 302  # Redirect to stock_in home (success)
 
-        # Verify product was created
-        product = MerchProduct.objects.filter(
-            business=self.business,
-            kind=BusinessKind.CEMENT,
-        ).filter(
-            name__icontains="Dangote"
-        ).filter(
-            name__icontains="Cement"
-        ).first()
-
-        assert product is not None, "Product should be created after stock-in"
-        assert product.quantity_in_stock == 100
-        assert product.cost_price == Decimal("25000.00")
-        assert product.selling_price == Decimal("30000.00")
-        assert product.is_active is True
-        assert product.track_inventory is True
+        # Verify product stock was updated
+        dangote.refresh_from_db()
+        assert dangote.quantity_in_stock == 100
+        assert dangote.cost_price == Decimal("25000.00")
+        assert dangote.selling_price == Decimal("30000.00")
+        assert dangote.is_active is True
+        assert dangote.track_inventory is True
 
     def test_stock_in_complete_flow_paint_5l(self):
         """Complete Stock-In flow creates paint product (5L)"""
@@ -282,10 +305,25 @@ class TestCementStockInWizard(TestCase):
 
     def test_stocked_product_is_sellable(self):
         """Product created via Stock-In is immediately available for sale"""
-        # Stock in a cement product
+        # Create Akshar product
+        akshar = MerchProduct.objects.create(
+            business=self.business,
+            name='Akshar Cement BAG (50KG)',
+            kind=BusinessKind.CEMENT,
+            category='cement',
+            spec_label='',
+            cost_price=24000,
+            selling_price=29000,
+            quantity_in_stock=0,
+            base_unit='bag',
+            is_active=True,
+            track_inventory=True
+        )
+        
+        # Stock in the cement product
         self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
         self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
-        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Akshar", "size": "50kg"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "product_id": str(akshar.id)})
         self.client.post(
             reverse("cement:stock_in") + "?step=4",
             {
@@ -297,27 +335,34 @@ class TestCementStockInWizard(TestCase):
         )
 
         # Verify product is sellable
-        product = MerchProduct.objects.filter(
-            business=self.business,
-        ).filter(
-            name__icontains="Akshar"
-        ).filter(
-            name__icontains="Cement"
-        ).first()
-
-        assert product is not None
-        assert product.is_active is True, "Product must be active"
-        assert product.track_inventory is True, "Product must track inventory"
-        assert product.quantity_in_stock > 0, "Product must have stock"
-        assert product.selling_price > 0, "Product must have selling price"
-        assert product.cost_price > 0, "Product must have cost price"
+        akshar.refresh_from_db()
+        assert akshar.is_active is True, "Product must be active"
+        assert akshar.track_inventory is True, "Product must track inventory"
+        assert akshar.quantity_in_stock > 0, "Product must have stock"
+        assert akshar.selling_price > 0, "Product must have selling price"
+        assert akshar.cost_price > 0, "Product must have cost price"
 
     def test_stock_in_updates_existing_product(self):
         """Stocking in same product again updates quantity (not duplicate)"""
+        # Create Duracrete product
+        duracrete = MerchProduct.objects.create(
+            business=self.business,
+            name='Duracrete Cement BAG (50KG)',
+            kind=BusinessKind.CEMENT,
+            category='cement',
+            spec_label='',
+            cost_price=25000,
+            selling_price=30000,
+            quantity_in_stock=0,
+            base_unit='bag',
+            is_active=True,
+            track_inventory=True
+        )
+        
         # First stock-in
         self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
         self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
-        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Duracrete", "size": "50kg"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "product_id": str(duracrete.id)})
         self.client.post(
             reverse("cement:stock_in") + "?step=4",
             {
@@ -336,7 +381,7 @@ class TestCementStockInWizard(TestCase):
         # Second stock-in (same product)
         self.client.post(reverse("cement:stock_in") + "?step=1", {"step": "1", "category": "construction-materials"})
         self.client.post(reverse("cement:stock_in") + "?step=2", {"step": "2", "product": "cement"})
-        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "brand": "Duracrete", "size": "50kg"})
+        self.client.post(reverse("cement:stock_in") + "?step=3", {"step": "3", "product_id": str(duracrete.id)})
         self.client.post(
             reverse("cement:stock_in") + "?step=4",
             {
@@ -356,11 +401,8 @@ class TestCementStockInWizard(TestCase):
         assert initial_count == final_count, "Should not create duplicate product"
 
         # Verify quantity was updated
-        product = MerchProduct.objects.filter(
-            business=self.business,
-            name__icontains="Duracrete",
-        ).first()
-        assert product.quantity_in_stock == 150, "Quantity should be 100 + 50 = 150"
+        duracrete.refresh_from_db()
+        assert duracrete.quantity_in_stock == 150, "Quantity should be 100 + 50 = 150"
 
 
 @pytest.mark.django_db

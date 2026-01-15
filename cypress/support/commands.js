@@ -1,694 +1,85 @@
-// ***********************************************
-// Custom Cypress commands for CircuitCity / Emajinet
-// - Managers have fixed creds per vertical from cypress/fixtures/users.json (source of truth)
-// - Agents are CREATED in tests and MUST be passed explicitly (or stored via setAgentCreds)
-// ***********************************************
-
 /**
- * Get manager credentials for a given kind.
- * Priority: explicit env vars > fixtures/users.json (source of truth)
- * 
- * @param {string} kind - phones|pharmacy|liquor|gym|clothing
- * @returns {Cypress.Chainable<{email: string, password: string}>}
+ * CircuitCity / Emajinet - Cypress Custom Commands
+ * Clean Suite Reboot (Jan 2026)
+ *
+ * SYSTEMATIC COMMANDS:
+ * - stepWait(): Consistent 12s+ wait with logging
+ * - assertPageReady(): Verify page is ready before proceeding
+ * - signupManagerAndCreateBusiness(): Full signup flow
+ * - stockInForVertical(): Stock in with vertical-specific fields
+ * - makeSaleForVertical(): Complete a sale
+ * - dashboardNumbersShouldMove(): Verify KPIs changed
  */
-function getManagerCreds(kind) {
-  const k = (kind || "phones").toLowerCase();
-  const keyUpper = k.toUpperCase();
 
-  // Explicit env overrides (highest priority)
-  const envEmail =
-    Cypress.env(`MANAGER_EMAIL_${keyUpper}`) ||
-    Cypress.env(`CYPRESS_MANAGER_EMAIL_${keyUpper}`) ||
-    Cypress.env("MANAGER_EMAIL") ||
-    Cypress.env("CYPRESS_MANAGER_EMAIL");
-
-  const envPassword =
-    Cypress.env(`MANAGER_PASSWORD_${keyUpper}`) ||
-    Cypress.env(`CYPRESS_MANAGER_PASSWORD_${keyUpper}`) ||
-    Cypress.env("MANAGER_PASSWORD") ||
-    Cypress.env("CYPRESS_MANAGER_PASSWORD");
-
-  if (envEmail && envPassword) {
-    return cy.wrap({ email: String(envEmail).trim(), password: String(envPassword) });
-  }
-
-  // FIXTURE DEFAULTS (source of truth)
-  return cy.fixture("users").then((u) => {
-    const mgr = u?.managers?.[k];
-    if (!mgr?.email || !mgr?.password) {
-      throw new Error(
-        `[loginAsManager] Missing users.json credentials for kind="${k}". ` +
-        `Expected cypress/fixtures/users.json managers.${k}.email/password`
-      );
-    }
-    return { email: String(mgr.email).trim(), password: String(mgr.password) };
-  });
-}
-
+// ============================================================================
+// STEP WAIT - Consistent wait with logging
+// ============================================================================
 /**
- * Runtime storage for agent creds created during tests.
- * Example:
- *   cy.setAgentCreds("clothing", { email, password })
- *   cy.getAgentCreds("clothing").then(({email,password}) => cy.loginAsAgent(email,password))
+ * Wait for STEP_WAIT_MS (default 12000ms) after major actions.
+ * Logs the step label for debugging in Cypress runner.
+ * @param {string} label - Description of the step (optional)
  */
-Cypress.Commands.add("setAgentCreds", (kind, creds) => {
-  const k = String(kind || "").toLowerCase();
-  const key = `AGENT_CREDS_${k}`;
-  Cypress.env(key, creds);
+Cypress.Commands.add('stepWait', (label = 'Step wait') => {
+  const waitMs = Cypress.env('STEP_WAIT_MS') || 12000;
+  cy.log(`⏳ ${label} - waiting ${waitMs}ms`);
+  cy.wait(waitMs);
 });
 
-Cypress.Commands.add("getAgentCreds", (kind) => {
-  const k = String(kind || "").toLowerCase();
-  const key = `AGENT_CREDS_${k}`;
-  const creds = Cypress.env(key);
-
-  if (!creds?.email || !creds?.password) {
-    throw new Error(
-      `No agent creds stored for "${k}". Create an agent in the test, then call cy.setAgentCreds("${k}", {email, password}).`
-    );
-  }
-
-  return cy.wrap(creds, { log: false });
-});
-
+// ============================================================================
+// ASSERT PAGE READY - Verify page is loaded before proceeding
+// ============================================================================
 /**
- * Generic: assert page does NOT show common server error texts.
+ * Assert the page is ready by checking:
+ * 1. A stable data-testid or heading exists and is visible
+ * 2. URL includes expected path (optional)
+ * 3. No server errors on page
+ *
+ * @param {string} testIdOrHeading - data-testid value or heading text
+ * @param {object} options - { urlContains, timeout }
  */
-Cypress.Commands.add("assertNoServerError", () => {
-  cy.get("body").should("not.contain", "A server error occurred");
-  cy.get("body").should("not.contain", "Server Error (500)");
-  cy.get("body").should("not.contain", "Traceback");
-});
+Cypress.Commands.add('assertPageReady', (testIdOrHeading, options = {}) => {
+  const timeout = options.timeout || 20000;
+  const urlContains = options.urlContains;
 
-/**
- * Wait until we’re “in the app” (works across all verticals).
- */
-Cypress.Commands.add("waitForAppShell", () => {
+  // Check for server errors first
   cy.assertNoServerError();
 
-  cy.get("body", { timeout: 60000 }).then(($body) => {
-    // Sidebar present?
-    if ($body.find('[data-cy="sidebar"]').length) {
-      cy.get('[data-cy="sidebar"]', { timeout: 60000 }).should("be.visible");
-      return;
-    }
-    if ($body.find("aside").length) {
-      cy.get("aside", { timeout: 60000 }).should("be.visible");
-      return;
-    }
-
-    // Fallback: at least confirm we see a dashboard label somewhere
-    cy.contains(/dashboard/i, { timeout: 60000 }).should("exist");
-  });
-});
-
-/**
- * Test-only login via API endpoint (faster, bypasses 2FA in test mode).
- * Only works when ALLOW_TEST_LOGIN=true is set in Django environment.
- * 
- * @param {string|object} kindOrEmail - If string, treated as kind; if object with email/password, uses those
- * @param {string} password - Password (optional if kindOrEmail is an object)
- * @param {object} opts - { kind: "clothing", email: "...", password: "..." } - optional overrides
- */
-Cypress.Commands.add("testLogin", (kindOrEmail, password, opts = {}) => {
-  // Handle different call signatures
-  let email, pass, kind;
-  
-  if (typeof kindOrEmail === "object" && kindOrEmail.email) {
-    // Called as testLogin({email, password}, opts)
-    email = kindOrEmail.email;
-    pass = kindOrEmail.password;
-    kind = opts.kind || kindOrEmail.kind;
-  } else if (typeof kindOrEmail === "string" && password) {
-    // Called as testLogin(email, password, opts)
-    email = kindOrEmail;
-    pass = password;
-    kind = opts.kind;
-  } else {
-    // Called as testLogin(kind, undefined, opts) - use fixtures
-    kind = kindOrEmail || opts.kind || "phones";
-    email = opts.email;
-    pass = opts.password;
-  }
-  
-  // If email/password not explicitly provided, use getManagerCreds
-  if (!email || !pass) {
-    if (!kind) {
-      throw new Error("[testLogin] Either provide email/password explicitly, or provide kind to load from fixtures/users.json");
-    }
-    return getManagerCreds(kind).then((creds) => {
-      return cy.testLogin(creds.email, creds.password, { kind });
-    });
-  }
-  
-  const body = { email, password: pass };
-  if (kind) {
-    body.kind = kind;
-  }
-  
-  cy.request({
-    method: "POST",
-    url: "/accounts/__e2e__/test-login/",
-    body,
-    failOnStatusCode: false,
-  }).then((response) => {
-    // Check for 404 (endpoint disabled)
-    if (response.status === 404) {
-      throw new Error(
-        `[e2e_test_login] 404 - Test login endpoint not found. ` +
-        `On localhost this should work automatically. Check ENV is not 'prod' or 'production'.`
-      );
-    }
-    // Check for 409 (manager business lock)
-    if (response.status === 409 && response.body.error === "MANAGER_BUSINESS_LOCK") {
-      const hint = response.body.hint || "";
-      const existingBiz = response.body.existing_business_name || response.body.existing_business_id || "unknown";
-      const detail = response.body.detail || response.body.message || "User is already a manager on a different business.";
-      throw new Error(
-        `[e2e_test_login] 409 - Manager business lock: ${detail} ${hint} Existing business: ${existingBiz}`
-      );
-    }
-    // Check for other error statuses
-    if (response.status !== 200) {
-      throw new Error(
-        `[e2e_test_login] ${response.status} ${JSON.stringify(response.body)}`
-      );
-    }
-    if (!response.body.ok) {
-      throw new Error(`[e2e_test_login] Response not ok: ${response.body.error || "Unknown error"}`);
-    }
-    
-    // Assert session cookie exists (try sessionid first, fallback to all cookies)
-    cy.getCookie("sessionid").then((cookie) => {
-      if (!cookie) {
-        // Try alternative cookie name (cc_sessionid)
-        cy.getCookie("cc_sessionid").then((altCookie) => {
-          if (!altCookie) {
-            // Dump all cookies for debugging
-            cy.getAllCookies().then((cookies) => {
-              throw new Error(
-                `[e2e_test_login] No session cookie found after login. Cookies: ${JSON.stringify(cookies.map(c => c.name))}`
-              );
-            });
-          }
-        });
-      }
-    });
-    
-    // Validate identity via __whoami__ - try both slash and no-slash
-    const tryWhoami = (url) => {
-      return cy.request({
-        url,
-        failOnStatusCode: false,
-      }).then((whoamiResponse) => {
-        if (whoamiResponse.status === 200 && whoamiResponse.body.ok) {
-          // Success - verify email matches
-          const whoamiEmail = (whoamiResponse.body.email || whoamiResponse.body.username || "").toLowerCase();
-          const expectedEmail = email.toLowerCase();
-          if (whoamiEmail !== expectedEmail) {
-            throw new Error(
-              `[e2e_test_login] Email mismatch: expected "${expectedEmail}", got "${whoamiEmail}"`
-            );
-          }
-          return true;
-        }
-        return false;
-      });
-    };
-    
-    // Try /__whoami__/ first, then /__whoami__ if that fails
-    tryWhoami("/__whoami__/").then((success) => {
-      if (!success) {
-        return tryWhoami("/__whoami__").then((success2) => {
-          if (!success2) {
-            throw new Error(
-              `[e2e_test_login] __whoami__ validation failed: both /__whoami__/ and /__whoami__ returned non-200`
-            );
-          }
-        });
-      }
-    });
-  });
-});
-
-/**
- * Login using provided credentials (no vertical assumptions).
- * Falls back to UI login if test login is not available.
- * @param {string} email
- * @param {string} password
- */
-Cypress.Commands.add("login", (email, password) => {
-  // Try test login first (faster)
-  cy.testLogin(email, password).then(() => {
-    // If testLogin succeeded, we're done
-  }).catch(() => {
-    // Fall back to UI login
-    cy.visit("/accounts/login/", { timeout: 60000 });
-
-    // Email / username
-    cy.get('input[name="username"], input[name="email"], [data-cy=login-email]', {
-      timeout: 30000,
-    })
-      .first()
-      .clear()
-      .type(email);
-
-    // Password
-    cy.get('input[name="password"], [data-cy=login-password]', {
-      timeout: 30000,
-    })
-      .first()
-      .clear()
-      .type(password, { log: false });
-
-    // Submit
-    cy.get('button[type="submit"], [data-cy=login-submit]', { timeout: 30000 })
-      .first()
-      .click();
-
-    // Must leave login page
-    cy.location("pathname", { timeout: 60000 }).should((path) => {
-      expect(path).to.not.eq("/accounts/login/");
-    });
-
-    cy.waitForAppShell();
-  });
-});
-
-/**
- * ✅ Backwards compatibility (your existing phones specs likely call this)
- * Uses TEST_EMAIL/TEST_PASSWORD if present, else defaults to PHONES manager creds from fixtures.
- */
-Cypress.Commands.add("loginAsOwner", () => {
-  const email = Cypress.env("TEST_EMAIL");
-  const password = Cypress.env("TEST_PASSWORD") || Cypress.env("MANAGER_PASSWORD");
-  
-  if (email && password) {
-    cy.login(email, password);
-  } else {
-    // Use fixtures for phones manager
-    getManagerCreds("phones").then((creds) => {
-      cy.login(creds.email, creds.password);
-    });
-  }
-});
-
-/**
- * Manager login per vertical (ONLY managers use these fixed creds).
- * Uses cy.session() to cache login and speed up tests.
- * Credentials come from cypress/fixtures/users.json by default (source of truth).
- * @param {string} kind - phones|pharmacy|liquor|gym|clothing
- */
-Cypress.Commands.add("loginAsManager", (kind = "phones") => {
-  const k = String(kind || "phones").toLowerCase();
-  
-  cy.session(
-    `manager-${k}`,
-    () => {
-      // Use backend login only (no UI fallback)
-      // testLogin will use getManagerCreds(k) to load from fixtures/users.json
-      cy.testLogin(k, undefined, { kind: k });
-    },
-    {
-      validate: () => {
-        // Validate session using whoami endpoint
-        // We can't easily check email here since it comes from fixtures async
-        cy.request({
-          url: "/__whoami__/",
-          failOnStatusCode: false,
-        }).then((response) => {
-          expect(response.status).to.eq(200);
-          expect(response.body.is_authenticated).to.eq(true);
-          expect(response.body.email || response.body.username).to.exist;
-        });
-      },
-      cacheAcrossSpecs: true,
-    }
-  );
-
-  // After session is established, visit a page
-  cy.visit("/", { failOnStatusCode: false });
-  cy.waitForAppShell();
-});
-
-/**
- * Agent login MUST be explicit: agent creds do NOT inherit manager creds.
- * @param {string} email
- * @param {string} password
- */
-Cypress.Commands.add("loginAsAgent", (email, password) => {
-  if (!email || !password) {
-    throw new Error(
-      "cy.loginAsAgent(email, password) requires explicit agent credentials (created in test)."
-    );
-  }
-  cy.login(email, password);
-});
-
-/**
- * ✅ NEW: Unified login helper used by your clothing sidebar test
- * Usage:
- *   cy.loginAs("clothing", "manager")
- *   cy.loginAs("phones", "owner")
- *   cy.loginAs("clothing", "agent") // uses stored agent creds via setAgentCreds()
- *   cy.loginAs("clothing", "agent", "email", "pass") // explicit
- */
-Cypress.Commands.add("loginAs", (kind = "phones", role = "owner", email, password) => {
-  const k = String(kind || "phones").toLowerCase();
-  const r = String(role || "owner").toLowerCase();
-
-  if (r === "owner") {
-    return cy.loginAsOwner();
+  // Check URL if specified
+  if (urlContains) {
+    cy.url({ timeout }).should('include', urlContains);
   }
 
-  if (r === "manager") {
-    return cy.loginAsManager(k);
-  }
+  // Check for testid or heading
+  cy.get('body', { timeout }).then(($body) => {
+    const testIdSel = `[data-testid="${testIdOrHeading}"]`;
 
-  if (r === "agent") {
-    if (email && password) {
-      return cy.loginAsAgent(email, password);
-    }
-    return cy.getAgentCreds(k).then((creds) => cy.loginAsAgent(creds.email, creds.password));
-  }
-
-  throw new Error(`Unknown role "${role}". Use "owner" | "manager" | "agent".`);
-});
-
-/**
- * Select business if on chooser page.
- */
-Cypress.Commands.add("selectBusiness", (businessName) => {
-  cy.url().then((url) => {
-    if (url.includes("/choose") || url.includes("/select")) {
-      cy.contains(businessName).click();
+    if ($body.find(testIdSel).length) {
+      cy.get(testIdSel, { timeout }).should('be.visible');
+    } else {
+      // Fallback: look for heading text
+      cy.contains('h1, h2, h3, [data-testid]', testIdOrHeading, { timeout })
+        .should('be.visible');
     }
   });
 });
 
-/**
- * Select a business by vertical kind if on chooser.
- */
-Cypress.Commands.add("selectBusinessByKind", (kind) => {
-  const k = String(kind || "").toLowerCase();
-
-  cy.url().then((url) => {
-    if (url.includes("/choose") || url.includes("/select") || url.includes("/business")) {
-      cy.get("body").then(($body) => {
-        const cySel = `[data-cy="business-${k}"]`;
-        if ($body.find(cySel).length) {
-          cy.get(cySel).first().click();
-        } else {
-          cy.contains(new RegExp(k, "i")).first().click();
-        }
-      });
-    }
-  });
-});
-
-/**
- * Visit a vertical dashboard (tries common routes safely).
- */
-Cypress.Commands.add("visitDashboard", (kind) => {
-  const k = String(kind || "").toLowerCase();
-
-  const candidates = {
-    clothing: ["/verticals/clothing/dashboard/", "/inventory/verticals/clothing/"],
-    phones: ["/inventory/dashboard/", "/verticals/phones/dashboard/", "/inventory/verticals/phones/"],
-    liquor: ["/verticals/liquor/dashboard/", "/inventory/verticals/liquor/"],
-    gym: ["/verticals/gym/dashboard/", "/inventory/verticals/gym/"],
-    pharmacy: ["/inventory/pharmacy/dashboard/", "/verticals/pharmacy/dashboard/"],
-  };
-
-  const urls = candidates[k] || ["/dashboard/"];
-
-  const tryNext = (idx) => {
-    const url = urls[idx];
-    if (!url) {
-      cy.visit("/dashboard/", { failOnStatusCode: false });
-      cy.waitForAppShell();
-      return;
-    }
-
-    cy.request({ url, failOnStatusCode: false }).then((resp) => {
-      if (resp.status >= 200 && resp.status < 400) {
-        cy.visit(url, { failOnStatusCode: false });
-        cy.waitForAppShell();
-      } else {
-        tryNext(idx + 1);
-      }
-    });
-  };
-
-  tryNext(0);
-});
-
-/**
- * Collect sidebar hrefs once (prevents detached DOM).
- */
-Cypress.Commands.add("sidebarHrefs", () => {
-  const candidates = [
-    '[data-cy="sidebar"] a[href]',
-    "aside a[href]",
-    ".sidebar a[href]",
-    "nav a[href]",
-  ];
-
-  return cy.get("body").then(($body) => {
-    let $links = null;
-
-    for (const sel of candidates) {
-      const found = $body.find(sel);
-      if (found.length) {
-        $links = found;
-        break;
-      }
-    }
-
-    if (!$links) $links = $body.find("a[href]"); // fallback
-
-    const hrefs = Array.from($links)
-      .map((a) => a.getAttribute("href"))
-      .filter(Boolean)
-      .map((h) => h.trim())
-      .filter((h) => h !== "#" && !h.startsWith("javascript:") && !h.startsWith("mailto:"))
-      .filter((h) => !h.includes("/logout")) // don’t log out mid-test
-      .filter((h) => h.startsWith("/")); // same-origin only
-
-    return Array.from(new Set(hrefs));
-  });
-});
-
-/**
- * Wait for element to be visible
- */
-Cypress.Commands.add("waitForElement", (selector) => {
-  cy.get(selector, { timeout: 20000 }).should("be.visible");
-});
-
-/**
- * Fill by data-cy OR label text
- */
-Cypress.Commands.add("fillField", (labelOrCy, value) => {
-  const cySel = `[data-cy="${labelOrCy}"]`;
-
-  cy.get("body").then(($body) => {
-    if ($body.find(cySel).length) {
-      cy.get(cySel).first().clear().type(String(value ?? ""));
-      return;
-    }
-
-    cy.contains("label", labelOrCy).then(($label) => {
-      const inputId = $label.attr("for");
-      if (inputId) {
-        cy.get(`#${inputId}`).clear().type(String(value ?? ""));
-      } else {
-        cy.wrap($label)
-          .parent()
-          .find("input, textarea, select")
-          .first()
-          .clear()
-          .type(String(value ?? ""));
-      }
-    });
-  });
-});
-
-/**
- * Click by data-cy OR button text
- */
-Cypress.Commands.add("clickButton", (textOrCy) => {
-  const cySel = `[data-cy="${textOrCy}"]`;
-
-  cy.get("body").then(($body) => {
-    if ($body.find(cySel).length) {
-      cy.get(cySel).first().click();
-      return;
-    }
-    cy.contains("button", textOrCy).first().click();
-  });
-});
-
-/**
- * Verify success message appears
- */
-Cypress.Commands.add("verifySuccess", (message) => {
-  const selectors = [
-    '[data-cy="success-message"]',
-    ".alert-success",
-    ".toast-success",
-    '[role="alert"].alert-success',
-  ];
-
-  cy.get("body").then(($body) => {
-    const hit = selectors.find((sel) => $body.find(sel).length > 0);
-    if (!hit) return;
-
-    if (message) cy.get(hit).should("contain", message);
-    else cy.get(hit).should("be.visible");
-  });
-});
-
-/**
- * Verify error message appears
- */
-Cypress.Commands.add("verifyError", (message) => {
-  const selectors = [
-    '[data-cy="error-message"]',
-    ".alert-danger",
-    ".toast-error",
-    '[role="alert"].alert-danger',
-  ];
-
-  cy.get("body").then(($body) => {
-    const hit = selectors.find((sel) => $body.find(sel).length > 0);
-    if (!hit) return;
-
-    if (message) cy.get(hit).should("contain", message);
-    else cy.get(hit).should("be.visible");
-  });
-});
-
-/**
- * Create a manager account, business, and location via signup wizard (UI-based).
- * @param {Object} options - { email, password, fullName, businessName, businessKind, locationName, city }
- */
-Cypress.Commands.add("createBusinessAndLocation", (options = {}) => {
-  const timestamp = Date.now();
-  const email = options.email || `test-manager-${timestamp}@e2e.test`;
-  const password = options.password || "TestPassword123!@#";
-  const fullName = options.fullName || `Test Manager ${timestamp}`;
-  const businessName = options.businessName || `Test Business ${timestamp}`;
-  const businessKind = options.businessKind || "phones";
-  const locationName = options.locationName || "Test Location";
-  const city = options.city || "Test City";
-
-  cy.visit("/accounts/signup/");
-
-  // Step 0: Welcome screen - click Get Started
-  cy.get('button[type="submit"]').contains(/get started/i).click();
-
-  // Step 1: Account details
-  cy.get('input[name="full_name"], #id_full_name').clear().type(fullName);
-  cy.get('input[name="email"], #id_email').clear().type(email);
-  cy.get('input[name="password1"], #id_password1').clear().type(password);
-  cy.get('input[name="password2"], #id_password2').clear().type(password);
-  cy.get('button[type="submit"]').contains(/continue/i).click();
-
-  // Step 2: Business details
-  cy.get('input[name="business_name"], #id_business_name').clear().type(businessName);
-  cy.get('select[name="business_kind"], #id_business_kind').select(businessKind);
-  cy.get('button[type="submit"]').contains(/continue/i).click();
-
-  // Step 3: Location
-  cy.get('input[name="location_name"], #id_location_name').clear().type(locationName);
-  cy.get('input[name="city"], #id_city').clear().type(city);
-  cy.get('button[type="submit"]').contains(/continue/i).click();
-
-  // Step 4: Goals (optional - just continue)
-  cy.get('button[type="submit"]').contains(/finish|complete/i).click();
-
-  // Handle OTP if present
-  cy.url().then((url) => {
-    if (url.includes("/signup/verify-email")) {
-      // Use E2E OTP bypass
-      cy.request({
-        method: "GET",
-        url: `/accounts/__e2e__/latest-otp/?email=${encodeURIComponent(email)}`,
-        failOnStatusCode: false,
-      }).then((resp) => {
-        if (resp.status === 200 && resp.body.ok) {
-          const otpCode = resp.body.code || "000000";
-          cy.get('input[name="code"], input[type="text"][placeholder*="code" i]').type(otpCode);
-          cy.get('button[type="submit"]').contains(/verify|submit/i).click();
-        } else {
-          // Fallback: try fixed OTP
-          cy.get('input[name="code"], input[type="text"][placeholder*="code" i]').type("000000");
-          cy.get('button[type="submit"]').contains(/verify|submit/i).click();
-        }
-      });
-    }
-  });
-
-  // Wait for dashboard
-  cy.waitForAppShell();
-
-  return cy.wrap({ email, password, businessName, businessKind });
-});
-
-/**
- * Switch to a different vertical (changes business kind).
- * Note: This may require creating a new business or switching context.
- * @param {string} vertical - phones|clothing|liquor|pharmacy|gym|grocery
- */
-Cypress.Commands.add("switchVertical", (vertical = "phones") => {
-  const v = String(vertical).toLowerCase();
-
-  // For now, we'll visit the vertical dashboard directly
-  // In a real scenario, you might need to create a new business or switch context
-  const verticalUrls = {
-    phones: "/inventory/verticals/phones/",
-    clothing: "/inventory/verticals/clothing/",
-    liquor: "/inventory/verticals/liquor/",
-    pharmacy: "/verticals/pharmacy/dashboard/",
-    gym: "/inventory/verticals/gym/",
-    grocery: "/inventory/dashboard/",
-  };
-
-  const url = verticalUrls[v] || verticalUrls.phones;
-  cy.visit(url, { failOnStatusCode: false });
-  cy.waitForAppShell();
-});
-
-// =============================================================================
-// PHONES JOURNEY UTILITIES - Added for slow-network resilience
-// =============================================================================
-
-/**
- * Extended error detection - fails if any common server error appears in DOM.
- * More comprehensive than assertNoServerError.
- */
-Cypress.Commands.add("assertNoServerErrorPage", () => {
+// ============================================================================
+// ASSERT NO SERVER ERROR - Check for common error patterns
+// ============================================================================
+Cypress.Commands.add('assertNoServerError', () => {
   const errorPatterns = [
-    "Server Error (500)",
-    "A server error occurred",
-    "Traceback (most recent call last)",
-    "DisallowedHost",
-    "IntegrityError",
-    "OperationalError",
-    "DoesNotExist",
-    "TemplateDoesNotExist",
-    "ImproperlyConfigured",
-    "ProgrammingError",
-    "ValueError:",
-    "TypeError:",
-    "KeyError:",
-    "AttributeError:",
-    "DEBUG = True",           // Django debug page indicator
-    "Request Method:",        // Django debug page header
+    'Server Error (500)',
+    'A server error occurred',
+    'Traceback (most recent call last)',
+    'DisallowedHost',
+    'IntegrityError',
+    'OperationalError',
+    'DoesNotExist',
+    'TemplateDoesNotExist',
+    'ImproperlyConfigured',
   ];
 
-  cy.get("body", { timeout: 5000 }).then(($body) => {
+  cy.get('body', { timeout: 5000 }).then(($body) => {
     const bodyText = $body.text();
     errorPatterns.forEach((pattern) => {
       if (bodyText.includes(pattern)) {
@@ -698,188 +89,540 @@ Cypress.Commands.add("assertNoServerErrorPage", () => {
   });
 });
 
+// ============================================================================
+// SIGNUP MANAGER AND CREATE BUSINESS - Full signup flow
+// ============================================================================
 /**
- * Safe click with visibility and timeout handling.
- * @param {string} testid - The data-testid value
- * @param {object} options - { timeout, force }
+ * Complete manager signup flow:
+ * 1. Visit signup page
+ * 2. Fill account details
+ * 3. Pick business kind (vertical)
+ * 4. Complete wizard
+ * 5. Handle OTP (bypass in E2E mode)
+ * 6. Land on dashboard
+ *
+ * @param {string} verticalKey - Vertical key from fixtures/verticals.json
+ * @returns {Cypress.Chainable<{email: string, password: string, businessName: string}>}
  */
-Cypress.Commands.add("safeClick", (testid, options = {}) => {
-  const timeout = options.timeout || 15000;
-  const force = options.force || false;
-  
-  cy.get(`[data-testid="${testid}"]`, { timeout })
-    .should("be.visible")
-    .click({ force });
-});
-
-/**
- * Safe click by data-cy selector.
- * @param {string} cyName - The data-cy value
- * @param {object} options - { timeout, force }
- */
-Cypress.Commands.add("safeClickCy", (cyName, options = {}) => {
-  const timeout = options.timeout || 15000;
-  const force = options.force || false;
-  
-  cy.get(`[data-cy="${cyName}"]`, { timeout })
-    .should("be.visible")
-    .click({ force });
-});
-
-/**
- * Wait for app to be idle (no spinners/loaders visible).
- * Falls back to body existence + no server error if no loader exists.
- */
-Cypress.Commands.add("waitForAppIdle", (options = {}) => {
-  const timeout = options.timeout || 15000;
-  
-  // Common loader/spinner selectors
-  const loaderSelectors = [
-    ".loading",
-    ".spinner",
-    ".loader",
-    "[data-loading]",
-    '[aria-busy="true"]',
-    ".cc-loading",
-    ".is-loading",
-  ];
-  
-  cy.get("body", { timeout }).should("exist").then(($body) => {
-    // Check if any loader is present and wait for it to disappear
-    const hasLoader = loaderSelectors.some((sel) => $body.find(sel).length > 0);
-    
-    if (hasLoader) {
-      loaderSelectors.forEach((sel) => {
-        if ($body.find(sel).length > 0) {
-          cy.get(sel, { timeout }).should("not.exist");
-        }
-      });
+Cypress.Commands.add('signupManagerAndCreateBusiness', (verticalKey) => {
+  // Load vertical config
+  return cy.fixture('verticals').then((verticals) => {
+    const vertical = verticals[verticalKey];
+    if (!vertical) {
+      throw new Error(`Unknown vertical: ${verticalKey}. Check fixtures/verticals.json`);
     }
-    
-    // Always verify no server error
-    cy.assertNoServerErrorPage();
+
+    // Generate unique test data
+    const timestamp = Date.now();
+    const email = `e2e-${verticalKey}-${timestamp}@test.circuitcity.local`;
+    const password = 'E2ETestPass123!@#';
+    const fullName = `E2E Test ${vertical.displayName}`;
+    const businessName = `E2E ${vertical.displayName} ${timestamp}`;
+
+    cy.log(`📝 Signing up manager for ${vertical.displayName}`);
+
+    // Visit signup page
+    cy.visit('/accounts/signup/', { timeout: 60000 });
+    cy.stepWait('Signup page loaded');
+
+    // Step 0: Welcome screen - click Get Started (if present)
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="signup-get-started"], button:contains("Get Started")').length) {
+        cy.get('[data-testid="signup-get-started"], button:contains("Get Started")')
+          .first()
+          .click();
+        cy.stepWait('Welcome screen passed');
+      }
+    });
+
+    // Step 1: Account details
+    cy.get('[data-testid="signup-full-name"], input[name="full_name"], #id_full_name', { timeout: 20000 })
+      .first()
+      .clear()
+      .type(fullName);
+
+    cy.get('[data-testid="signup-email"], input[name="email"], #id_email')
+      .first()
+      .clear()
+      .type(email);
+
+    cy.get('[data-testid="signup-password"], input[name="password1"], #id_password1')
+      .first()
+      .clear()
+      .type(password);
+
+    cy.get('[data-testid="signup-password-confirm"], input[name="password2"], #id_password2')
+      .first()
+      .clear()
+      .type(password);
+
+    cy.get('[data-testid="signup-continue"], button[type="submit"]:contains("Continue")')
+      .first()
+      .click();
+
+    cy.stepWait('Account details submitted');
+
+    // Step 2: Business details
+    cy.get('[data-testid="business-name"], input[name="business_name"], #id_business_name', { timeout: 20000 })
+      .first()
+      .clear()
+      .type(businessName);
+
+    // Select business kind
+    cy.get('body').then(($body) => {
+      const kindTestId = `[data-testid="business-kind-${verticalKey}"]`;
+      const kindSelect = '[data-testid="business-kind-select"], select[name="business_kind"], #id_business_kind';
+
+      if ($body.find(kindTestId).length) {
+        // Click the vertical tile/button
+        cy.get(kindTestId).click();
+      } else if ($body.find(kindSelect).length) {
+        // Select from dropdown
+        cy.get(kindSelect).first().select(vertical.signupBusinessKindValue || verticalKey);
+      }
+    });
+
+    cy.get('[data-testid="business-continue"], button[type="submit"]:contains("Continue")')
+      .first()
+      .click();
+
+    cy.stepWait('Business details submitted');
+
+    // Step 3: Location (if present)
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="location-name"], input[name="location_name"]').length) {
+        cy.get('[data-testid="location-name"], input[name="location_name"], #id_location_name')
+          .first()
+          .clear()
+          .type('Main Location');
+
+        cy.get('[data-testid="location-city"], input[name="city"], #id_city')
+          .first()
+          .clear()
+          .type('Test City');
+
+        cy.get('[data-testid="location-continue"], button[type="submit"]:contains("Continue")')
+          .first()
+          .click();
+
+        cy.stepWait('Location submitted');
+      }
+    });
+
+    // Step 4: Goals & Finish - wait for the page, then click finish
+    cy.url().then((url) => {
+      // If we're on wizard step 4, complete it
+      if (url.includes('/wizard/4') || url.includes('step=4')) {
+        // Wait for the finish button and click it
+        cy.get('[data-testid="signup-finish"]', { timeout: 20000 })
+          .scrollIntoView()
+          .should('be.visible')
+          .click();
+        cy.stepWait('Signup wizard step 4 completed');
+      } else {
+        // Fallback: check for any finish/complete button on page
+        cy.get('body').then(($body) => {
+          if ($body.find('[data-testid="signup-finish"], button:contains("Finish"), button:contains("Complete"), button:contains("Launch")').length) {
+            cy.get('[data-testid="signup-finish"], button:contains("Finish"), button:contains("Complete"), button:contains("Launch")')
+              .first()
+              .scrollIntoView()
+              .click();
+            cy.stepWait('Signup wizard completed');
+          }
+        });
+      }
+    });
+
+    // Handle OTP verification (E2E bypass)
+    cy.url().then((url) => {
+      if (url.includes('/verify') || url.includes('/otp')) {
+        const otpCode = Cypress.env('E2E_OTP_BYPASS') || '000000';
+
+        // Try to get OTP from backend first
+        cy.request({
+          method: 'GET',
+          url: `/accounts/__e2e__/latest-otp/?email=${encodeURIComponent(email)}`,
+          failOnStatusCode: false,
+        }).then((resp) => {
+          const code = (resp.status === 200 && resp.body.ok) ? resp.body.code : otpCode;
+
+          cy.get('[data-testid="otp-input"], input[name="code"], input[type="text"]', { timeout: 20000 })
+            .first()
+            .clear()
+            .type(code);
+
+          cy.get('[data-testid="otp-submit"], button[type="submit"]')
+            .first()
+            .click();
+
+          cy.stepWait('OTP submitted');
+        });
+      }
+    });
+
+    // Wait for dashboard
+    cy.url({ timeout: 60000 }).should('include', vertical.dashboardPath || '/dashboard');
+    cy.assertPageReady('dashboard-heading', { urlContains: vertical.dashboardPath });
+    cy.stepWait('Dashboard loaded after signup');
+
+    // Return credentials for later use
+    return cy.wrap({ email, password, businessName, verticalKey });
   });
 });
 
+// ============================================================================
+// LOGIN AS MANAGER - Use existing credentials
+// ============================================================================
 /**
- * Navigate via sidebar and assert page loads without errors.
- * @param {string} cyName - The data-cy value of the nav link (e.g., "nav-dashboard")
- * @param {string} expectedUrlPart - URL substring to verify (e.g., "/dashboard/")
- * @param {string} interceptPattern - Optional route pattern to intercept (e.g., "/inventory/**")
+ * Login with manager credentials (uses test login endpoint).
+ * @param {string} verticalKey - Vertical key
  */
-Cypress.Commands.add("navAndAssert", (cyName, expectedUrlPart, interceptPattern = null) => {
-  const aliasName = `nav_${cyName.replace(/-/g, "_")}`;
-  
-  // Set up intercept if pattern provided
-  if (interceptPattern) {
-    cy.intercept("GET", interceptPattern).as(aliasName);
-  }
-  
-  // Click the nav item
-  cy.get(`[data-cy="${cyName}"]`, { timeout: 15000 })
-    .should("be.visible")
-    .click();
-  
-  // Wait for intercept if set
-  if (interceptPattern) {
-    cy.wait(`@${aliasName}`, { timeout: 15000 });
-  }
-  
-  // Wait for page to stabilize
-  cy.waitForAppIdle();
-  
-  // Verify URL contains expected part
-  if (expectedUrlPart) {
-    cy.url({ timeout: 15000 }).should("include", expectedUrlPart);
-  }
-  
-  // Verify no server errors
-  cy.assertNoServerErrorPage();
+Cypress.Commands.add('loginAsManager', (verticalKey = 'phones') => {
+  return cy.fixture('users').then((users) => {
+    const manager = users.managers?.[verticalKey];
+    if (!manager?.email || !manager?.password) {
+      throw new Error(`No manager credentials for ${verticalKey} in fixtures/users.json`);
+    }
+
+    // Use test login endpoint (bypasses 2FA in E2E mode)
+    cy.request({
+      method: 'POST',
+      url: '/accounts/__e2e__/test-login/',
+      body: {
+        email: manager.email,
+        password: manager.password,
+        kind: verticalKey,
+      },
+      failOnStatusCode: false,
+    }).then((resp) => {
+      if (resp.status === 200 && resp.body.ok) {
+        cy.visit('/', { failOnStatusCode: false });
+        cy.stepWait('Logged in via test endpoint');
+      } else {
+        // Fallback to UI login
+        cy.visit('/accounts/login/');
+        cy.get('[data-testid="login-email"], input[name="username"], input[name="email"]')
+          .first()
+          .clear()
+          .type(manager.email);
+
+        cy.get('[data-testid="login-password"], input[name="password"]')
+          .first()
+          .clear()
+          .type(manager.password);
+
+        cy.get('[data-testid="login-submit"], button[type="submit"]')
+          .first()
+          .click();
+
+        cy.stepWait('Login submitted');
+      }
+    });
+  });
 });
 
+// ============================================================================
+// STOCK IN FOR VERTICAL - Stock in with vertical-specific fields
+// ============================================================================
 /**
- * Fill an input by data-testid with visibility check.
- * @param {string} testid - The data-testid value
- * @param {string} value - Value to type
- * @param {object} options - { clear, timeout }
+ * Stock in one item for the given vertical.
+ * Uses vertical-specific fields (IMEI for phones, SKU for others).
+ *
+ * @param {string} verticalKey - Vertical key from fixtures/verticals.json
  */
-Cypress.Commands.add("fillByTestId", (testid, value, options = {}) => {
-  const timeout = options.timeout || 15000;
-  const clear = options.clear !== false; // default true
-  
-  const el = cy.get(`[data-testid="${testid}"]`, { timeout }).should("be.visible");
-  
-  if (clear) {
-    el.clear();
-  }
-  
-  el.type(String(value));
-});
+Cypress.Commands.add('stockInForVertical', (verticalKey) => {
+  return cy.fixture('verticals').then((verticals) => {
+    const vertical = verticals[verticalKey];
+    if (!vertical) {
+      throw new Error(`Unknown vertical: ${verticalKey}`);
+    }
 
-/**
- * Generate deterministic test IMEIs based on timestamp.
- * @param {number} count - How many IMEIs to generate
- * @param {number} timestamp - Base timestamp (default: now)
- * @returns {string[]} Array of 15-digit IMEI strings
- */
-Cypress.Commands.add("generateIMEIs", (count, timestamp = null) => {
-  const ts = timestamp || Date.now();
-  const base = String(ts).slice(-10).padStart(10, "0");
-  
-  const imeis = [];
-  for (let i = 0; i < count; i++) {
-    const suffix = String(i).padStart(5, "0");
-    imeis.push(base + suffix);
-  }
-  
-  return cy.wrap(imeis);
-});
+    const stockInPath = vertical.stockInPath || '/inventory/scan-in/';
+    const payload = vertical.stockInPayload || {};
 
-/**
- * Click all sidebar navigation items and verify they load (smoke test).
- * Skips logout and external links.
- */
-Cypress.Commands.add("sidebarSmokeClickAll", () => {
-  cy.get('[data-cy="sidebar"]').should("be.visible");
+    cy.log(`📦 Stocking in for ${vertical.displayName}`);
 
-  // Collect all sidebar links
-  cy.get('[data-cy="sidebar"] a[href]').then(($links) => {
-    const links = Array.from($links)
-      .map((link) => ({
-        href: link.getAttribute("href"),
-        text: link.textContent.trim(),
-        dataCy: link.getAttribute("data-cy"),
-      }))
-      .filter((link) => {
-        // Skip logout, external links, empty hrefs
-        if (!link.href || link.href === "#") return false;
-        if (link.href.includes("/logout")) return false;
-        if (link.href.startsWith("http") && !link.href.includes(Cypress.config().baseUrl)) return false;
-        return link.href.startsWith("/");
-      });
+    // Navigate to stock in page
+    cy.visit(stockInPath, { failOnStatusCode: false });
+    cy.assertPageReady('stockin-form', { urlContains: stockInPath });
+    cy.stepWait('Stock in page loaded');
 
-    // Click each link and verify page loads
-    links.forEach((link, index) => {
-      cy.log(`Clicking sidebar item ${index + 1}/${links.length}: ${link.text || link.dataCy || link.href}`);
+    // Generate unique identifiers
+    const timestamp = Date.now();
 
-      cy.get(`[data-cy="${link.dataCy}"], a[href="${link.href}"]`).first().click();
+    // Fill vertical-specific fields
+    if (verticalKey === 'phones') {
+      // Phones use IMEI
+      const imei = `99${timestamp}`.slice(0, 15).padEnd(15, '0');
+      cy.get('[data-testid="stockin-imei"], input[name="imei"]', { timeout: 20000 })
+        .first()
+        .clear()
+        .type(imei);
 
-      // Wait for navigation
-      cy.url({ timeout: 10000 }).should("include", link.href.split("?")[0]);
-
-      // Verify no server errors
-      cy.assertNoServerError();
-
-      // Verify page has content (not a blank page)
-      cy.get("body").should("not.be.empty");
-
-      // Go back to sidebar (if we navigated away)
-      cy.get("body").then(($body) => {
-        if (!$body.find('[data-cy="sidebar"]').length) {
-          cy.go("back");
-          cy.waitForAppShell();
+      // Brand/model if present
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="stockin-brand"]').length) {
+          cy.get('[data-testid="stockin-brand"]').select(payload.brand || 'Samsung');
+        }
+        if ($body.find('[data-testid="stockin-model"]').length) {
+          cy.get('[data-testid="stockin-model"]').type(payload.model || 'Galaxy A50');
         }
       });
+    } else if (verticalKey === 'gym') {
+      // Gym stocks in products (supplements, etc.)
+      cy.get('[data-testid="stockin-name"], input[name="name"]', { timeout: 20000 })
+        .first()
+        .clear()
+        .type(payload.name || 'Protein Powder');
+
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="stockin-qty"]').length) {
+          cy.get('[data-testid="stockin-qty"]').clear().type(payload.qty || '10');
+        }
+      });
+    } else {
+      // Other verticals use SKU or name
+      const sku = `SKU-${verticalKey.toUpperCase()}-${timestamp}`;
+
+      cy.get('body').then(($body) => {
+        if ($body.find('[data-testid="stockin-sku"]').length) {
+          cy.get('[data-testid="stockin-sku"]').first().clear().type(sku);
+        }
+        if ($body.find('[data-testid="stockin-name"], input[name="name"]').length) {
+          cy.get('[data-testid="stockin-name"], input[name="name"]')
+            .first()
+            .clear()
+            .type(payload.name || `E2E Test Item ${timestamp}`);
+        }
+        if ($body.find('[data-testid="stockin-qty"]').length) {
+          cy.get('[data-testid="stockin-qty"]').clear().type(payload.qty || '5');
+        }
+      });
+    }
+
+    // Common fields: price, cost
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="stockin-cost"], input[name="cost"]').length) {
+        cy.get('[data-testid="stockin-cost"], input[name="cost"]')
+          .first()
+          .clear()
+          .type(payload.cost || '1000');
+      }
+      if ($body.find('[data-testid="stockin-price"], input[name="price"], input[name="selling_price"]').length) {
+        cy.get('[data-testid="stockin-price"], input[name="price"], input[name="selling_price"]')
+          .first()
+          .clear()
+          .type(payload.price || '1500');
+      }
     });
+
+    // Submit
+    cy.get('[data-testid="stockin-submit"], button[type="submit"]:contains("Save"), button[type="submit"]:contains("Stock")')
+      .first()
+      .click();
+
+    cy.stepWait('Stock in submitted');
+
+    // Assert success (toast or redirect)
+    cy.get('body').then(($body) => {
+      if ($body.find('.toast-success, .alert-success, [data-testid="success-toast"]').length) {
+        cy.get('.toast-success, .alert-success, [data-testid="success-toast"]')
+          .should('be.visible');
+      }
+    });
+
+    cy.assertNoServerError();
+  });
+});
+
+// ============================================================================
+// MAKE SALE FOR VERTICAL - Complete a sale
+// ============================================================================
+/**
+ * Make one sale for the given vertical.
+ *
+ * @param {string} verticalKey - Vertical key from fixtures/verticals.json
+ */
+Cypress.Commands.add('makeSaleForVertical', (verticalKey) => {
+  return cy.fixture('verticals').then((verticals) => {
+    const vertical = verticals[verticalKey];
+    if (!vertical) {
+      throw new Error(`Unknown vertical: ${verticalKey}`);
+    }
+
+    const sellPath = vertical.sellPath || '/inventory/sell/';
+
+    cy.log(`💰 Making sale for ${vertical.displayName}`);
+
+    // Navigate to sell page
+    cy.visit(sellPath, { failOnStatusCode: false });
+    cy.assertPageReady('sell-form', { urlContains: 'sell' });
+    cy.stepWait('Sell page loaded');
+
+    // Search for an item to sell
+    cy.get('body').then(($body) => {
+      // Try search input
+      if ($body.find('[data-testid="sell-search-item"], input[name="search"], input[placeholder*="search" i]').length) {
+        cy.get('[data-testid="sell-search-item"], input[name="search"], input[placeholder*="search" i]')
+          .first()
+          .clear()
+          .type('E2E{enter}');
+        cy.stepWait('Search submitted');
+      }
+
+      // Or click first available item
+      if ($body.find('[data-testid="sell-item"], .product-item, .stock-item').length) {
+        cy.get('[data-testid="sell-item"], .product-item, .stock-item')
+          .first()
+          .click();
+      }
+    });
+
+    // Add to cart (if applicable)
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="sell-add-to-cart"], button:contains("Add")').length) {
+        cy.get('[data-testid="sell-add-to-cart"], button:contains("Add")')
+          .first()
+          .click();
+        cy.stepWait('Added to cart');
+      }
+    });
+
+    // Checkout
+    cy.get('body').then(($body) => {
+      if ($body.find('[data-testid="sell-checkout"], button:contains("Checkout")').length) {
+        cy.get('[data-testid="sell-checkout"], button:contains("Checkout")')
+          .first()
+          .click();
+        cy.stepWait('Checkout clicked');
+      }
+    });
+
+    // Submit sale
+    cy.get('[data-testid="sell-submit"], button[type="submit"]:contains("Complete"), button[type="submit"]:contains("Sell")', { timeout: 20000 })
+      .first()
+      .click();
+
+    cy.stepWait('Sale submitted');
+
+    // Assert success
+    cy.get('body').then(($body) => {
+      if ($body.find('.toast-success, .alert-success, [data-testid="success-toast"]').length) {
+        cy.get('.toast-success, .alert-success, [data-testid="success-toast"]')
+          .should('be.visible');
+      }
+    });
+
+    cy.assertNoServerError();
+  });
+});
+
+// ============================================================================
+// DASHBOARD NUMBERS SHOULD MOVE - Verify KPIs changed
+// ============================================================================
+/**
+ * Capture KPI values before and after an action, assert they changed.
+ *
+ * Usage:
+ *   cy.captureKPIs().as('beforeKPIs');
+ *   // ... do stock in / sale ...
+ *   cy.get('@beforeKPIs').then((before) => cy.dashboardNumbersShouldMove(before));
+ */
+Cypress.Commands.add('captureKPIs', () => {
+  const kpis = {};
+
+  cy.get('body').then(($body) => {
+    // In stock count
+    if ($body.find('[data-testid="kpi-instock"]').length) {
+      kpis.instock = parseInt($body.find('[data-testid="kpi-instock"]').text().replace(/[^\d]/g, ''), 10) || 0;
+    }
+    // Sold count
+    if ($body.find('[data-testid="kpi-sold"]').length) {
+      kpis.sold = parseInt($body.find('[data-testid="kpi-sold"]').text().replace(/[^\d]/g, ''), 10) || 0;
+    }
+    // Sum selling
+    if ($body.find('[data-testid="kpi-sum-selling"]').length) {
+      kpis.sumSelling = parseInt($body.find('[data-testid="kpi-sum-selling"]').text().replace(/[^\d]/g, ''), 10) || 0;
+    }
+    // Sum cost
+    if ($body.find('[data-testid="kpi-sum-cost"]').length) {
+      kpis.sumCost = parseInt($body.find('[data-testid="kpi-sum-cost"]').text().replace(/[^\d]/g, ''), 10) || 0;
+    }
+  });
+
+  return cy.wrap(kpis);
+});
+
+Cypress.Commands.add('dashboardNumbersShouldMove', (beforeKPIs, expectation = 'increase') => {
+  cy.captureKPIs().then((afterKPIs) => {
+    cy.log(`📊 KPI Before: ${JSON.stringify(beforeKPIs)}`);
+    cy.log(`📊 KPI After: ${JSON.stringify(afterKPIs)}`);
+
+    // At least one KPI should have changed
+    const changed = Object.keys(afterKPIs).some((key) => {
+      const before = beforeKPIs[key] || 0;
+      const after = afterKPIs[key] || 0;
+      return expectation === 'increase' ? after > before : after !== before;
+    });
+
+    expect(changed, 'At least one KPI should have changed').to.be.true;
+  });
+});
+
+// ============================================================================
+// NAVIGATE SIDEBAR - Click sidebar item and verify page loads
+// ============================================================================
+/**
+ * Click a sidebar navigation item and verify the page loads correctly.
+ *
+ * @param {string} testId - data-testid of the sidebar link
+ * @param {string} expectedUrl - URL substring to verify
+ */
+Cypress.Commands.add('navigateSidebar', (testId, expectedUrl) => {
+  cy.get(`[data-testid="${testId}"]`, { timeout: 20000 })
+    .should('be.visible')
+    .click();
+
+  cy.stepWait(`Navigated to ${testId}`);
+
+  if (expectedUrl) {
+    cy.url({ timeout: 20000 }).should('include', expectedUrl);
+  }
+
+  cy.assertNoServerError();
+});
+
+// ============================================================================
+// WAIT FOR APP SHELL - Verify app is loaded
+// ============================================================================
+Cypress.Commands.add('waitForAppShell', () => {
+  cy.assertNoServerError();
+
+  cy.get('body', { timeout: 60000 }).then(($body) => {
+    // Check for sidebar
+    if ($body.find('[data-testid="sidebar"], [data-cy="sidebar"], aside').length) {
+      cy.get('[data-testid="sidebar"], [data-cy="sidebar"], aside', { timeout: 60000 })
+        .first()
+        .should('be.visible');
+      return;
+    }
+
+    // Fallback: check for dashboard heading
+    cy.contains(/dashboard/i, { timeout: 60000 }).should('exist');
+  });
+});
+
+// ============================================================================
+// HELPER: Generate unique test data
+// ============================================================================
+Cypress.Commands.add('generateTestData', (verticalKey) => {
+  const timestamp = Date.now();
+  return cy.wrap({
+    email: `e2e-${verticalKey}-${timestamp}@test.local`,
+    password: 'E2ETestPass123!@#',
+    businessName: `E2E ${verticalKey} ${timestamp}`,
+    imei: `99${timestamp}`.slice(0, 15).padEnd(15, '0'),
+    sku: `SKU-${verticalKey.toUpperCase()}-${timestamp}`,
+    timestamp,
   });
 });

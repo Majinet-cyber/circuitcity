@@ -16,4 +16,5 @@ urlpatterns = [
     path("costs/", cement.costs, name="costs"),
     path("analytics/", cement.analytics, name="analytics"),
     path("sales/<int:sale_id>/undo/", cement.undo_sale, name="undo_sale"),
+    path("sales/<int:sale_id>/edit/", cement.edit_sale, name="edit_sale"),
 ]

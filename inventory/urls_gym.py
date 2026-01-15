@@ -33,6 +33,8 @@ urlpatterns = [
     path("qr/<uuid:qr_uuid>/image.png", views_gym_qr.member_qr_png, name="member_qr_png"),
     path("qr/<uuid:qr_uuid>/card.pdf", views_gym_qr.member_qr_card_pdf, name="member_qr_card_pdf"),
     path("qr/<uuid:qr_uuid>/print/", views_gym_qr.member_qr_print, name="member_qr_print"),
+    # Public member status (short, non-guessable token URL - no auth required)
+    path("m/<str:token>/", views_gym_qr.public_member_status, name="gym_public_member_status"),
     # Check-in
     path("checkin/", views_gym.checkin_page, name="checkin_page"),
     # Leaderboard

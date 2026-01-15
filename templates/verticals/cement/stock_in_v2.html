@@ -322,13 +322,43 @@
   {% if step == '3' %}
   <div class="form-section">
     <h2 class="mb-4" style="font-weight: 800; color: var(--cement-text);">Step 3: Select {{ product_def.base_name }} Details</h2>
+    {% if is_cement_brand_selection %}
+    <p class="text-muted mb-4">Choose from your existing cement brands</p>
+    {% else %}
     <p class="text-muted mb-4">Choose brand, size, and other options</p>
+    {% endif %}
     
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="step" value="3">
       
-      <!-- Brand Selection (if applicable) -->
+      <!-- FIX: Cement Brand Selection from DB (real products) -->
+      {% if is_cement_brand_selection %}
+      <div class="mb-4">
+        <label class="form-label"><strong>Select Cement Brand *</strong></label>
+        {% if cement_brand_products %}
+        <div class="variant-grid">
+          {% for product in cement_brand_products %}
+          <div class="premium-card variant-card" onclick="selectRadio('product_{{ product.product_id }}')">
+            <div>{{ product.icon }}</div>
+            <div>{{ product.brand_name }}</div>
+            <input type="radio" name="product_id" value="{{ product.product_id }}" id="product_{{ product.product_id }}" style="display: none;" required>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+          <strong>No cement products found.</strong><br>
+          Add cement products first before stocking in.
+          <a href="{% url 'cement:products_catalog' %}" class="btn btn-sm btn-outline-primary mt-2">
+            → View Products Catalog
+          </a>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      
+      <!-- Brand Selection (if applicable) for non-cement products -->
       {% if product_def.brands %}
       <div class="mb-4">
         <label class="form-label"><strong>Brand *</strong></label>
@@ -417,6 +447,7 @@
           {% endfor %}
         </div>
       </div>
+      {% endif %}
       {% endif %}
       
       <div class="d-flex gap-2 mt-4">

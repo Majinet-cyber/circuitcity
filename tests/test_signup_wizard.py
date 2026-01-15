@@ -323,6 +323,107 @@ class SignupWizardTestCase(TestCase):
         # Should show validation error
 
 
+class SignupWizardVerticalRedirectTestCase(TestCase):
+    """Regression tests for vertical-specific redirect after wizard completion"""
+    
+    def setUp(self):
+        self.client = Client()
+        self.step1_url = reverse("accounts:signup_wizard_step", kwargs={"step": 1})
+        self.step2_url = reverse("accounts:signup_wizard_step", kwargs={"step": 2})
+        self.step3_url = reverse("accounts:signup_wizard_step", kwargs={"step": 3})
+        self.step4_url = reverse("accounts:signup_wizard_step", kwargs={"step": 4})
+    
+    def _complete_wizard_until_step4(self, business_kind="clothing"):
+        """Helper to complete wizard steps 1-3 with the given business kind"""
+        # Step 1: Account
+        self.client.post(self.step1_url, {
+            "full_name": "E2E Test User",
+            "email": f"e2e-{business_kind}-test@example.com",
+            "password1": "E2ETestPass123!@#",
+            "password2": "E2ETestPass123!@#",
+        })
+        
+        # Step 2: Business with specified vertical
+        self.client.post(self.step2_url, {
+            "business_name": f"E2E {business_kind.title()} Store",
+            "country": "Zambia",
+            "currency": "ZMW",
+            "business_kind": business_kind,
+        })
+        
+        # Step 3: Location
+        self.client.post(self.step3_url, {
+            "location_name": "Main Store",
+            "city": "Lusaka",
+            "staff_count": "3",
+        })
+    
+    def test_clothing_vertical_redirects_to_clothing_dashboard(self):
+        """Test completing wizard with clothing vertical redirects to /inventory/verticals/clothing/"""
+        self._complete_wizard_until_step4("clothing")
+        
+        # Step 4: Complete
+        response = self.client.post(self.step4_url, {
+            "goal_stop_theft": True,
+        })
+        
+        # Should redirect (302)
+        self.assertEqual(response.status_code, 302)
+        
+        # The redirect URL should include the clothing vertical path
+        redirect_url = response.url
+        # Allow for potential variations in URL structure
+        self.assertTrue(
+            "/inventory/verticals/clothing" in redirect_url or
+            "/verticals/clothing" in redirect_url,
+            f"Expected clothing dashboard redirect, got: {redirect_url}"
+        )
+    
+    def test_gym_vertical_redirects_to_gym_dashboard(self):
+        """Test completing wizard with gym vertical redirects to gym dashboard"""
+        self._complete_wizard_until_step4("gym")
+        
+        response = self.client.post(self.step4_url, {
+            "goal_see_profit": True,
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        redirect_url = response.url
+        self.assertTrue(
+            "/gym" in redirect_url or "/inventory/verticals/gym" in redirect_url,
+            f"Expected gym dashboard redirect, got: {redirect_url}"
+        )
+    
+    def test_phones_vertical_redirects_to_phones_dashboard(self):
+        """Test completing wizard with phones vertical redirects correctly"""
+        self._complete_wizard_until_step4("phones")
+        
+        response = self.client.post(self.step4_url, {
+            "goal_track_performance": True,
+        })
+        
+        self.assertEqual(response.status_code, 302)
+        redirect_url = response.url
+        # Phones may redirect to /inventory/ or /inventory/verticals/phones/
+        self.assertTrue(
+            "/inventory" in redirect_url,
+            f"Expected phones/inventory dashboard redirect, got: {redirect_url}"
+        )
+    
+    def test_step4_accepts_empty_goals(self):
+        """Test that step 4 accepts form submission with no goals selected (non-blocking)"""
+        self._complete_wizard_until_step4("clothing")
+        
+        # Submit with no goals selected (all False)
+        response = self.client.post(self.step4_url, {})
+        
+        # Should still redirect successfully (goals are optional)
+        self.assertEqual(response.status_code, 302)
+        # Should NOT stay on step 4
+        self.assertNotIn("/wizard/4", response.url)
+        self.assertNotIn("step=4", response.url)
+
+
 class OnboardingProfileModelTestCase(TestCase):
     """Test the OnboardingProfile model"""
     

@@ -1,57 +1,101 @@
+/**
+ * Cypress E2E Configuration
+ * CircuitCity / Emajinet - Clean Suite Reboot (Jan 2026)
+ *
+ * SLOW NETWORK FRIENDLY:
+ * - High timeouts for slow connections
+ * - Step waits via STEP_WAIT_MS env (default 12000ms)
+ * - Retries enabled for stability
+ */
 const { defineConfig } = require('cypress');
 
 module.exports = defineConfig({
   e2e: {
-    baseUrl: 'http://127.0.0.1:8000',
+    // Base URL from env or default to local
+    baseUrl: process.env.CYPRESS_BASE_URL || 'http://127.0.0.1:8000',
     supportFile: 'cypress/support/e2e.js',
-    specPattern: 'cypress/e2e/**/*.cy.{js,jsx,ts,tsx}',
-    viewportWidth: 1280,
-    viewportHeight: 720,
+    specPattern: 'cypress/e2e/**/*.cy.js',
 
-    // ✅ Slow-network resilient settings (15s+ tolerance)
-    video: false,
-    screenshotOnRunFailure: true,
-    defaultCommandTimeout: 15000,   // 15s per command (matches intercept waits)
-    requestTimeout: 15000,          // 15s for XHR/fetch
-    responseTimeout: 15000,         // 15s for responses
-    pageLoadTimeout: 60000,         // 60s for full page loads
+    // Viewport: mobile-first by default, desktop tests can override
+    viewportWidth: 375,
+    viewportHeight: 812,
 
-    // ✅ Light retry for CI stability (not excessive)
+    // ============================================
+    // SLOW NETWORK RESILIENT TIMEOUTS
+    // ============================================
+    defaultCommandTimeout: 20000,   // 20s per command
+    requestTimeout: 20000,          // 20s for XHR/fetch
+    responseTimeout: 60000,         // 60s for responses
+    pageLoadTimeout: 120000,        // 120s for full page loads
+    taskTimeout: 60000,             // 60s for cy.task
+
+    // ============================================
+    // RETRY SETTINGS FOR STABILITY
+    // ============================================
     retries: {
-      runMode: 1,      // Retry once in CI (npx cypress run)
+      runMode: 2,      // Retry twice in CI (npx cypress run)
       openMode: 0,     // No retries in interactive mode
     },
 
+    // ============================================
+    // VIDEO & SCREENSHOTS
+    // ============================================
+    video: false,                   // Disable video for faster runs
+    screenshotOnRunFailure: true,   // Capture on failure for debugging
+
+    // ============================================
+    // ENV VARIABLES
+    // ============================================
     env: {
-      // Test user credentials (fixed email)
-      TEST_EMAIL: 'empire@gmai.com',
-      TEST_PASSWORD: '@Lincoln1863?',
+      // Step wait duration (ms) - 12 seconds default for slow networks
+      STEP_WAIT_MS: 12000,
+
+      // E2E Mode flag - enables test-only endpoints
+      E2E_MODE: true,
+
+      // E2E OTP bypass code
+      E2E_OTP_BYPASS: '000000',
     },
 
     setupNodeEvents(on, config) {
-      // ✅ Run PyTests BEFORE Cypress starts (unless already ran in wrapper)
-      on('before:run', async () => {
-        // Skip pytest if wrapper already ran it (prevents double execution)
-        if (process.env.CC_SKIP_PYTEST === '1') {
-          console.log('[test-system] Skipping pytest in Cypress (already ran in wrapper).');
-          return;
-        }
-        
-        console.log('\n🔄 Running PyTests before Cypress...\n');
-        
-        try {
-          const { execSync } = require('child_process');
-          execSync('node scripts/run_pytests_and_summarize.mjs', {
-            stdio: 'inherit',
-            shell: true,
+      // Allow overriding STEP_WAIT_MS from environment
+      if (process.env.STEP_WAIT_MS) {
+        config.env.STEP_WAIT_MS = parseInt(process.env.STEP_WAIT_MS, 10);
+      }
+
+      // Allow overriding base URL from environment
+      if (process.env.CYPRESS_BASE_URL) {
+        config.baseUrl = process.env.CYPRESS_BASE_URL;
+      }
+
+      // Task for creating test users via Django management command
+      on('task', {
+        seedE2EUser({ vertical }) {
+          return new Promise((resolve, reject) => {
+            const { execSync } = require('child_process');
+            try {
+              const result = execSync(
+                `python manage.py seed_e2e_user --vertical=${vertical} --json`,
+                { encoding: 'utf8', timeout: 30000 }
+              );
+              // Parse JSON output from management command
+              const data = JSON.parse(result.trim());
+              resolve(data);
+            } catch (err) {
+              // Return null if seeding fails (tests can handle this)
+              console.warn(`[seed_e2e_user] Failed for ${vertical}:`, err.message);
+              resolve(null);
+            }
           });
-          console.log('\n✅ PyTest execution complete. Starting Cypress...\n');
-        } catch (err) {
-          // Script always exits 0, so this shouldn't happen
-          // But if it does, log and continue
-          console.error('⚠️  PyTest script error (continuing anyway):', err.message);
-        }
+        },
+
+        log(message) {
+          console.log(message);
+          return null;
+        },
       });
+
+      return config;
     },
   },
 });

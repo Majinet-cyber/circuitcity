@@ -199,10 +199,15 @@ if CI or TESTING:
     USE_X_FORWARDED_HOST = False
 
 # --------------------------- canonical host (SEO) ---------------------------
-# Canonical host for production: www.emajinet.africa
-# This is used by CanonicalURLMiddleware to enforce one canonical domain.
+# Canonical host for production: emajinet.africa (apex, NOT www)
+# This is used by CanonicalHostMiddleware to enforce one canonical domain.
 # Only set in production to avoid redirects in development/staging.
-CANONICAL_HOST = "www.emajinet.africa" if not DEBUG else ""
+# NOTE: We use apex as canonical; www redirects to apex (one-way only).
+CANONICAL_HOST = os.environ.get("CANONICAL_HOST", "emajinet.africa" if not DEBUG else "")
+
+# Site base URL for building absolute URLs in emails (without trailing slash)
+# Used for gym member status links, QR codes, etc.
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://emajinet.africa")
 
 # --------------------------- app version ---------------------------
 APP_VERSION = os.environ.get("APP_VERSION", "1.1.0")
@@ -217,6 +222,19 @@ SESSION_COOKIE_SAMESITE = os.environ.get("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.environ.get("CSRF_COOKIE_SAMESITE", "Lax")
 SESSION_COOKIE_AGE = 60 * 60 * 4
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
+
+# Cross-subdomain cookie support: sessions/CSRF work on both www and apex
+# This prevents auth/session bouncing during www → apex redirects
+# Format: ".domain.com" (leading dot = include subdomains)
+# Only set in production; local dev uses default (hostname-only cookies)
+SESSION_COOKIE_DOMAIN = os.environ.get(
+    "SESSION_COOKIE_DOMAIN",
+    ".emajinet.africa" if not DEBUG and not TESTING else None
+)
+CSRF_COOKIE_DOMAIN = os.environ.get(
+    "CSRF_COOKIE_DOMAIN",
+    ".emajinet.africa" if not DEBUG and not TESTING else None
+)
 
 # Canonical session key for active tenant (used by middleware/utils)
 TENANT_SESSION_KEY = os.environ.get("TENANT_SESSION_KEY", "active_business_id")
@@ -306,8 +324,9 @@ MIDDLEWARE = [
     "billing.middleware_subscription_gate.SubscriptionGateMiddleware",
     # ✅ SEO: noindex headers for private pages (Search Console indexing fix)
     "cc.middleware_seo.SEONoIndexMiddleware",
-    # ✅ SEO: canonical domain enforcement (www → non-www redirect)
-    "cc.middleware_seo.CanonicalURLMiddleware",
+    # ✅ SEO: canonical domain enforcement (www → apex redirect, one-way only)
+    # This replaces the old CanonicalURLMiddleware to fix redirect loops
+    "cc.middleware_canonical_host.CanonicalHostMiddleware",
     # ✅ SEO: UTM tracking parameter cleanup (2025-12-25)
     "cc.middleware_seo.PublicQueryCleanupMiddleware",
     # ✅ Two-Factor Authentication enforcement (after auth)

@@ -19,6 +19,26 @@
     "clothing": {
       "email": "motouch@gmail.com",
       "password": "@Lincoln1863?"
+    },
+    "grocery": {
+      "email": "grocery@test.circuitcity.local",
+      "password": "@Lincoln1863?"
+    },
+    "farm": {
+      "email": "farm@test.circuitcity.local",
+      "password": "@Lincoln1863?"
+    },
+    "cement": {
+      "email": "cement@test.circuitcity.local",
+      "password": "@Lincoln1863?"
+    },
+    "welding": {
+      "email": "welding@test.circuitcity.local",
+      "password": "@Lincoln1863?"
+    },
+    "hardware": {
+      "email": "hardware@test.circuitcity.local",
+      "password": "@Lincoln1863?"
     }
   },
   "agents": {}

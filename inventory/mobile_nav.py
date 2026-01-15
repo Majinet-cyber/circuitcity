@@ -311,20 +311,22 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
         ]
 
     elif vertical == CEMENT:
+        # Cement uses both /verticals/cement/ and /cement/ routes
+        # Prefer the cement: namespace (urls_cement.py) for consistency
         return [
             {
                 "key": "home",
                 "label": "Home",
                 "icon_class": "bi-speedometer2",
-                "url": _safe_reverse_any(["verticals:cement_dashboard"], "/verticals/cement/dashboard/"),
-                "active_prefix": "/verticals/cement/dashboard",
+                "url": _safe_reverse_any(["cement:dashboard", "verticals:cement_dashboard"], "/cement/dashboard/"),
+                "active_prefix": "/cement/",
                 "is_menu": False,
             },
             {
                 "key": "stock_in",
                 "label": "Stock In",
                 "icon_class": "bi-box-arrow-in-down",
-                "url": _safe_reverse_any(["cement:stock_in"], "/cement/stock-in/"),
+                "url": _safe_reverse_any(["cement:stock_in", "verticals:cement_stock_in"], "/cement/stock-in/"),
                 "active_prefix": "/cement/stock-in",
                 "is_menu": False,
             },
@@ -332,7 +334,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "key": "sell",
                 "label": "Sell",
                 "icon_class": "bi-bag-check",
-                "url": _safe_reverse_any(["cement:sell"], "/cement/sell/"),
+                "url": _safe_reverse_any(["cement:sell", "verticals:cement_sell"], "/cement/sell/"),
                 "active_prefix": "/cement/sell",
                 "is_menu": False,
             },
@@ -340,7 +342,7 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "key": "products",
                 "label": "Products",
                 "icon_class": "bi-box-seam",
-                "url": _safe_reverse_any(["cement:stock_list"], "/cement/stock/"),
+                "url": _safe_reverse_any(["cement:stock_list", "verticals:cement_stock_list"], "/cement/stock/"),
                 "active_prefix": "/cement/stock",
                 "is_menu": False,
             },

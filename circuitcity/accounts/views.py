@@ -2426,8 +2426,10 @@ def _complete_wizard_signup(request, wizard_data):
             )
         )
 
-        # Redirect to dashboard
-        return redirect(_safe_redirect("inventory:inventory_dashboard", default="/inventory/dashboard/"))
+        # Redirect to the appropriate vertical dashboard
+        from .services.post_auth_redirect import get_post_signup_redirect
+        redirect_url = get_post_signup_redirect(user, request, biz)
+        return redirect(redirect_url)
 
 
 # ----------------------------

@@ -12,6 +12,7 @@ from django.conf import settings
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_http_methods
 
 from inventory.models_verticals import GymMember
@@ -106,6 +107,57 @@ def member_qr_status_public(request, qr_uuid: str):
 
 
 @require_http_methods(["GET"])
+@cache_control(no_store=True)
+def public_member_status(request, token: str):
+    """
+    Public member status page accessible via short token link.
+    No authentication required. Read-only.
+
+    URL: /gym/m/<token>/
+
+    Shows:
+    - Member name (optional display)
+    - Gym name
+    - Membership status: Active / Expired / Suspended
+    - Valid from / valid to (next due date)
+    - Last check-in time (optional)
+
+    Template includes noindex meta tag for SEO exclusion.
+    """
+    member = get_object_or_404(GymMember, public_token=token, is_archived=False)
+
+    # Get member status
+    status_info = get_member_status(member)
+
+    # Map status to human-readable label
+    status_code = status_info.get("status", "UNKNOWN").upper()
+    status_labels = {
+        "ACTIVE": "Active",
+        "EXPIRED": "Expired",
+        "OVERDUE": "Expired",  # Treat overdue as expired for simplicity
+        "SUSPENDED": "Suspended",
+        "PENDING": "Pending Payment",
+        "PENDING_PAYMENT": "Pending Payment",
+    }
+    status_label = status_labels.get(status_code, status_code.title())
+
+    # Build context
+    context = {
+        "member": member,
+        "gym_name": member.business.name if member.business else "Gym",
+        "status_code": status_code,
+        "status_label": status_label,
+        "next_payment_date": status_info.get("next_payment_date"),
+        "membership_start": member.membership_start,
+        "membership_end": member.membership_end,
+        "last_checkin_date": member.last_checkin_date,
+        "reason": status_info.get("reason", ""),
+    }
+
+    return render(request, "inventory/gym/public_member_status.html", context)
+
+
+@require_http_methods(["GET"])
 def member_qr_png(request, qr_uuid):
     """
     Generate QR code PNG image for a member.
@@ -153,7 +205,7 @@ def member_qr_print(request, qr_uuid: str):
         raise Http404("Member not found")
 
     # Get QR image URL
-    qr_image_url = request.build_absolute_uri(reverse("gym:member_qr_image", args=[str(member.qr_uuid)]))
+    qr_image_url = request.build_absolute_uri(reverse("gym:member_qr_png", args=[str(member.qr_uuid)]))
 
     context = {
         "member": member,

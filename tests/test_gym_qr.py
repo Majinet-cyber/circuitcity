@@ -48,7 +48,7 @@ class TestGymMemberQR:
 
     def test_qr_image_endpoint_returns_png(self, client, gym_member):
         """Test that QR image endpoint returns PNG image"""
-        url = reverse("gym:member_qr_image", args=[str(gym_member.qr_uuid)])
+        url = reverse("gym:member_qr_png", args=[str(gym_member.qr_uuid)])
         response = client.get(url)
 
         assert response.status_code == 200

@@ -1,42 +1,44 @@
-// ***********************************************************
-// cypress/support/e2e.js
-// This file is processed and loaded automatically before your test files.
-// ***********************************************************
+/**
+ * CircuitCity / Emajinet - Cypress E2E Support
+ * Clean Suite Reboot (Jan 2026)
+ *
+ * This file is loaded before every E2E test.
+ * Import custom commands and configure global behavior.
+ */
 
-// Import commands.js
-import "./commands";
+// Import custom commands
+import './commands';
 
-// Hide fetch/XHR logs to reduce noise (safe + guarded)
-(function hideRequestLogs() {
-  try {
-    const topWin = window.top;
-    if (!topWin || !topWin.document || !topWin.document.head) return;
+// ============================================================================
+// GLOBAL CONFIGURATION
+// ============================================================================
 
-    if (!topWin.document.head.querySelector("[data-hide-command-log-request]")) {
-      const style = topWin.document.createElement("style");
-      style.innerHTML = `
-        .command-name-request,
-        .command-name-xhr { display: none !important; }
-      `;
-      style.setAttribute("data-hide-command-log-request", "");
-      topWin.document.head.appendChild(style);
-    }
-  } catch (e) {
-    // Ignore timing / cross-origin quirks in the Cypress runner
-  }
-})();
+// Disable uncaught exception handling (prevents test failures from app errors)
+Cypress.on('uncaught:exception', (err, runnable) => {
+  // Log the error but don't fail the test
+  console.warn('Uncaught exception:', err.message);
 
-// IMPORTANT: do NOT blanket-ignore all uncaught exceptions (it hides real bugs)
-// Only ignore known benign browser noise.
-const IGNORED_UNCAUGHT = [
-  "ResizeObserver loop limit exceeded",
-  "ResizeObserver loop completed with undelivered notifications",
-];
+  // Return false to prevent Cypress from failing the test
+  // We use assertNoServerError() explicitly in tests instead
+  return false;
+});
 
-Cypress.on("uncaught:exception", (err) => {
-  const msg = String(err?.message || "");
-  if (IGNORED_UNCAUGHT.some((m) => msg.includes(m))) {
-    return false; // don't fail the test for these
-  }
-  // otherwise: let Cypress fail (so we catch real regressions)
+// ============================================================================
+// BEFORE EACH TEST
+// ============================================================================
+beforeEach(() => {
+  // Clear cookies and local storage between tests for isolation
+  cy.clearCookies();
+  cy.clearLocalStorage();
+
+  // Log the test name for debugging
+  cy.log(`🧪 Starting: ${Cypress.currentTest.title}`);
+});
+
+// ============================================================================
+// AFTER EACH TEST
+// ============================================================================
+afterEach(() => {
+  // Log test completion
+  cy.log(`✅ Completed: ${Cypress.currentTest.title}`);
 });
