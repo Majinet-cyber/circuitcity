@@ -544,15 +544,15 @@
 {% block content %}
 <div class="farm-dashboard container-fluid py-3">
     
-    <!-- Page Header -->
-    <div class="farm-header">
+    <!-- Page Header with Filter Integration -->
+    <div class="farm-header" data-testid="farm-dashboard">
         <div class="farm-header-text">
             <h1><span>🌾</span> Farm Dashboard</h1>
             <p>Track profitability, costs, livestock & crops</p>
         </div>
-        <div class="farm-period-pill">
-            <i class="bi bi-calendar3"></i>
-            <span>{{ snapshot.month_name }} {{ snapshot.year }}</span>
+        <div class="farm-header-actions">
+            <!-- Filter Button -->
+            {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
         </div>
     </div>
 

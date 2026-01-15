@@ -821,7 +821,7 @@ class Invoice(models.Model):
     def mark_paid(self):
         self.status = self.Status.PAID
         self.paid_at = timezone.now()
-        self.save(update_fields=["status", "paid_at", "updated_at"])
+        self.save(update_fields=["status", "paid_at"])
 
     def save(self, *args, **kwargs):
         # Auto default due date (7 days) if missing
@@ -1385,7 +1385,7 @@ class SubscriptionChangeIntent(models.Model):
             return  # Already applied, no-op
         self.status = self.Status.PAID
         self.paid_at = timezone.now()
-        self.save(update_fields=["status", "paid_at", "updated_at"])
+        self.save(update_fields=["status", "paid_at"])
 
     def mark_applied(self):
         """Mark intent as applied (plan upgraded in subscription)."""
@@ -1393,18 +1393,18 @@ class SubscriptionChangeIntent(models.Model):
             return  # Already applied, idempotent
         self.status = self.Status.APPLIED
         self.applied_at = timezone.now()
-        self.save(update_fields=["status", "applied_at", "updated_at"])
+        self.save(update_fields=["status", "applied_at"])
 
     def mark_canceled(self):
         """Mark intent as canceled."""
         self.status = self.Status.CANCELED
         self.canceled_at = timezone.now()
-        self.save(update_fields=["status", "canceled_at", "updated_at"])
+        self.save(update_fields=["status", "canceled_at"])
 
     def mark_failed(self):
         """Mark intent as failed."""
         self.status = self.Status.FAILED
-        self.save(update_fields=["status", "updated_at"])
+        self.save(update_fields=["status"])
 
 
 # ======================================================================

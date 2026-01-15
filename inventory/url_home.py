@@ -63,6 +63,9 @@ def get_home_url_for_business(business) -> str:
         # Hardware and cement use generic dashboard (for now)
         "hardware": "/inventory/generic-dashboard/",
         "cement": "/inventory/generic-dashboard/",  # Treat cement as legacy for now
+        # Farm and Welding verticals
+        "farm": "/verticals/farm/dashboard/",
+        "welding": "/verticals/welding/dashboard/",
     }
     
     # If recognized, return the vertical-specific home
@@ -110,6 +113,9 @@ def get_home_url_name_for_business(business) -> str:
         "phones": "inventory:inventory_dashboard",
         "hardware": "inventory:generic_dashboard",
         "cement": "inventory:generic_dashboard",  # Treat cement as legacy
+        # Farm and Welding verticals
+        "farm": "verticals:farm_dashboard",
+        "welding": "verticals:welding_dashboard",
     }
     
     # If recognized, return the URL name

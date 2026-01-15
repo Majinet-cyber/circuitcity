@@ -463,6 +463,18 @@ def dashboard(request):
         ],
     }
     
+    # Add border_style to each KPI card for template compatibility
+    def _kpi_border_style(color_hex: str) -> str:
+        """Generate subtle premium border style from color hex.
+        
+        Uses 20% opacity (0x33) to create glass-morphic effect consistent
+        with cement vertical's premium UI theme.
+        """
+        return f"border: 1px solid {color_hex}33;"
+    
+    for kpi in dashboard_config['kpis']:
+        kpi['border_style'] = _kpi_border_style(kpi['color'])
+    
     context['dashboard_config'] = dashboard_config
 
     # Normalize dashboard context: add lowercase aliases for UPPERCASE keys
@@ -645,11 +657,38 @@ def stock_in(request):
                             kind=BusinessKind.CEMENT,
                             is_active=True
                         )
+                        
+                        # Check if prices have changed (need price history entry)
+                        price_changed = (
+                            product.selling_price != selling_price or 
+                            product.cost_price != cost_price
+                        )
+                        
                         # Update existing product
                         product.quantity_in_stock += quantity
                         product.cost_price = cost_price
                         product.selling_price = selling_price
                         product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
+                        
+                        # Record price history if prices changed
+                        if price_changed and product.selling_price and product.selling_price > 0:
+                            from inventory.models import ProductPriceHistory
+                            from datetime import date
+                            
+                            # Try to create price history (will fail silently if duplicate for today)
+                            try:
+                                ProductPriceHistory.objects.get_or_create(
+                                    product=product,
+                                    effective_date=date.today(),
+                                    defaults={
+                                        'selling_price': product.selling_price,
+                                        'cost_price': product.cost_price,
+                                        'created_by': request.user,
+                                    }
+                                )
+                            except Exception:
+                                # Silently continue if price history fails (non-critical)
+                                pass
                         
                         messages.success(
                             request,

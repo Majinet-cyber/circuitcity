@@ -216,30 +216,40 @@ class FarmSidebarIntegrityTest(TestCase):
         self.assertIn("dashboard", keys, "Farm sidebar must include 'dashboard'")
 
     def test_farm_sidebar_has_ledger(self):
-        """Farm sidebar should have Ledger link."""
+        """Farm sidebar should have Sales and Expenses links (replacing legacy 'ledger')."""
         items = get_vertical_sidebar_items("farm")
         keys = [item.get("key") for item in items]
-        self.assertIn("ledger", keys, "Farm sidebar must include 'ledger'")
+        # We now have separate Sales and Expenses keys instead of just "ledger"
+        self.assertIn("sales", keys, "Farm sidebar must include 'sales'")
+        self.assertIn("expenses", keys, "Farm sidebar must include 'expenses'")
 
     def test_farm_sidebar_has_livestock(self):
-        """Farm sidebar should have Livestock link."""
+        """Farm sidebar should have Assets link (livestock = assets)."""
         items = get_vertical_sidebar_items("farm")
         keys = [item.get("key") for item in items]
-        self.assertIn("livestock", keys, "Farm sidebar must include 'livestock'")
+        # Livestock is now called "Assets" per user requirements
+        self.assertIn("assets", keys, "Farm sidebar must include 'assets' (livestock)")
 
     def test_farm_sidebar_has_crops(self):
-        """Farm sidebar should have Crops link."""
+        """Farm sidebar should have Seasons link (crops = seasons)."""
         items = get_vertical_sidebar_items("farm")
         keys = [item.get("key") for item in items]
-        self.assertIn("crops", keys, "Farm sidebar must include 'crops'")
+        # Crops are now called "Seasons" per user requirements
+        self.assertIn("seasons", keys, "Farm sidebar must include 'seasons' (crops)")
 
     def test_farm_sidebar_has_billing(self):
         """
-        CRITICAL: Farm sidebar should have Billing/Choose Plan link (shared app button).
+        CRITICAL: Farm sidebar should have Billing/Subscribe links (shared app button).
         """
         items = get_vertical_sidebar_items("farm")
         keys = [item.get("key") for item in items]
-        self.assertIn("billing", keys, "Farm sidebar must include 'billing' for Subscription")
+        # We now have separate Subscribe and Checkout keys
+        billing_keys = [k for k in keys if "billing" in k]
+        self.assertGreater(
+            len(billing_keys),
+            0,
+            f"Farm sidebar must include billing keys. Got: {keys}"
+        )
 
     def test_farm_sidebar_has_settings(self):
         """

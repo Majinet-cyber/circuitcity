@@ -97,6 +97,30 @@ def _agree_flag(request) -> bool:
     return bool(request.GET.get("agree") or request.POST.get("agree"))
 
 
+def _send_owner_signup_alert(user, business=None):
+    """
+    Send owner alert email for new signups.
+    Uses SSOT email dispatcher to notify platform owners.
+    """
+    try:
+        from cc.services.email_dispatcher import send_owner_alert, EmailEvent
+        
+        send_owner_alert(
+            EmailEvent.OWNER_NEW_SIGNUP,
+            context={
+                'user_email': user.email or user.username,
+                'user_name': user.get_full_name() or user.username,
+                'business_name': business.name if business else "N/A",
+                'user_id': user.id,
+            },
+            business=business,
+            user=user
+        )
+        log.info(f"Owner alert sent for new signup: {user.email}")
+    except Exception as e:
+        log.error(f"Failed to send owner alert for signup {user.email}: {e}", exc_info=True)
+
+
 # --- Product Create (business-aware page) ------------------------------------
 def _infer_product_mode(business) -> str:
     """
@@ -2040,6 +2064,10 @@ def _complete_manager_wizard_signup(request, wizard_data, request_id=None):
                 user=user,
             )
         )
+        
+        # Send owner alert emails (new - Jan 2026)
+        # CRITICAL: Always notify owners of new signups
+        transaction.on_commit(lambda: _send_owner_signup_alert(user, biz))
 
         # Redirect to main dashboard (manager dashboard, not inventory dashboard)
         return redirect(_safe_redirect("dashboard:home", default="/dashboard/"))

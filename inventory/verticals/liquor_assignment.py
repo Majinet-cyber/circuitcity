@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from tenants.utils import require_business
+from tenants.utils_roles import is_manager as check_is_manager
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
@@ -51,8 +52,13 @@ def assignment_list(request):
     ctx = base.base_context(request)
     business = ctx.get("business")
 
-    # Permission check
-    if not request.user.is_manager(business):
+    # CRITICAL FIX: Guard against None business
+    if not business:
+        messages.error(request, "No active business found. Please select a business.")
+        return redirect("/")
+
+    # Permission check - use helper function
+    if not check_is_manager(request.user, business):
         messages.error(request, "Only managers can view assignments")
         return redirect("verticals:liquor_dashboard")
 
@@ -110,8 +116,13 @@ def assignment_create(request):
     ctx = base.base_context(request)
     business = ctx.get("business")
 
-    # Permission check
-    if not request.user.is_manager(business):
+    # CRITICAL FIX: Guard against None business
+    if not business:
+        messages.error(request, "No active business found. Please select a business.")
+        return redirect("/")
+
+    # Permission check - use helper function
+    if not check_is_manager(request.user, business):
         messages.error(request, "Only managers can assign stock")
         return redirect("verticals:liquor_dashboard")
 
@@ -274,12 +285,19 @@ def reconciliation_dashboard(request):
     """
     Manager view: Daily reconciliation dashboard.
     Shows all agents' performance for a specific date.
+    
+    CRITICAL FIX: Returns 200 with empty data even if no assignments exist.
     """
     ctx = base.base_context(request)
     business = ctx.get("business")
 
-    # Permission check
-    if not request.user.is_manager(business):
+    # CRITICAL FIX: Guard against None business
+    if not business:
+        messages.error(request, "No active business found. Please select a business.")
+        return redirect("/")
+
+    # Permission check - use helper function
+    if not check_is_manager(request.user, business):
         messages.error(request, "Only managers can view reconciliation")
         return redirect("verticals:liquor_dashboard")
 
@@ -295,35 +313,59 @@ def reconciliation_dashboard(request):
 
     # Get agents with assignments on this date
     from django.contrib.auth import get_user_model
+    from decimal import Decimal
 
     User = get_user_model()
 
-    agent_ids = (
-        LiquorStockAssignment.objects.filter(business=business, assigned_at__date=date)
-        .values_list("agent_id", flat=True)
-        .distinct()
-    )
-
-    agents = User.objects.filter(pk__in=agent_ids)
+    # CRITICAL FIX: Safely handle empty querysets
+    try:
+        agent_ids = (
+            LiquorStockAssignment.objects.filter(business=business, assigned_at__date=date)
+            .values_list("agent_id", flat=True)
+            .distinct()
+        )
+        
+        agents = User.objects.filter(pk__in=agent_ids)
+    except Exception as e:
+        # Log error but don't crash
+        import logging
+        logging.getLogger(__name__).error(f"Error fetching agents for reconciliation: {e}", exc_info=True)
+        agents = []
 
     # Generate reconciliation for each agent
     reconciliations = []
     for agent in agents:
-        recon = generate_daily_reconciliation(business=business, agent=agent, date=date)
-        reconciliations.append(
-            {
-                "agent": agent,
-                "recon": recon,
-                "assignments": LiquorStockAssignment.objects.filter(
-                    business=business, agent=agent, assigned_at__date=date
-                ).select_related("product"),
-            }
-        )
+        try:
+            recon = generate_daily_reconciliation(business=business, agent=agent, date=date)
+            reconciliations.append(
+                {
+                    "agent": agent,
+                    "recon": recon,
+                    "assignments": LiquorStockAssignment.objects.filter(
+                        business=business, agent=agent, assigned_at__date=date
+                    ).select_related("product"),
+                }
+            )
+        except Exception as e:
+            # Log error but continue with other agents
+            import logging
+            logging.getLogger(__name__).error(f"Error generating reconciliation for agent {agent.username}: {e}", exc_info=True)
+            continue
 
-    # Summary stats
-    total_assigned = sum(r["recon"].total_bottles_assigned for r in reconciliations)
-    total_sold = sum(r["recon"].total_bottles_sold for r in reconciliations)
-    total_revenue = sum(r["recon"].total_revenue for r in reconciliations)
+    # CRITICAL FIX: Summary stats with safe defaults (handle empty reconciliations)
+    total_assigned = 0
+    total_sold = 0
+    total_revenue = Decimal("0.00")
+    
+    if reconciliations:
+        try:
+            total_assigned = sum(r["recon"].total_bottles_assigned for r in reconciliations)
+            total_sold = sum(r["recon"].total_bottles_sold for r in reconciliations)
+            total_revenue = sum(r["recon"].total_revenue for r in reconciliations)
+        except Exception as e:
+            # Log error but use defaults
+            import logging
+            logging.getLogger(__name__).error(f"Error computing reconciliation totals: {e}", exc_info=True)
 
     ctx.update(
         {
@@ -333,6 +375,8 @@ def reconciliation_dashboard(request):
             "total_assigned": total_assigned,
             "total_sold": total_sold,
             "total_revenue": total_revenue,
+            # Add empty state flag
+            "has_data": len(reconciliations) > 0,
         }
     )
 
@@ -349,8 +393,13 @@ def finalize_reconciliation_view(request, reconciliation_id):
     """
     business = get_active_business(request)
 
-    # Permission check
-    if not request.user.is_manager(business):
+    # CRITICAL FIX: Guard against None business
+    if not business:
+        messages.error(request, "No active business found. Please select a business.")
+        return redirect("/")
+
+    # Permission check - use helper function
+    if not check_is_manager(request.user, business):
         messages.error(request, "Only managers can finalize reconciliation")
         return redirect("verticals:liquor_dashboard")
 
@@ -384,16 +433,34 @@ def agent_performance_report(request):
     ctx = base.base_context(request)
     business = ctx.get("business")
 
-    # Permission check
-    if not request.user.is_manager(business):
+    # CRITICAL FIX: Safely handle missing business
+    if not business:
+        messages.error(request, "No active business found. Please select a business.")
+        return redirect("/")
+
+    # Permission check - use helper function
+    if not check_is_manager(request.user, business):
         messages.error(request, "Only managers can view performance reports")
         return redirect("verticals:liquor_dashboard")
 
     # Get time period
-    days = int(request.GET.get("days", 30))
+    try:
+        days = int(request.GET.get("days", 30))
+    except (ValueError, TypeError):
+        days = 30
 
-    # Get top performers
-    top_agents = get_top_performing_agents(business=business, days=days, limit=20)
+    # CRITICAL FIX: Safe call to get_top_performing_agents with exception handling
+    try:
+        top_agents = get_top_performing_agents(business=business, days=days, limit=20)
+    except Exception as e:
+        # Log error for debugging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to get top performing agents: {str(e)}", exc_info=True)
+        
+        # Return empty list and show graceful message
+        top_agents = []
+        messages.info(request, "No performance data available yet. Agent performance will appear once sales are recorded.")
 
     ctx.update(
         {

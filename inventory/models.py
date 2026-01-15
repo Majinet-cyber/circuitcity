@@ -1709,6 +1709,88 @@ class LiquorProduct(MerchProduct):
         return super().save(*args, **kwargs)
 
 
+# ==============================================================================
+# PRODUCT PRICE HISTORY (for tracking price changes without creating duplicates)
+# ==============================================================================
+
+
+class ProductPriceHistory(models.Model):
+    """
+    Tracks price changes for products over time, avoiding duplicate product creation.
+    
+    Use case: Cement vertical needs to track weekly/seasonal price changes for the
+    same brand without creating "Brand Week 1", "Brand Week 2" as separate products.
+    
+    Instead, keep ONE canonical product and record price history entries.
+    """
+    product = models.ForeignKey(
+        MerchProduct,
+        on_delete=models.CASCADE,
+        related_name="price_history",
+        help_text="The product whose price is being tracked"
+    )
+    
+    # Prices (match MerchProduct fields)
+    selling_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Selling price at this point in time"
+    )
+    cost_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Cost/order price at this point in time"
+    )
+    
+    # Timing
+    effective_date = models.DateField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Date when this price became effective"
+    )
+    
+    # Optional label (e.g. "Week 1", "Q1 2026", "Jan Season")
+    label = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Optional label for this price period (e.g. 'Week 3', 'Q2 2026')"
+    )
+    
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="price_history_created"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ["-effective_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["product", "-effective_date"]),
+        ]
+        # Prevent duplicate price history for same product + date
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "effective_date"],
+                name="unique_product_price_per_date"
+            ),
+        ]
+        verbose_name = "Product Price History"
+        verbose_name_plural = "Product Price Histories"
+    
+    def __str__(self):
+        label_str = f" ({self.label})" if self.label else ""
+        return f"{self.product.name} - MK {self.selling_price}{label_str} @ {self.effective_date}"
+
+
 # ---- PhoneProduct proxy over phones' Product (for uniform import path) ----
 class PhoneProduct(Product):
     class Meta:

@@ -10,6 +10,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.core.exceptions import ValidationError, PermissionDenied
 
+from tenants.utils_roles import is_manager as check_is_manager
 from inventory.models_liquor_assignment import (
     LiquorStockAssignment,
     LiquorDailyReconciliation,
@@ -46,8 +47,8 @@ def assign_stock_to_agent(
         PermissionDenied: If assigned_by is not a manager
         ValidationError: If validation fails
     """
-    # Check permissions
-    if not assigned_by.is_manager(business):
+    # Check permissions - use helper function
+    if not check_is_manager(assigned_by, business):
         raise PermissionDenied("Only managers can assign stock to agents")
 
     # Validate bottles count
@@ -230,7 +231,8 @@ def finalize_reconciliation(*, reconciliation_id: int, reconciled_by, notes: str
     """
     recon = LiquorDailyReconciliation.objects.select_for_update().get(pk=reconciliation_id)
 
-    if not reconciled_by.is_manager(recon.business):
+    # Check permissions - use helper function
+    if not check_is_manager(reconciled_by, recon.business):
         raise PermissionDenied("Only managers can finalize reconciliations")
 
     # Mark reconciliation as complete
@@ -286,17 +288,44 @@ def get_agent_performance(*, business, agent, days=30) -> Dict[str, Any]:
     total_sold = assignments.aggregate(total=Sum("bottles_sold"))["total"] or 0
     total_returned = assignments.aggregate(total=Sum("bottles_returned"))["total"] or 0
 
-    total_revenue = sum(a.actual_revenue for a in assignments)
-    total_profit = sum(a.expected_profit for a in assignments)
+    # CRITICAL FIX: Safely compute revenue and profit (handle None values)
+    total_revenue = Decimal("0.00")
+    total_profit = Decimal("0.00")
+    for a in assignments:
+        try:
+            rev = a.actual_revenue
+            if rev is not None:
+                total_revenue += Decimal(str(rev))
+        except (ValueError, TypeError, AttributeError):
+            pass
+        
+        try:
+            prof = a.expected_profit
+            if prof is not None:
+                total_profit += Decimal(str(prof))
+        except (ValueError, TypeError, AttributeError):
+            pass
 
     # Sell-through rate
     sell_through = Decimal("0.00")
     if total_assigned > 0:
         sell_through = (Decimal(str(total_sold)) / Decimal(str(total_assigned))) * Decimal("100.00")
 
-    # Current inventory
-    current_bottles = sum(a.bottles_remaining for a in active_assignments)
-    current_value = sum(a.bottles_remaining * a.unit_sell_price for a in active_assignments)
+    # Current inventory - safely handle None values
+    current_bottles = 0
+    current_value = Decimal("0.00")
+    for a in active_assignments:
+        try:
+            remaining = a.bottles_remaining
+            if remaining is not None:
+                current_bottles += int(remaining)
+                
+                # Safe multiplication for value
+                unit_price = a.unit_sell_price
+                if unit_price is not None:
+                    current_value += Decimal(str(remaining)) * Decimal(str(unit_price))
+        except (ValueError, TypeError, AttributeError):
+            pass
 
     return {
         "period_days": days,

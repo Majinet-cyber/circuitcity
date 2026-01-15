@@ -202,22 +202,31 @@ def sell_liquor(request):
             else:
                 unit = "bottle"
 
-            # Get price based on mode - handle None values safely
-            if mode == "shot":
-                unit_price = product.price_per_shot or Decimal("0.00")
-                if unit_price == Decimal("0.00"):
-                    messages.error(request, f"❌ {product.name} does not have a price per shot set.")
-                    return redirect("liquor:sell")
-            elif mode == "glass":
-                unit_price = product.price_per_glass or Decimal("0.00")
-                if unit_price == Decimal("0.00"):
-                    messages.error(request, f"❌ {product.name} does not have a price per glass set.")
-                    return redirect("liquor:sell")
-            else:
-                unit_price = product.price_per_bottle or Decimal("0.00")
-                if unit_price == Decimal("0.00"):
-                    messages.error(request, f"❌ {product.name} does not have a price per bottle set.")
-                    return redirect("liquor:sell")
+            # CRITICAL FIX: Use liquor unit helper for correct pricing
+            from inventory.helpers_liquor_units import get_liquor_unit_info
+            
+            unit_info = get_liquor_unit_info(product)
+            default_unit_price = unit_info["unit_price"]
+            
+            # Check if user provided an override price
+            try:
+                override_price_str = request.POST.get("unit_price", "").strip()
+                if override_price_str:
+                    unit_price = Decimal(str(override_price_str))
+                    # Validate override price is positive
+                    if unit_price <= 0:
+                        messages.error(request, "❌ Price must be greater than zero.")
+                        return redirect("liquor:sell")
+                else:
+                    unit_price = default_unit_price
+            except (ValueError, TypeError, InvalidOperation):
+                # Fall back to default if override is invalid
+                unit_price = default_unit_price
+            
+            # Validate unit price is set
+            if unit_price == Decimal("0.00"):
+                messages.error(request, f"❌ {product.name} does not have a price per {unit} set.")
+                return redirect("liquor:sell")
 
             # Use the centralized liquor sale service (handles all transaction logic)
             from inventory.services.liquor_sale import create_liquor_sale, OutOfStockError
@@ -297,6 +306,7 @@ def sell_liquor(request):
 
     # GET: Build category-grouped products
     from collections import defaultdict
+    from inventory.helpers_liquor_units import get_liquor_unit_info
 
     products = MerchProduct.objects.filter(
         business=business, kind=BusinessKind.LIQUOR, is_archived=False, is_active=True
@@ -310,6 +320,25 @@ def sell_liquor(request):
             p.current_stock = p.quantity_in_stock or 0
             p.is_in_stock = p.current_stock > 0
             p.is_low_stock = 0 < p.current_stock <= 5
+            
+            # CRITICAL FIX: Add computed unit pricing info
+            unit_info = get_liquor_unit_info(p)
+            p.computed_unit_price = unit_info["unit_price"]
+            p.computed_unit_cost = unit_info["unit_cost"]
+            p.computed_unit_label = unit_info["label"]
+            p.computed_max_quantity = unit_info["max_quantity"]
+            
+            # Override displayed prices if product-specific prices are not set
+            if not p.price_per_bottle and unit_info["sale_unit"] == "bottle":
+                p.price_per_bottle = unit_info["unit_price"]
+                p.cost_per_bottle = unit_info["unit_cost"]
+            if not p.price_per_shot and unit_info["sale_unit"] == "shot":
+                p.price_per_shot = unit_info["unit_price"]
+                p.cost_per_shot = unit_info["unit_cost"]
+            if not p.price_per_glass and unit_info["sale_unit"] == "glass":
+                p.price_per_glass = unit_info["unit_price"]
+                p.cost_per_glass = unit_info["unit_cost"]
+            
             products_by_category[cat].append(p)
 
     # Build categories list in order, but include only those that have products
@@ -369,13 +398,24 @@ def get_product_pricing(request, product_id):
     business = get_active_business(request)
     try:
         product = MerchProduct.objects.get(pk=product_id, business=business, kind=BusinessKind.LIQUOR)
+        
+        # CRITICAL FIX: Use liquor unit helper for correct unit pricing
+        from inventory.helpers_liquor_units import get_liquor_unit_info
+        
+        unit_info = get_liquor_unit_info(product)
+        
         return JsonResponse(
             {
                 "success": True,
                 "has_shots": product.has_shots,
-                "price_per_bottle": str(product.price_per_bottle or "0.00"),
-                "price_per_shot": str(product.price_per_shot or "0.00"),
+                "has_glasses": product.has_glasses,
+                "price_per_bottle": str(unit_info["unit_price"]) if unit_info["sale_unit"] == "bottle" else str(product.price_per_bottle or "0.00"),
+                "price_per_shot": str(unit_info["unit_price"]) if unit_info["sale_unit"] == "shot" else str(product.price_per_shot or "0.00"),
+                "price_per_glass": str(unit_info["unit_price"]) if unit_info["sale_unit"] == "glass" else str(product.price_per_glass or "0.00"),
                 "sellable_shots": product.sellable_shots_per_bottle,
+                "unit_label": unit_info["label"],
+                "max_quantity": unit_info["max_quantity"],
+                "sale_unit": unit_info["sale_unit"],
             }
         )
     except MerchProduct.DoesNotExist:

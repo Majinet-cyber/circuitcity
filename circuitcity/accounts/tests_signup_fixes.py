@@ -143,3 +143,43 @@ class Step4AgreeCheckboxTest(TestCase):
         self.assertFalse(form.is_valid())  # Not bound with data
         # Template should handle form.agree safely
         self.assertTrue(hasattr(form, "agree") or True)  # Field exists or we handle it
+
+
+class BusinessTypeDisplayNameTest(TestCase):
+    """Regression test: Ensure 'Cement Store' is never shown, only 'Hardware & General Dealers'"""
+
+    def test_business_kind_choices_no_cement_store(self):
+        """BusinessKind choices should not contain 'Cement Store' label"""
+        choices = BusinessKind.choices
+        choice_labels = [label for value, label in choices]
+        
+        # Must NOT contain old label
+        self.assertNotIn("Cement Store", choice_labels)
+        
+        # Must contain new label
+        self.assertIn("Hardware & General Dealers", choice_labels)
+        
+        # Cement code must map to new label
+        cement_label = dict(choices).get("cement")
+        self.assertEqual(cement_label, "Hardware & General Dealers")
+
+    def test_signup_step2_page_no_cement_store(self):
+        """Signup step 2 page should not display 'Cement Store' anywhere"""
+        response = self.client.get(reverse("accounts:signup_manager") + "?step=2")
+        self.assertEqual(response.status_code, 200)
+        
+        # Old label must NOT appear in HTML
+        self.assertNotContains(response, "Cement Store")
+        
+        # New label MUST appear in HTML
+        self.assertContains(response, "Hardware &amp; General Dealers")
+        
+    def test_vertical_display_name_function(self):
+        """get_vertical_display_name() should return correct label for cement"""
+        from inventory.utils_verticals import get_vertical_display_name
+        
+        display_name = get_vertical_display_name("cement")
+        
+        # Must return new label, not old
+        self.assertEqual(display_name, "Hardware & General Dealers")
+        self.assertNotEqual(display_name, "Cement Store")

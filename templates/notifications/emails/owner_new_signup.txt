@@ -1,0 +1,14 @@
+New Signup - Emajinet
+
+A new user has signed up:
+
+- Email: {{ user_email }}
+- Name: {{ user_name }}
+- Business: {{ business_name }}
+- User ID: {{ user_id }}
+
+View in HQ: https://emajinet.africa/hq/
+
+---
+Emajinet Platform - Owner Alert
+

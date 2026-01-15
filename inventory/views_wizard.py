@@ -35,6 +35,7 @@ def resolve_active_location(request, business):
     2. session['active_location_id'] (if exists and is active)
     3. business default location (is_default=True)
     4. first active location
+    5. CRITICAL FIX: If business has exactly 1 location, auto-select it
     
     Returns:
         Location object or None if no active locations exist
@@ -80,33 +81,51 @@ def resolve_active_location(request, business):
         except Location.DoesNotExist:
             # Stale session, clear it
             try:
-                request.session.pop('active_location_id', None)
+                del request.session['active_location_id']
             except Exception:
                 pass
-        except Exception:
-            pass  # Other DB errors - fail gracefully
     
-    # 3. Auto-select: prefer default, else first by id
+    # 3. CRITICAL FIX: Auto-select if business has exactly ONE location
     try:
-        # CRITICAL FIX: Don't filter by is_active - it's not a database field
-        # All locations are considered "active" by design (see Location.is_active property)
-        location = Location.objects.filter(
-            business=business
-        ).order_by('-is_default', 'id').first()
+        locations = list(Location.objects.filter(business=business)[:2])  # Fetch max 2 to check count efficiently
         
-        if location:
-            # Store in session
+        if len(locations) == 1:
+            # Exactly one location - auto-select it
+            location = locations[0]
+            request.active_location = location
             try:
                 request.session['active_location_id'] = location.id
-                request.session.modified = True
             except Exception:
-                pass  # Session might not be available
-            request.active_location = location
+                pass
             return location
-    except Exception:
-        pass  # DB query failed - fail gracefully
+        
+        # Multiple locations exist - try default or first
+        if len(locations) > 0:
+            # Try default location first
+            default_loc = Location.objects.filter(business=business, is_default=True).first()
+            if default_loc:
+                request.active_location = default_loc
+                try:
+                    request.session['active_location_id'] = default_loc.id
+                except Exception:
+                    pass
+                return default_loc
+            
+            # Fall back to first location
+            first_loc = Location.objects.filter(business=business).order_by('name').first()
+            if first_loc:
+                request.active_location = first_loc
+                try:
+                    request.session['active_location_id'] = first_loc.id
+                except Exception:
+                    pass
+                return first_loc
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error in resolve_active_location: {e}", exc_info=True)
     
-    # No active location found
+    # No locations found
     return None
 
 
@@ -733,8 +752,9 @@ def clothing_wizard_submit(request):
                             user=request.user,
                         )
                     except ValidationError as e:
+                        # CRITICAL FIX: Return 200 (not 400) so frontend can display error properly
                         return JsonResponse(
-                            {"success": False, "error": f"Barcode validation failed: {str(e)}"}, status=400
+                            {"success": False, "error": f"Barcode validation failed: {str(e)}"}
                         )
 
         return JsonResponse(
@@ -767,6 +787,7 @@ def clothing_wizard_submit(request):
         )
 
         # Return friendly error message (never expose raw DB errors)
+        # CRITICAL FIX: Return status 200 (not 400/500) so frontend can display error properly
         if isinstance(e, IntegrityError):
             # Check if it's the spec_label constraint
             error_msg = str(e)
@@ -775,16 +796,14 @@ def clothing_wizard_submit(request):
                     {
                         "success": False,
                         "error": "Could not save product. Please ensure all required fields are filled.",
-                    },
-                    status=400,
+                    }
                 )
             return JsonResponse(
-                {"success": False, "error": "Could not save product. Please check required fields and try again."},
-                status=400,
+                {"success": False, "error": "Could not save product. Please check required fields and try again."}
             )
         elif isinstance(e, ValidationError):
             return JsonResponse(
-                {"success": False, "error": "Invalid product data. Please check your inputs and try again."}, status=400
+                {"success": False, "error": "Invalid product data. Please check your inputs and try again."}
             )
         else:
             # Only show debug info in DEBUG mode
@@ -793,6 +812,5 @@ def clothing_wizard_submit(request):
                     "success": False,
                     "error": "Could not save product. Please try again.",
                     "debug": traceback.format_exc() if settings.DEBUG else None,
-                },
-                status=500,
+                }
             )

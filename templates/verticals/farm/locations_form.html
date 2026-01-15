@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{{ hero_title }} - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="mb-4">
+        <a href="{% url 'verticals:farm_locations' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Locations</a>
+        <h1 class="h3 mb-1"><span class="me-2">📍</span>{{ hero_title }}</h1>
+    </div>
+    
+    <div class="card" style="max-width: 600px;">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="e.g., North Field, Plot A" value="{{ location.name|default:'' }}" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Address / Description</label>
+                    <input type="text" name="address" class="form-control" placeholder="e.g., Near the river, 5 acres" value="{{ location.address|default:'' }}">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional)</label>
+                    <textarea name="notes" class="form-control" rows="2">{{ location.notes|default:'' }}</textarea>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-check-lg me-1"></i> Save Location
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

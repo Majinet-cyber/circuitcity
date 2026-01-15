@@ -56,10 +56,12 @@ class TestFarmVerticalRegistration(TestCase):
         items = get_vertical_sidebar_items("farm")
         self.assertTrue(len(items) > 0, "Farm must have sidebar items")
         
-        # Check for key farm items
+        # Check for key farm items (updated to match new sidebar structure)
         item_keys = [item.get("key") for item in items]
         self.assertIn("dashboard", item_keys, "Farm sidebar must have dashboard")
-        self.assertIn("ledger", item_keys, "Farm sidebar must have ledger")
+        # New structure uses "sales" and "expenses" instead of single "ledger"
+        self.assertIn("sales", item_keys, "Farm sidebar must have sales")
+        self.assertIn("expenses", item_keys, "Farm sidebar must have expenses")
         self.assertIn("add_expense", item_keys, "Farm sidebar must have add_expense")
         self.assertIn("add_sale", item_keys, "Farm sidebar must have add_sale")
     

@@ -62,6 +62,14 @@ _VERTICAL_ALIASES = {
     # Cement / Building Materials (legacy)
     "cement": "cement",
     "building materials": "cement",
+    # Farm Manager
+    "farm": "farm",
+    "agriculture": "farm",
+    "farming": "farm",
+    # Welding Workshop
+    "welding": "welding",
+    "welder": "welding",
+    "fabrication": "welding",
 }
 
 PRODUCT_MODE_SESSION_KEY = "product_mode"

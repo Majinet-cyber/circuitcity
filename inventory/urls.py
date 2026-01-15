@@ -90,12 +90,50 @@ try:
 except Exception:
     _phone_products_views = SimpleNamespace()
 
-# Gamified Wizard views
+# Gamified Wizard views - BOOT-SAFE with placeholder views
+_wizard_import_exc = None
 try:
-    from . import views_wizard as _wizard_views
+    from . import views_wizard as _wizard_mod
 except Exception as e:
+    _wizard_import_exc = e
+    _wizard_mod = None
     print(f"WARNING: Failed to import views_wizard: {e}")
-    _wizard_views = SimpleNamespace()
+
+def _missing_wizard_view(name: str):
+    """Factory for placeholder views when wizard import fails"""
+    from django.core.exceptions import ImproperlyConfigured
+    def _view(*args, **kwargs):
+        raise ImproperlyConfigured(
+            f"Wizard view '{name}' is unavailable because views_wizard failed to import: {_wizard_import_exc}"
+        ) from _wizard_import_exc
+    return _view
+
+if _wizard_mod is None:
+    # Create placeholder namespace with all wizard views to prevent AttributeError at import time
+    _wizard_views = SimpleNamespace(
+        liquor_wizard=_missing_wizard_view("liquor_wizard"),
+        liquor_wizard_submit=_missing_wizard_view("liquor_wizard_submit"),
+        phones_wizard=_missing_wizard_view("phones_wizard"),
+        phones_wizard_submit=_missing_wizard_view("phones_wizard_submit"),
+        pharmacy_wizard=_missing_wizard_view("pharmacy_wizard"),
+        pharmacy_wizard_submit=_missing_wizard_view("pharmacy_wizard_submit"),
+        clothing_wizard=_missing_wizard_view("clothing_wizard"),
+        clothing_wizard_submit=_missing_wizard_view("clothing_wizard_submit"),
+        check_barcode_duplicate=_missing_wizard_view("check_barcode_duplicate"),
+    )
+else:
+    # Successfully imported - use real views
+    _wizard_views = SimpleNamespace(
+        liquor_wizard=_wizard_mod.liquor_wizard,
+        liquor_wizard_submit=_wizard_mod.liquor_wizard_submit,
+        phones_wizard=_wizard_mod.phones_wizard,
+        phones_wizard_submit=_wizard_mod.phones_wizard_submit,
+        pharmacy_wizard=_wizard_mod.pharmacy_wizard,
+        pharmacy_wizard_submit=_wizard_mod.pharmacy_wizard_submit,
+        clothing_wizard=_wizard_mod.clothing_wizard,
+        clothing_wizard_submit=_wizard_mod.clothing_wizard_submit,
+        check_barcode_duplicate=_wizard_mod.check_barcode_duplicate,
+    )
 
 # Stock assignment views (manager-only)
 try:
@@ -1360,13 +1398,7 @@ urlpatterns += [
     path(
         "phones/products/new/",
         manager_required(
-            _need_biz(
-                getattr(
-                    _wizard_views,
-                    "phones_wizard",
-                    getattr(_phone_products_views, "add_phone_products", _product_create_for_mode_factory("phones")),
-                )
-            )
+            _need_biz(_wizard_views.phones_wizard)
         ),
         name="product_create_phones",
     ),
@@ -1405,14 +1437,14 @@ urlpatterns += [
     path(
         "pharmacy/products/new/",
         manager_required(
-            _need_biz(getattr(_wizard_views, "pharmacy_wizard", _product_create_for_mode_factory("pharmacy")))
+            _need_biz(_wizard_views.pharmacy_wizard)
         ),
         name="product_create_pharmacy",
     ),
     path(
         "liquor/products/new/",
         manager_required(
-            _need_biz(getattr(_wizard_views, "liquor_wizard", _product_create_for_mode_factory("liquor")))
+            _need_biz(_wizard_views.liquor_wizard)
         ),
         name="product_create_liquor",
     ),
@@ -1424,7 +1456,7 @@ urlpatterns += [
     path(
         "clothing/products/new/",
         manager_required(
-            _need_biz(getattr(_wizard_views, "clothing_wizard", _product_create_for_mode_factory("clothing")))
+            _need_biz(_wizard_views.clothing_wizard)
         ),
         name="product_create_clothing",
     ),

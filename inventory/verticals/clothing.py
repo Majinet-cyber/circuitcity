@@ -629,13 +629,26 @@ def sell(request):
         def __init__(self, business=None, *args, **kwargs):
             super().__init__(*args, **kwargs)
             if business:
-                # Show only clothing products with available stock
+                # CRITICAL FIX: Exclude products that have unique barcode units
+                # Those can ONLY be sold via Fast Sell (barcode scan)
+                from inventory.models_clothing_barcode import ClothingBarcodeUnit
+                
+                # Get product IDs that have barcode units in stock
+                products_with_barcode_units = ClothingBarcodeUnit.objects.filter(
+                    business=business,
+                    status="IN_STOCK",
+                    is_active=True
+                ).values_list("product_id", flat=True).distinct()
+                
+                # Show only clothing products with available stock, EXCLUDING unique-barcode products
                 self.fields["product"].queryset = MerchProduct.objects.filter(
                     business=business,
                     kind=BusinessKind.CLOTHING,
                     is_active=True,
                     is_archived=False,
                     quantity_in_stock__gt=0,
+                ).exclude(
+                    id__in=products_with_barcode_units  # Exclude products with barcode units
                 ).order_by("name")
 
         def clean_payment_method(self):
@@ -666,6 +679,23 @@ def sell(request):
             data = form.cleaned_data
             product = data["product"]
             quantity = data["quantity"]
+
+            # CRITICAL FIX: Server-side validation - prevent selling unique-barcode items via normal sell
+            from inventory.models_clothing_barcode import ClothingBarcodeUnit
+            has_barcode_units = ClothingBarcodeUnit.objects.filter(
+                business=business,
+                product=product,
+                status="IN_STOCK",
+                is_active=True
+            ).exists()
+            
+            if has_barcode_units:
+                messages.error(
+                    request, 
+                    f"❌ {product.name} has unique barcoded items and can ONLY be sold via Fast Sell (barcode scan). "
+                    "Please use the Fast Sell page to scan and sell these items."
+                )
+                return redirect("verticals:clothing_sell")
 
             # CRITICAL: Enforce stock validation - NEVER allow negative stock
             current_stock = product.quantity_in_stock or 0

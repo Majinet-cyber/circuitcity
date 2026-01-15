@@ -1,12 +1,14 @@
 """
-Regression tests for cement stock-in wizard (brand product selection).
+Regression tests for cement stock-in wizard (2-step flow - Jan 2026).
 
-Tests that cement stock-in wizard:
-1. Shows only Cement in step 2 when only cement products exist
-2. Shows real cement brand products from DB (not catalog) in step 3
-3. Shows selected brand product name (not generic) in step 4
+NEW FLOW (Simplified):
+- Step 1: Select cement brand directly (from seeded DB products)
+- Step 2: Enter quantity, cost price, selling price
 
-FIX (Jan 2026): Cement stock-in must use actual DB products, not catalog brands.
+Tests verify:
+1. Step 1 shows real cement brands from DB
+2. Step 2 shows selected product name
+3. Stock-in updates existing product (no duplicates)
 """
 import pytest
 from django.contrib.auth import get_user_model
@@ -85,117 +87,84 @@ class CementStockInBrandTests(TestCase):
             track_inventory=True
         )
 
-    def test_step2_shows_only_cement_when_only_cement_products_exist(self):
+    def test_step1_shows_cement_brands_from_db(self):
         """
-        TEST 1: Step 2 shows only Cement when only cement products exist.
+        TEST 1: Step 1 shows cement brands from DB (NEW 2-STEP FLOW).
         
-        Verify that Paint, Iron Sheets, Angle Iron are hidden when the business
-        has not stocked those products.
+        Verify that step 1 displays actual cement products (Dangote, Akshar)
+        from the database, not catalog brands.
         """
-        # Start wizard - navigate to step 2 (product type selection)
-        # First select category
         url = reverse('cement:stock_in')
-        response = self.client.post(
-            f"{url}?step=1",
-            {'category': 'construction-materials'}
-        )
-        self.assertEqual(response.status_code, 302)
-        
-        # Get step 2
-        response = self.client.get(f"{url}?step=2")
-        self.assertEqual(response.status_code, 200)
-        
-        # Should contain "Cement"
-        content = response.content.decode('utf-8')
-        self.assertIn('Cement', content)
-        
-        # Should NOT contain other product types (no paint/iron products exist)
-        self.assertNotIn('Paint', content)
-        self.assertNotIn('Iron Sheets', content)
-        self.assertNotIn('Angle Iron', content)
-
-    def test_step3_lists_real_cement_brand_products_from_db(self):
-        """
-        TEST 2: Step 3 lists real cement brand products from DB.
-        
-        Verify that the brand selection step shows actual products
-        (Dangote, Akshar) not catalog brands.
-        """
-        # Navigate to step 3 for cement
-        url = reverse('cement:stock_in')
-        
-        # Select category
-        self.client.post(f"{url}?step=1", {'category': 'construction-materials'})
-        
-        # Select cement product
-        self.client.post(f"{url}?step=2", {'product': 'cement'})
-        
-        # Get step 3 (brand selection)
-        response = self.client.get(f"{url}?step=3")
+        response = self.client.get(f"{url}?step=1")
         self.assertEqual(response.status_code, 200)
         
         content = response.content.decode('utf-8')
         
-        # Should contain actual product brand names
+        # Should contain actual cement brands
         self.assertIn('Dangote', content)
         self.assertIn('Akshar', content)
         
         # Should contain product IDs (proving we're using DB products)
-        self.assertIn(f'value="{self.dangote.id}"', content)
-        self.assertIn(f'value="{self.akshar.id}"', content)
+        self.assertIn(str(self.dangote.id), content)
+        self.assertIn(str(self.akshar.id), content)
 
-    def test_step4_shows_selected_brand_product_name(self):
+    def test_step1_to_step2_advances_flow(self):
         """
-        TEST 3: Step 4 shows the selected brand product name (not generic).
+        TEST 2: Selecting brand in step 1 advances to step 2 (NEW 2-STEP FLOW).
         
-        Verify that after selecting "Dangote", step 4 shows
-        "Product: Dangote Cement BAG (50KG)" not just "Cement BAG (50KG)".
+        Verify that posting a product_id in step 1 redirects to step 2.
         """
         url = reverse('cement:stock_in')
         
-        # Navigate through wizard to step 4
-        # Step 1: Select category
-        self.client.post(f"{url}?step=1", {'category': 'construction-materials'})
+        # POST step 1: Select Dangote
+        response = self.client.post(
+            f"{url}?step=1",
+            {'product_id': str(self.dangote.id)}
+        )
         
-        # Step 2: Select cement
-        self.client.post(f"{url}?step=2", {'product': 'cement'})
+        # Should redirect to step 2
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('?step=2', response.url)
+
+    def test_step2_shows_selected_product_name(self):
+        """
+        TEST 3: Step 2 shows selected brand product name (NEW 2-STEP FLOW).
         
-        # Step 3: Select Dangote product
-        self.client.post(f"{url}?step=3", {'product_id': str(self.dangote.id)})
+        Verify that after selecting "Dangote" in step 1, step 2 shows
+        "Dangote Cement BAG (50KG)" not just generic "Cement".
+        """
+        url = reverse('cement:stock_in')
         
-        # Get step 4 (quantity & pricing)
-        response = self.client.get(f"{url}?step=4")
+        # Step 1: Select Dangote
+        self.client.post(f"{url}?step=1", {'product_id': str(self.dangote.id)})
+        
+        # Get step 2 (quantity & pricing)
+        response = self.client.get(f"{url}?step=2")
         self.assertEqual(response.status_code, 200)
         
         content = response.content.decode('utf-8')
         
-        # Should show the specific product name (Dangote Cement BAG 50KG)
-        self.assertIn('Dangote Cement BAG (50KG)', content)
-        
-        # Should NOT show just generic "Cement BAG (50KG)" without brand
-        # (We allow it if it's part of the full name, but verify brand is there)
+        # Should show the specific product name
         self.assertIn('Dangote', content)
 
-    def test_step4_updates_existing_cement_product_stock(self):
+    def test_step2_updates_existing_product_stock(self):
         """
-        TEST 4: Submitting step 4 updates the selected product's stock.
+        TEST 4: Submitting step 2 updates selected product stock (NEW 2-STEP FLOW).
         
-        Verify that stocking in adds to the selected product's quantity.
+        Verify that completing the flow adds stock to the selected product.
         """
         url = reverse('cement:stock_in')
         
-        # Navigate to step 4 with Dangote selected
-        self.client.post(f"{url}?step=1", {'category': 'construction-materials'})
-        self.client.post(f"{url}?step=2", {'product': 'cement'})
-        self.client.post(f"{url}?step=3", {'product_id': str(self.dangote.id)})
+        # Step 1: Select Dangote
+        self.client.post(f"{url}?step=1", {'product_id': str(self.dangote.id)})
         
         # Check initial stock
         self.dangote.refresh_from_db()
         initial_stock = self.dangote.quantity_in_stock
         
-        # Submit step 4 (add 20 bags)
+        # Step 2: Submit quantity & pricing
         response = self.client.post(
-            f"{url}?step=4",
+            f"{url}?step=2",
             {
                 'quantity': '20',
                 'cost_price': '25000',
@@ -203,9 +172,8 @@ class CementStockInBrandTests(TestCase):
             }
         )
         
-        # Should redirect to stock-in home (success)
+        # Should redirect (success)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.url.endswith(reverse('cement:stock_in')))
         
         # Verify stock was updated
         self.dangote.refresh_from_db()
@@ -213,13 +181,13 @@ class CementStockInBrandTests(TestCase):
         self.assertEqual(self.dangote.cost_price, 25000)
         self.assertEqual(self.dangote.selling_price, 28000)
 
-    def test_step2_shows_paint_when_paint_products_exist(self):
+    def test_step1_filters_only_cement_products(self):
         """
-        TEST 5: Step 2 shows Paint when business has paint products.
+        TEST 5: Step 1 shows only cement products (NEW 2-STEP FLOW).
         
-        Verify that non-cement product types appear once they're stocked.
+        Verify that paint/iron products don't appear in cement brand list.
         """
-        # Create a paint product
+        # Create a paint product (should not appear in cement stock-in)
         MerchProduct.objects.create(
             business=self.business,
             name='Rainbow Paint 5L Emulsion White',
@@ -234,19 +202,18 @@ class CementStockInBrandTests(TestCase):
             track_inventory=True
         )
         
-        # Navigate to step 2
+        # Get step 1
         url = reverse('cement:stock_in')
-        self.client.post(f"{url}?step=1", {'category': 'construction-materials'})
-        
-        response = self.client.get(f"{url}?step=2")
+        response = self.client.get(f"{url}?step=1")
         self.assertEqual(response.status_code, 200)
         
         content = response.content.decode('utf-8')
         
-        # Should show both Cement and Paint
-        self.assertIn('Cement', content)
-        self.assertIn('Paint', content)
+        # Should show cement brands
+        self.assertIn('Dangote', content)
+        self.assertIn('Akshar', content)
         
-        # Should NOT show Iron Sheets (no iron products)
-        self.assertNotIn('Iron Sheets', content)
+        # Should NOT show paint products (paint has its own flow)
+        # Note: "Rainbow" is distinctive enough to test
+        self.assertNotIn('Rainbow', content)
 

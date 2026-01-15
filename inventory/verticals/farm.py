@@ -55,7 +55,7 @@ from django.urls import reverse
 @require_business
 @require_business_kind(BusinessKind.FARM)
 def dashboard(request: HttpRequest) -> HttpResponse:
-    """Farm Manager dashboard with KPIs and quick actions."""
+    """Farm Manager dashboard with KPIs and filter integration."""
     import json
     import logging
     from django.db import OperationalError
@@ -68,12 +68,19 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     if not business:
         return redirect("verticals:no_business")
     
+    # Get filter state
+    from inventory.services.farm_filters import parse_farm_filters, get_available_filter_options, apply_filters_to_ledger, apply_filters_to_seasons
+    filter_state = parse_farm_filters(request, business)
+    filter_options = get_available_filter_options(business)
+    
     today = timezone.now().date()
     
-    # Get all ledger entries for computations
+    # Get all ledger entries for computations (FILTERED)
     # FAIL-SAFE: Handle missing table gracefully (if migrations not applied)
     try:
         ledger_qs = FarmLedgerEntry.objects.filter(business=business)
+        # Apply filters
+        ledger_qs = apply_filters_to_ledger(ledger_qs, filter_state)
         ledger_entries = [ledger_entry_to_data(e) for e in ledger_qs]
     except OperationalError as e:
         if "no such table: inventory_farmledgerentry" in str(e):
@@ -115,13 +122,16 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     if last_sale:
         days_since_last_sale = (today - last_sale.date).days
     
-    # Active crop seasons
+    # Active crop seasons (apply filter if needed)
     # FAIL-SAFE: Handle missing table gracefully
     try:
         active_seasons = FarmCropSeason.objects.filter(
             business=business,
             status__in=[FarmSeasonStatus.PLANNING, FarmSeasonStatus.ACTIVE],
-        ).order_by("-start_date")[:5]
+        )
+        # Apply filters
+        active_seasons = apply_filters_to_seasons(active_seasons, filter_state)
+        active_seasons = active_seasons.order_by("-start_date")[:5]
         
         # Compute totals for crop summary (inside try block to handle lazy evaluation)
         active_seasons_count = active_seasons.count()
@@ -167,6 +177,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         # SSOT snapshot (all computed values)
         "snapshot": snapshot,
         
+        # Filter state (NEW)
+        "filter_state": filter_state,
+        "filter_options": filter_options,
+        
         # Chart data (JSON for Chart.js)
         "profit_trend_json": profit_trend_json,
         "expense_breakdown_json": expense_breakdown_json,
@@ -195,9 +209,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "alerts_count": len(snapshot.alerts),
         "critical_alerts_count": snapshot.critical_alerts_count,
         
-        # Quick action URLs (use reverse for SSOT)
-        "url_add_expense": reverse("verticals:farm_add_expense"),
-        "url_add_sale": reverse("verticals:farm_add_sale"),
+        # Quick action URLs (use reverse for SSOT) - NOTE: Quick action buttons removed from template
+        "url_add_expense": reverse("verticals:farm_expenses_record"),
+        "url_add_sale": reverse("verticals:farm_sales_record"),
         "url_livestock_add_event": reverse("verticals:farm_livestock_add_event"),
         "url_season_create": reverse("verticals:farm_add_season"),
     })
@@ -604,12 +618,67 @@ def crop_season_detail(request: HttpRequest, season_id: int) -> HttpResponse:
 @require_business
 @require_business_kind(BusinessKind.FARM)
 def reports(request: HttpRequest) -> HttpResponse:
-    """Farm reports and exports."""
+    """Farm reports and exports with filter integration."""
+    import json
     ctx = base.base_context(request)
     business = ctx.get("business")
     
+    # Get filter state
+    from inventory.services.farm_filters import parse_farm_filters, get_available_filter_options, apply_filters_to_ledger
+    filter_state = parse_farm_filters(request, business)
+    filter_options = get_available_filter_options(business)
+    
+    # Get filtered ledger data
+    ledger_qs = FarmLedgerEntry.objects.filter(business=business)
+    ledger_qs = apply_filters_to_ledger(ledger_qs, filter_state)
+    
+    # Calculate summary metrics
+    totals = ledger_qs.aggregate(
+        total_income=Coalesce(
+            Sum("amount_mwk", filter=~models.Q(entry_type=FarmEntryType.EXPENSE)),
+            Decimal("0"),
+        ),
+        total_expenses=Coalesce(
+            Sum("amount_mwk", filter=models.Q(entry_type=FarmEntryType.EXPENSE)),
+            Decimal("0"),
+        ),
+        sales_count=Count("id", filter=models.Q(entry_type=FarmEntryType.SALE)),
+        expense_count=Count("id", filter=models.Q(entry_type=FarmEntryType.EXPENSE)),
+    )
+    
+    net_profit = totals["total_income"] - totals["total_expenses"]
+    
+    # Top expense categories
+    top_categories = (
+        ledger_qs.filter(entry_type=FarmEntryType.EXPENSE)
+        .values("category")
+        .annotate(total=Sum("amount_mwk"))
+        .order_by("-total")[:5]
+    )
+    
+    # Sales by enterprise type (crop/livestock breakdown)
+    sales_by_type = (
+        ledger_qs.filter(entry_type=FarmEntryType.SALE)
+        .values("enterprise_type")
+        .annotate(total=Sum("amount_mwk"), count=Count("id"))
+        .order_by("-total")
+    )
+    
     ctx.update({
         "active_tab": "reports",
+        "hero_title": "Farm Metrics & Reports",
+        "hero_blurb": "View insights and export your farm data",
+        "filter_state": filter_state,
+        "filter_options": filter_options,
+        # Summary metrics
+        "total_income": totals["total_income"],
+        "total_expenses": totals["total_expenses"],
+        "net_profit": net_profit,
+        "sales_count": totals["sales_count"],
+        "expense_count": totals["expense_count"],
+        # Breakdowns
+        "top_categories": top_categories,
+        "sales_by_type": sales_by_type,
     })
     
     return render(request, "verticals/farm/reports.html", ctx)
@@ -617,4 +686,24 @@ def reports(request: HttpRequest) -> HttpResponse:
 
 # Required import for aggregation
 from django.db import models
+
+# Import new premium view functions from separate modules
+# This allows verticals/urls.py to reference farm.sales_landing, etc.
+from inventory.verticals.farm_sales import (
+    sales_landing,
+    sales_crops,
+    sales_livestock,
+    sales_record,
+)
+from inventory.verticals.farm_expenses import (
+    expenses_landing,
+    expenses_record,
+    expenses_export,
+)
+from inventory.verticals.farm_assets import assets_landing
+from inventory.verticals.farm_locations import (
+    locations_list,
+    locations_create,
+    locations_edit,
+)
 

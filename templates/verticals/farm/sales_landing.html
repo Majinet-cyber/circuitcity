@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sales - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h1 class="h3 mb-1"><span class="me-2">💰</span>{{ hero_title }}</h1>
+            <p class="text-muted mb-0">{{ hero_blurb }}</p>
+        </div>
+        {% if filter_state %}
+        {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
+        {% endif %}
+    </div>
+    
+    <!-- Sales Type Cards -->
+    <div class="row g-3">
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_crops' %}" class="card text-decoration-none h-100">
+                <div class="card-body text-center py-4">
+                    <div class="fs-1 mb-2">🌽</div>
+                    <h5 class="card-title">Crop Sales</h5>
+                    <p class="card-text text-muted small">Record sales of maize, beans, vegetables...</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_livestock' %}" class="card text-decoration-none h-100">
+                <div class="card-body text-center py-4">
+                    <div class="fs-1 mb-2">🐄</div>
+                    <h5 class="card-title">Livestock Sales</h5>
+                    <p class="card-text text-muted small">Record sales of cattle, pigs, chickens...</p>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4">
+            <a href="{% url 'verticals:farm_sales_record' %}" class="card text-decoration-none h-100">
+                <div class="card-body text-center py-4">
+                    <div class="fs-1 mb-2">➕</div>
+                    <h5 class="card-title">Quick Sale</h5>
+                    <p class="card-text text-muted small">Record any sale directly</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

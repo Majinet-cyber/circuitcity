@@ -1,0 +1,576 @@
+{% comment %}
+===============================================================================
+FARM FILTER PANEL (Reusable)
+===============================================================================
+A premium, mobile-first filter panel for Farm Manager.
+
+Required context variables:
+  - filter_state: FilterState object from farm_filters.py
+  - filter_options: Dict with crops/animals/seasons/locations lists
+
+Usage:
+  {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
+
+The panel works as:
+  - Desktop: Dropdown/popover triggered by filter button
+  - Mobile: Bottom sheet/modal (full-width, slides up)
+{% endcomment %}
+
+<style>
+/* ===== Farm Filter Button & Panel ===== */
+.farm-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1rem;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+}
+
+.farm-filter-btn:hover {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.04);
+    box-shadow: var(--shadow-sm);
+}
+
+.farm-filter-btn.active {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.08);
+    color: #16a34a;
+}
+
+.farm-filter-btn i {
+    font-size: 1rem;
+}
+
+.farm-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.375rem;
+    background: #16a34a;
+    color: white;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+}
+
+/* Filter Panel Container */
+.farm-filter-panel-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 9998;
+    animation: fadeIn 0.2s ease;
+}
+
+.farm-filter-panel-overlay.show {
+    display: block;
+}
+
+.farm-filter-panel {
+    display: none;
+    position: fixed;
+    z-index: 9999;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 420px;
+    width: 100%;
+}
+
+.farm-filter-panel.show {
+    display: block;
+}
+
+/* Desktop: Dropdown style */
+@media (min-width: 768px) {
+    .farm-filter-panel {
+        top: auto;
+        right: 1rem;
+        bottom: auto;
+        left: auto;
+        animation: slideDown 0.25s ease;
+    }
+    
+    .farm-filter-panel-overlay {
+        background: transparent;
+        backdrop-filter: none;
+    }
+}
+
+/* Mobile: Bottom sheet */
+@media (max-width: 767px) {
+    .farm-filter-panel {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-width: 100%;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+        animation: slideUp 0.3s ease;
+        max-height: 85vh;
+        overflow-y: auto;
+    }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Panel Header */
+.farm-filter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.farm-filter-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.farm-filter-close {
+    background: none;
+    border: none;
+    padding: 0.25rem;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.25rem;
+    line-height: 1;
+}
+
+.farm-filter-close:hover {
+    color: var(--ink);
+}
+
+/* Panel Body */
+.farm-filter-body {
+    padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.farm-filter-group {
+    margin-bottom: 1.5rem;
+}
+
+.farm-filter-group:last-child {
+    margin-bottom: 0;
+}
+
+.farm-filter-label {
+    display: block;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.5rem;
+}
+
+.farm-filter-presets {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+.farm-filter-preset-btn {
+    padding: 0.625rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+
+.farm-filter-preset-btn:hover {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.04);
+}
+
+.farm-filter-preset-btn.active {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.12);
+    color: #16a34a;
+    font-weight: 700;
+}
+
+/* Custom date inputs */
+.farm-filter-date-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.farm-filter-input {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--ink);
+    background: var(--surface);
+    transition: all 0.15s ease;
+}
+
+.farm-filter-input:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+.farm-filter-select {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    color: var(--ink);
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.farm-filter-select:focus {
+    outline: none;
+    border-color: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+/* Panel Footer */
+.farm-filter-footer {
+    display: flex;
+    gap: 0.75rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+.farm-filter-clear {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.farm-filter-clear:hover {
+    border-color: #dc2626;
+    background: rgba(220, 38, 38, 0.04);
+    color: #dc2626;
+}
+
+.farm-filter-apply {
+    flex: 2;
+    padding: 0.75rem 1rem;
+    border: none;
+    border-radius: var(--radius);
+    background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+}
+
+.farm-filter-apply:hover {
+    background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+    box-shadow: 0 6px 16px rgba(22, 163, 74, 0.4);
+    transform: translateY(-1px);
+}
+
+/* Active Filter Chips */
+.farm-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.farm-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: rgba(22, 163, 74, 0.1);
+    border: 1px solid rgba(22, 163, 74, 0.2);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #15803d;
+}
+
+.farm-filter-chip-remove {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #15803d;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.farm-filter-chip-remove:hover {
+    opacity: 1;
+}
+</style>
+
+<!-- Filter Button -->
+<div class="farm-filter-wrapper">
+    <button type="button" class="farm-filter-btn {% if filter_state.is_filtered %}active{% endif %}" id="farmFilterToggle" data-testid="farm-filter-button">
+        <i class="bi bi-funnel"></i>
+        <span>Filter</span>
+        {% if filter_state.active_filter_chips %}
+        <span class="farm-filter-badge">{{ filter_state.active_filter_chips|length }}</span>
+        {% endif %}
+    </button>
+    
+    <!-- Active Filter Chips -->
+    {% if filter_state.active_filter_chips %}
+    <div class="farm-filter-chips">
+        {% for chip in filter_state.active_filter_chips %}
+        <div class="farm-filter-chip">
+            <span>{{ chip.label }}</span>
+            <button type="button" class="farm-filter-chip-remove" onclick="removeFilterChip('{{ chip.param }}')">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Filter Panel Overlay -->
+<div class="farm-filter-panel-overlay" id="farmFilterOverlay"></div>
+
+<!-- Filter Panel -->
+<div class="farm-filter-panel" id="farmFilterPanel">
+    <div class="farm-filter-header">
+        <h3><i class="bi bi-funnel"></i> Filter Options</h3>
+        <button type="button" class="farm-filter-close" id="farmFilterClose">
+            <i class="bi bi-x-lg"></i>
+        </button>
+    </div>
+    
+    <form method="get" id="farmFilterForm" class="farm-filter-body">
+        <!-- Date Range Presets -->
+        <div class="farm-filter-group">
+            <label class="farm-filter-label">Date Range</label>
+            <div class="farm-filter-presets">
+                <button type="button" class="farm-filter-preset-btn {% if filter_state.range_preset == 'today' %}active{% endif %}" data-range="today">Today</button>
+                <button type="button" class="farm-filter-preset-btn {% if filter_state.range_preset == '7d' %}active{% endif %}" data-range="7d">Last 7 Days</button>
+                <button type="button" class="farm-filter-preset-btn {% if filter_state.range_preset == 'mtd' %}active{% endif %}" data-range="mtd">This Month</button>
+                <button type="button" class="farm-filter-preset-btn {% if filter_state.range_preset == 'ytd' %}active{% endif %}" data-range="ytd">This Year</button>
+            </div>
+            <input type="hidden" name="range" id="filterRange" value="{{ filter_state.range_preset }}">
+        </div>
+        
+        <!-- Custom Date Range -->
+        <div class="farm-filter-group" id="customDateGroup" style="{% if filter_state.range_preset != 'custom' %}display:none;{% endif %}">
+            <label class="farm-filter-label">Custom Date Range</label>
+            <div class="farm-filter-date-row">
+                <input type="date" name="start" class="farm-filter-input" value="{{ filter_state.start_date|date:'Y-m-d' }}" placeholder="Start Date">
+                <input type="date" name="end" class="farm-filter-input" value="{{ filter_state.end_date|date:'Y-m-d' }}" placeholder="End Date">
+            </div>
+        </div>
+        
+        <!-- Season Filter (if seasons exist) -->
+        {% if filter_options.seasons %}
+        <div class="farm-filter-group">
+            <label class="farm-filter-label">Season</label>
+            <select name="season" class="farm-filter-select">
+                <option value="">All Seasons</option>
+                {% for season in filter_options.seasons %}
+                <option value="{{ season.id }}" {% if filter_state.season_id == season.id %}selected{% endif %}>
+                    {{ season.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <!-- Crop Filter (if multiple crops exist) -->
+        {% if filter_options.crops %}
+        <div class="farm-filter-group">
+            <label class="farm-filter-label">Crop</label>
+            <select name="crop" class="farm-filter-select">
+                <option value="">All Crops</option>
+                {% for crop in filter_options.crops %}
+                <option value="{{ crop.value }}" {% if filter_state.crop_type == crop.value %}selected{% endif %}>
+                    {{ crop.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <!-- Animal Filter (if multiple animal types exist) -->
+        {% if filter_options.animals %}
+        <div class="farm-filter-group">
+            <label class="farm-filter-label">Livestock</label>
+            <select name="animal" class="farm-filter-select">
+                <option value="">All Animals</option>
+                {% for animal in filter_options.animals %}
+                <option value="{{ animal.value }}" {% if filter_state.animal_type == animal.value %}selected{% endif %}>
+                    {{ animal.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+        
+        <!-- Location Filter (if multiple locations exist) -->
+        {% if filter_options.locations %}
+        <div class="farm-filter-group">
+            <label class="farm-filter-label">Location</label>
+            <select name="location" class="farm-filter-select">
+                <option value="">All Locations</option>
+                {% for location in filter_options.locations %}
+                <option value="{{ location.id }}" {% if filter_state.location_id == location.id %}selected{% endif %}>
+                    {{ location.label }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+    </form>
+    
+    <div class="farm-filter-footer">
+        <button type="button" class="farm-filter-clear" id="farmFilterClear">
+            Clear All
+        </button>
+        <button type="submit" form="farmFilterForm" class="farm-filter-apply">
+            Apply Filters
+        </button>
+    </div>
+</div>
+
+<script>
+(function() {
+    const toggleBtn = document.getElementById('farmFilterToggle');
+    const overlay = document.getElementById('farmFilterOverlay');
+    const panel = document.getElementById('farmFilterPanel');
+    const closeBtn = document.getElementById('farmFilterClose');
+    const clearBtn = document.getElementById('farmFilterClear');
+    const rangeInput = document.getElementById('filterRange');
+    const customGroup = document.getElementById('customDateGroup');
+    const presetBtns = document.querySelectorAll('.farm-filter-preset-btn');
+    
+    // Toggle panel
+    function openPanel() {
+        overlay.classList.add('show');
+        panel.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closePanel() {
+        overlay.classList.remove('show');
+        panel.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+    
+    toggleBtn.addEventListener('click', openPanel);
+    closeBtn.addEventListener('click', closePanel);
+    overlay.addEventListener('click', closePanel);
+    
+    // Date range preset selection
+    presetBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const range = this.getAttribute('data-range');
+            
+            // Update active state
+            presetBtns.forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update hidden input
+            rangeInput.value = range;
+            
+            // Show/hide custom date inputs
+            if (range === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+            }
+        });
+    });
+    
+    // Clear all filters
+    clearBtn.addEventListener('click', function() {
+        window.location.href = window.location.pathname + '?range=mtd';
+    });
+    
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && panel.classList.contains('show')) {
+            closePanel();
+        }
+    });
+})();
+
+// Remove individual filter chip
+function removeFilterChip(param) {
+    const url = new URL(window.location);
+    url.searchParams.delete(param);
+    
+    // If removing date range, reset to MTD
+    if (param === 'range') {
+        url.searchParams.set('range', 'mtd');
+        url.searchParams.delete('start');
+        url.searchParams.delete('end');
+    }
+    
+    window.location.href = url.toString();
+}
+</script>
+

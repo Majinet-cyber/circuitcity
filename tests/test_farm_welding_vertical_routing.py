@@ -159,12 +159,15 @@ class FarmVerticalRoutingTest(TestCase):
             f"Farm sidebar should have more than 2 items, got: {len(sidebar_items)}"
         )
         
-        # Should have farm-specific items
+        # Should have farm-specific items (updated to match new sidebar structure)
         item_keys = [item["key"] for item in sidebar_items]
         self.assertIn("dashboard", item_keys, "Farm sidebar should have dashboard")
-        self.assertIn("ledger", item_keys, "Farm sidebar should have ledger")
-        self.assertIn("livestock", item_keys, "Farm sidebar should have livestock")
-        self.assertIn("crops", item_keys, "Farm sidebar should have crops")
+        # New structure uses separate keys for sales/expenses, seasons (crops), assets (livestock)
+        self.assertIn("sales", item_keys, "Farm sidebar should have sales")
+        self.assertIn("expenses", item_keys, "Farm sidebar should have expenses")
+        self.assertIn("assets", item_keys, "Farm sidebar should have assets (livestock)")
+        self.assertIn("seasons", item_keys, "Farm sidebar should have seasons (crops)")
+
 
 
 class WeldingVerticalRoutingTest(TestCase):
