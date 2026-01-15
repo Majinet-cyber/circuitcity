@@ -1111,6 +1111,15 @@ urlpatterns = [
         ),
         name="restore_stock",
     ),
+    path(
+        "stock/<int:pk>/edit-price/",
+        _need_biz(
+            getattr(
+                _stock_controls, "edit_price", lambda r, pk: JsonResponse({"error": "Not implemented"}, status=501)
+            )
+        ),
+        name="edit_price",
+    ),
     # Stock CRUD operations (manager-only: edit and delete)
     path(
         "stock/<int:pk>/edit/",

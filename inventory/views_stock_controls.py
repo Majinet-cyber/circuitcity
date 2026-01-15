@@ -204,3 +204,93 @@ def restore_stock(request: HttpRequest, pk: int) -> HttpResponse:
 
     messages.success(request, f"Stock {item.imei or item.pk} restored.")
     return redirect("inventory:stock_list")
+
+
+@login_required
+@require_POST
+def edit_price(request: HttpRequest, pk: int) -> HttpResponse:
+    """
+    Edit the price of a stock item.
+    Manager-only. POST params: price (Decimal).
+    
+    - If item is SOLD: updates selling price in both InventoryItem.selling_price and Sale.price,
+      recomputing Sale commission if needed.
+    - If item is NOT sold: updates order price (cost) in InventoryItem.order_price.
+    """
+    from decimal import Decimal, InvalidOperation
+    
+    # Permission check
+    if not _is_manager(request):
+        return JsonResponse({"ok": False, "error": "Permission denied. Managers only."}, status=403)
+
+    biz = get_active_business(request)
+    if not biz:
+        return JsonResponse({"ok": False, "error": "No active business."}, status=400)
+
+    # Get the stock item
+    item = get_object_or_404(InventoryItem, pk=pk, business=biz)
+
+    # Get new price
+    new_price_str = (request.POST.get("price") or "").strip()
+    if not new_price_str:
+        return JsonResponse({"ok": False, "error": "Price required."}, status=400)
+
+    try:
+        new_price = Decimal(new_price_str)
+    except (ValueError, InvalidOperation):
+        return JsonResponse({"ok": False, "error": "Invalid price format."}, status=400)
+
+    # Validate price >= 0
+    if new_price < 0:
+        return JsonResponse({"ok": False, "error": "Price must be >= 0."}, status=400)
+
+    # Determine if item is sold
+    is_sold = item.status == "SOLD"
+
+    with transaction.atomic():
+        if is_sold:
+            # Update SELLING price
+            old_price = item.selling_price
+            item.selling_price = new_price
+            item.save(update_fields=["selling_price", "updated_at"])
+
+            # Update Sale record if exists
+            try:
+                from sales.models import Sale
+                sale = Sale.objects.select_for_update().get(item=item)
+                sale.price = new_price
+                sale.save(update_fields=["price"])
+                
+                # Note: Sale commission is auto-calculated via @property,
+                # so no need to manually update it. The commission_amount
+                # will automatically reflect the new price.
+                
+                messages.success(
+                    request,
+                    f"Selling price updated from {old_price or 0:,.0f} to {new_price:,.0f}. "
+                    f"Stock item and sale record updated."
+                )
+            except Sale.DoesNotExist:
+                # No sale record found, but item marked as SOLD.
+                # This is an edge case - still update the item's selling_price.
+                messages.warning(
+                    request,
+                    f"Selling price updated to {new_price:,.0f}. "
+                    f"Note: No sale record found for this item."
+                )
+        else:
+            # Update ORDER price (cost)
+            old_price = item.order_price
+            item.order_price = new_price
+            item.save(update_fields=["order_price", "updated_at"])
+
+            messages.success(
+                request,
+                f"Order price (cost) updated from {old_price:,.0f} to {new_price:,.0f}."
+            )
+
+    # Redirect to 'next' if provided, else back to stock list
+    next_url = request.POST.get("next") or request.GET.get("next")
+    if next_url:
+        return redirect(next_url)
+    return redirect("inventory:stock_list")

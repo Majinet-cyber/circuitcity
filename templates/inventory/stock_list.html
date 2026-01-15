@@ -522,7 +522,7 @@
                       <!-- Mobile Actions: Use button to open modal instead of dropdown -->
                       <button class="btn btn-sm btn-outline-secondary" 
                               type="button"
-                              onclick="showMobileActionsModal({{ it.pk }}, '{{ it.imei|default:""|escapejs }}', {{ show_archived|yesno:'true,false' }})"
+                              onclick="showMobileActionsModal({{ it.pk }}, '{{ it.imei|default:""|escapejs }}', {{ show_archived|yesno:'true,false' }}, '{{ it.status|lower }}', {% if it.status|lower == 'sold' %}{{ it.selling_price|default:0 }}{% else %}{{ it.order_price|default:0 }}{% endif %})"
                               style="font-size:.85rem;padding:.35rem .6rem;">
                         Actions
                       </button>
@@ -1346,7 +1346,7 @@ $id('invTopPeriod')?.addEventListener('change', loadInvTopModels);
 })();
 
 // ===== MOBILE ACTIONS MODAL =====
-window.showMobileActionsModal = function(itemId, imei, showArchived) {
+window.showMobileActionsModal = function(itemId, imei, showArchived, status, currentPrice) {
   const modal = new bootstrap.Offcanvas(document.getElementById('mobileActionsModal'));
   
   document.getElementById('mobile-action-imei').textContent = imei || '#' + itemId;
@@ -1376,6 +1376,18 @@ window.showMobileActionsModal = function(itemId, imei, showArchived) {
       showEditImeiModal(itemId, imei);
     };
     actionsList.appendChild(editBtn);
+    
+    // Edit Price button
+    const editPriceBtn = document.createElement('button');
+    editPriceBtn.className = 'btn btn-outline-secondary';
+    editPriceBtn.innerHTML = '<i class="bi bi-currency-dollar me-2"></i>Edit price';
+    editPriceBtn.setAttribute('data-testid', 'stock-edit-price');
+    editPriceBtn.onclick = function() {
+      modal.hide();
+      const isSold = status === 'sold';
+      showEditPriceModal(itemId, currentPrice, isSold, imei);
+    };
+    actionsList.appendChild(editPriceBtn);
     
     // Archive button
     const archiveForm = document.createElement('form');

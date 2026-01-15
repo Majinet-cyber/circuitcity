@@ -37,6 +37,14 @@ Usage: {% include 'inventory/partials/_stock_row_actions.html' with item=item sh
             <i class="bi bi-hash"></i> Edit IMEI
           </button>
         </li>
+        <li>
+          <button class="dropdown-item"
+                  type="button"
+                  onclick="showEditPriceModal({{ item.pk }}, {% if item.status|lower == 'sold' %}{{ item.selling_price|default:0 }}{% else %}{{ item.order_price|default:0 }}{% endif %}, {% if item.status|lower == 'sold' %}true{% else %}false{% endif %}, '{{ item.imei|default:"" }}')"
+                  data-testid="stock-edit-price">
+            <i class="bi bi-currency-dollar"></i> Edit price
+          </button>
+        </li>
         <li><hr class="dropdown-divider"></li>
         <li>
           <form method="post" action="{% url 'inventory:archive_stock' item.pk %}" style="display:inline-block; width:100%;">
