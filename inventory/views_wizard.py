@@ -72,7 +72,9 @@ def resolve_active_location(request, business):
     
     if location_id:
         try:
-            location = Location.objects.get(id=location_id, business=business, is_active=True)
+            # CRITICAL FIX: Don't query is_active - it's not a database field, only a property
+            # Location model only has is_default field (see inventory/models.py line 193-195)
+            location = Location.objects.get(id=location_id, business=business)
             request.active_location = location  # Set on request for consistency
             return location
         except Location.DoesNotExist:
@@ -84,11 +86,12 @@ def resolve_active_location(request, business):
         except Exception:
             pass  # Other DB errors - fail gracefully
     
-    # 3. Auto-select: prefer default, else first active
+    # 3. Auto-select: prefer default, else first by id
     try:
+        # CRITICAL FIX: Don't filter by is_active - it's not a database field
+        # All locations are considered "active" by design (see Location.is_active property)
         location = Location.objects.filter(
-            business=business,
-            is_active=True
+            business=business
         ).order_by('-is_default', 'id').first()
         
         if location:

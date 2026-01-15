@@ -289,15 +289,11 @@ def ensure_default_location(request: "HttpRequest", business: "Business") -> Non
             return
     
     try:
-        # Get first active location for this business
+        # Get first location for this business
+        # CRITICAL FIX: Don't filter by is_active - it's not a database field on Location
+        # Location model only has is_default field. All locations are considered "active"
+        # by design (see inventory/models.py Location.is_active property).
         qs = Location.objects.filter(business=business)
-        
-        # Prefer active locations if field exists
-        try:
-            if hasattr(Location, "is_active"):
-                qs = qs.filter(is_active=True)
-        except Exception:
-            pass
         
         # Prefer default location, fallback to first by name
         loc = (
