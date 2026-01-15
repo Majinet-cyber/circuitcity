@@ -38,18 +38,38 @@ def resolve_active_location(request, business):
     
     Returns:
         Location object or None if no active locations exist
+        
+    NOTE: This function NEVER raises exceptions - always returns None on failure
     """
-    from tenants.models import Location
+    try:
+        from inventory.models import Location
+    except ImportError:
+        # Location model not available - fail gracefully
+        import logging
+        logging.getLogger(__name__).warning("Location model not available in resolve_active_location")
+        return None
+    
+    # Guard: business must exist
+    if not business:
+        return None
     
     # 1. Check request.active_location
     location = getattr(request, "active_location", None)
     if location and getattr(location, "is_active", False):
         # Store in session for subsequent calls
-        request.session['active_location_id'] = location.id
+        try:
+            request.session['active_location_id'] = location.id
+        except Exception:
+            pass  # Session might not be available
         return location
     
     # 2. Try session active_location_id
-    location_id = request.session.get('active_location_id')
+    location_id = None
+    try:
+        location_id = request.session.get('active_location_id')
+    except Exception:
+        pass  # Session might not be available
+    
     if location_id:
         try:
             location = Location.objects.get(id=location_id, business=business, is_active=True)
@@ -57,7 +77,12 @@ def resolve_active_location(request, business):
             return location
         except Location.DoesNotExist:
             # Stale session, clear it
-            request.session.pop('active_location_id', None)
+            try:
+                request.session.pop('active_location_id', None)
+            except Exception:
+                pass
+        except Exception:
+            pass  # Other DB errors - fail gracefully
     
     # 3. Auto-select: prefer default, else first active
     try:
@@ -68,12 +93,15 @@ def resolve_active_location(request, business):
         
         if location:
             # Store in session
-            request.session['active_location_id'] = location.id
-            request.session.modified = True
+            try:
+                request.session['active_location_id'] = location.id
+                request.session.modified = True
+            except Exception:
+                pass  # Session might not be available
             request.active_location = location
             return location
     except Exception:
-        pass
+        pass  # DB query failed - fail gracefully
     
     # No active location found
     return None
@@ -129,13 +157,29 @@ def clothing_wizard(request):
     """Render the clothing add-product wizard"""
     business = get_active_business(request)
     
-    # Resolve active location (auto-select if needed)
-    location = resolve_active_location(request, business)
+    # Defensive: handle case where business is None (shouldn't happen with @require_business)
+    if not business:
+        from django.contrib import messages
+        from django.shortcuts import redirect
+        messages.error(request, "No active business found. Please select a business first.")
+        return redirect("/tenants/choose/")
     
+    # Resolve active location (auto-select if needed) - handles ImportError safely
+    location = None
+    try:
+        location = resolve_active_location(request, business)
+    except Exception as e:
+        # Fail gracefully if location resolution fails (e.g., Location model not available)
+        import logging
+        logging.getLogger(__name__).warning(f"Location resolution failed: {e}", exc_info=True)
+    
+    # CRITICAL: Even if location is None, the wizard must still load
+    # The template will show a prompt to create a location if needed
     context = {
         'business': business,
         'active_location': location,
-        'location_id': location.id if location else None
+        'location_id': location.id if location else None,
+        'has_location': location is not None
     }
     
     return render(request, "inventory/wizards/clothing_wizard.html", context)
