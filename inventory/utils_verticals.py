@@ -1770,11 +1770,8 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         ]
 
     elif business_kind == "farm":
-        # FARM MANAGER PREMIUM SIDEBAR (Jan 2026)
-        # Clean structure: Section links only, NO "Add..." duplicates
-        # Quick actions are on dashboard via quick action buttons
         return [
-            # MAIN section - Farm Manager vertical (GREEN theme)
+            # MAIN section - Farm Manager vertical (GREEN theme) - CLEAN NAVIGATION
             {
                 "section": "MAIN",
                 "key": "dashboard",
@@ -1787,6 +1784,19 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "testid": "nav-farm-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "crops",
+                "url": "verticals:farm_crops_list",
+                "label": "Crops",
+                "icon": "bi-flower1",
+                "active_prefix": "/verticals/farm/crops",
+                "active_pattern": "/verticals/farm/crops",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-farm-crops",
             },
             {
                 "section": "MAIN",
@@ -1829,19 +1839,6 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             },
             {
                 "section": "MAIN",
-                "key": "seasons",
-                "url": "verticals:farm_crops_list",
-                "label": "Seasons",
-                "icon": "bi-calendar2-week",
-                "active_prefix": "/verticals/farm/crops",
-                "active_pattern": "/verticals/farm/crops",
-                "require_manager": False,
-                "is_menu": False,
-                "is_header": False,
-                "testid": "nav-farm-seasons",
-            },
-            {
-                "section": "MAIN",
                 "key": "assets",
                 "url": "verticals:farm_assets",
                 "label": "Assets",
@@ -1870,8 +1867,8 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "section": "MAIN",
                 "key": "reports",
                 "url": "verticals:farm_reports",
-                "label": "Reports",
-                "icon": "bi-bar-chart-line",
+                "label": "Metrics & Reports",
+                "icon": "bi-graph-up-arrow",
                 "active_prefix": "/verticals/farm/reports",
                 "active_pattern": "/verticals/farm/reports",
                 "require_manager": False,
@@ -1879,24 +1876,22 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_header": False,
                 "testid": "nav-farm-reports",
             },
-            # BILLING section (manager-only, in More group)
+            # SUBSCRIPTION section (manager-only)
             {
-                "section": "MORE",
-                "key": "billing_subscribe",
+                "section": "SUBSCRIPTION",
+                "key": "billing",
                 "url": "billing:plans",
-                "label": "Subscribe",
+                "label": "Billing",
                 "icon": "bi-credit-card-2-front",
-                "active_prefix": "/billing/plans",
-                "active_pattern": "/billing/plans",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
                 "require_manager": True,
                 "is_menu": False,
                 "is_header": False,
-                "testid": "nav-farm-billing-subscribe",
-                "group": "more",
+                "testid": "nav-farm-billing",
             },
-            # SETTINGS section (manager-only, in More group)
             {
-                "section": "MORE",
+                "section": "SUBSCRIPTION",
                 "key": "settings",
                 "url": "settings_root",
                 "label": "Settings",
@@ -1907,7 +1902,6 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "testid": "nav-farm-settings",
-                "group": "more",
             },
         ]
 
@@ -2350,3 +2344,4 @@ __all__ = [
     "get_vertical_display_name",
     "get_vertical_sidebar_items",
 ]
+
