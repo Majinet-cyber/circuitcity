@@ -5,7 +5,7 @@
 
 {% block extra_head %}
 <style>
-  /* Cement/Hardware vertical: Premium blue theme (2026-01-14) */
+  /* Cement/Hardware vertical: Premium blue theme (2026-01-15 MOBILE-FIRST POLISH) */
   .vertical-cement .vertical-hero {
     background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #60a5fa 100%) !important;
     box-shadow: 0 20px 60px rgba(14, 165, 233, 0.2) !important;
@@ -22,6 +22,82 @@
   /* Card hover effects */
   .vertical-cement .card:hover {
     box-shadow: 0 8px 30px rgba(14, 165, 233, 0.1);
+  }
+  
+  /* ========= MOBILE-FIRST DASHBOARD POLISH (Jan 2026) ========= */
+  /* Ensure KPI cards fit perfectly on mobile like clothing vertical */
+  @media (max-width: 768px) {
+    .cc-kpi-grid {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    
+    .metric-card {
+      padding: 16px !important;
+      min-height: auto !important;
+    }
+    
+    .metric-card h3 {
+      font-size: 0.85rem !important;
+      margin-bottom: 8px !important;
+    }
+    
+    .metric-card p {
+      font-size: clamp(1.5rem, 6vw, 2rem) !important;
+      line-height: 1.2 !important;
+    }
+    
+    .metric-card small {
+      font-size: 0.85rem !important;
+      margin-top: 4px !important;
+    }
+    
+    /* Ensure content sections have proper spacing */
+    .row.g-3 {
+      gap: 12px !important;
+    }
+    
+    .card {
+      margin-bottom: 12px !important;
+    }
+    
+    /* Premium cement stock cards mobile polish */
+    .cement-stock-card {
+      border-radius: 16px !important;
+      overflow: hidden !important;
+      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.08) !important;
+    }
+  }
+  
+  /* Gamified cement stock cards for mobile */
+  .cement-stock-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid rgba(14, 165, 233, 0.1);
+    border-radius: 18px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .cement-stock-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 24px rgba(14, 165, 233, 0.15) !important;
+    border-color: rgba(14, 165, 233, 0.3);
+  }
+  
+  .cement-stock-status-badge {
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  
+  /* Payment mix and top products mobile responsive */
+  @media (max-width: 768px) {
+    .row.g-3 > .col-md-4 {
+      width: 100% !important;
+      margin-bottom: 12px;
+    }
   }
 </style>
 {% endblock %}

@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Stock In · Cement · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --cement-accent: #0ea5e9;
+    --cement-success: #16a34a;
+  }
+
+  .cement-container {
+    max-width: 900px;
+    margin: 2rem auto;
+    padding: 1.5rem;
+  }
+
+  .step-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .step-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    transition: all 0.3s;
+  }
+
+  .step-dot.active {
+    background: var(--cement-accent);
+    width: 32px;
+    border-radius: 6px;
+  }
+
+  .step-dot.completed {
+    background: var(--cement-success);
+  }
+
+  .premium-card {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(226, 232, 240, 0.8);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+  }
+
+  .premium-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(14, 165, 233, 0.2);
+    border-color: var(--cement-accent);
+  }
+
+  .premium-card.selected {
+    border-color: var(--cement-accent);
+    background: linear-gradient(135deg, rgba(219, 234, 254, 0.5), rgba(224, 231, 255, 0.3));
+  }
+
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+
+  .card-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+  }
+
+  .card-name {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+
+  .form-section {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 14px rgba(2, 6, 23, .08);
+  }
+
+  .form-control {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    font-size: 1rem;
+  }
+
+  .form-control:focus {
+    border-color: var(--cement-accent);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+  }
+
+  .btn-primary-cement {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: white;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    border: none;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+  }
+
+  .btn-primary-cement:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(14, 165, 233, 0.4);
+  }
+
+  @media (max-width: 640px) {
+    .cement-container {
+      padding: 1rem;
+    }
+    .card-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cement-container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="fw-bold mb-0">Stock In Cement</h1>
+    <a href="{% url 'cement:dashboard' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-x-lg"></i> Cancel
+    </a>
+  </div>
+
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <div class="step-dot {% if step == '1' %}active{% elif step == '2' %}completed{% endif %}"></div>
+    <div class="step-dot {% if step == '2' %}active{% endif %}"></div>
+  </div>
+
+  {% if step == "1" %}
+  <!-- Step 1: Select Cement Brand -->
+  <div class="text-center mb-4">
+    <h2 class="fw-bold">Select Cement Brand</h2>
+    <p class="text-muted">Choose the brand you want to stock</p>
+  </div>
+
+  {% if cement_brand_products %}
+  <form method="post">
+    {% csrf_token %}
+    <div class="card-grid">
+      {% for brand in cement_brand_products %}
+      <label class="premium-card" style="cursor: pointer;">
+        <input type="radio" name="product_id" value="{{ brand.product_id }}" style="display:none;" required>
+        <div style="text-align: center;">
+          <div class="card-icon">{{ brand.icon }}</div>
+          <h3 class="card-name">{{ brand.brand_name }}</h3>
+          <p class="text-muted mb-0" style="font-size: 0.9rem;">{{ brand.full_name }}</p>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+      <button type="submit" class="btn-primary-cement">
+        Continue <i class="bi bi-arrow-right ms-2"></i>
+      </button>
+    </div>
+  </form>
+
+  <script>
+    // Auto-select card on radio change
+    document.querySelectorAll('input[name="product_id"]').forEach(radio => {
+      radio.addEventListener('change', function() {
+        document.querySelectorAll('.premium-card').forEach(card => card.classList.remove('selected'));
+        this.closest('.premium-card').classList.add('selected');
+      });
+    });
+  </script>
+  {% else %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> No cement products found. Please add cement brands first.
+  </div>
+  {% endif %}
+
+  {% elif step == "2" %}
+  <!-- Step 2: Quantity & Pricing -->
+  <div class="text-center mb-4">
+    <h2 class="fw-bold">{{ selected_product_name }}</h2>
+    <p class="text-muted">Enter quantity and pricing</p>
+  </div>
+
+  <form method="post" class="form-section">
+    {% csrf_token %}
+    
+    <div class="mb-3">
+      <label for="quantity" class="form-label fw-bold">Quantity (Bags)</label>
+      <input type="number" class="form-control" id="quantity" name="quantity" min="1" required autofocus>
+      <small class="text-muted">Number of 50KG bags</small>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label for="cost_price" class="form-label fw-bold">Order Price (per bag)</label>
+        <input type="number" class="form-control" id="cost_price" name="cost_price" step="0.01" min="0.01" required
+               {% if default_cost_price %}value="{{ default_cost_price }}"{% endif %}>
+        <small class="text-muted">How much you paid</small>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label for="selling_price" class="form-label fw-bold">Selling Price (per bag)</label>
+        <input type="number" class="form-control" id="selling_price" name="selling_price" step="0.01" min="0.01" required
+               {% if default_selling_price %}value="{{ default_selling_price }}"{% endif %}>
+        <small class="text-muted">How much you'll sell</small>
+      </div>
+    </div>
+
+    <!-- Margin Calculator (JS) -->
+    <div id="margin-preview" class="alert alert-light d-none">
+      <strong>Margin:</strong> <span id="margin-value"></span>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+      <a href="{% url 'cement:stock_in' %}?step=1" class="btn btn-outline-secondary flex-fill">
+        <i class="bi bi-arrow-left"></i> Back
+      </a>
+      <button type="submit" class="btn-primary-cement flex-fill">
+        <i class="bi bi-check-circle me-2"></i> Save Stock
+      </button>
+    </div>
+  </form>
+
+  <script>
+    // Margin calculator
+    const costInput = document.getElementById('cost_price');
+    const sellInput = document.getElementById('selling_price');
+    const qtyInput = document.getElementById('quantity');
+    const marginPreview = document.getElementById('margin-preview');
+    const marginValue = document.getElementById('margin-value');
+
+    function updateMargin() {
+      const cost = parseFloat(costInput.value) || 0;
+      const sell = parseFloat(sellInput.value) || 0;
+      const qty = parseInt(qtyInput.value) || 0;
+      
+      if (cost > 0 && sell > 0 && qty > 0) {
+        const margin = sell - cost;
+        const marginPct = ((margin / sell) * 100).toFixed(1);
+        const totalMargin = margin * qty;
+        
+        marginValue.innerHTML = `MK ${margin.toFixed(0)} per bag (<strong>${marginPct}%</strong>) · Total: MK ${totalMargin.toFixed(0)}`;
+        marginPreview.classList.remove('d-none');
+        
+        if (marginPct < 10) {
+          marginPreview.className = 'alert alert-warning';
+        } else if (marginPct > 30) {
+          marginPreview.className = 'alert alert-success';
+        } else {
+          marginPreview.className = 'alert alert-info';
+        }
+      } else {
+        marginPreview.classList.add('d-none');
+      }
+    }
+
+    costInput.addEventListener('input', updateMargin);
+    sellInput.addEventListener('input', updateMargin);
+    qtyInput.addEventListener('input', updateMargin);
+    
+    // Initial calculation
+    updateMargin();
+  </script>
+  {% endif %}
+</div>
+{% endblock %}
+

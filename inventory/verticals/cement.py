@@ -574,150 +574,55 @@ def stock_list(request):
 @require_business_kind(BusinessKind.CEMENT)
 def stock_in(request):
     """
-    Card-based Stock-In wizard for cement/construction materials.
+    FAST Stock-In wizard for cement (2-step demo flow).
     
-    Flow:
-    Step 1: Category cards (Construction Materials, Welding Materials, Car Spares, etc.) - from catalog registry
-    Step 2: Product cards (Cement, Paint, Iron Sheets, etc.)
-    Step 3: Variant selection (Brand → Size → Finish/Color based on product)
-    Step 4: Quantity & Pricing
+    Flow (CEMENT DEMO OPTIMIZED - Jan 2026):
+    Step 1: Select Cement Brand (Dangote, Akshar, etc.) - fast demo start
+    Step 2: Quantity & Pricing (order price + selling price + quantity) → Save
+    
+    NO category step, NO extra details step for cement.
+    Default: 50KG bag cement products.
     
     All product definitions come from SSOT: inventory/catalog/construction_materials.py
-    All categories come from SSOT: inventory/catalog/registry.py
     """
     business = get_active_business(request)
 
     # Seed default cement brands if not already seeded (idempotent)
     seed_cement_defaults(business)
 
-    # Step tracking
+    # Step tracking (fast 2-step flow: brand → quantity/price)
     step = request.GET.get("step", "1")
 
     if request.method == "POST":
         try:
-            # Step 1: Category selection
+            # Step 1: Brand selection (select existing cement product by ID)
             if step == "1":
-                category = request.POST.get("category", "").strip()
-                if not category:
-                    messages.error(request, "Please select a category")
+                product_id = request.POST.get("product_id", "").strip()
+                if not product_id:
+                    messages.error(request, "Please select a cement brand")
                     return redirect(f"{reverse('cement:stock_in')}?step=1")
                 
-                # Validate category exists in registry
-                category_def = get_category_by_key(category)
-                if not category_def:
-                    messages.error(request, "Invalid category selected")
-                    return redirect(f"{reverse('cement:stock_in')}?step=1")
-                
-                # Check if category handler is implemented
-                handler = get_category_handler(category)
-                if handler == "coming_soon":
-                    messages.warning(
-                        request,
-                        f"⚠️ {category_def['label']} is coming soon! Stock-In flow not yet implemented."
+                # Validate product exists
+                try:
+                    selected_product = MerchProduct.objects.get(
+                        id=int(product_id),
+                        business=business,
+                        kind=BusinessKind.CEMENT,
+                        is_active=True
                     )
+                    # Store the product_id for step 2
+                    request.session["cement_stock_in_product_id"] = selected_product.id
+                    request.session["cement_stock_in_brand"] = get_brand_label_for_product(selected_product)
+                    return redirect(f"{reverse('cement:stock_in')}?step=2")
+                except (MerchProduct.DoesNotExist, ValueError):
+                    messages.error(request, "Invalid cement brand selected")
                     return redirect(f"{reverse('cement:stock_in')}?step=1")
-                
-                # Store category in session for next step
-                request.session["cement_stock_in_category"] = category
-                return redirect(f"{reverse('cement:stock_in')}?step=2")
 
-            # Step 2: Product selection
+            # Step 2: Quantity and pricing
             elif step == "2":
-                product_slug = request.POST.get("product", "").strip()
-                if not product_slug:
-                    messages.error(request, "Please select a product")
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
-                
-                # Validate product exists in catalog
-                product_def = get_product_by_slug(product_slug)
-                if not product_def:
-                    messages.error(request, "Invalid product selected")
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
-                
-                # Store product slug in session
-                request.session["cement_stock_in_product_slug"] = product_slug
-                
-                # All products go to step 3 for variant selection
-                return redirect(f"{reverse('cement:stock_in')}?step=3")
-
-            # Step 3: Variant selection (Brand → Size → Finish/Color)
-            elif step == "3":
-                product_slug = request.session.get("cement_stock_in_product_slug", "")
-                product_def = get_product_by_slug(product_slug)
-                
-                if not product_def:
-                    messages.error(request, "Product not found. Please start from Step 1.")
-                    return redirect("cement:stock_in")
-                
-                # FIX: For cement, handle product_id selection (real DB products)
-                if is_cement_product(product_slug):
-                    product_id = request.POST.get("product_id", "").strip()
-                    if not product_id:
-                        messages.error(request, "Please select a cement brand")
-                        return redirect(f"{reverse('cement:stock_in')}?step=3")
-                    
-                    # Validate product exists
-                    try:
-                        selected_product = MerchProduct.objects.get(
-                            id=int(product_id),
-                            business=business,
-                            kind=BusinessKind.CEMENT,
-                            is_active=True
-                        )
-                        # Store the product_id for step 4
-                        request.session["cement_stock_in_product_id"] = selected_product.id
-                        request.session["cement_stock_in_brand"] = get_brand_label_for_product(selected_product)
-                        request.session["cement_stock_in_size"] = "50kg"
-                        return redirect(f"{reverse('cement:stock_in')}?step=4")
-                    except (MerchProduct.DoesNotExist, ValueError):
-                        messages.error(request, "Invalid product selected")
-                        return redirect(f"{reverse('cement:stock_in')}?step=3")
-                
-                # Extract variant selections (for non-cement products)
-                brand = request.POST.get("brand", "").strip()
-                size = request.POST.get("size", "").strip()
-                finish = request.POST.get("finish", "").strip()
-                color = request.POST.get("color", "").strip()
-                gauge = request.POST.get("gauge", "").strip()
-                dimension = request.POST.get("dimension", "").strip()
-                
-                # Validate required variants based on product
-                if product_def.get("brands") and not brand:
-                    messages.error(request, "Please select a brand")
-                    return redirect(f"{reverse('cement:stock_in')}?step=3")
-                
-                if product_def.get("sizes") and not size:
-                    messages.error(request, "Please select a size")
-                    return redirect(f"{reverse('cement:stock_in')}?step=3")
-                
-                # Normalize paint size if needed (handles legacy 4L)
-                if product_slug == "paint" and size:
-                    size = normalize_paint_size(size)
-                
-                # Store variants in session
-                request.session["cement_stock_in_brand"] = brand
-                request.session["cement_stock_in_size"] = size
-                request.session["cement_stock_in_finish"] = finish
-                request.session["cement_stock_in_color"] = color
-                request.session["cement_stock_in_gauge"] = gauge
-                request.session["cement_stock_in_dimension"] = dimension
-                
-                return redirect(f"{reverse('cement:stock_in')}?step=4")
-
-            # Step 4: Quantity and pricing
-            elif step == "4":
-                product_slug = request.session.get("cement_stock_in_product_slug", "")
-                product_id = request.session.get("cement_stock_in_product_id")  # For cement (existing product)
-                brand = request.session.get("cement_stock_in_brand", "")
-                size = request.session.get("cement_stock_in_size", "")
-                finish = request.session.get("cement_stock_in_finish", "")
-                color = request.session.get("cement_stock_in_color", "")
-                gauge = request.session.get("cement_stock_in_gauge", "")
-                dimension = request.session.get("cement_stock_in_dimension", "")
-                
-                product_def = get_product_by_slug(product_slug)
-                if not product_def:
-                    messages.error(request, "Product not found. Please start from Step 1.")
+                product_id = request.session.get("cement_stock_in_product_id")
+                if not product_id:
+                    messages.error(request, "Please start from Step 1")
                     return redirect("cement:stock_in")
                 
                 quantity = int(request.POST.get("quantity", 0))
@@ -726,88 +631,36 @@ def stock_in(request):
 
                 if quantity <= 0:
                     messages.error(request, "Quantity must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=4")
+                    return redirect(f"{reverse('cement:stock_in')}?step=2")
 
                 if cost_price <= 0 or selling_price <= 0:
                     messages.error(request, "Cost and selling prices must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=4")
+                    return redirect(f"{reverse('cement:stock_in')}?step=2")
 
                 with transaction.atomic():
-                    # FIX: For cement with existing product_id, update that product
-                    if is_cement_product(product_slug) and product_id:
-                        try:
-                            product = MerchProduct.objects.get(
-                                id=product_id,
-                                business=business,
-                                kind=BusinessKind.CEMENT,
-                                is_active=True
-                            )
-                            # Update existing product
-                            product.quantity_in_stock += quantity
-                            product.cost_price = cost_price
-                            product.selling_price = selling_price
-                            product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
-                            
-                            messages.success(
-                                request,
-                                f"✅ Added {quantity} {product_def['default_unit']} of {product.name} to stock"
-                            )
-                        except MerchProduct.DoesNotExist:
-                            messages.error(request, "Product not found")
-                            return redirect("cement:stock_in")
-                    else:
-                        # Build product name using SSOT (for new products)
-                        product_name = build_product_name(
-                            product_slug,
-                            brand=brand,
-                            size=size,
-                            finish=finish,
-                            color=color,
-                            gauge=gauge,
-                            dimension=dimension,
-                        )
-                        
-                        # Get or create product
-                        product, created = MerchProduct.objects.get_or_create(
+                    try:
+                        product = MerchProduct.objects.get(
+                            id=product_id,
                             business=business,
-                            name=product_name,
                             kind=BusinessKind.CEMENT,
-                            defaults={
-                                "category": product_def["category"],
-                                "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
-                                "cost_price": cost_price,
-                                "selling_price": selling_price,
-                                "quantity_in_stock": quantity,
-                                "base_unit": product_def["default_unit"],
-                                "is_active": True,
-                                "track_inventory": True,
-                            },
+                            is_active=True
                         )
-
-                        if not created:
-                            # Update existing product
-                            product.quantity_in_stock += quantity
-                            product.cost_price = cost_price
-                            product.selling_price = selling_price
-                            product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
-
+                        # Update existing product
+                        product.quantity_in_stock += quantity
+                        product.cost_price = cost_price
+                        product.selling_price = selling_price
+                        product.save(update_fields=["quantity_in_stock", "cost_price", "selling_price"])
+                        
                         messages.success(
                             request,
-                            f"✅ Added {quantity} {product_def['default_unit']} of {product_name} to stock"
+                            f"✅ Added {quantity} bag of {product.name} to stock"
                         )
+                    except MerchProduct.DoesNotExist:
+                        messages.error(request, "Product not found")
+                        return redirect("cement:stock_in")
 
                     # Clear session
-                    for key in [
-                        "cement_stock_in_category",
-                        "cement_stock_in_product_slug",
-                        "cement_stock_in_product_id",  # Clear the product_id too
-                        "cement_stock_in_brand",
-                        "cement_stock_in_size",
-                        "cement_stock_in_finish",
-                        "cement_stock_in_color",
-                        "cement_stock_in_gauge",
-                        "cement_stock_in_dimension",
-                    ]:
+                    for key in ["cement_stock_in_product_id", "cement_stock_in_brand"]:
                         if key in request.session:
                             del request.session[key]
 
@@ -821,167 +674,71 @@ def stock_in(request):
             return redirect(f"{reverse('cement:stock_in')}?step={step}")
 
     # GET: Show appropriate step
-    product_slug = request.session.get("cement_stock_in_product_slug", "")
-    
     context = {
         "business": business,
         "step": step,
         "active_tab": "stock_in",
     }
 
-    # Step 1: Show category cards filtered by business inventory
+    # Step 1: Show cement brand selection (direct brand cards)
     if step == "1":
-        categories = get_filtered_stock_in_categories(business)
-        context["categories"] = categories
-
-    # Step 2: Show product cards for selected category
-    elif step == "2":
-        category = request.session.get("cement_stock_in_category", "")
-        all_products = get_all_products()  # Get all construction products from catalog
-        
-        # FIX: Filter products based on what business actually has in stock
-        # Only show product types that have at least one product in DB
-        # Always show cement, but hide others (paint, iron, etc.) unless they have products
-        filtered_products = []
-        for product_def in all_products:
-            product_slug = product_def["slug"]
-            
-            # Always show cement (default for cement businesses)
-            if product_slug == "cement":
-                filtered_products.append(product_def)
-                continue
-            
-            # For other products, only show if business has stocked them
-            # Map product slug to category for DB lookup
-            category_map = {
-                "paint": "paint",
-                "iron-sheets": "iron",
-                "angle-iron": "angle",
-            }
-            cat_name = category_map.get(product_slug, product_slug)
-            
-            # Check if business has any products of this type
-            has_products = MerchProduct.objects.filter(
-                business=business,
-                kind=BusinessKind.CEMENT,
-                is_active=True,
-                category__icontains=cat_name
-            ).exists()
-            
-            if has_products:
-                filtered_products.append(product_def)
-        
-        context["selected_category"] = category
-        context["products"] = filtered_products
-
-    # Step 3: Show variant selection for selected product (skipped for cement unless choosing brand)
-    elif step == "3":
-        product_def = get_product_by_slug(product_slug)
-        
-        if not product_def:
-            messages.error(request, "Product not found. Please start from Step 1.")
-            return redirect("cement:stock_in")
-        
-        # FIX: For cement, show actual brand products from DB instead of catalog brands
-        if is_cement_product(product_slug):
-            # Get real cement products from DB for this business
-            cement_products = MerchProduct.objects.filter(
-                business=business,
-                kind=BusinessKind.CEMENT,
-                is_active=True,
-                category__icontains="cement"
-            ).exclude(
-                name__iexact="Cement"  # Exclude generic placeholder
-            ).order_by("name")
-            
-            # Filter out placeholder products
-            cement_products = [p for p in cement_products if not is_placeholder_product(p)]
-            
-            # Build brand choices from actual products
-            cement_brand_products = []
-            seen_brands = set()
-            for product in cement_products:
-                brand_label = get_brand_label_for_product(product)
-                if brand_label and brand_label.lower() not in seen_brands:
-                    seen_brands.add(brand_label.lower())
-                    cement_brand_products.append({
-                        "product_id": product.id,
-                        "brand_name": brand_label,
-                        "full_name": product.name,
-                        "icon": "🏗️",
-                    })
-            
-            context["cement_brand_products"] = cement_brand_products
-            context["is_cement_brand_selection"] = True
-        
-        context["product_def"] = product_def
-        context["selected_product_slug"] = product_slug
-
-    # Step 4: Show quantity/pricing form
-    elif step == "4":
-        product_id = request.session.get("cement_stock_in_product_id")  # For cement (real DB product)
-        brand = request.session.get("cement_stock_in_brand", "")
-        size = request.session.get("cement_stock_in_size", "")
-        finish = request.session.get("cement_stock_in_finish", "")
-        color = request.session.get("cement_stock_in_color", "")
-        gauge = request.session.get("cement_stock_in_gauge", "")
-        dimension = request.session.get("cement_stock_in_dimension", "")
-        
-        product_def = get_product_by_slug(product_slug)
-        if not product_def:
-            messages.error(request, "Product not found. Please start from Step 1.")
-            return redirect("cement:stock_in")
-        
-        # FIX: For cement with selected product_id, show the actual product name
-        if is_cement_product(product_slug) and product_id:
-            try:
-                selected_product = MerchProduct.objects.get(
-                    id=product_id,
-                    business=business,
-                    kind=BusinessKind.CEMENT,
-                    is_active=True
-                )
-                suggested_name = selected_product.name
-                context["selected_product_id"] = product_id
-                context["is_existing_cement_product"] = True
-            except MerchProduct.DoesNotExist:
-                messages.error(request, "Selected product not found. Please start over.")
-                return redirect("cement:stock_in")
-        else:
-            # Build suggested product name for new products (paint, iron, etc.)
-            suggested_name = build_product_name(
-                product_slug,
-                brand=brand,
-                size=size,
-                finish=finish,
-                color=color,
-                gauge=gauge,
-                dimension=dimension,
-            )
-        
-        # For prefill: look up existing product's selling price if it exists
-        default_selling_price = None
-        existing_product = MerchProduct.objects.filter(
+        # Get real cement products from DB for this business
+        cement_products = MerchProduct.objects.filter(
             business=business,
-            name=suggested_name,
             kind=BusinessKind.CEMENT,
-            is_active=True
-        ).first()
-        if existing_product and existing_product.selling_price:
-            default_selling_price = existing_product.selling_price
+            is_active=True,
+            category__icontains="cement"
+        ).exclude(
+            name__iexact="Cement"  # Exclude generic placeholder
+        ).order_by("name")
         
-        context["product_def"] = product_def
-        context["suggested_name"] = suggested_name
-        context["selected_brand"] = brand
-        context["selected_size"] = size
-        context["selected_finish"] = finish
-        context["selected_color"] = color
-        context["selected_gauge"] = gauge
-        context["selected_dimension"] = dimension
-        context["default_selling_price"] = default_selling_price
-        context["is_cement"] = is_cement_product(product_slug)
+        # Filter out placeholder products
+        cement_products = [p for p in cement_products if not is_placeholder_product(p)]
+        
+        # Build brand choices from actual products
+        cement_brand_products = []
+        seen_brands = set()
+        for product in cement_products:
+            brand_label = get_brand_label_for_product(product)
+            if brand_label and brand_label.lower() not in seen_brands:
+                seen_brands.add(brand_label.lower())
+                cement_brand_products.append({
+                    "product_id": product.id,
+                    "brand_name": brand_label,
+                    "full_name": product.name,
+                    "icon": "🏗️",
+                })
+        
+        context["cement_brand_products"] = cement_brand_products
 
-    return render(request, "verticals/cement/stock_in_v2.html", context)
+    # Step 2: Show quantity/pricing form
+    elif step == "2":
+        product_id = request.session.get("cement_stock_in_product_id")
+        if not product_id:
+            messages.error(request, "Please start from Step 1")
+            return redirect("cement:stock_in")
+        
+        try:
+            selected_product = MerchProduct.objects.get(
+                id=product_id,
+                business=business,
+                kind=BusinessKind.CEMENT,
+                is_active=True
+            )
+            context["selected_product"] = selected_product
+            context["selected_product_name"] = selected_product.name
+            context["is_cement"] = True
+            
+            # For prefill: use existing prices if available
+            if selected_product.selling_price:
+                context["default_selling_price"] = selected_product.selling_price
+            if selected_product.cost_price:
+                context["default_cost_price"] = selected_product.cost_price
+        except MerchProduct.DoesNotExist:
+            messages.error(request, "Selected product not found. Please start over.")
+            return redirect("cement:stock_in")
+
+    return render(request, "verticals/cement/stock_in_fast.html", context)
 
 
 @login_required
