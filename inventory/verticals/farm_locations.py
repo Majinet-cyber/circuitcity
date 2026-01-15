@@ -44,18 +44,29 @@ def locations_list(request: HttpRequest) -> HttpResponse:
 @require_business_kind(BusinessKind.FARM)
 @require_http_methods(["GET", "POST"])
 def locations_create(request: HttpRequest) -> HttpResponse:
-    """Create a new farm location."""
+    """Create a new farm location with optional GPS coordinates."""
     ctx = base.base_context(request)
     business = ctx.get("business")
     
     if request.method == "POST":
         try:
-            location = Location.objects.create(
-                business=business,
-                name=request.POST.get("name", ""),
-                address=request.POST.get("address", ""),
-                notes=request.POST.get("notes", ""),
-            )
+            # Build location data
+            location_data = {
+                "business": business,
+                "name": request.POST.get("name", ""),
+                "address": request.POST.get("address", ""),
+                "notes": request.POST.get("notes", ""),
+            }
+            
+            # Handle GPS coordinates (optional) - store in notes if fields don't exist
+            latitude = request.POST.get("latitude", "").strip()
+            longitude = request.POST.get("longitude", "").strip()
+            if latitude and longitude:
+                # Append GPS coordinates to notes for now (backwards compatible)
+                gps_note = f"\n[GPS: {latitude}, {longitude}]"
+                location_data["notes"] = (location_data["notes"] or "") + gps_note
+            
+            location = Location.objects.create(**location_data)
             messages.success(request, f"Location '{location.name}' created successfully.")
             return redirect("verticals:farm_locations")
         except Exception as e:

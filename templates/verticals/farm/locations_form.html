@@ -2,8 +2,51 @@
 
 {% block title %}{{ hero_title }} - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* GPS Button Styles */
+.gps-section {
+    background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+    border: 1px solid #93c5fd;
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.gps-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.gps-status {
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.gps-status.success {
+    color: #16a34a;
+}
+
+.gps-status.error {
+    color: #dc2626;
+}
+
+.gps-coords {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.gps-coords input {
+    font-family: monospace;
+    font-size: 0.8125rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
+<div class="container-fluid py-3" data-testid="farm-locations-form">
     <div class="mb-4">
         <a href="{% url 'verticals:farm_locations' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Locations</a>
         <h1 class="h3 mb-1"><span class="me-2">📍</span>{{ hero_title }}</h1>
@@ -15,7 +58,7 @@
                 {% csrf_token %}
                 
                 <div class="mb-3">
-                    <label class="form-label">Name</label>
+                    <label class="form-label">Name *</label>
                     <input type="text" name="name" class="form-control" placeholder="e.g., North Field, Plot A" value="{{ location.name|default:'' }}" required>
                 </div>
                 
@@ -23,10 +66,36 @@
                     <label class="form-label">Address / Description</label>
                     <input type="text" name="address" class="form-control" placeholder="e.g., Near the river, 5 acres" value="{{ location.address|default:'' }}">
                 </div>
+
+                <!-- GPS Capture Section -->
+                <div class="gps-section" data-testid="gps-section">
+                    <label class="form-label"><i class="bi bi-geo-alt-fill me-1"></i> GPS Coordinates (Optional)</label>
+                    <p class="text-muted small mb-2">Capture your farm location for mapping and field boundaries.</p>
+                    
+                    <button type="button" class="btn btn-primary gps-btn" id="gpsBtn" data-testid="use-gps-btn">
+                        <i class="bi bi-crosshair"></i>
+                        <span id="gpsBtnText">Use GPS</span>
+                    </button>
+                    
+                    <div class="gps-status" id="gpsStatus"></div>
+                    
+                    <div class="gps-coords mt-3">
+                        <div class="flex-grow-1">
+                            <label class="form-label small">Latitude</label>
+                            <input type="text" name="latitude" id="latitude" class="form-control form-control-sm" 
+                                   placeholder="-13.9626" value="{{ location.latitude|default:'' }}">
+                        </div>
+                        <div class="flex-grow-1">
+                            <label class="form-label small">Longitude</label>
+                            <input type="text" name="longitude" id="longitude" class="form-control form-control-sm" 
+                                   placeholder="33.7741" value="{{ location.longitude|default:'' }}">
+                        </div>
+                    </div>
+                </div>
                 
                 <div class="mb-3">
                     <label class="form-label">Notes (optional)</label>
-                    <textarea name="notes" class="form-control" rows="2">{{ location.notes|default:'' }}</textarea>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Any additional notes">{{ location.notes|default:'' }}</textarea>
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100">
@@ -36,4 +105,76 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Farm-only GPS capture functionality
+(function() {
+    'use strict';
+    
+    const gpsBtn = document.getElementById('gpsBtn');
+    const gpsBtnText = document.getElementById('gpsBtnText');
+    const gpsStatus = document.getElementById('gpsStatus');
+    const latInput = document.getElementById('latitude');
+    const lngInput = document.getElementById('longitude');
+    
+    if (!gpsBtn) return;
+    
+    gpsBtn.addEventListener('click', function() {
+        // Check if geolocation is supported
+        if (!navigator.geolocation) {
+            gpsStatus.textContent = 'Geolocation is not supported by your browser.';
+            gpsStatus.className = 'gps-status error';
+            return;
+        }
+        
+        // Update button state
+        gpsBtnText.textContent = 'Getting location...';
+        gpsBtn.disabled = true;
+        gpsStatus.textContent = '';
+        gpsStatus.className = 'gps-status';
+        
+        navigator.geolocation.getCurrentPosition(
+            // Success callback
+            function(position) {
+                latInput.value = position.coords.latitude.toFixed(6);
+                lngInput.value = position.coords.longitude.toFixed(6);
+                
+                gpsBtnText.textContent = 'Update GPS';
+                gpsBtn.disabled = false;
+                gpsStatus.textContent = '✓ GPS coordinates captured successfully!';
+                gpsStatus.className = 'gps-status success';
+            },
+            // Error callback
+            function(error) {
+                gpsBtnText.textContent = 'Use GPS';
+                gpsBtn.disabled = false;
+                
+                let message = 'Unable to get location.';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        message = 'Location permission denied. Please enable location access in your browser settings.';
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        message = 'Location information unavailable. Try again later.';
+                        break;
+                    case error.TIMEOUT:
+                        message = 'Location request timed out. Please try again.';
+                        break;
+                }
+                
+                gpsStatus.textContent = message;
+                gpsStatus.className = 'gps-status error';
+            },
+            // Options
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            }
+        );
+    });
+})();
+</script>
 {% endblock %}
