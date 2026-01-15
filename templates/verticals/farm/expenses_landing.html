@@ -3,12 +3,157 @@
 
 {% block title %}Expenses - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Expenses Premium Styles ===== */
+.farm-expenses {
+    --farm-red: #dc2626;
+    --farm-red-light: #fee2e2;
+}
+
+/* Category Cards Grid */
+.category-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (min-width: 576px) {
+    .category-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .category-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Category Card */
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-xs);
+    cursor: pointer;
+    text-align: center;
+}
+
+.category-card:hover {
+    background: var(--farm-red-light);
+    border-color: var(--farm-red);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.category-card:focus {
+    outline: 2px solid var(--farm-red);
+    outline-offset: 2px;
+}
+
+.category-card .emoji {
+    font-size: 2rem;
+}
+
+.category-card .label {
+    font-weight: 700;
+    font-size: 0.8125rem;
+}
+
+.category-card .sublabel {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Fertiliser Sub-cards */
+.fertiliser-panel {
+    background: linear-gradient(135deg, #fef2f2, #fee2e2);
+    border: 1px solid #fca5a5;
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    display: none;
+}
+
+.fertiliser-panel.visible {
+    display: block;
+}
+
+.fertiliser-panel h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: #991b1b;
+}
+
+.fertiliser-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+
+@media (min-width: 576px) {
+    .fertiliser-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.fertiliser-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.75rem 0.5rem;
+    background: white;
+    border: 2px solid #fca5a5;
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+
+.fertiliser-card:hover {
+    background: #fef2f2;
+    border-color: var(--farm-red);
+    transform: translateY(-1px);
+}
+
+.fertiliser-card .icon {
+    font-size: 1.25rem;
+}
+
+.fertiliser-card .label {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
+<div class="farm-expenses container-fluid py-3" data-testid="farm-expenses-page">
     <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
-            <h1 class="h3 mb-1"><span class="me-2">📊</span>{{ hero_title }}</h1>
-            <p class="text-muted mb-0">{{ hero_blurb }}</p>
+            <h1 class="h3 mb-1"><span class="me-2">💸</span>Farm Expenses</h1>
+            <p class="text-muted mb-0">Track and categorize your farm costs</p>
         </div>
         {% if filter_state %}
         {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
@@ -16,25 +161,128 @@
     </div>
     
     <div class="mb-4">
-        <a href="{% url 'verticals:farm_expenses_record' %}" class="btn btn-danger">
-            <i class="bi bi-plus-circle me-1"></i> Record Expense
+        <p class="text-muted"><i class="bi bi-lightning-fill text-warning me-1"></i> Quick pick a category to record an expense</p>
+    </div>
+    
+    <!-- Category Cards -->
+    <div class="category-cards-grid" data-testid="expense-category-cards">
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=labour" class="category-card" data-testid="expense-card-labour">
+            <span class="emoji">👷</span>
+            <span class="label">Labour</span>
+            <span class="sublabel">Workers, casual</span>
         </a>
-        <a href="{% url 'verticals:farm_expenses_export' %}" class="btn btn-outline-secondary ms-2">
+        <button type="button" class="category-card" id="inputsBtn" data-testid="expense-card-inputs">
+            <span class="emoji">🌱</span>
+            <span class="label">Inputs</span>
+            <span class="sublabel">Fertiliser, seeds</span>
+        </button>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=transport" class="category-card" data-testid="expense-card-transport">
+            <span class="emoji">🚚</span>
+            <span class="label">Transport</span>
+            <span class="sublabel">Deliveries</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=equipment" class="category-card" data-testid="expense-card-equipment">
+            <span class="emoji">🔧</span>
+            <span class="label">Repairs</span>
+            <span class="sublabel">Equipment, tools</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=vet" class="category-card" data-testid="expense-card-vet">
+            <span class="emoji">💊</span>
+            <span class="label">Vet / Medicine</span>
+            <span class="sublabel">Animal health</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=feed" class="category-card" data-testid="expense-card-feed">
+            <span class="emoji">🌾</span>
+            <span class="label">Feed</span>
+            <span class="sublabel">Animal feed</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=fuel" class="category-card" data-testid="expense-card-fuel">
+            <span class="emoji">⛽</span>
+            <span class="label">Fuel / Diesel</span>
+            <span class="sublabel">Vehicles, machines</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=utilities" class="category-card" data-testid="expense-card-utilities">
+            <span class="emoji">💡</span>
+            <span class="label">Utilities</span>
+            <span class="sublabel">Water, electricity</span>
+        </a>
+        <a href="{% url 'verticals:farm_expenses_record' %}?category=other" class="category-card" data-testid="expense-card-other">
+            <span class="emoji">📝</span>
+            <span class="label">Other</span>
+            <span class="sublabel">Miscellaneous</span>
+        </a>
+    </div>
+
+    <!-- Fertiliser Sub-panel (appears when Inputs is clicked) -->
+    <div class="fertiliser-panel" id="fertiliserPanel" data-testid="fertiliser-cards-panel">
+        <h3><i class="bi bi-arrow-down-circle me-2"></i>Select Fertiliser Type</h3>
+        <div class="fertiliser-cards-grid" data-testid="fertiliser-cards">
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=urea" class="fertiliser-card" data-testid="fertiliser-card-urea">
+                <span class="icon">🧪</span>
+                <span class="label">Urea</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=npk" class="fertiliser-card" data-testid="fertiliser-card-npk">
+                <span class="icon">🌿</span>
+                <span class="label">NPK</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=d-compound" class="fertiliser-card" data-testid="fertiliser-card-d-compound">
+                <span class="icon">🧫</span>
+                <span class="label">D-Compound</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=can" class="fertiliser-card" data-testid="fertiliser-card-can">
+                <span class="icon">🥫</span>
+                <span class="label">CAN</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=ssp" class="fertiliser-card" data-testid="fertiliser-card-ssp">
+                <span class="icon">⚗️</span>
+                <span class="label">SSP</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=manure" class="fertiliser-card" data-testid="fertiliser-card-manure">
+                <span class="icon">💩</span>
+                <span class="label">Manure</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=seeds" class="fertiliser-card" data-testid="fertiliser-card-seeds">
+                <span class="icon">🌱</span>
+                <span class="label">Seeds</span>
+            </a>
+            <a href="{% url 'verticals:farm_expenses_record' %}?category=fertiliser&type=other" class="fertiliser-card" data-testid="fertiliser-card-other">
+                <span class="icon">📦</span>
+                <span class="label">Other Input</span>
+            </a>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-3" id="closeFertiliserPanel">
+            <i class="bi bi-x me-1"></i> Close
+        </button>
+    </div>
+
+    <hr class="my-4">
+    
+    <div class="d-flex gap-2">
+        <a href="{% url 'verticals:farm_expenses_record' %}" class="btn btn-outline-danger">
+            <i class="bi bi-plus-circle me-1"></i> Record Any Expense
+        </a>
+        <a href="{% url 'verticals:farm_expenses_export' %}" class="btn btn-outline-secondary">
             <i class="bi bi-download me-1"></i> Export CSV
         </a>
     </div>
-    
-    <!-- Expense Categories -->
-    <div class="row g-3">
-        {% for value, label in expense_categories %}
-        <div class="col-6 col-md-3">
-            <a href="{% url 'verticals:farm_expenses_record' %}?category={{ value }}" class="card text-decoration-none h-100">
-                <div class="card-body text-center py-3">
-                    <h6 class="card-title mb-0">{{ label }}</h6>
-                </div>
-            </a>
-        </div>
-        {% endfor %}
-    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputsBtn = document.getElementById('inputsBtn');
+    const fertiliserPanel = document.getElementById('fertiliserPanel');
+    const closeBtn = document.getElementById('closeFertiliserPanel');
+    
+    inputsBtn.addEventListener('click', function() {
+        fertiliserPanel.classList.add('visible');
+        fertiliserPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    
+    closeBtn.addEventListener('click', function() {
+        fertiliserPanel.classList.remove('visible');
+    });
+});
+</script>
 {% endblock %}
