@@ -113,11 +113,14 @@ class MarketingContentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'staticpages/about.html')
         
-        # Should contain trust block sections
+        # Should contain trust block sections (enhanced copy)
         self.assertContains(response, 'Who It\'s For')
         self.assertContains(response, 'What It Does')
         self.assertContains(response, 'Where We Focus')
-        self.assertContains(response, 'Get Support')
+        # Support section (new naming)
+        self.assertContains(response, 'Support')
+        # Trust section
+        self.assertContains(response, 'Why Businesses Trust Emajinet')
     
     def test_about_page_has_whatsapp(self):
         """About page should display working WhatsApp number."""

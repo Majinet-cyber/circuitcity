@@ -1005,7 +1005,20 @@ WHATSAPP_DEFAULT_COUNTRY_CODE = os.environ.get("WHATSAPP_DEFAULT_COUNTRY_CODE", 
 # Centralize marketing constants for consistency across public pages
 SUPPORT_EMAIL = "support@emajinet.africa"
 SUPPORT_WHATSAPP_NUMBER = os.environ.get("SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135")  # Real working number
-MARKETING_ACTIVE_BUSINESSES = 34  # Real count - update when milestones reached
+
+# --------------------------- PUBLIC SITE METRICS (SSOT) ---------------------------
+# SINGLE SOURCE OF TRUTH for all public-facing metrics.
+# These values must be used EVERYWHERE on the public site to prevent inconsistency.
+# Update when milestones are reached. Use env vars for production overrides.
+PUBLIC_SITE_METRICS = {
+    "active_businesses": env_int("PUBLIC_ACTIVE_BUSINESSES", 34),  # Real count
+    "registered_agents": env_int("PUBLIC_REGISTERED_AGENTS", 0),   # Real count
+    "show_counters": env_bool("PUBLIC_SHOW_COUNTERS", True),       # Show numeric counters?
+    "min_threshold": 5,  # Minimum count to display counters (hides if below)
+}
+
+# Legacy alias for backwards compatibility
+MARKETING_ACTIVE_BUSINESSES = PUBLIC_SITE_METRICS["active_businesses"]
 
 # --------------------------- global UI ---------------------------
 UI = {

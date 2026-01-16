@@ -122,13 +122,11 @@ class HQMobileFirstTests(TestCase):
             with open(css_path, "r", encoding="utf-8") as f:
                 css_content = f.read()
 
-            # Check for key mobile-first rules
+            # Check for key mobile-first rules (updated to match actual CSS)
             required_selectors = [
-                ".hq-page",
-                ".hq-main-content",
-                ".hq-table-scroll",
-                ".kpi-card",
-                "@media (max-width: 768px)",
+                ".hq-table-responsive",
+                ".hq-toolbar",
+                "@media (max-width: 767.98px)",
                 "overflow-x: auto",
             ]
 

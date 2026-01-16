@@ -252,16 +252,44 @@ def marketing_constants(request) -> Dict[str, Any]:
     Provides centralized access to:
     - SUPPORT_EMAIL: Official support email (support@emajinet.africa)
     - SUPPORT_WHATSAPP_NUMBER: Real working WhatsApp number
-    - MARKETING_ACTIVE_BUSINESSES: Current count of active businesses for marketing
+    - PUBLIC_SITE_METRICS: Single source of truth for all public metrics
+    - MARKETING_ACTIVE_BUSINESSES: Alias for backwards compatibility
     
     This ensures consistency across all public-facing pages and prevents drift.
     """
     from django.conf import settings
     
+    # Get centralized metrics (SSOT)
+    metrics = getattr(settings, "PUBLIC_SITE_METRICS", {
+        "active_businesses": 34,
+        "registered_agents": 0,
+        "show_counters": True,
+        "min_threshold": 5,
+    })
+    
+    # Determine if we should show numeric counters
+    # Only show if enabled AND both values meet the threshold
+    active_biz = metrics.get("active_businesses", 0)
+    registered_agents = metrics.get("registered_agents", 0)
+    min_threshold = metrics.get("min_threshold", 5)
+    show_counters = metrics.get("show_counters", True)
+    
+    # Show counters only if active_businesses meets threshold
+    # (hide "0+ Agents" if agents count is below threshold)
+    show_metrics = show_counters and active_biz >= min_threshold
+    show_agents_metric = registered_agents >= min_threshold
+    
     return {
         "SUPPORT_EMAIL": getattr(settings, "SUPPORT_EMAIL", "support@emajinet.africa"),
         "SUPPORT_WHATSAPP_NUMBER": getattr(settings, "SUPPORT_WHATSAPP_NUMBER", "+265 883 596 135"),
-        "MARKETING_ACTIVE_BUSINESSES": getattr(settings, "MARKETING_ACTIVE_BUSINESSES", 34),
+        "MARKETING_ACTIVE_BUSINESSES": active_biz,
+        # New centralized metrics
+        "PUBLIC_METRICS": {
+            "active_businesses": active_biz,
+            "registered_agents": registered_agents,
+            "show_counters": show_metrics,
+            "show_agents_counter": show_agents_metric,
+        },
     }
 
 

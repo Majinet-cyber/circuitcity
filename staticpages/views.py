@@ -41,13 +41,24 @@ def home(request):
     """
     Public home page with hero section and marketing copy.
     Never cached to ensure template updates are visible immediately.
-    """
-    # Get live platform metrics for display with safe threshold check
-    METRICS_THRESHOLD = 1  # Minimum credible value to show numbers
     
-    # Use marketing constant from settings for consistency
+    Uses PUBLIC_SITE_METRICS from settings as SINGLE SOURCE OF TRUTH
+    to prevent metric inconsistency across the site.
+    """
     from django.conf import settings
-    marketing_active_businesses = getattr(settings, 'MARKETING_ACTIVE_BUSINESSES', 34)
+    
+    # Get centralized metrics (SSOT) from settings
+    metrics = getattr(settings, 'PUBLIC_SITE_METRICS', {
+        "active_businesses": 34,
+        "registered_agents": 0,
+        "show_counters": True,
+        "min_threshold": 5,
+    })
+    
+    # Extract values
+    marketing_businesses = metrics.get("active_businesses", 34)
+    min_threshold = metrics.get("min_threshold", 5)
+    show_counters_setting = metrics.get("show_counters", True)
     
     try:
         from tenants.models import Business, Membership
@@ -58,40 +69,41 @@ def home(request):
         cached_stats = cache.get(cache_key)
         
         if cached_stats:
-            total_merchants = cached_stats.get('total_merchants', 0)
-            total_agents = cached_stats.get('total_agents', 0)
+            db_merchants = cached_stats.get('total_merchants', 0)
+            db_agents = cached_stats.get('total_agents', 0)
         else:
             # Count all businesses (no is_active field exists)
-            total_merchants = Business.objects.count()
+            db_merchants = Business.objects.count()
             # Count distinct users with agent role (case-insensitive)
-            total_agents = Membership.objects.filter(role__icontains='agent').values('user').distinct().count()
+            db_agents = Membership.objects.filter(role__icontains='agent').values('user').distinct().count()
             
             # Cache for 5 minutes
             cache.set(cache_key, {
-                'total_merchants': total_merchants,
-                'total_agents': total_agents,
+                'total_merchants': db_merchants,
+                'total_agents': db_agents,
             }, 300)
         
-        # Use marketing constant if actual count is below threshold for credibility
-        if total_merchants < METRICS_THRESHOLD:
-            total_merchants = marketing_active_businesses
-        
-        # Check if metrics meet credibility threshold
-        show_metrics = (total_merchants >= METRICS_THRESHOLD) or (total_agents >= METRICS_THRESHOLD)
+        # Use the HIGHER of DB count or marketing constant (ensures consistency)
+        total_merchants = max(db_merchants, marketing_businesses)
+        total_agents = db_agents
         
     except Exception as e:
         # Graceful degradation if models not available
         import logging
         logging.error(f"Error fetching platform stats: {e}")
-        total_merchants = marketing_active_businesses
+        total_merchants = marketing_businesses
         total_agents = 0
-        show_metrics = True  # Always show if we have marketing constant
+    
+    # Determine what to show based on thresholds (prevent "0+ Agents" display)
+    show_metrics = show_counters_setting and total_merchants >= min_threshold
+    show_agents_counter = total_agents >= min_threshold
     
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
         'total_merchants': total_merchants,
         'total_agents': total_agents,
         'show_metrics': show_metrics,
+        'show_agents_counter': show_agents_counter,
     })
 
 

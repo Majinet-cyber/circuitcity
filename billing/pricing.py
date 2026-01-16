@@ -26,6 +26,8 @@ class PlanConfig:
 # ====================================================================
 # PRODUCTION PRICING - SINGLE SOURCE OF TRUTH
 # ====================================================================
+# NOTE: "records" = products/members/livestock/crops depending on vertical
+#       "team seats" = staff members (trainers, assistants, attendants)
 PLANS = {
     "starter": PlanConfig(
         code="starter",
@@ -34,12 +36,12 @@ PLANS = {
         currency="MWK",
         max_stores=1,
         max_agents=3,
-        description="Perfect for small shops and solo entrepreneurs",
+        description="Perfect for small businesses and solo entrepreneurs",
         features=[
-            "Up to 500 stock items",
+            "Up to 500 records",
             "1 location",
-            "3 agents / team members",
-            "Basic inventory tracking",
+            "3 team seats",
+            "Basic inventory & records tracking",
             "Sales reports & analytics",
             "Mobile app access",
             "Email support",
@@ -54,12 +56,12 @@ PLANS = {
         max_agents=15,
         description="For growing businesses with multiple locations",
         features=[
-            "Up to 2,000 stock items",
+            "Up to 2,000 records",
             "Up to 5 locations",
-            "15 agents / team members",
-            "Advanced inventory tracking",
-            "Sales, profit & agent reports",
-            "Agent wallet & commission management",
+            "15 team seats",
+            "Advanced tracking & smart prompts",
+            "Sales, profit & team reports",
+            "Wallet & commission management",
             "Layby / installment payments",
             "Priority email support",
             "WhatsApp notifications",
@@ -74,11 +76,11 @@ PLANS = {
         max_agents=-1,  # Unlimited
         description="For established businesses needing full control",
         features=[
-            "Unlimited stock items",
+            "Unlimited records",
             "Unlimited locations",
-            "Unlimited agents",
+            "Unlimited team seats",
             "All Growth features",
-            "AI-powered insights & recommendations",
+            "Smart recommendations & prompts",
             "HQ Command Center dashboard",
             "Advanced analytics & forecasting",
             "Custom integrations",

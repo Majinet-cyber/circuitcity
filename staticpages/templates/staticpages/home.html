@@ -1740,36 +1740,44 @@
     <div class="hero-content">
       <div class="hero-text">
         <h1 class="hero-title">
-          Doing business <span class="highlight">shouldn't be a headache</span>
+          Run your <span class="highlight">shop, farm, or gym</span> from one system
         </h1>
         <p class="hero-subtitle">
-          The operating system for small businesses—manage stock, track sales and profits, run your shop, farm, or workshop, and grow with AI-powered insights.
+          Track stock, sales, and expenses. Get smart recommendations on what to do next—restock alerts, margin warnings, seasonal prompts. Mobile-first, built for Malawi.
         </p>
         
-        <!-- Live Platform Growth Metrics -->
+        <!-- Live Platform Growth Metrics - Uses PUBLIC_SITE_METRICS (SSOT) -->
         {% if show_metrics %}
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
           <div style="display: flex; gap: 2rem; justify-content: center; flex-wrap: wrap;">
             <div class="growth-metric" style="text-align: center;">
               <div class="growth-metric-value" style="font-size: 2.5rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants|default:0 }}">0<span class="metric-plus">+</span></div>
-              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Active Merchants</div>
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Active Businesses</div>
             </div>
+            {% if show_agents_counter %}
             <div class="growth-metric" style="text-align: center;">
               <div class="growth-metric-value" style="font-size: 2.5rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents|default:0 }}">0<span class="metric-plus">+</span></div>
-              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Registered Agents</div>
+              <div style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.25rem;">Team Members</div>
             </div>
+            {% endif %}
           </div>
           <div style="text-align: center; margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
             <span style="display: inline-block; width: 8px; height: 8px; background: var(--secondary); border-radius: 50%; margin-right: 0.5rem; animation: pulse 2s infinite;"></span>
-            Live platform metrics
+            Shops, farms, gyms, and more across Malawi
           </div>
         </div>
         {% else %}
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1); text-align: center;">
-          <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Growing daily</div>
-          <div style="font-size: 0.875rem; color: var(--text-secondary);">Join {{ total_merchants|default:34 }}+ businesses already using Emajinet</div>
+          <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Join businesses across Malawi</div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary);">Shops, farms, gyms, and more are already using Emajinet</div>
         </div>
         {% endif %}
+        
+        <!-- Hero CTA Buttons -->
+        <div class="hero-buttons" style="margin-top: 2rem;">
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
+          <a href="#how-it-works" class="btn btn-secondary">See How It Works</a>
+        </div>
       </div>
       <div class="hero-image">
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
@@ -1780,7 +1788,8 @@
   <!-- Section CTA after Stats -->
   <section class="section-cta landing-container">
     <h3>Ready to get started?</h3>
-    <p>Join {{ total_merchants|default:34 }}+ businesses already using Emajinet to manage their operations</p>
+    <p>{% if show_metrics %}Join {{ total_merchants }}+ businesses{% else %}Join businesses across Malawi{% endif %} already using Emajinet</p>
+    <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary" style="margin-top: 1rem;">Start Free Trial</a>
   </section>
 
   <!-- Reality → Solution Stats Section -->
@@ -1927,80 +1936,121 @@
         <div class="step-number">1</div>
         <h3 class="step-title">Sign Up & Set Up</h3>
         <p class="step-description">
-          Create your business account in seconds. Set up your stores, locations, and add your team members.
+          Create your business in seconds. Add your locations and team members—works for any business type.
         </p>
       </div>
       <div class="step-card">
         <div class="step-number">2</div>
-        <h3 class="step-title">Track Inventory</h3>
+        <h3 class="step-title">Add Your Records</h3>
         <p class="step-description">
-          Scan items in and out with our mobile-friendly interface. Real-time stock updates across all locations.
+          Track inventory, seasons, or members depending on your business. Shops add products, farms add crops, gyms add members.
         </p>
       </div>
       <div class="step-card">
         <div class="step-number">3</div>
-        <h3 class="step-title">Manage Sales</h3>
+        <h3 class="step-title">Run Daily Operations</h3>
         <p class="step-description">
-          Process sales, track agent performance, and manage customer orders with built-in wallet and layby features.
+          Record sales, expenses, and payments. Track team performance with built-in wallet and layby features.
         </p>
       </div>
       <div class="step-card">
         <div class="step-number">4</div>
-        <h3 class="step-title">Gain Insights</h3>
+        <h3 class="step-title">Get Recommendations</h3>
         <p class="step-description">
-          View real-time dashboards, profit reports, and AI-powered recommendations to grow your business.
+          Receive smart prompts: restock alerts, margin warnings, renewal reminders, and season timing—so you know what to do next.
         </p>
       </div>
+    </div>
+    <p style="text-align: center; margin-top: 2rem; color: var(--text-secondary); font-size: 0.95rem;">
+      <strong>Emajinet adapts to your business type</strong> — shop, farm, gym, liquor, cement, and more.
+    </p>
+  </section>
+
+  <!-- See It In Action Strip - Vertical-Specific Examples -->
+  <section class="landing-container" style="padding: 4rem 0; background: linear-gradient(135deg, rgba(79, 70, 229, 0.03) 0%, rgba(16, 185, 129, 0.03) 100%);">
+    <h2 class="section-title" style="margin-bottom: 1rem;">See It In Action</h2>
+    <p class="section-subtitle" style="margin-bottom: 2.5rem;">
+      Real examples of how Emajinet works for different business types
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1100px; margin: 0 auto;">
+      
+      <!-- Farm Card -->
+      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08); border: 2px solid rgba(16, 185, 129, 0.15); transition: transform 0.3s ease;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🌾</div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem;">Farm</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0;">
+          <strong style="color: var(--text-primary);">Add a season entry</strong> → get recommendations on inputs, timing, and expected yield prompts based on your records.
+        </p>
+      </div>
+      
+      <!-- Shop Card -->
+      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08); border: 2px solid rgba(79, 70, 229, 0.15); transition: transform 0.3s ease;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🏪</div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem;">Shop</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0;">
+          <strong style="color: var(--text-primary);">Stock-in or make a sale</strong> → get instant margin feedback plus restock alerts for fast movers.
+        </p>
+      </div>
+      
+      <!-- Gym Card -->
+      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08); border: 2px solid rgba(239, 68, 68, 0.15); transition: transform 0.3s ease;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">💪</div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.75rem;">Gym</h3>
+        <p style="color: var(--text-secondary); font-size: 0.95rem; line-height: 1.6; margin: 0;">
+          <strong style="color: var(--text-primary);">Record a member payment</strong> → automatic renewal tracking and arrears reminders so no one falls through the cracks.
+        </p>
+      </div>
+      
     </div>
   </section>
 
   <!-- Features Section -->
   <section class="features">
-    <h2 class="section-title">Powerful Features</h2>
+    <h2 class="section-title">Smart Recommendations</h2>
     <p class="section-subtitle">
-      Everything you need to run your business like a pro
+      Emajinet tells you what to do next—so you can focus on running your business
     </p>
     <div class="features-grid">
       <div class="feature-card">
+        <div class="feature-icon">📦</div>
+        <h3 class="feature-title">Restock Prompts</h3>
+        <p class="feature-description">
+          Get alerts when fast-moving items are running low. Never miss a sale because you're out of stock.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">💵</div>
+        <h3 class="feature-title">Margin Warnings</h3>
+        <p class="feature-description">
+          See which products have healthy margins and which are too low. Price smarter, profit more.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🌱</div>
+        <h3 class="feature-title">Season Prompts</h3>
+        <p class="feature-description">
+          For farms: get reminders on planting, inputs, and harvest timing based on your records.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚠️</div>
+        <h3 class="feature-title">Stock Movement Flags</h3>
+        <p class="feature-description">
+          Unusual movements get flagged automatically. Catch losses early with audit trails.
+        </p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔔</div>
+        <h3 class="feature-title">Renewal Reminders</h3>
+        <p class="feature-description">
+          For gyms: automatic alerts for expiring memberships and arrears. No member falls through.
+        </p>
+      </div>
+      <div class="feature-card">
         <div class="feature-icon">📊</div>
-        <h3 class="feature-title">HQ Command Center</h3>
+        <h3 class="feature-title">Live Dashboards</h3>
         <p class="feature-description">
-          NASA-style dashboard with monthly metrics, drill-down reports, and gamified agent rankings.
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">📱</div>
-        <h3 class="feature-title">Multi-Vertical Support</h3>
-        <p class="feature-description">
-          Phones, liquor, clothing, gym management - specialized workflows for different business types.
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">💰</div>
-        <h3 class="feature-title">Built-in Wallet</h3>
-        <p class="feature-description">
-          Manage agent wallets, track commissions, and handle deposits all in one place.
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🎯</div>
-        <h3 class="feature-title">Gamification</h3>
-        <p class="feature-description">
-          Motivate your team with leaderboards, rankings, and performance milestones.
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3 class="feature-title">Multi-Tenant Security</h3>
-        <p class="feature-description">
-          Enterprise-grade security with business and location-level data isolation.
-        </p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon">🤖</div>
-        <h3 class="feature-title">AI-Powered Insights</h3>
-        <p class="feature-description">
-          Smart recommendations for restocking, pricing, and business optimization.
+          Real-time view of sales, profits, and team performance. Reports you can trust for decisions.
         </p>
       </div>
     </div>
@@ -2293,7 +2343,8 @@
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
-    <p class="cta-subtitle">Join {{ total_merchants|default:34 }}+ businesses already using Emajinet</p>
+    <p class="cta-subtitle">{% if show_metrics %}Join {{ total_merchants }}+ businesses{% else %}Join businesses across Malawi{% endif %} already using Emajinet</p>
+    <a href="{% url 'accounts:signup_manager' %}" class="btn btn-light" style="margin-top: 1rem;">Start Free Trial</a>
   </section>
 
   <!-- Footer -->
