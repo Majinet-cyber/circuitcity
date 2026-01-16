@@ -56,7 +56,9 @@ urlpatterns = [
     path("paychangu/callback/", vpc.paychangu_callback, name="paychangu_callback"),
     path("paychangu/payment-status/", vpc.paychangu_payment_status, name="paychangu_payment_status"),
     path("api/payment-status/", v.payment_status_api, name="payment_status_api"),
-    # Invoice utilities (inline preview/actions)
+    # Invoice utilities (preview, download, send)
+    path("invoice/<uuid:pk>/", vi.invoice_preview, name="invoice_preview"),
+    path("invoice/<uuid:pk>/preview/", vi.invoice_preview, name="invoice_preview_alt"),
     path("invoice/<uuid:pk>/send/", vi.invoice_send, name="invoice_send"),
     path("invoice/<uuid:pk>/download/", vi.invoice_download, name="invoice_download"),
     # Receipt PDFs
@@ -67,6 +69,7 @@ urlpatterns = [
         name="transaction_receipt_pdf",
     ),
     # Compatibility for projects that used INT primary keys on invoices
+    path("invoice/<int:pk>/", vi.invoice_preview, name="invoice_preview_int"),
     path("invoice/<int:pk>/send/", vi.invoice_send, name="invoice_send_int"),
     path("invoice/<int:pk>/download/", vi.invoice_download, name="invoice_download_int"),
     # ------------------------------------------------------------------

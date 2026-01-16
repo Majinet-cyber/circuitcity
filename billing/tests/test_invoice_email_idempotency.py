@@ -35,11 +35,17 @@ class InvoiceEmailIdempotencyTest(TestCase):
         )
         self.business = Business.objects.create(
             name="Test Business",
+            slug="test-business-email",
             subdomain="testbiz",
-            email="manager@test.com",
         )
-        self.business.owner = self.user
-        self.business.save()
+        # Link manager through membership for email lookup
+        from tenants.models import Membership
+        Membership.objects.create(
+            business=self.business,
+            user=self.user,
+            role="MANAGER",
+            status="ACTIVE",
+        )
 
         # Create plan
         self.starter, _ = SubscriptionPlan.objects.get_or_create(
@@ -90,10 +96,11 @@ class InvoiceEmailIdempotencyTest(TestCase):
         self.assertEqual(mail.outbox[0].to, ["manager@test.com"])
         self.assertIn("Payment Confirmed", mail.outbox[0].subject)
 
-        # Check idempotency flag set
+        # Check idempotency flag set (using dedicated email_sent_at field)
         invoice.refresh_from_db()
+        self.assertIsNotNone(invoice.email_sent_at)
+        # Also check meta for backwards compatibility
         self.assertTrue(invoice.meta.get("email_sent"))
-        self.assertIsNotNone(invoice.meta.get("email_sent_at"))
 
         # Clear outbox
         mail.outbox = []

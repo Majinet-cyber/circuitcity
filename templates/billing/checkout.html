@@ -304,6 +304,60 @@
     color: #94a3b8;
     font-size: 13px;
   }
+
+  /* HTTP Card Warning */
+  .http-card-warning {
+    text-align: center;
+    padding: 32px 24px;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 12px;
+  }
+
+  .http-card-warning .warning-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+  }
+
+  .http-card-warning h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #92400e;
+    margin: 0 0 8px;
+  }
+
+  .http-card-warning p {
+    font-size: 14px;
+    color: #78350f;
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+
+  .http-card-warning .secure-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: #ffffff;
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    color: #92400e;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    margin-top: 8px;
+    transition: all 0.2s;
+  }
+
+  .http-card-warning .secure-link:hover {
+    background: #fffbeb;
+    border-color: #f59e0b;
+  }
+
+  .payment-tab.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 </style>
 {% endblock %}
 
@@ -327,9 +381,15 @@
         <button class="payment-tab" data-tab="tnm">
           <span class="icon">💰</span> TNM Mpamba
         </button>
+        {% if is_secure %}
         <button class="payment-tab" data-tab="card">
           <span class="icon">💳</span> Card
         </button>
+        {% else %}
+        <button class="payment-tab disabled" data-tab="card-disabled" title="Card payments require HTTPS">
+          <span class="icon">💳</span> Card <span style="font-size:11px;color:#94a3b8;">(HTTPS only)</span>
+        </button>
+        {% endif %}
       </div>
       <div class="divider"></div>
 
@@ -377,40 +437,60 @@
         </form>
       </section>
 
-      <!-- Card -->
+      <!-- Card (HTTPS only) -->
+      {% if is_secure %}
       <section id="card" class="payment-section" aria-labelledby="Card">
-        <form method="post" action="{% url 'billing:checkout' %}" autocomplete="off" novalidate id="cardForm">
+        <form method="post" action="{% url 'billing:checkout' %}" novalidate id="cardForm">
           {% csrf_token %}
           <input type="hidden" name="method" value="card">
+          <div class="form-field">
+            <label class="form-label">Cardholder Name</label>
+            <div class="form-control-wrap">
+              <span>👤</span>
+              <input name="card-name" id="cardName" type="text" autocomplete="cc-name" placeholder="John Doe" required>
+            </div>
+          </div>
           <div class="form-field">
             <label class="form-label">Card number</label>
             <div class="form-control-wrap">
               <span>💳</span>
-              <input name="card-number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19">
+              <input name="card-number" id="cardNumber" inputmode="numeric" autocomplete="cc-number" placeholder="4242 4242 4242 4242" maxlength="19" required>
             </div>
           </div>
           <div class="form-grid-2">
             <div class="form-field">
-              <label class="form-label">Expiry (MM / YYYY)</label>
+              <label class="form-label">Expiry</label>
               <div class="form-control-wrap">
                 <span>📅</span>
-                <input name="card-exp_month" id="cardExpMonth" inputmode="numeric" placeholder="MM" maxlength="2" style="width:40px;">
-                <span>/</span>
-                <input name="card-exp_year" id="cardExpYear" inputmode="numeric" placeholder="YYYY" maxlength="4" style="width:60px;">
+                <input name="card-exp" id="cardExp" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5" style="width:80px;" required>
               </div>
             </div>
             <div class="form-field">
               <label class="form-label">CVV</label>
               <div class="form-control-wrap">
                 <span>🔒</span>
-                <input name="card-cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4">
+                <input name="card-cvv" id="cardCvv" inputmode="numeric" autocomplete="cc-csc" placeholder="123" maxlength="4" required>
               </div>
             </div>
           </div>
-          <div class="form-hint">Your card details are transmitted securely. We never store CVV.</div>
+          <div class="form-hint">Your card details are transmitted securely via PayChangu. We never store your card info.</div>
           <button class="btn-pay" type="submit">Pay with Card</button>
         </form>
       </section>
+      {% else %}
+      <!-- Card disabled on HTTP - show message encouraging MoMo -->
+      <section id="card-disabled" class="payment-section" aria-labelledby="Card">
+        <div class="http-card-warning">
+          <div class="warning-icon">🔒</div>
+          <h3>Card Payments Require a Secure Connection</h3>
+          <p>For your security, card payments are only available over HTTPS.</p>
+          <p>Please use <strong>Airtel Money</strong> or <strong>TNM Mpamba</strong> to complete your payment, or access this page from our secure domain:</p>
+          <a href="https://emajinet.africa{% url 'billing:checkout' %}" class="secure-link">
+            <span>🔐</span> Open Secure Checkout
+          </a>
+        </div>
+      </section>
+      {% endif %}
 
       <div class="checkout-footer">
         <div class="checkout-footer-text">By continuing you agree to our terms.</div>
@@ -423,17 +503,14 @@
       </div>
     </div>
 
-    <!-- RIGHT: Invoice Preview -->
+    <!-- RIGHT: Order Summary -->
     <div class="checkout-card">
       <div class="invoice-header">
-        <h3 class="invoice-title">Invoice Preview</h3>
-        {% if invoice %}
+        <h3 class="invoice-title">Order Summary</h3>
+        {% if invoice and not invoice.is_pending_checkout %}
         <div class="invoice-actions">
-          <a class="btn-ghost" href="{% url 'billing:invoice_send' invoice.id %}" title="Email & WhatsApp">
-            <i class="bi bi-send"></i> Send
-          </a>
-          <a class="btn-ghost" href="{% url 'billing:invoice_download' invoice.id %}" title="Download PDF">
-            <i class="bi bi-download"></i> Download
+          <a class="btn-ghost" href="{% url 'billing:invoice_preview' invoice.id %}" title="View Invoice">
+            <i class="bi bi-eye"></i> View
           </a>
         </div>
         {% endif %}
@@ -441,7 +518,11 @@
       <div class="divider"></div>
       {% if invoice %}
         <div class="invoice-meta">
+          {% if invoice.is_pending_checkout %}
+          Plan: {{ invoice.plan_name }} · {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
+          {% else %}
           Invoice #{{ invoice.number }} · {{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}
+          {% endif %}
         </div>
         <table class="invoice-table">
           <thead>

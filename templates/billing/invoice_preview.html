@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Invoice {{ invoice.number }} · Billing{% endblock %}
+
+{% block extra_css %}
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    .invoice-container { margin: 0; padding: 20px; }
+    .invoice-card { box-shadow: none; border: none; }
+  }
+
+  .invoice-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 16px;
+  }
+
+  .invoice-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .btn-action {
+    padding: 10px 20px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    color: #ffffff;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    color: #ffffff;
+  }
+
+  .btn-secondary {
+    background: #f9fafb;
+    color: #475569;
+    border: 1px solid #e5e7eb;
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .invoice-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    gap: 24px;
+  }
+
+  .issuer-info h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #2563eb;
+    margin: 0 0 4px;
+  }
+
+  .issuer-info p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .invoice-meta {
+    text-align: right;
+  }
+
+  .invoice-meta h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .invoice-meta .number {
+    font-size: 16px;
+    color: #475569;
+    margin: 0 0 4px;
+  }
+
+  .invoice-meta .date {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+
+  .status-paid {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .status-draft {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .status-issued, .status-sent {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .status-overdue {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .billing-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    margin-bottom: 40px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  @media (max-width: 600px) {
+    .billing-section {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+  }
+
+  .billing-box h3 {
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 8px;
+  }
+
+  .billing-box .name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 4px;
+  }
+
+  .billing-box .details {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .items-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 24px;
+  }
+
+  .items-table th {
+    text-align: left;
+    padding: 12px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .items-table th:last-child,
+  .items-table td:last-child {
+    text-align: right;
+  }
+
+  .items-table td {
+    padding: 16px 8px;
+    font-size: 14px;
+    color: #334155;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .totals-section {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 40px;
+  }
+
+  .totals-table {
+    width: 280px;
+  }
+
+  .totals-table tr td {
+    padding: 8px 0;
+    font-size: 14px;
+    color: #475569;
+  }
+
+  .totals-table tr td:last-child {
+    text-align: right;
+    font-weight: 500;
+    color: #0f172a;
+  }
+
+  .totals-table .total-row td {
+    padding-top: 16px;
+    border-top: 2px solid #e5e7eb;
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .payment-info {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .payment-info h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 8px;
+  }
+
+  .payment-info p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+  }
+
+  .notes-section {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 24px;
+  }
+
+  .notes-section h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    margin: 0 0 8px;
+  }
+
+  .notes-section p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.6;
+  }
+
+  .footer-text {
+    text-align: center;
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="invoice-container">
+  <!-- Action buttons (not printed) -->
+  <div class="invoice-actions no-print">
+    <a href="{% url 'billing:invoice_download' invoice.pk %}" class="btn-action btn-primary">
+      <span>📥</span> Download PDF
+    </a>
+    <button onclick="window.print()" class="btn-action btn-secondary">
+      <span>🖨️</span> Print
+    </button>
+    <a href="{% url 'billing:invoice_send' invoice.pk %}" class="btn-action btn-secondary">
+      <span>📧</span> Send Email
+    </a>
+    <a href="{% url 'billing:invoices' %}" class="btn-action btn-secondary">
+      <span>⬅️</span> All Invoices
+    </a>
+  </div>
+
+  <!-- Invoice content -->
+  <div class="invoice-card">
+    <div class="invoice-header">
+      <div class="issuer-info">
+        <h1>{{ issuer_name|default:"Emajinet" }}</h1>
+        <p>Business Management Platform</p>
+        <p>{{ issuer_email|default:"support@emajinet.africa" }}</p>
+      </div>
+      <div class="invoice-meta">
+        <h2>Invoice</h2>
+        <p class="number">{{ invoice.number }}</p>
+        <p class="date">Issued: {{ invoice.issue_date|date:"F j, Y" }}</p>
+        {% if invoice.due_date %}
+        <p class="date">Due: {{ invoice.due_date|date:"F j, Y" }}</p>
+        {% endif %}
+        <span class="status-badge status-{{ invoice.status|lower }}">
+          {{ invoice.get_status_display }}
+        </span>
+      </div>
+    </div>
+
+    <div class="billing-section">
+      <div class="billing-box">
+        <h3>Billed By</h3>
+        <p class="name">{{ issuer_name|default:"Emajinet" }}</p>
+        <p class="details">
+          {{ issuer_email|default:"support@emajinet.africa" }}<br>
+          {{ issuer_phone|default:"+265 991 234 567" }}
+        </p>
+      </div>
+      <div class="billing-box">
+        <h3>Billed To</h3>
+        <p class="name">{{ business.name|default:invoice.to_name|default:"Customer" }}</p>
+        <p class="details">
+          {% if invoice.to_email or business.email %}
+          {{ invoice.to_email|default:business.email }}<br>
+          {% endif %}
+          {% if invoice.to_phone or business.phone %}
+          {{ invoice.to_phone|default:business.phone }}
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <!-- Line items -->
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in invoice.items.all %}
+        <tr>
+          <td>{{ item.description }}</td>
+          <td>{{ item.qty }}</td>
+          <td>{{ invoice.currency }} {{ item.unit_price|floatformat:0|intcomma }}</td>
+          <td>{{ invoice.currency }} {{ item.line_total|floatformat:0|intcomma }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="4" style="text-align: center; color: #94a3b8;">
+            No line items
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    <div class="totals-section">
+      <table class="totals-table">
+        <tr>
+          <td>Subtotal</td>
+          <td>{{ invoice.currency }} {{ invoice.subtotal|floatformat:0|intcomma }}</td>
+        </tr>
+        {% if invoice.tax_amount and invoice.tax_amount > 0 %}
+        <tr>
+          <td>Tax</td>
+          <td>{{ invoice.currency }} {{ invoice.tax_amount|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total-row">
+          <td>Total</td>
+          <td>{{ invoice.currency }} {{ invoice.total|floatformat:0|intcomma }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Payment info (for paid invoices) -->
+    {% if invoice.status == 'paid' %}
+    <div class="payment-info">
+      <h4>Payment Information</h4>
+      <p>
+        <strong>Status:</strong> Paid on {{ invoice.paid_at|date:"F j, Y" }}<br>
+        {% if payment_method %}
+        <strong>Method:</strong> {{ payment_method }}<br>
+        {% endif %}
+        {% if invoice.provider_reference %}
+        <strong>Reference:</strong> {{ invoice.provider_reference }}
+        {% endif %}
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- Notes -->
+    {% if invoice.notes %}
+    <div class="notes-section">
+      <h4>Notes</h4>
+      <p>{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="footer-text">
+      <p>Thank you for your business!</p>
+      <p>This invoice was generated by {{ issuer_name|default:"Emajinet" }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

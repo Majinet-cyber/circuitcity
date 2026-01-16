@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load static humanize billing_tags %}
 
 {% block title %}Manage Subscription{% endblock %}
 {% block header_title %}Manage Subscription{% endblock %}
@@ -508,13 +508,14 @@
             <span style="font-size: 0.9rem; font-weight: 600; opacity: 0.8;">/month</span>
           </div>
 
+          {% vertical_copy as copy %}
           <div class="description">
             {% if p.max_stores == 1 %}
-              {{ p.max_stores }} store, {{ p.max_agents }} agent{{ p.max_agents|pluralize }}
+              1 {{ copy.location_singular }}, {{ p.max_agents }} {{ copy.staff_singular }}{{ p.max_agents|pluralize }}
             {% elif p.max_stores == -1 %}
-              Unlimited stores & agents
+              Unlimited {{ copy.location_plural }} & {{ copy.staff_plural }}
             {% else %}
-              {{ p.max_stores }} stores, {{ p.max_agents }} agents
+              {{ p.max_stores }} {{ copy.location_plural }}, {{ p.max_agents }} {{ copy.staff_plural }}
             {% endif %}
           </div>
         </div>
@@ -571,9 +572,12 @@
             </span>
           </td>
           <td>{{ inv.created_at|date:"M j, Y" }}</td>
-          <td>
+          <td style="display: flex; gap: 6px;">
+            <a href="{% url 'billing:invoice_preview' inv.id %}" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">
+              View
+            </a>
             <a href="{% url 'billing:invoice_download' inv.id %}" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">
-              Download
+              PDF
             </a>
           </td>
         </tr>

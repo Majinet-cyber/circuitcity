@@ -707,6 +707,17 @@ class Invoice(models.Model):
     attempt_count = models.PositiveIntegerField(default=0, help_text="Number of billing attempts made")
     locked_for_dunning = models.BooleanField(default=False, help_text="Lock to prevent concurrent dunning processing")
 
+    # Email notification tracking (idempotency)
+    email_sent_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When invoice confirmation email was sent (idempotency)",
+    )
+    email_send_attempts = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of email send attempts",
+    )
+    
     # HQ notification tracking (idempotency)
     hq_notified_paid_at = models.DateTimeField(
         null=True,
@@ -821,7 +832,7 @@ class Invoice(models.Model):
     def mark_paid(self):
         self.status = self.Status.PAID
         self.paid_at = timezone.now()
-        self.save(update_fields=["status", "paid_at"])
+        self.save(update_fields=["status", "paid_at", "updated_at"])
 
     def save(self, *args, **kwargs):
         # Auto default due date (7 days) if missing
@@ -1393,18 +1404,18 @@ class SubscriptionChangeIntent(models.Model):
             return  # Already applied, idempotent
         self.status = self.Status.APPLIED
         self.applied_at = timezone.now()
-        self.save(update_fields=["status", "applied_at"])
+        self.save(update_fields=["status", "applied_at", "updated_at"])
 
     def mark_canceled(self):
         """Mark intent as canceled."""
         self.status = self.Status.CANCELED
         self.canceled_at = timezone.now()
-        self.save(update_fields=["status", "canceled_at"])
+        self.save(update_fields=["status", "canceled_at", "updated_at"])
 
     def mark_failed(self):
         """Mark intent as failed."""
         self.status = self.Status.FAILED
-        self.save(update_fields=["status"])
+        self.save(update_fields=["status", "updated_at"])
 
 
 # ======================================================================

@@ -98,8 +98,16 @@ def _ensure_trial_subscription(biz: Business) -> BusinessSubscription:
     # pick the cheapest active plan as default when seeding a trial
     plan = SubscriptionPlan.objects.filter(is_active=True).order_by("amount").first()
     if not plan:
-        # create a placeholder plan so UI keeps working
-        plan = SubscriptionPlan.objects.create(code="starter", name="Starter", amount=Decimal("0.00"))
+        # create a placeholder plan so UI keeps working (use get_or_create to prevent duplicates)
+        plan, _ = SubscriptionPlan.objects.get_or_create(
+            code="starter",
+            defaults={
+                "name": "Starter",
+                "amount": Decimal("0.00"),
+                "currency": "MWK",
+                "is_active": True,
+            }
+        )
     return BusinessSubscription.start_trial(
         business=biz,
         plan=plan,
@@ -177,18 +185,64 @@ def _send_invoice_whatsapp(inv: Invoice) -> None:
 
 def _dedupe_plans(plans):
     """
-    Dedupe plans list by a stable key (code/slug/name).
-    Prevents duplicate plan cards if DB has bad data or joins duplicate rows.
-    Works on SQLite + Postgres.
+    Dedupe plans list by base code (ignoring test suffixes).
+    Prevents duplicate plan cards if DB has bad data or test plans leak.
+    
+    Priority order: production plans (code without '_test' suffix) take precedence.
+    Test plans are filtered out if a production equivalent exists.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     seen = set()
     out = []
+    
+    # First pass: collect all base codes and prefer non-test plans
+    plan_map = {}  # base_code -> plan object
+    
     for p in plans:
-        key = getattr(p, "code", None) or getattr(p, "slug", None) or getattr(p, "name", str(p)).lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(p)
+        code = getattr(p, "code", None) or getattr(p, "slug", None) or getattr(p, "name", str(p)).lower()
+        
+        # Extract base code (remove _test, _ux_test, _upgrade_test suffixes)
+        base_code = code
+        for suffix in ["_test", "_ux_test", "_upgrade_test", "_integration_test"]:
+            if base_code.endswith(suffix):
+                base_code = base_code[:-len(suffix)]
+                break
+        
+        # Skip if we already have this base code
+        if base_code in plan_map:
+            existing_code = getattr(plan_map[base_code], "code", "")
+            # Prefer production plan (non-test) over test plan
+            if "_test" not in existing_code and "_test" in code:
+                # Keep existing production plan, skip this test plan
+                logger.warning(f"Filtering out test plan '{code}' in favor of production plan '{existing_code}'")
+                continue
+            elif "_test" in existing_code and "_test" not in code:
+                # Replace test plan with production plan
+                logger.warning(f"Replacing test plan '{existing_code}' with production plan '{code}'")
+                plan_map[base_code] = p
+                continue
+            else:
+                # Both are test or both are production - keep first one
+                logger.warning(f"Duplicate plan detected: '{code}' conflicts with '{existing_code}', keeping first")
+                continue
+        
+        plan_map[base_code] = p
+        seen.add(base_code)
+    
+    # Build output list in original order
+    for p in plans:
+        code = getattr(p, "code", None) or getattr(p, "slug", None) or getattr(p, "name", str(p)).lower()
+        base_code = code
+        for suffix in ["_test", "_ux_test", "_upgrade_test", "_integration_test"]:
+            if base_code.endswith(suffix):
+                base_code = base_code[:-len(suffix)]
+                break
+        
+        if plan_map.get(base_code) == p:
+            out.append(p)
+    
     return out
 
 
@@ -376,6 +430,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             self.qty = Decimal("1")
                             self.unit_price = amount
                             self.total = amount
+                            self.line_total = amount  # Template uses line_total, not total
                     
                     class FakeQuerySet:
                         def __init__(self, item):
@@ -402,6 +457,9 @@ def checkout(request: HttpRequest) -> HttpResponse:
 
     # Pass PayChangu mode to template for test mode hints
     paychangu_mode = getattr(settings, "PAYCHANGU_MODE", "test")
+    
+    # Detect if connection is secure (HTTPS) for card payment gating
+    is_secure = request.is_secure()
 
     if request.method == "POST":
         method = (request.POST.get("method") or "").lower()
@@ -418,6 +476,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                     "invoice": invoice,
                     "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                     "PAYCHANGU_MODE": paychangu_mode,
+                    "is_secure": is_secure,
                 },
             )
 
@@ -432,6 +491,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                         "invoice": invoice,
                         "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                         "PAYCHANGU_MODE": paychangu_mode,
+                        "is_secure": is_secure,
                     },
                 )
 
@@ -447,6 +507,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                         "invoice": invoice,
                         "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                         "PAYCHANGU_MODE": paychangu_mode,
+                        "is_secure": is_secure,
                     },
                 )
 
@@ -462,6 +523,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             "invoice": invoice,
                             "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                             "PAYCHANGU_MODE": paychangu_mode,
+                            "is_secure": is_secure,
                         },
                     )
 
@@ -547,6 +609,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             "invoice": invoice,
                             "sub_badge": _sub_badge(sub),
                             "PAYCHANGU_MODE": paychangu_mode,
+                            "is_secure": is_secure,
                         },
                     )
 
@@ -581,6 +644,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             "invoice": invoice,
                             "sub_badge": _sub_badge(sub),
                             "PAYCHANGU_MODE": paychangu_mode,
+                            "is_secure": is_secure,
                         },
                     )
 
@@ -638,6 +702,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             "invoice": invoice,
                             "sub_badge": _sub_badge(sub),
                             "PAYCHANGU_MODE": paychangu_mode,
+                            "is_secure": is_secure,
                         },
                     )
 
@@ -664,6 +729,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                             "invoice": invoice,
                             "sub_badge": _sub_badge(sub),
                             "PAYCHANGU_MODE": paychangu_mode,
+                            "is_secure": is_secure,
                         },
                     )
 
@@ -676,6 +742,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
                         "invoice": invoice,
                         "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                         "PAYCHANGU_MODE": paychangu_mode,
+                        "is_secure": is_secure,
                     },
                 )
 
@@ -689,11 +756,13 @@ def checkout(request: HttpRequest) -> HttpResponse:
                     "invoice": invoice,
                     "sub_badge": _sub_badge(_ensure_trial_subscription(biz)),
                     "PAYCHANGU_MODE": paychangu_mode,
+                    "is_secure": is_secure,
                 },
             )
 
     # GET request: show checkout form
     sub = _ensure_trial_subscription(biz)
+    
     return render(
         request,
         "billing/checkout.html",
@@ -701,6 +770,7 @@ def checkout(request: HttpRequest) -> HttpResponse:
             "invoice": invoice,
             "sub_badge": _sub_badge(sub),
             "PAYCHANGU_MODE": paychangu_mode,
+            "is_secure": is_secure,
         },
     )
 

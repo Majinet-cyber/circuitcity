@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Invoice Not Found · Billing{% endblock %}
+
+{% block extra_css %}
+<style>
+  .error-container {
+    max-width: 600px;
+    margin: 80px auto;
+    padding: 40px 24px;
+    text-align: center;
+  }
+
+  .error-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    padding: 48px 32px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  }
+
+  .error-icon {
+    font-size: 64px;
+    margin-bottom: 24px;
+    color: #94a3b8;
+  }
+
+  .error-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 12px;
+  }
+
+  .error-message {
+    font-size: 15px;
+    color: #64748b;
+    margin: 0 0 8px;
+    line-height: 1.6;
+  }
+
+  .error-subtext {
+    font-size: 13px;
+    color: #94a3b8;
+    margin: 0 0 32px;
+  }
+
+  .error-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(180deg, #3b82f6, #2563eb);
+    color: #ffffff;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+    color: #ffffff;
+  }
+
+  .btn-secondary {
+    background: #f9fafb;
+    color: #475569;
+    padding: 12px 24px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-secondary:hover {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .help-text {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #f1f5f9;
+    font-size: 13px;
+    color: #94a3b8;
+  }
+
+  .help-text a {
+    color: #2563eb;
+    text-decoration: none;
+  }
+
+  .help-text a:hover {
+    text-decoration: underline;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-container">
+  <div class="error-card">
+    <div class="error-icon">📄</div>
+    <h1 class="error-title">Invoice Not Found</h1>
+    <p class="error-message">{{ message|default:"The invoice you're looking for could not be found." }}</p>
+    <p class="error-subtext">{{ subtext|default:"This invoice may have been deleted, or you may not have permission to view it." }}</p>
+
+    <div class="error-actions">
+      <a href="{% url 'billing:invoices' %}" class="btn-primary">
+        <span>📋</span> View All Invoices
+      </a>
+      <a href="{% url 'billing:manage' %}" class="btn-secondary">
+        <span>⬅️</span> Back to Billing
+      </a>
+    </div>
+
+    <div class="help-text">
+      <p>
+        If you believe this is an error, please 
+        <a href="mailto:support@emajinet.africa">contact support</a> 
+        with your business name and the invoice reference you're looking for.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

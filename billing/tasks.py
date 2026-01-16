@@ -73,8 +73,8 @@ def process_subscription_renewals():
     }
 
 
-@shared_task
-def send_invoice_paid_email(invoice_id):
+@shared_task(bind=True, max_retries=5, default_retry_delay=60)
+def send_invoice_paid_email(self, invoice_id):
     """
     Celery task to send invoice paid confirmation email.
 
@@ -82,7 +82,8 @@ def send_invoice_paid_email(invoice_id):
         invoice_id: UUID or int ID of the Invoice
 
     Sends HTML + plain text email with optional PDF attachment.
-    Non-blocking: failures are logged but don't break webhook processing.
+    NEVER fails permanently - retries with exponential backoff.
+    Idempotent: uses email_sent_at field to prevent duplicates.
     """
     import logging
 
@@ -101,17 +102,21 @@ def send_invoice_paid_email(invoice_id):
         invoice = Invoice.objects.select_related("business", "subscription").get(pk=invoice_id)
     except Invoice.DoesNotExist:
         logger.error(f"Invoice {invoice_id} not found for email send")
-        return
+        return {"status": "error", "message": "Invoice not found"}
 
     if invoice.status != Invoice.Status.PAID:
         logger.warning(f"Invoice {invoice_id} is not PAID (status={invoice.status}), skipping email")
-        return
+        return {"status": "skipped", "message": "Invoice not paid"}
 
     # Idempotency check: only send email once per invoice
-    # Use meta field to track if email was sent
-    if invoice.meta.get("email_sent"):
-        logger.info(f"Email already sent for invoice {invoice.number} (idempotent), skipping")
-        return
+    # Use dedicated email_sent_at field (more reliable than meta)
+    if invoice.email_sent_at:
+        logger.info(f"Email already sent for invoice {invoice.number} at {invoice.email_sent_at} (idempotent), skipping")
+        return {"status": "already_sent", "sent_at": invoice.email_sent_at.isoformat()}
+
+    # Increment attempt counter
+    invoice.email_send_attempts = (invoice.email_send_attempts or 0) + 1
+    invoice.save(update_fields=["email_send_attempts", "updated_at"])
 
     # Get recipient email
     business = invoice.business
@@ -138,7 +143,7 @@ def send_invoice_paid_email(invoice_id):
 
     if not recipient_email:
         logger.error(f"No recipient email found for invoice {invoice.number}")
-        return
+        return {"status": "error", "message": "No recipient email"}
 
     # Build context for template
     subscription = invoice.subscription
@@ -149,37 +154,70 @@ def send_invoice_paid_email(invoice_id):
     # Build download URL (full URL)
     download_url = None
     try:
-        from django.contrib.sites.models import Site
-
-        domain = Site.objects.get_current().domain
+        site_base_url = getattr(settings, "SITE_BASE_URL", "https://emajinet.africa")
         download_path = reverse("billing:invoice_download", args=[invoice.pk])
-        download_url = f"https://{domain}{download_path}"
+        download_url = f"{site_base_url}{download_path}"
     except Exception:
-        # Fallback if Sites framework not configured
-        download_url = f"https://emajinet.com/billing/invoice/{invoice.pk}/download/"
+        # Fallback
+        download_url = f"https://emajinet.africa/billing/invoice/{invoice.pk}/download/"
+
+    # Payment method display
+    payment_method = "Mobile Money"
+    if subscription:
+        try:
+            payment_method = subscription.get_payment_method_display()
+        except Exception:
+            pass
 
     context = {
         "invoice": invoice,
         "business": business,
         "subscription": subscription,
         "next_billing_date": next_billing_date,
-        "payment_method": getattr(subscription, "payment_method", "Mobile Money") if subscription else "Mobile Money",
+        "payment_method": payment_method,
         "provider_reference": invoice.provider_reference or "",
         "download_url": download_url,
-        "dashboard_url": "https://emajinet.com/app/",
-        "support_url": "mailto:support@emajinet.com",
+        "preview_url": f"{getattr(settings, 'SITE_BASE_URL', 'https://emajinet.africa')}/billing/invoice/{invoice.pk}/",
+        "dashboard_url": f"{getattr(settings, 'SITE_BASE_URL', 'https://emajinet.africa')}/app/",
+        "support_email": "support@emajinet.africa",
+        "issuer_name": "Emajinet",
     }
 
     # Render templates
     subject = f"Payment Confirmed - Invoice {invoice.number}"
-    text_content = render_to_string("billing/emails/invoice_paid.txt", context)
-    html_content = render_to_string("billing/emails/invoice_paid.html", context)
+    try:
+        text_content = render_to_string("billing/emails/invoice_paid.txt", context)
+        html_content = render_to_string("billing/emails/invoice_paid.html", context)
+    except Exception as e:
+        logger.error(f"Failed to render email templates for {invoice.number}: {e}", exc_info=True)
+        # Use fallback plain text
+        text_content = f"""
+Payment Confirmed - Invoice {invoice.number}
+
+Dear Customer,
+
+Your payment of {invoice.currency} {invoice.total:,.0f} has been received and confirmed.
+
+Invoice Number: {invoice.number}
+Amount: {invoice.currency} {invoice.total:,.0f}
+Date: {invoice.paid_at.strftime('%B %d, %Y') if invoice.paid_at else 'Today'}
+
+Download your invoice: {download_url}
+
+Thank you for your business!
+
+Best regards,
+The Emajinet Team
+support@emajinet.africa
+        """.strip()
+        html_content = None
 
     # Create email
     email = EmailMultiAlternatives(
         subject=subject, body=text_content, from_email=settings.DEFAULT_FROM_EMAIL, to=[recipient_email]
     )
-    email.attach_alternative(html_content, "text/html")
+    if html_content:
+        email.attach_alternative(html_content, "text/html")
 
     # Optionally attach PDF (if generated and not too large)
     if invoice.pdf_file and invoice.pdf_file.name:
@@ -193,20 +231,29 @@ def send_invoice_paid_email(invoice_id):
                 logger.warning(f"PDF too large to attach ({file_size} bytes), using download link only")
         except Exception as e:
             logger.warning(f"Could not attach PDF to email: {e}")
+            # Don't fail - email is more important than attachment
 
     # Send email
     try:
         email.send(fail_silently=False)
         logger.info(f"Invoice paid email sent successfully to {recipient_email} for invoice {invoice.number}")
 
-        # Mark email as sent (idempotency)
+        # Mark email as sent (idempotency) - use dedicated field
+        invoice.email_sent_at = timezone.now()
+        # Also update meta for backwards compatibility
+        invoice.meta = invoice.meta or {}
         invoice.meta["email_sent"] = True
-        invoice.meta["email_sent_at"] = timezone.now().isoformat()
         invoice.meta["email_sent_to"] = recipient_email
-        invoice.save(update_fields=["meta", "updated_at"])
+        invoice.save(update_fields=["email_sent_at", "meta", "updated_at"])
+        
+        return {"status": "sent", "recipient": recipient_email}
+        
     except Exception as e:
-        logger.error(f"Failed to send invoice paid email for {invoice.number}: {e}", exc_info=True)
-        raise  # Re-raise so Celery can retry if configured
+        logger.error(f"Failed to send invoice paid email for {invoice.number} (attempt {invoice.email_send_attempts}): {e}", exc_info=True)
+        
+        # Retry with exponential backoff
+        retry_delay = 60 * (2 ** self.request.retries)  # 60s, 120s, 240s, 480s, 960s
+        raise self.retry(exc=e, countdown=retry_delay)
 
 
 # ======================================================================
