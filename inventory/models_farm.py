@@ -604,3 +604,243 @@ class FarmCropSeason(models.Model):
             return self.actual_yield * self.actual_price_per_unit_mwk
         return None
 
+
+# ==============================================================================
+# FARM CROP STOCK (for "sell only what is recorded" enforcement)
+# ==============================================================================
+
+
+class FarmCropCategory(models.TextChoices):
+    """Categories for Malawi crops"""
+    STAPLES = "staples", "Staples"
+    CASH_CROPS = "cash_crops", "Cash Crops"
+    LEGUMES = "legumes", "Legumes"
+    ROOTS_TUBERS = "roots_tubers", "Roots & Tubers"
+    VEGETABLES = "vegetables", "Vegetables"
+
+
+# Malawi crop catalog - used for seeding and display
+MALAWI_CROP_CATALOG = {
+    "staples": [
+        {"name": "Maize", "emoji": "🌽", "unit": "bag"},
+        {"name": "Rice", "emoji": "🍚", "unit": "bag"},
+        {"name": "Sorghum", "emoji": "🌾", "unit": "bag"},
+        {"name": "Millet", "emoji": "🌾", "unit": "bag"},
+    ],
+    "cash_crops": [
+        {"name": "Tobacco", "emoji": "🍂", "unit": "kg"},
+        {"name": "Cotton", "emoji": "🧶", "unit": "kg"},
+        {"name": "Tea", "emoji": "🍵", "unit": "kg"},
+        {"name": "Sugarcane", "emoji": "🎋", "unit": "kg"},
+        {"name": "Sunflower", "emoji": "🌻", "unit": "kg"},
+    ],
+    "legumes": [
+        {"name": "Groundnuts", "emoji": "🥜", "unit": "bag"},
+        {"name": "Soybean", "emoji": "🫘", "unit": "bag"},
+        {"name": "Beans", "emoji": "🫘", "unit": "bag"},
+        {"name": "Pigeon Peas", "emoji": "🫛", "unit": "bag"},
+    ],
+    "roots_tubers": [
+        {"name": "Cassava", "emoji": "🥔", "unit": "kg"},
+        {"name": "Sweet Potato", "emoji": "🍠", "unit": "kg"},
+        {"name": "Irish Potato", "emoji": "🥔", "unit": "kg"},
+    ],
+    "vegetables": [
+        {"name": "Tomato", "emoji": "🍅", "unit": "kg"},
+        {"name": "Onion", "emoji": "🧅", "unit": "kg"},
+        {"name": "Cabbage", "emoji": "🥬", "unit": "head"},
+        {"name": "Okra", "emoji": "🥒", "unit": "kg"},
+        {"name": "Rape/Leafy Greens", "emoji": "🥬", "unit": "bundle"},
+    ],
+}
+
+
+class FarmCrop(models.Model):
+    """
+    Tracks crops recorded/available for a farm business.
+    Used for "sell only what is recorded" validation.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="farm_crops",
+        db_index=True,
+    )
+    name = models.CharField(max_length=100, help_text="Crop name, e.g. 'Maize'")
+    category = models.CharField(
+        max_length=20,
+        choices=FarmCropCategory.choices,
+        default=FarmCropCategory.STAPLES,
+        db_index=True,
+    )
+    emoji = models.CharField(max_length=10, default="🌾", blank=True)
+    unit = models.CharField(
+        max_length=20,
+        choices=FarmUnit.choices,
+        default=FarmUnit.BAG,
+    )
+    
+    # Stock tracking (optional, for quantity validation)
+    quantity_available = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0"),
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Current available quantity (updated by harvests/sales)",
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["category", "name"]
+        unique_together = [("business", "name")]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "category"]),
+        ]
+        verbose_name = "Farm Crop"
+        verbose_name_plural = "Farm Crops"
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+
+
+class FarmCropSale(models.Model):
+    """
+    Tracks individual crop sales linked to a recorded crop.
+    Ensures sales only happen for crops that exist.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="farm_crop_sales",
+        db_index=True,
+    )
+    crop = models.ForeignKey(
+        FarmCrop,
+        on_delete=models.PROTECT,
+        related_name="sales",
+    )
+    ledger_entry = models.OneToOneField(
+        FarmLedgerEntry,
+        on_delete=models.CASCADE,
+        related_name="crop_sale",
+        null=True,
+        blank=True,
+    )
+    
+    # Sale details
+    date = models.DateField(default=timezone.now, db_index=True)
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    unit_price_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    
+    # Buyer info (optional)
+    buyer_name = models.CharField(max_length=100, blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farm_crop_sales_created",
+    )
+    
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-date"]),
+        ]
+        verbose_name = "Farm Crop Sale"
+        verbose_name_plural = "Farm Crop Sales"
+    
+    def __str__(self):
+        return f"{self.crop.name} - {self.quantity} @ MWK {self.unit_price_mwk}"
+    
+    @property
+    def total_mwk(self) -> Decimal:
+        return self.quantity * self.unit_price_mwk
+
+
+# ==============================================================================
+# FARM ASSETS
+# ==============================================================================
+
+
+class FarmAssetCondition(models.TextChoices):
+    """Asset condition status"""
+    NEW = "new", "New"
+    GOOD = "good", "Good"
+    FAIR = "fair", "Fair"
+    POOR = "poor", "Poor"
+
+
+class FarmAsset(models.Model):
+    """
+    Tracks farm assets: equipment, tools, infrastructure, land.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="farm_assets",
+        db_index=True,
+    )
+    
+    # Asset details
+    asset_type = models.CharField(max_length=50, help_text="Asset type code, e.g. 'tractor'")
+    name = models.CharField(max_length=150, help_text="Display name")
+    quantity = models.PositiveIntegerField(default=1)
+    value_mwk = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    purchase_date = models.DateField(null=True, blank=True)
+    condition = models.CharField(
+        max_length=10,
+        choices=FarmAssetCondition.choices,
+        default=FarmAssetCondition.GOOD,
+    )
+    notes = models.TextField(blank=True, default="")
+    
+    # Status
+    is_active = models.BooleanField(default=True)
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farm_assets_created",
+    )
+    
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "asset_type"]),
+        ]
+        verbose_name = "Farm Asset"
+        verbose_name_plural = "Farm Assets"
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_condition_display()})"

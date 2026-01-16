@@ -301,7 +301,7 @@
                 </div>
 
                 <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-warning btn-lg text-dark">
+                    <button type="submit" class="btn btn-warning btn-lg text-dark" data-testid="asset-submit-btn">
                         <i class="bi bi-check-circle me-1"></i> Add Asset
                     </button>
                     <button type="button" class="btn btn-outline-secondary" id="cancelAsset">Cancel</button>
@@ -309,6 +309,54 @@
             </form>
         </div>
     </div>
+
+    <!-- Assets List (shows existing assets) -->
+    {% if assets %}
+    <div class="asset-category" data-testid="asset-list-section" style="margin-top: 2rem;">
+        <h2><span>📋</span> Your Assets ({{ total_assets }} items)</h2>
+        <div class="table-responsive">
+            <table class="table table-hover" data-testid="assets-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Qty</th>
+                        <th>Condition</th>
+                        <th>Value</th>
+                        <th>Added</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in assets %}
+                    <tr data-testid="asset-row-{{ asset.id }}">
+                        <td><strong>{{ asset.name }}</strong></td>
+                        <td>{{ asset.quantity }}</td>
+                        <td>
+                            <span class="badge {% if asset.condition == 'new' %}bg-success{% elif asset.condition == 'good' %}bg-primary{% elif asset.condition == 'fair' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                                {{ asset.get_condition_display }}
+                            </span>
+                        </td>
+                        <td>{% if asset.value_mwk %}MWK {{ asset.value_mwk|floatformat:0|intcomma }}{% else %}—{% endif %}</td>
+                        <td>{{ asset.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% if total_value %}
+                <tfoot>
+                    <tr class="table-light">
+                        <th colspan="3">Total Estimated Value</th>
+                        <th colspan="2">MWK {{ total_value|floatformat:0|intcomma }}</th>
+                    </tr>
+                </tfoot>
+                {% endif %}
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-4" data-testid="no-assets-message">
+        <i class="bi bi-box-seam" style="font-size: 2.5rem; opacity: 0.5;"></i>
+        <p class="mt-2">No assets recorded yet. Select an asset above to add your first!</p>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 

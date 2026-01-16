@@ -25,6 +25,9 @@ from inventory.verticals import (
     phones,
     welding,
 )
+
+# Import new Farm modules
+from inventory.verticals import farm_sales, farm_expenses, farm_assets, farm_locations, farm_reports
 from tenants.utils import require_business
 
 app_name = "verticals"
@@ -141,23 +144,23 @@ urlpatterns = [
     path("farm/dashboard/", farm.dashboard, name="farm_dashboard"),
     
     # Sales (new premium gamified flow)
-    path("farm/sales/", farm.sales_landing, name="farm_sales"),
-    path("farm/sales/crops/", farm.sales_crops, name="farm_sales_crops"),
-    path("farm/sales/livestock/", farm.sales_livestock, name="farm_sales_livestock"),
-    path("farm/sales/record/", farm.sales_record, name="farm_sales_record"),
+    path("farm/sales/", farm_sales.sales_landing, name="farm_sales"),
+    path("farm/sales/crops/", farm_sales.sales_crops, name="farm_sales_crops"),
+    path("farm/sales/livestock/", farm_sales.sales_livestock, name="farm_sales_livestock"),
+    path("farm/sales/record/", farm_sales.sales_record, name="farm_sales_record"),
     
     # Expenses (new premium gamified flow)
-    path("farm/expenses/", farm.expenses_landing, name="farm_expenses"),
-    path("farm/expenses/record/", farm.expenses_record, name="farm_expenses_record"),
-    path("farm/expenses/export/", farm.expenses_export, name="farm_expenses_export"),
+    path("farm/expenses/", farm_expenses.expenses_landing, name="farm_expenses"),
+    path("farm/expenses/record/", farm_expenses.expenses_record, name="farm_expenses_record"),
+    path("farm/expenses/export/", farm_expenses.expenses_export, name="farm_expenses_export"),
     
     # Assets (new premium section)
-    path("farm/assets/", farm.assets_landing, name="farm_assets"),
+    path("farm/assets/", farm_assets.assets_landing, name="farm_assets"),
     
     # Locations (new premium section)
-    path("farm/locations/", farm.locations_list, name="farm_locations"),
-    path("farm/locations/create/", farm.locations_create, name="farm_locations_create"),
-    path("farm/locations/<int:location_id>/edit/", farm.locations_edit, name="farm_locations_edit"),
+    path("farm/locations/", farm_locations.locations_list, name="farm_locations"),
+    path("farm/locations/create/", farm_locations.locations_create, name="farm_locations_create"),
+    path("farm/locations/<int:location_id>/edit/", farm_locations.locations_edit, name="farm_locations_edit"),
     
     # Legacy ledger URLs (keep for backward compatibility)
     path("farm/ledger/", farm.ledger_list, name="farm_ledger_list"),
@@ -178,7 +181,12 @@ urlpatterns = [
     
     # Reports
     path("farm/reports/", farm.reports, name="farm_reports"),
-    
+    path("farm/reports/profit-loss/", farm_reports.profit_loss_report, name="farm_report_profit_loss"),
+    path("farm/reports/livestock/", farm_reports.livestock_report, name="farm_report_livestock"),
+    path("farm/reports/crop-season/", farm_reports.crop_season_report, name="farm_report_crop_season"),
+    path("farm/reports/ledger-export/", farm_reports.ledger_export, name="farm_report_ledger_export"),
+    path("farm/reports/livestock-export/", farm_reports.livestock_export, name="farm_report_livestock_export"),
+    path("farm/reports/crops-export/", farm_reports.crops_export, name="farm_report_crops_export"),
     
     # ==================== WELDING VERTICAL ====================
     path("welding/dashboard/", welding.dashboard, name="welding_dashboard"),

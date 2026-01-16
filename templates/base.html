@@ -444,6 +444,16 @@
       /* Don't override Bootstrap's display handling */
     }
 
+    /* CRITICAL: Dropdown menus with hidden attribute must stay hidden until JS removes it.
+       This prevents BFCache from showing stale dropdown state. */
+    .dropdown-menu[hidden],
+    #ccNotifMenu[hidden],
+    #userMenu[hidden] {
+      display: none !important;
+      visibility: hidden !important;
+      opacity: 0 !important;
+    }
+
     /* ========= Mobile-First Dropdown Fixes (Jan 2026) ========= */
     @media (max-width: 576px) {
       /* Notifications dropdown: constrain to viewport */
@@ -752,7 +762,8 @@
                      id="ccNotifMenu"
                      aria-labelledby="ccNotifBtn"
                      style="min-width:320px;max-height:400px;overflow-y:auto"
-                     data-testid="notifications-panel">
+                     data-testid="notifications-panel"
+                     hidden>
                   <div class="p-2 border-bottom d-flex align-items-center justify-content-between">
                     <strong>Notifications</strong>
                     {% with latest_notifications|default:None as notif_list %}
@@ -819,7 +830,7 @@
                 </span>
                 <span class="presence-dot" aria-hidden="true"></span>
               </button>
-              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px" data-testid="avatar-menu">
+              <div id="userMenu" class="dropdown-menu dropdown-menu-end p-0 shadow" aria-labelledby="userMenuBtn" style="min-width:260px" data-testid="avatar-menu" hidden>
                 <div class="px-3 py-2 text-muted">
                   {% if request.user.is_authenticated %}
                     <div class="fw-bold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
@@ -998,27 +1009,33 @@
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
 
-<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Dec 20 behavior) -->
+<!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Jan 2026 - BFCache fix) -->
 <script>
   /* ================================================================
-     UI CLEANUP SYSTEM v3 — Fixed dropdown auto-open + mobile issues
-     - Ensures dropdowns are ALWAYS CLOSED by default on page load
-     - Uses Bootstrap's API when available (not raw class manipulation)
-     - Cleans up orphaned backdrops and modal state
-     - Runs AFTER Bootstrap is loaded (uses DOMContentLoaded + setTimeout)
-     - MUTUAL EXCLUSION: Only one dropdown open at a time
-     - CLICK OUTSIDE: Closes dropdowns when clicking outside
+     UI CLEANUP SYSTEM v4 — BFCache/pageshow fix for mobile browsers
+     
+     ROOT CAUSE ADDRESSED:
+     - iOS Safari & Android Chrome use BFCache (back-forward cache)
+     - When navigating back/forward, the page is restored with previous
+       UI state (dropdowns open, modals visible, classes intact)
+     - This causes dropdowns to appear "open" on page load
+     
+     SOLUTION:
+     1. Dropdown menus have `hidden` attribute in HTML by default
+     2. Bootstrap dropdown events remove/restore `hidden` attribute
+     3. pageshow event (especially event.persisted) resets all UI state
+     4. DOMContentLoaded also ensures clean state
+     5. Mutual exclusion: only one dropdown open at a time
      ================================================================ */
   (function() {
-    if (window.__CC_UI_CLEANUP_V3__) return;
-    window.__CC_UI_CLEANUP_V3__ = true;
+    if (window.__CC_UI_CLEANUP_V4__) return;
+    window.__CC_UI_CLEANUP_V4__ = true;
 
     // Wait for Bootstrap to be available
     function waitForBootstrap(callback) {
       if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
         callback();
       } else {
-        // Bootstrap loads with defer, so wait a tick
         setTimeout(function() { waitForBootstrap(callback); }, 50);
       }
     }
@@ -1026,117 +1043,184 @@
     // Force close a Bootstrap dropdown by element
     function forceCloseDropdown(el) {
       if (!el) return;
+      var menu = document.getElementById(el.getAttribute('aria-controls') || '') || el.nextElementSibling;
+      
+      // Use Bootstrap API if available
       if (typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
         var instance = bootstrap.Dropdown.getInstance(el);
         if (instance) {
           try { instance.hide(); } catch(e) {}
         }
       }
-      // Also remove classes directly as fallback
+      
+      // Directly set attributes (fallback & reinforcement)
       el.setAttribute('aria-expanded', 'false');
-      var menu = el.nextElementSibling;
       if (menu && menu.classList.contains('dropdown-menu')) {
         menu.classList.remove('show');
+        menu.setAttribute('hidden', '');  // Hide via attribute
       }
     }
 
-    // Cleanup function that uses Bootstrap API when available
-    function cleanupUIState() {
-      // 1. Force ccInbox modal to hidden state (if visible)
-      var modal = document.getElementById("ccInbox");
-      if (modal && modal.classList.contains("show")) {
+    // Reset ALL transient UI state (dropdowns, modals, offcanvas, etc.)
+    function resetTransientUIState() {
+      // 1. Force close both navbar dropdowns
+      var notifBtn = document.getElementById("ccNotifBtn");
+      var userBtn = document.getElementById("userMenuBtn");
+      var notifMenu = document.getElementById("ccNotifMenu");
+      var userMenu = document.getElementById("userMenu");
+      
+      forceCloseDropdown(notifBtn);
+      forceCloseDropdown(userBtn);
+      
+      // Ensure hidden attribute is set on menus
+      if (notifMenu) {
+        notifMenu.classList.remove('show');
+        notifMenu.setAttribute('hidden', '');
+      }
+      if (userMenu) {
+        userMenu.classList.remove('show');
+        userMenu.setAttribute('hidden', '');
+      }
+
+      // 2. Force close any modal that's open
+      document.querySelectorAll(".modal.show").forEach(function(modal) {
         if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
           var bsModal = bootstrap.Modal.getInstance(modal);
-          if (bsModal) bsModal.hide();
+          if (bsModal) { try { bsModal.hide(); } catch(e) {} }
         }
         modal.classList.remove("show");
         modal.style.display = "none";
         modal.setAttribute("aria-hidden", "true");
-      }
+      });
 
-      // 2. Remove modal-open class from body (causes layout shift)
-      document.body.classList.remove("modal-open");
+      // 3. Force close any offcanvas that's open
+      document.querySelectorAll(".offcanvas.show").forEach(function(oc) {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Offcanvas) {
+          var bsOc = bootstrap.Offcanvas.getInstance(oc);
+          if (bsOc) { try { bsOc.hide(); } catch(e) {} }
+        }
+        oc.classList.remove("show");
+      });
 
-      // 3. Remove any orphaned backdrops
-      document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
+      // 4. Close custom filter offcanvas (analytics)
+      var filterOffcanvas = document.getElementById("filterOffcanvas");
+      var filterBackdrop = document.getElementById("filterBackdrop");
+      if (filterOffcanvas) filterOffcanvas.classList.remove("show");
+      if (filterBackdrop) filterBackdrop.classList.remove("show");
 
-      // 4. Reset body styles only if they look like scroll-lock values
+      // 5. Remove any orphaned backdrops
+      document.querySelectorAll(".modal-backdrop, .offcanvas-backdrop").forEach(function(el) { 
+        el.remove(); 
+      });
+
+      // 6. Remove modal-open / offcanvas-open from body
+      document.body.classList.remove("modal-open", "offcanvas-open");
+
+      // 7. Reset body scroll-lock styles (only if drawer isn't intentionally open)
       var bodyStyle = document.body.style;
       var drawerOpen = document.body.getAttribute("data-drawer") === "open";
-      if (!drawerOpen && (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden")) {
-        bodyStyle.position = "";
-        bodyStyle.top = "";
-        bodyStyle.left = "";
-        bodyStyle.right = "";
-        bodyStyle.width = "";
-        bodyStyle.overflow = "";
-        bodyStyle.paddingRight = "";
+      if (!drawerOpen) {
+        if (bodyStyle.position === "fixed" || bodyStyle.overflow === "hidden") {
+          bodyStyle.position = "";
+          bodyStyle.top = "";
+          bodyStyle.left = "";
+          bodyStyle.right = "";
+          bodyStyle.width = "";
+          bodyStyle.overflow = "";
+          bodyStyle.paddingRight = "";
+        }
       }
 
-      // 5. FORCE CLOSE ALL DROPDOWNS on page load (critical fix)
-      var notifBtn = document.getElementById("ccNotifBtn");
-      var userBtn = document.getElementById("userMenuBtn");
-      forceCloseDropdown(notifBtn);
-      forceCloseDropdown(userBtn);
-
-      // 6. Fallback: ensure no dropdown menus have .show class (catches render artifacts)
+      // 8. Catch-all: remove .show from any dropdown menu
       document.querySelectorAll(".dropdown-menu.show").forEach(function(el) {
         el.classList.remove("show");
       });
-      document.querySelectorAll("[aria-expanded='true']").forEach(function(el) {
-        if (el.hasAttribute('data-bs-toggle') && el.getAttribute('data-bs-toggle') === 'dropdown') {
-          el.setAttribute('aria-expanded', 'false');
-        }
+
+      // 9. Reset aria-expanded on all dropdown toggles
+      document.querySelectorAll("[data-bs-toggle='dropdown'][aria-expanded='true']").forEach(function(el) {
+        el.setAttribute('aria-expanded', 'false');
       });
+
+      // 10. Close tenant menu if open
+      var tenantMenu = document.getElementById("tenantMenu");
+      var tenantBtn = document.getElementById("tenantBtn");
+      if (tenantMenu) tenantMenu.style.display = "none";
+      if (tenantBtn) tenantBtn.setAttribute('aria-expanded', 'false');
     }
 
-    // MUTUAL EXCLUSION: When one dropdown opens, close the other
-    function setupMutualExclusion() {
+    // Setup Bootstrap dropdown event handlers for hidden attribute management
+    function setupDropdownHiddenManagement() {
       var notifBtn = document.getElementById("ccNotifBtn");
       var userBtn = document.getElementById("userMenuBtn");
-      
-      if (notifBtn) {
+      var notifMenu = document.getElementById("ccNotifMenu");
+      var userMenu = document.getElementById("userMenu");
+
+      // When dropdown shows: remove hidden, close the other dropdown
+      if (notifBtn && notifMenu) {
         notifBtn.addEventListener('show.bs.dropdown', function() {
+          notifMenu.removeAttribute('hidden');
           forceCloseDropdown(userBtn);
         });
+        notifBtn.addEventListener('hidden.bs.dropdown', function() {
+          notifMenu.setAttribute('hidden', '');
+        });
       }
-      if (userBtn) {
+
+      if (userBtn && userMenu) {
         userBtn.addEventListener('show.bs.dropdown', function() {
+          userMenu.removeAttribute('hidden');
           forceCloseDropdown(notifBtn);
+        });
+        userBtn.addEventListener('hidden.bs.dropdown', function() {
+          userMenu.setAttribute('hidden', '');
         });
       }
     }
 
-    // Run cleanup after Bootstrap loads (on page load)
+    // Run on DOMContentLoaded
     document.addEventListener("DOMContentLoaded", function() {
       waitForBootstrap(function() {
-        cleanupUIState();
-        setupMutualExclusion();
+        resetTransientUIState();
+        setupDropdownHiddenManagement();
       });
     });
 
-    // Run when page becomes visible (handles bfcache)
+    // CRITICAL: Run on pageshow (handles BFCache restoration)
+    window.addEventListener("pageshow", function(event) {
+      // event.persisted is true when page comes from BFCache
+      // But we reset regardless to be safe (also handles forward navigation)
+      waitForBootstrap(function() {
+        resetTransientUIState();
+      });
+    });
+
+    // Run when page becomes visible (tab switch, etc.)
     document.addEventListener("visibilitychange", function() {
       if (document.visibilityState === "visible") {
-        waitForBootstrap(cleanupUIState);
+        waitForBootstrap(resetTransientUIState);
       }
     });
 
-    // Run on popstate (browser back/forward)
+    // Run on popstate (browser back/forward without BFCache)
     window.addEventListener("popstate", function() {
-      waitForBootstrap(cleanupUIState);
+      waitForBootstrap(resetTransientUIState);
     });
 
     // Cleanup after modal hide (Bootstrap event)
     document.addEventListener("hidden.bs.modal", function(e) {
-      if (e.target && e.target.id === "ccInbox") {
-        document.body.classList.remove("modal-open");
-        document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
-      }
+      document.body.classList.remove("modal-open");
+      document.querySelectorAll(".modal-backdrop").forEach(function(el) { el.remove(); });
+    });
+
+    // Cleanup after offcanvas hide
+    document.addEventListener("hidden.bs.offcanvas", function(e) {
+      document.body.classList.remove("offcanvas-open");
+      document.querySelectorAll(".offcanvas-backdrop").forEach(function(el) { el.remove(); });
     });
 
     // Expose for debugging
-    window.CC_UI_CLEANUP = cleanupUIState;
+    window.CC_UI_CLEANUP = resetTransientUIState;
+    window.resetTransientUIState = resetTransientUIState;
   })();
 </script>
 

@@ -2,26 +2,210 @@
 
 {% block title %}Record Expense - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Farm Expense Premium Styles ===== */
+.expense-record-page {
+    --farm-primary: #2563eb;
+    --farm-red: #dc2626;
+    --farm-red-light: #fee2e2;
+}
+
+/* Category Cards Grid */
+.category-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+@media (min-width: 576px) {
+    .category-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .category-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Category Card */
+.category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.875rem 0.5rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.category-card:hover {
+    border-color: var(--farm-red);
+    background: var(--farm-red-light);
+}
+
+.category-card.selected {
+    border-color: var(--farm-red);
+    background: var(--farm-red-light);
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
+}
+
+.category-card input[type="radio"] {
+    display: none;
+}
+
+.category-card .icon {
+    font-size: 1.5rem;
+}
+
+.category-card .label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.2;
+}
+
+/* Payment Method Cards */
+.payment-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+@media (min-width: 576px) {
+    .payment-cards-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+.payment-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.625rem 0.25rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.payment-card:hover {
+    border-color: var(--farm-primary);
+    background: #dbeafe;
+}
+
+.payment-card.selected {
+    border-color: var(--farm-primary);
+    background: #dbeafe;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+}
+
+.payment-card input[type="radio"] {
+    display: none;
+}
+
+.payment-card .icon {
+    font-size: 1.125rem;
+}
+
+.payment-card .label {
+    font-size: 0.625rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
+<div class="expense-record-page container-fluid py-3" data-vertical="farm" data-testid="expense-record-page">
     <div class="mb-4">
         <a href="{% url 'verticals:farm_expenses' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Expenses</a>
         <h1 class="h3 mb-1"><span class="me-2">💸</span>{{ hero_title }}</h1>
     </div>
     
-    <div class="card" style="max-width: 600px;">
+    <div class="card" style="max-width: 700px;">
         <div class="card-body">
-            <form method="post">
+            <form method="post" data-testid="expense-form">
                 {% csrf_token %}
                 
-                <div class="mb-3">
-                    <label class="form-label">Date</label>
-                    <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label">Category</label>
-                    <select name="category" class="form-select" required>
+                <!-- Premium Category Cards -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Expense Category *</label>
+                    <div class="category-cards-grid" data-testid="category-cards-container">
+                        <label class="category-card" data-value="fertiliser">
+                            <input type="radio" name="category" value="fertiliser" required>
+                            <span class="icon">🌱</span>
+                            <span class="label">Fertiliser</span>
+                        </label>
+                        <label class="category-card" data-value="feed">
+                            <input type="radio" name="category" value="feed">
+                            <span class="icon">🌾</span>
+                            <span class="label">Animal Feed</span>
+                        </label>
+                        <label class="category-card" data-value="labour">
+                            <input type="radio" name="category" value="labour">
+                            <span class="icon">👷</span>
+                            <span class="label">Labour</span>
+                        </label>
+                        <label class="category-card" data-value="vet">
+                            <input type="radio" name="category" value="vet">
+                            <span class="icon">🏥</span>
+                            <span class="label">Veterinary</span>
+                        </label>
+                        <label class="category-card" data-value="transport">
+                            <input type="radio" name="category" value="transport">
+                            <span class="icon">🚚</span>
+                            <span class="label">Transport</span>
+                        </label>
+                        <label class="category-card" data-value="rentals">
+                            <input type="radio" name="category" value="rentals">
+                            <span class="icon">🚜</span>
+                            <span class="label">Equipment Rentals</span>
+                        </label>
+                        <label class="category-card" data-value="seeds">
+                            <input type="radio" name="category" value="seeds">
+                            <span class="icon">🌰</span>
+                            <span class="label">Seeds & Seedlings</span>
+                        </label>
+                        <label class="category-card" data-value="chemicals">
+                            <input type="radio" name="category" value="chemicals">
+                            <span class="icon">🧪</span>
+                            <span class="label">Pesticides</span>
+                        </label>
+                        <label class="category-card" data-value="equipment">
+                            <input type="radio" name="category" value="equipment">
+                            <span class="icon">🔧</span>
+                            <span class="label">Equipment</span>
+                        </label>
+                        <label class="category-card" data-value="fuel">
+                            <input type="radio" name="category" value="fuel">
+                            <span class="icon">⛽</span>
+                            <span class="label">Fuel & Diesel</span>
+                        </label>
+                        <label class="category-card" data-value="utilities">
+                            <input type="radio" name="category" value="utilities">
+                            <span class="icon">💡</span>
+                            <span class="label">Utilities</span>
+                        </label>
+                        <label class="category-card" data-value="other">
+                            <input type="radio" name="category" value="other">
+                            <span class="icon">📦</span>
+                            <span class="label">Other</span>
+                        </label>
+                    </div>
+                    <!-- Hidden fallback select for accessibility -->
+                    <select name="category_fallback" class="form-select d-none" id="categoryFallback" data-testid="category-fallback-select">
                         {% for value, label in expense_categories %}
                         <option value="{{ value }}">{{ label }}</option>
                         {% endfor %}
@@ -29,19 +213,24 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <input type="text" name="description" class="form-control" placeholder="e.g., 50kg fertilizer" required>
+                    <label class="form-label">Date</label>
+                    <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}">
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label">Amount (MWK)</label>
-                    <input type="number" name="amount" class="form-control" step="0.01" min="0" required>
+                    <label class="form-label">Description *</label>
+                    <input type="text" name="description" class="form-control" placeholder="e.g., 50kg NPK fertilizer" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Amount (MWK) *</label>
+                    <input type="number" name="amount" class="form-control form-control-lg" step="0.01" min="0" required placeholder="e.g., 25000">
                 </div>
                 
                 <div class="row mb-3">
                     <div class="col-6">
                         <label class="form-label">Quantity</label>
-                        <input type="number" name="quantity" class="form-control" step="0.01" min="0">
+                        <input type="number" name="quantity" class="form-control" step="0.01" min="0" placeholder="e.g., 2">
                     </div>
                     <div class="col-6">
                         <label class="form-label">Unit</label>
@@ -53,25 +242,81 @@
                     </div>
                 </div>
                 
+                <!-- Payment Method Cards -->
                 <div class="mb-3">
                     <label class="form-label">Payment Method</label>
-                    <select name="payment_method" class="form-select">
-                        {% for value, label in payment_methods %}
-                        <option value="{{ value }}">{{ label }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="payment-cards-grid" data-testid="payment-cards-container">
+                        <label class="payment-card selected" data-value="cash">
+                            <input type="radio" name="payment_method" value="cash" checked>
+                            <span class="icon">💵</span>
+                            <span class="label">Cash</span>
+                        </label>
+                        <label class="payment-card" data-value="mobile_money">
+                            <input type="radio" name="payment_method" value="mobile_money">
+                            <span class="icon">📱</span>
+                            <span class="label">Mobile Money</span>
+                        </label>
+                        <label class="payment-card" data-value="bank">
+                            <input type="radio" name="payment_method" value="bank">
+                            <span class="icon">🏦</span>
+                            <span class="label">Bank</span>
+                        </label>
+                        <label class="payment-card" data-value="credit">
+                            <input type="radio" name="payment_method" value="credit">
+                            <span class="icon">📝</span>
+                            <span class="label">Credit</span>
+                        </label>
+                        <label class="payment-card" data-value="barter">
+                            <input type="radio" name="payment_method" value="barter">
+                            <span class="icon">🤝</span>
+                            <span class="label">Barter</span>
+                        </label>
+                    </div>
                 </div>
                 
                 <div class="mb-3">
                     <label class="form-label">Notes (optional)</label>
-                    <textarea name="notes" class="form-control" rows="2"></textarea>
+                    <textarea name="notes" class="form-control" rows="2" placeholder="Any additional details"></textarea>
                 </div>
                 
-                <button type="submit" class="btn btn-danger w-100">
+                <button type="submit" class="btn btn-danger btn-lg w-100" data-testid="submit-expense-btn">
                     <i class="bi bi-check-lg me-1"></i> Record Expense
                 </button>
             </form>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Category card selection
+    document.querySelectorAll('.category-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.category-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+            // Sync with fallback select
+            const value = this.dataset.value;
+            document.getElementById('categoryFallback').value = value;
+        });
+    });
+    
+    // Payment card selection
+    document.querySelectorAll('.payment-card').forEach(function(card) {
+        card.addEventListener('click', function() {
+            document.querySelectorAll('.payment-card').forEach(c => c.classList.remove('selected'));
+            this.classList.add('selected');
+            this.querySelector('input[type="radio"]').checked = true;
+        });
+    });
+    
+    // Set today's date
+    const dateInput = document.querySelector('input[name="date"]');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
+</script>
 {% endblock %}

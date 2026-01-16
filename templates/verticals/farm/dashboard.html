@@ -6,7 +6,14 @@
 {% block extra_css %}
 <style>
 /* ===== Farm Dashboard Premium Styles ===== */
+/* PREMIUM BLUE THEME (Jan 2026) - matches Clothing/Cement premium feel */
 .farm-dashboard {
+    /* Primary accent: Premium blue (not green) */
+    --farm-primary: #2563eb;
+    --farm-primary-light: #dbeafe;
+    --farm-primary-rgb: 37, 99, 235;
+    
+    /* Secondary colors */
     --farm-green: #16a34a;
     --farm-green-light: #dcfce7;
     --farm-amber: #d97706;
@@ -15,6 +22,24 @@
     --farm-red-light: #fee2e2;
     --farm-blue: #2563eb;
     --farm-blue-light: #dbeafe;
+}
+
+/* Premium Header Styling - Blue accent like Clothing/Cement */
+.farm-dashboard .farm-header-text h1 {
+    background: linear-gradient(135deg, var(--farm-primary) 0%, #3b82f6 50%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Business chip / vertical badge - premium blue */
+.farm-dashboard .farm-period-pill {
+    background: var(--farm-primary-light);
+    border-color: rgba(var(--farm-primary-rgb), 0.3);
+}
+
+.farm-dashboard .farm-period-pill i {
+    color: var(--farm-primary);
 }
 
 /* Page Header */
@@ -487,7 +512,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="farm-dashboard container-fluid py-3">
+<div class="farm-dashboard container-fluid py-3" data-vertical="farm" data-testid="farm-dashboard-container">
     
     <!-- Page Header with Filter Integration -->
     <div class="farm-header" data-testid="farm-dashboard">

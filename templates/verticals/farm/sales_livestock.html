@@ -173,56 +173,49 @@
 {% endblock %}
 
 {% block content %}
-<div class="livestock-sales container-fluid py-3" data-testid="farm-livestock-sales-page">
+<div class="livestock-sales container-fluid py-3" data-vertical="farm" data-testid="farm-livestock-sales-page">
     <div class="mb-4">
         <a href="{% url 'verticals:farm_sales' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Sales</a>
         <h1 class="h3 mb-1"><span class="me-2">🐄</span>Livestock Sales</h1>
-        <p class="text-muted mb-0">Select the animal type you sold</p>
+        <p class="text-muted mb-0">{{ hero_blurb }}</p>
     </div>
     
-    <!-- Livestock Type Cards -->
-    <div class="livestock-cards-grid" data-testid="livestock-type-cards">
-        <button type="button" class="livestock-card" data-type="chickens" data-testid="livestock-card-chickens">
-            <span class="emoji">🐔</span>
-            <span class="label">Chickens</span>
-            <span class="count">Nkhuku</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="pigs" data-testid="livestock-card-pigs">
-            <span class="emoji">🐖</span>
-            <span class="label">Pigs</span>
-            <span class="count">Nkhumba</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="goats" data-testid="livestock-card-goats">
-            <span class="emoji">🐐</span>
-            <span class="label">Goats</span>
-            <span class="count">Mbuzi</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="cattle" data-testid="livestock-card-cattle">
-            <span class="emoji">🐄</span>
-            <span class="label">Cattle</span>
-            <span class="count">Ng'ombe</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="sheep" data-testid="livestock-card-sheep">
-            <span class="emoji">🐑</span>
-            <span class="label">Sheep</span>
-            <span class="count">Nkhosa</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="ducks" data-testid="livestock-card-ducks">
-            <span class="emoji">🦆</span>
-            <span class="label">Ducks</span>
-            <span class="count">Bakha</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="rabbits" data-testid="livestock-card-rabbits">
-            <span class="emoji">🐰</span>
-            <span class="label">Rabbits</span>
-            <span class="count">Kalulu</span>
-        </button>
-        <button type="button" class="livestock-card" data-type="fish" data-testid="livestock-card-fish">
-            <span class="emoji">🐟</span>
-            <span class="label">Fish</span>
-            <span class="count">Nsomba</span>
-        </button>
+    {% if has_livestock %}
+    <p class="text-muted mb-4"><i class="bi bi-lightning-fill text-primary me-1"></i> Select a recorded batch to sell from</p>
+    
+    <!-- Recorded Livestock Batches -->
+    <div class="livestock-cards-grid" data-testid="livestock-batch-cards">
+        {% for batch in batches %}
+        <a href="{% url 'verticals:farm_sales_record' %}?type=livestock&batch_id={{ batch.id }}" 
+           class="livestock-card" data-testid="livestock-batch-{{ batch.id }}">
+            <span class="emoji">
+                {% if batch.animal_type == 'chickens' %}🐔
+                {% elif batch.animal_type == 'pigs' %}🐖
+                {% elif batch.animal_type == 'goats' %}🐐
+                {% elif batch.animal_type == 'cattle' %}🐄
+                {% elif batch.animal_type == 'sheep' %}🐑
+                {% elif batch.animal_type == 'ducks' %}🦆
+                {% elif batch.animal_type == 'rabbits' %}🐰
+                {% elif batch.animal_type == 'fish' %}🐟
+                {% else %}🐾{% endif %}
+            </span>
+            <span class="label">{{ batch.name }}</span>
+            <span class="count text-success"><i class="bi bi-check-circle"></i> {{ batch.count_current }} head</span>
+        </a>
+        {% endfor %}
     </div>
+    
+    {% else %}
+    <!-- Empty State: No livestock recorded -->
+    <div class="text-center py-5" style="background: linear-gradient(135deg, #dbeafe 0%, #f0f9ff 100%); border-radius: 12px; border: 2px dashed rgba(37,99,235,0.3);" data-testid="empty-livestock-cta">
+        <i class="bi bi-piggy-bank" style="font-size: 3rem; color: #2563eb; opacity: 0.6;"></i>
+        <h3 class="mt-3" style="font-size: 1.25rem; font-weight: 700;">No Livestock Recorded Yet</h3>
+        <p class="text-muted mb-4">Add your livestock batches first before making sales.</p>
+        <a href="{% url 'verticals:farm_livestock_add_batch' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-1"></i> Add Livestock First
+        </a>
+    </div>
+    {% endif %}
     
     <!-- Sale Form (appears after selecting livestock type) -->
     <div class="sale-form-card" id="saleFormCard" data-testid="livestock-sale-form">

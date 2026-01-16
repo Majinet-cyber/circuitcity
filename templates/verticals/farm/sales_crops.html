@@ -1,21 +1,183 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Crop Sales - {{ business.name }}{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Premium Crop Sales Cards (Jan 2026) ===== */
+.crop-sales-page {
+    --farm-primary: #2563eb;
+    --farm-primary-light: #dbeafe;
+    --farm-primary-rgb: 37, 99, 235;
+    --farm-green: #16a34a;
+    --farm-green-light: #dcfce7;
+}
+
+/* Category Section */
+.crop-category {
+    margin-bottom: 2rem;
+}
+
+.crop-category h2 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--farm-primary-light);
+}
+
+/* Crop Cards Grid */
+.crop-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+@media (min-width: 576px) {
+    .crop-cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .crop-cards-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+@media (min-width: 992px) {
+    .crop-cards-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+/* Premium Crop Card */
+.crop-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius, 12px);
+    text-decoration: none;
+    color: var(--ink);
+    font-weight: 600;
+    font-size: 0.875rem;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    cursor: pointer;
+    text-align: center;
+}
+
+.crop-card:hover {
+    background: var(--farm-primary-light);
+    border-color: var(--farm-primary);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(var(--farm-primary-rgb), 0.2);
+    text-decoration: none;
+    color: var(--ink);
+}
+
+.crop-card:focus {
+    outline: 2px solid var(--farm-primary);
+    outline-offset: 2px;
+}
+
+.crop-card .emoji {
+    font-size: 2.25rem;
+    line-height: 1;
+}
+
+.crop-card .label {
+    font-weight: 700;
+    font-size: 0.8125rem;
+}
+
+.crop-card .stock-badge {
+    font-size: 0.6875rem;
+    color: var(--muted);
+    font-weight: 400;
+}
+
+/* Empty State */
+.empty-crops-cta {
+    text-align: center;
+    padding: 3rem 1rem;
+    background: linear-gradient(135deg, var(--farm-primary-light) 0%, #f0f9ff 100%);
+    border-radius: var(--radius, 12px);
+    border: 2px dashed rgba(var(--farm-primary-rgb), 0.3);
+}
+
+.empty-crops-cta i {
+    font-size: 3rem;
+    color: var(--farm-primary);
+    opacity: 0.6;
+}
+
+.empty-crops-cta h3 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 1rem 0 0.5rem;
+    color: var(--ink);
+}
+
+.empty-crops-cta p {
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
+<div class="crop-sales-page container-fluid py-3" data-vertical="farm" data-testid="crop-sales-page">
     <div class="mb-4">
         <a href="{% url 'verticals:farm_sales' %}" class="text-decoration-none mb-2 d-inline-block">&larr; Back to Sales</a>
         <h1 class="h3 mb-1"><span class="me-2">🌽</span>{{ hero_title }}</h1>
         <p class="text-muted mb-0">{{ hero_blurb }}</p>
     </div>
     
-    <div class="alert alert-info">
-        <strong>Coming Soon:</strong> Malawi-specific crop quick-pick cards will appear here.
-    </div>
+    {% if has_crops %}
+    <p class="text-muted mb-4"><i class="bi bi-lightning-fill text-primary me-1"></i> Quick pick a crop to record sale</p>
     
-    <a href="{% url 'verticals:farm_sales_record' %}?type=crop" class="btn btn-primary">
-        <i class="bi bi-plus-circle me-1"></i> Record Crop Sale
-    </a>
+    {% for category, crops in crops_by_category.items %}
+    <div class="crop-category" data-testid="crop-category-{{ category|slugify }}">
+        <h2>{{ category }}</h2>
+        <div class="crop-cards-grid" data-testid="crop-cards-{{ category|slugify }}">
+            {% for crop in crops %}
+            <a href="{% url 'verticals:farm_sales_record' %}?type=crop&crop_id={{ crop.id }}" 
+               class="crop-card" 
+               data-testid="crop-card-{{ crop.id }}">
+                <span class="emoji">{{ crop.emoji }}</span>
+                <span class="label">{{ crop.name }}</span>
+                {% if crop.quantity_available > 0 %}
+                <span class="stock-badge text-success">
+                    <i class="bi bi-box-seam"></i> {{ crop.quantity_available|floatformat:0 }} {{ crop.get_unit_display }}
+                </span>
+                {% endif %}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+    
+    {% else %}
+    <!-- Empty State: No crops recorded -->
+    <div class="empty-crops-cta" data-testid="empty-crops-cta">
+        <i class="bi bi-flower1"></i>
+        <h3>No Crops Recorded Yet</h3>
+        <p>Record your crops first before making sales. This ensures accurate tracking.</p>
+        <a href="{% url 'verticals:farm_crops_list' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-1"></i> Record Crops First
+        </a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

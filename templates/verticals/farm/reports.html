@@ -1,74 +1,153 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Reports - Farm Manager{% endblock %}
 
+{% block extra_css %}
+<style>
+.farm-reports-page {
+    --farm-primary: #2563eb;
+    --farm-primary-light: #dbeafe;
+}
+
+.report-card {
+    transition: all 0.2s ease;
+    border-radius: 16px !important;
+}
+
+.report-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.15) !important;
+}
+
+.report-card .btn {
+    min-width: 120px;
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid py-3">
+<div class="farm-reports-page container-fluid py-3" data-vertical="farm" data-testid="farm-reports-page">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h3 mb-0">📊 Farm Reports</h1>
+        <div>
+            <h1 class="h3 mb-1">📊 Farm Reports</h1>
+            <p class="text-muted mb-0">Generate and download detailed farm reports</p>
+        </div>
     </div>
 
-    <div class="row g-4">
+    <!-- Report Cards -->
+    <div class="row g-4" data-testid="report-cards">
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card report-card border-0 shadow-sm h-100">
                 <div class="card-body text-center py-5">
                     <i class="bi bi-journal-text text-primary h1"></i>
                     <h5 class="mt-3">Profit & Loss</h5>
-                    <p class="text-muted">Monthly income and expense summary</p>
-                    <a href="#" class="btn btn-outline-primary">Generate</a>
+                    <p class="text-muted small">Monthly income and expense summary with category breakdown</p>
+                    <a href="{% url 'verticals:farm_report_profit_loss' %}" 
+                       class="btn btn-primary" 
+                       data-testid="btn-profit-loss">
+                        <i class="bi bi-download me-1"></i> Generate CSV
+                    </a>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card report-card border-0 shadow-sm h-100">
                 <div class="card-body text-center py-5">
                     <i class="bi bi-piggy-bank text-success h1"></i>
                     <h5 class="mt-3">Livestock Report</h5>
-                    <p class="text-muted">Batch counts, events, and valuation</p>
-                    <a href="#" class="btn btn-outline-success">Generate</a>
+                    <p class="text-muted small">Batch counts, events, and estimated valuation</p>
+                    <a href="{% url 'verticals:farm_report_livestock' %}" 
+                       class="btn btn-success" 
+                       data-testid="btn-livestock-report">
+                        <i class="bi bi-download me-1"></i> Generate CSV
+                    </a>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card report-card border-0 shadow-sm h-100">
                 <div class="card-body text-center py-5">
                     <i class="bi bi-flower1 text-warning h1"></i>
                     <h5 class="mt-3">Crop Season Report</h5>
-                    <p class="text-muted">Season projections vs actuals</p>
-                    <a href="#" class="btn btn-outline-warning">Generate</a>
+                    <p class="text-muted small">Season projections vs actual results</p>
+                    <a href="{% url 'verticals:farm_report_crop_season' %}" 
+                       class="btn btn-warning text-dark" 
+                       data-testid="btn-crop-season-report">
+                        <i class="bi bi-download me-1"></i> Generate CSV
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Quick Stats (if available) -->
+    {% if net_profit is not None %}
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-transparent">
-            <h6 class="mb-0">Export Data</h6>
+            <h6 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Current Period Summary</h6>
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Income</p>
+                    <p class="h5 mb-0 text-success">MWK {{ total_income|floatformat:0|intcomma }}</p>
+                </div>
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Expenses</p>
+                    <p class="h5 mb-0 text-danger">MWK {{ total_expenses|floatformat:0|intcomma }}</p>
+                </div>
+                <div class="col-4">
+                    <p class="text-muted small mb-1">Net Profit</p>
+                    <p class="h5 mb-0 {% if net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        MWK {{ net_profit|floatformat:0|intcomma }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Export Data Section -->
+    <div class="card border-0 shadow-sm mt-4" data-testid="export-section">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Export Raw Data</h6>
         </div>
         <div class="card-body">
             <div class="row g-3">
                 <div class="col-md-4">
-                    <a href="#" class="btn btn-outline-secondary w-100">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Ledger (CSV)
+                    <a href="{% url 'verticals:farm_report_ledger_export' %}" 
+                       class="btn btn-outline-secondary w-100"
+                       data-testid="btn-export-ledger">
+                        <i class="bi bi-table me-1"></i> Export Ledger (CSV)
                     </a>
                 </div>
                 <div class="col-md-4">
-                    <a href="#" class="btn btn-outline-secondary w-100">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Livestock (CSV)
+                    <a href="{% url 'verticals:farm_report_livestock_export' %}" 
+                       class="btn btn-outline-secondary w-100"
+                       data-testid="btn-export-livestock">
+                        <i class="bi bi-table me-1"></i> Export Livestock (CSV)
                     </a>
                 </div>
                 <div class="col-md-4">
-                    <a href="#" class="btn btn-outline-secondary w-100">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Export Crops (CSV)
+                    <a href="{% url 'verticals:farm_report_crops_export' %}" 
+                       class="btn btn-outline-secondary w-100"
+                       data-testid="btn-export-crops">
+                        <i class="bi bi-table me-1"></i> Export Crops (CSV)
                     </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="alert alert-info mt-4">
-        <i class="bi bi-info-circle"></i>
-        <strong>Coming Soon:</strong> AI-powered recommendations based on your farm data.
+    <div class="alert alert-info mt-4" style="border-radius: 12px;">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-lightbulb fs-4"></i>
+            <div>
+                <strong>Coming Soon:</strong>
+                <span class="text-muted">AI-powered recommendations based on your farm data.</span>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
