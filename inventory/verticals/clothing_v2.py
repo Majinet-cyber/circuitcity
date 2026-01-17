@@ -497,29 +497,76 @@ def fast_stock_in(request):
 @require_business_kind(BusinessKind.CLOTHING)
 def fast_sell(request):
     """
-    Fast sell page: search box + top items grid + sticky cart.
+    Fast sell page: scanner-first UX for barcoded clothing items.
+    
+    CRITICAL: Fast Sell is ONLY for barcoded items (ClothingBarcodeUnit).
+    For common stock (non-barcoded), users should use Manual Sell instead.
     """
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    
     ctx = base.base_context(request)
     business = ctx.get("business")
+    location = ctx.get("location")
 
-    # Get products with stock
-    available_products = MerchProduct.objects.filter(
+    # Get in-stock barcode units (authoritative source for Fast Sell)
+    barcode_units_query = ClothingBarcodeUnit.objects.filter(
         business=business,
-        kind=BusinessKind.CLOTHING,
+        status="IN_STOCK",
         is_active=True,
-        is_archived=False,
-        quantity_in_stock__gt=0,
-    ).order_by("-id")[:20]
-
-    # Get top sellers
-    top_sellers = get_top_sellers(business, days=7, limit=10)
-    top_seller_ids = [item["product"].id for item in top_sellers]
+    )
+    
+    # Apply location filter if available
+    if location:
+        barcode_units_query = barcode_units_query.filter(location=location)
+    
+    # Get distinct products that have barcoded units in stock
+    # Group by product attributes for display
+    barcode_units = barcode_units_query.select_related("product").order_by("-created_at")[:50]
+    
+    # Build available items list (one entry per unique product/size combo)
+    available_items = []
+    seen_combos = set()
+    
+    for unit in barcode_units:
+        # Create unique key for product + size combination
+        combo_key = (
+            unit.product.id if unit.product else None,
+            unit.size,
+            unit.category,
+            unit.brand,
+        )
+        
+        if combo_key not in seen_combos:
+            seen_combos.add(combo_key)
+            
+            # Count how many units of this combo are in stock
+            units_count = barcode_units_query.filter(
+                product=unit.product if unit.product else None,
+                size=unit.size,
+                category=unit.category,
+                brand=unit.brand,
+            ).count()
+            
+            available_items.append({
+                "product": unit.product,
+                "size": unit.size,
+                "category": unit.category,
+                "brand": unit.brand,
+                "color": unit.color,
+                "selling_price": unit.selling_price,
+                "units_in_stock": units_count,
+                "display_name": f"{unit.brand} {unit.category} - Size {unit.size}" if unit.brand else f"{unit.category} - Size {unit.size}",
+            })
+    
+    # Calculate total barcoded units available
+    total_barcoded_units = barcode_units_query.count()
 
     ctx.update(
         {
-            "available_products": available_products,
-            "top_seller_ids": top_seller_ids,
-            "page_title": "Sell",
+            "available_items": available_items,
+            "total_barcoded_units": total_barcoded_units,
+            "page_title": "Fast Sell",
+            "vertical": "clothing",
         }
     )
 

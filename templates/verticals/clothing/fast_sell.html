@@ -56,17 +56,20 @@
 
 .search-input {
   width: 100%;
-  padding: 16px 20px;
-  border: 2px solid #e2e8f0;
+  padding: 18px 70px 18px 20px;
+  border: 3px solid #10b981;
   border-radius: 16px;
-  font-size: 1.1rem;
+  font-size: 1.3rem;
+  font-weight: 600;
   transition: all 0.2s;
+  background: linear-gradient(to right, #f0fdf4, white);
 }
 
 .search-input:focus {
   outline: none;
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  border-color: #059669;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+  background: #f0fdf4;
 }
 
 /* Product Grid */
@@ -205,210 +208,78 @@
   <!-- CSRF Token -->
   <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
 
-  <!-- Barcode Scanner Input -->
+  <!-- SCANNER-FIRST: Barcode Scanner Input (PRIMARY) -->
   <div class="search-box">
-    <input 
-      type="text" 
-      class="search-input" 
-      id="barcodeInput" 
-      placeholder="📷 Scan barcode or type & press Enter for instant sale..." 
-      style="border-color: #10b981; background: linear-gradient(to right, #f0fdf4, white);"
-    >
-    <small style="display: block; margin-top: 4px; color: #10b981; font-weight: 600;">⚡ Scan/type barcode → Enter = Instant sale</small>
+    <div style="position: relative;">
+      <input 
+        type="text" 
+        class="search-input" 
+        id="barcodeInput" 
+        placeholder="📷 Scan barcode or type & press Enter for instant sale..." 
+        style="border-color: #10b981; background: linear-gradient(to right, #f0fdf4, white); font-size: 1.3rem; font-weight: 600; padding: 18px 70px 18px 20px; border-width: 3px;"
+        autofocus
+        autocomplete="off"
+      >
+      <button 
+        type="button" 
+        id="cameraScanBtn"
+        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: #10b981; color: white; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 1.3rem; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); transition: all 0.2s;"
+        title="Open camera scanner"
+      >
+        📷
+      </button>
+    </div>
+    <small style="display: block; margin-top: 8px; color: #10b981; font-weight: 700; font-size: 1rem;">
+      ⚡ SCANNER-FIRST: Scan/type barcode → Enter = Instant sale | 
+      <span style="color: #64748b;">Barcoded units: {{ total_barcoded_units }}</span>
+    </small>
   </div>
 
-  <!-- Search Box -->
-  <div class="search-box">
-    <input 
-      type="text" 
-      class="search-input" 
-      id="searchInput" 
-      placeholder="🔍 Search by name, brand, SKU..." 
-    >
-  </div>
-
-  <!-- Products Grid -->
+  <!-- Discoverable: In-Stock Barcoded Items (optional list) -->
   <div id="productsContainer">
-    {% if available_products %}
+    {% if available_items %}
+    <div style="margin-bottom: 16px;">
+      <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 12px;">
+        📦 In Stock Barcoded Items ({{ available_items|length }} types)
+      </h3>
+    </div>
     <div class="products-grid" id="productsGrid">
-      {% for product in available_products %}
-      <div class="product-card{% if product.id in top_seller_ids %} top-seller{% endif %}" 
-           data-product-id="{{ product.id }}"
-           data-product-name="{{ product.name }}"
-           data-product-price="{{ product.selling_price }}"
-           data-product-stock="{{ product.quantity_in_stock }}"
-           onclick="addToCart(this)">
-        <div class="product-name">{{ product.name }}</div>
-        {% if product.brand %}
-        <div class="product-meta">{{ product.brand }}</div>
-        {% endif %}
-        <div class="product-price">K {{ product.selling_price }}</div>
-        <div class="product-stock">{{ product.quantity_in_stock }} in stock</div>
+      {% for item in available_items %}
+      <div class="product-card" 
+           data-item-info="{{ item.display_name }}"
+           data-product-price="{{ item.selling_price }}"
+           data-product-stock="{{ item.units_in_stock }}">
+        <div class="product-name">{{ item.display_name }}</div>
+        <div class="product-meta">
+          {% if item.color %}{{ item.color }}{% endif %}
+          {% if item.category %} · {{ item.category|title }}{% endif %}
+        </div>
+        <div class="product-price">K {{ item.selling_price }}</div>
+        <div class="product-stock">{{ item.units_in_stock }} unit{{ item.units_in_stock|pluralize }} in stock</div>
+        <div style="margin-top: 8px; padding: 6px 12px; background: #dbeafe; color: #1e40af; border-radius: 8px; font-size: 0.75rem; font-weight: 700; text-align: center;">
+          🏷️ Tracked
+        </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
     <div class="empty-state">
       <div class="empty-state-icon">📦</div>
-      <p>No products with stock available</p>
-      <a href="{% url 'verticals:clothing_fast_stock_in' %}" style="color: #10b981; font-weight: 700;">Stock in products</a>
+      <h3 style="margin: 0 0 12px; color: #64748b; font-size: 1.4rem;">No barcoded items in stock</h3>
+      <p style="color: #94a3b8; margin-bottom: 8px;">Fast Sell works with barcoded clothing items only.</p>
+      <p style="color: #94a3b8; margin-bottom: 24px; font-size: 0.9rem;">Stock in products with barcodes to use this scanner.</p>
+      <a href="{% url 'inventory:clothing_wizard' %}" style="display: inline-block; background: #10b981; color: white; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: 700; margin-right: 12px;">
+        + Add Barcoded Items
+      </a>
+      <a href="{% url 'verticals:clothing_hub' %}" style="display: inline-block; background: #e2e8f0; color: #0f172a; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: 700;">
+        ← Back to Hub
+      </a>
     </div>
     {% endif %}
   </div>
 </div>
 
-<!-- Sticky Cart Bar -->
-<div class="cart-bar" id="cartBar">
-  <div class="cart-bar-content">
-    <div class="cart-info">
-      <div class="cart-stat">
-        <span id="cartItemCount">0</span> items
-      </div>
-      <div class="cart-stat">
-        K <span id="cartTotal">0.00</span>
-      </div>
-    </div>
-    <div style="display: flex; gap: 12px;">
-      <button onclick="clearCart()" style="background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.3); padding: 12px 24px; border-radius: 12px; font-weight: 700; cursor: pointer;">
-        Clear
-      </button>
-      <button class="checkout-btn" onclick="checkout()">
-        Checkout →
-      </button>
-    </div>
-  </div>
-</div>
-
 <script>
-let cart = [];
-
-function addToCart(element) {
-  const productId = element.dataset.productId;
-  const productName = element.dataset.productName;
-  const productPrice = parseFloat(element.dataset.productPrice);
-  const productStock = parseInt(element.dataset.productStock);
-  
-  // Check if already in cart
-  const existingItem = cart.find(item => item.id === productId);
-  
-  if (existingItem) {
-    if (existingItem.quantity < productStock) {
-      existingItem.quantity++;
-    } else {
-      alert(`Maximum stock reached (${productStock} available)`);
-      return;
-    }
-  } else {
-    cart.push({
-      id: productId,
-      name: productName,
-      price: productPrice,
-      quantity: 1,
-      maxStock: productStock
-    });
-  }
-  
-  updateCartDisplay();
-  
-  // Visual feedback
-  element.style.transform = 'scale(0.95)';
-  setTimeout(() => {
-    element.style.transform = '';
-  }, 200);
-}
-
-function updateCartDisplay() {
-  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  
-  document.getElementById('cartItemCount').textContent = totalItems;
-  document.getElementById('cartTotal').textContent = totalPrice.toFixed(2);
-  
-  const cartBar = document.getElementById('cartBar');
-  if (cart.length > 0) {
-    cartBar.classList.add('active');
-  } else {
-    cartBar.classList.remove('active');
-  }
-}
-
-function clearCart() {
-  if (confirm('Clear all items from cart?')) {
-    cart = [];
-    updateCartDisplay();
-  }
-}
-
-async function checkout() {
-  if (cart.length === 0) {
-    alert('Cart is empty');
-    return;
-  }
-  
-  // Confirm checkout
-  const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  let summary = 'Complete Sale?\n\n';
-  cart.forEach(item => {
-    summary += `${item.name} x ${item.quantity} = K ${(item.price * item.quantity).toFixed(2)}\n`;
-  });
-  summary += `\nTotal: K ${total.toFixed(2)}`;
-  
-  if (!confirm(summary)) return;
-  
-  // Process each item in cart via API
-  const checkoutBtn = document.querySelector('.checkout-btn');
-  checkoutBtn.disabled = true;
-  checkoutBtn.textContent = 'Processing...';
-  
-  let successCount = 0;
-  let errorMessages = [];
-  
-  for (const item of cart) {
-    try {
-      const response = await fetch('{% url "verticals:clothing_fast_sell_create_api" %}', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || getCsrfToken()
-        },
-        body: JSON.stringify({
-          product_id: item.id,
-          quantity: item.quantity,
-          selling_price: item.price,
-          payment_method: 'cash'
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (result.ok) {
-        successCount++;
-      } else {
-        errorMessages.push(`${item.name}: ${result.error || 'Failed'}`);
-      }
-    } catch (e) {
-      errorMessages.push(`${item.name}: Network error`);
-    }
-  }
-  
-  // Show results
-  if (successCount === cart.length) {
-    alert(`✅ Sale complete! ${successCount} item(s) sold for K ${total.toFixed(2)}`);
-    cart = [];
-    updateCartDisplay();
-    // Reload page to refresh stock counts
-    location.reload();
-  } else if (successCount > 0) {
-    alert(`⚠️ Partial sale: ${successCount}/${cart.length} items sold.\n\nErrors:\n${errorMessages.join('\n')}`);
-    location.reload();
-  } else {
-    alert(`❌ Sale failed:\n${errorMessages.join('\n')}`);
-  }
-  
-  checkoutBtn.disabled = false;
-  checkoutBtn.textContent = 'Checkout →';
-}
-
 // Get CSRF token helper
 function getCsrfToken() {
   const meta = document.querySelector('meta[name="csrf-token"]');
@@ -421,22 +292,15 @@ function getCsrfToken() {
   return '';
 }
 
-// Search functionality
-document.getElementById('searchInput').addEventListener('input', function(e) {
-  const searchTerm = e.target.value.toLowerCase();
-  const products = document.querySelectorAll('.product-card');
-  
-  products.forEach(product => {
-    const name = product.dataset.productName.toLowerCase();
-    if (name.includes(searchTerm)) {
-      product.style.display = 'block';
-    } else {
-      product.style.display = 'none';
-    }
-  });
+// Autofocus on barcode input on page load
+window.addEventListener('DOMContentLoaded', function() {
+  const barcodeInput = document.getElementById('barcodeInput');
+  if (barcodeInput) {
+    barcodeInput.focus();
+  }
 });
 
-// Barcode instant sale functionality
+// Barcode instant sale functionality (SCANNER-FIRST)
 document.getElementById('barcodeInput').addEventListener('keydown', async function(e) {
   if (e.key !== 'Enter') return;
   e.preventDefault();

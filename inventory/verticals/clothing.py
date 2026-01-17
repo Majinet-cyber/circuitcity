@@ -207,23 +207,103 @@ def dashboard(request):
 @require_business_kind(BusinessKind.CLOTHING)
 def hub(request):
     """
-    Clothing Hub - Stock Overview Page with gamified battery display.
-    Shows each product with stock levels, sales, and status indicators.
+    Clothing Hub - Premium Inventory Cockpit.
+    
+    Shows:
+    - Top KPI cards (total products, in stock, low stock, barcoded units)
+    - Product cards with stock battery, badges (Tracked/Common), quick actions
+    - Filter chips: All / Common / Barcoded / Low Stock
     """
     from inventory.models_verticals import ClothingProductLog, ClothingProductAction
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
 
     ctx = base.base_context(request)
     business = ctx.get("business")
     location = ctx.get("location")
 
-    # Get all active clothing products
-    products = MerchProduct.objects.filter(
+    # Get filter from query params
+    filter_type = request.GET.get("filter", "all")  # all, common, barcoded, low_stock
+
+    # === TOP KPI CARDS ===
+    # Total products
+    total_products = MerchProduct.objects.filter(
         business=business, kind=BusinessKind.CLOTHING, is_active=True, is_archived=False
-    ).order_by("-id")
+    ).count()
+
+    # In stock (common stock qty)
+    in_stock_common = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__gt=0,
+    ).count()
+
+    # Barcoded units in stock
+    barcode_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",
+        is_active=True,
+    )
+    if location:
+        barcode_query = barcode_query.filter(location=location)
+    
+    barcoded_units_count = barcode_query.count()
+
+    # Low stock count (products with quantity < 3)
+    low_stock_count = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__lt=3,
+        quantity_in_stock__gt=0,
+    ).count()
+
+    # Get all active clothing products
+    products_query = MerchProduct.objects.filter(
+        business=business, kind=BusinessKind.CLOTHING, is_active=True, is_archived=False
+    )
+
+    # Apply filters
+    if filter_type == "low_stock":
+        products_query = products_query.filter(quantity_in_stock__lt=3, quantity_in_stock__gt=0)
+    elif filter_type == "common":
+        # Products with common stock (quantity_in_stock > 0) and no barcoded units
+        # We'll filter this after building panels
+        pass
+    elif filter_type == "barcoded":
+        # Products that have barcoded units
+        # We'll filter this after building panels
+        pass
+
+    products = products_query.order_by("-id")
 
     # Build product panel data
     product_panels = []
     for product in products:
+        # Check if product has barcoded units
+        product_barcode_units = ClothingBarcodeUnit.objects.filter(
+            business=business,
+            product=product,
+            status="IN_STOCK",
+            is_active=True,
+        )
+        if location:
+            product_barcode_units = product_barcode_units.filter(location=location)
+        
+        barcode_units_count = product_barcode_units.count()
+        is_tracked = barcode_units_count > 0
+        is_common = (product.quantity_in_stock or 0) > 0
+
+        # Apply "barcoded" filter
+        if filter_type == "barcoded" and not is_tracked:
+            continue
+        
+        # Apply "common" filter
+        if filter_type == "common" and not is_common:
+            continue
+
         # Calculate stock IN quantities from logs
         stock_in_logs = ClothingProductLog.objects.filter(product=product, action=ClothingProductAction.STOCK_IN)
 
@@ -249,8 +329,8 @@ def hub(request):
         revenue_total = sales["total_revenue"] or Decimal("0.00")
         cost_of_goods_sold = sales["total_cost"] or Decimal("0.00")
 
-        # Calculate available stock
-        available_qty = product.quantity_in_stock or 0
+        # Calculate available stock (common + barcoded)
+        available_qty = (product.quantity_in_stock or 0) + barcode_units_count
 
         # Calculate inventory cost (cost of remaining stock)
         # Use current product cost_price or calculate average cost
@@ -291,6 +371,10 @@ def hub(request):
             {
                 "product": product,
                 "available_stock": available_qty,
+                "common_stock": product.quantity_in_stock or 0,
+                "barcode_units": barcode_units_count,
+                "is_tracked": is_tracked,
+                "is_common": is_common,
                 "stock_in_qty": stock_in_qty,
                 "total_sold": stock_sold_qty,
                 "revenue": revenue_total,
@@ -307,7 +391,14 @@ def hub(request):
         {
             "product_panels": product_panels,
             "page_title": "Clothing Hub",
-            "active_tab": "hub",  # Fix template variable error
+            "active_tab": "hub",
+            # KPI cards
+            "total_products": total_products,
+            "in_stock_common": in_stock_common,
+            "barcoded_units_count": barcoded_units_count,
+            "low_stock_count": low_stock_count,
+            # Filters
+            "filter_type": filter_type,
         }
     )
 

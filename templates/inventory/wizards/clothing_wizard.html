@@ -312,6 +312,7 @@
       columns: 'two-col'
     },
     // REORDERED: Pricing comes AFTER barcode selection (always shown)
+    // CRITICAL: Selling price is REQUIRED, shows smart margin feedback as user types
     {
       type: 'multi-input',
       key: 'pricing',
@@ -319,8 +320,8 @@
       subtitle: 'Set prices and initial stock quantity',
       fields: [
         { key: 'product_name', label: 'Product Name (Optional)', type: 'text', placeholder: 'e.g., Air Jordan 1, Summer Dress', required: false },
-        { key: 'selling_price', label: 'Selling Price (MWK)', type: 'number', min: 0, step: '0.01', required: true },
-        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01' },
+        { key: 'cost_price', label: 'Cost Price/Order Price (MWK)', type: 'number', min: 0, step: '0.01', required: false },
+        { key: 'selling_price', label: 'Selling Price (MWK) *REQUIRED*', type: 'number', min: 0, step: '0.01', required: true, smartPricing: true },
         { key: 'initial_stock', label: 'Initial Stock Quantity', type: 'number', min: 1, value: 1, required: true }
       ]
     },
@@ -381,7 +382,7 @@
                 </div>
 
                 <div>
-                  <label class="wizard-label" for="pricing-selling-price">Selling Price (MWK) <span style="color: #dc2626;">*</span></label>
+                  <label class="wizard-label" for="pricing-selling-price">Selling Price (MWK) <span style="color: #dc2626;">*REQUIRED*</span></label>
                   <input
                     type="number"
                     id="pricing-selling-price"
@@ -391,8 +392,11 @@
                     value="${price || ''}"
                     placeholder="e.g., 15000.00"
                     required
+                    oninput="updateInlineSmartPricing()"
+                    onblur="updateInlineSmartPricing()"
                   >
-                  <small class="text-muted">Price per unit</small>
+                  <small class="text-muted">Price per unit - REQUIRED</small>
+                  <div id="inline-smart-pricing-feedback" style="margin-top: 12px; padding: 14px 18px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; display: none; transition: all 0.3s;"></div>
                 </div>
 
                 <div>
@@ -405,6 +409,8 @@
                     step="0.01"
                     value="${cost || ''}"
                     placeholder="e.g., 10000.00"
+                    oninput="updateInlineSmartPricing()"
+                    onblur="updateInlineSmartPricing()"
                   >
                   <small class="text-muted">Optional: Your cost per unit</small>
                 </div>
@@ -482,18 +488,21 @@
                 <i class="bi bi-upc-scan me-2"></i>Scan Barcode
               </button>
 
-              <!-- Manual Entry -->
+              <!-- Manual Entry (SCANNER-FIRST: Autofocus) -->
               <div class="input-group mb-2">
                 <input type="text"
                        class="form-control"
                        id="manual-barcode-input"
-                       placeholder="Or type barcode manually..."
+                       placeholder="📷 Scan or type barcode, press Enter..."
                        autocomplete="off"
+                       autofocus
+                       style="font-size: 1.05rem; padding: 12px;"
                        onkeypress="if(event.key==='Enter'){event.preventDefault();addManualBarcode();}">
                 <button class="btn btn-outline-primary"
                         type="button"
                         id="btn-add-manual-barcode"
-                        onclick="addManualBarcode()">
+                        onclick="addManualBarcode()"
+                        style="padding: 12px 20px;">
                   <i class="bi bi-plus-lg"></i> Add
                 </button>
               </div>
@@ -912,14 +921,22 @@
         // Update wizard data with new scanned barcodes from server
         wizard.data.scanned_barcodes = result.scanned_barcodes;
 
-        // Clear manual input
+        // Clear manual input and refocus
         const manualInput = document.getElementById('manual-barcode-input');
         if (manualInput) {
           manualInput.value = '';
+          // CRITICAL: Refocus input for next scan
+          setTimeout(() => manualInput.focus(), 100);
         }
 
         // Re-render the step to update UI
         wizard.render();
+        
+        // After render, ensure focus returns to input
+        setTimeout(() => {
+          const input = document.getElementById('manual-barcode-input');
+          if (input) input.focus();
+        }, 200);
 
         // Show success feedback
         const successMsg = document.createElement('div');
@@ -958,6 +975,75 @@
       showBarcodeError('Please enter a barcode');
     }
   }
+
+  // Update inline smart pricing feedback (for barcode step inline pricing form)
+  window.updateInlineSmartPricing = function() {
+    const feedbackDiv = document.getElementById('inline-smart-pricing-feedback');
+    if (!feedbackDiv) return;
+
+    const costInput = document.getElementById('pricing-cost-price');
+    const priceInput = document.getElementById('pricing-selling-price');
+    
+    if (!costInput || !priceInput) return;
+
+    const cost = parseFloat(costInput.value || 0);
+    const price = parseFloat(priceInput.value || 0);
+
+    // Hide if no valid data
+    if (!cost || !price || cost <= 0 || price <= 0) {
+      feedbackDiv.style.display = 'none';
+      return;
+    }
+
+    // Calculate metrics
+    const profit = price - cost;
+    const margin = ((profit / price) * 100).toFixed(1);
+    const profitPerUnit = profit.toFixed(2);
+
+    // Determine feedback type
+    let icon = '';
+    let label = '';
+
+    if (profit <= 0) {
+      icon = '⚠️';
+      label = 'Below Cost';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+      feedbackDiv.style.border = '2px solid #fbbf24';
+      feedbackDiv.style.color = '#92400e';
+    } else if (margin < 20) {
+      icon = '⚡';
+      label = 'Low Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
+      feedbackDiv.style.border = '2px solid #eab308';
+      feedbackDiv.style.color = '#854d0e';
+    } else if (margin < 40) {
+      icon = '✅';
+      label = 'Good Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+      feedbackDiv.style.border = '2px solid #4ade80';
+      feedbackDiv.style.color = '#065f46';
+    } else {
+      icon = '🎉';
+      label = 'Excellent Margin';
+      feedbackDiv.style.background = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+      feedbackDiv.style.border = '2px solid #22c55e';
+      feedbackDiv.style.color = '#14532d';
+    }
+
+    feedbackDiv.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 1.3em;">${icon}</span>
+        <div style="flex: 1;">
+          <div><strong>${label}</strong> • Margin: <strong>${margin}%</strong></div>
+          <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 4px;">
+            Profit per unit: <strong>K ${profitPerUnit}</strong> | Cost: K ${cost.toFixed(2)} → Selling: K ${price.toFixed(2)}
+          </div>
+        </div>
+      </div>
+    `;
+    feedbackDiv.style.display = 'block';
+  };
+
 
   // Remove barcode
   function removeBarcode(index) {
@@ -1114,14 +1200,90 @@
 
       // Mark as touched on blur
       qtyInput.addEventListener('blur', () => { touched.qty = true; updateContinueButton(); });
-      priceInput.addEventListener('blur', () => { touched.price = true; updateContinueButton(); });
-      if (costInput) costInput.addEventListener('blur', () => { touched.cost = true; updateContinueButton(); });
+      priceInput.addEventListener('blur', () => { touched.price = true; updateContinueButton(); updateSmartPricingFeedback(); });
+      if (costInput) costInput.addEventListener('blur', () => { touched.cost = true; updateContinueButton(); updateSmartPricingFeedback(); });
       if (sizeInput) sizeInput.addEventListener('blur', () => { touched.size = true; });
 
       // Validate on input (but only show errors if touched)
       qtyInput.addEventListener('input', updateContinueButton);
-      priceInput.addEventListener('input', updateContinueButton);
-      if (costInput) costInput.addEventListener('input', updateContinueButton);
+      priceInput.addEventListener('input', () => { updateContinueButton(); updateSmartPricingFeedback(); });
+      if (costInput) costInput.addEventListener('input', () => { updateContinueButton(); updateSmartPricingFeedback(); });
+
+      // Add smart pricing feedback container if not exists
+      if (priceInput && !document.getElementById('smart-pricing-feedback')) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.id = 'smart-pricing-feedback';
+        feedbackDiv.style.cssText = 'margin-top: 12px; padding: 14px 18px; border-radius: 12px; font-size: 0.95rem; font-weight: 600; display: none; transition: all 0.3s;';
+        priceInput.parentNode.appendChild(feedbackDiv);
+      }
+
+      // Function to update smart pricing feedback
+      function updateSmartPricingFeedback() {
+        const feedbackDiv = document.getElementById('smart-pricing-feedback');
+        if (!feedbackDiv || !priceInput) return;
+
+        const cost = parseFloat(costInput?.value || 0);
+        const price = parseFloat(priceInput.value || 0);
+
+        // Hide if no valid data
+        if (!cost || !price || cost <= 0 || price <= 0) {
+          feedbackDiv.style.display = 'none';
+          return;
+        }
+
+        // Calculate metrics
+        const profit = price - cost;
+        const margin = ((profit / price) * 100).toFixed(1);
+        const profitPerUnit = profit.toFixed(2);
+
+        // Determine feedback type
+        let feedbackClass = '';
+        let icon = '';
+        let label = '';
+
+        if (profit <= 0) {
+          feedbackClass = 'below-cost';
+          icon = '⚠️';
+          label = 'Below Cost';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)';
+          feedbackDiv.style.border = '2px solid #fbbf24';
+          feedbackDiv.style.color = '#92400e';
+        } else if (margin < 20) {
+          feedbackClass = 'low-margin';
+          icon = '⚡';
+          label = 'Low Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #fef9c3 0%, #fef08a 100%)';
+          feedbackDiv.style.border = '2px solid #eab308';
+          feedbackDiv.style.color = '#854d0e';
+        } else if (margin < 40) {
+          feedbackClass = 'good-margin';
+          icon = '✅';
+          label = 'Good Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+          feedbackDiv.style.border = '2px solid #4ade80';
+          feedbackDiv.style.color = '#065f46';
+        } else {
+          feedbackClass = 'excellent-margin';
+          icon = '🎉';
+          label = 'Excellent Margin';
+          feedbackDiv.style.background = 'linear-gradient(135deg, #bbf7d0 0%, #86efac 100%)';
+          feedbackDiv.style.border = '2px solid #22c55e';
+          feedbackDiv.style.color = '#14532d';
+        }
+
+        feedbackDiv.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3em;">${icon}</span>
+            <div style="flex: 1;">
+              <div><strong>${label}</strong> • Margin: <strong>${margin}%</strong></div>
+              <div style="font-size: 0.85rem; opacity: 0.9; margin-top: 4px;">
+                Profit per unit: <strong>K ${profitPerUnit}</strong> | Cost: K ${cost.toFixed(2)} → Selling: K ${price.toFixed(2)}
+              </div>
+            </div>
+          </div>
+        `;
+        feedbackDiv.style.display = 'block';
+      }
 
       // Initial check (without showing errors - button stays enabled by default)
       updateContinueButton();
