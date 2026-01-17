@@ -1742,6 +1742,79 @@
 
   {% include "partials/loading_spinner.html" %}
 
+{# ===== Modal Portal Root (outside stacking contexts) ===== #}
+{# CRITICAL: Bootstrap modals must render here to avoid z-index traps #}
+<div id="cc-modal-root"></div>
+
+{# ===== Bootstrap Modal Portal Configuration ===== #}
+<script>
+(function() {
+  // CRITICAL FIX: Ensure all Bootstrap modals render in #cc-modal-root
+  // This prevents modals from being trapped in stacking contexts (z-index:0 on .cc-main)
+  
+  // Wait for Bootstrap to be available
+  function waitForBootstrap(callback) {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      callback();
+    } else {
+      setTimeout(function() { waitForBootstrap(callback); }, 50);
+    }
+  }
+  
+  document.addEventListener('DOMContentLoaded', function() {
+    waitForBootstrap(function() {
+      var modalRoot = document.getElementById('cc-modal-root');
+      if (!modalRoot) {
+        console.warn('[Modal] cc-modal-root not found, modals may be trapped in stacking contexts');
+        return;
+      }
+      
+      // Move all existing modals to the modal root
+      document.querySelectorAll('.modal').forEach(function(modal) {
+        if (modal.parentElement !== modalRoot && modal.id !== 'ccInbox') {
+          modalRoot.appendChild(modal);
+        }
+      });
+      
+      // Watch for new modals being added dynamically
+      var observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && node.classList && node.classList.contains('modal')) {
+              if (node.parentElement !== modalRoot && node.id !== 'ccInbox') {
+                modalRoot.appendChild(node);
+              }
+            }
+            // Also move modal backdrops to modal root
+            if (node.nodeType === 1 && node.classList && node.classList.contains('modal-backdrop')) {
+              if (node.parentElement !== modalRoot) {
+                modalRoot.appendChild(node);
+              }
+            }
+          });
+        });
+      });
+      
+      observer.observe(document.body, { childList: true, subtree: true });
+      
+      // Ensure backdrops also render in modal root
+      document.addEventListener('show.bs.modal', function() {
+        // Check for backdrops after modal animation starts
+        setTimeout(function() {
+          document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+            if (backdrop.parentElement !== modalRoot) {
+              modalRoot.appendChild(backdrop);
+            }
+          });
+        }, 50);
+      });
+      
+      console.log('[Modal] Portal configured: all modals will render in #cc-modal-root');
+    });
+  });
+})();
+</script>
+
 {# ===== Sidebar More Features Toggle ===== #}
 <script src="{% static 'js/sidebar-more-features.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 

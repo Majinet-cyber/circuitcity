@@ -732,14 +732,90 @@ a[href*="/locations/switch"],
 
 /* Keep hamburger/mobile toggles visible on phones (already reinforced above) */
 
-/* --------------------------------------------------------------------------
-   Bootstrap Modal z-index fix – prevents modal from appearing under backdrop
-   -------------------------------------------------------------------------- */
+/* ==========================================================================
+   MODAL Z-INDEX & STACKING CONTEXT FIX (2026-01-17)
+   --------------------------------------------------------------------------
+   ROOT CAUSE: .cc-main has position:relative + z-index:0, creating a 
+   stacking context trap. Modals rendered inside cannot escape.
+   
+   SOLUTION:
+   1. Modal portal (#cc-modal-root) lives at body level (outside .cc-shell)
+   2. Enforce correct z-index ordering (modal > backdrop > sidebar)
+   3. Ensure pointer-events are correct
+   4. Prevent any blur/filter from affecting modals
+   ========================================================================== */
+
+/* Modal portal container */
+#cc-modal-root {
+  position: relative;
+  z-index: 9999; /* Above everything */
+  pointer-events: none; /* Allow clicks to pass through when no modal */
+}
+
+/* Modal container - MUST be on top */
 .modal {
   z-index: 20050 !important;
+  pointer-events: auto !important; /* Modals must capture clicks */
+  position: fixed !important; /* Ensure fixed positioning */
 }
+
+/* Modal dialog - the actual content */
+.modal-dialog {
+  pointer-events: auto !important;
+  z-index: inherit;
+}
+
+/* Modal content - ensure it's crisp (no blur) */
+.modal-content {
+  filter: none !important;
+  -webkit-filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: auto !important;
+}
+
+/* Modal backdrop - below modal but above everything else */
 .modal-backdrop {
   z-index: 20040 !important;
+  pointer-events: auto !important; /* Backdrop should capture clicks */
+}
+
+/* Ensure modal backdrops render in portal too */
+#cc-modal-root .modal-backdrop {
+  position: fixed !important;
+}
+
+/* When modal is open, ensure sidebar is below */
+body.modal-open .cc-sidebar {
+  z-index: 1030 !important; /* Below modal */
+}
+
+body.modal-open .cc-backdrop {
+  z-index: 1020 !important; /* Below sidebar */
+}
+
+/* Ensure mobile toggle stays accessible */
+body.modal-open .mobile-toggle {
+  z-index: 2010 !important;
+}
+
+/* Prevent any parent blur from affecting modals */
+.modal-open #cc-modal-root {
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+/* Ensure modals are scrollable */
+.modal-body {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Material picker specific */
+.material-picker-modal {
+  max-height: 70vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ==========================================================================

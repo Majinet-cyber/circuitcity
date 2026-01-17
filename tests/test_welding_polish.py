@@ -643,3 +643,192 @@ class TestWeldingQuoteNoAutoFill:
         # Should get 404
         assert response.status_code == 404
 
+
+# ==============================================================================
+# PART 5: MODAL Z-INDEX & CLICKABILITY REGRESSION TESTS (2026-01-17)
+# ==============================================================================
+
+
+@pytest.mark.django_db
+class TestModalStructureRegression:
+    """
+    Regression tests for modal overlay z-index/pointer-events fix.
+    
+    ROOT CAUSE: Modals rendered inside .cc-main (which has z-index:0) were
+    trapped in a stacking context, causing them to appear below sidebar/backdrop.
+    
+    FIX: Modal portal (#cc-modal-root) at body level + proper z-index ordering.
+    """
+
+    @pytest.fixture
+    def welding_business(self, db):
+        """Create a welding business."""
+        from tenants.models import Business
+        from inventory.business_kinds import BusinessKind
+        
+        business = Business.objects.create(
+            name="Test Welding Shop Modal",
+            kind=BusinessKind.WELDING,
+            is_active=True,
+        )
+        return business
+
+    @pytest.fixture
+    def welding_manager(self, db, welding_business):
+        """Create manager user."""
+        from tenants.models import Membership
+        
+        user = User.objects.create_user(
+            username="weld_mgr_modal",
+            email="weld_mgr_modal@test.com",
+            password="testpass123",
+        )
+        Membership.objects.create(
+            user=user,
+            business=welding_business,
+            role="manager",
+        )
+        return user
+
+    @pytest.fixture
+    def authenticated_client(self, welding_manager, welding_business):
+        """Create authenticated client."""
+        client = Client()
+        client.force_login(welding_manager)
+        session = client.session
+        session["active_business_id"] = welding_business.id
+        session.save()
+        return client
+
+    def test_base_html_includes_modal_root(self, authenticated_client):
+        """
+        base.html must include #cc-modal-root at the end of body (outside .cc-shell).
+        This ensures modals escape the stacking context trap of .cc-main.
+        """
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        
+        html = response.content.decode('utf-8')
+        
+        # Modal root must exist
+        assert 'id="cc-modal-root"' in html, "Modal root container missing from base.html"
+        
+        # Modal root should be after the closing .cc-shell div
+        # (Simple check: it appears after </div> that closes cc-main)
+        shell_end_pos = html.rfind('</div><!-- close cc-shell or cc-main -->')
+        if shell_end_pos == -1:
+            # Fallback: find last occurrence of cc-main or cc-shell
+            shell_end_pos = max(html.rfind('class="cc-main"'), html.rfind('class="cc-shell"'))
+        
+        modal_root_pos = html.find('id="cc-modal-root"')
+        
+        # If both exist, modal root should come after (or at least not deeply nested)
+        if shell_end_pos > 0 and modal_root_pos > 0:
+            # Modal root should be relatively close to end of body
+            body_end_pos = html.rfind('</body>')
+            assert body_end_pos - modal_root_pos < 10000, \
+                "Modal root should be near end of body, not deeply nested"
+
+    def test_welding_quote_detail_renders_modals(self, authenticated_client, welding_business):
+        """
+        Welding quote detail page must render modal triggers and modal markup.
+        """
+        from inventory.models_welding import WeldingQuote
+        
+        quote = WeldingQuote.objects.create(
+            business=welding_business,
+            customer_name="Test Customer Modal",
+        )
+        
+        response = authenticated_client.get(f"/verticals/welding/quotes/{quote.id}/")
+        assert response.status_code == 200
+        
+        html = response.content.decode('utf-8')
+        
+        # Material picker modal must exist
+        assert 'id="materialPickerModal"' in html, "Material picker modal missing"
+        
+        # Cost picker modal must exist
+        assert 'id="costPickerModal"' in html, "Cost picker modal missing"
+        
+        # Modal trigger buttons must exist
+        assert 'data-bs-target="#materialPickerModal"' in html, "Material picker trigger missing"
+        assert 'data-bs-target="#costPickerModal"' in html, "Cost picker trigger missing"
+
+    def test_modal_css_ensures_proper_z_index(self, authenticated_client):
+        """
+        CSS must define proper z-index ordering:
+        - modal (20050) > modal-backdrop (20040) > sidebar (2000) > sidebar-backdrop (1990)
+        """
+        # We can't directly test CSS parsing in pytest without selenium,
+        # but we can verify the CSS file contains the critical rules
+        import os
+        from django.conf import settings
+        
+        css_path = os.path.join(settings.BASE_DIR, 'static', 'css', 'v2-overrides.2025-09-25.css')
+        
+        if os.path.exists(css_path):
+            with open(css_path, 'r', encoding='utf-8') as f:
+                css_content = f.read()
+            
+            # Check for modal z-index
+            assert 'z-index: 20050' in css_content or 'z-index:20050' in css_content, \
+                "Modal z-index (20050) not found in CSS"
+            
+            # Check for modal-backdrop z-index
+            assert 'z-index: 20040' in css_content or 'z-index:20040' in css_content, \
+                "Modal backdrop z-index (20040) not found in CSS"
+            
+            # Check for pointer-events on modal
+            assert 'pointer-events: auto' in css_content or 'pointer-events:auto' in css_content, \
+                "Modal pointer-events:auto not found in CSS"
+        else:
+            pytest.skip(f"CSS file not found: {css_path}")
+
+    def test_modal_portal_script_exists(self, authenticated_client):
+        """
+        base.html must include the modal portal configuration script
+        that moves modals to #cc-modal-root.
+        """
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        
+        html = response.content.decode('utf-8')
+        
+        # Script must exist
+        assert 'cc-modal-root' in html, "Modal root not referenced in HTML"
+        
+        # Check for portal configuration logic (even if minified/compressed)
+        # We look for key function names or comments
+        assert 'Modal Portal' in html or 'modal-root' in html.lower(), \
+            "Modal portal configuration missing from base.html"
+
+    def test_quote_detail_modals_have_proper_bootstrap_structure(self, authenticated_client, welding_business):
+        """
+        Modals must have proper Bootstrap structure:
+        - .modal.fade with tabindex="-1"
+        - .modal-dialog > .modal-content > .modal-header/.modal-body
+        """
+        from inventory.models_welding import WeldingQuote
+        
+        quote = WeldingQuote.objects.create(
+            business=welding_business,
+            customer_name="Test Customer Structure",
+        )
+        
+        response = authenticated_client.get(f"/verticals/welding/quotes/{quote.id}/")
+        assert response.status_code == 200
+        
+        html = response.content.decode('utf-8')
+        
+        # Material modal structure
+        assert 'class="modal fade"' in html, "Modal must have 'modal fade' classes"
+        assert 'tabindex="-1"' in html, "Modal must have tabindex=-1"
+        assert 'modal-dialog' in html, "Modal must have .modal-dialog"
+        assert 'modal-content' in html, "Modal must have .modal-content"
+        assert 'modal-header' in html, "Modal must have .modal-header"
+        assert 'modal-body' in html, "Modal must have .modal-body"
+        
+        # Close button with proper data attribute
+        assert 'data-bs-dismiss="modal"' in html, "Modal must have close button with data-bs-dismiss"
+

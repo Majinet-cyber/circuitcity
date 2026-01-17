@@ -23,7 +23,7 @@
                 <strong>New Quote Builder:</strong> Create an empty quote shell, then add materials, costs, and profit manually on the next page.
             </div>
 
-            <form method="post" action="{% url 'verticals:welding_quote_create' %}">
+            <form method="post" action="{% url 'verticals:welding_quote_create' %}" data-testid="welding-quote-form">>
                 {% csrf_token %}
 
                 <!-- Customer Info -->
@@ -60,7 +60,7 @@
 
                     <div class="mb-3">
                         <label for="template_id" class="form-label">Job Template</label>
-                        <select class="form-select" id="template_id" name="template_id">
+                        <select class="form-select" id="template_id" name="template_id" data-testid="welding-template-grid">
                             <option value="">Custom Quote (no template)</option>
                             {% for template in templates %}
                             <option value="{{ template.id }}">{{ template.name }}</option>
