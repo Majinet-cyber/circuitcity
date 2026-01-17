@@ -50,12 +50,13 @@ def is_footwear_category(category: str, subcategory: str = "") -> bool:
     return False
 
 
-def validate_shoe_size(size: str) -> Tuple[bool, str]:
+def validate_shoe_size(size: str, allow_blank: bool = False) -> Tuple[bool, str]:
     """
     Validate shoe size (numeric only, 30-50).
 
     Args:
         size: Size string to validate
+        allow_blank: If True, empty size is allowed. Default False.
 
     Returns:
         (is_valid, error_message)
@@ -63,6 +64,8 @@ def validate_shoe_size(size: str) -> Tuple[bool, str]:
     size = size.strip()
 
     if not size:
+        if allow_blank:
+            return True, ""
         return False, "Size is required for shoes"
 
     # Check if numeric
@@ -115,9 +118,9 @@ def validate_clothing_size(
             return True, ""
         return False, "Size is required"
 
-    # CRITICAL: Shoes must be numeric only
+    # CRITICAL: Shoes must be numeric only (if size is provided)
     if is_footwear_category(category, subcategory):
-        return validate_shoe_size(size)
+        return validate_shoe_size(size, allow_blank=allow_blank)
 
     # For other categories, allow alpha or numeric
     # Alpha sizes: XS, S, M, L, XL, XXL, XXXL

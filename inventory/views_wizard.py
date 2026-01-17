@@ -176,35 +176,19 @@ def pharmacy_wizard(request):
 @manager_required
 @require_business
 def clothing_wizard(request):
-    """Render the clothing add-product wizard"""
-    business = get_active_business(request)
+    """
+    Redirect to new 2-step clothing wizard.
     
-    # Defensive: handle case where business is None (shouldn't happen with @require_business)
-    if not business:
-        from django.contrib import messages
-        from django.shortcuts import redirect
-        messages.error(request, "No active business found. Please select a business first.")
-        return redirect("/tenants/choose/")
+    OLD: Complex 8-step JS wizard with premature validation issues
+    NEW: Simple 2-step flow (Step A: Product Setup, Step B: Barcodes if unique)
     
-    # Resolve active location (auto-select if needed) - handles ImportError safely
-    location = None
-    try:
-        location = resolve_active_location(request, business)
-    except Exception as e:
-        # Fail gracefully if location resolution fails (e.g., Location model not available)
-        import logging
-        logging.getLogger(__name__).warning(f"Location resolution failed: {e}", exc_info=True)
+    This keeps the old URL working but routes to the new wizard.
+    """
+    from django.shortcuts import redirect
+    from django.urls import reverse
     
-    # CRITICAL: Even if location is None, the wizard must still load
-    # The template will show a prompt to create a location if needed
-    context = {
-        'business': business,
-        'active_location': location,
-        'location_id': location.id if location else None,
-        'has_location': location is not None
-    }
-    
-    return render(request, "inventory/wizards/clothing_wizard.html", context)
+    # Redirect to the new redesigned 2-step wizard
+    return redirect(reverse("clothing:stockin_step_a"))
 
 
 # =============================================================================
@@ -610,9 +594,8 @@ def clothing_wizard_submit(request):
         if not category:
             return JsonResponse({"success": False, "error": "Product type is required. Please go back and select a category."})
         # CRITICAL FIX: product_name is optional - we build it from category/brand/color/size
-        # Only require it if we can't build a meaningful name from other fields
-        if not size:
-            return JsonResponse({"success": False, "error": "Size is required. Please go back and select or enter a size."})
+        # CRITICAL FIX JAN 2026: Size is now OPTIONAL for all clothing items
+        # Only enforce size if category-specific rules require it (none by default)
 
         # Parse pricing
         try:

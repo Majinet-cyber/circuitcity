@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Clothing Product · Step 2 (Barcodes){% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --cc-primary: #0ea5e9;
+    --cc-primary-dark: #0284c7;
+    --cc-success: #10b981;
+    --cc-danger: #ef4444;
+    --cc-warning: #f59e0b;
+    --cc-bg: #f8fafc;
+    --cc-card: #ffffff;
+    --cc-border: #e2e8f0;
+    --cc-text: #1e293b;
+    --cc-text-muted: #64748b;
+  }
+
+  .stockin-container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  .stockin-header {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .stockin-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--cc-text);
+    margin: 0 0 8px;
+  }
+
+  .stockin-header p {
+    color: var(--cc-text-muted);
+    margin: 0;
+  }
+
+  .stockin-card {
+    background: var(--cc-card);
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  /* Product summary */
+  .product-summary {
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    border: 1px solid var(--cc-primary);
+  }
+
+  .product-summary h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: var(--cc-primary-dark);
+  }
+
+  .product-summary-details {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    font-size: 0.85rem;
+    color: var(--cc-text);
+  }
+
+  .product-summary-item {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .product-summary-item span:first-child {
+    color: var(--cc-text-muted);
+    font-size: 0.75rem;
+  }
+
+  .product-summary-item span:last-child {
+    font-weight: 600;
+  }
+
+  /* Progress bar */
+  .progress-section {
+    margin-bottom: 20px;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .progress-label {
+    font-weight: 600;
+    color: var(--cc-text);
+  }
+
+  .progress-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+
+  .progress-badge.in-progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  .progress-badge.complete {
+    background: #d1fae5;
+    color: #059669;
+  }
+
+  .progress-bar {
+    height: 10px;
+    background: var(--cc-border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cc-primary), var(--cc-success));
+    border-radius: 5px;
+    transition: width 0.3s ease;
+  }
+
+  /* Barcode input */
+  .barcode-input-section {
+    margin-bottom: 20px;
+  }
+
+  .barcode-input-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .barcode-input {
+    flex: 1;
+    padding: 14px 16px;
+    border: 2px solid var(--cc-border);
+    border-radius: 10px;
+    font-size: 1.1rem;
+    font-family: 'SF Mono', 'Courier New', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .barcode-input:focus {
+    outline: none;
+    border-color: var(--cc-primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+  }
+
+  .btn-add {
+    padding: 14px 20px;
+    background: var(--cc-primary);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-add:hover {
+    background: var(--cc-primary-dark);
+  }
+
+  /* Messages */
+  .alert {
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+  }
+
+  .alert-danger {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: var(--cc-danger);
+  }
+
+  .alert-success {
+    background: #d1fae5;
+    border: 1px solid #a7f3d0;
+    color: #059669;
+  }
+
+  /* Barcode list */
+  .barcode-list {
+    margin-bottom: 20px;
+  }
+
+  .barcode-list-empty {
+    text-align: center;
+    padding: 24px;
+    color: var(--cc-text-muted);
+  }
+
+  .barcode-list-empty .icon {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+  }
+
+  .barcode-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1px solid var(--cc-border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+
+  .barcode-item-code {
+    font-family: 'SF Mono', 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--cc-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .barcode-item-code .number {
+    background: var(--cc-primary);
+    color: #fff;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+  }
+
+  .btn-remove {
+    padding: 6px 12px;
+    background: none;
+    border: 1px solid var(--cc-danger);
+    color: var(--cc-danger);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-remove:hover {
+    background: var(--cc-danger);
+    color: #fff;
+  }
+
+  /* Buttons */
+  .btn-finalize {
+    width: 100%;
+    padding: 16px 24px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, var(--cc-success), #059669);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+
+  .btn-finalize:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+  }
+
+  .btn-finalize:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-back {
+    display: block;
+    text-align: center;
+    padding: 12px;
+    color: var(--cc-text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    margin-top: 12px;
+  }
+
+  .btn-back:hover {
+    color: var(--cc-text);
+  }
+
+  /* Step indicator */
+  .step-indicator {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .step-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cc-border);
+  }
+
+  .step-dot.active {
+    background: var(--cc-primary);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+  }
+
+  .step-dot.complete {
+    background: var(--cc-success);
+  }
+
+  /* Hint box */
+  .hint-box {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    color: #92400e;
+  }
+
+  .hint-box strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stockin-container">
+  <!-- Step Indicator -->
+  <div class="step-indicator">
+    <div class="step-dot complete" title="Step 1: Product Setup ✓"></div>
+    <div class="step-dot active" title="Step 2: Barcodes"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="stockin-header">
+    <h1>📱 Scan Barcodes</h1>
+    <p>Step 2: Scan or enter barcodes for each unit</p>
+  </div>
+
+  <!-- Product Summary -->
+  <div class="product-summary">
+    <h3>{{ draft.name }}</h3>
+    <div class="product-summary-details">
+      <div class="product-summary-item">
+        <span>Category</span>
+        <span>{{ draft.category|title }}</span>
+      </div>
+      <div class="product-summary-item">
+        <span>Quantity</span>
+        <span>{{ quantity }} units</span>
+      </div>
+      <div class="product-summary-item">
+        <span>Price</span>
+        <span>MWK {{ draft.selling_price }}</span>
+      </div>
+      {% if draft.size %}
+      <div class="product-summary-item">
+        <span>Size</span>
+        <span>{{ draft.size }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="stockin-card">
+    <!-- Progress -->
+    <div class="progress-section">
+      <div class="progress-header">
+        <span class="progress-label">Scanning Progress</span>
+        <span class="progress-badge {% if is_complete %}complete{% else %}in-progress{% endif %}">
+          {{ scanned_count }} / {{ quantity }}
+        </span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: {% widthratio scanned_count quantity 100 %}%"></div>
+      </div>
+    </div>
+
+    <!-- Hint -->
+    {% if not is_complete %}
+    <div class="hint-box">
+      <strong>💡 Tip</strong>
+      Type or scan the barcode and press <kbd>Enter</kbd> or click <strong>Add</strong>.
+      Scan {{ remaining }} more barcode{{ remaining|pluralize }} to complete.
+    </div>
+    {% endif %}
+
+    <!-- Messages -->
+    {% if error %}
+    <div class="alert alert-danger">❌ {{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success">{{ success }}</div>
+    {% endif %}
+
+    <!-- Barcode Input (only if not complete) -->
+    {% if not is_complete %}
+    <form method="POST" class="barcode-input-section">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_barcode">
+      <div class="barcode-input-row">
+        <input 
+          type="text" 
+          name="barcode" 
+          class="barcode-input" 
+          placeholder="Scan or type barcode..."
+          autocomplete="off"
+          autofocus
+          id="barcode-input"
+        >
+        <button type="submit" class="btn-add">Add</button>
+      </div>
+    </form>
+    {% endif %}
+
+    <!-- Barcode List -->
+    <div class="barcode-list">
+      {% if scanned_barcodes %}
+        {% for barcode in scanned_barcodes %}
+        <div class="barcode-item">
+          <div class="barcode-item-code">
+            <span class="number">{{ forloop.counter }}</span>
+            {{ barcode }}
+          </div>
+          <form method="POST" style="display: inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="remove_barcode">
+            <input type="hidden" name="index" value="{{ forloop.counter0 }}">
+            <button type="submit" class="btn-remove">Remove</button>
+          </form>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="barcode-list-empty">
+          <div class="icon">📭</div>
+          <div>No barcodes scanned yet</div>
+          <div style="font-size: 0.8rem; margin-top: 4px;">Start scanning to add barcodes</div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Finalize Button -->
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="finalize">
+      <button type="submit" class="btn-finalize" {% if not is_complete %}disabled{% endif %}>
+        {% if is_complete %}
+          ✅ Save & Finish
+        {% else %}
+          Scan {{ remaining }} more barcode{{ remaining|pluralize }} to continue
+        {% endif %}
+      </button>
+    </form>
+  </div>
+
+  <a href="{% url 'clothing:stockin_step_a' %}" class="btn-back">
+    ← Back to Step 1
+  </a>
+</div>
+
+<script>
+// Focus barcode input on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('barcode-input');
+  if (input) {
+    input.focus();
+    
+    // Re-focus after any form submission (for continuous scanning)
+    setTimeout(() => input.focus(), 100);
+  }
+});
+
+// Auto-dismiss success messages after 2 seconds
+document.querySelectorAll('.alert-success').forEach(alert => {
+  setTimeout(() => {
+    alert.style.transition = 'opacity 0.3s';
+    alert.style.opacity = '0';
+    setTimeout(() => alert.remove(), 300);
+  }, 2000);
+});
+</script>
+{% endblock %}
+

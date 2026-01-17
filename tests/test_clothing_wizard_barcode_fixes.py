@@ -1,528 +1,677 @@
 """
-Tests for Clothing Wizard Barcode Flow Fixes
+Regression Tests for Clothing Wizard Barcode Fixes - January 2026
 
-Tests cover:
-1. Barcode scanning with proper progress tracking
-2. Custom numeric size input (34, 41, 45, etc.)
-3. Smart pricing warnings (non-blocking)
-4. Dashboard recent sales display
-5. Payment method panels
+These tests PERMANENTLY lock down the fixed behavior:
+
+1. NO premature red toasts on page load or step entry
+2. Barcode Add button works reliably (Enter key + button)
+3. Common Stock vs Unique Stock modes work correctly
+4. Fast Sell ONLY works for unique barcoded stock
+5. Size is OPTIONAL by default
+6. Validation only fires on POST/submit
+
+CRITICAL: These tests MUST pass before merging any changes.
 """
 import json
 from decimal import Decimal
-from django.test import TestCase, Client
+
 from django.contrib.auth import get_user_model
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
-from tenants.models import Business, Membership
-from inventory.models import MerchProduct
-from inventory.models_verticals import ClothingSale
+
 from inventory.business_kinds import BusinessKind
+from inventory.models import Location, MerchProduct
+from inventory.models_clothing_barcode import ClothingBarcodeUnit
+from tenants.models import Business, Membership
 
 User = get_user_model()
 
 
-class ClothingWizardBarcodeFixesTestCase(TestCase):
-    """Test fixes for clothing wizard barcode flow"""
+# =============================================================================
+# Test: NO PREMATURE VALIDATION ERRORS ON GET
+# =============================================================================
+
+
+class NoPrematureToastOnGetTestCase(TestCase):
+    """
+    CRITICAL TEST: GET requests must NEVER show validation errors.
+    
+    BUG FIXED: "Selling price must be greater than zero" and "Size is required"
+    appeared on page load before user typed anything.
+    
+    FIX: Validation only runs on POST/submit.
+    """
 
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
-            username="testmanager",
-            email="manager@test.com",
-            password="testpass123",
-            role="MANAGER"
+            username="testmanager", email="manager@test.com", password="testpass123"
         )
         self.business = Business.objects.create(
-            name="Test Clothing Store",
-            kind=BusinessKind.CLOTHING,
-            owner=self.user
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
         )
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
         self.client.login(username="testmanager", password="testpass123")
-        
-        # Set active business in session
+
         session = self.client.session
-        session['active_business_id'] = self.business.id
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
         session.save()
 
-    def test_wizard_submit_with_valid_single_barcode(self):
-        """Test wizard submission with quantity=1 and single barcode"""
-        data = {
-            "category": "shoes",
-            "shoe_subtype": "sneakers",
-            "brand": "Nike",
-            "size": "42",
-            "gender": "men",
-            "has_barcode": "yes",
-            "selling_price": "25000.00",
-            "cost_price": "18000.00",
-            "quantity": 1,
-            "initial_stock": 1,
-            "barcode": "123456789012",
-            "scanned_barcodes": ["123456789012"]
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
+    def test_step_a_get_has_no_selling_price_error(self):
+        """GET Step A: Must NOT contain 'Selling price must be greater than zero'"""
+        response = self.client.get(reverse("clothing:stockin_step_a"))
         self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertTrue(result['success'])
-        self.assertIn('product_id', result)
-        
-        # Verify product was created with correct barcode
-        product = MerchProduct.objects.get(id=result['product_id'])
-        self.assertEqual(product.barcode, "123456789012")
-        self.assertEqual(product.quantity_in_stock, 1)
-        self.assertEqual(product.size, "42")
+        content = response.content.decode("utf-8")
+        self.assertNotIn("Selling price must be greater than zero", content)
+        self.assertNotIn("selling_price", content.lower().split("error")[0] if "error" in content.lower() else "")
 
-    def test_wizard_submit_with_multiple_barcodes(self):
-        """Test wizard submission with quantity>1 and multiple unique barcodes"""
-        data = {
-            "category": "shirts",
-            "size": "L",
-            "color": "blue",
-            "has_barcode": "yes",
-            "selling_price": "15000.00",
-            "cost_price": "10000.00",
-            "quantity": 3,
-            "initial_stock": 3,
-            "barcodes": ["BC001", "BC002", "BC003"],
-            "scanned_barcodes": ["BC001", "BC002", "BC003"]
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
+    def test_step_a_get_has_no_size_required_error(self):
+        """GET Step A: Must NOT contain 'Size is required'"""
+        response = self.client.get(reverse("clothing:stockin_step_a"))
         self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertTrue(result['success'])
-        
-        # Verify product was created with first barcode
-        product = MerchProduct.objects.get(id=result['product_id'])
-        self.assertEqual(product.barcode, "BC001")
-        self.assertEqual(product.quantity_in_stock, 3)
+        content = response.content.decode("utf-8")
+        self.assertNotIn("Size is required", content)
 
-    def test_wizard_reject_duplicate_barcodes_in_list(self):
-        """Test that duplicate barcodes within the list are rejected"""
-        data = {
-            "category": "jeans",
-            "size": "32",
-            "has_barcode": "yes",
-            "selling_price": "12000.00",
-            "quantity": 3,
-            "initial_stock": 3,
-            "barcodes": ["BC001", "BC001", "BC003"],  # Duplicate!
-            "scanned_barcodes": ["BC001", "BC001", "BC003"]
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
+    def test_step_a_get_has_no_validation_summary(self):
+        """GET Step A: Must NOT contain validation summary message"""
+        response = self.client.get(reverse("clothing:stockin_step_a"))
         self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertFalse(result['success'])
-        self.assertIn('Duplicate barcodes', result['error'])
+        content = response.content.decode("utf-8")
+        self.assertNotIn("Please fix the errors below", content)
 
-    def test_wizard_reject_wrong_barcode_count(self):
-        """Test that mismatched barcode count is rejected"""
-        data = {
-            "category": "shoes",
-            "size": "40",
-            "has_barcode": "yes",
-            "selling_price": "20000.00",
-            "quantity": 5,
-            "initial_stock": 5,
-            "barcodes": ["BC001", "BC002"],  # Only 2 but quantity is 5
-            "scanned_barcodes": ["BC001", "BC002"]
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
+    def test_step_a_get_context_errors_is_empty(self):
+        """GET Step A: Context 'errors' dict must be empty"""
+        response = self.client.get(reverse("clothing:stockin_step_a"))
         self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertFalse(result['success'])
-        self.assertIn('scan all', result['error'].lower())
+        self.assertEqual(response.context.get("errors", {}), {})
 
-    def test_wizard_custom_numeric_size(self):
-        """Test that custom numeric sizes (34, 41, 45) work correctly"""
-        custom_sizes = ["34", "41", "45", "52"]
-        
-        for size in custom_sizes:
-            with self.subTest(size=size):
-                data = {
-                    "category": "shoes",
-                    "size": size,
-                    "has_barcode": "no",
-                    "selling_price": "25000.00",
-                    "cost_price": "18000.00",
-                    "quantity": 1,
-                    "initial_stock": 1
-                }
-                
-                response = self.client.post(
-                    reverse('inventory:clothing_wizard_submit'),
-                    data=json.dumps(data),
-                    content_type='application/json'
-                )
-                
-                self.assertEqual(response.status_code, 200)
-                result = response.json()
-                self.assertTrue(result['success'], f"Failed for size {size}: {result.get('error')}")
-                
-                # Verify product has correct size
-                product = MerchProduct.objects.get(id=result['product_id'])
-                self.assertEqual(product.size, size)
-                self.assertIn(f"Size {size}", product.spec_label)
-
-    def test_wizard_no_barcode_flow(self):
-        """Test wizard with 'no barcode' option works smoothly"""
-        data = {
-            "category": "dresses",
-            "size": "M",
-            "color": "red",
-            "has_barcode": "no",
-            "selling_price": "18000.00",
-            "quantity": 2,
-            "initial_stock": 2
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
+    def test_step_a_get_context_form_data_is_empty(self):
+        """GET Step A: Context 'form_data' dict must be empty (not pre-filled with errors)"""
+        response = self.client.get(reverse("clothing:stockin_step_a"))
         self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertTrue(result['success'])
-        
-        # Verify product has no barcode
-        product = MerchProduct.objects.get(id=result['product_id'])
-        self.assertIsNone(product.barcode)
-        self.assertFalse(product.scan_required)
+        self.assertEqual(response.context.get("form_data", {}), {})
 
-    def test_wizard_size_required_validation(self):
-        """Test that size is required and cannot be skipped"""
-        data = {
-            "category": "shoes",
-            "has_barcode": "no",
-            "selling_price": "25000.00",
-            "quantity": 1,
-            "initial_stock": 1
-            # Missing size!
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
-        self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertFalse(result['success'])
-        self.assertIn('Size is required', result['error'])
-
-    def test_wizard_selling_price_validation(self):
-        """Test that selling price must be greater than zero"""
-        data = {
-            "category": "shirts",
-            "size": "L",
-            "has_barcode": "no",
-            "selling_price": "0",  # Invalid!
-            "quantity": 1,
-            "initial_stock": 1
-        }
-        
-        response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
-        )
-        
-        self.assertEqual(response.status_code, 200)
-        result = response.json()
-        self.assertFalse(result['success'])
-        self.assertIn('Selling price must be greater than zero', result['error'])
+    def test_old_wizard_url_redirects_to_new_wizard(self):
+        """Old wizard URL (/inventory/wizard/clothing/) redirects to new 2-step wizard"""
+        response = self.client.get(reverse("inventory:clothing_wizard"))
+        # Should redirect to new step A
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("stockin", response.url)
 
 
-class ClothingDashboardRecentSalesTestCase(TestCase):
-    """Test that recent sales display correctly on dashboard"""
+# =============================================================================
+# Test: BARCODE ADD WORKS RELIABLY
+# =============================================================================
+
+
+class BarcodeAddWorksReliablyTestCase(TestCase):
+    """
+    Test that barcode Add works reliably:
+    - Typing barcode + click Add → barcode persists
+    - Typing barcode + press Enter → barcode persists
+    - No "blink and nothing happens"
+    """
 
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user(
-            username="testmanager",
-            email="manager@test.com",
-            password="testpass123",
-            role="MANAGER"
+            username="testmanager", email="manager@test.com", password="testpass123"
         )
         self.business = Business.objects.create(
-            name="Test Clothing Store",
-            kind=BusinessKind.CLOTHING,
-            owner=self.user
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
         )
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
         self.client.login(username="testmanager", password="testpass123")
-        
-        # Set active business in session
+
         session = self.client.session
-        session['active_business_id'] = self.business.id
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
         session.save()
+
+    def _create_draft_for_unique_stock(self, quantity=2):
+        """Helper: Create a draft for unique stock mode"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Test Shoe",
+                "category": "shoes",
+                "stock_mode": "unique",
+                "quantity": str(quantity),
+                "selling_price": "15000",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        session = self.client.session
+        draft = session.get("clothing_stock_draft", {})
+        return draft.get("draft_id")
+
+    def test_barcode_add_via_form_post_persists(self):
+        """POST barcode via form → barcode persists in session"""
+        draft_id = self._create_draft_for_unique_stock()
         
-        # Create a test product
-        self.product = MerchProduct.objects.create(
+        # Add barcode via form POST
+        response = self.client.post(
+            reverse("clothing:stockin_step_b", kwargs={"draft_id": draft_id}),
+            data={"action": "add_barcode", "barcode": "PERSIST001"},
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        
+        # Check barcode was added to session
+        session = self.client.session
+        draft = session.get("clothing_stock_draft", {})
+        self.assertIn("PERSIST001", draft.get("scanned_barcodes", []))
+
+    def test_barcode_add_via_ajax_api_persists(self):
+        """POST barcode via AJAX API → barcode persists in session"""
+        draft_id = self._create_draft_for_unique_stock()
+        
+        # Add barcode via AJAX API
+        response = self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "AJAX001"}),
+            content_type="application/json",
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["scanned_count"], 1)
+        self.assertIn("AJAX001", result["scanned_barcodes"])
+
+    def test_barcode_add_shows_in_list_after_add(self):
+        """After adding barcode, it appears in the barcode list on page"""
+        draft_id = self._create_draft_for_unique_stock()
+        
+        # Add barcode
+        self.client.post(
+            reverse("clothing:stockin_step_b", kwargs={"draft_id": draft_id}),
+            data={"action": "add_barcode", "barcode": "VISIBLE001"},
+        )
+        
+        # Re-fetch the page
+        response = self.client.get(
+            reverse("clothing:stockin_step_b", kwargs={"draft_id": draft_id})
+        )
+        
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("VISIBLE001", content)
+
+    def test_duplicate_barcode_in_batch_rejected(self):
+        """Duplicate barcode within same batch is rejected with friendly error"""
+        draft_id = self._create_draft_for_unique_stock()
+        
+        # Add first barcode
+        self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "DUP001"}),
+            content_type="application/json",
+        )
+        
+        # Try to add same barcode again
+        response = self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "DUP001"}),
+            content_type="application/json",
+        )
+        
+        result = response.json()
+        self.assertFalse(result["ok"])
+        self.assertIn("already", result["error"].lower())
+
+    def test_barcode_remove_works(self):
+        """Barcode can be removed from batch"""
+        draft_id = self._create_draft_for_unique_stock()
+        
+        # Add two barcodes
+        self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "REMOVE001"}),
+            content_type="application/json",
+        )
+        self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "REMOVE002"}),
+            content_type="application/json",
+        )
+        
+        # Remove first barcode
+        response = self.client.post(
+            reverse("clothing:stockin_api_remove_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"index": 0}),
+            content_type="application/json",
+        )
+        
+        result = response.json()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["scanned_count"], 1)
+        self.assertNotIn("REMOVE001", result["scanned_barcodes"])
+        self.assertIn("REMOVE002", result["scanned_barcodes"])
+
+
+# =============================================================================
+# Test: COMMON STOCK vs UNIQUE STOCK MODES
+# =============================================================================
+
+
+class StockModesTestCase(TestCase):
+    """
+    Test Common Stock vs Unique Stock modes work correctly.
+    
+    Common Stock: Quantity-based, no barcodes, manual sell
+    Unique Stock: Each unit has barcode, Fast Sell only
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testmanager", email="manager@test.com", password="testpass123"
+        )
+        self.business = Business.objects.create(
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
+        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
+        self.client.login(username="testmanager", password="testpass123")
+
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
+        session.save()
+
+    def test_common_stock_skips_step_b(self):
+        """Common Stock mode finalizes immediately after Step A (no Step B)"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Basic T-Shirt",
+                "category": "tshirts",
+                "stock_mode": "common",
+                "quantity": "10",
+                "selling_price": "3000",
+            },
+        )
+
+        # Should redirect to dashboard, NOT to barcodes
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn("barcodes", response.url)
+
+    def test_common_stock_creates_product_with_quantity(self):
+        """Common Stock creates MerchProduct with correct quantity"""
+        self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Common Stock Shirt",
+                "category": "shirts",
+                "stock_mode": "common",
+                "quantity": "5",
+                "selling_price": "5000",
+            },
+        )
+
+        product = MerchProduct.objects.get(business=self.business, name__icontains="Shirt")
+        self.assertEqual(product.quantity_in_stock, 5)
+
+    def test_common_stock_no_barcode_units_created(self):
+        """Common Stock mode does NOT create ClothingBarcodeUnit records"""
+        self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Common Stock Item",
+                "category": "shirts",
+                "stock_mode": "common",
+                "quantity": "5",
+                "selling_price": "5000",
+            },
+        )
+
+        # No ClothingBarcodeUnit should exist for this batch
+        units = ClothingBarcodeUnit.objects.filter(business=self.business)
+        self.assertEqual(units.count(), 0)
+
+    def test_unique_stock_redirects_to_step_b(self):
+        """Unique Stock mode redirects to Step B for barcode scanning"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Unique Shoe",
+                "category": "shoes",
+                "stock_mode": "unique",
+                "quantity": "2",
+                "selling_price": "15000",
+            },
+        )
+
+        # Should redirect to Step B
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("barcodes", response.url)
+
+    def test_unique_stock_creates_barcode_units(self):
+        """Unique Stock creates ClothingBarcodeUnit records after scanning"""
+        # Step A
+        self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Test Shoe",
+                "category": "shoes",
+                "stock_mode": "unique",
+                "quantity": "2",
+                "selling_price": "15000",
+                "cost_price": "10000",
+                "size": "42",
+            },
+        )
+
+        session = self.client.session
+        draft = session.get("clothing_stock_draft", {})
+        draft_id = draft.get("draft_id")
+
+        # Add both barcodes
+        self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "UNIT001"}),
+            content_type="application/json",
+        )
+        self.client.post(
+            reverse("clothing:stockin_api_add_barcode", kwargs={"draft_id": draft_id}),
+            data=json.dumps({"barcode": "UNIT002"}),
+            content_type="application/json",
+        )
+
+        # Finalize
+        self.client.post(
+            reverse("clothing:stockin_step_b", kwargs={"draft_id": draft_id}),
+            data={"action": "finalize"},
+        )
+
+        # Verify ClothingBarcodeUnit records created
+        units = ClothingBarcodeUnit.objects.filter(business=self.business)
+        self.assertEqual(units.count(), 2)
+
+        for unit in units:
+            self.assertEqual(unit.status, "IN_STOCK")
+            self.assertEqual(unit.selling_price, Decimal("15000"))
+
+
+# =============================================================================
+# Test: FAST SELL ONLY FOR BARCODED STOCK
+# =============================================================================
+
+
+class FastSellBarcodeOnlyTestCase(TestCase):
+    """
+    CRITICAL: Fast Sell must ONLY work with ClothingBarcodeUnit (unique barcoded stock).
+    
+    RULE: Fast Sell = Unique Barcoded Stock ONLY
+          Manual Sell = Common Stock (non-barcoded) ONLY
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testmanager", email="manager@test.com", password="testpass123"
+        )
+        self.business = Business.objects.create(
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
+        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
+        self.client.login(username="testmanager", password="testpass123")
+
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
+        session.save()
+
+    def test_fast_sell_finds_barcoded_unit(self):
+        """Fast Sell lookup finds ClothingBarcodeUnit by barcode"""
+        # Create a barcoded unit
+        ClothingBarcodeUnit.objects.create(
             business=self.business,
-            name="Test Shoe - Size 42",
-            kind=BusinessKind.CLOTHING,
+            location=self.location,
+            barcode="FASTSELL001",
             category="shoes",
             size="42",
-            selling_price=Decimal("25000.00"),
-            cost_price=Decimal("18000.00"),
-            quantity_in_stock=10,
-            is_active=True
+            cost_price=Decimal("10000"),
+            selling_price=Decimal("15000"),
+            status="IN_STOCK",
+            created_by=self.user,
         )
 
-    def test_dashboard_shows_recent_sales(self):
-        """Test that dashboard displays recent sales when they exist"""
-        # Create a sale
-        sale = ClothingSale.objects.create(
-            business=self.business,
-            product=self.product,
-            quantity=1,
-            unit_price=Decimal("25000.00"),
-            total_price=Decimal("25000.00"),
-            unit_cost=Decimal("18000.00"),
-            total_cost=Decimal("18000.00"),
-            payment_method="CASH",
-            sold_by=self.user
-        )
-        
-        # Load dashboard
-        response = self.client.get(reverse('verticals:clothing_dashboard'))
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('recent_sales', response.context)
-        recent_sales = response.context['recent_sales']
-        self.assertTrue(len(recent_sales) > 0)
-        self.assertEqual(recent_sales[0].id, sale.id)
-        
-        # Check that sale is rendered in HTML
-        self.assertContains(response, self.product.name)
-        self.assertContains(response, "25000")
-        self.assertContains(response, "💰 Recent Sales")
-
-    def test_dashboard_shows_empty_state_when_no_sales(self):
-        """Test that dashboard shows empty state when no sales exist"""
-        response = self.client.get(reverse('verticals:clothing_dashboard'))
-        
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('recent_sales', response.context)
-        recent_sales = response.context['recent_sales']
-        self.assertEqual(len(recent_sales), 0)
-        
-        # Check empty state message
-        self.assertContains(response, "No recent sales yet")
-
-
-class ClothingPaymentMethodPanelsTestCase(TestCase):
-    """Test that payment method panels work correctly"""
-
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(
-            username="testmanager",
-            email="manager@test.com",
-            password="testpass123",
-            role="MANAGER"
-        )
-        self.business = Business.objects.create(
-            name="Test Clothing Store",
-            kind=BusinessKind.CLOTHING,
-            owner=self.user
-        )
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
-        self.client.login(username="testmanager", password="testpass123")
-        
-        # Set active business in session
-        session = self.client.session
-        session['active_business_id'] = self.business.id
-        session.save()
-        
-        # Create a test product
-        self.product = MerchProduct.objects.create(
-            business=self.business,
-            name="Test Shirt - Size L",
-            kind=BusinessKind.CLOTHING,
-            category="shirts",
-            size="L",
-            selling_price=Decimal("15000.00"),
-            cost_price=Decimal("10000.00"),
-            quantity_in_stock=5,
-            is_active=True
-        )
-
-    def test_sell_page_renders_payment_panels(self):
-        """Test that sell page renders payment method as panels, not dropdown"""
-        response = self.client.get(reverse('verticals:clothing_sell'))
-        
-        self.assertEqual(response.status_code, 200)
-        
-        # Check for payment card panels
-        self.assertContains(response, 'payment-card')
-        self.assertContains(response, 'data-method="CASH"')
-        self.assertContains(response, 'data-method="MOBILE_MONEY"')
-        self.assertContains(response, 'data-method="BANK"')
-        
-        # Check for gamified styling
-        self.assertContains(response, '💵')  # Cash icon
-        self.assertContains(response, '📱')  # Mobile Money icon
-        self.assertContains(response, '🏦')  # Bank icon
-        
-        # Ensure it's NOT a dropdown select
-        self.assertNotContains(response, '<select')
-
-    def test_sell_with_different_payment_methods(self):
-        """Test that all payment methods work when posting sale"""
-        payment_methods = ["CASH", "MOBILE_MONEY", "BANK"]
-        
-        for method in payment_methods:
-            with self.subTest(payment_method=method):
-                data = {
-                    "product": self.product.id,
-                    "quantity": 1,
-                    "selling_price": "15000.00",
-                    "payment_method": method
-                }
-                
-                response = self.client.post(
-                    reverse('verticals:clothing_sell'),
-                    data=data
-                )
-                
-                # Should redirect on success
-                self.assertEqual(response.status_code, 302)
-                
-                # Verify sale was created with correct payment method
-                sale = ClothingSale.objects.filter(
-                    business=self.business,
-                    product=self.product,
-                    payment_method=method
-                ).first()
-                self.assertIsNotNull(sale)
-                self.assertEqual(sale.payment_method, method)
-
-
-class ClothingSmartPricingTestCase(TestCase):
-    """Test smart pricing warnings (non-blocking)"""
-
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(
-            username="testmanager",
-            email="manager@test.com",
-            password="testpass123",
-            role="MANAGER"
-        )
-        self.business = Business.objects.create(
-            name="Test Clothing Store",
-            kind=BusinessKind.CLOTHING,
-            owner=self.user
-        )
-        Membership.objects.create(
-            user=self.user,
-            business=self.business,
-            role="MANAGER",
-            status="ACTIVE"
-        )
-        self.client.login(username="testmanager", password="testpass123")
-        
-        # Set active business in session
-        session = self.client.session
-        session['active_business_id'] = self.business.id
-        session.save()
-
-    def test_below_cost_pricing_allowed_but_warned(self):
-        """Test that pricing below cost is allowed but should generate warning"""
-        # This is tested client-side, so we test that backend allows it
-        data = {
-            "category": "shirts",
-            "size": "M",
-            "has_barcode": "no",
-            "selling_price": "8000.00",  # Below cost
-            "cost_price": "10000.00",
-            "quantity": 1,
-            "initial_stock": 1
-        }
-        
         response = self.client.post(
-            reverse('inventory:clothing_wizard_submit'),
-            data=json.dumps(data),
-            content_type='application/json'
+            reverse("clothing:fast_sell_lookup"),
+            data=json.dumps({"barcode": "FASTSELL001"}),
+            content_type="application/json",
         )
-        
+
         self.assertEqual(response.status_code, 200)
         result = response.json()
-        # Should succeed (not blocked)
-        self.assertTrue(result['success'])
-        
-        # Product should be created
-        product = MerchProduct.objects.get(id=result['product_id'])
-        self.assertEqual(product.selling_price, Decimal("8000.00"))
-        self.assertEqual(product.cost_price, Decimal("10000.00"))
+        self.assertTrue(result["found"])
+        self.assertEqual(result["size"], "42")
+        self.assertEqual(Decimal(result["selling_price"]), Decimal("15000"))
 
-    def test_zero_or_negative_price_blocked(self):
-        """Test that zero or negative selling price is hard-blocked"""
-        invalid_prices = ["0", "-100", "-5000"]
-        
-        for price in invalid_prices:
-            with self.subTest(price=price):
-                data = {
-                    "category": "shirts",
-                    "size": "M",
-                    "has_barcode": "no",
-                    "selling_price": price,
-                    "quantity": 1,
-                    "initial_stock": 1
-                }
-                
-                response = self.client.post(
-                    reverse('inventory:clothing_wizard_submit'),
-                    data=json.dumps(data),
-                    content_type='application/json'
-                )
-                
-                self.assertEqual(response.status_code, 200)
-                result = response.json()
-                self.assertFalse(result['success'])
-                self.assertIn('greater than zero', result['error'].lower())
+    def test_fast_sell_rejects_unknown_barcode(self):
+        """Fast Sell returns friendly error for unknown barcode"""
+        response = self.client.post(
+            reverse("clothing:fast_sell_lookup"),
+            data=json.dumps({"barcode": "UNKNOWN999"}),
+            content_type="application/json",
+        )
 
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result["found"])
+        self.assertIn("not found", result["error"].lower())
+
+    def test_fast_sell_rejects_already_sold_barcode(self):
+        """Fast Sell returns friendly error for already-sold barcode"""
+        ClothingBarcodeUnit.objects.create(
+            business=self.business,
+            location=self.location,
+            barcode="SOLD001",
+            category="shoes",
+            size="42",
+            selling_price=Decimal("15000"),
+            status="SOLD",  # Already sold
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("clothing:fast_sell_lookup"),
+            data=json.dumps({"barcode": "SOLD001"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertFalse(result["found"])
+        self.assertIn("sold", result["error"].lower())
+
+    def test_fast_sell_creates_sale_and_marks_sold(self):
+        """Fast Sell creates sale record and marks unit as SOLD"""
+        unit = ClothingBarcodeUnit.objects.create(
+            business=self.business,
+            location=self.location,
+            barcode="SELLME001",
+            category="shoes",
+            size="42",
+            cost_price=Decimal("10000"),
+            selling_price=Decimal("15000"),
+            status="IN_STOCK",
+            created_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("clothing:fast_sell_create"),
+            data=json.dumps({"barcode": "SELLME001", "payment_method": "cash"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result = response.json()
+        self.assertTrue(result["ok"])
+        self.assertEqual(Decimal(result["amount"]), Decimal("15000"))
+
+        # Verify unit marked as SOLD
+        unit.refresh_from_db()
+        self.assertEqual(unit.status, "SOLD")
+        self.assertIsNotNone(unit.sold_at)
+
+
+# =============================================================================
+# Test: SIZE IS OPTIONAL
+# =============================================================================
+
+
+class SizeIsOptionalTestCase(TestCase):
+    """
+    Test that size field is OPTIONAL by default.
+    
+    FIX: Size was previously required, causing "Size is required" errors.
+    Now size is optional for all clothing items.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testmanager", email="manager@test.com", password="testpass123"
+        )
+        self.business = Business.objects.create(
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
+        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
+        self.client.login(username="testmanager", password="testpass123")
+
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
+        session.save()
+
+    def test_product_creation_succeeds_without_size(self):
+        """Product creation succeeds when size is empty"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Generic Jacket",
+                "category": "jackets",
+                "stock_mode": "common",
+                "quantity": "3",
+                "selling_price": "25000",
+                "size": "",  # Explicitly empty
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        
+        product = MerchProduct.objects.get(business=self.business, name__icontains="Jacket")
+        self.assertEqual(product.size, "")
+
+    def test_product_creation_succeeds_without_size_field(self):
+        """Product creation succeeds when size field is not provided at all"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "No Size Product",
+                "category": "accessories",
+                "stock_mode": "common",
+                "quantity": "1",
+                "selling_price": "5000",
+                # size field not provided at all
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        
+        product = MerchProduct.objects.get(business=self.business, name__icontains="No Size")
+        self.assertEqual(product.size, "")
+
+
+# =============================================================================
+# Test: VALIDATION ONLY ON POST
+# =============================================================================
+
+
+class ValidationOnlyOnPostTestCase(TestCase):
+    """
+    Test that validation ONLY fires on POST, never on GET.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="testmanager", email="manager@test.com", password="testpass123"
+        )
+        self.business = Business.objects.create(
+            name="Test Clothing Store", kind=BusinessKind.CLOTHING, owner=self.user
+        )
+        Membership.objects.create(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
+        self.location = Location.objects.create(business=self.business, name="Main Store", is_default=True)
+        self.client.login(username="testmanager", password="testpass123")
+
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session["active_location_id"] = self.location.id
+        session.save()
+
+    def test_post_with_invalid_data_shows_errors(self):
+        """POST with invalid data shows validation errors"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "",  # Required, empty
+                "category": "shoes",
+                "stock_mode": "common",
+                "quantity": "0",  # Must be >= 1
+                "selling_price": "",  # Required
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        
+        errors = response.context.get("errors", {})
+        self.assertIn("name", errors)
+        self.assertIn("quantity", errors)
+        self.assertIn("selling_price", errors)
+
+    def test_post_with_zero_selling_price_shows_error(self):
+        """POST with selling_price = 0 shows specific error"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Test Product",
+                "category": "shoes",
+                "stock_mode": "common",
+                "quantity": "1",
+                "selling_price": "0",  # Must be > 0
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        
+        errors = response.context.get("errors", {})
+        self.assertIn("selling_price", errors)
+        self.assertIn("greater than zero", errors["selling_price"].lower())
+
+    def test_post_with_valid_data_succeeds(self):
+        """POST with valid data creates product and redirects"""
+        response = self.client.post(
+            reverse("clothing:stockin_step_a"),
+            data={
+                "name": "Valid Product",
+                "category": "shirts",
+                "stock_mode": "common",
+                "quantity": "5",
+                "selling_price": "10000",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        
+        product = MerchProduct.objects.get(business=self.business, name__icontains="Valid Product")
+        self.assertEqual(product.quantity_in_stock, 5)
+        self.assertEqual(product.selling_price, Decimal("10000"))

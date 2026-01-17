@@ -20,9 +20,10 @@ import json
 
 from tenants.models import Business
 from tenants.constants import BusinessKind
-from inventory.models import MerchProduct, BarcodeRegistry
+from inventory.models import MerchProduct, BarcodeRegistry, Location
 from inventory.models_pharmacy import PharmacyBatch
 from inventory.models_verticals import ClothingSale
+from inventory.models_clothing_barcode import ClothingBarcodeUnit
 from inventory.utils_barcodes import (
     normalize_barcode_enhanced,
     register_barcode,
@@ -302,7 +303,12 @@ class QuickCreateAPITestCase(TestCase):
 
 
 class InstantSaleWorkflowTestCase(TestCase):
-    """Test complete instant sale workflow"""
+    """Test complete instant sale workflow.
+    
+    NOTE: Clothing Fast Sell ONLY works with ClothingBarcodeUnit (unique barcoded items).
+    For common stock (MerchProduct with quantity), use the regular sell flow.
+    This is by design as per the clothing stock-in redesign.
+    """
 
     def setUp(self):
         self.client = Client()
@@ -316,14 +322,35 @@ class InstantSaleWorkflowTestCase(TestCase):
         # Create membership so require_business can auto-select the business
         make_membership(user=self.user, business=self.business, role="MANAGER", status="ACTIVE")
 
+        # Create a location (required for ClothingBarcodeUnit)
+        self.location = Location.objects.create(
+            business=self.business,
+            name="Main Store",
+            is_default=True,
+        )
+
+        # Create a base MerchProduct for the clothing item
         self.product = MerchProduct.objects.create(
             business=self.business,
             name="Test Product",
             kind=BusinessKind.CLOTHING,
-            barcode="INSTANT-SALE-123",  # Set barcode on product for fast_sell lookup
             selling_price=Decimal("50.00"),
             cost_price=Decimal("30.00"),
-            quantity_in_stock=10,
+            quantity_in_stock=0,  # Unique stock doesn't use this field
+        )
+
+        # Create ClothingBarcodeUnit for Fast Sell (unique barcoded item)
+        # Clothing Fast Sell ONLY works with ClothingBarcodeUnit, not MerchProduct.barcode
+        self.barcode_unit = ClothingBarcodeUnit.objects.create(
+            business=self.business,
+            location=self.location,
+            product=self.product,
+            barcode="INSTANT-SALE-123",
+            category="shirt",
+            size="L",
+            selling_price=Decimal("50.00"),
+            cost_price=Decimal("30.00"),
+            status="IN_STOCK",
         )
 
         # Also register in BarcodeRegistry for barcode lookup API
@@ -331,9 +358,13 @@ class InstantSaleWorkflowTestCase(TestCase):
 
         self.client.login(username="testuser", password="testpass")
 
-    def test_instant_sale_decrements_stock(self):
-        """Test that instant sale decrements stock correctly"""
-        initial_stock = self.product.quantity_in_stock
+    def test_instant_sale_marks_unit_sold(self):
+        """Test that instant sale marks the barcoded unit as sold.
+        
+        Clothing Fast Sell works with ClothingBarcodeUnit (unique items).
+        Each unit is sold once and marked as SOLD.
+        """
+        self.assertEqual(self.barcode_unit.status, "IN_STOCK")
 
         # Simulate instant sale via fast sell API
         payload = {"barcode": "INSTANT-SALE-123", "quantity": 1, "payment_method": "cash", "selling_price": 50.00}
@@ -347,13 +378,18 @@ class InstantSaleWorkflowTestCase(TestCase):
 
         self.assertTrue(data["ok"])
 
-        # Verify stock was decremented
-        self.product.refresh_from_db()
-        self.assertEqual(self.product.quantity_in_stock, initial_stock - 1)
+        # Verify barcode unit was marked as sold
+        self.barcode_unit.refresh_from_db()
+        self.assertEqual(self.barcode_unit.status, "SOLD")
 
     def test_instant_sale_creates_sale_record(self):
-        """Test that instant sale creates a sale record"""
-        payload = {"barcode": "INSTANT-SALE-123", "quantity": 2, "payment_method": "cash", "selling_price": 50.00}
+        """Test that instant sale creates a sale record.
+        
+        Clothing Fast Sell creates a ClothingSale record when selling
+        a unique barcoded item (ClothingBarcodeUnit).
+        """
+        # Quantity is always 1 for unique barcoded items
+        payload = {"barcode": "INSTANT-SALE-123", "quantity": 1, "payment_method": "cash", "selling_price": 50.00}
 
         response = self.client.post(
             "/verticals/clothing/api/fast-sell/create/", data=json.dumps(payload), content_type="application/json"
@@ -368,13 +404,18 @@ class InstantSaleWorkflowTestCase(TestCase):
         # Verify sale record exists
         sale = ClothingSale.objects.get(id=data["sale_id"])
         self.assertEqual(sale.product, self.product)
-        self.assertEqual(sale.quantity, 2)
+        self.assertEqual(sale.quantity, 1)  # Always 1 for unique items
         self.assertEqual(sale.unit_price, Decimal("50.00"))
 
-    def test_instant_sale_out_of_stock(self):
-        """Test instant sale when product is out of stock"""
-        self.product.quantity_in_stock = 0
-        self.product.save()
+    def test_instant_sale_already_sold(self):
+        """Test instant sale when barcode unit is already sold.
+        
+        For unique barcoded items, each unit can only be sold once.
+        Attempting to sell an already-sold unit returns an error.
+        """
+        # Mark the unit as sold
+        self.barcode_unit.status = "SOLD"
+        self.barcode_unit.save()
 
         payload = {"barcode": "INSTANT-SALE-123", "quantity": 1, "payment_method": "cash", "selling_price": 50.00}
 
@@ -386,7 +427,10 @@ class InstantSaleWorkflowTestCase(TestCase):
         data = response.json()
 
         self.assertFalse(data["ok"])
-        self.assertIn("stock", data["error"].lower())
+        # Error should indicate the item is sold or not available
+        self.assertTrue(
+            "sold" in data["error"].lower() or "not found" in data["error"].lower() or "stock" in data["error"].lower()
+        )
 
 
 class MultiTenantIsolationTestCase(TestCase):

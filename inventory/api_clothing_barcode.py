@@ -293,7 +293,32 @@ def barcode_batch_scan_api(request):
     if not business:
         return JsonResponse({"ok": False, "error": "No active business"}, status=400)
 
+    # Get location: prefer request attribute, then session, then auto-select
     location = getattr(request, "active_location", None)
+    if not location:
+        # Try session
+        location_id = request.session.get('active_location_id')
+        if location_id:
+            try:
+                from inventory.models import Location
+                location = Location.objects.get(id=location_id, business=business)
+            except Location.DoesNotExist:
+                location = None
+        
+        # Last resort: auto-select first location
+        if not location:
+            try:
+                from inventory.models import Location
+                location = Location.objects.filter(
+                    business=business,
+                ).order_by('-is_default', 'id').first()
+                
+                if location:
+                    request.session['active_location_id'] = location.id
+                    request.session.modified = True
+            except Exception:
+                pass
+    
     if not location:
         return JsonResponse({"ok": False, "error": "No active location"}, status=400)
 
@@ -377,6 +402,17 @@ def fast_sell_lookup_api(request):
         barcode=barcode,
         location=location,
     )
+
+    # Remove non-serializable unit object from response
+    # Keep only the serializable fields
+    if result.get("found") and "unit" in result:
+        del result["unit"]
+    
+    # Convert Decimal to str for JSON serialization
+    if "selling_price" in result:
+        result["selling_price"] = str(result["selling_price"])
+    if "cost_price" in result:
+        result["cost_price"] = str(result["cost_price"])
 
     return JsonResponse(result)
 

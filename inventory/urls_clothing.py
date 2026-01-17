@@ -4,7 +4,7 @@ URL patterns for clothing store operations.
 """
 from django.urls import path
 
-from . import api_clothing_barcode, views_clothing
+from . import api_clothing_barcode, views_clothing, views_clothing_wizard
 
 app_name = "clothing"
 
@@ -20,7 +20,23 @@ urlpatterns = [
     # Sales
     path("sell/", views_clothing.sell_clothing, name="sell"),
     path("sales/", views_clothing.sales_list, name="sales_list"),
-    # Barcode APIs
+    
+    # =========================================================================
+    # NEW: Redesigned 2-Step Stock-In Wizard (replaces fragile 8-step wizard)
+    # =========================================================================
+    # Step A: Product Setup (name, category, stock mode, qty, price, size, brand)
+    path("stockin/", views_clothing_wizard.step_a_product_setup, name="stockin_step_a"),
+    path("stockin/step-a/", views_clothing_wizard.step_a_product_setup, name="stockin_step_a_alt"),
+    # Step B: Barcodes (only for unique stock mode)
+    path("stockin/barcodes/<str:draft_id>/", views_clothing_wizard.step_b_barcodes, name="stockin_step_b"),
+    # AJAX APIs for barcode operations
+    path("api/stockin/<str:draft_id>/add-barcode/", views_clothing_wizard.api_add_barcode, name="stockin_api_add_barcode"),
+    path("api/stockin/<str:draft_id>/remove-barcode/", views_clothing_wizard.api_remove_barcode, name="stockin_api_remove_barcode"),
+    path("api/stockin/<str:draft_id>/finalize/", views_clothing_wizard.api_finalize, name="stockin_api_finalize"),
+    
+    # =========================================================================
+    # Legacy Barcode APIs (kept for backward compatibility with old wizard)
+    # =========================================================================
     path(
         "api/check-barcode-duplicate/", api_clothing_barcode.check_barcode_duplicate_api, name="check_barcode_duplicate"
     ),
