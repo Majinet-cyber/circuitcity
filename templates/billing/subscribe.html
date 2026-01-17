@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load static humanize billing_tags %}
 
 {% block title %}Subscribe{% endblock %}
 {% block header_title %}Choose a plan{% endblock %}
@@ -231,14 +231,15 @@
               <span class="per">/month</span>
             </div>
 
-            {# --- SHORT DESCRIPTION PER TIER --- #}
+            {# --- SHORT DESCRIPTION PER TIER (Vertical-Aware) --- #}
+            {% vertical_copy as copy %}
             <div class="desc text-muted">
               {% if p.max_stores == 1 %}
-                {{ p.max_stores }} store{% if p.max_agents > 0 %}, {{ p.max_agents }} agent{{ p.max_agents|pluralize }}{% else %}, no agents{% endif %}
+                1 {{ copy.location_singular }}{% if p.max_agents > 0 %}, {{ p.max_agents }} {{ copy.staff_singular }}{{ p.max_agents|pluralize }}{% else %}, no {{ copy.staff_plural }}{% endif %}
               {% elif p.max_stores == -1 %}
-                Unlimited
+                Unlimited {{ copy.location_plural }} and {{ copy.staff_plural }}
               {% else %}
-                {{ p.max_stores }} stores, {{ p.max_agents|default:"unlimited" }} agents
+                {{ p.max_stores }} {{ copy.location_plural }}, {{ p.max_agents|default:"unlimited" }} {{ copy.staff_plural }}
               {% endif %}
             </div>
 

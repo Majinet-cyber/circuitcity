@@ -1,215 +1,828 @@
 {% extends "base.html" %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Welding Dashboard - {{ business.name }}{% endblock %}
 
-{% block content %}
-<div class="container-fluid py-3">
-    <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h1 class="h3 mb-1">🔧 Welding Workshop</h1>
-            <p class="text-muted mb-0">Create quotes, track jobs, generate invoices</p>
-        </div>
-        <a href="{{ url_create_quote }}" class="btn btn-success btn-lg" data-testid="welding-create-quote">
-            <i class="bi bi-plus-circle"></i> New Quote
-        </a>
-    </div>
-
-    <!-- Low Stock Alert -->
-    {% if low_stock_count > 0 %}
-    <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
-        <i class="bi bi-exclamation-triangle-fill me-2"></i>
-        <div>
-            <strong>{{ low_stock_count }} materials running low!</strong>
-            <a href="/verticals/welding/materials/?low_stock=1" class="alert-link ms-2">View &raquo;</a>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- KPI Cards Row -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Revenue This Month</div>
-                    <div class="h4 mb-0 text-success">
-                        MWK {{ revenue_this_month|floatformat:0|intcomma }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Quotes This Month</div>
-                    <div class="h4 mb-0 text-primary">{{ quotes_this_month }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Active Jobs</div>
-                    <div class="h4 mb-0 text-info">{{ jobs_active }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="card h-100 border-0 shadow-sm">
-                <div class="card-body text-center">
-                    <div class="text-muted small mb-1">Outstanding</div>
-                    <div class="h4 mb-0 text-warning">
-                        MWK {{ total_outstanding|floatformat:0|intcomma }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <a href="{{ url_create_quote }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-create-quote">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-file-earmark-text text-success h2"></i>
-                    <div class="mt-2 fw-medium">New Quote</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_stock_in }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-stock-in">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-box-arrow-in-down text-primary h2"></i>
-                    <div class="mt-2 fw-medium">Stock In</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_materials }}" class="card h-100 text-decoration-none border-0 shadow-sm bg-light" data-testid="welding-add-material">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-gear text-secondary h2"></i>
-                    <div class="mt-2 fw-medium">Materials</div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="/verticals/welding/jobs/" class="card h-100 text-decoration-none border-0 shadow-sm bg-light">
-                <div class="card-body text-center py-4">
-                    <i class="bi bi-clipboard-check text-info h2"></i>
-                    <div class="mt-2 fw-medium">Jobs</div>
-                </div>
-            </a>
-        </div>
-    </div>
-
-    <div class="row g-4">
-        <!-- Pending Quotes -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">📝 Recent Quotes</h5>
-                    <a href="/verticals/welding/quotes/" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    {% if recent_quotes %}
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Quote #</th>
-                                    <th>Customer</th>
-                                    <th>Total</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for quote in recent_quotes %}
-                                <tr onclick="window.location='/verticals/welding/quotes/{{ quote.id }}/';" style="cursor:pointer;">
-                                    <td>{{ quote.quote_number }}</td>
-                                    <td>{{ quote.customer_name|truncatechars:15 }}</td>
-                                    <td>MWK {{ quote.total|floatformat:0|intcomma }}</td>
-                                    <td>
-                                        <span class="badge bg-{% if quote.status == 'accepted' %}success{% elif quote.status == 'sent' %}info{% elif quote.status == 'rejected' %}danger{% else %}secondary{% endif %}">
-                                            {{ quote.get_status_display }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-file-earmark-text h1"></i>
-                        <p class="mb-0">No quotes yet.</p>
-                        <a href="{{ url_create_quote }}" class="btn btn-sm btn-success mt-2">Create First Quote</a>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Active Jobs -->
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">🔨 Recent Jobs</h5>
-                    <a href="/verticals/welding/jobs/" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="card-body p-0">
-                    {% if recent_jobs %}
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Job #</th>
-                                    <th>Customer</th>
-                                    <th>Price</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for job in recent_jobs %}
-                                <tr onclick="window.location='/verticals/welding/jobs/{{ job.id }}/';" style="cursor:pointer;">
-                                    <td>{{ job.job_number }}</td>
-                                    <td>{{ job.customer_name|truncatechars:15 }}</td>
-                                    <td>MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
-                                    <td>
-                                        <span class="badge bg-{% if job.status == 'delivered' %}success{% elif job.status == 'ready' %}info{% elif job.status == 'in_progress' %}warning{% else %}secondary{% endif %}">
-                                            {{ job.get_status_display }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="text-center py-4 text-muted">
-                        <i class="bi bi-clipboard-check h1"></i>
-                        <p class="mb-0">No jobs yet.</p>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Ready for Pickup -->
-    {% if jobs_ready > 0 %}
-    <div class="card border-0 shadow-sm mt-4 bg-success bg-opacity-10">
-        <div class="card-body">
-            <div class="d-flex align-items-center">
-                <i class="bi bi-check-circle-fill text-success h3 mb-0 me-3"></i>
-                <div>
-                    <h5 class="mb-0">{{ jobs_ready }} job{{ jobs_ready|pluralize }} ready for pickup</h5>
-                    <a href="/verticals/welding/jobs/?status=ready" class="text-success">View ready jobs &raquo;</a>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-</div>
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 {% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Welding Dashboard Premium Styles ===== */
+/* PREMIUM BLUE THEME (Jan 2026) - matches Clothing/Cement premium feel */
+
+.welding-page {
+  background: var(--surface, #f8fafc);
+  min-height: 100vh;
+  color: var(--ink, #0f172a);
+}
+
+.welding-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* Premium Blue Hero Card (like Clothing) */
+.vertical-hero {
+  background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #60a5fa 100%);
+  padding: 28px;
+  border-radius: 24px;
+  color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 20px 60px rgba(14, 165, 233, 0.2);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.vertical-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.vertical-hero .eyebrow {
+  opacity: 0.9;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  margin: 0;
+  font-weight: 600;
+}
+
+.vertical-hero h1 {
+  margin: 6px 0;
+  font-size: clamp(26px, 4vw, 36px);
+  font-weight: 800;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.vertical-hero p {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  z-index: 1;
+  position: relative;
+}
+
+.hero-actions a {
+  border-radius: 30px;
+  padding: 12px 20px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hero-actions .primary {
+  background: #fff;
+  color: #0f172a;
+}
+
+.hero-actions .primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  background: #f8fafc;
+}
+
+.hero-actions .ghost {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.hero-actions .ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
+}
+
+/* Alert Box */
+.alert-box {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+  color: var(--ink, #0f172a);
+}
+
+.alert-icon {
+  font-size: 1.5rem;
+  color: #eab308;
+}
+
+.alert-text {
+  flex: 1;
+  font-weight: 600;
+}
+
+.alert-link {
+  color: #b45309;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.alert-link:hover {
+  text-decoration: underline;
+}
+
+/* KPI Grid - Premium Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.kpi-card:hover::before {
+  opacity: 1;
+}
+
+.kpi-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.kpi-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.kpi-value.success { color: #16a34a; }
+.kpi-value.primary { color: #f97316; }
+.kpi-value.info { color: #2563eb; }
+.kpi-value.warning { color: #eab308; }
+
+/* Charts Row */
+.charts-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.chart-card {
+  background: #fff;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.chart-card-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-card-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chart-card-body {
+  padding: 1rem;
+  height: 280px;
+  position: relative;
+}
+
+/* Section Cards */
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+}
+
+.section-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #0f172a;
+}
+
+.section-link {
+  font-size: 0.85rem;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.section-link:hover {
+  text-decoration: underline;
+}
+
+.section-body {
+  padding: 0;
+}
+
+/* Table Styles */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.data-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover {
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.status-badge.accepted, .status-badge.delivered {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.status-badge.sent, .status-badge.in_progress {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+.status-badge.ready {
+  background: rgba(234, 179, 8, 0.1);
+  color: #b45309;
+}
+
+.status-badge.draft, .status-badge.pending {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.status-badge.rejected, .status-badge.cancelled {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Insights Grid */
+.insights-section {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.08);
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+}
+
+.insights-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.insights-header h3 {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.insight-card {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.insight-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+}
+
+.insight-value {
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+/* Ready Banner */
+.ready-banner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.1), rgba(22, 163, 74, 0.05));
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+}
+
+.ready-icon {
+  font-size: 2rem;
+  color: #16a34a;
+}
+
+.ready-text {
+  flex: 1;
+}
+
+.ready-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #16a34a;
+}
+
+.ready-link {
+  color: #16a34a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.ready-link:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .welding-container {
+    padding: 1rem;
+  }
+  
+  .vertical-hero {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .hero-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .hero-actions a {
+    flex: 1;
+    text-align: center;
+    min-width: 120px;
+  }
+  
+  .section-grid,
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welding-page" data-testid="welding-dashboard">
+  <div class="welding-container">
+    <!-- Premium Blue Hero Card (like Clothing) -->
+    <header class="vertical-hero" data-testid="welding-hero-card">
+      <div>
+        <p class="eyebrow">{{ business.name }}</p>
+        <h1>🔧 Welding Workshop</h1>
+        <p>Create quotes, track jobs, generate invoices</p>
+      </div>
+      <div class="hero-actions">
+        <a class="primary" href="{{ url_create_quote }}" data-testid="welding-create-quote">
+          <i class="bi bi-plus-circle"></i> New Quote
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_sales' %}">Sales</a>
+      </div>
+    </header>
+    
+    <!-- Low Stock Alert -->
+    {% if low_stock_count > 0 %}
+    <div class="alert-box">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-text">{{ low_stock_count }} materials running low!</div>
+      <a href="{% url 'verticals:welding_materials_list' %}?low_stock=1" class="alert-link">View →</a>
+    </div>
+    {% endif %}
+    
+    <!-- KPI Grid -->
+    <div class="kpi-grid" data-testid="welding-dashboard-kpis">
+      <div class="kpi-card">
+        <div class="kpi-label">💰 Revenue This Month</div>
+        <div class="kpi-value success">MWK {{ revenue_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📋 Quotes This Month</div>
+        <div class="kpi-value primary">{{ quotes_this_month }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🔨 Active Jobs</div>
+        <div class="kpi-value info">{{ jobs_active }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📄 Outstanding</div>
+        <div class="kpi-value warning">MWK {{ total_outstanding|floatformat:0|intcomma }}</div>
+      </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="charts-row" data-testid="welding-charts">
+      <!-- Revenue Trend Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="bi bi-graph-up me-2"></i>Revenue Trend (Last 30 Days)</h3>
+        </div>
+        <div class="chart-card-body">
+          <canvas id="revenueTrendChart" data-testid="welding-revenue-chart"></canvas>
+        </div>
+      </div>
+      
+      <!-- Quotes Trend Chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3><i class="bi bi-file-text me-2"></i>Quotes & Jobs Trend</h3>
+        </div>
+        <div class="chart-card-body">
+          <canvas id="quotesJobsChart" data-testid="welding-quotes-chart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="section-grid">
+      <!-- Recent Quotes -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">📝 Recent Quotes</div>
+          <a href="{% url 'verticals:welding_quotes_list' %}" class="section-link">View All</a>
+        </div>
+        <div class="section-body">
+          {% if recent_quotes %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Quote #</th>
+                <th>Customer</th>
+                <th>Total</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for quote in recent_quotes %}
+              <tr onclick="window.location='{% url 'verticals:welding_quote_detail' quote.id %}';">
+                <td>{{ quote.quote_number }}</td>
+                <td>{{ quote.customer_name|truncatechars:15 }}</td>
+                <td>MWK {{ quote.total|floatformat:0|intcomma }}</td>
+                <td><span class="status-badge {{ quote.status }}">{{ quote.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">📝</div>
+            <p>No quotes yet.</p>
+            <a href="{{ url_create_quote }}" class="section-link">Create First Quote</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      
+      <!-- Recent Jobs -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">🔨 Recent Jobs</div>
+          <a href="{% url 'verticals:welding_jobs_list' %}" class="section-link">View All</a>
+        </div>
+        <div class="section-body">
+          {% if recent_jobs %}
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Job #</th>
+                <th>Customer</th>
+                <th>Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for job in recent_jobs %}
+              <tr onclick="window.location='{% url 'verticals:welding_job_detail' job.id %}';">
+                <td>{{ job.job_number }}</td>
+                <td>{{ job.customer_name|truncatechars:15 }}</td>
+                <td>MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
+                <td><span class="status-badge {{ job.status }}">{{ job.get_status_display }}</span></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon">🔨</div>
+            <p>No jobs yet.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Insights Section -->
+    <div class="insights-section">
+      <div class="insights-header">
+        <h3>💡 Insights</h3>
+      </div>
+      <div class="insights-grid">
+        <div class="insight-card">
+          <div class="insight-label">Pending Quotes</div>
+          <div class="insight-value">{{ quotes_pending }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Jobs Ready for Pickup</div>
+          <div class="insight-value">{{ jobs_ready }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Low Stock Materials</div>
+          <div class="insight-value">{{ low_stock_count }}</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Ready for Pickup Banner -->
+    {% if jobs_ready > 0 %}
+    <div class="ready-banner">
+      <div class="ready-icon">✅</div>
+      <div class="ready-text">
+        <div class="ready-title">{{ jobs_ready }} job{{ jobs_ready|pluralize }} ready for pickup</div>
+        <a href="{% url 'verticals:welding_jobs_list' %}?status=ready" class="ready-link">View ready jobs →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Revenue Trend Chart
+  const revenueTrendData = {{ revenue_trend_json|safe|default:'[]' }};
+  const quotesJobsData = {{ quotes_jobs_trend_json|safe|default:'[]' }};
+  
+  // Revenue Trend Chart
+  const revenueCtx = document.getElementById('revenueTrendChart');
+  if (revenueCtx && revenueTrendData.length > 0) {
+    new Chart(revenueCtx, {
+      type: 'line',
+      data: {
+        labels: revenueTrendData.map(d => d.date),
+        datasets: [{
+          label: 'Revenue (MWK)',
+          data: revenueTrendData.map(d => d.revenue),
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22, 163, 74, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#16a34a',
+          borderWidth: 2.5,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                return 'MWK ' + context.parsed.y.toLocaleString();
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 45 }
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(226, 232, 240, 0.5)' },
+            ticks: {
+              font: { size: 11 },
+              callback: function(value) {
+                if (value >= 1000000) return 'MWK ' + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return 'MWK ' + (value / 1000).toFixed(0) + 'K';
+                return 'MWK ' + value.toLocaleString();
+              },
+              // Calculate nice step size based on max value
+              stepSize: (function() {
+                const data = revenueTrendData.map(d => d.revenue);
+                const maxValue = Math.max(...data, 0);
+                
+                if (maxValue === 0) return 50000;  // Default when no data
+                if (maxValue <= 50000) return 10000;
+                if (maxValue <= 200000) return 50000;
+                if (maxValue <= 1000000) return 100000;
+                return 500000;
+              })()
+            }
+          }
+        }
+      }
+    });
+  } else if (revenueCtx) {
+    // Empty state
+    revenueCtx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;text-align:center;"><div><div style="font-size:2rem;margin-bottom:0.5rem;">📊</div><p>No revenue data yet</p></div></div>';
+  }
+  
+  // Quotes & Jobs Trend Chart
+  const quotesCtx = document.getElementById('quotesJobsChart');
+  if (quotesCtx && quotesJobsData.length > 0) {
+    new Chart(quotesCtx, {
+      type: 'bar',
+      data: {
+        labels: quotesJobsData.map(d => d.date),
+        datasets: [
+          {
+            label: 'Quotes',
+            data: quotesJobsData.map(d => d.quotes),
+            backgroundColor: 'rgba(249, 115, 22, 0.8)',
+            borderColor: '#f97316',
+            borderWidth: 1,
+            borderRadius: 4,
+          },
+          {
+            label: 'Jobs',
+            data: quotesJobsData.map(d => d.jobs),
+            backgroundColor: 'rgba(37, 99, 235, 0.8)',
+            borderColor: '#2563eb',
+            borderWidth: 1,
+            borderRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: { size: 12, weight: '600' }
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 45 }
+          },
+          y: {
+            grid: { color: 'rgba(226, 232, 240, 0.5)' },
+            ticks: {
+              stepSize: 1,
+              font: { size: 11 }
+            }
+          }
+        }
+      }
+    });
+  } else if (quotesCtx) {
+    // Empty state
+    quotesCtx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;text-align:center;"><div><div style="font-size:2rem;margin-bottom:0.5rem;">📈</div><p>No quotes/jobs data yet</p></div></div>';
+  }
+});
+</script>
+{% endblock %}

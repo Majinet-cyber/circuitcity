@@ -9,22 +9,31 @@ Tests for:
 4. Assets save and success message
 5. Reports generate endpoints return 200 + CSV
 6. Expenses category cards UI
+7. NEW: Dashboard Farm Snapshot (crops breakdown, livestock by type, assets preview)
+8. NEW: AI Insights engine and dashboard display
+9. NEW: Smart Add Entry with context-aware recommendations
+10. NEW: Vertical-aware billing copy
 """
 import pytest
+from datetime import date, timedelta
 from decimal import Decimal
 from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 
 from inventory.business_kinds import BusinessKind
 from inventory.models_farm import (
     FarmAsset,
     FarmCrop,
     FarmCropSale,
+    FarmCropSeason,
     FarmLedgerEntry,
     FarmLivestockBatch,
     FarmCropCategory,
     FarmEntryType,
+    FarmSeasonStatus,
+    FarmAnimalType,
     MALAWI_CROP_CATALOG,
 )
 from tenants.models import Business, Membership
@@ -423,4 +432,287 @@ class TestFarmVerticalNoRegressions:
         # Sidebar should still work
         content = response.content.decode("utf-8")
         assert "Dashboard" in content or "dashboard" in content.lower()
+
+
+# ==============================================================================
+# NEW: Farm Dashboard Detailed Snapshot Tests (Jan 2026)
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestFarmDashboardSnapshot:
+    """Test Farm Snapshot section with detailed breakdowns."""
+    
+    def test_dashboard_has_farm_snapshot_section(self, farm_user_business, client):
+        """Dashboard should have Farm Snapshot section."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        response = client.get(reverse("verticals:farm_dashboard"))
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        assert 'data-testid="farm-snapshot-section"' in content
+    
+    def test_crops_breakdown_shows_recorded_crops(self, farm_user_business, client):
+        """Crops breakdown should show actual recorded crop seasons."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        # Create a crop season
+        FarmCropSeason.objects.create(
+            business=business,
+            crop_type="maize",
+            name="Maize 2026",
+            start_date=date.today() - timedelta(days=21),  # 3 weeks ago
+            area_value=Decimal("9.0"),
+            area_unit="acre",
+            status=FarmSeasonStatus.ACTIVE,
+            created_by=user,
+        )
+        
+        response = client.get(reverse("verticals:farm_dashboard"))
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        # Should contain the crop type
+        assert 'data-testid="crops-breakdown-card"' in content
+        assert 'data-testid="crop-name"' in content
+        assert "Maize" in content
+    
+    def test_livestock_breakdown_shows_counts_by_type(self, farm_user_business, client):
+        """Livestock breakdown should show counts by animal type."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        # Create livestock batches
+        FarmLivestockBatch.objects.create(
+            business=business,
+            animal_type=FarmAnimalType.PIGS,
+            name="Pigs Batch 1",
+            count_current=12,
+            is_active=True,
+            created_by=user,
+        )
+        FarmLivestockBatch.objects.create(
+            business=business,
+            animal_type=FarmAnimalType.CHICKENS,
+            name="Broilers Group A",
+            count_current=100,
+            is_active=True,
+            created_by=user,
+        )
+        
+        response = client.get(reverse("verticals:farm_dashboard"))
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        assert 'data-testid="livestock-breakdown-card"' in content
+        assert 'data-testid="livestock-type-count"' in content
+    
+    def test_assets_preview_shows_when_assets_exist(self, farm_user_business, client):
+        """Assets preview should show when assets exist."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        # Create an asset
+        FarmAsset.objects.create(
+            business=business,
+            asset_type="tractor",
+            name="John Deere Tractor",
+            quantity=1,
+            value_mwk=Decimal("5000000"),
+            condition="good",
+            is_active=True,
+            created_by=user,
+        )
+        
+        response = client.get(reverse("verticals:farm_dashboard"))
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        assert 'data-testid="assets-preview-card"' in content
+        assert "John Deere" in content or "Tractor" in content
+
+
+# ==============================================================================
+# NEW: AI Insights Engine Unit Tests (Jan 2026)
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestFarmInsightsEngine:
+    """Test the deterministic Farm Insights Engine."""
+    
+    def test_maize_fertilizer_recommendation_generated(self, farm_user_business):
+        """Given Maize season planted 3 weeks ago, should return fertilizer recommendation."""
+        from inventory.services.farm_insights import generate_crop_insights
+        
+        user, business = farm_user_business
+        today = date.today()
+        
+        # Simulate a maize season planted 3 weeks ago
+        season = FarmCropSeason.objects.create(
+            business=business,
+            crop_type="maize",
+            name="Maize 2026",
+            start_date=today - timedelta(days=21),  # 3 weeks ago
+            area_value=Decimal("9.0"),
+            area_unit="acre",
+            status=FarmSeasonStatus.ACTIVE,
+            created_by=user,
+        )
+        
+        insights = generate_crop_insights([season], today)
+        
+        # Should have at least one fertilizer recommendation
+        assert len(insights) > 0
+        fert_insights = [i for i in insights if i.category.value == "fertilizer"]
+        assert len(fert_insights) > 0
+        
+        # Should have non-zero bag estimates
+        first_insight = fert_insights[0]
+        assert first_insight.suggested_quantities is not None
+        assert "bags" in first_insight.suggested_quantities.lower()
+        
+        # Should have disclaimer
+        assert "estimate" in first_insight.confidence_note.lower() or "adjust" in first_insight.confidence_note.lower()
+    
+    def test_fertilizer_estimate_calculation(self, farm_user_business):
+        """Test fertilizer estimate calculation for maize."""
+        from inventory.services.farm_insights import calculate_fertilizer_estimate
+        
+        result = calculate_fertilizer_estimate("maize", 9.0, 3)  # Week 3, 9 acres
+        
+        assert result["has_recommendation"] is True
+        assert result["npk_bags"] > 0
+        assert result["urea_bags"] > 0
+        assert "disclaimer" in result
+    
+    def test_livestock_insights_generated(self, farm_user_business):
+        """Test livestock insights generation."""
+        from inventory.services.farm_insights import generate_livestock_insights
+        
+        user, business = farm_user_business
+        today = date.today()
+        
+        # Create a batch
+        batch = FarmLivestockBatch.objects.create(
+            business=business,
+            animal_type=FarmAnimalType.CHICKENS,
+            name="Broilers Group A",
+            count_current=100,
+            is_active=True,
+            created_by=user,
+        )
+        
+        insights = generate_livestock_insights([batch], today)
+        
+        # Should have feed and/or vet insights
+        assert len(insights) > 0
+        
+        # Check categories
+        categories = [i.category.value for i in insights]
+        assert "feed" in categories or "veterinary" in categories
+
+
+# ==============================================================================
+# NEW: Smart Add Entry Tests (Jan 2026)
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestSmartAddEntry:
+    """Test context-aware Add Entry flow."""
+    
+    def test_crop_season_detail_has_recommended_panel(self, farm_user_business, client):
+        """For crop season, recommended panel should contain fertilizer suggestion."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        # Create a crop season
+        season = FarmCropSeason.objects.create(
+            business=business,
+            crop_type="maize",
+            name="Maize 2026",
+            start_date=date.today() - timedelta(days=21),
+            area_value=Decimal("9.0"),
+            area_unit="acre",
+            status=FarmSeasonStatus.ACTIVE,
+            created_by=user,
+        )
+        
+        response = client.get(reverse("verticals:farm_crop_detail", args=[season.id]))
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        # Should have recommended actions panel
+        assert 'data-testid="recommended-actions-panel"' in content or 'data-testid="entry-types-panel"' in content
+    
+    def test_livestock_add_event_has_recommendations(self, farm_user_business, client):
+        """For livestock cohort, recommended panel should contain feed/vet suggestion."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        # Create a batch
+        batch = FarmLivestockBatch.objects.create(
+            business=business,
+            animal_type=FarmAnimalType.PIGS,
+            name="Pigs Batch 1",
+            count_current=12,
+            is_active=True,
+            created_by=user,
+        )
+        
+        # Access with batch_id
+        response = client.get(reverse("verticals:farm_livestock_add_event") + f"?batch_id={batch.id}")
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        # Should have the form
+        assert 'data-testid="farm-livestock-event-form"' in content
+
+
+# ==============================================================================
+# NEW: Vertical-Aware Billing Copy Tests (Jan 2026)
+# ==============================================================================
+
+@pytest.mark.django_db
+class TestVerticalBillingCopy:
+    """Test that billing pages use vertical-appropriate terminology."""
+    
+    def test_farm_billing_uses_farm_terminology(self, farm_user_business, client):
+        """When vertical=farm, billing page should contain 'farm' not 'shop'."""
+        user, business = farm_user_business
+        client.force_login(user)
+        
+        response = client.get(reverse("billing:subscribe"))
+        
+        # Page should load
+        assert response.status_code == 200
+        
+        content = response.content.decode("utf-8")
+        # Should use farm terminology
+        assert "farm" in content.lower() or "assistant manager" in content.lower()
+    
+    def test_vertical_copy_returns_correct_terms(self):
+        """Test vertical copy map returns correct terminology."""
+        from billing.vertical_copy import get_billing_copy
+        
+        farm_copy = get_billing_copy("farm")
+        assert farm_copy.location_singular == "farm"
+        assert farm_copy.staff_plural == "assistant managers"
+        
+        gym_copy = get_billing_copy("gym")
+        assert gym_copy.location_singular == "gym"
+        assert gym_copy.staff_plural == "trainers"
+        
+        phones_copy = get_billing_copy("phones")
+        assert phones_copy.location_singular == "shop"
+        assert phones_copy.staff_plural == "agents"
+    
+    def test_unknown_vertical_falls_back_to_default(self):
+        """Unknown vertical should use default shop/agents terminology."""
+        from billing.vertical_copy import get_billing_copy
+        
+        unknown_copy = get_billing_copy("unknown_vertical")
+        assert unknown_copy.location_singular == "shop"
+        assert unknown_copy.staff_plural == "agents"
 

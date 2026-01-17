@@ -514,11 +514,24 @@
 {% block content %}
 <div class="farm-dashboard container-fluid py-3" data-vertical="farm" data-testid="farm-dashboard-container">
     
+    <!-- Premium Blue Hero Card (like Clothing) -->
+    <header class="vertical-hero" data-testid="farm-hero-card" style="background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 50%,#60a5fa 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(14,165,233,0.2);position:relative;overflow:hidden;margin-bottom:1.5rem;">
+      <div style="position:relative;z-index:1;">
+        <p style="opacity:0.9;text-transform:uppercase;font-size:0.8rem;letter-spacing:0.15em;margin:0;font-weight:600;">{{ business.name }}</p>
+        <h1 style="margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1);color:#fff !important;background:none !important;-webkit-text-fill-color:#fff !important;">🌾 Farm Manager</h1>
+        <p style="margin:0;opacity:0.95;font-size:1rem;">Track profitability, costs, livestock & crops</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;z-index:1;position:relative;">
+        <a style="border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);background:#fff;color:#0f172a;" href="{% url 'verticals:farm_crops_list' %}">Crops</a>
+        <a style="border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);border:2px solid rgba(255,255,255,0.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);" href="{% url 'verticals:farm_livestock_list' %}">Livestock</a>
+      </div>
+    </header>
+    
     <!-- Page Header with Filter Integration -->
     <div class="farm-header" data-testid="farm-dashboard">
         <div class="farm-header-text">
-            <h1><span>🌾</span> Farm Dashboard</h1>
-            <p>Track profitability, costs, livestock & crops</p>
+            <h1><span></span> Dashboard Overview</h1>
+            <p>Your farm at a glance</p>
         </div>
         <div class="farm-header-actions">
             <!-- Filter Button -->
@@ -671,82 +684,200 @@
         </div>
     </div>
 
-    <!-- Summary Panels -->
-    <div class="summary-grid">
-        <!-- Livestock Summary -->
-        <div class="summary-panel">
-            <div class="summary-panel-header">
-                <h3><span>🐖</span> Livestock</h3>
-                <a href="{% url 'verticals:farm_livestock_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+    <!-- ==================== FARM SNAPSHOT SECTION ==================== -->
+    <div class="farm-snapshot-section" data-testid="farm-snapshot-section" style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="bi bi-grid-3x3-gap-fill" style="color: var(--farm-primary);"></i> Farm Snapshot
+        </h2>
+        
+        <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            
+            <!-- Crops Breakdown Card -->
+            <div class="summary-panel" data-testid="crops-breakdown-card">
+                <div class="summary-panel-header">
+                    <h3><span>🌱</span> Crops Breakdown</h3>
+                    <a href="{% url 'verticals:farm_crops_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="summary-panel-body">
+                    {% if crops_breakdown %}
+                        {% for crop in crops_breakdown %}
+                        <div class="crop-row" style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px dashed var(--border);">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.25rem;">{{ crop.emoji }}</span>
+                                <div>
+                                    <div style="font-weight: 600; font-size: 0.875rem; color: var(--ink);" data-testid="crop-name">{{ crop.crop_type }}</div>
+                                    <div style="font-size: 0.75rem; color: var(--muted);">{{ crop.area }} {{ crop.area_unit }} — Season: {{ crop.year }}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="badge" style="background: var(--farm-primary-light); color: var(--farm-primary); font-size: 0.7rem; padding: 0.25rem 0.5rem; border-radius: 999px;">{{ crop.stage }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if snapshot.active_seasons_count > 0 %}
+                        <div class="summary-stat" style="border-bottom: none; margin-top: 0.5rem;">
+                            <span class="summary-stat-label">Total Area</span>
+                            <span class="summary-stat-value">{{ snapshot.total_crop_area|floatformat:1 }} acres</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-flower1"></i>
+                            <p>No active crop seasons</p>
+                            <a href="{% url 'verticals:farm_add_season' %}" class="btn btn-sm btn-primary">Add Season</a>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="summary-panel-body">
-                {% if total_livestock_count > 0 %}
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Total Animals</span>
-                    <span class="summary-stat-value">{{ snapshot.total_livestock_count|intcomma }}</span>
-                </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Births</span>
-                    <span class="summary-stat-value positive">+{{ snapshot.livestock_births_this_month }}</span>
-                </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Deaths</span>
-                    <span class="summary-stat-value negative">-{{ snapshot.livestock_deaths_this_month }}</span>
-                </div>
-                {% if snapshot.mortality_rate_pct is not None %}
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Mortality Rate</span>
-                    <span class="summary-stat-value {% if snapshot.mortality_rate_pct > 10 %}negative{% endif %}">{{ snapshot.mortality_rate_pct|floatformat:1 }}%</span>
-                </div>
-                {% endif %}
-                {% if snapshot.total_livestock_value %}
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Est. Value</span>
-                    <span class="summary-stat-value">MWK {{ snapshot.total_livestock_value|floatformat:0|intcomma }}</span>
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="empty-state">
-                    <i class="bi bi-piggy-bank"></i>
-                    <p>No livestock batches yet</p>
-                    <a href="{% url 'verticals:farm_livestock_add_batch' %}" class="btn btn-sm btn-primary">Add First Batch</a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
 
-        <!-- Crops Summary -->
-        <div class="summary-panel">
-            <div class="summary-panel-header">
-                <h3><span>🌱</span> Crops</h3>
-                <a href="{% url 'verticals:farm_crops_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+            <!-- Livestock Breakdown Card -->
+            <div class="summary-panel" data-testid="livestock-breakdown-card">
+                <div class="summary-panel-header">
+                    <h3><span>🐖</span> Livestock Breakdown</h3>
+                    <a href="{% url 'verticals:farm_livestock_list' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="summary-panel-body">
+                    {% if livestock_by_type %}
+                        {% for animal_type, data in livestock_by_type.items %}
+                        <div class="summary-stat" data-testid="livestock-type-count">
+                            <span class="summary-stat-label" style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.125rem;">{{ data.icon }}</span> {{ animal_type }}
+                            </span>
+                            <span class="summary-stat-value">{{ data.count|intcomma }}</span>
+                        </div>
+                        {% endfor %}
+                        <div class="summary-stat" style="border-bottom: none; margin-top: 0.25rem; background: var(--surface-2); padding: 0.5rem; border-radius: 8px;">
+                            <span class="summary-stat-label"><strong>Total Animals</strong></span>
+                            <span class="summary-stat-value"><strong>{{ snapshot.total_livestock_count|intcomma }}</strong></span>
+                        </div>
+                        {% if snapshot.livestock_births_this_month > 0 or snapshot.livestock_deaths_this_month > 0 %}
+                        <div style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.75rem;">
+                            <span style="color: var(--farm-green);"><i class="bi bi-plus-circle-fill"></i> {{ snapshot.livestock_births_this_month }} births</span>
+                            <span style="color: var(--farm-red);"><i class="bi bi-dash-circle-fill"></i> {{ snapshot.livestock_deaths_this_month }} deaths</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-piggy-bank"></i>
+                            <p>No livestock batches yet</p>
+                            <a href="{% url 'verticals:farm_livestock_add_batch' %}" class="btn btn-sm btn-primary">Add First Batch</a>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="summary-panel-body">
-                {% if snapshot.active_seasons_count > 0 %}
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Active Seasons</span>
-                    <span class="summary-stat-value">{{ snapshot.active_seasons_count }}</span>
+
+            <!-- Assets Preview Card -->
+            <div class="summary-panel" data-testid="assets-preview-card">
+                <div class="summary-panel-header">
+                    <h3><span>🚜</span> Assets Preview</h3>
+                    <a href="{% url 'verticals:farm_assets' %}" class="btn btn-sm btn-outline-primary">View All</a>
                 </div>
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Total Area</span>
-                    <span class="summary-stat-value">{{ snapshot.total_crop_area|floatformat:1 }} acres</span>
+                <div class="summary-panel-body">
+                    {% if assets_preview %}
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+                            {% for asset in assets_preview|slice:":6" %}
+                            <div class="asset-tile" style="background: var(--surface-2); padding: 0.5rem; border-radius: 8px; text-align: center;">
+                                <div style="font-size: 1.5rem;">
+                                    {% if asset.asset_type == 'tractor' %}🚜{% elif asset.asset_type == 'pump' %}💧{% elif asset.asset_type == 'plough' %}🔧{% elif asset.asset_type == 'truck' %}🚛{% elif asset.asset_type == 'storage' %}🏠{% else %}📦{% endif %}
+                                </div>
+                                <div style="font-size: 0.75rem; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ asset.name|truncatechars:15 }}</div>
+                                {% if asset.value_mwk %}
+                                <div style="font-size: 0.65rem; color: var(--muted);">MWK {{ asset.value_mwk|floatformat:0|intcomma }}</div>
+                                {% endif %}
+                                <div style="font-size: 0.6rem; text-transform: uppercase; color: {% if asset.condition == 'good' or asset.condition == 'new' %}var(--farm-green){% elif asset.condition == 'fair' %}var(--farm-amber){% else %}var(--farm-red){% endif %};">{{ asset.condition }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="summary-stat" style="border-bottom: none; background: linear-gradient(135deg, var(--farm-primary-light), rgba(37, 99, 235, 0.05)); padding: 0.5rem; border-radius: 8px;">
+                            <span class="summary-stat-label"><strong>Total Value</strong> ({{ assets_count }} assets)</span>
+                            <span class="summary-stat-value" style="color: var(--farm-primary);">MWK {{ total_assets_value|floatformat:0|intcomma }}</span>
+                        </div>
+                    {% else %}
+                        <div class="empty-state" style="padding: 1.5rem;">
+                            <i class="bi bi-tools"></i>
+                            <p>No assets recorded</p>
+                            <a href="{% url 'verticals:farm_assets' %}" class="btn btn-sm btn-primary">Add Asset</a>
+                        </div>
+                    {% endif %}
                 </div>
-                {% if snapshot.projected_crop_income %}
-                <div class="summary-stat">
-                    <span class="summary-stat-label">Projected Income</span>
-                    <span class="summary-stat-value positive">MWK {{ snapshot.projected_crop_income|floatformat:0|intcomma }}</span>
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="empty-state">
-                    <i class="bi bi-flower1"></i>
-                    <p>No active crop seasons</p>
-                    <a href="{% url 'verticals:farm_add_season' %}" class="btn btn-sm btn-primary">Add Season</a>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
+
+    <!-- ==================== AI INSIGHTS SECTION ==================== -->
+    {% if ai_insights %}
+    <div class="ai-insights-section" data-testid="ai-insights-section" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="bi bi-lightbulb-fill" style="color: var(--farm-amber);"></i> AI Insights <span style="background: var(--farm-amber-light); color: var(--farm-amber); font-size: 0.65rem; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; text-transform: uppercase; margin-left: 0.5rem;">Beta</span>
+            </h2>
+            <span style="font-size: 0.75rem; color: var(--muted);">{{ ai_insights|length }} recommendations</span>
+        </div>
+        
+        <div class="insights-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0.75rem;">
+            {% for insight in ai_insights %}
+            <div class="insight-card" data-testid="insight-card" style="
+                background: var(--surface);
+                border-radius: var(--radius);
+                border: 1px solid var(--border);
+                border-left: 4px solid {% if insight.priority == 'critical' %}var(--farm-red){% elif insight.priority == 'high' %}var(--farm-amber){% elif insight.priority == 'medium' %}var(--farm-blue){% else %}var(--muted){% endif %};
+                padding: 1rem;
+                box-shadow: var(--shadow-xs);
+            ">
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                    <div style="
+                        width: 36px; height: 36px;
+                        border-radius: 10px;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 1.125rem;
+                        background: {% if insight.color == 'green' %}var(--farm-green-light){% elif insight.color == 'amber' %}var(--farm-amber-light){% elif insight.color == 'red' %}var(--farm-red-light){% else %}var(--farm-blue-light){% endif %};
+                        color: {% if insight.color == 'green' %}var(--farm-green){% elif insight.color == 'amber' %}var(--farm-amber){% elif insight.color == 'red' %}var(--farm-red){% else %}var(--farm-blue){% endif %};
+                    ">
+                        <i class="bi {{ insight.icon }}"></i>
+                    </div>
+                    <div style="flex: 1; min-width: 0;">
+                        <h4 style="font-size: 0.9375rem; font-weight: 700; margin: 0 0 0.25rem; color: var(--ink);">{{ insight.title }}</h4>
+                        <p style="font-size: 0.8125rem; color: var(--ink-500); margin: 0 0 0.5rem; line-height: 1.4;">{{ insight.reason }}</p>
+                        
+                        {% if insight.suggested_quantities %}
+                        <div style="background: var(--surface-2); padding: 0.5rem; border-radius: 6px; font-size: 0.8125rem; margin-bottom: 0.5rem;">
+                            <strong style="color: var(--ink);">📊 Estimate:</strong> {{ insight.suggested_quantities }}
+                        </div>
+                        {% endif %}
+                        
+                        <div style="font-size: 0.6875rem; color: var(--muted); font-style: italic;">
+                            <i class="bi bi-info-circle"></i> {{ insight.confidence_note }}
+                        </div>
+                    </div>
+                </div>
+                
+                {% if insight.season_id or insight.batch_id %}
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
+                    {% if insight.season_id %}
+                    <a href="{% url 'verticals:farm_crop_detail' insight.season_id %}?prefill={{ insight.entry_prefill.type|default:'other' }}" class="btn btn-sm" style="background: var(--farm-primary); color: white; font-size: 0.75rem;">
+                        <i class="bi bi-plus-lg"></i> Add Entry
+                    </a>
+                    {% elif insight.batch_id %}
+                    <a href="{% url 'verticals:farm_livestock_add_event' %}?batch_id={{ insight.batch_id }}&type={{ insight.entry_prefill.type|default:'other' }}" class="btn btn-sm" style="background: var(--farm-primary); color: white; font-size: 0.75rem;">
+                        <i class="bi bi-plus-lg"></i> Add Entry
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- AI Insights Empty State -->
+    <div class="alert alert-info d-flex align-items-center gap-2" style="border-radius: var(--radius); margin-bottom: 1.5rem;" data-testid="ai-insights-empty">
+        <i class="bi bi-lightbulb-fill fs-5"></i>
+        <div>
+            <strong>AI Insights (beta)</strong>
+            <p class="mb-0 small text-muted">Add crop seasons or livestock batches to receive smart recommendations.</p>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Recent Activity -->
     <div class="activity-card" data-testid="farm-recent-activity">
@@ -783,14 +914,6 @@
         </div>
     </div>
 
-    <!-- AI Recommendations Placeholder -->
-    <div class="alert alert-info d-flex align-items-center gap-2" style="border-radius: var(--radius);">
-        <i class="bi bi-lightbulb-fill fs-5"></i>
-        <div>
-            <strong>AI Recommendations</strong>
-            <p class="mb-0 small text-muted">Coming soon: Smart insights based on your farm data.</p>
-        </div>
-    </div>
 
 </div>
 {% endblock %}

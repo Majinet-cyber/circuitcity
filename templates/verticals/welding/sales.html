@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Sales - {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.sales-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* Page Header */
+.page-header {
+  margin-bottom: 1.5rem;
+}
+
+.page-header h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  color: var(--ink, #0f172a);
+  margin: 0 0 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.page-header p {
+  color: var(--muted, #64748b);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Filter Pills */
+.filter-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  align-items: center;
+}
+
+.filter-pill {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.filter-pill:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.filter-pill.active {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.kpi-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.5);
+}
+
+.kpi-card.primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+}
+
+.kpi-card.primary .kpi-label {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.kpi-card.primary .kpi-value {
+  color: #fff;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.kpi-value.success { color: #16a34a; }
+
+/* Chart Card */
+.chart-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.chart-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chart-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+}
+
+.chart-body {
+  padding: 1rem;
+  height: 280px;
+  position: relative;
+}
+
+/* Table Card */
+.table-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.table-header {
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-header h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.data-table td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tr:hover {
+  background: #f8fafc;
+}
+
+.status-badge {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.status-badge.paid {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+.status-badge.partial {
+  background: rgba(234, 179, 8, 0.1);
+  color: #b45309;
+}
+
+.status-badge.sent, .status-badge.draft {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.status-badge.overdue {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: #64748b;
+}
+
+.empty-state .icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sales-page {
+    padding: 1rem;
+  }
+  
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .filter-section {
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sales-page" data-testid="welding-sales-page">
+  <div class="page-header">
+    <h1>💰 Sales</h1>
+    <p>Track revenue from invoices and payments</p>
+  </div>
+  
+  <!-- Filter Pills -->
+  <div class="filter-section">
+    <a href="?range=today" class="filter-pill {% if filter_range == 'today' %}active{% endif %}">Today</a>
+    <a href="?range=7d" class="filter-pill {% if filter_range == '7d' %}active{% endif %}">Last 7 Days</a>
+    <a href="?range=mtd" class="filter-pill {% if filter_range == 'mtd' %}active{% endif %}">This Month</a>
+    <a href="?range=30d" class="filter-pill {% if filter_range == '30d' %}active{% endif %}">Last 30 Days</a>
+    <span style="color: #64748b; font-size: 0.875rem; margin-left: 1rem;">
+      <strong>Showing:</strong> {{ range_label }}
+    </span>
+  </div>
+  
+  <!-- KPI Grid -->
+  <div class="kpi-grid">
+    <div class="kpi-card primary">
+      <div class="kpi-label">💵 Total Paid</div>
+      <div class="kpi-value">MWK {{ total_paid|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">📄 Total Invoiced</div>
+      <div class="kpi-value">MWK {{ total_invoiced|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">⏳ Outstanding</div>
+      <div class="kpi-value" style="color: #eab308;">MWK {{ total_outstanding|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">🧾 Invoices</div>
+      <div class="kpi-value">{{ num_invoices }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">📊 Avg. Sale</div>
+      <div class="kpi-value success">MWK {{ average_sale|floatformat:0|intcomma }}</div>
+    </div>
+  </div>
+  
+  <!-- Sales Trend Chart -->
+  <div class="chart-card">
+    <div class="chart-header">
+      <h3><i class="bi bi-graph-up me-2"></i>Sales Trend (Last 14 Days)</h3>
+    </div>
+    <div class="chart-body">
+      <canvas id="salesTrendChart" data-testid="welding-sales-chart"></canvas>
+    </div>
+  </div>
+  
+  <!-- Invoices Table -->
+  <div class="table-card">
+    <div class="table-header">
+      <h3>🧾 Recent Invoices</h3>
+      <a href="{% url 'verticals:welding_invoices_list' %}" style="font-size: 0.875rem; color: #2563eb; text-decoration: none; font-weight: 600;">View All →</a>
+    </div>
+    {% if invoices %}
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Customer</th>
+          <th>Date</th>
+          <th>Total</th>
+          <th>Paid</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+        <tr onclick="window.location='{% url 'verticals:welding_invoice_detail' invoice.id %}';" style="cursor: pointer;">
+          <td><strong>{{ invoice.invoice_number }}</strong></td>
+          <td>{{ invoice.customer_name|truncatechars:20 }}</td>
+          <td>{{ invoice.issue_date|date:"M d, Y" }}</td>
+          <td>MWK {{ invoice.total|floatformat:0|intcomma }}</td>
+          <td>MWK {{ invoice.amount_paid|floatformat:0|intcomma }}</td>
+          <td><span class="status-badge {{ invoice.status }}">{{ invoice.get_status_display }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">📄</div>
+      <p>No invoices yet for this period.</p>
+      <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+        <a href="{% url 'verticals:welding_quote_create' %}" style="color: #2563eb;">Create a quote</a> and convert it to an invoice.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const salesData = {{ sales_trend_json|safe|default:'[]' }};
+  
+  const ctx = document.getElementById('salesTrendChart');
+  if (ctx && salesData.length > 0) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: salesData.map(d => d.date),
+        datasets: [{
+          label: 'Revenue (MWK)',
+          data: salesData.map(d => d.revenue),
+          backgroundColor: 'rgba(22, 163, 74, 0.8)',
+          borderColor: '#16a34a',
+          borderWidth: 1,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            padding: 12,
+            callbacks: {
+              label: function(context) {
+                const idx = context.dataIndex;
+                const count = salesData[idx].count || 0;
+                return [
+                  'Revenue: MWK ' + context.parsed.y.toLocaleString(),
+                  'Invoices: ' + count
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 11 }, maxRotation: 45 }
+          },
+          y: {
+            grid: { color: 'rgba(226, 232, 240, 0.5)' },
+            ticks: {
+              font: { size: 11 },
+              callback: function(value) {
+                if (value >= 1000000) return 'MWK ' + (value / 1000000).toFixed(1) + 'M';
+                if (value >= 1000) return 'MWK ' + (value / 1000).toFixed(0) + 'K';
+                return 'MWK ' + value;
+              }
+            }
+          }
+        }
+      }
+    });
+  } else if (ctx) {
+    ctx.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;text-align:center;"><div><div style="font-size:2rem;margin-bottom:0.5rem;">📊</div><p>No sales data yet</p></div></div>';
+  }
+});
+</script>
+{% endblock %}
+

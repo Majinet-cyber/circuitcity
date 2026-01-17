@@ -299,8 +299,8 @@ def dashboard(request):
     ctx["sales_revenue"] = sales_qs.aggregate(total=Coalesce(Sum("price"), zero_dec))["total"]
 
     # === Monthly aggregates for the selected year ===
-    year_start = dt(year, 1, 1).date()
-    year_end = dt(year + 1, 1, 1).date()
+    year_start = timezone.make_aware(dt(year, 1, 1))
+    year_end = timezone.make_aware(dt(year + 1, 1, 1))
 
     # SQLite-safe monthly aggregation
     from django.db import connection

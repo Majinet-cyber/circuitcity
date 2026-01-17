@@ -12,6 +12,42 @@
         </ol>
     </nav>
 
+    <!-- ==================== RECOMMENDED ACTIONS (Smart Entry) ==================== -->
+    {% if recommended_actions %}
+    <div class="card border-0 shadow-sm mb-4" data-testid="recommended-actions-panel" style="border-left: 4px solid #2563eb !important;">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0" style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="bi bi-lightbulb-fill" style="color: #f59f00;"></i>
+                Recommended Actions
+                <span style="background: #fef3c7; color: #d97706; font-size: 0.6rem; padding: 0.15rem 0.4rem; border-radius: 999px; font-weight: 700; text-transform: uppercase;">Smart</span>
+            </h6>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.5rem;">
+                {% for action in recommended_actions %}
+                <div class="recommendation-card" data-testid="recommendation-card" style="
+                    background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02));
+                    border: 1px solid rgba(37, 99, 235, 0.2);
+                    border-radius: 8px;
+                    padding: 0.5rem;
+                    cursor: pointer;
+                " onclick="document.getElementById('event_type').value='{{ action.entry_prefill.type }}'; document.getElementById('notes').value='{{ action.entry_prefill.notes|escapejs }}';">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1rem;">
+                            {% if action.category == 'feed' %}🌾{% elif action.category == 'veterinary' %}💉{% else %}📋{% endif %}
+                        </span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.75rem; color: #1e293b;">{{ action.title }}</div>
+                            <div style="font-size: 0.65rem; color: #64748b;">{{ action.reason|truncatechars:40 }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-primary text-white">
             <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Add Livestock Event</h5>
@@ -25,7 +61,7 @@
                     <select class="form-select" id="batch_id" name="batch_id" required>
                         <option value="">Select a batch...</option>
                         {% for batch in batches %}
-                        <option value="{{ batch.id }}">{{ batch.name }} ({{ batch.get_animal_type_display }} - {{ batch.count_current }} current)</option>
+                        <option value="{{ batch.id }}" {% if preselect_batch_id and batch.id|stringformat:"s" == preselect_batch_id %}selected{% endif %}>{{ batch.name }} ({{ batch.get_animal_type_display }} - {{ batch.count_current }} current)</option>
                         {% endfor %}
                     </select>
                 </div>

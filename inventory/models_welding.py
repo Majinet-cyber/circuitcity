@@ -26,26 +26,38 @@ User = settings.AUTH_USER_MODEL
 
 
 class WeldingMaterialCategory(models.TextChoices):
-    """Categories for welding materials"""
-    TUBE = "tube", "Square/Round Tube"
+    """Categories for welding materials - split for clarity"""
+    # Structural Steel
+    TUBE = "tube", "Tubes (Square/Round)"
     FLAT_BAR = "flat_bar", "Flat Bar"
     ANGLE_IRON = "angle_iron", "Angle Iron"
     SHEET = "sheet", "Sheet Metal"
+    # Boards & Panels
+    BOARD = "board", "Boards & Panels"
+    ALUMINUM = "aluminum", "Aluminum Profiles"
+    # Consumables (split)
+    ELECTRODE = "electrode", "Electrodes"
+    DISC = "disc", "Discs (Cutting/Grinding)"
+    SANDING = "sanding", "Sanding Discs"
+    # Finishes
     PAINT = "paint", "Paint & Finishes"
-    CONSUMABLE = "consumable", "Consumables (Electrodes, Discs)"
-    HARDWARE = "hardware", "Hardware (Hinges, Locks, Bolts)"
+    # Hardware
+    HARDWARE = "hardware", "Hardware"
+    # Other
     OTHER = "other", "Other"
 
 
 class WeldingMaterialUnit(models.TextChoices):
     """Unit types for welding materials"""
     LENGTH_6M = "length_6m", "6m Length"
+    LENGTH_5_8M = "length_5_8m", "5.8m Length"
     METRE = "metre", "Metre"
     LITRE = "litre", "Litre"
     PIECE = "piece", "Piece"
     KG = "kg", "Kilogram"
     PACKET = "packet", "Packet"
     SHEET = "sheet", "Sheet (2.4x1.2m)"
+    BOARD = "board", "Board (8ft x 4ft)"
 
 
 class WeldingMaterial(models.Model):
@@ -474,6 +486,144 @@ class WeldingQuote(models.Model):
         if "NEW" in self.quote_number:
             self.quote_number = f"WQ-{timezone.now().strftime('%Y%m%d')}-{self.pk}"
             super().save(update_fields=["quote_number"])
+    
+    @property
+    def computed_total(self) -> Decimal:
+        """Compute total from line items + costs dynamically."""
+        materials_total = sum(
+            (item.line_total for item in self.line_items.all()),
+            Decimal("0")
+        )
+        labour_total = self.costs.filter(cost_type="labour").aggregate(
+            models.Sum("amount")
+        )["amount__sum"] or Decimal("0")
+        transport_total = self.costs.filter(cost_type="transport").aggregate(
+            models.Sum("amount")
+        )["amount__sum"] or Decimal("0")
+        other_total = self.costs.filter(cost_type="other").aggregate(
+            models.Sum("amount")
+        )["amount__sum"] or Decimal("0")
+        profit_total = self.costs.filter(cost_type="profit").aggregate(
+            models.Sum("amount")
+        )["amount__sum"] or Decimal("0")
+        
+        return materials_total + labour_total + transport_total + other_total + profit_total
+
+
+class WeldingQuoteLineItem(models.Model):
+    """
+    Individual line item in a quote - manually added by manager.
+    Replaces auto-generated BOM approach with manager-driven selection.
+    """
+    quote = models.ForeignKey(
+        WeldingQuote,
+        on_delete=models.CASCADE,
+        related_name="line_items",
+    )
+    material = models.ForeignKey(
+        WeldingMaterial,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        help_text="Reference to material (optional, snapshots name/unit)",
+    )
+    
+    # Snapshot fields (so quote is immutable even if material changes)
+    material_name = models.CharField(max_length=150)
+    material_unit = models.CharField(max_length=20, default="piece")
+    
+    # Quantity and pricing (manager enters these manually)
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    unit_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Unit price in MWK - left blank until manager enters",
+    )
+    
+    # Notes
+    notes = models.CharField(max_length=255, blank=True, default="")
+    
+    # Position for ordering
+    position = models.PositiveIntegerField(default=0)
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["position", "created_at"]
+        indexes = [
+            models.Index(fields=["quote", "position"]),
+        ]
+        verbose_name = "Welding Quote Line Item"
+        verbose_name_plural = "Welding Quote Line Items"
+    
+    def __str__(self):
+        return f"{self.material_name} x {self.quantity} @ {self.unit_price or 'TBD'}"
+    
+    @property
+    def line_total(self) -> Decimal:
+        """Calculate line total."""
+        if self.unit_price is None:
+            return Decimal("0")
+        return self.quantity * self.unit_price
+
+
+class WeldingQuoteCost(models.Model):
+    """
+    Additional costs for a quote (labour, transport, other, profit).
+    Manager adds these manually.
+    """
+    
+    class CostType(models.TextChoices):
+        LABOUR = "labour", "Labour"
+        TRANSPORT = "transport", "Transport"
+        OTHER = "other", "Other"
+        PROFIT = "profit", "Profit/Markup"
+    
+    quote = models.ForeignKey(
+        WeldingQuote,
+        on_delete=models.CASCADE,
+        related_name="costs",
+    )
+    cost_type = models.CharField(
+        max_length=20,
+        choices=CostType.choices,
+        db_index=True,
+    )
+    description = models.CharField(max_length=150, blank=True, default="")
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    notes = models.CharField(max_length=255, blank=True, default="")
+    
+    # Position for ordering
+    position = models.PositiveIntegerField(default=0)
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["cost_type", "position", "created_at"]
+        indexes = [
+            models.Index(fields=["quote", "cost_type"]),
+        ]
+        verbose_name = "Welding Quote Cost"
+        verbose_name_plural = "Welding Quote Costs"
+    
+    def __str__(self):
+        desc = f" - {self.description}" if self.description else ""
+        return f"{self.get_cost_type_display()}{desc}: MWK {self.amount:,.0f}"
 
 
 class WeldingJobStatus(models.TextChoices):

@@ -92,49 +92,143 @@ class QuoteCostResult:
 # ==============================================================================
 
 DEFAULT_MATERIALS: List[Dict[str, Any]] = [
-    # Square Tubes (6m lengths)
-    {"code": "TUBE_25x25", "name": "Square Tube 25x25mm (6m)", "category": "tube", "unit": "length_6m", "default_price": Decimal("15000")},
-    {"code": "TUBE_40x40", "name": "Square Tube 40x40mm (6m)", "category": "tube", "unit": "length_6m", "default_price": Decimal("28000")},
-    {"code": "TUBE_50x50", "name": "Square Tube 50x50mm (6m)", "category": "tube", "unit": "length_6m", "default_price": Decimal("38000")},
-    {"code": "TUBE_ROUND_25", "name": "Round Tube 25mm (6m)", "category": "tube", "unit": "length_6m", "default_price": Decimal("12000")},
+    # ===========================================================================
+    # SQUARE TUBES (5.8m standard in Malawi)
+    # ===========================================================================
+    {"code": "TUBE_20x20", "name": "Square Tube 20x20mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("12000")},
+    {"code": "TUBE_25x25", "name": "Square Tube 25x25mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("15000")},
+    {"code": "TUBE_30x30", "name": "Square Tube 30x30mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("22000")},
+    {"code": "TUBE_40x40", "name": "Square Tube 40x40mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("28000")},
+    {"code": "TUBE_50x50", "name": "Square Tube 50x50mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("38000")},
+    {"code": "TUBE_60x60", "name": "Square Tube 60x60mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("48000")},
+    {"code": "TUBE_75x75", "name": "Square Tube 75x75mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("65000")},
     
-    # Flat Bar
+    # ===========================================================================
+    # ROUND TUBES
+    # ===========================================================================
+    {"code": "TUBE_ROUND_20", "name": "Round Tube 20mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("10000")},
+    {"code": "TUBE_ROUND_25", "name": "Round Tube 25mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("12000")},
+    {"code": "TUBE_ROUND_32", "name": "Round Tube 32mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("16000")},
+    {"code": "TUBE_ROUND_38", "name": "Round Tube 38mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("20000")},
+    {"code": "TUBE_ROUND_50", "name": "Round Tube 50mm (5.8m)", "category": "tube", "unit": "length_5_8m", "default_price": Decimal("28000")},
+    
+    # ===========================================================================
+    # FLAT BAR
+    # ===========================================================================
+    {"code": "FLAT_20x3", "name": "Flat Bar 20x3mm (6m)", "category": "flat_bar", "unit": "length_6m", "default_price": Decimal("6000")},
     {"code": "FLAT_25x3", "name": "Flat Bar 25x3mm (6m)", "category": "flat_bar", "unit": "length_6m", "default_price": Decimal("8000")},
+    {"code": "FLAT_30x3", "name": "Flat Bar 30x3mm (6m)", "category": "flat_bar", "unit": "length_6m", "default_price": Decimal("10000")},
     {"code": "FLAT_40x3", "name": "Flat Bar 40x3mm (6m)", "category": "flat_bar", "unit": "length_6m", "default_price": Decimal("12000")},
+    {"code": "FLAT_50x5", "name": "Flat Bar 50x5mm (6m)", "category": "flat_bar", "unit": "length_6m", "default_price": Decimal("18000")},
     
-    # Angle Iron
+    # ===========================================================================
+    # ANGLE IRON
+    # ===========================================================================
     {"code": "ANGLE_25x25", "name": "Angle Iron 25x25mm (6m)", "category": "angle_iron", "unit": "length_6m", "default_price": Decimal("10000")},
+    {"code": "ANGLE_30x30", "name": "Angle Iron 30x30mm (6m)", "category": "angle_iron", "unit": "length_6m", "default_price": Decimal("14000")},
     {"code": "ANGLE_40x40", "name": "Angle Iron 40x40mm (6m)", "category": "angle_iron", "unit": "length_6m", "default_price": Decimal("18000")},
+    {"code": "ANGLE_50x50", "name": "Angle Iron 50x50mm (6m)", "category": "angle_iron", "unit": "length_6m", "default_price": Decimal("25000")},
+    {"code": "ANGLE_60x60", "name": "Angle Iron 60x60mm (6m)", "category": "angle_iron", "unit": "length_6m", "default_price": Decimal("35000")},
     
-    # Sheet Metal
+    # ===========================================================================
+    # SHEET METAL
+    # ===========================================================================
+    {"code": "SHEET_0.6", "name": "Sheet Metal 0.6mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("28000")},
     {"code": "SHEET_0.8", "name": "Sheet Metal 0.8mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("35000")},
     {"code": "SHEET_1.0", "name": "Sheet Metal 1.0mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("45000")},
     {"code": "SHEET_1.2", "name": "Sheet Metal 1.2mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("55000")},
+    {"code": "SHEET_1.5", "name": "Sheet Metal 1.5mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("68000")},
+    {"code": "SHEET_2.0", "name": "Sheet Metal 2.0mm (2.4x1.2m)", "category": "sheet", "unit": "sheet", "default_price": Decimal("85000")},
     
-    # Paint & Finishes
+    # ===========================================================================
+    # BOARDS & PANELS (MDF, Laminated) - NEW
+    # ===========================================================================
+    {"code": "BOARD_MDF_WHITE", "name": "MDF Board White (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("45000")},
+    {"code": "BOARD_MDF_BLACK", "name": "MDF Board Black (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("48000")},
+    {"code": "BOARD_MDF_NAVY", "name": "MDF Board Navy (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("48000")},
+    {"code": "BOARD_MDF_VINTAGE", "name": "MDF Board Vintage/Wood (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("52000")},
+    {"code": "BOARD_MDF_GREY", "name": "MDF Board Grey (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("48000")},
+    {"code": "BOARD_MDF_PLAIN", "name": "MDF Board Plain (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("35000")},
+    {"code": "BOARD_PLY_12MM", "name": "Plywood 12mm (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("42000")},
+    {"code": "BOARD_PLY_18MM", "name": "Plywood 18mm (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("55000")},
+    
+    # ===========================================================================
+    # ALUMINUM PROFILES/FRAMES - NEW
+    # ===========================================================================
+    {"code": "ALU_WINDOW_FRAME", "name": "Aluminum Window Frame Profile (6m)", "category": "aluminum", "unit": "length_6m", "default_price": Decimal("25000")},
+    {"code": "ALU_SLIDING_TRACK", "name": "Aluminum Sliding Track (6m)", "category": "aluminum", "unit": "length_6m", "default_price": Decimal("18000")},
+    {"code": "ALU_ANGLE_25x25", "name": "Aluminum Angle 25x25mm (6m)", "category": "aluminum", "unit": "length_6m", "default_price": Decimal("15000")},
+    {"code": "ALU_CHANNEL_U", "name": "Aluminum U-Channel (6m)", "category": "aluminum", "unit": "length_6m", "default_price": Decimal("22000")},
+    {"code": "ALU_FLAT_25x3", "name": "Aluminum Flat Bar 25x3mm (6m)", "category": "aluminum", "unit": "length_6m", "default_price": Decimal("12000")},
+    
+    # ===========================================================================
+    # ELECTRODES (separated from consumables)
+    # ===========================================================================
+    {"code": "ELECTRODE_2.5_PKT", "name": "Electrodes 2.5mm (packet)", "category": "electrode", "unit": "packet", "default_price": Decimal("3500")},
+    {"code": "ELECTRODE_3.2_PKT", "name": "Electrodes 3.2mm (packet)", "category": "electrode", "unit": "packet", "default_price": Decimal("4000")},
+    {"code": "ELECTRODE_4.0_PKT", "name": "Electrodes 4.0mm (packet)", "category": "electrode", "unit": "packet", "default_price": Decimal("4500")},
+    {"code": "WELDING_WIRE_0.8", "name": "MIG Welding Wire 0.8mm (5kg)", "category": "electrode", "unit": "piece", "default_price": Decimal("18000")},
+    {"code": "WELDING_WIRE_1.0", "name": "MIG Welding Wire 1.0mm (5kg)", "category": "electrode", "unit": "piece", "default_price": Decimal("20000")},
+    
+    # ===========================================================================
+    # DISCS - CUTTING/GRINDING (separated)
+    # ===========================================================================
+    {"code": "DISC_CUT_4IN", "name": "Cutting Disc 4in (100mm)", "category": "disc", "unit": "piece", "default_price": Decimal("1500")},
+    {"code": "DISC_CUT_7IN", "name": "Cutting Disc 7in (180mm)", "category": "disc", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "DISC_CUT_9IN", "name": "Cutting Disc 9in (230mm)", "category": "disc", "unit": "piece", "default_price": Decimal("4500")},
+    {"code": "DISC_GRIND_4IN", "name": "Grinding Disc 4in", "category": "disc", "unit": "piece", "default_price": Decimal("2000")},
+    {"code": "DISC_GRIND_7IN", "name": "Grinding Disc 7in", "category": "disc", "unit": "piece", "default_price": Decimal("4000")},
+    {"code": "DISC_FLAP_4IN", "name": "Flap Disc 4in", "category": "disc", "unit": "piece", "default_price": Decimal("3000")},
+    {"code": "DISC_FLAP_7IN", "name": "Flap Disc 7in", "category": "disc", "unit": "piece", "default_price": Decimal("5500")},
+    
+    # ===========================================================================
+    # SANDING DISCS - NEW (separated)
+    # ===========================================================================
+    {"code": "DISC_SAND_4IN_40", "name": "Sanding Disc 4in (40 grit)", "category": "sanding", "unit": "piece", "default_price": Decimal("800")},
+    {"code": "DISC_SAND_4IN_80", "name": "Sanding Disc 4in (80 grit)", "category": "sanding", "unit": "piece", "default_price": Decimal("800")},
+    {"code": "DISC_SAND_4IN_120", "name": "Sanding Disc 4in (120 grit)", "category": "sanding", "unit": "piece", "default_price": Decimal("800")},
+    {"code": "DISC_SAND_7IN_40", "name": "Sanding Disc 7in (40 grit)", "category": "sanding", "unit": "piece", "default_price": Decimal("1500")},
+    {"code": "DISC_SAND_7IN_80", "name": "Sanding Disc 7in (80 grit)", "category": "sanding", "unit": "piece", "default_price": Decimal("1500")},
+    {"code": "SANDPAPER_SHEET", "name": "Sandpaper Sheet (Assorted)", "category": "sanding", "unit": "piece", "default_price": Decimal("300")},
+    
+    # ===========================================================================
+    # PAINT & FINISHES
+    # ===========================================================================
     {"code": "PAINT_GLOSS_5L", "name": "Gloss Paint 5L", "category": "paint", "unit": "piece", "default_price": Decimal("18000")},
     {"code": "PAINT_GLOSS_1L", "name": "Gloss Paint 1L", "category": "paint", "unit": "piece", "default_price": Decimal("5000")},
-    {"code": "RED_OXIDE_5L", "name": "Red Oxide 5L", "category": "paint", "unit": "piece", "default_price": Decimal("12000")},
-    {"code": "RED_OXIDE_1L", "name": "Red Oxide 1L", "category": "paint", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "PAINT_LITRE", "name": "Paint (per litre)", "category": "paint", "unit": "litre", "default_price": Decimal("5500")},
+    {"code": "RED_OXIDE_5L", "name": "Red Oxide Primer 5L", "category": "paint", "unit": "piece", "default_price": Decimal("12000")},
+    {"code": "RED_OXIDE_1L", "name": "Red Oxide Primer 1L", "category": "paint", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "PRIMER_5L", "name": "Primer 5L", "category": "paint", "unit": "piece", "default_price": Decimal("14000")},
+    {"code": "PRIMER_1L", "name": "Primer 1L", "category": "paint", "unit": "piece", "default_price": Decimal("4000")},
+    {"code": "VARNISH_5L", "name": "Varnish 5L", "category": "paint", "unit": "piece", "default_price": Decimal("22000")},
+    {"code": "VARNISH_1L", "name": "Varnish 1L", "category": "paint", "unit": "piece", "default_price": Decimal("6000")},
     {"code": "THINNER_5L", "name": "Paint Thinner 5L", "category": "paint", "unit": "piece", "default_price": Decimal("8000")},
     {"code": "THINNER_1L", "name": "Paint Thinner 1L", "category": "paint", "unit": "piece", "default_price": Decimal("2500")},
+    {"code": "LACQUER_SPRAY", "name": "Lacquer Spray Can", "category": "paint", "unit": "piece", "default_price": Decimal("3500")},
     
-    # Consumables
-    {"code": "ELECTRODE_2.5_PKT", "name": "Electrodes 2.5mm (packet)", "category": "consumable", "unit": "packet", "default_price": Decimal("3500")},
-    {"code": "ELECTRODE_3.2_PKT", "name": "Electrodes 3.2mm (packet)", "category": "consumable", "unit": "packet", "default_price": Decimal("4000")},
-    {"code": "DISC_CUT_4IN", "name": "Cutting Disc 4in", "category": "consumable", "unit": "piece", "default_price": Decimal("1500")},
-    {"code": "DISC_GRIND_4IN", "name": "Grinding Disc 4in", "category": "consumable", "unit": "piece", "default_price": Decimal("2000")},
-    {"code": "DISC_FLAP_4IN", "name": "Flap Disc 4in", "category": "consumable", "unit": "piece", "default_price": Decimal("3000")},
-    
-    # Hardware
+    # ===========================================================================
+    # HARDWARE
+    # ===========================================================================
     {"code": "HINGE_3IN", "name": "Hinge 3in (pair)", "category": "hardware", "unit": "piece", "default_price": Decimal("2500")},
     {"code": "HINGE_4IN", "name": "Hinge 4in (pair)", "category": "hardware", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "HINGE_5IN", "name": "Hinge 5in (pair)", "category": "hardware", "unit": "piece", "default_price": Decimal("4500")},
     {"code": "LOCK_PADLOCK", "name": "Padlock Hasp & Staple", "category": "hardware", "unit": "piece", "default_price": Decimal("4000")},
     {"code": "LOCK_MORTISE", "name": "Mortise Lock Set", "category": "hardware", "unit": "piece", "default_price": Decimal("15000")},
+    {"code": "LOCK_RIM", "name": "Rim Lock Set", "category": "hardware", "unit": "piece", "default_price": Decimal("12000")},
     {"code": "HANDLE_DOOR", "name": "Door Handle", "category": "hardware", "unit": "piece", "default_price": Decimal("8000")},
+    {"code": "HANDLE_WINDOW", "name": "Window Handle", "category": "hardware", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "BOLT_M6_PKT", "name": "Bolts M6 (packet of 10)", "category": "hardware", "unit": "packet", "default_price": Decimal("1200")},
     {"code": "BOLT_M8_PKT", "name": "Bolts M8 (packet of 10)", "category": "hardware", "unit": "packet", "default_price": Decimal("1500")},
     {"code": "BOLT_M10_PKT", "name": "Bolts M10 (packet of 10)", "category": "hardware", "unit": "packet", "default_price": Decimal("2000")},
-    {"code": "CASTER_WHEEL", "name": "Caster Wheel (piece)", "category": "hardware", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "BOLT_M12_PKT", "name": "Bolts M12 (packet of 10)", "category": "hardware", "unit": "packet", "default_price": Decimal("2500")},
+    {"code": "NUT_M8_PKT", "name": "Nuts M8 (packet of 20)", "category": "hardware", "unit": "packet", "default_price": Decimal("800")},
+    {"code": "WASHER_PKT", "name": "Washers (packet of 50)", "category": "hardware", "unit": "packet", "default_price": Decimal("600")},
+    {"code": "CASTER_WHEEL", "name": "Caster Wheel", "category": "hardware", "unit": "piece", "default_price": Decimal("3500")},
+    {"code": "CASTER_WHEEL_HD", "name": "Caster Wheel Heavy Duty", "category": "hardware", "unit": "piece", "default_price": Decimal("6000")},
+    {"code": "GATE_WHEEL", "name": "Gate Wheel (V-groove)", "category": "hardware", "unit": "piece", "default_price": Decimal("8000")},
+    {"code": "DOOR_CLOSER", "name": "Door Closer", "category": "hardware", "unit": "piece", "default_price": Decimal("18000")},
+    {"code": "TOWER_BOLT", "name": "Tower Bolt 6in", "category": "hardware", "unit": "piece", "default_price": Decimal("2000")},
 ]
 
 
@@ -143,6 +237,9 @@ DEFAULT_MATERIALS: List[Dict[str, Any]] = [
 # ==============================================================================
 
 DEFAULT_TEMPLATES: List[Dict[str, Any]] = [
+    # ===========================================================================
+    # BED FRAMES
+    # ===========================================================================
     {
         "code": "BED_3x4",
         "name": "Bed Frame 3ft x 4ft (Single)",
@@ -186,21 +283,129 @@ DEFAULT_TEMPLATES: List[Dict[str, Any]] = [
         "default_labour_hours": Decimal("5"),
     },
     {
-        "code": "WINDOW_SLIDING",
+        "code": "BED_6x6",
+        "name": "Bed Frame 6ft x 6ft (King)",
+        "params_schema": {"width_ft": 6, "length_ft": 6},
+        "base_bom": {
+            "TUBE_50x50": {"qty_formula": "frame_perimeter", "base_qty": 4},
+            "TUBE_40x40": {"qty_formula": "supports", "base_qty": 2},
+            "FLAT_25x3": {"qty_formula": "slats", "base_qty": 2},
+            "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 0.7},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 0.7},
+            "ELECTRODE_3.2_PKT": {"qty_formula": "fixed", "base_qty": 1.5},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 3},
+        },
+        "default_labour_hours": Decimal("6"),
+    },
+    # ===========================================================================
+    # TV STANDS
+    # ===========================================================================
+    {
+        "code": "TV_STAND_BASIC",
+        "name": "TV Stand (Basic 1.0m)",
+        "params_schema": {"width_m": 1.0, "height_m": 0.45, "depth_m": 0.35},
+        "base_bom": {
+            "TUBE_20x20": {"qty_formula": "frame", "base_qty": 1.5},
+            "BOARD_MDF_PLAIN": {"qty_formula": "shelves", "base_qty": 0.25},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.3},
+            "CASTER_WHEEL": {"qty_formula": "fixed", "base_qty": 4},
+        },
+        "default_labour_hours": Decimal("2"),
+    },
+    {
+        "code": "TV_STAND_PREMIUM",
+        "name": "TV Stand (Premium 1.5m)",
+        "params_schema": {"width_m": 1.5, "height_m": 0.55, "depth_m": 0.4},
+        "base_bom": {
+            "TUBE_25x25": {"qty_formula": "frame", "base_qty": 2.5},
+            "BOARD_MDF_BLACK": {"qty_formula": "shelves", "base_qty": 0.5},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.5},
+            "CASTER_WHEEL": {"qty_formula": "fixed", "base_qty": 4},
+        },
+        "default_labour_hours": Decimal("3.5"),
+    },
+    {
+        "code": "TV_STAND_WALL",
+        "name": "TV Stand Wall Mount Console (1.8m)",
+        "params_schema": {"width_m": 1.8, "height_m": 0.35, "depth_m": 0.3},
+        "base_bom": {
+            "TUBE_25x25": {"qty_formula": "frame", "base_qty": 2},
+            "BOARD_MDF_WHITE": {"qty_formula": "shelves", "base_qty": 0.5},
+            "FLAT_25x3": {"qty_formula": "brackets", "base_qty": 0.5},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.3},
+        },
+        "default_labour_hours": Decimal("3"),
+    },
+    # ===========================================================================
+    # WINDOWS
+    # ===========================================================================
+    {
+        "code": "WINDOW_0.9x1.0",
+        "name": "Window Frame (0.9m x 1.0m)",
+        "params_schema": {"width_m": 0.9, "height_m": 1.0},
+        "base_bom": {
+            "TUBE_25x25": {"qty_formula": "frame_perimeter", "base_qty": 1},
+            "TUBE_20x20": {"qty_formula": "dividers", "base_qty": 0.5},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.3},
+        },
+        "default_labour_hours": Decimal("2"),
+    },
+    {
+        "code": "WINDOW_1.2x1.2",
         "name": "Sliding Window Frame (1.2m x 1.2m)",
         "params_schema": {"width_m": 1.2, "height_m": 1.2},
         "base_bom": {
             "TUBE_25x25": {"qty_formula": "frame_perimeter", "base_qty": 1.5},
             "FLAT_25x3": {"qty_formula": "tracks", "base_qty": 0.5},
+            "HANDLE_WINDOW": {"qty_formula": "fixed", "base_qty": 2},
             "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
             "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.5},
             "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.3},
-            "CASTER_WHEEL": {"qty_formula": "fixed", "base_qty": 4},
         },
         "default_labour_hours": Decimal("3"),
     },
     {
-        "code": "DOOR_STANDARD",
+        "code": "WINDOW_1.5x1.2",
+        "name": "Sliding Window Frame (1.5m x 1.2m)",
+        "params_schema": {"width_m": 1.5, "height_m": 1.2},
+        "base_bom": {
+            "TUBE_25x25": {"qty_formula": "frame_perimeter", "base_qty": 2},
+            "FLAT_25x3": {"qty_formula": "tracks", "base_qty": 0.7},
+            "HANDLE_WINDOW": {"qty_formula": "fixed", "base_qty": 2},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.5},
+        },
+        "default_labour_hours": Decimal("3.5"),
+    },
+    {
+        "code": "WINDOW_1.8x1.5",
+        "name": "Large Sliding Window (1.8m x 1.5m)",
+        "params_schema": {"width_m": 1.8, "height_m": 1.5},
+        "base_bom": {
+            "TUBE_30x30": {"qty_formula": "frame_perimeter", "base_qty": 2.5},
+            "TUBE_25x25": {"qty_formula": "panels", "base_qty": 1},
+            "FLAT_25x3": {"qty_formula": "tracks", "base_qty": 1},
+            "HANDLE_WINDOW": {"qty_formula": "fixed", "base_qty": 2},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.7},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.7},
+        },
+        "default_labour_hours": Decimal("4.5"),
+    },
+    # ===========================================================================
+    # DOORS
+    # ===========================================================================
+    {
+        "code": "DOOR_0.9x2.1",
         "name": "Security Door (0.9m x 2.1m)",
         "params_schema": {"width_m": 0.9, "height_m": 2.1},
         "base_bom": {
@@ -218,21 +423,66 @@ DEFAULT_TEMPLATES: List[Dict[str, Any]] = [
         "default_labour_hours": Decimal("6"),
     },
     {
-        "code": "TV_STAND",
-        "name": "TV Stand (Basic)",
-        "params_schema": {"width_m": 1.2, "height_m": 0.5, "depth_m": 0.4},
+        "code": "DOOR_1.0x2.1",
+        "name": "Security Door (1.0m x 2.1m)",
+        "params_schema": {"width_m": 1.0, "height_m": 2.1},
         "base_bom": {
-            "TUBE_25x25": {"qty_formula": "frame", "base_qty": 2},
-            "SHEET_0.8": {"qty_formula": "shelves", "base_qty": 0.3},
-            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
-            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.5},
-            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.3},
-            "CASTER_WHEEL": {"qty_formula": "fixed", "base_qty": 4},
+            "TUBE_40x40": {"qty_formula": "frame", "base_qty": 2.5},
+            "TUBE_25x25": {"qty_formula": "infill", "base_qty": 2.5},
+            "SHEET_1.0": {"qty_formula": "panel", "base_qty": 0.6},
+            "HINGE_5IN": {"qty_formula": "fixed", "base_qty": 3},
+            "LOCK_MORTISE": {"qty_formula": "fixed", "base_qty": 1},
+            "HANDLE_DOOR": {"qty_formula": "fixed", "base_qty": 1},
+            "TOWER_BOLT": {"qty_formula": "fixed", "base_qty": 2},
+            "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 0.6},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 0.6},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 1.2},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 3},
         },
-        "default_labour_hours": Decimal("2.5"),
+        "default_labour_hours": Decimal("7"),
     },
     {
-        "code": "GATE_SLIDING",
+        "code": "DOOR_DOUBLE",
+        "name": "Double Security Door (1.8m x 2.1m)",
+        "params_schema": {"width_m": 1.8, "height_m": 2.1},
+        "base_bom": {
+            "TUBE_50x50": {"qty_formula": "frame", "base_qty": 3},
+            "TUBE_40x40": {"qty_formula": "panels", "base_qty": 3},
+            "TUBE_25x25": {"qty_formula": "infill", "base_qty": 4},
+            "SHEET_1.2": {"qty_formula": "panel", "base_qty": 1},
+            "HINGE_5IN": {"qty_formula": "fixed", "base_qty": 6},
+            "LOCK_MORTISE": {"qty_formula": "fixed", "base_qty": 2},
+            "HANDLE_DOOR": {"qty_formula": "fixed", "base_qty": 2},
+            "TOWER_BOLT": {"qty_formula": "fixed", "base_qty": 4},
+            "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 1},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 1},
+            "ELECTRODE_3.2_PKT": {"qty_formula": "fixed", "base_qty": 2},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 5},
+        },
+        "default_labour_hours": Decimal("12"),
+    },
+    # ===========================================================================
+    # GATES
+    # ===========================================================================
+    {
+        "code": "GATE_SWING_1.2",
+        "name": "Swing Gate (1.2m x 1.5m)",
+        "params_schema": {"width_m": 1.2, "height_m": 1.5},
+        "base_bom": {
+            "TUBE_40x40": {"qty_formula": "frame", "base_qty": 2},
+            "TUBE_25x25": {"qty_formula": "infill", "base_qty": 2},
+            "FLAT_25x3": {"qty_formula": "decorative", "base_qty": 0.5},
+            "HINGE_5IN": {"qty_formula": "fixed", "base_qty": 3},
+            "LOCK_PADLOCK": {"qty_formula": "fixed", "base_qty": 1},
+            "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 1},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 2},
+        },
+        "default_labour_hours": Decimal("5"),
+    },
+    {
+        "code": "GATE_SLIDING_3x1.8",
         "name": "Sliding Gate (3m x 1.8m)",
         "params_schema": {"width_m": 3, "height_m": 1.8},
         "base_bom": {
@@ -240,13 +490,90 @@ DEFAULT_TEMPLATES: List[Dict[str, Any]] = [
             "TUBE_40x40": {"qty_formula": "infill", "base_qty": 4},
             "TUBE_25x25": {"qty_formula": "decorative", "base_qty": 2},
             "ANGLE_40x40": {"qty_formula": "tracks", "base_qty": 1},
+            "GATE_WHEEL": {"qty_formula": "fixed", "base_qty": 2},
             "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 1},
             "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 1},
             "ELECTRODE_3.2_PKT": {"qty_formula": "fixed", "base_qty": 2},
-            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 3},
-            "CASTER_WHEEL": {"qty_formula": "fixed", "base_qty": 2},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 4},
         },
         "default_labour_hours": Decimal("8"),
+    },
+    {
+        "code": "GATE_SLIDING_4x2",
+        "name": "Sliding Gate (4m x 2m)",
+        "params_schema": {"width_m": 4, "height_m": 2},
+        "base_bom": {
+            "TUBE_60x60": {"qty_formula": "frame", "base_qty": 5},
+            "TUBE_50x50": {"qty_formula": "supports", "base_qty": 2},
+            "TUBE_40x40": {"qty_formula": "infill", "base_qty": 5},
+            "TUBE_25x25": {"qty_formula": "decorative", "base_qty": 3},
+            "ANGLE_50x50": {"qty_formula": "tracks", "base_qty": 1.5},
+            "GATE_WHEEL": {"qty_formula": "fixed", "base_qty": 3},
+            "RED_OXIDE_5L": {"qty_formula": "fixed", "base_qty": 1.5},
+            "PAINT_GLOSS_5L": {"qty_formula": "fixed", "base_qty": 1.5},
+            "ELECTRODE_3.2_PKT": {"qty_formula": "fixed", "base_qty": 3},
+            "DISC_CUT_4IN": {"qty_formula": "fixed", "base_qty": 5},
+        },
+        "default_labour_hours": Decimal("12"),
+    },
+    # ===========================================================================
+    # BURGLAR BARS
+    # ===========================================================================
+    {
+        "code": "BURGLAR_FIXED",
+        "name": "Burglar Bars Fixed (1.2m x 1.2m)",
+        "params_schema": {"width_m": 1.2, "height_m": 1.2},
+        "base_bom": {
+            "TUBE_20x20": {"qty_formula": "bars", "base_qty": 2},
+            "FLAT_25x3": {"qty_formula": "frame", "base_qty": 1},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.5},
+        },
+        "default_labour_hours": Decimal("2"),
+    },
+    {
+        "code": "BURGLAR_EXPANDABLE",
+        "name": "Burglar Gate Expandable (1m x 2m)",
+        "params_schema": {"width_m": 1.0, "height_m": 2.0},
+        "base_bom": {
+            "FLAT_25x3": {"qty_formula": "lattice", "base_qty": 4},
+            "TUBE_25x25": {"qty_formula": "frame", "base_qty": 1.5},
+            "HINGE_4IN": {"qty_formula": "fixed", "base_qty": 2},
+            "LOCK_PADLOCK": {"qty_formula": "fixed", "base_qty": 1},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "PAINT_GLOSS_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 1},
+        },
+        "default_labour_hours": Decimal("4"),
+    },
+    # ===========================================================================
+    # SHELVING & RACKS
+    # ===========================================================================
+    {
+        "code": "SHELF_WALL",
+        "name": "Wall Shelf Bracket Set (0.6m)",
+        "params_schema": {"width_m": 0.6},
+        "base_bom": {
+            "FLAT_25x3": {"qty_formula": "brackets", "base_qty": 0.5},
+            "TUBE_20x20": {"qty_formula": "frame", "base_qty": 0.3},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.2},
+        },
+        "default_labour_hours": Decimal("1"),
+    },
+    {
+        "code": "RACK_STORAGE",
+        "name": "Storage Rack 4-Tier (1.2m x 1.8m)",
+        "params_schema": {"width_m": 1.2, "height_m": 1.8, "depth_m": 0.45},
+        "base_bom": {
+            "ANGLE_40x40": {"qty_formula": "uprights", "base_qty": 3},
+            "ANGLE_25x25": {"qty_formula": "shelves", "base_qty": 2},
+            "BOARD_PLY_12MM": {"qty_formula": "shelves", "base_qty": 0.5},
+            "BOLT_M8_PKT": {"qty_formula": "fixed", "base_qty": 2},
+            "RED_OXIDE_1L": {"qty_formula": "fixed", "base_qty": 0.5},
+            "ELECTRODE_2.5_PKT": {"qty_formula": "fixed", "base_qty": 0.5},
+        },
+        "default_labour_hours": Decimal("3"),
     },
 ]
 
@@ -348,12 +675,14 @@ def estimate_bom(
         category = material["category"]
         if category == "tube":
             qty = base_qty * tube_mult
-            # Track tube length for cut list
+            # Track tube length for cut list (handle both 5.8m and 6m)
             if material["unit"] == "length_6m":
                 total_tube_length_m += qty * Decimal("6")
+            elif material["unit"] == "length_5_8m":
+                total_tube_length_m += qty * Decimal("5.8")
         elif category in ("paint", "finish"):
             qty = base_qty * paint_mult
-        elif category in ("consumable",):
+        elif category in ("consumable", "electrode", "disc", "sanding"):
             qty = base_qty * consumable_mult
         else:
             qty = base_qty

@@ -55,10 +55,11 @@ from django.urls import reverse
 @require_business
 @require_business_kind(BusinessKind.FARM)
 def dashboard(request: HttpRequest) -> HttpResponse:
-    """Farm Manager dashboard with KPIs and filter integration."""
+    """Farm Manager dashboard with KPIs, insights, and filter integration."""
     import json
     import logging
     from django.db import OperationalError
+    from django.db.models import Sum
     
     logger = logging.getLogger(__name__)
     
@@ -107,11 +108,21 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             batch_data = livestock_batch_to_data(batch)
             snapshot = compute_livestock_snapshot(batch_data, events_data, today)
             livestock_snapshots.append(snapshot)
+        
+        # === NEW: Livestock breakdown by type for dashboard ===
+        livestock_by_type = {}
+        for batch in batches:
+            atype = batch.get_animal_type_display()
+            if atype not in livestock_by_type:
+                livestock_by_type[atype] = {"count": 0, "icon": _get_animal_emoji(batch.animal_type)}
+            livestock_by_type[atype]["count"] += batch.count_current
+        
     except OperationalError as e:
         if "no such table" in str(e):
             logger.warning(f"Farm migrations not applied; missing table: {e}")
             batches = FarmLivestockBatch.objects.none()
             livestock_snapshots = []
+            livestock_by_type = {}
             ctx["farm_setup_required"] = True
         else:
             raise
@@ -140,6 +151,24 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             (s.projected_income_mwk for s in active_seasons if s.projected_income_mwk),
             Decimal("0"),
         ) or None
+        
+        # === NEW: Detailed crop breakdown for Farm Snapshot ===
+        crops_breakdown = []
+        for season in active_seasons:
+            weeks_since_planting = max(0, (today - season.start_date).days // 7)
+            crops_breakdown.append({
+                "id": season.id,
+                "name": season.name,
+                "crop_type": season.get_crop_type_display(),
+                "area": float(season.area_value),
+                "area_unit": season.area_unit,
+                "year": season.start_date.year,
+                "weeks_since_planting": weeks_since_planting,
+                "stage": f"Week {weeks_since_planting}",
+                "status": season.get_status_display(),
+                "emoji": _get_crop_emoji(season.crop_type),
+            })
+        
     except OperationalError as e:
         if "no such table" in str(e):
             logger.warning(f"Farm migrations not applied; missing table: {e}")
@@ -147,9 +176,38 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             active_seasons_count = 0
             total_crop_area = Decimal("0")
             projected_crop_income = None
+            crops_breakdown = []
             ctx["farm_setup_required"] = True
         else:
             raise
+    
+    # === NEW: Assets preview for dashboard ===
+    from inventory.models_farm import FarmAsset
+    try:
+        assets = FarmAsset.objects.filter(business=business, is_active=True)
+        assets_preview = list(assets.order_by("-value_mwk", "-created_at")[:6])
+        total_assets_value = assets.aggregate(total=Sum("value_mwk"))["total"] or Decimal("0")
+        assets_count = assets.count()
+    except OperationalError:
+        assets_preview = []
+        total_assets_value = Decimal("0")
+        assets_count = 0
+    
+    # === NEW: AI Insights using farm insights engine ===
+    from inventory.services.farm_insights import generate_all_insights
+    try:
+        ai_insights = generate_all_insights(
+            business=business,
+            seasons=list(active_seasons),
+            batches=list(batches),
+            today=today,
+            limit=10,
+        )
+        # Convert to dicts for template
+        ai_insights_data = [insight.to_dict() for insight in ai_insights]
+    except Exception as e:
+        logger.warning(f"Failed to generate AI insights: {e}")
+        ai_insights_data = []
     
     # === SSOT: Get complete dashboard snapshot ===
     snapshot = get_farm_dashboard_snapshot(
@@ -197,9 +255,19 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "livestock_snapshots": livestock_snapshots,
         "total_livestock_count": snapshot.total_livestock_count,
         "total_livestock_value": snapshot.total_livestock_value,
+        "livestock_by_type": livestock_by_type,  # NEW: for dashboard breakdown
         
         # Crops
         "active_seasons": active_seasons,
+        "crops_breakdown": crops_breakdown,  # NEW: detailed crop info
+        
+        # Assets preview (NEW)
+        "assets_preview": assets_preview,
+        "total_assets_value": total_assets_value,
+        "assets_count": assets_count,
+        
+        # AI Insights (NEW)
+        "ai_insights": ai_insights_data,
         
         # Recent activity
         "recent_entries": recent_entries,
@@ -215,6 +283,38 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     })
     
     return render(request, "verticals/farm/dashboard.html", ctx)
+
+
+def _get_animal_emoji(animal_type: str) -> str:
+    """Get emoji for an animal type."""
+    ANIMAL_EMOJIS = {
+        "pigs": "🐖",
+        "cattle": "🐄",
+        "goats": "🐐",
+        "chickens": "🐔",
+        "ducks": "🦆",
+        "rabbits": "🐇",
+        "sheep": "🐑",
+        "fish": "🐟",
+    }
+    return ANIMAL_EMOJIS.get(animal_type, "🐾")
+
+
+def _get_crop_emoji(crop_type: str) -> str:
+    """Get emoji for a crop type."""
+    CROP_EMOJIS = {
+        "maize": "🌽",
+        "soya": "🫘",
+        "groundnuts": "🥜",
+        "tobacco": "🍂",
+        "cotton": "🧶",
+        "rice": "🍚",
+        "beans": "🫘",
+        "cassava": "🥔",
+        "sweet_potato": "🍠",
+        "vegetables": "🥬",
+    }
+    return CROP_EMOJIS.get(crop_type, "🌱")
 
 
 # ==============================================================================
@@ -459,11 +559,15 @@ def livestock_batch_create(request: HttpRequest) -> HttpResponse:
 @require_business_kind(BusinessKind.FARM)
 @require_http_methods(["GET", "POST"])
 def livestock_add_event(request: HttpRequest) -> HttpResponse:
-    """Add an event to a livestock batch."""
+    """Add an event to a livestock batch with smart recommendations."""
     ctx = base.base_context(request)
     business = ctx.get("business")
     
     batches = FarmLivestockBatch.objects.filter(business=business, is_active=True)
+    
+    # Pre-select batch if specified in URL
+    preselect_batch_id = request.GET.get("batch_id")
+    preselect_type = request.GET.get("type", "")
     
     if request.method == "POST":
         try:
@@ -495,11 +599,32 @@ def livestock_add_event(request: HttpRequest) -> HttpResponse:
         except Exception as e:
             messages.error(request, f"Error recording event: {e}")
     
+    # === Smart Entry: Get recommended actions for selected batch ===
+    from inventory.services.farm_insights import (
+        get_recommended_actions_for_season,
+        LIVESTOCK_ENTRY_TYPES,
+    )
+    
+    recommended_actions = []
+    if preselect_batch_id:
+        try:
+            selected_batch = FarmLivestockBatch.objects.get(id=preselect_batch_id, business=business)
+            today = timezone.now().date()
+            actions = get_recommended_actions_for_season(selected_batch, today, limit=4)
+            recommended_actions = [action.to_dict() for action in actions]
+        except FarmLivestockBatch.DoesNotExist:
+            pass
+    
     from inventory.models_farm import FarmLivestockEventType
     ctx.update({
         "active_tab": "livestock",
         "batches": batches,
         "event_types": FarmLivestockEventType.choices,
+        "entry_types": LIVESTOCK_ENTRY_TYPES,
+        "recommended_actions": recommended_actions,
+        "preselect_batch_id": preselect_batch_id,
+        "preselect_type": preselect_type,
+        "season_type": "livestock",
     })
     
     return render(request, "verticals/farm/livestock_add_event.html", ctx)
@@ -621,7 +746,7 @@ def crop_season_create(request: HttpRequest) -> HttpResponse:
 @require_business
 @require_business_kind(BusinessKind.FARM)
 def crop_season_detail(request: HttpRequest, season_id: int) -> HttpResponse:
-    """View crop season details with projections vs actuals."""
+    """View crop season details with projections vs actuals and smart recommendations."""
     ctx = base.base_context(request)
     business = ctx.get("business")
     
@@ -642,6 +767,38 @@ def crop_season_detail(request: HttpRequest, season_id: int) -> HttpResponse:
         ),
     )
     
+    # === Smart Season Entry: Get recommended actions ===
+    from inventory.services.farm_insights import (
+        get_recommended_actions_for_season,
+        get_entry_types_for_season,
+        calculate_fertilizer_estimate,
+        calculate_yield_estimate,
+        CROP_ENTRY_TYPES,
+    )
+    
+    today = timezone.now().date()
+    recommended_actions = get_recommended_actions_for_season(season, today, limit=4)
+    recommended_actions_data = [action.to_dict() for action in recommended_actions]
+    
+    # Get entry types for crop seasons
+    entry_types = CROP_ENTRY_TYPES
+    
+    # Calculate weeks since planting
+    weeks_since_planting = max(0, (today - season.start_date).days // 7)
+    
+    # Get fertilizer estimates
+    fertilizer_estimate = calculate_fertilizer_estimate(
+        season.crop_type,
+        float(season.area_value),
+        weeks_since_planting,
+    )
+    
+    # Get yield estimates
+    yield_estimate = calculate_yield_estimate(
+        season.crop_type,
+        float(season.area_value),
+    )
+    
     ctx.update({
         "active_tab": "crops",
         "season": season,
@@ -649,6 +806,14 @@ def crop_season_detail(request: HttpRequest, season_id: int) -> HttpResponse:
         "actual_income": totals["total_income"],
         "actual_expenses": totals["total_expenses"],
         "actual_profit": totals["total_income"] - totals["total_expenses"],
+        
+        # Smart Entry context (NEW)
+        "recommended_actions": recommended_actions_data,
+        "entry_types": entry_types,
+        "weeks_since_planting": weeks_since_planting,
+        "fertilizer_estimate": fertilizer_estimate,
+        "yield_estimate": yield_estimate,
+        "season_type": "crop",
     })
     
     return render(request, "verticals/farm/crop_season_detail.html", ctx)

@@ -190,20 +190,31 @@ urlpatterns = [
     
     # ==================== WELDING VERTICAL ====================
     path("welding/dashboard/", welding.dashboard, name="welding_dashboard"),
+    path("welding/sales/", welding.sales, name="welding_sales"),
     path("welding/materials/", welding.materials_list, name="welding_materials_list"),
     path("welding/materials/<int:material_id>/edit/", welding.material_edit, name="welding_material_edit"),
     path("welding/stock-in/", welding.stock_in, name="welding_stock_in"),
     path("welding/quotes/", welding.quotes_list, name="welding_quotes_list"),
     path("welding/quotes/create/", welding.quote_create, name="welding_quote_create"),
     path("welding/quotes/<int:quote_id>/", welding.quote_detail, name="welding_quote_detail"),
+    path("welding/quotes/<int:quote_id>/pdf/", welding.quote_pdf, name="welding_quote_pdf"),
     path("welding/quotes/<int:quote_id>/accept/", welding.quote_accept, name="welding_quote_accept"),
     path("welding/quotes/<int:quote_id>/invoice/", welding.invoice_from_quote, name="welding_invoice_from_quote"),
+    # New quote builder endpoints (AJAX)
+    path("welding/quotes/<int:quote_id>/add-line-item/", welding.quote_add_line_item, name="welding_quote_add_line_item"),
+    path("welding/quotes/<int:quote_id>/line-item/<int:item_id>/update/", welding.quote_update_line_item, name="welding_quote_update_line_item"),
+    path("welding/quotes/<int:quote_id>/line-item/<int:item_id>/delete/", welding.quote_delete_line_item, name="welding_quote_delete_line_item"),
+    path("welding/quotes/<int:quote_id>/add-cost/", welding.quote_add_cost, name="welding_quote_add_cost"),
+    path("welding/quotes/<int:quote_id>/cost/<int:cost_id>/update/", welding.quote_update_cost, name="welding_quote_update_cost"),
+    path("welding/quotes/<int:quote_id>/cost/<int:cost_id>/delete/", welding.quote_delete_cost, name="welding_quote_delete_cost"),
     path("welding/jobs/", welding.jobs_list, name="welding_jobs_list"),
     path("welding/jobs/<int:job_id>/", welding.job_detail, name="welding_job_detail"),
     path("welding/jobs/<int:job_id>/status/", welding.job_update_status, name="welding_job_update_status"),
     path("welding/invoices/", welding.invoices_list, name="welding_invoices_list"),
     path("welding/invoices/<int:invoice_id>/", welding.invoice_detail, name="welding_invoice_detail"),
     path("welding/reports/", welding.reports, name="welding_reports"),
+    path("welding/simulator/", welding.job_simulator, name="welding_job_simulator"),
+    path("welding/simulator/to-quote/", welding.simulator_to_quote, name="welding_simulator_to_quote"),
     
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),

@@ -1,80 +1,616 @@
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block title %}Stock In Materials - Welding Workshop{% endblock %}
 
-{% block content %}
-<div class="container py-4" style="max-width: 600px;">
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
-            <li class="breadcrumb-item active">Stock In</li>
-        </ol>
-    </nav>
+{% block extra_css %}
+<style>
+:root {
+  --weld-primary: #f97316;
+  --weld-accent: #ea580c;
+  --weld-dark: #0c0a09;
+  --weld-surface: #1c1917;
+  --weld-card: #292524;
+  --weld-border: #44403c;
+  --weld-text: #fafaf9;
+  --weld-muted: #a8a29e;
+  --weld-success: #22c55e;
+}
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Stock In Materials</h5>
-        </div>
-        <div class="card-body">
-            <form method="post" data-testid="welding-stock-in-form">
-                {% csrf_token %}
+.welding-page {
+  background: linear-gradient(135deg, var(--weld-dark) 0%, #1c1917 100%);
+  min-height: 100vh;
+  color: var(--weld-text);
+}
 
-                <div class="mb-3">
-                    <label for="material_id" class="form-label">Material *</label>
-                    <select class="form-select form-select-lg" id="material_id" name="material_id" required autofocus>
-                        <option value="">Select material...</option>
-                        {% for material in materials %}
-                        <option value="{{ material.id }}">
-                            {{ material.name }} ({{ material.get_category_display }}) - Stock: {{ material.quantity_in_stock }}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
+.welding-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
 
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label for="quantity" class="form-label">Quantity *</label>
-                        <input type="number" class="form-control form-control-lg" id="quantity" name="quantity" 
-                               min="0.01" step="0.01" required>
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label for="unit_cost" class="form-label">Cost per Unit (MWK)</label>
-                        <input type="number" class="form-control" id="unit_cost" name="unit_cost" 
-                               min="0" step="0.01" placeholder="Purchase price">
-                    </div>
-                </div>
+.page-header {
+  margin-bottom: 1.5rem;
+}
 
-                <div class="mb-3">
-                    <label for="date" class="form-label">Date</label>
-                    <input type="date" class="form-control" id="date" name="date">
-                </div>
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--weld-primary), #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
 
-                <div class="mb-3">
-                    <label for="notes" class="form-label">Notes</label>
-                    <textarea class="form-control" id="notes" name="notes" rows="2" 
-                              placeholder="e.g., Supplier name, invoice number"></textarea>
-                </div>
+.breadcrumb {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--weld-muted);
+}
 
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="add_another" name="add_another">
-                    <label class="form-check-label" for="add_another">Add another item after this</label>
-                </div>
+.breadcrumb a {
+  color: var(--weld-muted);
+  text-decoration: none;
+}
 
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary btn-lg" data-testid="welding-stock-in-submit">
-                        <i class="bi bi-check-circle"></i> Stock In
-                    </button>
-                    <a href="/verticals/welding/dashboard/" class="btn btn-outline-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
-    </div>
+.breadcrumb a:hover {
+  color: var(--weld-primary);
+}
 
-    <!-- Barcode Scanner Tip -->
-    <div class="alert alert-info mt-4">
-        <i class="bi bi-upc-scan"></i>
-        <strong>Tip:</strong> If your materials have barcodes, you can scan them to quickly find the right material.
-    </div>
-</div>
+/* Form Card */
+.form-card {
+  background: var(--weld-card);
+  border: 1px solid var(--weld-border);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.form-header {
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+  padding: 1.25rem 1.5rem;
+}
+
+.form-header-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-body {
+  padding: 1.5rem;
+}
+
+/* Material Picker Button */
+.material-picker-btn {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: var(--weld-surface);
+  border: 2px dashed var(--weld-border);
+  border-radius: 16px;
+  color: var(--weld-text);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.material-picker-btn:hover {
+  border-color: var(--weld-primary);
+  border-style: solid;
+}
+
+.material-picker-btn.selected {
+  border-style: solid;
+  border-color: var(--weld-primary);
+  background: rgba(249, 115, 22, 0.1);
+}
+
+.picker-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--weld-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.picker-text {
+  flex: 1;
+}
+
+.picker-label {
+  font-size: 0.85rem;
+  color: var(--weld-muted);
+  margin-bottom: 0.25rem;
+}
+
+.picker-value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--weld-text);
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-size: 1rem;
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  border-radius: 12px;
+  color: var(--weld-text);
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--weld-primary);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+.form-control::placeholder {
+  color: var(--weld-muted);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: var(--weld-surface);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.form-check-input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--weld-primary);
+}
+
+.form-check-label {
+  font-size: 0.9rem;
+  color: var(--weld-text);
+}
+
+/* Buttons */
+.btn-group {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.btn {
+  padding: 0.875rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.btn-primary {
+  flex: 1;
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+  color: white;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(249, 115, 22, 0.4);
+}
+
+.btn-secondary {
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  color: var(--weld-text);
+}
+
+.btn-secondary:hover {
+  border-color: var(--weld-primary);
+  color: var(--weld-primary);
+}
+
+/* Tip Box */
+.tip-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  margin-top: 1.5rem;
+}
+
+.tip-icon {
+  font-size: 1.25rem;
+  color: #3b82f6;
+}
+
+.tip-text {
+  font-size: 0.9rem;
+  color: var(--weld-muted);
+}
+
+/* Material Picker Modal */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal-content {
+  background: var(--weld-card);
+  border: 1px solid var(--weld-border);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--weld-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.modal-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--weld-surface);
+  border: none;
+  color: var(--weld-muted);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: var(--weld-primary);
+  color: white;
+}
+
+.modal-search {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--weld-border);
+}
+
+.modal-search input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  border-radius: 12px;
+  color: var(--weld-text);
+  font-size: 1rem;
+}
+
+.modal-search input:focus {
+  outline: none;
+  border-color: var(--weld-primary);
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 1.5rem;
+}
+
+.picker-category-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--weld-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 1rem 0 0.5rem;
+}
+
+.picker-category-label:first-child {
+  margin-top: 0;
+}
+
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.picker-item {
+  padding: 1rem;
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.picker-item:hover {
+  border-color: var(--weld-primary);
+  transform: translateY(-2px);
+}
+
+.picker-item-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.picker-item-meta {
+  font-size: 0.8rem;
+  color: var(--weld-muted);
+}
+
+.picker-item-stock {
+  font-size: 0.8rem;
+  color: var(--weld-primary);
+  margin-top: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .btn-group {
+    flex-direction: column;
+  }
+  
+  .picker-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
 {% endblock %}
 
+{% block content %}
+<div class="welding-page">
+  <div class="welding-container">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="breadcrumb">
+        <a href="{% url 'verticals:welding_dashboard' %}">Dashboard</a>
+        <span>›</span>
+        <span>Stock In</span>
+      </div>
+      <h1 class="page-title">📦 Stock In Materials</h1>
+    </div>
+    
+    <!-- Form Card -->
+    <div class="form-card">
+      <div class="form-header">
+        <div class="form-header-title">
+          <i class="bi bi-box-arrow-in-down"></i>
+          Record Purchase
+        </div>
+      </div>
+      
+      <div class="form-body">
+        <form method="post" data-testid="welding-stock-in-form">
+          {% csrf_token %}
+          
+          <!-- Material Picker -->
+          <div class="form-group">
+            <label class="form-label">Material *</label>
+            <button type="button" class="material-picker-btn" id="materialPickerBtn" onclick="openMaterialPicker()">
+              <div class="picker-icon">🔩</div>
+              <div class="picker-text">
+                <div class="picker-label">Select a material</div>
+                <div class="picker-value" id="selectedMaterialName">Tap to choose...</div>
+              </div>
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <input type="hidden" name="material_id" id="material_id" required>
+            
+            <!-- Fallback select for no-JS -->
+            <noscript>
+              <select class="form-control" name="material_id_fallback" required style="margin-top: 0.5rem;">
+                <option value="">Select material...</option>
+                {% for material in materials %}
+                <option value="{{ material.id }}">
+                  {{ material.name }} ({{ material.get_category_display }}) - Stock: {{ material.quantity_in_stock }}
+                </option>
+                {% endfor %}
+              </select>
+            </noscript>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="quantity" class="form-label">Quantity *</label>
+              <input type="number" class="form-control" id="quantity" name="quantity" 
+                     min="0.01" step="0.01" required placeholder="Enter quantity">
+            </div>
+            <div class="form-group">
+              <label for="unit_cost" class="form-label">Cost per Unit (MWK)</label>
+              <input type="number" class="form-control" id="unit_cost" name="unit_cost" 
+                     min="0" step="0.01" placeholder="Purchase price">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="date" class="form-label">Date</label>
+            <input type="date" class="form-control" id="date" name="date">
+          </div>
+          
+          <div class="form-group">
+            <label for="notes" class="form-label">Notes (Optional)</label>
+            <textarea class="form-control" id="notes" name="notes" rows="2" 
+                      placeholder="e.g., Supplier name, invoice number"></textarea>
+          </div>
+          
+          <label class="form-check">
+            <input type="checkbox" class="form-check-input" id="add_another" name="add_another">
+            <span class="form-check-label">Add another item after this</span>
+          </label>
+          
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" data-testid="welding-stock-in-submit">
+              <i class="bi bi-check-circle"></i> Stock In
+            </button>
+            <a href="{% url 'verticals:welding_dashboard' %}" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+        
+        <div class="tip-box">
+          <div class="tip-icon"><i class="bi bi-lightbulb"></i></div>
+          <div class="tip-text">
+            <strong>Tip:</strong> Entering the cost per unit will update the material's price for future quotes.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Material Picker Modal -->
+<div class="modal-overlay" id="materialPickerModal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">🔩 Select Material</div>
+      <button type="button" class="modal-close" onclick="closeMaterialPicker()">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-search">
+      <input type="search" id="pickerSearch" placeholder="Search materials...">
+    </div>
+    
+    <div class="modal-body" id="pickerBody">
+      {% regroup materials by get_category_display as materials_by_category %}
+      {% for category in materials_by_category %}
+      <div class="picker-category" data-category="{{ category.grouper }}">
+        <div class="picker-category-label">{{ category.grouper }}</div>
+        <div class="picker-grid">
+          {% for material in category.list %}
+          <div class="picker-item" 
+               data-id="{{ material.id }}" 
+               data-name="{{ material.name }}"
+               data-searchable="{{ material.name|lower }} {{ material.code|lower }}"
+               onclick="selectMaterial({{ material.id }}, '{{ material.name|escapejs }}')">
+            <div class="picker-item-name">{{ material.name }}</div>
+            <div class="picker-item-meta">{{ material.get_unit_display }}</div>
+            <div class="picker-item-stock">Stock: {{ material.quantity_in_stock|floatformat:1 }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+const modal = document.getElementById('materialPickerModal');
+const pickerSearch = document.getElementById('pickerSearch');
+const materialIdInput = document.getElementById('material_id');
+const selectedMaterialName = document.getElementById('selectedMaterialName');
+const pickerBtn = document.getElementById('materialPickerBtn');
+
+function openMaterialPicker() {
+  modal.classList.add('show');
+  pickerSearch.focus();
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMaterialPicker() {
+  modal.classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function selectMaterial(id, name) {
+  materialIdInput.value = id;
+  selectedMaterialName.textContent = name;
+  pickerBtn.classList.add('selected');
+  closeMaterialPicker();
+}
+
+// Search in picker
+pickerSearch.addEventListener('input', function() {
+  const query = this.value.toLowerCase().trim();
+  const items = document.querySelectorAll('.picker-item');
+  const categories = document.querySelectorAll('.picker-category');
+  
+  items.forEach(item => {
+    const searchable = item.dataset.searchable || '';
+    item.style.display = searchable.includes(query) ? '' : 'none';
+  });
+  
+  // Hide empty categories
+  categories.forEach(cat => {
+    const visibleItems = cat.querySelectorAll('.picker-item:not([style*="display: none"])');
+    cat.style.display = visibleItems.length > 0 ? '' : 'none';
+  });
+});
+
+// Close on ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && modal.classList.contains('show')) {
+    closeMaterialPicker();
+  }
+});
+
+// Close on overlay click
+modal.addEventListener('click', function(e) {
+  if (e.target === modal) {
+    closeMaterialPicker();
+  }
+});
+</script>
+{% endblock %}

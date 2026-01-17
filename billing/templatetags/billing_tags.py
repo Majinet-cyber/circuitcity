@@ -5,7 +5,38 @@ from datetime import datetime
 from django import template
 from django.utils import timezone
 
+from billing.vertical_copy import get_billing_copy, get_billing_copy_for_business
+
 register = template.Library()
+
+
+@register.simple_tag(takes_context=True)
+def vertical_copy(context):
+    """
+    Get vertical-aware billing copy for the current business.
+    
+    Usage in template:
+        {% vertical_copy as copy %}
+        {{ copy.location_singular }}  -> "farm" or "shop"
+        {{ copy.staff_plural }}       -> "assistant managers" or "agents"
+    """
+    request = context.get("request")
+    business = getattr(request, "business", None)
+    return get_billing_copy_for_business(business)
+
+
+@register.filter
+def plan_description(plan, business):
+    """
+    Format plan description with vertical-appropriate terminology.
+    
+    Usage:
+        {{ plan|plan_description:business }}
+    """
+    copy = get_billing_copy_for_business(business)
+    max_stores = getattr(plan, "max_stores", 1)
+    max_agents = getattr(plan, "max_agents", 0)
+    return copy.format_plan_description(max_stores, max_agents)
 
 
 @register.inclusion_tag("billing/components/subscription_badge.html", takes_context=True)

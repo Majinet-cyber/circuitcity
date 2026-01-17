@@ -80,6 +80,95 @@
         </div>
     </div>
 
+    <!-- ==================== SMART ADD ENTRY SECTION ==================== -->
+    {% if recommended_actions %}
+    <div class="card border-0 shadow-sm mb-4" data-testid="recommended-actions-panel" style="border-left: 4px solid #2563eb !important;">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0" style="display: flex; align-items: center; gap: 0.5rem;">
+                <i class="bi bi-lightbulb-fill" style="color: #f59f00;"></i>
+                Recommended Actions
+                <span style="background: #fef3c7; color: #d97706; font-size: 0.6rem; padding: 0.15rem 0.4rem; border-radius: 999px; font-weight: 700; text-transform: uppercase;">Smart</span>
+            </h6>
+        </div>
+        <div class="card-body">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+                {% for action in recommended_actions %}
+                <div class="recommendation-card" data-testid="recommendation-card" style="
+                    background: linear-gradient(135deg, rgba(37, 99, 235, 0.05), rgba(59, 130, 246, 0.02));
+                    border: 1px solid rgba(37, 99, 235, 0.2);
+                    border-radius: 10px;
+                    padding: 0.75rem;
+                ">
+                    <div style="display: flex; align-items: flex-start; gap: 0.5rem;">
+                        <span style="font-size: 1.25rem;">
+                            {% if action.category == 'fertilizer' %}🌱{% elif action.category == 'harvest' %}🌾{% elif action.category == 'irrigation' %}💧{% else %}📋{% endif %}
+                        </span>
+                        <div style="flex: 1;">
+                            <div style="font-weight: 700; font-size: 0.8125rem; color: #1e293b;">{{ action.title }}</div>
+                            <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">{{ action.reason|truncatechars:60 }}</div>
+                            {% if action.suggested_quantities %}
+                            <div style="font-size: 0.7rem; background: #dbeafe; color: #2563eb; padding: 0.25rem 0.5rem; border-radius: 4px; margin-top: 0.5rem; display: inline-block;">
+                                {{ action.suggested_quantities|truncatechars:50 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <a href="/verticals/farm/ledger/add-expense/?season={{ season.id }}&category={{ action.entry_prefill.category|default:'fertiliser' }}&notes={{ action.entry_prefill.notes|urlencode }}" 
+                       class="btn btn-sm w-100 mt-2" style="background: #2563eb; color: white; font-size: 0.75rem;">
+                        <i class="bi bi-plus-lg"></i> Add Entry
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Entry Types Quick Actions -->
+    <div class="card border-0 shadow-sm mb-4" data-testid="entry-types-panel">
+        <div class="card-header bg-transparent">
+            <h6 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Quick Add Entry</h6>
+        </div>
+        <div class="card-body">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                {% for entry_type in entry_types %}
+                <a href="/verticals/farm/ledger/add-expense/?season={{ season.id }}&category={{ entry_type.value }}" 
+                   class="btn btn-sm btn-outline-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
+                    <i class="bi {{ entry_type.icon }}"></i> {{ entry_type.label }}
+                </a>
+                {% endfor %}
+            </div>
+            
+            {% if fertilizer_estimate.has_recommendation %}
+            <div style="margin-top: 1rem; padding: 0.75rem; background: #dcfce7; border-radius: 8px; border: 1px solid rgba(22, 163, 74, 0.2);">
+                <div style="font-weight: 700; font-size: 0.875rem; color: #15803d; margin-bottom: 0.25rem;">
+                    📊 {{ fertilizer_estimate.title }}
+                </div>
+                <div style="font-size: 0.8125rem; color: #166534;">
+                    For {{ season.area_value }} acres: <strong>NPK ~{{ fertilizer_estimate.npk_bags }} bags, Urea ~{{ fertilizer_estimate.urea_bags }} bags</strong> (50kg)
+                </div>
+                <div style="font-size: 0.7rem; color: #16a34a; font-style: italic; margin-top: 0.25rem;">
+                    <i class="bi bi-info-circle"></i> {{ fertilizer_estimate.disclaimer }}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if yield_estimate.has_estimate %}
+            <div style="margin-top: 0.75rem; padding: 0.75rem; background: #dbeafe; border-radius: 8px; border: 1px solid rgba(37, 99, 235, 0.2);">
+                <div style="font-weight: 700; font-size: 0.875rem; color: #1d4ed8; margin-bottom: 0.25rem;">
+                    🌾 Expected Yield ({{ season.area_value }} acres)
+                </div>
+                <div style="font-size: 0.8125rem; color: #2563eb;">
+                    <strong>{{ yield_estimate.avg_yield }}</strong> {{ yield_estimate.unit }} average (range: {{ yield_estimate.min_yield }}–{{ yield_estimate.max_yield }})
+                </div>
+                <div style="font-size: 0.7rem; color: #3b82f6; font-style: italic; margin-top: 0.25rem;">
+                    <i class="bi bi-info-circle"></i> {{ yield_estimate.disclaimer }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
     <!-- Linked Ledger Entries -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
