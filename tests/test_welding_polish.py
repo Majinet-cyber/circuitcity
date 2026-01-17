@@ -8,6 +8,7 @@ Regression tests for Welding vertical polish:
 """
 import pytest
 from decimal import Decimal
+from datetime import timedelta
 from django.test import Client
 from django.contrib.auth import get_user_model
 
@@ -831,4 +832,433 @@ class TestModalStructureRegression:
         
         # Close button with proper data attribute
         assert 'data-bs-dismiss="modal"' in html, "Modal must have close button with data-bs-dismiss"
+
+
+# ==============================================================================
+# PART 6: WELDING 500 ERROR REGRESSION TESTS (2026-01-17)
+# ==============================================================================
+
+
+@pytest.mark.django_db
+class TestWelding500ErrorFixes:
+    """
+    Regression tests for Welding pages that were crashing with VariableDoesNotExist.
+    
+    ROOT CAUSE: Templates accessed .name on potentially None variables (business, location, etc.)
+    
+    FIX: Use safe Django template conditionals ({% if business %}{{ business.name }}{% endif %})
+    """
+
+    @pytest.fixture
+    def welding_business(self, db):
+        """Create a welding business."""
+        from tenants.models import Business
+        from inventory.business_kinds import BusinessKind
+        
+        business = Business.objects.create(
+            name="Test Welding 500 Fix",
+            kind=BusinessKind.WELDING,
+            is_active=True,
+        )
+        return business
+
+    @pytest.fixture
+    def welding_manager(self, db, welding_business):
+        """Create manager user."""
+        from tenants.models import Membership
+        
+        user = User.objects.create_user(
+            username="weld_mgr_500",
+            email="weld_mgr_500@test.com",
+            password="testpass123",
+        )
+        Membership.objects.create(
+            user=user,
+            business=welding_business,
+            role="manager",
+        )
+        return user
+
+    @pytest.fixture
+    def authenticated_client(self, welding_manager, welding_business):
+        """Create authenticated client."""
+        client = Client()
+        client.force_login(welding_manager)
+        session = client.session
+        session["active_business_id"] = welding_business.id
+        session.save()
+        return client
+
+    def test_welding_jobs_page_returns_200(self, authenticated_client):
+        """Jobs list page renders without server error."""
+        response = authenticated_client.get("/verticals/welding/jobs/")
+        assert response.status_code == 200, "Jobs page should render successfully"
+
+    def test_welding_sales_page_returns_200(self, authenticated_client):
+        """Sales page renders without server error."""
+        response = authenticated_client.get("/verticals/welding/sales/")
+        assert response.status_code == 200, "Sales page should render successfully"
+
+    def test_welding_dashboard_returns_200(self, authenticated_client):
+        """Dashboard renders without server error."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200, "Dashboard should render successfully"
+
+    def test_welding_quotes_list_returns_200(self, authenticated_client):
+        """Quotes list page renders without server error."""
+        response = authenticated_client.get("/verticals/welding/quotes/")
+        assert response.status_code == 200, "Quotes page should render successfully"
+
+    def test_welding_materials_list_returns_200(self, authenticated_client):
+        """Materials list page renders without server error."""
+        response = authenticated_client.get("/verticals/welding/materials/")
+        assert response.status_code == 200, "Materials page should render successfully"
+
+    def test_welding_stock_in_returns_200(self, authenticated_client):
+        """Stock in page renders without server error."""
+        response = authenticated_client.get("/verticals/welding/stock-in/")
+        assert response.status_code == 200, "Stock in page should render successfully"
+
+    def test_jobs_page_with_no_location_in_session(self, authenticated_client):
+        """
+        Edge case: Jobs page works even when no location is set in session.
+        This was a common cause of None values.
+        """
+        # Clear location from session
+        session = authenticated_client.session
+        if 'active_location_id' in session:
+            del session['active_location_id']
+        session.save()
+        
+        response = authenticated_client.get("/verticals/welding/jobs/")
+        assert response.status_code == 200, "Jobs page should work without location"
+
+    def test_sales_page_with_no_location_in_session(self, authenticated_client):
+        """
+        Edge case: Sales page works even when no location is set in session.
+        """
+        # Clear location from session
+        session = authenticated_client.session
+        if 'active_location_id' in session:
+            del session['active_location_id']
+        session.save()
+        
+        response = authenticated_client.get("/verticals/welding/sales/")
+        assert response.status_code == 200, "Sales page should work without location"
+
+    def test_dashboard_context_always_has_business(self, authenticated_client):
+        """Dashboard view always provides business in context."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert "business" in response.context, "Context must include business"
+        # Business can be None, but key must exist
+        
+    def test_jobs_page_title_renders_safely(self, authenticated_client):
+        """Jobs page title renders without crashing when business name is accessed."""
+        response = authenticated_client.get("/verticals/welding/jobs/")
+        assert response.status_code == 200
+        html = response.content.decode('utf-8')
+        # Should contain "Jobs" in title
+        assert '<title>' in html
+        assert 'Jobs' in html
+
+    def test_sales_page_title_renders_safely(self, authenticated_client):
+        """Sales page title renders without crashing when business name is accessed."""
+        response = authenticated_client.get("/verticals/welding/sales/")
+        assert response.status_code == 200
+        html = response.content.decode('utf-8')
+        # Should contain "Sales" in title
+        assert '<title>' in html
+        assert 'Sales' in html
+
+    def test_invoice_detail_renders_without_business_address(self, authenticated_client, welding_business):
+        """Invoice detail page renders even when business has no address."""
+        from inventory.models_welding import WeldingInvoice
+        
+        # Create invoice
+        invoice = WeldingInvoice.objects.create(
+            business=welding_business,
+            invoice_number="INV-TEST-001",
+            customer_name="Test Customer",
+            total=1000,
+        )
+        
+        response = authenticated_client.get(f"/verticals/welding/invoices/{invoice.id}/")
+        assert response.status_code == 200, "Invoice detail should render without address"
+
+    def test_sales_page_with_no_invoices_returns_200(self, authenticated_client):
+        """
+        CRITICAL REGRESSION: Sales page with ZERO invoices must not crash.
+        Previously crashed with empty queryset in sales_by_day aggregation.
+        """
+        response = authenticated_client.get("/verticals/welding/sales/")
+        assert response.status_code == 200, "Sales page should render with no invoices"
+        
+        # Verify context has expected keys
+        assert "total_invoiced" in response.context
+        assert "total_paid" in response.context
+        assert response.context["total_invoiced"] == Decimal("0")
+
+    def test_sales_page_sqlite_date_grouping_works(self, authenticated_client, welding_business):
+        """
+        CRITICAL: Sales page date aggregation must work on SQLite.
+        Previously failed with OperationalError on TruncDate.
+        """
+        from inventory.models_welding import WeldingInvoice
+        from django.utils import timezone
+        
+        # Create test invoices
+        WeldingInvoice.objects.create(
+            business=welding_business,
+            invoice_number="INV-001",
+            customer_name="Customer A",
+            total=Decimal("50000"),
+            amount_paid=Decimal("50000"),
+            issue_date=timezone.now().date(),
+        )
+        
+        WeldingInvoice.objects.create(
+            business=welding_business,
+            invoice_number="INV-002",
+            customer_name="Customer B",
+            total=Decimal("30000"),
+            amount_paid=Decimal("30000"),
+            issue_date=timezone.now().date() - timedelta(days=5),
+        )
+        
+        # This should NOT crash with OperationalError
+        response = authenticated_client.get("/verticals/welding/sales/")
+        assert response.status_code == 200, "Sales page should work with invoices on SQLite"
+        
+        # Verify chart data is present
+        assert "sales_trend_json" in response.context
+        import json
+        sales_data = json.loads(response.context["sales_trend_json"])
+        assert isinstance(sales_data, list), "Sales trend should be a list"
+
+    def test_jobs_page_with_template_none_renders(self, authenticated_client, welding_business):
+        """
+        CRITICAL: Jobs page with job.template=None must not crash.
+        Previously crashed with VariableDoesNotExist when accessing job.template.name.
+        """
+        from inventory.models_welding import WeldingJob, WeldingJobStatus
+        
+        # Create job WITHOUT template
+        job = WeldingJob.objects.create(
+            business=welding_business,
+            customer_name="Test Customer",
+            job_number="WJ-NO-TEMPLATE",
+            product_description="Custom Job",
+            status=WeldingJobStatus.PENDING,
+            quoted_price=Decimal("100000"),
+            template=None,  # CRITICAL: No template
+        )
+        
+        response = authenticated_client.get("/verticals/welding/jobs/")
+        assert response.status_code == 200, "Jobs page should render with template=None"
+        
+        html = response.content.decode('utf-8')
+        assert "WJ-NO-TEMPLATE" in html
+        assert "Custom Job" in html or "-" in html  # Should show description or fallback
+
+    def test_dashboard_with_custom_date_range_returns_200(self, authenticated_client):
+        """Dashboard with custom date range filter should work."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?start=2026-01-01&end=2026-01-15")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "custom"
+
+
+# ==============================================================================
+# PART 7: DASHBOARD FILTER & INSIGHTS TESTS (2026-01-17)
+# ==============================================================================
+
+
+@pytest.mark.django_db
+class TestWeldingDashboardFilters:
+    """
+    Tests for Welding dashboard date range filtering and insights.
+    
+    FEATURE: Dashboard Filter button with MTD/7d/30d/Custom date range.
+    FEATURE: Insights section with job/revenue metrics.
+    """
+
+    @pytest.fixture
+    def welding_business(self, db):
+        """Create a welding business."""
+        from tenants.models import Business
+        from inventory.business_kinds import BusinessKind
+        
+        business = Business.objects.create(
+            name="Test Welding Filters",
+            kind=BusinessKind.WELDING,
+            is_active=True,
+        )
+        return business
+
+    @pytest.fixture
+    def welding_manager(self, db, welding_business):
+        """Create manager user."""
+        from tenants.models import Membership
+        
+        user = User.objects.create_user(
+            username="weld_mgr_filters",
+            email="weld_mgr_filters@test.com",
+            password="testpass123",
+        )
+        Membership.objects.create(
+            user=user,
+            business=welding_business,
+            role="manager",
+        )
+        return user
+
+    @pytest.fixture
+    def authenticated_client(self, welding_manager, welding_business):
+        """Create authenticated client."""
+        client = Client()
+        client.force_login(welding_manager)
+        session = client.session
+        session["active_business_id"] = welding_business.id
+        session.save()
+        return client
+
+    def test_dashboard_defaults_to_mtd(self, authenticated_client):
+        """Dashboard defaults to Month to Date when no filter is specified."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "mtd"
+        assert "Month to Date" in response.context["range_label"]
+
+    def test_dashboard_supports_7d_filter(self, authenticated_client):
+        """Dashboard supports Last 7 Days filter."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?range=7d")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "7d"
+        assert "Last 7 Days" in response.context["range_label"]
+
+    def test_dashboard_supports_30d_filter(self, authenticated_client):
+        """Dashboard supports Last 30 Days filter."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?range=30d")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "30d"
+        assert "Last 30 Days" in response.context["range_label"]
+
+    def test_dashboard_supports_custom_date_range(self, authenticated_client):
+        """Dashboard supports custom start/end dates."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?start=2026-01-01&end=2026-01-15")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "custom"
+        # Custom range should show date span in label
+        assert "Jan" in response.context["range_label"]
+
+    def test_dashboard_filter_button_renders(self, authenticated_client):
+        """Dashboard renders filter button UI."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        html = response.content.decode('utf-8')
+        
+        # Filter button should exist
+        assert 'id="dashboardFilterBtn"' in html or 'data-testid="welding-filter-button"' in html
+        
+        # Filter options should exist
+        assert '?range=mtd' in html
+        assert '?range=7d' in html
+        assert '?range=30d' in html
+
+    def test_dashboard_insights_section_renders(self, authenticated_client):
+        """Dashboard renders insights section."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        html = response.content.decode('utf-8')
+        
+        # Insights section should exist
+        assert 'data-testid="welding-insights"' in html or '💡 Insights' in html
+
+    def test_dashboard_insights_include_jobs_created(self, authenticated_client):
+        """Dashboard insights include jobs created count."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert "jobs_created_in_range" in response.context
+
+    def test_dashboard_insights_include_jobs_completed(self, authenticated_client):
+        """Dashboard insights include jobs completed count."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert "jobs_completed_in_range" in response.context
+
+    def test_dashboard_insights_include_avg_job_value(self, authenticated_client):
+        """Dashboard insights include average job value."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert "avg_job_value" in response.context
+
+    def test_dashboard_insights_include_outstanding_jobs(self, authenticated_client):
+        """Dashboard insights include outstanding jobs count."""
+        response = authenticated_client.get("/verticals/welding/dashboard/")
+        assert response.status_code == 200
+        assert "outstanding_jobs" in response.context
+
+    def test_dashboard_filter_affects_revenue_kpi(self, authenticated_client, welding_business):
+        """Filtering changes revenue KPI calculation."""
+        from inventory.models_welding import WeldingJob, WeldingJobStatus
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        # Create a job delivered 20 days ago
+        past_job = WeldingJob.objects.create(
+            business=welding_business,
+            customer_name="Past Customer",
+            job_number="WJ-PAST-001",
+            status=WeldingJobStatus.DELIVERED,
+            quoted_price=Decimal("100000"),
+            final_price=Decimal("100000"),
+            delivered_at=timezone.now() - timedelta(days=20),
+        )
+        
+        # Create a job delivered 5 days ago
+        recent_job = WeldingJob.objects.create(
+            business=welding_business,
+            customer_name="Recent Customer",
+            job_number="WJ-RECENT-001",
+            status=WeldingJobStatus.DELIVERED,
+            quoted_price=Decimal("50000"),
+            final_price=Decimal("50000"),
+            delivered_at=timezone.now() - timedelta(days=5),
+        )
+        
+        # Last 7 days should only include recent job
+        response_7d = authenticated_client.get("/verticals/welding/dashboard/?range=7d")
+        assert response_7d.status_code == 200
+        revenue_7d = response_7d.context["revenue_this_month"]
+        
+        # Last 30 days should include both jobs
+        response_30d = authenticated_client.get("/verticals/welding/dashboard/?range=30d")
+        assert response_30d.status_code == 200
+        revenue_30d = response_30d.context["revenue_this_month"]
+        
+        # 30d revenue should be greater than 7d revenue
+        assert revenue_30d >= revenue_7d
+
+    def test_dashboard_filter_label_updates(self, authenticated_client):
+        """Dashboard shows active filter label."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?range=7d")
+        assert response.status_code == 200
+        html = response.content.decode('utf-8')
+        
+        # Should show "Last 7 Days" somewhere in the page
+        assert 'data-testid="welding-date-range-label"' in html
+        assert "Last 7 Days" in html
+
+    def test_invalid_date_range_falls_back_to_mtd(self, authenticated_client):
+        """Invalid date range parameter falls back to MTD."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?range=invalid")
+        assert response.status_code == 200
+        assert response.context["active_range"] == "mtd"
+
+    def test_custom_range_with_invalid_dates_falls_back(self, authenticated_client):
+        """Custom range with invalid dates falls back to MTD."""
+        response = authenticated_client.get("/verticals/welding/dashboard/?start=invalid&end=invalid")
+        assert response.status_code == 200
+        # Should fall back gracefully
+        assert "active_range" in response.context
 

@@ -44,7 +44,7 @@
                         <tr>
                             <td><strong>{{ job.job_number }}</strong></td>
                             <td>{{ job.customer_name }}</td>
-                            <td>{{ job.product_description|default:job.template.name|default:"-" }}</td>
+                            <td>{% if job.product_description %}{{ job.product_description }}{% elif job.template %}{{ job.template.name }}{% else %}-{% endif %}</td>
                             <td>{{ job.created_at|date:"M d" }}</td>
                             <td class="text-end fw-bold">MWK {{ job.quoted_price|floatformat:0|intcomma }}</td>
                             <td>

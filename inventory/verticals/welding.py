@@ -125,28 +125,91 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     # Ensure templates exist
     ensure_templates_seeded()
     
-    today = timezone.now().date()
-    month_start = today.replace(day=1)
+    # Import the Revenue and Cost models
+    from inventory.models_welding import WeldingRevenue, WeldingCost
     
-    # Quote stats
+    today = timezone.now().date()
+    
+    # Parse date range from request
+    from inventory.verticals.base import parse_date_range_from_request
+    date_range = parse_date_range_from_request(request)
+    active_range = date_range["active_range"]
+    start_date = date_range["start_date"]
+    end_date = date_range["end_date"]
+    
+    # Support custom start/end dates
+    start_param = request.GET.get("start", "")
+    end_param = request.GET.get("end", "")
+    
+    if start_param and end_param:
+        try:
+            from datetime import date as date_class
+            start_date = date_class.fromisoformat(start_param)
+            end_date = date_class.fromisoformat(end_param) + timedelta(days=1)  # Make end_date exclusive
+            active_range = "custom"
+            range_label = f"{start_date.strftime('%b %d')} - {(end_date - timedelta(days=1)).strftime('%b %d, %Y')}"
+        except (ValueError, TypeError):
+            # Invalid dates, fall back to active_range
+            pass
+    
+    # Generate range label
+    if active_range == "custom":
+        pass  # Already set above
+    elif active_range == "7d":
+        range_label = "Last 7 Days"
+    elif active_range == "30d":
+        range_label = "Last 30 Days"
+    else:  # mtd
+        range_label = "Month to Date"
+    
+    # Convert dates to timezone-aware datetimes for filtering
+    start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
+    end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time()))
+    
+    # Quote stats (filtered by date range)
     quotes = WeldingQuote.objects.filter(business=business)
-    quotes_this_month = quotes.filter(created_at__date__gte=month_start)
+    quotes_in_range = quotes.filter(created_at__gte=start_dt, created_at__lt=end_dt)
     quotes_pending = quotes.filter(status__in=[WeldingQuoteStatus.DRAFT, WeldingQuoteStatus.SENT])
     quotes_accepted = quotes.filter(status=WeldingQuoteStatus.ACCEPTED)
     
-    # Job stats
+    # Job stats (filtered by date range)
     jobs = WeldingJob.objects.filter(business=business)
     jobs_active = jobs.filter(status__in=[WeldingJobStatus.PENDING, WeldingJobStatus.IN_PROGRESS])
     jobs_ready = jobs.filter(status=WeldingJobStatus.READY)
-    jobs_completed_this_month = jobs.filter(
+    jobs_completed_in_range = jobs.filter(
         status=WeldingJobStatus.DELIVERED,
-        delivered_at__date__gte=month_start,
+        delivered_at__gte=start_dt,
+        delivered_at__lt=end_dt,
     )
     
-    # Revenue this month (from delivered jobs)
-    revenue_this_month = jobs_completed_this_month.aggregate(
+    # Revenue in range (from delivered jobs)
+    job_revenue_in_range = jobs_completed_in_range.aggregate(
         total=Coalesce(Sum("final_price"), Decimal("0"))
     )["total"]
+    
+    # Additional revenue from WeldingRevenue entries
+    additional_revenue = WeldingRevenue.objects.filter(
+        business=business,
+        received_on__gte=start_date,
+        received_on__lt=end_date,
+    ).aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    
+    # Total revenue = job revenue + additional revenue
+    total_revenue_in_range = job_revenue_in_range + additional_revenue
+    
+    # Costs in range from WeldingCost entries
+    total_costs_in_range = WeldingCost.objects.filter(
+        business=business,
+        incurred_on__gte=start_date,
+        incurred_on__lt=end_date,
+    ).aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    
+    # Profit = Revenue - Costs
+    profit_in_range = total_revenue_in_range - total_costs_in_range
     
     # Invoice stats
     invoices = WeldingInvoice.objects.filter(business=business)
@@ -173,15 +236,21 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     # Recent jobs
     recent_jobs = jobs.order_by("-created_at")[:5]
     
-    # Build chart data for last 30 days
-    thirty_days_ago = today - timedelta(days=30)
+    # Build chart data for the selected range (show up to 30 days, or actual range if smaller)
+    days_to_show = min((end_date - start_date).days, 30)
+    if days_to_show > 14:
+        # Show last 14 days of the range
+        chart_start_date = end_date - timedelta(days=14)
+    else:
+        chart_start_date = start_date
     
     # Revenue trend (from delivered jobs)
     revenue_by_day = (
         WeldingJob.objects.filter(
             business=business,
             status=WeldingJobStatus.DELIVERED,
-            delivered_at__date__gte=thirty_days_ago,
+            delivered_at__date__gte=chart_start_date,
+            delivered_at__date__lt=end_date,
         )
         .annotate(date=TruncDate("delivered_at"))
         .values("date")
@@ -196,7 +265,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     quotes_by_day = (
         WeldingQuote.objects.filter(
             business=business,
-            created_at__date__gte=thirty_days_ago,
+            created_at__date__gte=chart_start_date,
+            created_at__date__lt=end_date,
         )
         .annotate(date=TruncDate("created_at"))
         .values("date")
@@ -206,7 +276,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     jobs_by_day = (
         WeldingJob.objects.filter(
             business=business,
-            created_at__date__gte=thirty_days_ago,
+            created_at__date__gte=chart_start_date,
+            created_at__date__lt=end_date,
         )
         .annotate(date=TruncDate("created_at"))
         .values("date")
@@ -217,11 +288,12 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     quotes_lookup = {q["date"]: q["count"] for q in quotes_by_day}
     jobs_lookup = {j["date"]: j["count"] for j in jobs_by_day}
     
-    # Build chart data arrays (last 14 days for cleaner display)
+    # Build chart data arrays
     revenue_trend = []
     quotes_jobs_trend = []
-    for i in range(14):
-        d = today - timedelta(days=13 - i)
+    chart_days = (end_date - chart_start_date).days
+    for i in range(chart_days):
+        d = chart_start_date + timedelta(days=i)
         date_str = d.strftime("%b %d")
         revenue_trend.append({
             "date": date_str,
@@ -233,17 +305,42 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "jobs": jobs_lookup.get(d, 0),
         })
     
+    # Insights section - stats for the selected period
+    jobs_created_in_range = jobs.filter(created_at__gte=start_dt, created_at__lt=end_dt).count()
+    jobs_completed_count = jobs_completed_in_range.count()
+    avg_job_value = job_revenue_in_range / jobs_completed_count if jobs_completed_count > 0 else Decimal("0")
+    
+    # Top job category (if template is used)
+    top_categories = (
+        jobs_completed_in_range.filter(template__isnull=False)
+        .values("template__name")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:1]
+    )
+    top_job_category = top_categories[0]["template__name"] if top_categories else "N/A"
+    
+    # Outstanding jobs (not delivered)
+    outstanding_jobs = jobs.exclude(status=WeldingJobStatus.DELIVERED).count()
+    
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Welding Manager",
         "hero_blurb": "Create quotes in seconds, track jobs, and generate invoices quickly.",
         
-        # KPIs
-        "quotes_this_month": quotes_this_month.count(),
+        # Date range context
+        "active_range": active_range,
+        "range_label": range_label,
+        "start_date_param": start_param,
+        "end_date_param": end_param,
+        
+        # KPIs (filtered by date range)
+        "quotes_this_month": quotes_in_range.count(),
         "quotes_pending": quotes_pending.count(),
         "jobs_active": jobs_active.count(),
         "jobs_ready": jobs_ready.count(),
-        "revenue_this_month": revenue_this_month,
+        "revenue_this_month": total_revenue_in_range,
+        "costs_this_month": total_costs_in_range,
+        "profit_this_month": profit_in_range,
         "total_outstanding": total_outstanding.get("total", Decimal("0")),
         
         # Low stock alert
@@ -257,6 +354,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         # Chart data (JSON for JavaScript)
         "revenue_trend_json": json.dumps(revenue_trend),
         "quotes_jobs_trend_json": json.dumps(quotes_jobs_trend),
+        
+        # Insights
+        "jobs_created_in_range": jobs_created_in_range,
+        "jobs_completed_in_range": jobs_completed_count,
+        "avg_job_value": avg_job_value,
+        "top_job_category": top_job_category,
+        "outstanding_jobs": outstanding_jobs,
         
         # Quick action URLs
         "url_create_quote": "/verticals/welding/quotes/create/",
@@ -1273,15 +1377,43 @@ def sales(request: HttpRequest) -> HttpResponse:
         status__in=[WeldingInvoiceStatus.PAID, WeldingInvoiceStatus.PARTIAL]
     )
     
-    # Build sales trend data
-    sales_by_day = (
-        invoices.annotate(date=TruncDate("issue_date"))
-        .values("date")
-        .annotate(revenue=Sum("amount_paid"), count=Count("id"))
-        .order_by("date")
-    )
+    # Build sales trend data - FIXED: Backend-safe date grouping for SQLite
+    from django.db import connection
+    from django.db.models import DateField
+    from django.db.models import Func as DbFunc
     
-    sales_lookup = {s["date"]: {"revenue": float(s["revenue"] or 0), "count": s["count"]} for s in sales_by_day}
+    sales_lookup = {}
+    try:
+        # SQLite-safe date grouping
+        if connection.vendor == "sqlite":
+            # Use SQLite's built-in date() function
+            date_expr = DbFunc(F("issue_date"), function="date", output_field=DateField())
+        else:
+            # Use Django's efficient TruncDate for PostgreSQL/MySQL
+            date_expr = TruncDate("issue_date")
+        
+        sales_by_day = (
+            invoices.annotate(date=date_expr)
+            .values("date")
+            .annotate(revenue=Sum("amount_paid"), count=Count("id"))
+            .order_by("date")
+        )
+        
+        sales_lookup = {s["date"]: {"revenue": float(s["revenue"] or 0), "count": s["count"]} for s in sales_by_day}
+    except Exception as e:
+        # Fallback: If DB aggregation fails, do Python grouping for the small window
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Sales page date aggregation failed: {e}. Falling back to Python grouping.")
+        
+        # Python fallback for small date range (safe for all DBs)
+        from collections import defaultdict
+        daily_sales = defaultdict(lambda: {"revenue": 0, "count": 0})
+        for inv in invoices:
+            day = inv.issue_date
+            daily_sales[day]["revenue"] += float(inv.amount_paid or 0)
+            daily_sales[day]["count"] += 1
+        sales_lookup = dict(daily_sales)
     
     # Build chart data
     sales_trend = []
@@ -1324,3 +1456,260 @@ def sales(request: HttpRequest) -> HttpResponse:
 # Required import for Q objects
 from django.db import models
 
+
+# ==============================================================================
+# REVENUE TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def revenue_list(request: HttpRequest) -> HttpResponse:
+    """Revenue tracking page for Welding vertical."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if not business:
+        return redirect("verticals:no_business")
+    
+    from inventory.models_welding import WeldingRevenue
+    
+    today = timezone.now().date()
+    
+    # Parse date range from request
+    from inventory.verticals.base import parse_date_range_from_request
+    date_range = parse_date_range_from_request(request)
+    active_range = date_range["active_range"]
+    start_date = date_range["start_date"]
+    end_date = date_range["end_date"]
+    
+    # Support custom start/end dates
+    start_param = request.GET.get("start", "")
+    end_param = request.GET.get("end", "")
+    
+    if start_param and end_param:
+        try:
+            from datetime import date as date_class
+            start_date = date_class.fromisoformat(start_param)
+            end_date = date_class.fromisoformat(end_param) + timedelta(days=1)  # Make end_date exclusive
+            active_range = "custom"
+            range_label = f"{start_date.strftime('%b %d')} - {(end_date - timedelta(days=1)).strftime('%b %d, %Y')}"
+        except (ValueError, TypeError):
+            # Invalid dates, fall back to active_range
+            pass
+    
+    # Generate range label
+    if active_range == "custom":
+        pass  # Already set above
+    elif active_range == "7d":
+        range_label = "Last 7 Days"
+    elif active_range == "30d":
+        range_label = "Last 30 Days"
+    else:  # mtd
+        range_label = "Month to Date"
+    
+    # Get revenues in range
+    revenues = WeldingRevenue.objects.filter(
+        business=business,
+        received_on__gte=start_date,
+        received_on__lt=end_date,
+    ).order_by("-received_on")
+    
+    # Calculate total
+    total_revenue = revenues.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    
+    ctx.update({
+        "active_tab": "revenue",
+        "page_title": "Revenue",
+        "active_range": active_range,
+        "range_label": range_label,
+        "start_date_param": start_param,
+        "end_date_param": end_param,
+        "revenues": revenues,
+        "total_revenue": total_revenue,
+        "revenue_count": revenues.count(),
+    })
+    
+    return render(request, "verticals/welding/revenue.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def revenue_add(request: HttpRequest) -> HttpResponse:
+    """Add a revenue entry."""
+    business = request.active_business
+    
+    from inventory.models_welding import WeldingRevenue
+    
+    if request.method == "POST":
+        try:
+            amount = Decimal(request.POST.get("amount", "0"))
+            if amount <= 0:
+                messages.error(request, "Amount must be greater than 0.")
+                return redirect("/verticals/welding/revenue/")
+            
+            category = request.POST.get("category", "other")
+            description = request.POST.get("description", "").strip()
+            notes = request.POST.get("notes", "")
+            received_on = request.POST.get("received_on") or timezone.now().date()
+            
+            if not description:
+                messages.error(request, "Description is required.")
+                return redirect("/verticals/welding/revenue/")
+            
+            revenue = WeldingRevenue.objects.create(
+                business=business,
+                amount=amount,
+                category=category,
+                description=description,
+                notes=notes,
+                received_on=received_on,
+                created_by=request.user,
+            )
+            
+            messages.success(request, f"Revenue entry added: MWK {amount:,.0f}")
+            return redirect("/verticals/welding/revenue/")
+        except Exception as e:
+            messages.error(request, f"Error adding revenue: {e}")
+            return redirect("/verticals/welding/revenue/")
+    
+    # GET - render form
+    ctx = base.base_context(request)
+    ctx.update({
+        "active_tab": "revenue",
+    })
+    return render(request, "verticals/welding/revenue_add.html", ctx)
+
+
+# ==============================================================================
+# COSTS TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def costs_list(request: HttpRequest) -> HttpResponse:
+    """Costs tracking page for Welding vertical."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if not business:
+        return redirect("verticals:no_business")
+    
+    from inventory.models_welding import WeldingCost
+    
+    today = timezone.now().date()
+    
+    # Parse date range from request
+    from inventory.verticals.base import parse_date_range_from_request
+    date_range = parse_date_range_from_request(request)
+    active_range = date_range["active_range"]
+    start_date = date_range["start_date"]
+    end_date = date_range["end_date"]
+    
+    # Support custom start/end dates
+    start_param = request.GET.get("start", "")
+    end_param = request.GET.get("end", "")
+    
+    if start_param and end_param:
+        try:
+            from datetime import date as date_class
+            start_date = date_class.fromisoformat(start_param)
+            end_date = date_class.fromisoformat(end_param) + timedelta(days=1)  # Make end_date exclusive
+            active_range = "custom"
+            range_label = f"{start_date.strftime('%b %d')} - {(end_date - timedelta(days=1)).strftime('%b %d, %Y')}"
+        except (ValueError, TypeError):
+            # Invalid dates, fall back to active_range
+            pass
+    
+    # Generate range label
+    if active_range == "custom":
+        pass  # Already set above
+    elif active_range == "7d":
+        range_label = "Last 7 Days"
+    elif active_range == "30d":
+        range_label = "Last 30 Days"
+    else:  # mtd
+        range_label = "Month to Date"
+    
+    # Get costs in range
+    costs = WeldingCost.objects.filter(
+        business=business,
+        incurred_on__gte=start_date,
+        incurred_on__lt=end_date,
+    ).order_by("-incurred_on")
+    
+    # Calculate total
+    total_costs = costs.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    
+    ctx.update({
+        "active_tab": "costs",
+        "page_title": "Costs",
+        "active_range": active_range,
+        "range_label": range_label,
+        "start_date_param": start_param,
+        "end_date_param": end_param,
+        "costs": costs,
+        "total_costs": total_costs,
+        "costs_count": costs.count(),
+    })
+    
+    return render(request, "verticals/welding/costs.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def costs_add(request: HttpRequest) -> HttpResponse:
+    """Add a cost entry."""
+    business = request.active_business
+    
+    from inventory.models_welding import WeldingCost
+    
+    if request.method == "POST":
+        try:
+            amount = Decimal(request.POST.get("amount", "0"))
+            if amount <= 0:
+                messages.error(request, "Amount must be greater than 0.")
+                return redirect("/verticals/welding/costs/")
+            
+            category = request.POST.get("category", "other")
+            description = request.POST.get("description", "").strip()
+            notes = request.POST.get("notes", "")
+            incurred_on = request.POST.get("incurred_on") or timezone.now().date()
+            
+            if not description:
+                messages.error(request, "Description is required.")
+                return redirect("/verticals/welding/costs/")
+            
+            cost = WeldingCost.objects.create(
+                business=business,
+                amount=amount,
+                category=category,
+                description=description,
+                notes=notes,
+                incurred_on=incurred_on,
+                created_by=request.user,
+            )
+            
+            messages.success(request, f"Cost entry added: MWK {amount:,.0f}")
+            return redirect("/verticals/welding/costs/")
+        except Exception as e:
+            messages.error(request, f"Error adding cost: {e}")
+            return redirect("/verticals/welding/costs/")
+    
+    # GET - render form
+    ctx = base.base_context(request)
+    ctx.update({
+        "active_tab": "costs",
+    })
+    return render(request, "verticals/welding/costs_add.html", ctx)
