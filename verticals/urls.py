@@ -191,6 +191,10 @@ urlpatterns = [
     # ==================== WELDING VERTICAL ====================
     path("welding/dashboard/", welding.dashboard, name="welding_dashboard"),
     path("welding/sales/", welding.sales, name="welding_sales"),
+    path("welding/revenue/", welding.revenue_list, name="welding_revenue"),
+    path("welding/revenue/add/", welding.revenue_add, name="welding_revenue_add"),
+    path("welding/costs/", welding.costs_list, name="welding_costs"),
+    path("welding/costs/add/", welding.costs_add, name="welding_costs_add"),
     path("welding/materials/", welding.materials_list, name="welding_materials_list"),
     path("welding/materials/<int:material_id>/edit/", welding.material_edit, name="welding_material_edit"),
     path("welding/stock-in/", welding.stock_in, name="welding_stock_in"),

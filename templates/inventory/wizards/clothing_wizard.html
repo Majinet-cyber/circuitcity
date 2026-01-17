@@ -4,13 +4,13 @@
 {% block title %}Add Clothing Product · Wizard{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}">
+<link rel="stylesheet" href="{% static 'css/wizard-system.css' %}?v=20260107">
 {% endblock %}
 
 {% block content %}
 <div id="wizard-container"></div>
 
-<script src="{% static 'js/wizard-engine.js' %}"></script>
+<script src="{% static 'js/wizard-engine.js' %}?v=20260107"></script>
 <script>
 (function() {
   // Clothing categories
@@ -354,6 +354,18 @@
 
               <div style="display: grid; gap: 16px;">
                 <div>
+                  <label class="wizard-label" for="pricing-size">Size (Optional)</label>
+                  <input
+                    type="text"
+                    id="pricing-size"
+                    class="form-control"
+                    value="${data.size || ''}"
+                    placeholder="e.g. M, L, XL, 34, 45"
+                  >
+                  <small class="text-muted">Product size (leave blank if not applicable)</small>
+                </div>
+
+                <div>
                   <label class="wizard-label" for="pricing-quantity">Initial Stock Quantity <span style="color: #dc2626;">*</span></label>
                   <input
                     type="number"
@@ -397,12 +409,15 @@
                   <small class="text-muted">Optional: Your cost per unit</small>
                 </div>
 
-                <div id="pricing-error" class="alert d-none"></div>
+                <input type="hidden" id="pricing-location-id" value="{{ location_id|default:'' }}">
+
+                <div id="pricing-error" class="alert d-none" style="display: none;"></div>
 
                 <button
                   type="button"
                   class="btn btn-primary btn-lg w-100"
                   onclick="savePricingAndContinue()"
+                  data-step1-url="{% url 'clothing:barcode_batch_step1' %}"
                   style="background: linear-gradient(135deg, #0ea5e9, #0284c7); border: none; font-weight: 600;"
                 >
                   Continue to Scan Barcodes →
@@ -473,7 +488,8 @@
                        class="form-control"
                        id="manual-barcode-input"
                        placeholder="Or type barcode manually..."
-                       autocomplete="off">
+                       autocomplete="off"
+                       onkeypress="if(event.key==='Enter'){event.preventDefault();addManualBarcode();}">
                 <button class="btn btn-outline-primary"
                         type="button"
                         id="btn-add-manual-barcode"
@@ -771,6 +787,92 @@
     }
   }
 
+  // Save pricing and initialize barcode batch session (Step 1)
+  async function savePricingAndContinue() {
+    const sellingPrice = parseFloat(document.getElementById('inline-selling-price')?.value || 0);
+    const costPrice = parseFloat(document.getElementById('inline-cost-price')?.value || 0);
+    const quantity = parseInt(document.getElementById('inline-quantity')?.value || 1);
+
+    // Validate inputs
+    if (!sellingPrice || sellingPrice <= 0) {
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Selling price must be greater than zero.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+      return;
+    }
+
+    if (!quantity || quantity < 1) {
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Quantity must be at least 1.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+      return;
+    }
+
+    // Call backend Step 1 API to initialize barcode batch session
+    try {
+      const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+      const step1Data = {
+        category: wizard.data.category || '',
+        subcategory: wizard.data.shoe_subtype || wizard.data.subcategory || '',
+        size: wizard.data.size || '',
+        quantity: quantity,
+        cost_price: costPrice,
+        selling_price: sellingPrice,
+        brand: wizard.data.brand || '',
+        color: wizard.data.color || '',
+        product_name: wizard.data.product_name || ''
+      };
+
+      const response = await fetch('/clothing/api/barcode-batch/step1/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(step1Data)
+      });
+
+      const result = await response.json();
+
+      if (result.ok) {
+        // Update wizard data
+        wizard.data.selling_price = sellingPrice;
+        wizard.data.cost_price = costPrice;
+        wizard.data.quantity = quantity;
+        wizard.data.initial_stock = quantity;
+        
+        // Clear any previous scanned barcodes
+        wizard.data.scanned_barcodes = [];
+        
+        // Re-render to show barcode scanning UI
+        wizard.render();
+      } else {
+        const errorDiv = document.getElementById('pricing-error');
+        if (errorDiv) {
+          errorDiv.textContent = result.error || 'Failed to save pricing. Please try again.';
+          errorDiv.classList.remove('d-none');
+          errorDiv.classList.add('alert-danger');
+        }
+      }
+    } catch (error) {
+      console.error('Step 1 API error:', error);
+      const errorDiv = document.getElementById('pricing-error');
+      if (errorDiv) {
+        errorDiv.textContent = 'Network error. Please check your connection and try again.';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+      }
+    }
+  }
+
   // Add barcode (from scanner or manual input)
   async function addBarcode(barcode) {
     if (!barcode || !barcode.trim()) {
@@ -923,12 +1025,21 @@
       const qtyInput = document.getElementById('pricing-quantity');
       const priceInput = document.getElementById('pricing-selling-price');
       const costInput = document.getElementById('pricing-cost-price');
+      const sizeInput = document.getElementById('pricing-size');
       const continueBtn = document.querySelector('[onclick="savePricingAndContinue()"]');
+      const errorDiv = document.getElementById('pricing-error');
       
       if (!qtyInput || !priceInput) return;
 
+      // CRITICAL: Hide error div on initial load
+      if (errorDiv) {
+        errorDiv.classList.add('d-none');
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+      }
+
       // Track if fields have been touched
-      const touched = { qty: false, price: false, cost: false };
+      const touched = { qty: false, price: false, cost: false, size: false };
 
       function validateField(field) {
         const fieldId = field.id;
@@ -942,13 +1053,17 @@
           errorSpan = document.createElement('small');
           errorSpan.id = errorId;
           errorSpan.className = 'text-danger d-block mt-1';
+          errorSpan.style.display = 'none';  // Hidden by default
           field.parentNode.appendChild(errorSpan);
         }
 
         // Only show errors if field has been touched
-        const key = fieldId.includes('quantity') ? 'qty' : fieldId.includes('selling') ? 'price' : 'cost';
+        const key = fieldId.includes('quantity') ? 'qty' : 
+                    fieldId.includes('selling') ? 'price' : 
+                    fieldId.includes('cost') ? 'cost' : 'size';
         if (!touched[key]) {
           errorSpan.textContent = '';
+          errorSpan.style.display = 'none';
           return true;
         }
 
@@ -956,25 +1071,30 @@
         if (fieldId.includes('quantity')) {
           if (!value || isNaN(num) || num <= 0 || !Number.isInteger(num)) {
             errorSpan.textContent = '❌ Must be a whole number greater than 0';
+            errorSpan.style.display = 'block';
             field.classList.add('is-invalid');
             return false;
           }
         } else if (fieldId.includes('selling')) {
           if (!value || isNaN(num) || num <= 0) {
             errorSpan.textContent = '❌ Must be greater than 0';
+            errorSpan.style.display = 'block';
             field.classList.add('is-invalid');
             return false;
           }
         } else if (fieldId.includes('cost')) {
           if (value && (isNaN(num) || num < 0)) {
             errorSpan.textContent = '❌ Must be 0 or greater';
+            errorSpan.style.display = 'block';
             field.classList.add('is-invalid');
             return false;
           }
         }
+        // Size has no validation (optional field)
 
         // Clear error if valid
         errorSpan.textContent = '';
+        errorSpan.style.display = 'none';
         field.classList.remove('is-invalid');
         return true;
       }
@@ -996,54 +1116,93 @@
       qtyInput.addEventListener('blur', () => { touched.qty = true; updateContinueButton(); });
       priceInput.addEventListener('blur', () => { touched.price = true; updateContinueButton(); });
       if (costInput) costInput.addEventListener('blur', () => { touched.cost = true; updateContinueButton(); });
+      if (sizeInput) sizeInput.addEventListener('blur', () => { touched.size = true; });
 
       // Validate on input (but only show errors if touched)
       qtyInput.addEventListener('input', updateContinueButton);
       priceInput.addEventListener('input', updateContinueButton);
       if (costInput) costInput.addEventListener('input', updateContinueButton);
 
-      // Initial check (without showing errors)
+      // Initial check (without showing errors - button stays enabled by default)
       updateContinueButton();
     }, 100);
   }
 
   // Save pricing and continue to scanning
   window.savePricingAndContinue = async function() {
+    // Guard against double submission
+    if (window.__savePricingInProgress) {
+      console.log('Submission already in progress, ignoring duplicate call');
+      return;
+    }
+    window.__savePricingInProgress = true;
+
+    const sizeInput = document.getElementById('pricing-size');
     const qtyInput = document.getElementById('pricing-quantity');
     const priceInput = document.getElementById('pricing-selling-price');
     const costInput = document.getElementById('pricing-cost-price');
+    const locationInput = document.getElementById('pricing-location-id');
     const errorDiv = document.getElementById('pricing-error');
+    const continueBtn = document.querySelector('[onclick="savePricingAndContinue()"]');
 
-    // Get values
-    const qty = parseInt(qtyInput?.value || 0);
-    const price = parseFloat(priceInput?.value || 0);
-    const cost = parseFloat(costInput?.value || 0);
+    // Validate inputs exist
+    if (!qtyInput || !priceInput || !errorDiv) {
+      console.error('Internal error: required input fields not found');
+      if (errorDiv) {
+        errorDiv.textContent = '❌ Internal error: price fields not found';
+        errorDiv.classList.remove('d-none');
+        errorDiv.classList.add('alert-danger');
+        errorDiv.style.display = 'block';
+      }
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    // CRITICAL: Clear any previous error messages first
+    errorDiv.classList.add('d-none');
+    errorDiv.classList.remove('alert-danger', 'alert-warning', 'alert-info');
+    errorDiv.textContent = '';
+    errorDiv.style.display = 'none';
+
+    // Get values with safe parsing
+    const sizeVal = (sizeInput?.value || "").trim();
+    const qtyRaw = (qtyInput.value || "").trim();
+    const priceRaw = (priceInput.value || "").trim().replace(/,/g, "");
+    const costRaw = (costInput?.value || "").trim().replace(/,/g, "");
+    const locationId = locationInput?.value || null;
+
+    const qty = parseInt(qtyRaw);
+    const price = Number(priceRaw);
+    const cost = Number(costRaw);
 
     // Validate (BLOCKING errors only)
-    if (!qty || qty <= 0) {
-      errorDiv.textContent = '❌ Please enter a valid quantity (must be greater than 0)';
-      errorDiv.classList.remove('d-none');
-      errorDiv.classList.remove('alert-warning');
+    if (!qty || qty <= 0 || isNaN(qty) || !Number.isInteger(qty)) {
+      errorDiv.textContent = '❌ Please enter a valid quantity (must be a whole number greater than 0)';
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
       errorDiv.classList.add('alert-danger');
-      qtyInput?.focus();
+      errorDiv.style.display = 'block';
+      qtyInput.focus();
+      window.__savePricingInProgress = false;
       return;
     }
 
-    if (!price || price <= 0) {
+    if (!price || price <= 0 || isNaN(price)) {
       errorDiv.textContent = '❌ Please enter a valid selling price (must be greater than 0)';
-      errorDiv.classList.remove('d-none');
-      errorDiv.classList.remove('alert-warning');
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
       errorDiv.classList.add('alert-danger');
-      priceInput?.focus();
+      errorDiv.style.display = 'block';
+      priceInput.focus();
+      window.__savePricingInProgress = false;
       return;
     }
 
-    if (cost < 0) {
-      errorDiv.textContent = '❌ Cost price cannot be negative';
-      errorDiv.classList.remove('d-none');
-      errorDiv.classList.remove('alert-warning');
+    if (isNaN(cost) || cost < 0) {
+      errorDiv.textContent = '❌ Cost price must be a valid number (0 or greater)';
+      errorDiv.classList.remove('d-none', 'alert-warning', 'alert-info');
       errorDiv.classList.add('alert-danger');
-      costInput?.focus();
+      errorDiv.style.display = 'block';
+      if (costInput) costInput.focus();
+      window.__savePricingInProgress = false;
       return;
     }
 
@@ -1052,48 +1211,93 @@
     if (cost > 0 && price < cost) {
       const suggestedPrice = (cost * 1.2).toFixed(2);
       errorDiv.textContent = `⚠️ Warning: Selling price (K${price.toFixed(0)}) is below cost (K${cost.toFixed(0)}). You're pricing at a loss. Consider K${suggestedPrice} for 20% markup. Click Continue to proceed anyway.`;
-      errorDiv.classList.remove('d-none');
-      errorDiv.classList.remove('alert-danger');
+      errorDiv.classList.remove('d-none', 'alert-danger', 'alert-info');
       errorDiv.classList.add('alert-warning');
+      errorDiv.style.display = 'block';
       hasWarning = true;
       // Don't return - allow user to continue
-    } else {
+    } else if (!hasWarning) {
       // Clear warnings if pricing is good
       errorDiv.classList.add('d-none');
       errorDiv.textContent = '';
+      errorDiv.style.display = 'none';
+    }
+
+    // Get API URL from data attribute (Django reverse)
+    const apiUrl = document.querySelector('[data-step1-url]')?.getAttribute('data-step1-url');
+    if (!apiUrl) {
+      console.error('API URL not found in template');
+      errorDiv.textContent = '❌ Configuration error: API URL not found';
+      errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+      errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+      window.__savePricingInProgress = false;
+      return;
+    }
+
+    // Disable button during submission
+    if (continueBtn) {
+      continueBtn.disabled = true;
+      continueBtn.style.opacity = '0.5';
     }
 
     // Call backend API to validate and store batch session
     try {
       const csrfToken = document.querySelector('[name=csrf-token]')?.content ||
-                        document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                        document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+                        document.querySelector('input[name=csrfmiddlewaretoken]')?.value;
+
+      if (!csrfToken) {
+        console.warn('CSRF token not found');
+      }
 
       errorDiv.textContent = '⏳ Validating...';
-      errorDiv.classList.remove('d-none');
-      errorDiv.classList.remove('alert-danger', 'alert-warning');
+      errorDiv.classList.remove('d-none', 'alert-danger', 'alert-warning');
       errorDiv.classList.add('alert-info');
+      errorDiv.style.display = 'block';
 
-      const response = await fetch('/clothing/api/barcode-batch/step1/', {
+      const payload = {
+        category: wizard.data.category || '',
+        subcategory: wizard.data.shoe_subtype || wizard.data.suit_subtype || '',
+        size: sizeVal,  // Include size (optional)
+        quantity: qty,
+        cost_price: cost > 0 ? cost.toFixed(2) : '0',
+        selling_price: price.toFixed(2),
+        brand: wizard.data.brand || '',
+        color: wizard.data.color || '',
+        product_name: wizard.data.product_name || ''
+      };
+
+      // Add location_id if available
+      if (locationId) {
+        payload.location_id = locationId;
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken
+          'X-CSRFToken': csrfToken || ''
         },
-        body: JSON.stringify({
-          category: wizard.data.category || '',
-          subcategory: wizard.data.shoe_subtype || wizard.data.suit_subtype || '',
-          size: wizard.data.size || '',
-          quantity: qty,
-          cost_price: cost.toFixed(2),
-          selling_price: price.toFixed(2),
-          brand: wizard.data.brand || '',
-          color: wizard.data.color || '',
-          product_name: wizard.data.product_name || '',
-          location_id: {{ location_id|default:'null' }}
-        })
+        body: JSON.stringify(payload)
       });
 
-      const result = await response.json();
+      // ALWAYS parse as JSON (API now always returns JSON)
+      let result;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          result = await response.json();
+        } else {
+          // Fallback for non-JSON responses
+          const text = await response.text();
+          console.error('Non-JSON response:', text);
+          throw new Error('Server returned non-JSON response (status: ' + response.status + ')');
+        }
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        throw new Error('Failed to parse server response');
+      }
 
       if (result.ok) {
         // Save to wizard data
@@ -1103,35 +1307,76 @@
         if (cost > 0) {
           wizard.data.cost_price = cost.toFixed(2);
         }
+        if (sizeVal) {
+          wizard.data.size = sizeVal;
+        }
 
-        // Clear error
-        errorDiv.classList.add('d-none');
+        // Show warning if present (non-blocking)
+        if (result.warning) {
+          errorDiv.textContent = '⚠️ ' + result.warning + ' Continuing...';
+          errorDiv.classList.remove('d-none', 'alert-danger', 'alert-info');
+          errorDiv.classList.add('alert-warning');
+          errorDiv.style.display = 'block';
+          // Auto-clear warning after 2 seconds
+          setTimeout(() => {
+            errorDiv.classList.add('d-none');
+            errorDiv.style.display = 'none';
+          }, 2000);
+        } else {
+          // Clear error
+          errorDiv.classList.add('d-none');
+          errorDiv.textContent = '';
+          errorDiv.style.display = 'none';
+        }
 
         // Re-render to show scanning UI
         wizard.render();
       } else {
-        // Handle structured errors
+        // Handle structured errors (NEVER show location errors as price errors)
         if (result.code === 'no_active_location' && result.action_url) {
           errorDiv.innerHTML = '❌ ' + (result.error || 'No active location') + 
-            ' <a href="' + result.action_url + '" class="alert-link">Create Location</a>';
+            ' <a href="' + result.action_url + '" class="alert-link" target="_blank">Create Location</a>';
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
         } else if (result.field_errors) {
-          // Show field-specific errors
+          // Show field-specific errors (but map correctly to field names)
           const errors = [];
           for (const [field, msg] of Object.entries(result.field_errors)) {
-            errors.push(`${field}: ${msg}`);
+            if (field === 'selling_price') {
+              errors.push(`Selling price: ${msg}`);
+            } else if (field === 'quantity') {
+              errors.push(`Quantity: ${msg}`);
+            } else if (field === 'cost_price') {
+              errors.push(`Cost price: ${msg}`);
+            } else {
+              errors.push(`${field}: ${msg}`);
+            }
           }
           errorDiv.textContent = '❌ ' + errors.join(', ');
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
         } else {
           errorDiv.textContent = '❌ ' + (result.error || 'Validation failed');
+          errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
+          errorDiv.classList.add('alert-danger');
+          errorDiv.style.display = 'block';
         }
-        errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
-        errorDiv.classList.add('alert-danger');
       }
     } catch (error) {
       console.error('Batch step 1 error:', error);
-      errorDiv.textContent = '❌ Failed to validate. Please try again.';
+      errorDiv.textContent = '❌ Failed to validate. Please try again. (' + error.message + ')';
       errorDiv.classList.remove('d-none', 'alert-info', 'alert-warning');
       errorDiv.classList.add('alert-danger');
+      errorDiv.style.display = 'block';
+    } finally {
+      // Re-enable button
+      if (continueBtn) {
+        continueBtn.disabled = false;
+        continueBtn.style.opacity = '1';
+      }
+      window.__savePricingInProgress = false;
     }
   };
 

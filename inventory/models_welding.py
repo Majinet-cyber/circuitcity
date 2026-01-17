@@ -955,3 +955,151 @@ class WeldingInvoice(models.Model):
             self.invoice_number = f"WI-{timezone.now().strftime('%Y%m%d')}-{self.pk}"
             super().save(update_fields=["invoice_number"])
 
+
+# ==============================================================================
+# REVENUE & COSTS TRACKING
+# ==============================================================================
+
+
+class WeldingRevenue(models.Model):
+    """
+    Tracks additional revenue entries for Welding business (beyond job-based revenue).
+    E.g. consultations, small repairs not tracked as full jobs, etc.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="welding_revenues",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="welding_revenues",
+    )
+    
+    # Revenue details
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Revenue amount in MWK",
+    )
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("consultation", "Consultation"),
+            ("repair", "Repair Work"),
+            ("custom_job", "Custom Job"),
+            ("other", "Other"),
+        ],
+        default="other",
+        db_index=True,
+    )
+    description = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    
+    # Date tracking
+    received_on = models.DateField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Date when revenue was received",
+    )
+    
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="welding_revenues_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-received_on", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-received_on"]),
+            models.Index(fields=["business", "category", "-received_on"]),
+        ]
+        verbose_name = "Welding Revenue"
+        verbose_name_plural = "Welding Revenues"
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - MWK {self.amount:,.0f} ({self.received_on})"
+
+
+class WeldingCost(models.Model):
+    """
+    Tracks costs/expenses for Welding business (transport, utilities, rent, labor, etc.)
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="welding_costs",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="welding_costs",
+    )
+    
+    # Cost details
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Cost amount in MWK",
+    )
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("transport", "Transport"),
+            ("labor", "Labor"),
+            ("rent", "Rent"),
+            ("utilities", "Utilities"),
+            ("equipment", "Equipment/Maintenance"),
+            ("consumables", "Consumables"),
+            ("other", "Other"),
+        ],
+        default="other",
+        db_index=True,
+    )
+    description = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    
+    # Date tracking
+    incurred_on = models.DateField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Date when cost was incurred",
+    )
+    
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="welding_costs_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-incurred_on", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-incurred_on"]),
+            models.Index(fields=["business", "category", "-incurred_on"]),
+        ]
+        verbose_name = "Welding Cost"
+        verbose_name_plural = "Welding Costs"
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - MWK {self.amount:,.0f} ({self.incurred_on})"

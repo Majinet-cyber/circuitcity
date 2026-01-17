@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Edit {{ material.name }} - Welding Workshop{% endblock %}
+{% block title %}Edit Material{% if material %} - {{ material.name }}{% endif %} - Welding Workshop{% endblock %}
 
 {% block content %}
 <div class="container py-4" style="max-width: 600px;">

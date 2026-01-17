@@ -54,13 +54,17 @@ class PricingIntelligence {
       this.inputElement.parentElement.classList.add('pricing-intelligence-field');
     }
     
-    // Initial validation if value exists
-    if (this.inputElement.value) {
-      this._validatePrice();
-    }
+    // CRITICAL FIX: Do NOT validate on page load
+    // Only validate after user interaction (input/blur)
+    // This prevents "Price must be greater than zero" showing before user types anything
+    // Track whether user has interacted with the field
+    this._userInteracted = false;
   }
 
   _onInput() {
+    // Mark as interacted when user types
+    this._userInteracted = true;
+    
     // Real-time validation as user types
     clearTimeout(this._debounceTimer);
     this._debounceTimer = setTimeout(() => {
@@ -69,6 +73,9 @@ class PricingIntelligence {
   }
 
   _onBlur() {
+    // Mark as interacted on blur
+    this._userInteracted = true;
+    
     // Format price on blur
     const value = this._parseInput(this.inputElement.value);
     if (value > 0) {
@@ -143,6 +150,12 @@ class PricingIntelligence {
       profitMargin: null,
       profitMarginPct: null
     };
+    
+    // CRITICAL FIX: Don't show validation errors if user hasn't interacted yet
+    // This prevents "Price must be greater than zero" on page load
+    if (!this._userInteracted) {
+      return result;
+    }
     
     // Basic validation
     if (sellingPrice <= 0) {

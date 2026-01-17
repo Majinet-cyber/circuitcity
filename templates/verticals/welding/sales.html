@@ -2,7 +2,7 @@
 {% load humanize %}
 {% load static %}
 
-{% block title %}Sales - {{ business.name }}{% endblock %}
+{% block title %}Sales{% if business %} - {{ business.name }}{% endif %}{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

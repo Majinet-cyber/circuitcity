@@ -214,6 +214,9 @@ def lookup_barcode_for_fast_sell(
 ) -> Dict[str, Any]:
     """
     Lookup a barcoded unit for fast sell.
+    
+    CRITICAL: ONLY works with ClothingBarcodeUnit (unique barcoded items).
+    For common stock (non-barcoded), use Manual Sell instead.
 
     Args:
         business: Business instance
@@ -245,32 +248,9 @@ def lookup_barcode_for_fast_sell(
         if sold_unit:
             return {"found": False, "error": f"Barcode {barcode} already sold on {sold_unit.sold_at}"}
 
-        # FALLBACK: Check MerchProduct (for legacy/test compatibility)
-        from inventory.models import MerchProduct
-        
-        merch_product = MerchProduct.objects.filter(
-            business=business,
-            kind="clothing",
-            is_active=True,
-            barcode__iexact=barcode,
-        ).first()
-        
-        # Check stock separately to give better error messages
-        if merch_product and merch_product.quantity_in_stock < 1:
-            return {"found": False, "error": f"Barcode {barcode} is out of stock"}
-        
-        if merch_product:
-            return {
-                "found": True,
-                "merch_product": merch_product,  # Use merch_product key to distinguish
-                "barcode": barcode,
-                "size": merch_product.size or "",
-                "category": merch_product.category or "clothing",
-                "selling_price": merch_product.selling_price or Decimal("0"),
-                "cost_price": merch_product.cost_price or Decimal("0"),
-            }
-
-        return {"found": False, "error": f"Barcode {barcode} not found in stock"}
+        # CRITICAL: No fallback to MerchProduct
+        # Fast Sell is ONLY for unique barcoded items
+        return {"found": False, "error": f"Barcode {barcode} not found. Add it to stock first or use manual sell."}
 
     return {
         "found": True,
@@ -296,15 +276,16 @@ def create_fast_sell_from_barcode(
     """
     Fast sell: scan barcode -> create sale -> mark unit sold.
 
-    This is the ONLY way to sell barcoded clothing items.
-    Uses pre-stored prices from the unit.
+    CRITICAL: This is the ONLY way to sell barcoded clothing items (unique stock).
+    For common stock (non-barcoded), use Manual Sell instead.
+    Uses pre-stored prices from the ClothingBarcodeUnit.
 
     Args:
         business: Business instance
         location: Location instance
         user: User making the sale
         barcode: Barcode to sell
-        quantity: Quantity to sell (default 1, only used for MerchProduct fallback)
+        quantity: Quantity (ignored for barcode units, always 1)
         payment_method: Payment method (cash, bank, mobile_money)
 
     Returns:
@@ -315,7 +296,7 @@ def create_fast_sell_from_barcode(
             - profit: Decimal (if ok)
             - error: str (if not ok)
     """
-    # Lookup unit
+    # Lookup unit (ONLY ClothingBarcodeUnit, no fallback)
     lookup_result = lookup_barcode_for_fast_sell(business=business, barcode=barcode, location=location)
 
     if not lookup_result.get("found"):
@@ -332,55 +313,7 @@ def create_fast_sell_from_barcode(
     }
     payment_method_enum = payment_map.get(payment_method.lower(), PaymentMethod.CASH)
 
-    # Handle MerchProduct fallback (for legacy/test compatibility)
-    if "merch_product" in lookup_result:
-        merch_product = lookup_result["merch_product"]
-        selling_price = merch_product.selling_price or Decimal("0")
-        cost_price = merch_product.cost_price or Decimal("0")
-        
-        # Validate stock
-        if merch_product.quantity_in_stock < quantity:
-            return {"ok": False, "error": f"Insufficient stock. Available: {merch_product.quantity_in_stock}"}
-        
-        # Calculate totals
-        total_price = selling_price * quantity
-        total_cost = cost_price * quantity
-        
-        # Create sale from MerchProduct
-        sale = ClothingSale.objects.create(
-            business=business,
-            product=merch_product,
-            quantity=quantity,
-            unit_price=selling_price,
-            total_price=total_price,
-            unit_cost=cost_price,
-            total_cost=total_cost,
-            payment_method=payment_method_enum,
-            sold_by=user,
-            sold_at=timezone.now(),
-            notes=f"Fast sell - Barcode: {barcode}",
-        )
-        
-        # Decrement stock
-        merch_product.quantity_in_stock = max(0, merch_product.quantity_in_stock - quantity)
-        merch_product.save(update_fields=["quantity_in_stock"])
-        
-        # Calculate profit
-        profit = total_price - total_cost
-        
-        return {
-            "ok": True,
-            "sale_id": sale.id,
-            "product_id": merch_product.id,
-            "barcode": barcode,
-            "size": merch_product.size or "",
-            "amount": total_price,
-            "cost": total_cost,
-            "profit": profit,
-            "payment_method": payment_method_enum.value,
-        }
-
-    # Standard ClothingBarcodeUnit path
+    # CRITICAL: Only ClothingBarcodeUnit path (no MerchProduct fallback)
     unit = lookup_result["unit"]
 
     # Create sale

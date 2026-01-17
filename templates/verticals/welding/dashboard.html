@@ -2,7 +2,7 @@
 {% load humanize %}
 {% load static %}
 
-{% block title %}Welding Dashboard - {{ business.name }}{% endblock %}
+{% block title %}Welding Dashboard{% if business %} - {{ business.name }}{% endif %}{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -504,7 +504,7 @@
     <!-- Premium Blue Hero Card (like Clothing) -->
     <header class="vertical-hero" data-testid="welding-hero-card">
       <div>
-        <p class="eyebrow">{{ business.name }}</p>
+        <p class="eyebrow">{% if business %}{{ business.name }}{% else %}Welding Workshop{% endif %}</p>
         <h1>🔧 Welding Workshop</h1>
         <p>Create quotes, track jobs, generate invoices</p>
       </div>
@@ -525,14 +525,75 @@
     </div>
     {% endif %}
     
-    <!-- KPI Grid -->
+    <!-- Date Range Filter Bar -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <div class="filter-label" style="color: #64748b; font-weight: 600; font-size: 0.9rem;">
+        <i class="bi bi-calendar3"></i>
+        <span>Showing: <strong data-testid="welding-date-range-label">{{ range_label|default:"Month to Date" }}</strong></span>
+      </div>
+      
+      <!-- Filter Button (Bootstrap Dropdown) -->
+      <div class="dropdown">
+        <button class="btn btn-outline-primary btn-sm dropdown-toggle" type="button" id="dashboardFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" data-testid="welding-filter-button">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 320px;" aria-labelledby="dashboardFilterBtn">
+          <h6 class="dropdown-header px-0">Date Range</h6>
+          
+          <!-- Quick Filters -->
+          <div class="d-grid gap-2 mb-3">
+            <a href="?range=mtd" class="btn btn-sm {% if active_range == 'mtd' or not active_range %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📅 Month to Date
+            </a>
+            <a href="?range=7d" class="btn btn-sm {% if active_range == '7d' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📊 Last 7 Days
+            </a>
+            <a href="?range=30d" class="btn btn-sm {% if active_range == '30d' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+              📈 Last 30 Days
+            </a>
+          </div>
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Custom Date Range -->
+          <form method="get" action="" id="customDateRangeForm">
+            <h6 class="mb-2" style="font-size: 0.85rem; color: #64748b;">Custom Range</h6>
+            <div class="mb-2">
+              <label for="start_date" class="form-label" style="font-size: 0.8rem; margin-bottom: 0.25rem;">Start Date</label>
+              <input type="date" class="form-control form-control-sm" id="start_date" name="start" value="{{ start_date_param|default:'' }}">
+            </div>
+            <div class="mb-3">
+              <label for="end_date" class="form-label" style="font-size: 0.8rem; margin-bottom: 0.25rem;">End Date</label>
+              <input type="date" class="form-control form-control-sm" id="end_date" name="end" value="{{ end_date_param|default:'' }}">
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">Apply Custom Range</button>
+          </form>
+          
+          <div class="dropdown-divider"></div>
+          
+          <!-- Reset -->
+          <a href="?" class="btn btn-sm btn-outline-secondary w-100">
+            <i class="bi bi-arrow-clockwise"></i> Reset to Default
+          </a>
+        </div>
+      </div>
+    </div>
+    
     <div class="kpi-grid" data-testid="welding-dashboard-kpis">
       <div class="kpi-card">
-        <div class="kpi-label">💰 Revenue This Month</div>
+        <div class="kpi-label">💰 Revenue ({{ range_label|default:"MTD" }})</div>
         <div class="kpi-value success">MWK {{ revenue_this_month|floatformat:0|intcomma }}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">📋 Quotes This Month</div>
+        <div class="kpi-label">💸 Costs ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value danger">MWK {{ costs_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📊 Profit ({{ range_label|default:"MTD" }})</div>
+        <div class="kpi-value {% if profit_this_month >= 0 %}success{% else %}danger{% endif %}">MWK {{ profit_this_month|floatformat:0|intcomma }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📋 Quotes ({{ range_label|default:"MTD" }})</div>
         <div class="kpi-value primary">{{ quotes_this_month }}</div>
       </div>
       <div class="kpi-card">
@@ -647,11 +708,31 @@
     </div>
     
     <!-- Insights Section -->
-    <div class="insights-section">
+    <div class="insights-section" data-testid="welding-insights">
       <div class="insights-header">
         <h3>💡 Insights</h3>
       </div>
       <div class="insights-grid">
+        <div class="insight-card">
+          <div class="insight-label">Jobs Created</div>
+          <div class="insight-value">{{ jobs_created_in_range }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Jobs Completed</div>
+          <div class="insight-value">{{ jobs_completed_in_range }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Average Job Value</div>
+          <div class="insight-value">MWK {{ avg_job_value|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Outstanding Jobs</div>
+          <div class="insight-value">{{ outstanding_jobs }}</div>
+        </div>
+        <div class="insight-card">
+          <div class="insight-label">Top Job Type</div>
+          <div class="insight-value" style="font-size: 1rem;">{{ top_job_category }}</div>
+        </div>
         <div class="insight-card">
           <div class="insight-label">Pending Quotes</div>
           <div class="insight-value">{{ quotes_pending }}</div>

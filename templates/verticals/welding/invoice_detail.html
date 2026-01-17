@@ -23,8 +23,8 @@
                     <p class="mb-0 text-muted">{{ invoice.invoice_number }}</p>
                 </div>
                 <div class="col-6 text-end">
-                    <h5>{{ business.name }}</h5>
-                    <p class="text-muted mb-0">{{ business.address|default:"" }}</p>
+                    <h5>{% if business %}{{ business.name }}{% else %}Welding Workshop{% endif %}</h5>
+                    <p class="text-muted mb-0">{% if business %}{{ business.address|default:"" }}{% endif %}</p>
                 </div>
             </div>
 

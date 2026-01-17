@@ -151,7 +151,7 @@ def _compute_date_range(period: str = "mtd", date_str: Optional[str] = None) -> 
     Compute start and end dates for a given period.
 
     Args:
-        period: One of "today", "7d", "mtd", "date"
+        period: One of "today", "7d", "30d", "mtd", "date"
         date_str: Specific date string (YYYY-MM-DD) when period="date"
 
     Returns:
@@ -165,6 +165,9 @@ def _compute_date_range(period: str = "mtd", date_str: Optional[str] = None) -> 
         end_date = today + timedelta(days=1)  # Exclusive end
     elif period == "7d":
         start_date = today - timedelta(days=6)  # Last 7 days including today
+        end_date = today + timedelta(days=1)
+    elif period == "30d":
+        start_date = today - timedelta(days=29)  # Last 30 days including today
         end_date = today + timedelta(days=1)
     elif period == "date" and date_str:
         try:
@@ -205,7 +208,7 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
     date_param = request.GET.get("date", "")  # Specific date for "date" range
 
     # Validate range parameter
-    valid_ranges = ["today", "7d", "mtd", "date"]
+    valid_ranges = ["today", "7d", "30d", "mtd", "date"]
     if range_param not in valid_ranges:
         range_param = "mtd"
 

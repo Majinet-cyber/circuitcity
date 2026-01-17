@@ -159,17 +159,18 @@
   <div class="menu-group">FARM MANAGER</div>
   <ul class="navlist">
     <li><a class="navlink" href="{% url 'verticals:farm_dashboard' %}" data-cy="nav-dashboard"><i class="bi bi-house-door"></i> Dashboard</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_ledger_list' %}" data-cy="nav-farm-ledger"><i class="bi bi-journal-text"></i> Ledger</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_add_expense' %}" data-cy="nav-farm-add-expense"><i class="bi bi-dash-circle"></i> Add Expense</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_add_sale' %}" data-cy="nav-farm-add-sale"><i class="bi bi-plus-circle"></i> Add Sale</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_sales' %}" data-cy="nav-farm-sales"><i class="bi bi-cart-check"></i> Sales</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_expenses' %}" data-cy="nav-farm-expenses"><i class="bi bi-receipt-cutoff"></i> Expenses</a></li>
     <li><a class="navlink" href="{% url 'verticals:farm_livestock_list' %}" data-cy="nav-farm-livestock"><i class="bi bi-piggy-bank"></i> Livestock</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_crops_list' %}" data-cy="nav-farm-crops"><i class="bi bi-flower1"></i> Crops</a></li>
-    <li><a class="navlink" href="{% url 'verticals:farm_reports' %}" data-cy="nav-farm-reports"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_crops_list' %}" data-cy="nav-farm-crops"><i class="bi bi-flower1"></i> Seasons</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_assets' %}" data-cy="nav-farm-assets"><i class="bi bi-tools"></i> Assets</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_locations' %}" data-cy="nav-farm-locations"><i class="bi bi-geo-alt"></i> Locations</a></li>
+    <li><a class="navlink" href="{% url 'verticals:farm_reports' %}" data-cy="nav-farm-reports"><i class="bi bi-graph-up-arrow"></i> Metrics & Reports</a></li>
   </ul>
   <div class="menu-group">SUBSCRIPTION</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-farm-billing"><i class="bi bi-credit-card-2-front"></i> Choose Plan</a></li>
-    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-farm-settings"><i class="bi bi-gear"></i> Business Settings</a></li>
+    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-farm-billing"><i class="bi bi-credit-card-2-front"></i> Billing</a></li>
+    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-farm-settings"><i class="bi bi-gear"></i> Settings</a></li>
   </ul>
   {% endif %}
 
@@ -182,6 +183,8 @@
     <li><a class="navlink" href="/verticals/welding/jobs/" data-cy="nav-welding-jobs"><i class="bi bi-clipboard-check"></i> Jobs</a></li>
     <li><a class="navlink" href="/verticals/welding/materials/" data-cy="nav-welding-materials"><i class="bi bi-gear"></i> Materials</a></li>
     <li><a class="navlink" href="/verticals/welding/stock-in/" data-cy="nav-welding-stock-in"><i class="bi bi-box-arrow-in-down"></i> Stock In</a></li>
+    <li><a class="navlink" href="/verticals/welding/revenue/" data-cy="nav-welding-revenue"><i class="bi bi-cash-coin"></i> Revenue</a></li>
+    <li><a class="navlink" href="/verticals/welding/costs/" data-cy="nav-welding-costs"><i class="bi bi-receipt-cutoff"></i> Costs</a></li>
     <li><a class="navlink" href="/verticals/welding/invoices/" data-cy="nav-welding-invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
     <li><a class="navlink" href="/verticals/welding/reports/" data-cy="nav-welding-reports"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
   </ul>
