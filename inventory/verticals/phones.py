@@ -143,9 +143,14 @@ def dashboard(request):
     last_30_days_start = today_start - timedelta(days=30)
 
     # Base queryset for sold items (scoped to business + role)
-    sold_items = InventoryItem.objects.filter(business=business, status="SOLD", sold_at__isnull=False).select_related(
-        "product", "assigned_agent"
-    )
+    # CRITICAL FIX: Include ALL sold items, not just those with sold_at timestamp
+    # Legacy data may have status="SOLD" but NULL sold_at - these must still be counted
+    # We filter is_active=True to exclude voided records (Data Correction feature)
+    sold_items = InventoryItem.objects.filter(
+        business=business, 
+        status="SOLD",
+        is_active=True,  # Exclude voided items
+    ).select_related("product", "assigned_agent")
 
     # If location is set, optionally filter by location
     # (Following Liquor pattern where location filtering is optional)
@@ -162,7 +167,20 @@ def dashboard(request):
     # ==========================================================================
 
     # Filter sales to the selected date range
-    range_sales = sold_items.filter(sold_at__gte=start_date, sold_at__lt=end_date)
+    # CRITICAL FIX: Handle legacy data where sold_at may be NULL
+    # For items with NULL sold_at, fall back to received_at for date filtering
+    # This ensures historical sales are counted even if they lack sold_at timestamp
+    from django.db.models import Case, When, F
+    from django.db.models.functions import Coalesce as CoalesceFunc
+    
+    # Use sold_at if available, otherwise fall back to received_at (as datetime)
+    # Note: received_at is a DateField, sold_at is a DateTimeField
+    # We need to compare both as dates for proper filtering
+    range_sales = sold_items.filter(
+        Q(sold_at__gte=start_date, sold_at__lt=end_date) |
+        Q(sold_at__isnull=True, received_at__gte=start_date.date() if hasattr(start_date, 'date') else start_date, 
+          received_at__lt=end_date.date() if hasattr(end_date, 'date') else end_date)
+    )
 
     # Units sold in selected range
     units_sold = range_sales.count()
@@ -373,11 +391,19 @@ def dashboard(request):
 
     # --- SALES TREND - LAST 30 DAYS (line chart, never empty) ---
     # Always generate 30 days of data (with zeros if no sales) so chart always renders
+    # CRITICAL FIX: Handle items with NULL sold_at by falling back to received_at
     sales_trend_data = []
     for i in range(30):
         day_start = today_start - timedelta(days=29 - i)
         day_end = day_start + timedelta(days=1)
-        day_sales = sold_items.filter(sold_at__gte=day_start, sold_at__lt=day_end)
+        day_date = day_start.date()
+        day_end_date = day_end.date()
+        
+        # Include items with sold_at in range OR items with null sold_at but received_at in range
+        day_sales = sold_items.filter(
+            Q(sold_at__gte=day_start, sold_at__lt=day_end) |
+            Q(sold_at__isnull=True, received_at=day_date)
+        )
         day_units = day_sales.count()
         day_revenue = day_sales.aggregate(
             total=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField())
@@ -482,8 +508,9 @@ def dashboard(request):
             )
 
     # --- BEST SALES DAY IN SELECTED RANGE ---
+    # CRITICAL FIX: Use COALESCE to handle items with NULL sold_at (fall back to received_at)
     best_day_query = (
-        range_sales.extra(select={"day": "DATE(sold_at)"})
+        range_sales.extra(select={"day": "COALESCE(DATE(sold_at), received_at)"})
         .values("day")
         .annotate(
             day_units=Count("id"),

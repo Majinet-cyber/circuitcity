@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Edit Accessory · {{ product.name }} · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Item Summary -->
+            <div class="card bg-success text-white mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">{{ product.name }}</h5>
+                            <div class="opacity-75">
+                                SKU: <strong>{{ product.sku }}</strong>
+                                · {{ product.get_category_display }}
+                            </div>
+                        </div>
+                        <span class="badge bg-light text-success">
+                            {{ stock.qty_on_hand }} in stock
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Form -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil-square"></i> Correction Form
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'verticals:phones_data_correction_accessory_edit' stock.id %}">
+                        {% csrf_token %}
+                        
+                        <!-- Reason (Required) -->
+                        <div class="mb-4">
+                            <label for="reason" class="form-label fw-bold">
+                                Reason for Correction <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" 
+                                      id="reason" 
+                                      name="reason" 
+                                      rows="2" 
+                                      required
+                                      placeholder="Explain why this correction is needed..."></textarea>
+                            <div class="form-text">
+                                <i class="bi bi-info-circle"></i> 
+                                This reason will be logged for audit purposes.
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <!-- Quantity -->
+                        <div class="mb-4">
+                            <label for="qty_on_hand" class="form-label fw-bold">Quantity on Hand</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="qty_on_hand" 
+                                   name="qty_on_hand"
+                                   value="{{ stock.qty_on_hand }}"
+                                   min="0"
+                                   placeholder="Enter new quantity">
+                            <div class="form-text">
+                                Current: {{ stock.qty_on_hand }} units
+                            </div>
+                        </div>
+                        
+                        <!-- Average Cost -->
+                        <div class="mb-4">
+                            <label for="avg_cost" class="form-label fw-bold">Average Cost (MK)</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="avg_cost" 
+                                   name="avg_cost"
+                                   value="{{ stock.avg_cost }}"
+                                   min="0"
+                                   step="0.01"
+                                   placeholder="Enter new average cost">
+                            <div class="form-text">
+                                Current: MK {{ stock.avg_cost|floatformat:2 }}
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Apply Correction
+                            </button>
+                            <a href="{% url 'verticals:phones_data_correction' %}" class="btn btn-outline-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Correction History -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i> Correction History
+                    </h6>
+                </div>
+                <div class="card-body">
+                    {% if correction_history %}
+                    {% for log in correction_history %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="fw-bold small">{{ log.get_correction_type_display }}</div>
+                        <div class="text-muted small">
+                            {{ log.corrected_at|date:"M d, Y H:i" }}
+                            by {{ log.corrected_by.get_full_name|default:log.corrected_by.username }}
+                        </div>
+                        <div class="small mt-1">{{ log.changes_summary }}</div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted small mb-0">
+                        No corrections have been made to this stock yet.
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Stock Details -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-info-circle"></i> Stock Details
+                    </h6>
+                </div>
+                <div class="card-body small">
+                    <div class="mb-2">
+                        <span class="text-muted">Product:</span><br>
+                        {{ product.name }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Category:</span><br>
+                        {{ product.get_category_display }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Location:</span><br>
+                        {{ stock.location|default:"N/A" }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Stock Value:</span><br>
+                        MK {{ stock.stock_value|floatformat:0 }}
+                    </div>
+                    <div class="mb-2">
+                        <span class="text-muted">Selling Price:</span><br>
+                        MK {{ product.default_selling_price|floatformat:0 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

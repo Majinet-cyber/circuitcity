@@ -549,12 +549,17 @@ def phone_sales_metrics(
     end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time()))
 
     # Base queryset for sold items
+    # CRITICAL FIX: Include ALL sold items, not just those with sold_at timestamp
+    # Legacy data may have status="SOLD" but NULL sold_at - these must still be counted
+    # We filter is_active=True to exclude voided records (Data Correction feature)
     sold_items = InventoryItem.objects.filter(
         business=business,
         status="SOLD",
-        sold_at__isnull=False,
-        sold_at__gte=start_dt,
-        sold_at__lt=end_dt,
+        is_active=True,  # Exclude voided items
+    ).filter(
+        # Include items with sold_at in range OR items with null sold_at but received_at in range
+        Q(sold_at__gte=start_dt, sold_at__lt=end_dt) |
+        Q(sold_at__isnull=True, received_at__gte=start_date, received_at__lt=end_date)
     ).select_related("product", "assigned_agent")
 
     if location:

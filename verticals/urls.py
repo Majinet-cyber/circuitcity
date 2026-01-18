@@ -26,6 +26,9 @@ from inventory.verticals import (
     welding,
 )
 
+# Import data correction views
+from inventory import views_data_correction as data_correction
+
 # Import new Farm modules
 from inventory.verticals import farm_sales, farm_expenses, farm_assets, farm_locations, farm_reports
 from tenants.utils import require_business
@@ -133,6 +136,67 @@ urlpatterns = [
     path("phones/accessories/api/lookup/", phones.accessories_lookup_api, name="phones_accessories_lookup_api"),
     path("phones/accessories/api/stock-in/", phones.accessories_stock_in_api, name="phones_accessories_stock_in_api"),
     path("phones/accessories/api/sell/", phones.accessories_sell_api, name="phones_accessories_sell_api"),
+    # ==========================================================================
+    # PHONES DATA CORRECTION (Manager-only feature)
+    # Allows managers to fix wrong sales/stock data safely with full audit trail
+    # ==========================================================================
+    path("phones/data-correction/", data_correction.data_correction_dashboard, name="phones_data_correction"),
+    path(
+        "phones/data-correction/phone/<int:item_id>/",
+        data_correction.phone_item_detail,
+        name="phones_data_correction_phone_detail",
+    ),
+    path(
+        "phones/data-correction/phone/<int:item_id>/edit/",
+        data_correction.phone_item_edit,
+        name="phones_data_correction_phone_edit",
+    ),
+    path(
+        "phones/data-correction/phone/<int:item_id>/void/",
+        data_correction.phone_item_void,
+        name="phones_data_correction_phone_void",
+    ),
+    path(
+        "phones/data-correction/accessory/<int:stock_id>/",
+        data_correction.accessory_stock_detail,
+        name="phones_data_correction_accessory_detail",
+    ),
+    path(
+        "phones/data-correction/accessory/<int:stock_id>/edit/",
+        data_correction.accessory_stock_edit,
+        name="phones_data_correction_accessory_edit",
+    ),
+    path(
+        "phones/data-correction/audit-trail/",
+        data_correction.correction_audit_trail,
+        name="phones_data_correction_audit_trail",
+    ),
+    path(
+        "phones/data-correction/export.csv",
+        data_correction.export_corrections_csv,
+        name="phones_data_correction_export",
+    ),
+    # Data Correction API endpoints
+    path(
+        "phones/data-correction/api/search/",
+        data_correction.api_search_items,
+        name="phones_data_correction_api_search",
+    ),
+    path(
+        "phones/data-correction/api/history/<str:model_name>/<int:object_id>/",
+        data_correction.api_item_history,
+        name="phones_data_correction_api_history",
+    ),
+    path(
+        "phones/data-correction/api/edit-phone/",
+        data_correction.api_edit_phone,
+        name="phones_data_correction_api_edit_phone",
+    ),
+    path(
+        "phones/data-correction/api/void-phone/",
+        data_correction.api_void_phone,
+        name="phones_data_correction_api_void_phone",
+    ),
     # Cement vertical (building materials, gamified stock + sell)
     path("cement/dashboard/", cement.dashboard, name="cement_dashboard"),
     path("cement/stock/", cement.stock_list, name="cement_stock_list"),

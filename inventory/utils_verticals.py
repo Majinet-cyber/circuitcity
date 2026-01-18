@@ -2190,6 +2190,20 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
             },
+            # DATA CORRECTION (Manager-only - critical adoption feature)
+            {
+                "section": "MAIN",
+                "key": "data_correction",
+                "url": "verticals:phones_data_correction",
+                "label": "Data Correction",
+                "icon": "bi-pencil-square",
+                "active_prefix": "/verticals/phones/data-correction/",
+                "active_pattern": "/verticals/phones/data-correction/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-phones-data-correction",
+            },
             # MORE section - Collapsible tools (Wallet & Time Logs accessible to all, manager tools below)
             {
                 "section": "MORE",

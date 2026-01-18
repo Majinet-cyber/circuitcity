@@ -4450,8 +4450,10 @@ def api_mark_sold(request):
         update_fields["selling_price"] = price_val
     if _bool_field_present(InventoryItem, "in_stock"):
         update_fields["in_stock"] = False
-    if _bool_field_present(InventoryItem, "is_active"):
-        update_fields["is_active"] = False
+    # CRITICAL: DO NOT set is_active=False when selling!
+    # is_active=False is ONLY for voided/deleted items (Data Correction feature)
+    # Sold items must remain is_active=True to be counted in KPIs
+    # REMOVED: update_fields["is_active"] = False  # This was a bug!
     if loc_fk and (loc_id is not None):
         update_fields[loc_fk] = loc_id
 

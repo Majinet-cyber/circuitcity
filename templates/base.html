@@ -445,13 +445,14 @@
     }
 
     /* CRITICAL: Dropdown menus with hidden attribute must stay hidden until JS removes it.
-       This prevents BFCache from showing stale dropdown state. */
+       This prevents BFCache from showing stale dropdown state. 
+       NOTE: We use regular display:none (no !important) so Bootstrap can override when showing */
     .dropdown-menu[hidden],
     #ccNotifMenu[hidden],
     #userMenu[hidden] {
-      display: none !important;
-      visibility: hidden !important;
-      opacity: 0 !important;
+      display: none;
+      visibility: hidden;
+      opacity: 0;
     }
 
     /* ========= Mobile-First Dropdown Fixes (Jan 2026) ========= */
@@ -1012,7 +1013,7 @@
 <!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Jan 2026 - BFCache fix) -->
 <script>
   /* ================================================================
-     UI CLEANUP SYSTEM v4 — BFCache/pageshow fix for mobile browsers
+     UI CLEANUP SYSTEM v5 — BFCache/pageshow fix + click functionality (Jan 2026)
      
      ROOT CAUSE ADDRESSED:
      - iOS Safari & Android Chrome use BFCache (back-forward cache)
@@ -1028,8 +1029,8 @@
      5. Mutual exclusion: only one dropdown open at a time
      ================================================================ */
   (function() {
-    if (window.__CC_UI_CLEANUP_V4__) return;
-    window.__CC_UI_CLEANUP_V4__ = true;
+    if (window.__CC_UI_CLEANUP_V5__) return;
+    window.__CC_UI_CLEANUP_V5__ = true;
 
     // Wait for Bootstrap to be available
     function waitForBootstrap(callback) {
@@ -1155,22 +1156,31 @@
       var notifMenu = document.getElementById("ccNotifMenu");
       var userMenu = document.getElementById("userMenu");
 
-      // When dropdown shows: remove hidden, close the other dropdown
+      // CRITICAL FIX: Remove hidden attribute BEFORE Bootstrap tries to show
+      // Listen to click event (capture phase) to remove hidden before Bootstrap processes it
       if (notifBtn && notifMenu) {
-        notifBtn.addEventListener('show.bs.dropdown', function() {
+        notifBtn.addEventListener('click', function() {
           notifMenu.removeAttribute('hidden');
+          // Close the other dropdown
+          if (userMenu) userMenu.setAttribute('hidden', '');
           forceCloseDropdown(userBtn);
-        });
+        }, {capture: true});
+        
+        // Restore hidden when dropdown closes
         notifBtn.addEventListener('hidden.bs.dropdown', function() {
           notifMenu.setAttribute('hidden', '');
         });
       }
 
       if (userBtn && userMenu) {
-        userBtn.addEventListener('show.bs.dropdown', function() {
+        userBtn.addEventListener('click', function() {
           userMenu.removeAttribute('hidden');
+          // Close the other dropdown
+          if (notifMenu) notifMenu.setAttribute('hidden', '');
           forceCloseDropdown(notifBtn);
-        });
+        }, {capture: true});
+        
+        // Restore hidden when dropdown closes
         userBtn.addEventListener('hidden.bs.dropdown', function() {
           userMenu.setAttribute('hidden', '');
         });

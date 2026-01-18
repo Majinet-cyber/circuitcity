@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Correction Audit Trail · {{ business.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .audit-table {
+        font-size: 0.9rem;
+    }
+    .audit-table th {
+        background: var(--bs-gray-100);
+        font-weight: 600;
+        white-space: nowrap;
+    }
+    .audit-table td {
+        vertical-align: middle;
+    }
+    
+    .correction-type-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .correction-type-badge.edit {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+    .correction-type-badge.void {
+        background: #fef3c7;
+        color: #d97706;
+    }
+    .correction-type-badge.restore {
+        background: #dcfce7;
+        color: #16a34a;
+    }
+    
+    .impact-cell {
+        font-family: monospace;
+        font-size: 0.85rem;
+    }
+    .impact-positive { color: #16a34a; }
+    .impact-negative { color: #dc2626; }
+    
+    .changes-preview {
+        max-width: 300px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    
+    .filter-bar {
+        background: var(--bs-gray-100);
+        padding: 1rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="mb-1">
+                <i class="bi bi-clock-history"></i> Correction Audit Trail
+            </h4>
+            <p class="text-muted mb-0">
+                Complete history of all data corrections for accountability and compliance.
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'verticals:phones_data_correction' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+            <a href="{% url 'verticals:phones_data_correction_export' %}" class="btn btn-primary">
+                <i class="bi bi-download"></i> Export CSV
+            </a>
+        </div>
+    </div>
+    
+    <!-- Results -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table audit-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date & Time</th>
+                            <th>Type</th>
+                            <th>Record</th>
+                            <th>Corrected By</th>
+                            <th>Reason</th>
+                            <th>Changes</th>
+                            <th class="text-end">Revenue Impact</th>
+                            <th class="text-end">Profit Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in corrections %}
+                        <tr>
+                            <td>
+                                <div>{{ log.corrected_at|date:"M d, Y" }}</div>
+                                <div class="text-muted small">{{ log.corrected_at|time:"H:i" }}</div>
+                            </td>
+                            <td>
+                                <span class="correction-type-badge {% if 'VOID' in log.correction_type %}void{% elif 'RESTORE' in log.correction_type %}restore{% else %}edit{% endif %}">
+                                    {% if 'VOID' in log.correction_type %}
+                                    <i class="bi bi-trash"></i>
+                                    {% elif 'RESTORE' in log.correction_type %}
+                                    <i class="bi bi-arrow-counterclockwise"></i>
+                                    {% else %}
+                                    <i class="bi bi-pencil"></i>
+                                    {% endif %}
+                                    {{ log.get_correction_type_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="fw-medium">{{ log.model_name }}</div>
+                                <div class="text-muted small">#{{ log.object_id }}</div>
+                            </td>
+                            <td>
+                                <div>{{ log.corrected_by.get_full_name|default:log.corrected_by.username }}</div>
+                                <div class="text-muted small">{{ log.corrected_by.email|default:"" }}</div>
+                            </td>
+                            <td>
+                                <div class="changes-preview" title="{{ log.reason }}">
+                                    {{ log.reason|truncatewords:15 }}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="changes-preview" title="{{ log.changes_summary }}">
+                                    {{ log.changes_summary|truncatewords:8 }}
+                                </div>
+                            </td>
+                            <td class="text-end impact-cell {% if log.revenue_impact < 0 %}impact-negative{% elif log.revenue_impact > 0 %}impact-positive{% endif %}">
+                                {% if log.revenue_impact != 0 %}
+                                {% if log.revenue_impact > 0 %}+{% endif %}MK {{ log.revenue_impact|floatformat:0 }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                            <td class="text-end impact-cell {% if log.profit_impact < 0 %}impact-negative{% elif log.profit_impact > 0 %}impact-positive{% endif %}">
+                                {% if log.profit_impact != 0 %}
+                                {% if log.profit_impact > 0 %}+{% endif %}MK {{ log.profit_impact|floatformat:0 }}
+                                {% else %}
+                                —
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="bi bi-inbox display-4 text-muted d-block mb-3"></i>
+                                <h5 class="text-muted">No corrections recorded yet</h5>
+                                <p class="text-muted">
+                                    When you make corrections, they will appear here for audit purposes.
+                                </p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        {% if corrections.has_other_pages %}
+        <div class="card-footer">
+            <nav>
+                <ul class="pagination justify-content-center mb-0">
+                    {% if corrections.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1">&laquo; First</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ corrections.previous_page_number }}">Previous</a>
+                    </li>
+                    {% endif %}
+                    
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            Page {{ corrections.number }} of {{ corrections.paginator.num_pages }}
+                        </span>
+                    </li>
+                    
+                    {% if corrections.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ corrections.next_page_number }}">Next</a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ corrections.paginator.num_pages }}">Last &raquo;</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
