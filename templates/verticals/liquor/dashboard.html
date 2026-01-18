@@ -344,6 +344,201 @@
     {% endif %}
   </section>
 
+  <!-- Business Insights Section -->
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">
+      <i class="bi bi-graph-up"></i> Business Insights
+    </h2>
+    
+    <!-- Loading State -->
+    <div id="insights-loading" style="text-align:center;padding:48px">
+      <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <p style="margin-top:12px;color:#64748b;font-weight:600">Loading insights...</p>
+    </div>
+    
+    <!-- Insights Content (Hidden initially) -->
+    <div id="insights-content" style="display:none">
+      <!-- Revenue Trend Chart -->
+      <div style="margin-bottom:24px">
+        <h3 style="font-size:0.95rem;color:#64748b;text-transform:uppercase;margin-bottom:12px">Revenue Trend (Last 30 Days)</h3>
+        <canvas id="revenueTrendChart" style="max-height:250px"></canvas>
+      </div>
+      
+      <!-- Quick Stats Grid -->
+      <div class="metrics-grid" style="margin-bottom:24px">
+        <article class="metric-card">
+          <h3>Total Revenue</h3>
+          <p id="total-revenue" style="color:#16a34a">MK 0.00</p>
+          <small id="total-sales-count">0 sales</small>
+        </article>
+        <article class="metric-card">
+          <h3>Stock Value</h3>
+          <p id="stock-value">MK 0.00</p>
+          <small>Current inventory cost</small>
+        </article>
+        <article class="metric-card">
+          <h3>Stock Alerts</h3>
+          <p id="stock-alerts" style="color:#f59e0b">0</p>
+          <small id="stock-alerts-detail">low stock</small>
+        </article>
+      </div>
+      
+      <!-- Top Selling Items -->
+      <div>
+        <h3 style="font-size:0.95rem;color:#64748b;text-transform:uppercase;margin-bottom:12px">Top Selling Items</h3>
+        <div id="top-items-list" class="recent-list">
+          <!-- Will be populated by JS -->
+        </div>
+      </div>
+    </div>
+    
+    <!-- Error State (Hidden initially) -->
+    <div id="insights-error" style="display:none;text-align:center;padding:48px;background:#fef2f2;border-radius:12px">
+      <div style="font-size:48px;margin-bottom:12px">⚠️</div>
+      <p style="margin:0;color:#991b1b;font-weight:600">Failed to load insights</p>
+      <button onclick="loadBusinessInsights()" class="btn btn-sm btn-outline-danger" style="margin-top:12px">Retry</button>
+    </div>
+  </section>
+  
+  <script>
+    let revenueChart = null;
+    
+    function loadBusinessInsights() {
+      const loading = document.getElementById('insights-loading');
+      const content = document.getElementById('insights-content');
+      const error = document.getElementById('insights-error');
+      
+      // Show loading
+      loading.style.display = 'block';
+      content.style.display = 'none';
+      error.style.display = 'none';
+      
+      // Fetch insights data
+      fetch('/liquor/api/business-insights/?days=30')
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to fetch insights');
+          return response.json();
+        })
+        .then(data => {
+          // Hide loading, show content
+          loading.style.display = 'none';
+          content.style.display = 'block';
+          
+          // Update quick stats
+          document.getElementById('total-revenue').textContent = 
+            'MK ' + parseFloat(data.total_revenue || 0).toFixed(2);
+          document.getElementById('total-sales-count').textContent = 
+            (data.total_sales_count || 0) + ' sales';
+          document.getElementById('stock-value').textContent = 
+            'MK ' + parseFloat(data.total_stock_value || 0).toFixed(2);
+          document.getElementById('stock-alerts').textContent = 
+            (data.low_stock_count || 0);
+          document.getElementById('stock-alerts-detail').textContent = 
+            (data.low_stock_count || 0) + ' low stock, ' + (data.out_of_stock_count || 0) + ' out';
+          
+          // Render revenue trend chart
+          renderRevenueChart(data.revenue_trend || []);
+          
+          // Render top items list
+          renderTopItems(data.top_items || []);
+        })
+        .catch(err => {
+          console.error('Error loading insights:', err);
+          loading.style.display = 'none';
+          error.style.display = 'block';
+        });
+    }
+    
+    function renderRevenueChart(trend) {
+      const ctx = document.getElementById('revenueTrendChart');
+      if (!ctx) return;
+      
+      // Destroy existing chart
+      if (revenueChart) {
+        revenueChart.destroy();
+      }
+      
+      // Prepare data
+      const labels = trend.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      const revenues = trend.map(d => d.revenue);
+      
+      // Create chart
+      revenueChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Revenue (MK)',
+            data: revenues,
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+            tension: 0.3,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return 'MK ' + context.parsed.y.toFixed(2);
+                }
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return 'MK ' + value.toLocaleString();
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    
+    function renderTopItems(items) {
+      const container = document.getElementById('top-items-list');
+      if (!container) return;
+      
+      if (items.length === 0) {
+        container.innerHTML = '<li class="recent-item" style="text-align:center;padding:24px;color:#94a3b8">No sales data yet</li>';
+        return;
+      }
+      
+      container.innerHTML = items.map((item, i) => `
+        <li class="recent-item" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="flex:1">
+            <strong style="color:#0f172a">#${i + 1} ${item.name}</strong>
+            <div style="font-size:0.85rem;color:#64748b;margin-top:4px">
+              ${item.category || 'Uncategorized'} · ${item.quantity} units · ${item.sales_count} sales
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:800;color:#16a34a">MK ${parseFloat(item.revenue).toFixed(0)}</div>
+          </div>
+        </li>
+      `).join('');
+    }
+    
+    // Load insights on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      loadBusinessInsights();
+    });
+  </script>
+
   {% comment %}Rotating Insights Panel{% endcomment %}
   {% include "partials/dashboard_rotating_insights.html" %}
 

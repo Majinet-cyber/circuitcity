@@ -152,7 +152,7 @@ def assignment_create(request):
             messages.success(
                 request, f"✅ Assigned {bottles_count} bottles of {assignment.product.name} to {agent.username}"
             )
-            return redirect("verticals:liquor_assignment_list")
+            return redirect("liquor:assignment_list")
 
         except (ValueError, KeyError) as e:
             messages.error(request, f"Invalid input: {e}")
@@ -270,7 +270,7 @@ def return_stock(request, assignment_id):
     except Exception as e:
         messages.error(request, f"Error returning stock: {e}")
 
-    return redirect("verticals:liquor_my_stock")
+    return redirect("liquor:my_stock")
 
 
 # ==============================================================================
@@ -415,7 +415,7 @@ def finalize_reconciliation_view(request, reconciliation_id):
     except Exception as e:
         messages.error(request, f"Error finalizing reconciliation: {e}")
 
-    return redirect("verticals:liquor_reconciliation")
+    return redirect("liquor:reconciliation")
 
 
 # ==============================================================================

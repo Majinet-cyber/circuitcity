@@ -137,7 +137,7 @@
     
     <!-- Finalize Button -->
     {% if not item.recon.is_reconciled %}
-    <form method="post" action="{% url 'verticals:liquor_finalize_reconciliation' item.recon.id %}">
+    <form method="post" action="{% url 'liquor:finalize_reconciliation' item.recon.id %}">
       {% csrf_token %}
       <button type="submit" class="lr-finalize-btn">✅ Finalize Reconciliation</button>
     </form>

@@ -10,6 +10,7 @@ from typing import Optional, Any
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum, F
 from django.http import HttpRequest, JsonResponse
@@ -1464,3 +1465,163 @@ def stock_overview(request):
         "active_tab": "stock_overview",
     }
     return render(request, "verticals/liquor/stock_overview.html", ctx)
+
+
+# ==============================================================================
+# BUSINESS INSIGHTS API
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def business_insights_api(request):
+    """
+    API endpoint for liquor dashboard Business Insights.
+    
+    Returns:
+    - Revenue trend (last 7/30 days)
+    - Top selling items (top 5)
+    - Low stock alerts count
+    - Stock value summary
+    """
+    from datetime import timedelta
+    from django.db.models import Sum, Count, Q
+    from django.db.models.functions import TruncDate
+    
+    business = get_active_business(request)
+    
+    if not business:
+        return JsonResponse({"error": "No active business found"}, status=400)
+    
+    # Get date range from request (default to 30 days)
+    days = int(request.GET.get("days", 30))
+    end_date = timezone.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # Revenue trend by day
+    # Use database-safe date grouping
+    from django.conf import settings
+    from django.db import connection
+    
+    sales = LiquorSale.objects.filter(
+        business=business,
+        sold_at__gte=start_date,
+        sold_at__lte=end_date
+    )
+    
+    # Database-agnostic date grouping
+    if connection.vendor == 'sqlite':
+        # SQLite: use DATE() function
+        from django.db.models import Func, DateField
+        
+        class SQLiteDate(Func):
+            function = 'DATE'
+            output_field = DateField()
+        
+        revenue_by_day = (
+            sales
+            .annotate(date=SQLiteDate('sold_at'))
+            .values('date')
+            .annotate(
+                revenue=Sum('total_price'),
+                count=Count('id')
+            )
+            .order_by('date')
+        )
+    else:
+        # PostgreSQL: use TruncDate
+        revenue_by_day = (
+            sales
+            .annotate(date=TruncDate('sold_at'))
+            .values('date')
+            .annotate(
+                revenue=Sum('total_price'),
+                count=Count('id')
+            )
+            .order_by('date')
+        )
+    
+    # Convert to list of dicts with string dates
+    revenue_trend = [
+        {
+            'date': item['date'].isoformat() if item['date'] else None,
+            'revenue': float(item['revenue'] or 0),
+            'count': item['count']
+        }
+        for item in revenue_by_day
+    ]
+    
+    # Top selling items (top 5 by revenue)
+    top_items = (
+        sales
+        .values('product__name', 'product__category')
+        .annotate(
+            revenue=Sum('total_price'),
+            quantity=Sum('quantity'),
+            count=Count('id')
+        )
+        .order_by('-revenue')[:5]
+    )
+    
+    top_items_list = [
+        {
+            'name': item['product__name'],
+            'category': item['product__category'],
+            'revenue': float(item['revenue'] or 0),
+            'quantity': item['quantity'],
+            'sales_count': item['count']
+        }
+        for item in top_items
+    ]
+    
+    # Low stock alerts (products with stock <= 5)
+    low_stock_products = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True,
+        quantity_in_stock__lte=5,
+        quantity_in_stock__gt=0
+    )
+    low_stock_count = low_stock_products.count()
+    
+    # Out of stock count
+    out_of_stock_count = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True,
+        quantity_in_stock=0
+    ).count()
+    
+    # Total stock value
+    products_with_stock = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.LIQUOR,
+        is_active=True,
+        quantity_in_stock__gt=0
+    )
+    
+    total_stock_value = Decimal("0.00")
+    for product in products_with_stock:
+        if product.cost_per_bottle:
+            total_stock_value += product.quantity_in_stock * product.cost_per_bottle
+    
+    # Total revenue for period
+    total_revenue = sales.aggregate(total=Sum('total_price'))['total'] or Decimal("0.00")
+    
+    # Total sales count
+    total_sales_count = sales.count()
+    
+    return JsonResponse({
+        'ok': True,
+        'period_days': days,
+        'start_date': start_date.isoformat(),
+        'end_date': end_date.isoformat(),
+        'revenue_trend': revenue_trend,
+        'top_items': top_items_list,
+        'low_stock_count': low_stock_count,
+        'out_of_stock_count': out_of_stock_count,
+        'total_stock_value': float(total_stock_value),
+        'total_revenue': float(total_revenue),
+        'total_sales_count': total_sales_count,
+    })

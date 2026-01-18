@@ -114,7 +114,7 @@
         
         <!-- Return Form -->
         {% if assignment.bottles_remaining > 0 %}
-        <form method="post" action="{% url 'verticals:liquor_return_stock' assignment.id %}" class="ls-return-form">
+        <form method="post" action="{% url 'liquor:return_stock' assignment.id %}" class="ls-return-form">
           {% csrf_token %}
           <input type="number" name="bottles_count" min="1" max="{{ assignment.bottles_remaining }}" placeholder="Bottles to return" required>
           <button type="submit">↩️ Return</button>

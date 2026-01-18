@@ -71,6 +71,8 @@ urlpatterns = [
     # Stock edit requests
     path("product/<int:product_id>/request-edit/", views_liquor.request_stock_edit, name="request_stock_edit"),
     path("stock-requests/", views_liquor.stock_edit_requests, name="stock_edit_requests"),
+    # Business Insights API
+    path("api/business-insights/", views_liquor.business_insights_api, name="business_insights_api"),
 ]
 
 # Phase 6: Agent Stock Assignment URLs
