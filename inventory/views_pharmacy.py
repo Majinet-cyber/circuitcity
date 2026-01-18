@@ -379,12 +379,54 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     except Exception:
         pass  # Gracefully degrade if helpers not available, defaults already set
 
+    # ===== ADDITIONAL KPIs FOR ENHANCED DASHBOARD =====
+    # Calculate stock value at cost (sum of cost_price * quantity for all batches)
+    total_stock_value_cost = sum(b.stock_value_cost for b in batches)
+    
+    # Top category by revenue (last 30 days)
+    thirty_days_ago = today - timedelta(days=30)
+    recent_sales = PharmacySale.objects.filter(
+        business=business,
+        sold_at__gte=timezone.make_aware(datetime.combine(thirty_days_ago, datetime.min.time())),
+        is_deleted=False,
+        is_reversed=False,
+    )
+    
+    top_category_name = "N/A"
+    if top_categories_data:
+        top_category_name = top_categories_data[0]["category"]
+    
+    # Fast movers (top products by quantity in last 30 days)
+    fast_movers = (
+        recent_sales.values("batch__merch_product__name")
+        .annotate(total_qty=Sum("quantity"))
+        .order_by("-total_qty")[:3]
+    )
+    fast_movers_count = fast_movers.count()
+    
+    # "What Needs Attention" lists
+    expiring_soon_items = near_expiry_batches[:5]  # Top 5 expiring soon
+    
+    # Out of stock products (quantity = 0)
+    out_of_stock_products = products_all.filter(quantity_in_stock=0)[:5]
+    out_of_stock_items = []
+    for product in out_of_stock_products:
+        category_display = dict(PharmacyCategory.choices).get(product.category or "general", "General")
+        out_of_stock_items.append({
+            "name": product.name,
+            "category_display": category_display,
+        })
+    
+    # Low stock items
+    low_stock_items = low_stock_batches[:5]  # Top 5 low stock
+
     ctx = {
         # Navigation context (for base template)
         "active_tab": "home",  # Highlights the dashboard/home tab in mobile nav
         # Stock metrics (current state)
         "total_batches": total_batches,
-        "total_stock_value": total_stock_value,
+        "total_stock_value": total_stock_value,  # At selling price
+        "total_stock_value_cost": total_stock_value_cost,  # At cost price
         "products_count": products_count,
         "total_products": products_count,  # Alias for template compatibility
         "medicine_count": medicine_count,
@@ -426,6 +468,13 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "today_revenue": period_revenue if range_param == "today" else Decimal("0.00"),
         "today_profit": period_profit if range_param == "today" else Decimal("0.00"),
         "today_sales_count": period_sales_count if range_param == "today" else 0,
+        # ===== ENHANCED DASHBOARD KPIs =====
+        "top_category_name": top_category_name,
+        "fast_movers_count": fast_movers_count,
+        # What Needs Attention panels
+        "expiring_soon_items": expiring_soon_items,
+        "out_of_stock_items": out_of_stock_items,
+        "low_stock_items": low_stock_items,
     }
 
     # Merge enhancements from above (includes quotes)
@@ -440,7 +489,177 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
 
 
 # ==============================================================================
-# GAMIFIED STOCK IN WIZARD (Card-Based Flow)
+# STOCK IN - NEW GAMIFIED FLOW (PHARMACY vs COSMETICS)
+# ==============================================================================
+
+
+@login_required
+@require_business
+def pharmacy_stock_in_choice(request: HttpRequest) -> HttpResponse:
+    """
+    Stock In landing page with choice between Pharmacy and Cosmetics.
+    Part of the new gamified, organized stock-in UX.
+    """
+    return render(request, "verticals/pharmacy/stock_in_choice.html", {})
+
+
+@login_required
+@require_business
+def pharmacy_stock_in_catalog(request: HttpRequest, category: str) -> HttpResponse:
+    """
+    Show curated product catalog for the selected category (pharmacy or cosmetics).
+    Users click product cards to quickly add stock with minimal typing.
+    """
+    business: Business = request.business
+    
+    # Determine category and products
+    is_pharmacy = category.lower() == "pharmacy"
+    
+    if is_pharmacy:
+        category_name = "Pharmacy"
+        category_icon = "💊"
+        
+        # Curated pharmacy products
+        products = [
+            {"name": "Paracetamol 500mg", "category": "analgesic", "category_display": "Pain Relief", "icon": "💊"},
+            {"name": "Ibuprofen 400mg", "category": "analgesic", "category_display": "Pain Relief", "icon": "💊"},
+            {"name": "Amoxicillin 500mg", "category": "antibiotic", "category_display": "Antibiotic", "icon": "💊"},
+            {"name": "Amoxicillin 250mg", "category": "antibiotic", "category_display": "Antibiotic", "icon": "💊"},
+            {"name": "ORS Sachets", "category": "gastrointestinal", "category_display": "Gastrointestinal", "icon": "💧"},
+            {"name": "Cough Syrup", "category": "respiratory", "category_display": "Respiratory", "icon": "🍯"},
+            {"name": "Vitamin C Tablets", "category": "vitamin", "category_display": "Vitamin", "icon": "🍊"},
+            {"name": "Multivitamins", "category": "vitamin", "category_display": "Vitamin", "icon": "💊"},
+            {"name": "Antacid Tablets", "category": "gastrointestinal", "category_display": "Gastrointestinal", "icon": "💊"},
+            {"name": "Antihistamine", "category": "antihistamine", "category_display": "Antihistamine", "icon": "💊"},
+            {"name": "Malaria Test Kit (RDT)", "category": "antiparasitic", "category_display": "Diagnostic", "icon": "🔬"},
+            {"name": "Aspirin", "category": "analgesic", "category_display": "Pain Relief", "icon": "💊"},
+            {"name": "Ciprofloxacin", "category": "antibiotic", "category_display": "Antibiotic", "icon": "💊"},
+            {"name": "Metronidazole", "category": "antiparasitic", "category_display": "Antiparasitic", "icon": "💊"},
+            {"name": "Albendazole", "category": "antiparasitic", "category_display": "Antiparasitic", "icon": "💊"},
+            {"name": "Panadol Extra", "category": "analgesic", "category_display": "Pain Relief", "icon": "💊"},
+            {"name": "Throat Lozenges", "category": "respiratory", "category_display": "Respiratory", "icon": "🍬"},
+            {"name": "Eye Drops", "category": "drops", "category_display": "Eye Care", "icon": "👁️"},
+            {"name": "Ear Drops", "category": "drops", "category_display": "Ear Care", "icon": "💧"},
+            {"name": "First Aid Kit", "category": "general", "category_display": "General", "icon": "🏥"},
+        ]
+    else:
+        category_name = "Cosmetics"
+        category_icon = "💄"
+        
+        # Curated cosmetics products
+        products = [
+            {"name": "Body Lotion", "category": "skin_care", "category_display": "Skin Care", "icon": "🧴"},
+            {"name": "Vaseline Petroleum Jelly", "category": "skin_care", "category_display": "Skin Care", "icon": "🧴"},
+            {"name": "Face Wash", "category": "skin_care", "category_display": "Skin Care", "icon": "🧼"},
+            {"name": "Shampoo", "category": "hair_care", "category_display": "Hair Care", "icon": "🧴"},
+            {"name": "Conditioner", "category": "hair_care", "category_display": "Hair Care", "icon": "🧴"},
+            {"name": "Hair Oil", "category": "hair_care", "category_display": "Hair Care", "icon": "🧴"},
+            {"name": "Deodorant", "category": "personal_care", "category_display": "Personal Care", "icon": "💨"},
+            {"name": "Perfume", "category": "beauty_makeup", "category_display": "Fragrance", "icon": "🌸"},
+            {"name": "Lipstick", "category": "beauty_makeup", "category_display": "Makeup", "icon": "💄"},
+            {"name": "Foundation", "category": "beauty_makeup", "category_display": "Makeup", "icon": "💄"},
+            {"name": "Sunscreen SPF 50", "category": "skin_care", "category_display": "Skin Care", "icon": "☀️"},
+            {"name": "Moisturizer", "category": "skin_care", "category_display": "Skin Care", "icon": "🧴"},
+            {"name": "Hand Cream", "category": "skin_care", "category_display": "Skin Care", "icon": "✋"},
+            {"name": "Toothpaste", "category": "oral_care", "category_display": "Oral Care", "icon": "🦷"},
+            {"name": "Toothbrush", "category": "oral_care", "category_display": "Oral Care", "icon": "🪥"},
+            {"name": "Mouthwash", "category": "oral_care", "category_display": "Oral Care", "icon": "💧"},
+            {"name": "Baby Lotion", "category": "baby_care", "category_display": "Baby Care", "icon": "👶"},
+            {"name": "Baby Powder", "category": "baby_care", "category_display": "Baby Care", "icon": "👶"},
+            {"name": "Diaper Rash Cream", "category": "baby_care", "category_display": "Baby Care", "icon": "👶"},
+            {"name": "Soap Bar", "category": "personal_care", "category_display": "Personal Care", "icon": "🧼"},
+            {"name": "Shower Gel", "category": "personal_care", "category_display": "Personal Care", "icon": "🧴"},
+            {"name": "Nail Polish", "category": "beauty_makeup", "category_display": "Makeup", "icon": "💅"},
+            {"name": "Mascara", "category": "beauty_makeup", "category_display": "Makeup", "icon": "💄"},
+            {"name": "Eyeliner", "category": "beauty_makeup", "category_display": "Makeup", "icon": "💄"},
+        ]
+    
+    ctx = {
+        "category": category,
+        "category_name": category_name,
+        "category_icon": category_icon,
+        "is_pharmacy": is_pharmacy,
+        "products": products,
+    }
+    
+    return render(request, "verticals/pharmacy/stock_in_catalog.html", ctx)
+
+
+@login_required
+@require_business
+@require_POST
+def pharmacy_stock_in_catalog_save(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint to save stock from the catalog flow.
+    Reuses existing stock_in_pharmacy service for consistency.
+    """
+    import json
+    from inventory.services.pharmacy_sale import stock_in_pharmacy
+    
+    business: Business = request.business
+    location = getattr(request, "location", None)
+    
+    try:
+        data = json.loads(request.body)
+        
+        product_name = data.get("product_name")
+        category = data.get("category")
+        quantity = int(data.get("quantity", 1))
+        cost_price = Decimal(str(data.get("cost_price", 0)))
+        selling_price = Decimal(str(data.get("selling_price", 0)))
+        expiry_date_str = data.get("expiry_date")
+        batch_number = data.get("batch_number")
+        
+        # Validate required fields
+        if not product_name or not category:
+            return JsonResponse({"ok": False, "error": "Product name and category are required"}, status=400)
+        
+        if quantity <= 0:
+            return JsonResponse({"ok": False, "error": "Quantity must be greater than 0"}, status=400)
+        
+        if cost_price < 0 or selling_price < 0:
+            return JsonResponse({"ok": False, "error": "Prices cannot be negative"}, status=400)
+        
+        # Parse expiry date if provided
+        expiry_date = None
+        if expiry_date_str:
+            try:
+                from datetime import datetime
+                expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return JsonResponse({"ok": False, "error": "Invalid expiry date format"}, status=400)
+        
+        # Use the existing service layer to save stock
+        result = stock_in_pharmacy(
+            business=business,
+            product_name=product_name,
+            category=category,
+            user=request.user,
+            quantity=quantity,
+            unit="piece",  # Catalog flow uses base units
+            cost_price=cost_price,
+            selling_price=selling_price,
+            batch_number=batch_number or None,
+            expiry_date=expiry_date,
+            barcode=None,  # No barcode in catalog flow
+            supplier=None,
+            location=location,
+            notes=f"Added via catalog (category: {category})",
+        )
+        
+        return JsonResponse(result)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:
+        logger.error(f"Error in pharmacy_stock_in_catalog_save: {e}", exc_info=True)
+        return JsonResponse({"ok": False, "error": "Internal server error"}, status=500)
+
+
+# ==============================================================================
+# GAMIFIED STOCK IN WIZARD (Card-Based Flow - LEGACY)
 # ==============================================================================
 
 

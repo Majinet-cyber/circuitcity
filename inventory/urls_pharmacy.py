@@ -11,7 +11,12 @@ urlpatterns = [
     # Dashboard
     path("", views_pharmacy.pharmacy_dashboard, name="dashboard"),
     # Gamified vertical-aware flows
-    path("stock-in/", views_pharmacy.pharmacy_stock_in, name="stock_in"),  # Form-based flow for tests/API
+    path("stock-in/", views_pharmacy.pharmacy_stock_in_choice, name="stock_in_choice"),  # NEW: Landing page with Pharmacy/Cosmetics choice
+    path("stock-in/catalog/save/", views_pharmacy.pharmacy_stock_in_catalog_save, name="stock_in_catalog_save"),  # API endpoint - MUST BE BEFORE generic catalog pattern
+    path("stock-in/pharmacy/", views_pharmacy.pharmacy_stock_in_catalog, {"category": "pharmacy"}, name="stock_in_catalog_pharmacy"),  # Pharmacy catalog
+    path("stock-in/cosmetics/", views_pharmacy.pharmacy_stock_in_catalog, {"category": "cosmetics"}, name="stock_in_catalog_cosmetics"),  # Cosmetics catalog
+    path("stock-in/catalog/<str:category>/", views_pharmacy.pharmacy_stock_in_catalog, name="stock_in_catalog"),  # Generic catalog
+    path("stock-in/custom/", views_pharmacy.pharmacy_stock_in, name="stock_in"),  # Custom/form-based flow
     path("stock-in/wizard/", views_pharmacy.pharmacy_stock_in_wizard, name="stock_in_wizard"),  # Wizard-based flow
     path("stock-in/legacy/", views_pharmacy.pharmacy_stock_in, name="stock_in_legacy"),  # Alias for compatibility
     path("sell/", views_pharmacy.pharmacy_sell, name="sell"),

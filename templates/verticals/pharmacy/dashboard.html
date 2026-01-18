@@ -388,43 +388,292 @@
   </div>
   {% endif %}
   
-  <!-- KPI Section -->
+  <!-- PREMIUM KPI SECTION -->
   <div class="kpi-section">
-    <h2 class="section-title">📊 Overview</h2>
+    <h2 class="section-title">📊 Business Overview</h2>
     <div class="kpi-grid">
       <div class="kpi-card">
-        <p class="kpi-label">Total Products</p>
+        <p class="kpi-label">💊 Total Products</p>
         <h3 class="kpi-value">{{ total_products|default:0|intcomma }}</h3>
       </div>
       
       <div class="kpi-card">
-        <p class="kpi-label">Active Batches</p>
-        <h3 class="kpi-value">{{ active_batches|default:0|intcomma }}</h3>
+        <p class="kpi-label">📦 Active Batches</p>
+        <h3 class="kpi-value">{{ total_batches|default:0|intcomma }}</h3>
       </div>
       
       <div class="kpi-card">
-        <p class="kpi-label">Today's Sales</p>
-        <h3 class="kpi-value">MWK {{ today_sales|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-label">💰 Today's Sales</p>
+        <h3 class="kpi-value">MWK {{ today_revenue|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">{{ today_sales_count|default:0 }} transaction{{ today_sales_count|default:0|pluralize }}</p>
       </div>
       
       <div class="kpi-card">
-        <p class="kpi-label">This Month</p>
-        <h3 class="kpi-value">MWK {{ month_sales|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-label">📈 This Month Sales</p>
+        <h3 class="kpi-value">MWK {{ period_revenue|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">{{ period_sales_count|default:0 }} transaction{{ period_sales_count|default:0|pluralize }}</p>
       </div>
       
       <div class="kpi-card">
-        <p class="kpi-label">Stock Value</p>
-        <h3 class="kpi-value">MWK {{ stock_value|default:0|floatformat:0|intcomma }}</h3>
-        <p class="kpi-sublabel">At cost price</p>
+        <p class="kpi-label">🏦 Stock Value (Cost)</p>
+        <h3 class="kpi-value">MWK {{ total_stock_value_cost|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">What you invested</p>
       </div>
       
       <div class="kpi-card">
-        <p class="kpi-label">Potential Revenue</p>
-        <h3 class="kpi-value">MWK {{ potential_revenue|default:0|floatformat:0|intcomma }}</h3>
-        <p class="kpi-sublabel">At selling price</p>
+        <p class="kpi-label">💎 Potential Revenue</p>
+        <h3 class="kpi-value">MWK {{ total_stock_value|default:0|floatformat:0|intcomma }}</h3>
+        <p class="kpi-sublabel">If all sold at retail</p>
       </div>
     </div>
   </div>
+
+  <!-- OPERATIONAL INSIGHTS -->
+  <div class="kpi-section">
+    <h2 class="section-title">⚙️ Operational Insights</h2>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <p class="kpi-label">⏰ Expiring Soon</p>
+        <h3 class="kpi-value">{{ near_expiry_count|default:0|intcomma }}</h3>
+        <p class="kpi-sublabel">Next 30 days</p>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">📉 Low Stock Alerts</p>
+        <h3 class="kpi-value">{{ low_stock_count|default:0|intcomma }}</h3>
+        <p class="kpi-sublabel">Below threshold</p>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">🏆 Top Category</p>
+        <h3 class="kpi-value" style="font-size: 1.3rem;">{{ top_category_name|default:"N/A"|truncatewords:2 }}</h3>
+        <p class="kpi-sublabel">By revenue (30 days)</p>
+      </div>
+      
+      <div class="kpi-card">
+        <p class="kpi-label">🚀 Fast Movers</p>
+        <h3 class="kpi-value" style="font-size: 1.3rem;">{{ fast_movers_count|default:0 }} item{{ fast_movers_count|default:0|pluralize }}</h3>
+        <p class="kpi-sublabel">Top sellers (30 days)</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALES TREND CHART -->
+  <div class="kpi-section">
+    <h2 class="section-title">📊 Sales Trend (Last 7 Days)</h2>
+    <div class="chart-container">
+      <canvas id="salesTrendChart" style="max-height: 300px;"></canvas>
+    </div>
+  </div>
+
+  <!-- WHAT NEEDS ATTENTION -->
+  {% if expiring_soon_items or out_of_stock_items or low_stock_items %}
+  <div class="kpi-section">
+    <h2 class="section-title">⚠️ What Needs Attention</h2>
+    
+    {% if expiring_soon_items %}
+    <div class="attention-panel">
+      <h3 class="attention-title">⏰ Expiring Soon (Top 5)</h3>
+      <div class="attention-list">
+        {% for item in expiring_soon_items %}
+        <div class="attention-item">
+          <div class="attention-item-info">
+            <strong>{{ item.merch_product.name }}</strong>
+            <span class="attention-item-meta">Batch: {{ item.batch_number }} | Expires: {{ item.expiry_date|date:"M d, Y" }} ({{ item.days_to_expiry }} days)</span>
+          </div>
+          <a href="{% url 'pharmacy:batch_list' %}" class="attention-item-action">Manage</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if out_of_stock_items %}
+    <div class="attention-panel">
+      <h3 class="attention-title">🚨 Out of Stock (Top 5)</h3>
+      <div class="attention-list">
+        {% for item in out_of_stock_items %}
+        <div class="attention-item">
+          <div class="attention-item-info">
+            <strong>{{ item.name }}</strong>
+            <span class="attention-item-meta">Category: {{ item.category_display }}</span>
+          </div>
+          <a href="{% url 'pharmacy:stock_in' %}" class="attention-item-action">Stock In</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    
+    {% if low_stock_items %}
+    <div class="attention-panel">
+      <h3 class="attention-title">📉 Low Stock (Top 5)</h3>
+      <div class="attention-list">
+        {% for item in low_stock_items %}
+        <div class="attention-item">
+          <div class="attention-item-info">
+            <strong>{{ item.merch_product.name }}</strong>
+            <span class="attention-item-meta">Stock: {{ item.quantity }} (threshold: {{ item.reorder_level }})</span>
+          </div>
+          <a href="{% url 'pharmacy:stock_in' %}" class="attention-item-action">Restock</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
+
+<!-- Chart.js for Sales Trend -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Sales Trend Chart
+  const ctx = document.getElementById('salesTrendChart');
+  if (ctx) {
+    fetch('{% url "verticals:pharmacy_sales_trend_json" %}?range=7d&t=' + Date.now())
+      .then(response => response.json())
+      .then(data => {
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: data.labels || [],
+            datasets: [{
+              label: 'Revenue (MWK)',
+              data: data.revenue || [],
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              tension: 0.4,
+              fill: true,
+              borderWidth: 3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                  label: function(context) {
+                    return 'MWK ' + context.parsed.y.toLocaleString();
+                  }
+                }
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: {
+                  callback: function(value) {
+                    return 'MWK ' + value.toLocaleString();
+                  }
+                }
+              }
+            }
+          }
+        });
+      })
+      .catch(error => {
+        console.error('Error loading sales trend:', error);
+        ctx.parentElement.innerHTML = '<p style="text-align: center; padding: 40px; color: #94a3b8;">Sales trend data unavailable</p>';
+      });
+  }
+});
+</script>
+
+<style>
+  .chart-container {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  }
+  
+  .attention-panel {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    margin-bottom: 20px;
+  }
+  
+  .attention-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 16px 0;
+  }
+  
+  .attention-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .attention-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  
+  .attention-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 200px;
+  }
+  
+  .attention-item-info strong {
+    color: #0f172a;
+    font-size: 0.95rem;
+  }
+  
+  .attention-item-meta {
+    color: #64748b;
+    font-size: 0.85rem;
+  }
+  
+  .attention-item-action {
+    padding: 6px 14px;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+  
+  .attention-item-action:hover {
+    background: #2563eb;
+    color: #fff;
+    transform: translateY(-1px);
+  }
+  
+  @media (max-width: 640px) {
+    .attention-item {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .attention-item-action {
+      text-align: center;
+    }
+  }
+</style>
 
 {% endblock %}

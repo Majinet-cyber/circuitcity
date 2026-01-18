@@ -22,12 +22,28 @@ from django.core.exceptions import ValidationError
 class PharmacyCategory:
     """Pharmacy product categories (simplified for Malawi merchants)"""
 
+    # Simplified categories (legacy)
     TABLETS_CAPSULES = "tablets_capsules"
     SYRUP = "syrup"
     OINTMENT = "ointment"
     DROPS = "drops"
     COSMETICS = "cosmetics"
     OTHER = "other"
+    
+    # Detailed medicine categories (from models_pharmacy.PharmacyCategory)
+    ANALGESIC = "analgesic"
+    ANTIBIOTIC = "antibiotic"
+    ANTIFUNGAL = "antifungal"
+    ANTIVIRAL = "antiviral"
+    ANTIHISTAMINE = "antihistamine"
+    ANTIPYRETIC = "antipyretic"
+    ANTIHYPERTENSIVE = "antihypertensive"
+    ANTIDIABETIC = "antidiabetic"
+    VITAMIN = "vitamin"
+    ANTIPARASITIC = "antiparasitic"
+    RESPIRATORY = "respiratory"
+    GASTROINTESTINAL = "gastrointestinal"
+    CONTRACEPTIVE = "contraceptive"
     
     # Detailed cosmetics subcategories (from models_pharmacy.PharmacyCategory)
     SKIN_CARE = "skin_care"
@@ -36,11 +52,21 @@ class PharmacyCategory:
     BEAUTY_MAKEUP = "beauty_makeup"
     BABY_CARE = "baby_care"
     ORAL_CARE = "oral_care"
+    
+    # General
+    GENERAL = "general"
 
     ALL = [
+        # Simplified legacy categories
         TABLETS_CAPSULES, SYRUP, OINTMENT, DROPS, COSMETICS, OTHER,
+        # Detailed medicine categories
+        ANALGESIC, ANTIBIOTIC, ANTIFUNGAL, ANTIVIRAL, ANTIHISTAMINE,
+        ANTIPYRETIC, ANTIHYPERTENSIVE, ANTIDIABETIC, VITAMIN, ANTIPARASITIC,
+        RESPIRATORY, GASTROINTESTINAL, CONTRACEPTIVE,
         # Detailed cosmetics categories
         SKIN_CARE, HAIR_CARE, PERSONAL_CARE, BEAUTY_MAKEUP, BABY_CARE, ORAL_CARE,
+        # General
+        GENERAL,
     ]
 
     CHOICES = [
