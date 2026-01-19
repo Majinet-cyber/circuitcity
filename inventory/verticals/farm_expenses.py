@@ -65,7 +65,21 @@ def expenses_record(request: HttpRequest) -> HttpResponse:
     
     if request.method == "POST":
         try:
-            amount = Decimal(request.POST.get("amount", "0"))
+            # CRITICAL FIX (Jan 2026): Calculate total based on unit price × quantity
+            # If quantity is provided, treat "amount" as unit_price and compute total
+            # Otherwise, "amount" is the total already
+            unit_price_or_total = Decimal(request.POST.get("amount", "0"))
+            quantity_str = request.POST.get("quantity", "").strip()
+            
+            if quantity_str:
+                # User provided quantity → amount field is unit price
+                quantity = Decimal(quantity_str)
+                total_amount = unit_price_or_total * quantity
+            else:
+                # No quantity → amount field is the total
+                total_amount = unit_price_or_total
+                quantity = None
+            
             entry = FarmLedgerEntry.objects.create(
                 business=business,
                 date=request.POST.get("date") or timezone.now().date(),
@@ -73,14 +87,14 @@ def expenses_record(request: HttpRequest) -> HttpResponse:
                 enterprise_type=request.POST.get("enterprise_type", "general"),
                 category=request.POST.get("category", "other"),
                 description=request.POST.get("description", ""),
-                amount_mwk=amount,
-                quantity=request.POST.get("quantity") or None,
+                amount_mwk=total_amount,  # Store computed total, not unit price
+                quantity=quantity,
                 unit=request.POST.get("unit", "item"),
                 payment_method=request.POST.get("payment_method", "cash"),
                 notes=request.POST.get("notes", ""),
                 created_by=request.user,
             )
-            messages.success(request, f"Expense of MWK {amount:,.2f} recorded successfully.")
+            messages.success(request, f"Expense of MWK {total_amount:,.2f} recorded successfully.")
             return redirect("verticals:farm_expenses")
         except Exception as e:
             messages.error(request, f"Error recording expense: {e}")
