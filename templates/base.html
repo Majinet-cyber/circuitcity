@@ -123,6 +123,9 @@
   <!-- PRODUCTION ENHANCEMENTS 2025-12-19 -->
   <link rel="stylesheet" href="{% static 'css/numeric-display.css' %}?v={{ ASSET_V }}">
   <link rel="stylesheet" href="{% static 'css/glassmorphic-design-system.css' %}?v={{ ASSET_V }}">
+  
+  <!-- VERTICAL-SPECIFIC POLISH 2026-01-19 (Liquor, Welding, Farm, Phones) -->
+  <link rel="stylesheet" href="{% static 'css/vertical-polish-2026.css' %}?v={{ ASSET_V }}">
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
@@ -1156,31 +1159,75 @@
       var notifMenu = document.getElementById("ccNotifMenu");
       var userMenu = document.getElementById("userMenu");
 
-      // CRITICAL FIX: Remove hidden attribute BEFORE Bootstrap tries to show
-      // Listen to click event (capture phase) to remove hidden before Bootstrap processes it
-      if (notifBtn && notifMenu) {
-        notifBtn.addEventListener('click', function() {
+      // CRITICAL FIX: Initialize Bootstrap dropdowns explicitly and manage hidden attribute
+      // This ensures dropdowns work on first load without refresh
+      if (notifBtn && notifMenu && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        // Remove hidden attribute immediately (Bootstrap needs it visible to calculate positioning)
+        notifMenu.removeAttribute('hidden');
+        
+        // Initialize Bootstrap dropdown instance
+        try {
+          var notifDropdown = new bootstrap.Dropdown(notifBtn, {
+            autoClose: true,
+            boundary: 'viewport'
+          });
+        } catch(e) {
+          console.warn('[Dropdown] Failed to initialize notif dropdown:', e);
+        }
+        
+        // Re-hide after Bootstrap initialization
+        setTimeout(function() {
+          if (!notifMenu.classList.contains('show')) {
+            notifMenu.setAttribute('hidden', '');
+          }
+        }, 0);
+        
+        // Handle show event: remove hidden
+        notifBtn.addEventListener('show.bs.dropdown', function() {
           notifMenu.removeAttribute('hidden');
           // Close the other dropdown
-          if (userMenu) userMenu.setAttribute('hidden', '');
-          forceCloseDropdown(userBtn);
-        }, {capture: true});
+          if (userBtn && userMenu) {
+            forceCloseDropdown(userBtn);
+          }
+        });
         
-        // Restore hidden when dropdown closes
+        // Handle hidden event: restore hidden attribute
         notifBtn.addEventListener('hidden.bs.dropdown', function() {
           notifMenu.setAttribute('hidden', '');
         });
       }
 
-      if (userBtn && userMenu) {
-        userBtn.addEventListener('click', function() {
+      if (userBtn && userMenu && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+        // Remove hidden attribute immediately
+        userMenu.removeAttribute('hidden');
+        
+        // Initialize Bootstrap dropdown instance
+        try {
+          var userDropdown = new bootstrap.Dropdown(userBtn, {
+            autoClose: true,
+            boundary: 'viewport'
+          });
+        } catch(e) {
+          console.warn('[Dropdown] Failed to initialize user dropdown:', e);
+        }
+        
+        // Re-hide after Bootstrap initialization
+        setTimeout(function() {
+          if (!userMenu.classList.contains('show')) {
+            userMenu.setAttribute('hidden', '');
+          }
+        }, 0);
+        
+        // Handle show event: remove hidden
+        userBtn.addEventListener('show.bs.dropdown', function() {
           userMenu.removeAttribute('hidden');
           // Close the other dropdown
-          if (notifMenu) notifMenu.setAttribute('hidden', '');
-          forceCloseDropdown(notifBtn);
-        }, {capture: true});
+          if (notifBtn && notifMenu) {
+            forceCloseDropdown(notifBtn);
+          }
+        });
         
-        // Restore hidden when dropdown closes
+        // Handle hidden event: restore hidden attribute
         userBtn.addEventListener('hidden.bs.dropdown', function() {
           userMenu.setAttribute('hidden', '');
         });
