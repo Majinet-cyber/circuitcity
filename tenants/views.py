@@ -284,13 +284,17 @@ def choose_business(request: HttpRequest) -> HttpResponse:
     """
     Chooser page for users with multiple businesses.
     
-    MULTI-TENANCY HARDENING: Regular users (non-superusers) with ANY business
-    membership are automatically redirected to their business dashboard.
-    Only superusers can access the switcher.
+    CRITICAL FIX (Jan 2026): Agents with business memberships should NOT be blocked.
+    They should be auto-redirected to their business dashboard.
+    
+    This view handles:
+    - Superusers: Show business switcher
+    - Regular users with business: Auto-redirect to dashboard
+    - Users without business: Redirect to tenant selection/signup
     """
     user = request.user
 
-    # SECURITY: Block regular users from accessing business switcher
+    # Auto-redirect logic for non-superusers
     if not user.is_superuser:
         from .utils import user_has_any_business
         
@@ -303,7 +307,7 @@ def choose_business(request: HttpRequest) -> HttpResponse:
                 messages.info(request, f"Your account is linked to {bound.name}.")
                 return _home_redirect(request)
             
-            # Get their single business membership
+            # Get their business membership (agents or managers)
             memberships_list = list(
                 Membership.objects.filter(user=user, status="ACTIVE")
                 .select_related("business")
@@ -314,13 +318,12 @@ def choose_business(request: HttpRequest) -> HttpResponse:
                 single_biz = memberships_list[0].business
                 _ensure_seed_on_switch(single_biz)
                 set_active_business(request, single_biz)
-                messages.info(request, f"Your account is linked to {single_biz.name}.")
+                # No message needed - just redirect to their dashboard
                 home_url = get_business_home_url(user=user, business=single_biz)
                 return redirect(home_url)
         
-        # No business yet - redirect to signup manager flow
-        messages.info(request, "Please set up or join a business first.")
-        return redirect("accounts:signup_manager")
+        # No business yet - redirect to tenant selection (activate_mine handles join flow)
+        return redirect("tenants:activate_mine")
 
     # SUPERUSERS ONLY beyond this point
     memberships_qs = (

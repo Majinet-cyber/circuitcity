@@ -228,15 +228,13 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"
 # Cross-subdomain cookie support: sessions/CSRF work on both www and apex
 # This prevents auth/session bouncing during www → apex redirects
 # Format: ".domain.com" (leading dot = include subdomains)
-# Only set in production; local dev uses default (hostname-only cookies)
-SESSION_COOKIE_DOMAIN = os.environ.get(
-    "SESSION_COOKIE_DOMAIN",
-    ".emajinet.africa" if not DEBUG and not TESTING else None
-)
-CSRF_COOKIE_DOMAIN = os.environ.get(
-    "CSRF_COOKIE_DOMAIN",
-    ".emajinet.africa" if not DEBUG and not TESTING else None
-)
+# CRITICAL FIX: Never hardcode domain - staging and production have different domains
+# Staging: emajinet-staging.onrender.com (NO domain cookie)
+# Production: emajinet.africa (YES domain cookie for www/apex)
+# Default: None (host-only cookies) for all environments
+# Set SESSION_COOKIE_DOMAIN env var explicitly in production ONLY
+SESSION_COOKIE_DOMAIN = os.environ.get("SESSION_COOKIE_DOMAIN", None)
+CSRF_COOKIE_DOMAIN = os.environ.get("CSRF_COOKIE_DOMAIN", None)
 
 # Canonical session key for active tenant (used by middleware/utils)
 TENANT_SESSION_KEY = os.environ.get("TENANT_SESSION_KEY", "active_business_id")
