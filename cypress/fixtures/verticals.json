@@ -7,14 +7,14 @@
     "stockInPath": "/inventory/scan-in/",
     "sellPath": "/inventory/sell/",
     "sidebarItems": [
-      { "testid": "sidebar-dashboard", "path": "/inventory/", "readyTestid": "dashboard-heading" },
-      { "testid": "sidebar-analytics", "path": "/inventory/analytics/", "readyTestid": "analytics-heading" },
-      { "testid": "sidebar-stock", "path": "/inventory/stock/", "readyTestid": "stock-heading" },
-      { "testid": "sidebar-scan-in", "path": "/inventory/scan-in/", "readyTestid": "stockin-form" },
-      { "testid": "sidebar-sell", "path": "/inventory/sell/", "readyTestid": "sell-form" },
-      { "testid": "sidebar-sales-history", "path": "/inventory/sales/", "readyTestid": "sales-heading" },
-      { "testid": "sidebar-agents", "path": "/inventory/agents/", "readyTestid": "agents-heading" },
-      { "testid": "sidebar-reports", "path": "/inventory/reports/", "readyTestid": "reports-heading" }
+      { "testid": "sidebar-dashboard", "path": "/inventory/verticals/phones/", "readyTestid": "dashboard-heading" },
+      { "testid": "sidebar-analytics", "path": "/app/analytics", "readyTestid": "analytics-heading" },
+      { "testid": "sidebar-stock", "path": "/inventory/list/", "readyTestid": "stock-heading" },
+      { "testid": "sidebar-scan-in", "path": "/inventory/scan", "readyTestid": "stockin-form" },
+      { "testid": "sidebar-sell", "path": "/inventory/phone-sale-wizard/", "readyTestid": "sell-form" },
+      { "testid": "sidebar-sales-history", "path": "/sales/", "readyTestid": "sales-heading" },
+      { "testid": "sidebar-agents", "path": "/tenants/manager/agents/", "readyTestid": "agents-heading" },
+      { "testid": "sidebar-reports", "path": "/reports/", "readyTestid": "reports-heading" }
     ],
     "stockInPayload": {
       "brand": "Samsung",

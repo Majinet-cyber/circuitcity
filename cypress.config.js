@@ -47,8 +47,8 @@ module.exports = defineConfig({
     // ENV VARIABLES
     // ============================================
     env: {
-      // Step wait duration (ms) - 12 seconds default for slow networks
-      STEP_WAIT_MS: 12000,
+      // Step wait duration (ms) - 1 second for faster tests
+      STEP_WAIT_MS: 1000,
 
       // E2E Mode flag - enables test-only endpoints
       E2E_MODE: true,
