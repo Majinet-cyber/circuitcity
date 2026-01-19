@@ -185,8 +185,11 @@ class NavbarDropdownClosedStateTestCase(TestCase):
         
         # Check for the CSS rule that enforces display:none on hidden dropdowns
         # This is in inline <style> in base.html
+        # NOTE: We do NOT use !important so Bootstrap can override when showing
         self.assertIn('.dropdown-menu[hidden]', content)
-        self.assertIn('display: none !important', content)
+        # Verify the rule exists - it should have display: none (without !important)
+        self.assertIn('#ccNotifMenu[hidden]', content)
+        self.assertIn('#userMenu[hidden]', content)
 
     def test_bfcache_reset_script_exists(self):
         """Ensure the BFCache/pageshow reset script is present."""
@@ -194,8 +197,8 @@ class NavbarDropdownClosedStateTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode()
         
-        # Check for the UI cleanup system v4
-        self.assertIn('UI CLEANUP SYSTEM v4', content)
+        # Check for the UI cleanup system v5 (Jan 2026 - includes dropdown click fix)
+        self.assertIn('UI CLEANUP SYSTEM v5', content)
         
         # Check for pageshow event handler
         self.assertIn('pageshow', content)

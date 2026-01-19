@@ -315,8 +315,8 @@ class TestBaseHTMLDropdownContract:
         
         html = response.content.decode('utf-8')
         
-        # The UI cleanup script should be present
-        assert '__CC_UI_CLEANUP_V3__' in html or 'CC_UI_CLEANUP' in html, (
+        # The UI cleanup script should be present (v5 is the current version as of Jan 2026)
+        assert '__CC_UI_CLEANUP_V5__' in html or 'CC_UI_CLEANUP' in html, (
             "Base template must include UI cleanup JavaScript for dropdown state management"
         )
 
@@ -336,7 +336,12 @@ class TestBaseHTMLDropdownContract:
         
         html = response.content.decode('utf-8')
         
-        # The mutual exclusion setup should be present
-        assert 'setupMutualExclusion' in html or 'show.bs.dropdown' in html, (
+        # The mutual exclusion setup should be present (implemented via forceCloseDropdown or setupDropdownHiddenManagement)
+        has_mutual_exclusion = (
+            'setupMutualExclusion' in html or 
+            'forceCloseDropdown' in html or
+            'setupDropdownHiddenManagement' in html
+        )
+        assert has_mutual_exclusion, (
             "Base template must include mutual exclusion logic for dropdowns"
         )

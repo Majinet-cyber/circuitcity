@@ -123,22 +123,23 @@ def assert_dropdown_elements_have_correct_attributes(html: str, page_name: str =
     # Check notification menu attributes
     notif_menu_index = html.find('id="ccNotifMenu"')
     if notif_menu_index > 0:
-        notif_menu_section = html[notif_menu_index:notif_menu_index+600]
+        # Look backward to find the opening <div with class (class comes before id)
+        notif_menu_section = html[max(0, notif_menu_index-200):notif_menu_index+600]
         
-        # Must have dropdown-menu class for Bootstrap
-        assert 'dropdown-menu' in notif_menu_section[:200], (
+        # Must have dropdown-menu class for Bootstrap (could be before or after id)
+        assert 'dropdown-menu' in notif_menu_section, (
             f"REGRESSION: Notification menu on {page_name} missing 'dropdown-menu' class. "
             f"This is required for Bootstrap dropdown functionality."
         )
         
         # Must start with hidden attribute (our fix for BFCache issues)
-        assert 'hidden' in notif_menu_section[:300], (
+        assert 'hidden' in notif_menu_section, (
             f"REGRESSION: Notification menu on {page_name} missing 'hidden' attribute. "
             f"This is required to prevent BFCache from showing stale dropdown state."
         )
         
-        # Must NOT have 'show' class initially
-        assert 'dropdown-menu show' not in notif_menu_section[:200], (
+        # Must NOT have 'show' class initially (check both before and after id)
+        assert 'dropdown-menu show' not in notif_menu_section, (
             f"REGRESSION: Notification menu on {page_name} has 'show' class on load. "
             f"Dropdowns must start closed."
         )
@@ -146,22 +147,23 @@ def assert_dropdown_elements_have_correct_attributes(html: str, page_name: str =
     # Check user menu attributes
     user_menu_index = html.find('id="userMenu"')
     if user_menu_index > 0:
-        user_menu_section = html[user_menu_index:user_menu_index+600]
+        # Look backward to find the opening <div with class (class comes before id)
+        user_menu_section = html[max(0, user_menu_index-200):user_menu_index+600]
         
-        # Must have dropdown-menu class for Bootstrap
-        assert 'dropdown-menu' in user_menu_section[:200], (
+        # Must have dropdown-menu class for Bootstrap (could be before or after id)
+        assert 'dropdown-menu' in user_menu_section, (
             f"REGRESSION: User menu on {page_name} missing 'dropdown-menu' class. "
             f"This is required for Bootstrap dropdown functionality."
         )
         
         # Must start with hidden attribute (our fix for BFCache issues)
-        assert 'hidden' in user_menu_section[:300], (
+        assert 'hidden' in user_menu_section, (
             f"REGRESSION: User menu on {page_name} missing 'hidden' attribute. "
             f"This is required to prevent BFCache from showing stale dropdown state."
         )
         
-        # Must NOT have 'show' class initially
-        assert 'dropdown-menu show' not in user_menu_section[:200], (
+        # Must NOT have 'show' class initially (check both before and after id)
+        assert 'dropdown-menu show' not in user_menu_section, (
             f"REGRESSION: User menu on {page_name} has 'show' class on load. "
             f"Dropdowns must start closed."
         )
@@ -427,11 +429,11 @@ class TestBootstrapDropdownContract:
         
         html = response.content.decode('utf-8')
         
-        # Find notification menu
+        # Find notification menu - look backward since class comes before id
         notif_menu_index = html.find('id="ccNotifMenu"')
         assert notif_menu_index > 0, "Notification menu not found"
         
-        notif_menu_section = html[notif_menu_index:notif_menu_index+300]
+        notif_menu_section = html[max(0, notif_menu_index-200):notif_menu_index+300]
         
         # Check for dropdown-menu class
         assert 'dropdown-menu' in notif_menu_section, "Missing dropdown-menu class"
@@ -452,11 +454,11 @@ class TestBootstrapDropdownContract:
         
         html = response.content.decode('utf-8')
         
-        # Find user menu
+        # Find user menu - look backward since class comes before id
         user_menu_index = html.find('id="userMenu"')
         assert user_menu_index > 0, "User menu not found"
         
-        user_menu_section = html[user_menu_index:user_menu_index+300]
+        user_menu_section = html[max(0, user_menu_index-200):user_menu_index+300]
         
         # Check for dropdown-menu class
         assert 'dropdown-menu' in user_menu_section, "Missing dropdown-menu class"
