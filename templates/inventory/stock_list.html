@@ -106,6 +106,22 @@
   }
   .kpi-pill b{ font-weight:800 }
 
+  /* CRITICAL: Ensure offcanvas modals are ALWAYS hidden by default (even if Bootstrap CSS fails to load) */
+  .offcanvas:not(.show) {
+    visibility: hidden !important;
+    transform: translateX(-100%) !important;
+  }
+  .offcanvas.offcanvas-bottom:not(.show) {
+    transform: translateY(100%) !important;
+  }
+  .offcanvas.offcanvas-end:not(.show) {
+    transform: translateX(100%) !important;
+  }
+  /* Also ensure modals are hidden by default */
+  .modal:not(.show) {
+    display: none !important;
+  }
+
   .filters-wrap{ margin:.25rem 0 .85rem }
   .filters-row{ display:flex; gap:.5rem; align-items:center; flex-wrap:wrap }
   .filters-row input[type="text"], .filters-row select, .filters-row input[type="number"]{

@@ -392,9 +392,11 @@ def dashboard(request):
     # --- SALES TREND - LAST 30 DAYS (line chart, never empty) ---
     # Always generate 30 days of data (with zeros if no sales) so chart always renders
     # CRITICAL FIX: Handle items with NULL sold_at by falling back to received_at
+    # BUGFIX (Jan 2026): Corrected to show proper 30-day window (day -30 through day -1, NOT including today)
+    # This ensures "Last 30 Days" means the completed 30 days before today
     sales_trend_data = []
     for i in range(30):
-        day_start = today_start - timedelta(days=29 - i)
+        day_start = today_start - timedelta(days=30 - i)  # Start from 30 days ago
         day_end = day_start + timedelta(days=1)
         day_date = day_start.date()
         day_end_date = day_end.date()
