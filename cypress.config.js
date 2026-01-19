@@ -16,9 +16,9 @@ module.exports = defineConfig({
     supportFile: 'cypress/support/e2e.js',
     specPattern: 'cypress/e2e/**/*.cy.js',
 
-    // Viewport: mobile-first by default, desktop tests can override
-    viewportWidth: 375,
-    viewportHeight: 812,
+    // Viewport: desktop by default for sidebar tests (can be overridden per test)
+    viewportWidth: 1280,
+    viewportHeight: 720,
 
     // ============================================
     // SLOW NETWORK RESILIENT TIMEOUTS
