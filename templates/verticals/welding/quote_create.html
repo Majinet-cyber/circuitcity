@@ -23,7 +23,7 @@
                 <strong>New Quote Builder:</strong> Create an empty quote shell, then add materials, costs, and profit manually on the next page.
             </div>
 
-            <form method="post" action="{% url 'verticals:welding_quote_create' %}" data-testid="welding-quote-form">>
+            <form method="post" action="{% url 'verticals:welding_quote_create' %}" data-testid="welding-quote-form">
                 {% csrf_token %}
 
                 <!-- Customer Info -->

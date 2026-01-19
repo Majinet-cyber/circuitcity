@@ -403,6 +403,51 @@
 {% block extra_js %}
 {% if is_editable %}
 <script>
+// CRITICAL: Ensure Bootstrap modals are initialized after Bootstrap loads
+(function() {
+  function initializeModals() {
+    // Wait for Bootstrap to be available
+    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      setTimeout(initializeModals, 50);
+      return;
+    }
+    
+    // Explicitly initialize modal triggers
+    // This ensures buttons work even if Bootstrap's automatic initialization fails
+    document.querySelectorAll('[data-bs-toggle="modal"]').forEach(function(trigger) {
+      trigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        var targetSelector = trigger.getAttribute('data-bs-target');
+        if (!targetSelector) return;
+        
+        var targetModal = document.querySelector(targetSelector);
+        if (!targetModal) {
+          console.error('[Welding Quote] Modal not found:', targetSelector);
+          return;
+        }
+        
+        // Get or create Bootstrap Modal instance
+        var modalInstance = bootstrap.Modal.getInstance(targetModal);
+        if (!modalInstance) {
+          modalInstance = new bootstrap.Modal(targetModal);
+        }
+        
+        // Show the modal
+        modalInstance.show();
+      });
+    });
+    
+    console.log('[Welding Quote] Modals initialized successfully');
+  }
+  
+  // Initialize on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeModals);
+  } else {
+    initializeModals();
+  }
+})();
+
 // Material search
 document.getElementById('materialSearch')?.addEventListener('input', function(e) {
     const search = e.target.value.toLowerCase();
