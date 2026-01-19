@@ -1,0 +1,356 @@
+/**
+ * Vertical-Specific UI Polish (Jan 2026)
+ * 
+ * SAFE SCOPE: Uses body[data-vertical="..."] selectors to avoid leaking
+ * Mobile-first, premium polish for liquor, welding, and farm verticals
+ */
+
+/* ========================================================================
+   LIQUOR VERTICAL POLISH
+   ======================================================================== */
+
+body[data-vertical="liquor"] {
+  --liquor-primary: #7c3aed;
+  --liquor-accent: #a78bfa;
+  --liquor-bg: #faf5ff;
+}
+
+body[data-vertical="liquor"] .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+body[data-vertical="liquor"] .kpi-card,
+body[data-vertical="liquor"] .glass-card {
+  background: linear-gradient(135deg, #ffffff 0%, #faf5ff 100%);
+  border: 1px solid rgba(124, 58, 237, 0.1);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body[data-vertical="liquor"] .kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.12);
+}
+
+body[data-vertical="liquor"] .kpi-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+body[data-vertical="liquor"] .kpi-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--liquor-primary);
+  line-height: 1.2;
+}
+
+@media (max-width: 576px) {
+  body[data-vertical="liquor"] .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  body[data-vertical="liquor"] .kpi-card {
+    padding: 20px;
+  }
+  
+  body[data-vertical="liquor"] .kpi-value {
+    font-size: 1.75rem;
+  }
+}
+
+/* ========================================================================
+   WELDING VERTICAL POLISH
+   ======================================================================== */
+
+body[data-vertical="welding"] {
+  --welding-primary: #ea580c;
+  --welding-accent: #fb923c;
+  --welding-bg: #fff7ed;
+}
+
+body[data-vertical="welding"] .dashboard-grid,
+body[data-vertical="welding"] .quote-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+body[data-vertical="welding"] .kpi-card,
+body[data-vertical="welding"] .quote-card,
+body[data-vertical="welding"] .glass-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
+  border: 1px solid rgba(234, 88, 12, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body[data-vertical="welding"] .kpi-card:hover,
+body[data-vertical="welding"] .quote-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.15);
+}
+
+body[data-vertical="welding"] .kpi-label,
+body[data-vertical="welding"] .quote-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #78350f;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+body[data-vertical="welding"] .kpi-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--welding-primary);
+  line-height: 1.2;
+}
+
+/* Welding quote detail improvements */
+body[data-vertical="welding"] .quote-section {
+  margin-bottom: 24px;
+}
+
+body[data-vertical="welding"] .quote-section-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+body[data-vertical="welding"] .quote-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 576px) {
+  body[data-vertical="welding"] .dashboard-grid,
+  body[data-vertical="welding"] .quote-cards {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  body[data-vertical="welding"] .kpi-card,
+  body[data-vertical="welding"] .quote-card {
+    padding: 20px;
+  }
+  
+  body[data-vertical="welding"] .kpi-value {
+    font-size: 1.75rem;
+  }
+}
+
+/* ========================================================================
+   FARM VERTICAL POLISH
+   ======================================================================== */
+
+body[data-vertical="farm"] {
+  --farm-primary: #16a34a;
+  --farm-accent: #22c55e;
+  --farm-bg: #f0fdf4;
+}
+
+body[data-vertical="farm"] .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+body[data-vertical="farm"] .kpi-card,
+body[data-vertical="farm"] .glass-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+  border: 1px solid rgba(22, 163, 74, 0.15);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body[data-vertical="farm"] .kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(22, 163, 74, 0.12);
+}
+
+body[data-vertical="farm"] .kpi-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #065f46;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+body[data-vertical="farm"] .kpi-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--farm-primary);
+  line-height: 1.2;
+}
+
+body[data-vertical="farm"] .ledger-table,
+body[data-vertical="farm"] .activity-list {
+  background: #ffffff;
+  border: 1px solid rgba(22, 163, 74, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-x: auto;
+}
+
+@media (max-width: 576px) {
+  body[data-vertical="farm"] .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  body[data-vertical="farm"] .kpi-card {
+    padding: 20px;
+  }
+  
+  body[data-vertical="farm"] .kpi-value {
+    font-size: 1.75rem;
+  }
+}
+
+/* ========================================================================
+   SHARED MOBILE IMPROVEMENTS (All Polished Verticals)
+   ======================================================================== */
+
+@media (max-width: 576px) {
+  body[data-vertical="liquor"] .btn,
+  body[data-vertical="welding"] .btn,
+  body[data-vertical="farm"] .btn {
+    min-height: 48px;
+    padding: 12px 20px;
+    font-size: 1rem;
+  }
+  
+  body[data-vertical="liquor"] form .form-group,
+  body[data-vertical="welding"] form .form-group,
+  body[data-vertical="farm"] form .form-group {
+    margin-bottom: 20px;
+  }
+  
+  body[data-vertical="liquor"] .form-control,
+  body[data-vertical="welding"] .form-control,
+  body[data-vertical="farm"] .form-control {
+    min-height: 48px;
+    font-size: 16px; /* Prevents iOS zoom */
+  }
+  
+  /* Better card padding on mobile */
+  body[data-vertical="liquor"] .card,
+  body[data-vertical="welding"] .card,
+  body[data-vertical="farm"] .card {
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  
+  body[data-vertical="liquor"] .card-body,
+  body[data-vertical="welding"] .card-body,
+  body[data-vertical="farm"] .card-body {
+    padding: 20px;
+  }
+}
+
+/* ========================================================================
+   PHONE AGENT-SIDE MOBILE IMPROVEMENTS
+   ======================================================================== */
+
+body[data-vertical="phones"] {
+  --phones-primary: #2563eb;
+  --phones-accent: #60a5fa;
+}
+
+@media (max-width: 576px) {
+  /* Improve touch targets for agent-facing phone actions */
+  body[data-vertical="phones"] .btn-action,
+  body[data-vertical="phones"] .wizard-actions .btn {
+    min-height: 56px;
+    min-width: 56px;
+    padding: 16px 24px;
+    font-size: 1.05rem;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  
+  /* Better spacing for phone listings/cards */
+  body[data-vertical="phones"] .phone-card,
+  body[data-vertical="phones"] .inventory-card {
+    padding: 20px;
+    margin-bottom: 16px;
+    border-radius: 16px;
+  }
+  
+  /* Improve form inputs on phones */
+  body[data-vertical="phones"] .form-control,
+  body[data-vertical="phones"] input[type="text"],
+  body[data-vertical="phones"] input[type="number"],
+  body[data-vertical="phones"] select {
+    min-height: 52px;
+    font-size: 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+  }
+  
+  /* Scanner button should be large and thumb-friendly */
+  body[data-vertical="phones"] .scanner-btn,
+  body[data-vertical="phones"] [data-cy="scanner-btn"] {
+    min-height: 56px;
+    min-width: 100%;
+    font-size: 1.1rem;
+    padding: 16px;
+  }
+}
+
+/* ========================================================================
+   SAFE UTILITY OVERRIDES (Won't break existing layouts)
+   ======================================================================== */
+
+/* Better spacing for all polished verticals on mobile */
+@media (max-width: 576px) {
+  body[data-vertical="liquor"] .container,
+  body[data-vertical="welding"] .container,
+  body[data-vertical="farm"] .container,
+  body[data-vertical="phones"] .container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  body[data-vertical="liquor"] h1,
+  body[data-vertical="welding"] h1,
+  body[data-vertical="farm"] h1,
+  body[data-vertical="phones"] h1 {
+    font-size: 1.75rem;
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+  
+  body[data-vertical="liquor"] h2,
+  body[data-vertical="welding"] h2,
+  body[data-vertical="farm"] h2,
+  body[data-vertical="phones"] h2 {
+    font-size: 1.5rem;
+    line-height: 1.3;
+    margin-bottom: 14px;
+  }
+}
+
