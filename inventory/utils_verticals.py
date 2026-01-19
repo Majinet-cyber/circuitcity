@@ -662,6 +662,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -962,6 +963,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -1182,6 +1184,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -1339,6 +1342,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -1532,6 +1536,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -1727,6 +1732,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",
@@ -2087,6 +2093,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
+                "testid": "sidebar-dashboard",
             },
             {
                 "section": "MAIN",
@@ -2099,6 +2106,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
+                "testid": "sidebar-analytics",
             },
             # Note: Fast Sell removed - phones uses dedicated scan/sell flows
             {
@@ -2112,6 +2120,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
+                "testid": "sidebar-stock",
             },
             {
                 "section": "MAIN",
@@ -2124,6 +2133,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
+                "testid": "sidebar-scan-in",
             },
             {
                 "section": "MAIN",
@@ -2136,6 +2146,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,
+                "testid": "sidebar-sell",
             },
             # ACCESSORIES section (phones accessories - quantity-based, separate from IMEI phones)
             {
@@ -2190,6 +2201,21 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
             },
+            # SALES & TEAM section (MORE section items)
+            {
+                "section": "MORE",
+                "key": "sales_history",
+                "url": "sales:list",
+                "label": "Sales History",
+                "icon": "bi-receipt",
+                "active_prefix": "/sales/",
+                "active_pattern": "/sales/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+                "testid": "sidebar-sales-history",
+            },
             # DATA CORRECTION (Manager-only - critical adoption feature)
             {
                 "section": "MAIN",
@@ -2243,6 +2269,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-reports",
             },
             {
                 "section": "MORE",
@@ -2308,6 +2335,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+                "testid": "sidebar-agents",
             },
             {
                 "section": "MORE",

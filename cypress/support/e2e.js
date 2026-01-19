@@ -27,10 +27,9 @@ Cypress.on('uncaught:exception', (err, runnable) => {
 // BEFORE EACH TEST
 // ============================================================================
 beforeEach(() => {
-  // Clear cookies and local storage between tests for isolation
-  cy.clearCookies();
-  cy.clearLocalStorage();
-
+  // NOTE: We do NOT clear cookies/localStorage here because cy.session() manages that.
+  // Clearing here would break cy.session() caching and slow down tests significantly.
+  
   // Log the test name for debugging
   cy.log(`🧪 Starting: ${Cypress.currentTest.title}`);
 });

@@ -271,10 +271,12 @@ Cypress.Commands.add('signupManagerAndCreateBusiness', (verticalKey) => {
 });
 
 // ============================================================================
-// LOGIN AS MANAGER - Use existing credentials
+// LOGIN AS MANAGER - Use existing credentials with cy.session()
 // ============================================================================
 /**
  * Login with manager credentials (uses test login endpoint).
+ * Uses cy.session() to cache authentication across tests for better performance.
+ * 
  * @param {string} verticalKey - Vertical key
  */
 Cypress.Commands.add('loginAsManager', (verticalKey = 'phones') => {
@@ -284,39 +286,44 @@ Cypress.Commands.add('loginAsManager', (verticalKey = 'phones') => {
       throw new Error(`No manager credentials for ${verticalKey} in fixtures/users.json`);
     }
 
-    // Use test login endpoint (bypasses 2FA in E2E mode)
-    cy.request({
-      method: 'POST',
-      url: '/accounts/__e2e__/test-login/',
-      body: {
-        email: manager.email,
-        password: manager.password,
-        kind: verticalKey,
+    // Use cy.session() to cache login - login only happens once per vertical
+    cy.session(
+      `manager-${verticalKey}`,
+      () => {
+        cy.log(`🔐 Logging in as ${verticalKey} manager: ${manager.email}`);
+        
+        // Use test login endpoint (bypasses 2FA in E2E mode)
+        cy.request({
+          method: 'POST',
+          url: '/accounts/__e2e__/test-login/',
+          body: {
+            email: manager.email,
+            password: manager.password,
+            kind: verticalKey,
+          },
+          failOnStatusCode: false,
+        }).then((resp) => {
+          if (resp.status !== 200 || !resp.body.ok) {
+            throw new Error(`Login failed for ${verticalKey}: ${resp.body.error || 'Unknown error'}`);
+          }
+          cy.log(`✓ Logged in: user_id=${resp.body.user_id}, business_id=${resp.body.business_id}`);
+        });
       },
-      failOnStatusCode: false,
-    }).then((resp) => {
-      if (resp.status === 200 && resp.body.ok) {
-        cy.visit('/', { failOnStatusCode: false });
-        cy.stepWait('Logged in via test endpoint');
-      } else {
-        // Fallback to UI login
-        cy.visit('/accounts/login/');
-        cy.get('[data-testid="login-email"], input[name="username"], input[name="email"]')
-          .first()
-          .clear()
-          .type(manager.email);
-
-        cy.get('[data-testid="login-password"], input[name="password"]')
-          .first()
-          .clear()
-          .type(manager.password);
-
-        cy.get('[data-testid="login-submit"], button[type="submit"]')
-          .first()
-          .click();
-
-        cy.stepWait('Login submitted');
+      {
+        validate: () => {
+          // Verify session is still valid by checking for auth cookie
+          cy.getCookie('sessionid').should('exist');
+        },
+        cacheAcrossSpecs: true, // Cache across all specs for max performance
       }
+    );
+
+    // After session is restored/created, visit the dashboard
+    cy.fixture('verticals').then((verticals) => {
+      const vertical = verticals[verticalKey];
+      const dashboardPath = vertical?.dashboardPath || '/inventory/';
+      cy.visit(dashboardPath, { failOnStatusCode: false });
+      cy.log(`📍 Visiting ${verticalKey} dashboard: ${dashboardPath}`);
     });
   });
 });

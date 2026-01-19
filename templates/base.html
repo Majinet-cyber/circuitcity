@@ -1842,8 +1842,27 @@
   // Service workers can cache bad responses (302 redirects, 500 errors) during development,
   // causing "blank page" or "warped dashboard" issues that persist even after fixes.
   var hostname = window.location.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    console.log('[DEV] Service worker disabled on localhost to prevent cache issues');
+  // CRITICAL: Disable service worker on localhost AND in Cypress tests
+  // This prevents stale cache issues and flaky tests
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || window.Cypress) {
+    console.log('[DEV/E2E] Service worker disabled on localhost/Cypress to prevent cache issues');
+    
+    // If running in Cypress, also aggressively clear all caches on every load
+    if (window.Cypress && 'caches' in window) {
+      caches.keys().then(function(names) {
+        return Promise.all(
+          names.map(function(name) {
+            console.log('[E2E] Deleting cache:', name);
+            return caches.delete(name);
+          })
+        );
+      }).then(function() {
+        console.log('[E2E] All caches cleared for Cypress test');
+      }).catch(function(err) {
+        console.warn('[E2E] Cache cleanup failed:', err);
+      });
+    }
+    
     return;
   }
 
