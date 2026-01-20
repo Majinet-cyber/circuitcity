@@ -103,11 +103,11 @@
     </div>
   </header>
 
-  {% comment %}Date Filter Controls - Unified (Single Button with Period support){% endcomment %}
+  {% comment %}Date Filter Controls - Unified (ALL OPTIONS RESTORED){% endcomment %}
   <section class="recent-block" style="padding:16px 22px">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
       <div style="display:flex;gap:12px;align-items:center">
-        {% include "partials/date_filter_unified.html" with period=period month=month year=year range_key=active_range start_date=start_date end_date=end_date range_label=range_label %}
+        {% include "partials/date_filter_unified.html" with filter_mode=filter_mode period=period month=month year=year custom_start=custom_start custom_end=custom_end range_label=range_label %}
       </div>
       <div style="font-size:.9rem;color:#64748b">
         <strong>Showing:</strong> {{ range_label }}

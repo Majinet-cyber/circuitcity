@@ -38,20 +38,20 @@ def dashboard(request):
     # Get product metrics (unchanged)
     metrics = base.merch_metrics(business, BusinessKind.CLOTHING)
 
-    # ===== DATE FILTER PARAMS (NEW PERIOD SUPPORT) =====
-    # Use shared date range parser with period support
+    # ===== DATE FILTER PARAMS (ALL OPTIONS RESTORED) =====
+    # Use shared date range parser with ALL filter support
     date_range_ctx = base.parse_date_range_from_request(request)
     
     # Extract all values for context
+    filter_mode = date_range_ctx.get("filter_mode")
     period = date_range_ctx.get("period")
     month = date_range_ctx.get("month")
     year = date_range_ctx.get("year")
-    range_param = date_range_ctx["active_range"]
-    selected_date = date_range_ctx["selected_date"]
-    date_param = date_range_ctx["date_param"]
     start_date = date_range_ctx["start_date"]
     end_date = date_range_ctx["end_date"]
     range_label = date_range_ctx["range_label"]
+    custom_start = date_range_ctx.get("custom_start")
+    custom_end = date_range_ctx.get("custom_end")
 
     # ===== SALES METRICS WITH DATE FILTERING =====
     # Pass explicit start/end dates (None for all-time)
@@ -198,16 +198,16 @@ def dashboard(request):
             "sales_trend": sales_trend,
             # Stock Summary
             "stock_summary": stock_summary_display,
-            # Date Filter State (NEW: Period support)
+            # Date Filter State (ALL OPTIONS RESTORED)
+            "filter_mode": filter_mode,
             "period": period,
             "month": month,
             "year": year,
-            "active_range": range_param,
-            "selected_date": selected_date,
-            "date_param": date_param,
             "start_date": start_date,
             "end_date": end_date,
             "range_label": range_label,
+            "custom_start": custom_start,
+            "custom_end": custom_end,
             **ctx_enhancements,  # Merge dashboard enhancements
         }
     )

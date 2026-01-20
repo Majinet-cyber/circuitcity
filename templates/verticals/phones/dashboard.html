@@ -129,11 +129,11 @@
     </div>
   </header>
 
-  <!-- DATE RANGE FILTER BAR (SINGLE BUTTON WITH PERIOD SUPPORT) -->
+  <!-- DATE RANGE FILTER BAR (ALL OPTIONS RESTORED) -->
   <section class="recent-block" style="padding:16px 22px;position:relative;overflow:visible">
     <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
       <div style="display:flex;gap:12px;align-items:center">
-        {% include "partials/date_filter_unified.html" with period=dashboard_kpis.period month=dashboard_kpis.month year=dashboard_kpis.year range_key=dashboard_kpis.range_key start_date=dashboard_kpis.start_date end_date=dashboard_kpis.end_date range_label=dashboard_kpis.range_label %}
+        {% include "partials/date_filter_unified.html" with filter_mode=dashboard_kpis.filter_mode period=dashboard_kpis.period month=dashboard_kpis.month year=dashboard_kpis.year custom_start=dashboard_kpis.custom_start custom_end=dashboard_kpis.custom_end range_label=dashboard_kpis.range_label %}
       </div>
       <div style="font-size:.9rem;color:#64748b">
         <strong>Showing:</strong> {{ dashboard_kpis.range_label }}

@@ -130,21 +130,22 @@ def dashboard(request):
     ctx["IS_AGENT"] = is_agent
 
     # ==========================================================================
-    # DATE RANGE PARSING (NEW PERIOD SUPPORT)
+    # DATE RANGE PARSING (ALL OPTIONS RESTORED)
     # ==========================================================================
-    # Use shared date range parser with period support
+    # Use shared date range parser with ALL filter support
     date_range_ctx = base.parse_date_range_from_request(request)
     
     # Extract all values for context
+    filter_mode = date_range_ctx.get("filter_mode")
     period = date_range_ctx.get("period")
     month = date_range_ctx.get("month")
     year = date_range_ctx.get("year")
     range_key = date_range_ctx["active_range"]
-    selected_date = date_range_ctx["selected_date"]
-    date_param = date_range_ctx["date_param"]
     start_date = date_range_ctx["start_date"]
     end_date = date_range_ctx["end_date"]
     range_label = date_range_ctx["range_label"]
+    custom_start = date_range_ctx.get("custom_start")
+    custom_end = date_range_ctx.get("custom_end")
 
     # Current datetime for other calculations
     now = timezone.now()
@@ -389,12 +390,15 @@ def dashboard(request):
     # CRITICAL FIX: Revenue KPI MUST show sales revenue (not stock value)
     # This ensures Revenue matches Payment Mix totals (both derived from range_sales)
     dashboard_kpis = {
-        # Period filter state (NEW)
+        # Period filter state (ALL OPTIONS RESTORED)
+        "filter_mode": filter_mode,
         "period": period,
         "month": month,
         "year": year,
         "range_key": range_key,
         "range_label": range_label,
+        "custom_start": custom_start,
+        "custom_end": custom_end,
         "start_date": start_date.date() if start_date and hasattr(start_date, "date") else start_date,
         "end_date": end_date.date() if end_date and hasattr(end_date, "date") else end_date,
         "units_sold": units_sold,

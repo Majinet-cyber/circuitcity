@@ -1,12 +1,13 @@
 {% comment %}
-Unified Date Filter Component with Period Filter
+Unified Date Filter Component - ALL OPTIONS RESTORED
 Mobile-first, premium glass design
-Usage: {% include "partials/date_filter_unified.html" with range_key=range_key period=period month=month year=year start_date=start_date end_date=end_date %}
+Supports: All time, Month, MTD, Last 7 Days, Custom Range
+Usage: {% include "partials/date_filter_unified.html" with filter_mode=filter_mode period=period month=month year=year custom_start=custom_start custom_end=custom_end range_label=range_label %}
 {% endcomment %}
 
 <!-- Filter Button -->
 <div class="unified-date-filter" data-date-filter>
-  <button type="button" class="filter-trigger-btn" data-filter-trigger>
+  <button type="button" class="filter-trigger-btn" data-filter-trigger data-testid="dashboard-filter-button">
     <i class="bi bi-funnel"></i>
     <span>Filter</span>
     {% if range_label %}
@@ -18,131 +19,123 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
   <div class="filter-panel" data-filter-panel>
     <div class="filter-panel-content">
       <div class="filter-header">
-        <h3>Dashboard Filters</h3>
+        <h3>Date Filter</h3>
         <button type="button" class="filter-close" data-filter-close aria-label="Close">
           <i class="bi bi-x-lg"></i>
         </button>
       </div>
 
       <div class="filter-body">
-        <!-- PERIOD FILTER (NEW) -->
+        <!-- UNIFIED FILTER MODE SELECTOR -->
         <div class="filter-section">
-          <h4 class="filter-section-title">Period</h4>
-          <div class="filter-presets">
-            <a href="?period=all" class="filter-preset-item {% if period == 'all' %}active{% endif %}" data-period-option>
+          <h4 class="filter-section-title">Select Period</h4>
+          <div class="filter-mode-options">
+            <!-- All time -->
+            <a href="?period=all" class="filter-mode-option {% if filter_mode == 'all' %}active{% endif %}" data-mode="all" data-testid="date-filter-mode-all">
               <i class="bi bi-infinity"></i>
               <span>All time</span>
             </a>
-            <button type="button" class="filter-preset-item {% if period == 'month' %}active{% endif %}" data-period-month-toggle>
+            
+            <!-- Month -->
+            <button type="button" class="filter-mode-option {% if filter_mode == 'month' %}active{% endif %}" data-mode="month" data-mode-toggle data-testid="date-filter-mode-month">
               <i class="bi bi-calendar-month"></i>
               <span>Month</span>
             </button>
-          </div>
-
-          <!-- Month Picker (shown when Month is selected) -->
-          <form method="get" class="filter-month-form" data-month-form style="display:{% if period == 'month' %}block{% else %}none{% endif %}">
-            <input type="hidden" name="period" value="month">
             
-            <div class="filter-form-group">
-              <label for="filterMonth">Select month</label>
-              <select id="filterMonth" name="month" required class="filter-select" data-cy="month-select">
-                <option value="">Choose...</option>
-                <option value="1" {% if month == 1 %}selected{% endif %}>January</option>
-                <option value="2" {% if month == 2 %}selected{% endif %}>February</option>
-                <option value="3" {% if month == 3 %}selected{% endif %}>March</option>
-                <option value="4" {% if month == 4 %}selected{% endif %}>April</option>
-                <option value="5" {% if month == 5 %}selected{% endif %}>May</option>
-                <option value="6" {% if month == 6 %}selected{% endif %}>June</option>
-                <option value="7" {% if month == 7 %}selected{% endif %}>July</option>
-                <option value="8" {% if month == 8 %}selected{% endif %}>August</option>
-                <option value="9" {% if month == 9 %}selected{% endif %}>September</option>
-                <option value="10" {% if month == 10 %}selected{% endif %}>October</option>
-                <option value="11" {% if month == 11 %}selected{% endif %}>November</option>
-                <option value="12" {% if month == 12 %}selected{% endif %}>December</option>
-              </select>
-            </div>
-
-            <div class="filter-form-group" style="display:none">
-              <label for="filterYear">Year (optional)</label>
-              <input type="number" id="filterYear" name="year" 
-                     value="{% if year %}{{ year }}{% endif %}" 
-                     placeholder="Current year" 
-                     min="2000" 
-                     max="2100"
-                     class="filter-input">
-            </div>
-
-            <div class="filter-actions">
-              <button type="submit" class="btn-filter-apply" data-cy="apply-month-filter">
-                <i class="bi bi-check-circle"></i> Apply
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- LEGACY RANGE FILTER (backward compatibility, can be hidden if not needed) -->
-        <div class="filter-section" style="display:none">
-          <h4 class="filter-section-title">Quick Ranges</h4>
-          <div class="filter-presets">
-            <a href="?range=today" class="filter-preset-item {% if range_key == 'today' %}active{% endif %}">
-              <i class="bi bi-calendar-day"></i>
-              <span>Today</span>
+            <!-- MTD -->
+            <a href="?range=mtd" class="filter-mode-option {% if filter_mode == 'mtd' %}active{% endif %}" data-mode="mtd" data-testid="date-filter-mode-mtd">
+              <i class="bi bi-calendar-event"></i>
+              <span>MTD</span>
             </a>
-            <a href="?range=yesterday" class="filter-preset-item {% if range_key == 'yesterday' %}active{% endif %}">
-              <i class="bi bi-calendar-check"></i>
-              <span>Yesterday</span>
-            </a>
-            <a href="?range=7d" class="filter-preset-item {% if range_key == '7d' %}active{% endif %}">
+            
+            <!-- Last 7 Days -->
+            <a href="?range=last7" class="filter-mode-option {% if filter_mode == 'last7' %}active{% endif %}" data-mode="last7" data-testid="date-filter-mode-last7">
               <i class="bi bi-calendar-week"></i>
               <span>Last 7 days</span>
             </a>
-            <a href="?range=30d" class="filter-preset-item {% if range_key == '30d' %}active{% endif %}">
-              <i class="bi bi-calendar-range"></i>
-              <span>Last 30 days</span>
-            </a>
-            <a href="?range=month" class="filter-preset-item {% if range_key == 'month' %}active{% endif %}">
-              <i class="bi bi-calendar-month"></i>
-              <span>This month</span>
-            </a>
-            <button type="button" class="filter-preset-item {% if range_key == 'custom' %}active{% endif %}" data-custom-toggle>
+            
+            <!-- Custom Range -->
+            <button type="button" class="filter-mode-option {% if filter_mode == 'custom' %}active{% endif %}" data-mode="custom" data-mode-toggle data-testid="date-filter-mode-custom">
               <i class="bi bi-calendar2-range"></i>
-              <span>Custom range</span>
+              <span>Custom</span>
             </button>
           </div>
-
-          <!-- Custom Range Form -->
-          <form method="get" class="filter-custom-form" data-custom-form style="display:{% if range_key == 'custom' %}block{% else %}none{% endif %}">
-            <input type="hidden" name="range" value="custom">
-            
-            <div class="filter-form-row">
-              <div class="filter-form-group">
-                <label for="filterStartDate">Start date</label>
-                <input type="date" id="filterStartDate" name="start" 
-                       value="{% if range_key == 'custom' and start_date %}{{ start_date|date:'Y-m-d' }}{% endif %}" 
-                       required>
-              </div>
-              <div class="filter-form-group">
-                <label for="filterEndDate">End date</label>
-                <input type="date" id="filterEndDate" name="end" 
-                       value="{% if range_key == 'custom' and end_date %}{{ end_date|date:'Y-m-d' }}{% endif %}" 
-                       required>
-              </div>
-            </div>
-
-            <div class="filter-actions">
-              <button type="submit" class="btn-filter-apply">
-                <i class="bi bi-check-circle"></i> Apply
-              </button>
-              <button type="button" class="btn-filter-clear" data-filter-clear>
-                <i class="bi bi-arrow-counterclockwise"></i> Clear
-              </button>
-            </div>
-          </form>
         </div>
 
-        <!-- Clear All Action -->
+        <!-- MONTH PICKER FORM (shown when Month is selected) -->
+        <form method="get" class="filter-conditional-form" data-form="month" style="display:{% if filter_mode == 'month' %}block{% else %}none{% endif %}">
+          <input type="hidden" name="period" value="month">
+          
+          <div class="filter-form-group">
+            <label for="filterMonth">Select month</label>
+            <select id="filterMonth" name="month" required class="filter-select" data-testid="date-filter-month">
+              <option value="">Choose...</option>
+              <option value="1" {% if month == 1 %}selected{% endif %}>January</option>
+              <option value="2" {% if month == 2 %}selected{% endif %}>February</option>
+              <option value="3" {% if month == 3 %}selected{% endif %}>March</option>
+              <option value="4" {% if month == 4 %}selected{% endif %}>April</option>
+              <option value="5" {% if month == 5 %}selected{% endif %}>May</option>
+              <option value="6" {% if month == 6 %}selected{% endif %}>June</option>
+              <option value="7" {% if month == 7 %}selected{% endif %}>July</option>
+              <option value="8" {% if month == 8 %}selected{% endif %}>August</option>
+              <option value="9" {% if month == 9 %}selected{% endif %}>September</option>
+              <option value="10" {% if month == 10 %}selected{% endif %}>October</option>
+              <option value="11" {% if month == 11 %}selected{% endif %}>November</option>
+              <option value="12" {% if month == 12 %}selected{% endif %}>December</option>
+            </select>
+          </div>
+
+          <div class="filter-form-group">
+            <label for="filterYear">Year (optional)</label>
+            <input type="number" id="filterYear" name="year" 
+                   value="{% if year %}{{ year }}{% endif %}" 
+                   placeholder="Current year" 
+                   min="2000" 
+                   max="2100"
+                   class="filter-input"
+                   data-testid="date-filter-year">
+          </div>
+
+          <div class="filter-actions">
+            <button type="submit" class="btn-filter-apply" data-testid="date-filter-apply">
+              <i class="bi bi-check-circle"></i> Apply
+            </button>
+          </div>
+        </form>
+
+        <!-- CUSTOM RANGE FORM (shown when Custom is selected) -->
+        <form method="get" class="filter-conditional-form" data-form="custom" style="display:{% if filter_mode == 'custom' %}block{% else %}none{% endif %}">
+          <input type="hidden" name="range" value="custom">
+          
+          <div class="filter-form-row">
+            <div class="filter-form-group">
+              <label for="filterStartDate">Start date</label>
+              <input type="date" id="filterStartDate" name="start" 
+                     value="{% if custom_start %}{{ custom_start|date:'Y-m-d' }}{% endif %}" 
+                     required
+                     class="filter-input"
+                     data-testid="date-filter-start">
+            </div>
+            <div class="filter-form-group">
+              <label for="filterEndDate">End date</label>
+              <input type="date" id="filterEndDate" name="end" 
+                     value="{% if custom_end %}{{ custom_end|date:'Y-m-d' }}{% endif %}" 
+                     required
+                     class="filter-input"
+                     data-testid="date-filter-end">
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button type="submit" class="btn-filter-apply" data-testid="date-filter-apply">
+              <i class="bi bi-check-circle"></i> Apply
+            </button>
+          </div>
+        </form>
+
+        <!-- RESET ACTION -->
         <div class="filter-actions" style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.06)">
-          <button type="button" class="btn-filter-clear" data-filter-clear-all>
+          <button type="button" class="btn-filter-reset" data-filter-reset data-testid="date-filter-reset">
             <i class="bi bi-arrow-counterclockwise"></i> Reset to All time
           </button>
         </div>
@@ -282,50 +275,56 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
   color: var(--muted, #64748b);
 }
 
-/* Filter Presets */
-.filter-presets {
+/* Filter Mode Options (unified grid) */
+.filter-mode-options {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
-.filter-preset-item {
+.filter-mode-option {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
+  padding: 14px 12px;
+  border: 2px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.6);
   color: var(--muted, #64748b);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-align: center;
 }
 
-.filter-preset-item:hover {
+.filter-mode-option:hover {
   background: rgba(59, 130, 246, 0.08);
-  border-color: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.3);
   color: #2563eb;
+  transform: translateY(-1px);
 }
 
-.filter-preset-item.active {
+.filter-mode-option.active {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
   border-color: #2563eb;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transform: translateY(-1px);
 }
 
-.filter-preset-item i {
+.filter-mode-option i {
   font-size: 16px;
 }
 
-/* Month Form */
-.filter-month-form {
-  padding-top: 12px;
+/* Conditional Forms */
+.filter-conditional-form {
+  padding-top: 16px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 12px;
 }
 
 .filter-form-group {
@@ -512,12 +511,9 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
   const panel = filterContainer.querySelector('[data-filter-panel]');
   const backdrop = filterContainer.querySelector('[data-filter-backdrop]');
   const closeBtn = filterContainer.querySelector('[data-filter-close]');
-  const customToggle = filterContainer.querySelector('[data-custom-toggle]');
-  const customForm = filterContainer.querySelector('[data-custom-form]');
-  const clearBtn = filterContainer.querySelector('[data-filter-clear]');
-  const clearAllBtn = filterContainer.querySelector('[data-filter-clear-all]');
-  const periodMonthToggle = filterContainer.querySelector('[data-period-month-toggle]');
-  const monthForm = filterContainer.querySelector('[data-month-form]');
+  const resetBtn = filterContainer.querySelector('[data-filter-reset]');
+  const modeToggles = filterContainer.querySelectorAll('[data-mode-toggle]');
+  const conditionalForms = filterContainer.querySelectorAll('[data-form]');
   
   // Open filter
   function openFilter() {
@@ -533,46 +529,45 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
     document.body.style.overflow = '';
   }
   
-  // Toggle custom form
-  function toggleCustomForm() {
-    if (customForm.style.display === 'none' || !customForm.style.display) {
-      customForm.style.display = 'block';
-      customToggle.classList.add('active');
-    } else {
-      customForm.style.display = 'none';
-      customToggle.classList.remove('active');
+  // Toggle conditional form
+  function toggleForm(mode) {
+    // Hide all forms
+    conditionalForms.forEach(form => {
+      form.style.display = 'none';
+    });
+    
+    // Show the form for this mode (if it exists)
+    const form = filterContainer.querySelector(`[data-form="${mode}"]`);
+    if (form) {
+      form.style.display = 'block';
     }
   }
   
-  // Toggle month form
-  function toggleMonthForm() {
-    if (monthForm.style.display === 'none' || !monthForm.style.display) {
-      monthForm.style.display = 'block';
-      periodMonthToggle.classList.add('active');
-    } else {
-      monthForm.style.display = 'none';
-      periodMonthToggle.classList.remove('active');
-    }
-  }
-  
-  // Clear all filters (reset to all-time)
-  function clearAllFilters() {
+  // Reset to All time
+  function resetFilter() {
     window.location.href = window.location.pathname + '?period=all';
-  }
-  
-  // Clear filters (legacy)
-  function clearFilters() {
-    window.location.href = window.location.pathname;
   }
   
   // Event listeners
   if (trigger) trigger.addEventListener('click', openFilter);
   if (closeBtn) closeBtn.addEventListener('click', closeFilter);
   if (backdrop) backdrop.addEventListener('click', closeFilter);
-  if (customToggle) customToggle.addEventListener('click', toggleCustomForm);
-  if (clearBtn) clearBtn.addEventListener('click', clearFilters);
-  if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllFilters);
-  if (periodMonthToggle) periodMonthToggle.addEventListener('click', toggleMonthForm);
+  if (resetBtn) resetBtn.addEventListener('click', resetFilter);
+  
+  // Mode toggle buttons (month, custom)
+  modeToggles.forEach(toggle => {
+    toggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      const mode = this.getAttribute('data-mode');
+      toggleForm(mode);
+      
+      // Update active state
+      filterContainer.querySelectorAll('.filter-mode-option').forEach(opt => {
+        opt.classList.remove('active');
+      });
+      this.classList.add('active');
+    });
+  });
   
   // Close on Escape
   document.addEventListener('keydown', function(e) {
@@ -581,11 +576,9 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
     }
   });
   
-  // Preserve other query params when clicking period/preset links
-  const periodLinks = filterContainer.querySelectorAll('[data-period-option]');
-  const presetLinks = filterContainer.querySelectorAll('.filter-preset-item[href]');
-  
-  [].concat(Array.from(periodLinks), Array.from(presetLinks)).forEach(link => {
+  // Preserve other query params when clicking mode links
+  const modeLinks = filterContainer.querySelectorAll('.filter-mode-option[href]');
+  modeLinks.forEach(link => {
     link.addEventListener('click', function(e) {
       e.preventDefault();
       const url = new URL(window.location.href);
@@ -604,9 +597,9 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
     });
   });
   
-  // Preserve other query params when submitting month form
-  if (monthForm) {
-    monthForm.addEventListener('submit', function(e) {
+  // Preserve other query params when submitting forms
+  conditionalForms.forEach(form => {
+    form.addEventListener('submit', function(e) {
       e.preventDefault();
       const url = new URL(window.location.href);
       const formData = new FormData(this);
@@ -630,7 +623,7 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key p
       
       window.location.href = newUrl.toString();
     });
-  }
+  });
 })();
 </script>
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -185,47 +185,78 @@ def _compute_date_range(period: str = "mtd", date_str: Optional[str] = None) -> 
     return start_date, end_date
 
 
+def _date_to_aware_datetime(d: date, hour: int = 0, minute: int = 0, second: int = 0):
+    """
+    Convert a date to a timezone-aware datetime for safe ORM filtering.
+    
+    Args:
+        d: date object
+        hour, minute, second: time components (default to start of day)
+    
+    Returns:
+        Timezone-aware datetime
+    """
+    naive_dt = datetime.combine(d, datetime.min.time().replace(hour=hour, minute=minute, second=second))
+    return timezone.make_aware(naive_dt)
+
+
 def parse_date_range_from_request(request) -> Dict[str, Any]:
     """
     Parse date range parameters from request and return normalized data.
-    NOW SUPPORTS PERIOD FILTERING: All time + Month picker.
+    SUPPORTS ALL FILTER OPTIONS: All time, Month, MTD, Last 7 Days, Custom Range.
 
     This is a reusable helper for all vertical dashboards to parse date filters
     from GET parameters in a consistent way.
 
+    PRECEDENCE RULES (to avoid ambiguity):
+    1. Legacy ?range=... params (if present) -> backward compatibility + restored UI
+    2. New ?period=... params (if present) -> period filtering
+    3. Default to MTD (existing behavior)
+
     Query Parameters:
-        - period: "all" | "month" (new filtering dimension)
+        LEGACY (RESTORED):
+        - range: "mtd" | "last7" | "today" | "yesterday" | "7d" | "30d" | "custom"
+        - start: YYYY-MM-DD (for range=custom)
+        - end: YYYY-MM-DD (for range=custom)
+        
+        NEW:
+        - period: "all" | "month"
         - month: 1..12 (required when period=month)
         - year: YYYY (optional, defaults to current year when period=month)
-        - range: "today" | "7d" | "30d" | "mtd" | "date" (legacy, still supported)
-        - date: YYYY-MM-DD (for range=date)
 
     Args:
         request: Django HttpRequest object
 
     Returns:
         Dictionary with:
-            - period: str ("all" | "month" | None)
+            - filter_mode: str ("all" | "month" | "mtd" | "last7" | "custom" | "today" | etc.)
+            - period: str ("all" | "month" | None) - for new period filtering
             - month: int (1-12) or None
             - year: int or None
-            - active_range: str ("today" | "7d" | "mtd" | "date" | "all")
-            - start_date: date object (inclusive) or None (for period=all)
-            - end_date: date object (exclusive for range queries) or None (for period=all)
-            - selected_date: date object or None (for "date" range only)
-            - date_param: str or None (ISO date string for "date" range)
+            - active_range: str (same as filter_mode for compatibility)
+            - start_date: date object (inclusive) or None (for all-time)
+            - end_date: date object (exclusive for range queries) or None (for all-time)
+            - selected_date: date object or None (for single-day ranges)
+            - date_param: str or None (ISO date string)
             - range_label: str (human-readable label)
     """
     now = timezone.now()
     today = now.date()
 
-    # ===== NEW PERIOD FILTER (All time / Month) =====
-    period_param = request.GET.get("period", "")  # "" means not set, use legacy range
-    month_param = request.GET.get("month", "")
-    year_param = request.GET.get("year", "")
-
-    # If period=all is explicitly set, return all-time range (no date filtering)
+    # ===== PRECEDENCE 1: LEGACY RANGE PARAMS (highest priority for backward compat) =====
+    range_param = request.GET.get("range", "")
+    
+    if range_param:
+        # Legacy range param exists - process it (backward compatibility)
+        return _parse_legacy_range(request, range_param, today, now)
+    
+    # ===== PRECEDENCE 2: NEW PERIOD PARAMS =====
+    period_param = request.GET.get("period", "")
+    
     if period_param == "all":
+        # All-time filtering (no date constraints)
         return {
+            "filter_mode": "all",
             "period": "all",
             "month": None,
             "year": None,
@@ -236,9 +267,12 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
             "date_param": None,
             "range_label": "All time",
         }
-
-    # If period=month, parse month/year and compute range
+    
     if period_param == "month":
+        # Month filtering
+        month_param = request.GET.get("month", "")
+        year_param = request.GET.get("year", "")
+        
         try:
             month = int(month_param)
             # Validate month
@@ -255,13 +289,17 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
                 year = today.year
 
             # Compute month range: first day of month at 00:00:00 to first day of next month
-            start_date = date(year, month, 1)
+            start_date_naive = date(year, month, 1)
 
             # End date: first day of next month (exclusive)
             if month == 12:
-                end_date = date(year + 1, 1, 1)
+                end_date_naive = date(year + 1, 1, 1)
             else:
-                end_date = date(year, month + 1, 1)
+                end_date_naive = date(year, month + 1, 1)
+
+            # Convert to timezone-aware datetimes
+            start_date = _date_to_aware_datetime(start_date_naive)
+            end_date = _date_to_aware_datetime(end_date_naive)
 
             # Month name for label
             import calendar
@@ -269,6 +307,7 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
             range_label = f"{month_name} {year}"
 
             return {
+                "filter_mode": "month",
                 "period": "month",
                 "month": month,
                 "year": year,
@@ -283,63 +322,177 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
         except (ValueError, TypeError):
             # Invalid month/year, fall back to MTD
             pass
-
-    # ===== LEGACY RANGE FILTER (backward compatibility) =====
-    # Parse filter parameters from request
-    range_param = request.GET.get("range", "mtd")  # Default to MTD
-    date_param = request.GET.get("date", "")  # Specific date for "date" range
-
-    # Validate range parameter
-    valid_ranges = ["today", "7d", "30d", "mtd", "date"]
-    if range_param not in valid_ranges:
-        range_param = "mtd"
-
-    # For "date" range, validate the date parameter
-    selected_date = None
-    if range_param == "date":
-        if date_param:
-            try:
-                selected_date = date.fromisoformat(date_param)
-            except ValueError:
-                # Invalid date format, fall back to MTD
-                range_param = "mtd"
-                selected_date = None
-                date_param = ""
-        else:
-            # No date provided, default to today
-            selected_date = timezone.now().date()
-            date_param = selected_date.isoformat()
-
-    # Compute date range
-    start_date, end_date = _compute_date_range(range_param, date_param)
-
-    # Generate human-readable label
-    if range_param == "today":
-        range_label = "Today"
-    elif range_param == "7d":
-        range_label = "Last 7 days"
-    elif range_param == "30d":
-        range_label = "Last 30 days"
-    elif range_param == "mtd":
-        range_label = "This month"
-    elif range_param == "date":
-        if selected_date:
-            range_label = selected_date.strftime("%b %d, %Y")
-        else:
-            range_label = "Selected date"
-    else:
-        range_label = "This month"
-
+    
+    # ===== PRECEDENCE 3: DEFAULT (MTD) =====
+    # No params provided, use MTD as default (existing behavior)
+    month_start = today.replace(day=1)
+    tomorrow = today + timedelta(days=1)
+    
+    # Convert to timezone-aware datetimes
+    start_date = _date_to_aware_datetime(month_start)
+    end_date = _date_to_aware_datetime(tomorrow)
+    
     return {
-        "period": None,  # Legacy mode, no period filtering
+        "filter_mode": "mtd",
+        "period": None,
         "month": None,
         "year": None,
-        "active_range": range_param,
+        "active_range": "mtd",
         "start_date": start_date,
         "end_date": end_date,
-        "selected_date": selected_date,
-        "date_param": date_param,
-        "range_label": range_label,
+        "selected_date": None,
+        "date_param": None,
+        "range_label": "This month (MTD)",
+    }
+
+
+def _parse_legacy_range(request, range_param: str, today: date, now) -> Dict[str, Any]:
+    """
+    Parse legacy range parameters (backward compatibility + restored UI).
+    
+    Supports: mtd, last7, today, yesterday, 7d, 30d, custom
+    
+    Returns timezone-aware datetimes for safe ORM filtering.
+    """
+    tomorrow = today + timedelta(days=1)
+    
+    # MTD (Month-to-date): first day of current month to today
+    if range_param == "mtd":
+        month_start = today.replace(day=1)
+        return {
+            "filter_mode": "mtd",
+            "period": None,
+            "month": None,
+            "year": None,
+            "active_range": "mtd",
+            "start_date": _date_to_aware_datetime(month_start),
+            "end_date": _date_to_aware_datetime(tomorrow),  # Exclusive end
+            "selected_date": None,
+            "date_param": None,
+            "range_label": "This month (MTD)",
+        }
+    
+    # Last 7 days (including today)
+    if range_param in ("last7", "7d"):
+        start_date_naive = today - timedelta(days=6)  # 6 days ago + today = 7 days
+        return {
+            "filter_mode": "last7",
+            "period": None,
+            "month": None,
+            "year": None,
+            "active_range": "last7",
+            "start_date": _date_to_aware_datetime(start_date_naive),
+            "end_date": _date_to_aware_datetime(tomorrow),  # Exclusive end
+            "selected_date": None,
+            "date_param": None,
+            "range_label": "Last 7 days",
+        }
+    
+    # Today
+    if range_param == "today":
+        return {
+            "filter_mode": "today",
+            "period": None,
+            "month": None,
+            "year": None,
+            "active_range": "today",
+            "start_date": _date_to_aware_datetime(today),
+            "end_date": _date_to_aware_datetime(tomorrow),  # Exclusive end
+            "selected_date": today,
+            "date_param": today.isoformat(),
+            "range_label": "Today",
+        }
+    
+    # Yesterday
+    if range_param == "yesterday":
+        yesterday = today - timedelta(days=1)
+        return {
+            "filter_mode": "yesterday",
+            "period": None,
+            "month": None,
+            "year": None,
+            "active_range": "yesterday",
+            "start_date": _date_to_aware_datetime(yesterday),
+            "end_date": _date_to_aware_datetime(today),  # Exclusive end
+            "selected_date": yesterday,
+            "date_param": yesterday.isoformat(),
+            "range_label": "Yesterday",
+        }
+    
+    # Last 30 days
+    if range_param == "30d":
+        start_date_naive = today - timedelta(days=29)  # 29 days ago + today = 30 days
+        return {
+            "filter_mode": "30d",
+            "period": None,
+            "month": None,
+            "year": None,
+            "active_range": "30d",
+            "start_date": _date_to_aware_datetime(start_date_naive),
+            "end_date": _date_to_aware_datetime(tomorrow),  # Exclusive end
+            "selected_date": None,
+            "date_param": None,
+            "range_label": "Last 30 days",
+        }
+    
+    # Custom date range
+    if range_param == "custom":
+        start_param = request.GET.get("start", "")
+        end_param = request.GET.get("end", "")
+        
+        try:
+            start_date_naive = date.fromisoformat(start_param)
+            end_date_naive = date.fromisoformat(end_param)
+            
+            # Validate dates
+            if start_date_naive > end_date_naive:
+                start_date_naive, end_date_naive = end_date_naive, start_date_naive
+            
+            # Make end_date exclusive (add 1 day)
+            end_date_exclusive_naive = end_date_naive + timedelta(days=1)
+            
+            # Convert to timezone-aware datetimes
+            start_date = _date_to_aware_datetime(start_date_naive)
+            end_date_exclusive = _date_to_aware_datetime(end_date_exclusive_naive)
+            
+            # Generate label
+            if start_date_naive == end_date_naive:
+                range_label = start_date_naive.strftime("%b %d, %Y")
+            else:
+                range_label = f"{start_date_naive.strftime('%b %d')} - {end_date_naive.strftime('%b %d, %Y')}"
+            
+            return {
+                "filter_mode": "custom",
+                "period": None,
+                "month": None,
+                "year": None,
+                "active_range": "custom",
+                "start_date": start_date,
+                "end_date": end_date_exclusive,
+                "selected_date": None,
+                "date_param": None,
+                "range_label": range_label,
+                "custom_start": start_date_naive,
+                "custom_end": end_date_naive,  # Store the original (inclusive) end date
+            }
+        
+        except (ValueError, TypeError):
+            # Invalid dates, fall back to MTD
+            pass
+    
+    # Fallback: MTD (if invalid range param)
+    month_start = today.replace(day=1)
+    return {
+        "filter_mode": "mtd",
+        "period": None,
+        "month": None,
+        "year": None,
+        "active_range": "mtd",
+        "start_date": _date_to_aware_datetime(month_start),
+        "end_date": _date_to_aware_datetime(tomorrow),
+        "selected_date": None,
+        "date_param": None,
+        "range_label": "This month (MTD)",
     }
 
 
