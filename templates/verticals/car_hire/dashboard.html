@@ -333,7 +333,14 @@
 
 @media (min-width: 768px) {
     .kpi-grid {
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1024px) {
+    .kpi-grid {
+        grid-template-columns: repeat(6, 1fr);
         gap: 1rem;
     }
 }
@@ -397,6 +404,8 @@
 .kpi-icon.available { background: var(--hire-green-light); color: var(--hire-green); }
 .kpi-icon.utilization { background: var(--hire-amber-light); color: var(--hire-amber); }
 .kpi-icon.revenue { background: var(--hire-primary-light); color: var(--hire-primary); }
+.kpi-icon.costs { background: var(--hire-red-light); color: var(--hire-red); }
+.kpi-icon.profit { background: var(--hire-green-light); color: var(--hire-green); }
 
 .kpi-value {
     font-size: 1.5rem;
@@ -1369,7 +1378,7 @@
                     <i class="fas fa-wallet"></i>
                 </div>
             </div>
-            <div class="kpi-value">MK {{ revenue_filtered|default:revenue_this_month|intcomma }}</div>
+            <div class="kpi-value">MK {{ total_revenue_filtered|default:revenue_filtered|intcomma }}</div>
             {% if revenue_today > 0 and filter_mode == 'mtd' %}
             <div class="kpi-trend positive">
                 <i class="fas fa-coins"></i> +MK {{ revenue_today|intcomma }} today
@@ -1379,6 +1388,36 @@
                 <i class="fas fa-calendar"></i> {{ range_label|default:"This month" }}
             </div>
             {% endif %}
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-4" data-testid="kpi-costs">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Costs ({{ range_label_short|default:"MTD" }})</span>
+                <div class="kpi-icon costs">
+                    <i class="fas fa-receipt"></i>
+                </div>
+            </div>
+            <div class="kpi-value" style="color: var(--hire-red);">MK {{ costs_filtered|default:0|intcomma }}</div>
+            <div class="kpi-trend neutral">
+                <i class="fas fa-chart-line"></i> 
+                <a href="{% url 'verticals:car_hire_costs' %}" style="color: inherit; text-decoration: none;">View costs</a>
+            </div>
+        </div>
+        
+        <div class="kpi-card animate-in animate-in-4" data-testid="kpi-profit">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Net Profit ({{ range_label_short|default:"MTD" }})</span>
+                <div class="kpi-icon profit">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+            </div>
+            <div class="kpi-value" style="color: {% if net_profit_filtered >= 0 %}var(--hire-green){% else %}var(--hire-red){% endif %};">
+                MK {{ net_profit_filtered|default:0|intcomma }}
+            </div>
+            <div class="kpi-trend {% if net_profit_filtered >= 0 %}positive{% else %}negative{% endif %}">
+                <i class="fas fa-{% if net_profit_filtered >= 0 %}arrow-up{% else %}arrow-down{% endif %}"></i>
+                {% if net_profit_filtered >= 0 %}Profit{% else %}Loss{% endif %}
+            </div>
         </div>
     </div>
     
@@ -1416,6 +1455,73 @@
                 <div class="chart-empty">
                     <i class="fas fa-car"></i>
                     <p>Add vehicles to see fleet status</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Finance Snapshot Section -->
+    <div class="charts-grid animate-in animate-in-3" style="margin-top: 1.5rem;" data-testid="finance-snapshot">
+        <!-- Revenue vs Costs Chart -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-balance-scale"></i>
+                    Revenue vs Costs (Last 14 Days)
+                </h3>
+                <div style="display: flex; gap: 0.75rem;">
+                    <a href="{% url 'verticals:car_hire_revenue' %}" style="font-size: 0.8125rem; color: var(--hire-green); text-decoration: none; font-weight: 600;">
+                        <i class="fas fa-plus"></i> Revenue
+                    </a>
+                    <a href="{% url 'verticals:car_hire_costs' %}" style="font-size: 0.8125rem; color: var(--hire-red); text-decoration: none; font-weight: 600;">
+                        <i class="fas fa-plus"></i> Costs
+                    </a>
+                </div>
+            </div>
+            <div class="chart-card-body">
+                <div class="chart-container" data-testid="finance-chart">
+                    <canvas id="financeChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Cost Categories -->
+        <div class="chart-card">
+            <div class="chart-card-header">
+                <h3 class="chart-title">
+                    <i class="fas fa-tags"></i>
+                    Top Cost Categories
+                </h3>
+                <a href="{% url 'verticals:car_hire_costs_add' %}" style="font-size: 0.8125rem; color: var(--hire-primary); text-decoration: none; font-weight: 600;">
+                    <i class="fas fa-plus"></i> Add Cost
+                </a>
+            </div>
+            <div class="chart-card-body">
+                {% if cost_categories %}
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    {% for cat in cost_categories %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--border); border-radius: 10px;">
+                        <div style="display: flex; align-items: center; gap: 0.625rem;">
+                            <span style="font-size: 1.25rem;">
+                                {% if cat.category == 'fuel' %}⛽{% elif cat.category == 'maintenance' %}🔧{% elif cat.category == 'driver' %}👤{% elif cat.category == 'insurance' %}🛡️{% elif cat.category == 'cleaning' %}🧼{% elif cat.category == 'taxes' %}📋{% elif cat.category == 'parking' %}🅿️{% elif cat.category == 'rent' %}🏢{% else %}📦{% endif %}
+                            </span>
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.9375rem;">{{ cat.category|title }}</div>
+                                <div style="font-size: 0.75rem; color: var(--muted);">{{ cat.count }} {{ cat.count|pluralize:"entry,entries" }}</div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 800; color: var(--hire-red);">MK {{ cat.total|intcomma }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="chart-empty">
+                    <i class="fas fa-receipt"></i>
+                    <p>No costs recorded in this period</p>
+                    <a href="{% url 'verticals:car_hire_costs_add' %}" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;">
+                        <i class="fas fa-plus"></i> Add Cost
+                    </a>
                 </div>
                 {% endif %}
             </div>
@@ -1621,6 +1727,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const chartLabels = {{ chart_labels|safe }};
     const chartBookings = {{ chart_bookings|safe }};
     const chartRevenue = {{ chart_revenue|safe }};
+    const chartCosts = {{ chart_costs|safe }};
     const fleetStatusData = {{ fleet_status_data|safe }};
     const fleetStatusLabels = {{ fleet_status_labels|safe }};
     
@@ -1697,6 +1804,72 @@ document.addEventListener('DOMContentLoaded', function() {
                         position: 'right',
                         title: { display: true, text: 'Revenue (MK)' },
                         grid: { drawOnChartArea: false },
+                        ticks: {
+                            callback: function(value) {
+                                return 'MK ' + (value / 1000).toFixed(0) + 'K';
+                            }
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 0,
+                            font: { size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Finance Chart (Revenue vs Costs)
+    const financeCtx = document.getElementById('financeChart');
+    if (financeCtx) {
+        new Chart(financeCtx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [
+                    {
+                        label: 'Revenue',
+                        data: chartRevenue,
+                        borderColor: '#16a34a',
+                        backgroundColor: 'rgba(22, 163, 74, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                    },
+                    {
+                        label: 'Costs',
+                        data: chartCosts,
+                        borderColor: '#dc2626',
+                        backgroundColor: 'rgba(220, 38, 38, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { usePointStyle: true, padding: 15 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': MK ' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
                         ticks: {
                             callback: function(value) {
                                 return 'MK ' + (value / 1000).toFixed(0) + 'K';

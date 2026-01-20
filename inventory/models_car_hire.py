@@ -525,3 +525,169 @@ class MaintenanceRecord(models.Model):
             self.vehicle.next_maintenance_km = self.next_maintenance_km
             self.vehicle.save(update_fields=["next_maintenance_km"])
 
+
+# ==============================================================================
+# REVENUE & COSTS TRACKING
+# ==============================================================================
+
+
+class CarHireRevenue(models.Model):
+    """
+    Tracks additional revenue entries for Car Hire business (beyond trip-based revenue).
+    E.g. extra charges, insurance claims, late fees, etc.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="car_hire_revenues",
+        db_index=True,
+    )
+    
+    # Revenue details
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Revenue amount in MWK",
+    )
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("trip", "Trip/Booking"),
+            ("extra_charges", "Extra Charges"),
+            ("insurance", "Insurance Claim"),
+            ("late_fee", "Late Return Fee"),
+            ("damage", "Damage Recovery"),
+            ("other", "Other"),
+        ],
+        default="other",
+        db_index=True,
+    )
+    description = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    
+    # Optional vehicle reference
+    vehicle = models.ForeignKey(
+        Vehicle,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="revenues",
+    )
+    
+    # Optional trip reference
+    trip = models.ForeignKey(
+        Trip,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="additional_revenues",
+    )
+    
+    # Date tracking
+    received_on = models.DateField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Date when revenue was received",
+    )
+    
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="car_hire_revenues_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-received_on", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-received_on"]),
+            models.Index(fields=["business", "category", "-received_on"]),
+        ]
+        verbose_name = "Car Hire Revenue"
+        verbose_name_plural = "Car Hire Revenues"
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - MWK {self.amount:,.0f} ({self.received_on})"
+
+
+class CarHireCost(models.Model):
+    """
+    Tracks costs/expenses for Car Hire business (fuel, maintenance, driver wages, insurance, etc.)
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="car_hire_costs",
+        db_index=True,
+    )
+    
+    # Cost details
+    amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Cost amount in MWK",
+    )
+    category = models.CharField(
+        max_length=50,
+        choices=[
+            ("fuel", "Fuel"),
+            ("maintenance", "Maintenance/Repairs"),
+            ("driver", "Driver Wages"),
+            ("insurance", "Insurance"),
+            ("cleaning", "Cleaning/Wash"),
+            ("taxes", "Taxes/Licenses"),
+            ("parking", "Parking/Tolls"),
+            ("rent", "Office/Parking Rent"),
+            ("utilities", "Utilities"),
+            ("other", "Other"),
+        ],
+        default="other",
+        db_index=True,
+    )
+    description = models.CharField(max_length=255)
+    notes = models.TextField(blank=True, default="")
+    
+    # Optional vehicle reference
+    vehicle = models.ForeignKey(
+        Vehicle,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="costs",
+    )
+    
+    # Date tracking
+    incurred_on = models.DateField(
+        default=timezone.now,
+        db_index=True,
+        help_text="Date when cost was incurred",
+    )
+    
+    # Audit
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="car_hire_costs_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ["-incurred_on", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-incurred_on"]),
+            models.Index(fields=["business", "category", "-incurred_on"]),
+        ]
+        verbose_name = "Car Hire Cost"
+        verbose_name_plural = "Car Hire Costs"
+    
+    def __str__(self):
+        return f"{self.get_category_display()} - MWK {self.amount:,.0f} ({self.incurred_on})"

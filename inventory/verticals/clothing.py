@@ -1451,7 +1451,8 @@ def sales_trend_json(request):
 
     current_date = start_date
     while current_date < end_date:
-        date_key = current_date.isoformat()
+        # Use strftime to get consistent date-only key (TruncDate returns date, not datetime)
+        date_key = current_date.strftime("%Y-%m-%d")
         day_data = sales_by_date.get(date_key, {"revenue": 0.0, "count": 0})
 
         labels.append(current_date.strftime("%b %d"))

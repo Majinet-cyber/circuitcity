@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Add Cost - Car Hire{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --hire-primary: #0ea5e9;
+  --hire-accent: #0284c7;
+  --hire-dark: #0f172a;
+  --hire-surface: #1e293b;
+  --hire-card: #334155;
+  --hire-border: #475569;
+  --hire-text: #f8fafc;
+  --hire-muted: #94a3b8;
+  --hire-danger: #ef4444;
+}
+
+.car-hire-page {
+  background: linear-gradient(135deg, var(--hire-dark) 0%, #1e293b 100%);
+  min-height: 100vh;
+  color: var(--hire-text);
+}
+
+.car-hire-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.page-header {
+  background: linear-gradient(135deg, var(--hire-surface) 0%, var(--hire-card) 100%);
+  border: 1px solid var(--hire-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+
+.page-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(135deg, var(--hire-primary), #38bdf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.form-card {
+  background: var(--hire-card);
+  border: 1px solid var(--hire-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--hire-muted);
+  margin-bottom: 0.5rem;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--hire-dark);
+  border: 1px solid var(--hire-border);
+  border-radius: 10px;
+  color: var(--hire-text);
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: var(--hire-primary);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.amount-input {
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--hire-danger), #dc2626);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+}
+
+.btn-cancel {
+  display: block;
+  text-align: center;
+  padding: 0.875rem;
+  color: var(--hire-muted);
+  text-decoration: none;
+  margin-top: 1rem;
+  font-weight: 600;
+}
+
+.btn-cancel:hover {
+  color: var(--hire-text);
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.category-chip {
+  padding: 0.625rem 1rem;
+  background: var(--hire-dark);
+  border: 2px solid var(--hire-border);
+  border-radius: 10px;
+  color: var(--hire-muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-chip:hover {
+  border-color: var(--hire-primary);
+  color: var(--hire-text);
+}
+
+.category-chip.active {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: var(--hire-danger);
+  color: #f87171;
+}
+
+.category-chip input {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .car-hire-container {
+    padding: 1rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="car-hire-page" data-testid="car-hire-costs-add-page">
+  <div class="car-hire-container">
+    <!-- Page Header -->
+    <div class="page-header">
+      <h1 class="page-title">💸 Add Cost</h1>
+      <p style="color: var(--hire-muted); margin: 0;">Record a new business expense</p>
+    </div>
+    
+    <!-- Form -->
+    <form method="post" class="form-card" data-testid="costs-add-form">
+      {% csrf_token %}
+      
+      <!-- Amount -->
+      <div class="form-group">
+        <label class="form-label">Amount (MWK) *</label>
+        <input type="number" name="amount" class="form-input amount-input" placeholder="0" min="1" step="1" required data-testid="input-amount">
+      </div>
+      
+      <!-- Category -->
+      <div class="form-group">
+        <label class="form-label">Category *</label>
+        <div class="category-chips">
+          <label class="category-chip active">
+            <input type="radio" name="category" value="fuel" checked>
+            ⛽ Fuel
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="maintenance">
+            🔧 Maintenance
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="driver">
+            👤 Driver Wages
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="insurance">
+            🛡️ Insurance
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="cleaning">
+            🧼 Cleaning
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="taxes">
+            📋 Taxes/Licenses
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="parking">
+            🅿️ Parking/Tolls
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="rent">
+            🏢 Rent
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="utilities">
+            💡 Utilities
+          </label>
+          <label class="category-chip">
+            <input type="radio" name="category" value="other">
+            📦 Other
+          </label>
+        </div>
+      </div>
+      
+      <!-- Description -->
+      <div class="form-group">
+        <label class="form-label">Description *</label>
+        <input type="text" name="description" class="form-input" placeholder="e.g., Full tank refill for Fortuner" required data-testid="input-description">
+      </div>
+      
+      <!-- Vehicle (Optional) -->
+      {% if all_vehicles %}
+      <div class="form-group">
+        <label class="form-label">Vehicle (Optional)</label>
+        <select name="vehicle_id" class="form-select" data-testid="select-vehicle">
+          <option value="">-- Select Vehicle --</option>
+          {% for vehicle in all_vehicles %}
+          <option value="{{ vehicle.id }}">{{ vehicle.name }} ({{ vehicle.plate_number }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      
+      <!-- Date -->
+      <div class="form-group">
+        <label class="form-label">Date Incurred</label>
+        <input type="date" name="incurred_on" class="form-input" value="{{ today|date:'Y-m-d' }}" data-testid="input-date">
+      </div>
+      
+      <!-- Notes -->
+      <div class="form-group">
+        <label class="form-label">Notes (Optional)</label>
+        <textarea name="notes" class="form-textarea" placeholder="Any additional notes..." data-testid="input-notes"></textarea>
+      </div>
+      
+      <!-- Submit -->
+      <button type="submit" class="btn-submit" data-testid="btn-submit">
+        <i class="bi bi-check-circle"></i> Add Cost Entry
+      </button>
+      
+      <a href="{% url 'verticals:car_hire_costs' %}" class="btn-cancel">Cancel</a>
+    </form>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Category chip selection
+  const chips = document.querySelectorAll('.category-chip');
+  chips.forEach(chip => {
+    chip.addEventListener('click', function() {
+      chips.forEach(c => c.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+  
+  // Set today's date if not set
+  const dateInput = document.querySelector('input[name="incurred_on"]');
+  if (dateInput && !dateInput.value) {
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+  }
+});
+</script>
+{% endblock %}
+

@@ -304,6 +304,14 @@ urlpatterns = [
     path("car_hire/maintenance/", car_hire.maintenance_list, name="car_hire_maintenance"),
     path("car_hire/maintenance/add/", car_hire.maintenance_add, name="car_hire_maintenance_add"),
     
+    # Revenue
+    path("car_hire/revenue/", car_hire.revenue_list, name="car_hire_revenue"),
+    path("car_hire/revenue/add/", car_hire.revenue_add, name="car_hire_revenue_add"),
+    
+    # Costs
+    path("car_hire/costs/", car_hire.costs_list, name="car_hire_costs"),
+    path("car_hire/costs/add/", car_hire.costs_add, name="car_hire_costs_add"),
+    
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),
 ]

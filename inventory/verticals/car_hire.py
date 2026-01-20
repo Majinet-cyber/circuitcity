@@ -22,6 +22,8 @@ from django.views.decorators.http import require_http_methods
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.models_car_hire import (
+    CarHireCost,
+    CarHireRevenue,
     MaintenanceRecord,
     MaintenanceType,
     Trip,
@@ -263,6 +265,52 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         total=Coalesce(Sum("price_total"), Decimal("0.00"))
     )["total"]
     
+    # ===== COSTS KPIs (affected by all filters) =====
+    
+    # Costs for filtered period
+    costs_filtered_qs = CarHireCost.objects.filter(
+        business=business,
+        incurred_on__gte=start_date,
+        incurred_on__lt=end_date,
+    )
+    if selected_vehicle:
+        costs_filtered_qs = costs_filtered_qs.filter(vehicle=selected_vehicle)
+    costs_filtered = costs_filtered_qs.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )["total"]
+    
+    # Costs this month (for comparison)
+    costs_this_month = CarHireCost.objects.filter(
+        business=business,
+        incurred_on__gte=month_start,
+    ).aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )["total"]
+    
+    # Top cost categories for this period
+    cost_categories = costs_filtered_qs.values("category").annotate(
+        total=Sum("amount"),
+        count=Count("id")
+    ).order_by("-total")[:5]
+    
+    # Additional revenue from CarHireRevenue entries (beyond trip revenue)
+    additional_revenue_filtered = CarHireRevenue.objects.filter(
+        business=business,
+        received_on__gte=start_date,
+        received_on__lt=end_date,
+    )
+    if selected_vehicle:
+        additional_revenue_filtered = additional_revenue_filtered.filter(vehicle=selected_vehicle)
+    additional_revenue = additional_revenue_filtered.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0.00"))
+    )["total"]
+    
+    # Total revenue = trip revenue + additional revenue entries
+    total_revenue_filtered = revenue_filtered + additional_revenue
+    
+    # Net Profit = Total Revenue - Costs
+    net_profit_filtered = total_revenue_filtered - costs_filtered
+    
     # ===== TREND INDICATORS =====
     last_week_start = today - timedelta(days=7)
     last_week_end = today - timedelta(days=1)
@@ -366,6 +414,21 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         )["total"]
         chart_revenue.append(float(day_revenue))
     
+    # Chart data for costs (last 14 days)
+    chart_costs = []
+    for i in range(13, -1, -1):
+        day = today - timedelta(days=i)
+        day_costs_qs = CarHireCost.objects.filter(
+            business=business,
+            incurred_on=day,
+        )
+        if selected_vehicle:
+            day_costs_qs = day_costs_qs.filter(vehicle=selected_vehicle)
+        day_cost = day_costs_qs.aggregate(
+            total=Coalesce(Sum("amount"), Decimal("0.00"))
+        )["total"]
+        chart_costs.append(float(day_cost))
+    
     # Fleet status breakdown for donut chart
     fleet_status_data = [available_count, on_trip_count, maintenance_count]
     fleet_status_labels = ["Available", "On Trip", "Maintenance"]
@@ -414,6 +477,16 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "revenue_this_month": revenue_this_month,
         "revenue_today": revenue_today,
         
+        # Costs KPIs
+        "costs_filtered": costs_filtered,
+        "costs_this_month": costs_this_month,
+        "cost_categories": cost_categories,
+        
+        # Finance (Revenue + Costs + Net Profit)
+        "additional_revenue": additional_revenue,
+        "total_revenue_filtered": total_revenue_filtered,
+        "net_profit_filtered": net_profit_filtered,
+        
         # Trend indicators
         "bookings_trend": bookings_trend,
         "bookings_trend_pct": bookings_trend_pct,
@@ -432,6 +505,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "chart_labels": json.dumps(chart_labels),
         "chart_bookings": json.dumps(chart_bookings),
         "chart_revenue": json.dumps(chart_revenue),
+        "chart_costs": json.dumps(chart_costs),
         "fleet_status_data": json.dumps(fleet_status_data),
         "fleet_status_labels": json.dumps(fleet_status_labels),
         
@@ -903,3 +977,286 @@ def maintenance_add(request: HttpRequest) -> HttpResponse:
     
     return render(request, "verticals/car_hire/maintenance_add.html", ctx)
 
+
+# ==============================================================================
+# REVENUE TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+def revenue_list(request: HttpRequest) -> HttpResponse:
+    """Revenue tracking page for Car Hire vertical."""
+    from inventory.models_car_hire import CarHireRevenue, Vehicle
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if not business:
+        return redirect("verticals:no_business")
+    
+    today = timezone.now().date()
+    
+    # Parse date range from request
+    date_range = parse_date_range_from_request(request)
+    active_range = date_range.get("filter_mode", "mtd")
+    start_date = date_range.get("start_date")
+    end_date = date_range.get("end_date")
+    range_label = date_range.get("range_label", "Month to Date")
+    
+    # Vehicle filter
+    vehicle_id = request.GET.get("vehicle_id", "")
+    selected_vehicle = None
+    if vehicle_id:
+        try:
+            selected_vehicle = Vehicle.objects.filter(
+                id=int(vehicle_id),
+                business=business,
+                is_active=True,
+            ).first()
+        except (ValueError, TypeError):
+            pass
+    
+    # Get revenues in range
+    revenues = CarHireRevenue.objects.filter(
+        business=business,
+        received_on__gte=start_date,
+        received_on__lt=end_date,
+    )
+    
+    if selected_vehicle:
+        revenues = revenues.filter(vehicle=selected_vehicle)
+    
+    revenues = revenues.order_by("-received_on")
+    
+    # Aggregates
+    from django.db.models.functions import Coalesce
+    total_revenue = revenues.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    revenue_count = revenues.count()
+    
+    # Get all vehicles for filter dropdown
+    all_vehicles = Vehicle.objects.filter(business=business, is_active=True).order_by("name")
+    
+    ctx.update({
+        "active_tab": "revenue",
+        "revenues": revenues[:50],
+        "total_revenue": total_revenue,
+        "revenue_count": revenue_count,
+        "active_range": active_range,
+        "range_label": range_label,
+        "all_vehicles": all_vehicles,
+        "selected_vehicle": selected_vehicle,
+    })
+    
+    return render(request, "verticals/car_hire/revenue.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+@require_http_methods(["GET", "POST"])
+def revenue_add(request: HttpRequest) -> HttpResponse:
+    """Add a revenue entry."""
+    from inventory.models_car_hire import CarHireRevenue, Vehicle
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if request.method == "POST":
+        try:
+            amount = Decimal(request.POST.get("amount", "0"))
+            if amount <= 0:
+                messages.error(request, "Amount must be greater than 0.")
+                return redirect("/verticals/car_hire/revenue/")
+            
+            category = request.POST.get("category", "other")
+            description = request.POST.get("description", "").strip()
+            notes = request.POST.get("notes", "")
+            received_on = request.POST.get("received_on") or timezone.now().date()
+            vehicle_id = request.POST.get("vehicle_id") or None
+            
+            if not description:
+                messages.error(request, "Description is required.")
+                return redirect("/verticals/car_hire/revenue/")
+            
+            vehicle = None
+            if vehicle_id:
+                try:
+                    vehicle = Vehicle.objects.filter(id=int(vehicle_id), business=business).first()
+                except (ValueError, TypeError):
+                    pass
+            
+            revenue = CarHireRevenue.objects.create(
+                business=business,
+                amount=amount,
+                category=category,
+                description=description,
+                notes=notes,
+                received_on=received_on,
+                vehicle=vehicle,
+                created_by=request.user,
+            )
+            
+            messages.success(request, f"Revenue entry added: MWK {amount:,.0f}")
+            return redirect("/verticals/car_hire/revenue/")
+        except Exception as e:
+            messages.error(request, f"Error adding revenue: {e}")
+            return redirect("/verticals/car_hire/revenue/")
+    
+    # GET - render form
+    all_vehicles = Vehicle.objects.filter(business=business, is_active=True).order_by("name")
+    
+    ctx.update({
+        "active_tab": "revenue",
+        "all_vehicles": all_vehicles,
+    })
+    return render(request, "verticals/car_hire/revenue_add.html", ctx)
+
+
+# ==============================================================================
+# COSTS TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+def costs_list(request: HttpRequest) -> HttpResponse:
+    """Costs tracking page for Car Hire vertical."""
+    from inventory.models_car_hire import CarHireCost, Vehicle
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if not business:
+        return redirect("verticals:no_business")
+    
+    today = timezone.now().date()
+    
+    # Parse date range from request
+    date_range = parse_date_range_from_request(request)
+    active_range = date_range.get("filter_mode", "mtd")
+    start_date = date_range.get("start_date")
+    end_date = date_range.get("end_date")
+    range_label = date_range.get("range_label", "Month to Date")
+    
+    # Vehicle filter
+    vehicle_id = request.GET.get("vehicle_id", "")
+    selected_vehicle = None
+    if vehicle_id:
+        try:
+            selected_vehicle = Vehicle.objects.filter(
+                id=int(vehicle_id),
+                business=business,
+                is_active=True,
+            ).first()
+        except (ValueError, TypeError):
+            pass
+    
+    # Get costs in range
+    costs = CarHireCost.objects.filter(
+        business=business,
+        incurred_on__gte=start_date,
+        incurred_on__lt=end_date,
+    )
+    
+    if selected_vehicle:
+        costs = costs.filter(vehicle=selected_vehicle)
+    
+    costs = costs.order_by("-incurred_on")
+    
+    # Aggregates
+    from django.db.models.functions import Coalesce
+    total_costs = costs.aggregate(
+        total=Coalesce(Sum("amount"), Decimal("0"))
+    )["total"]
+    costs_count = costs.count()
+    
+    # Get category breakdown
+    from django.db.models import Count
+    category_breakdown = costs.values("category").annotate(
+        total=Sum("amount"),
+        count=Count("id")
+    ).order_by("-total")
+    
+    # Get all vehicles for filter dropdown
+    all_vehicles = Vehicle.objects.filter(business=business, is_active=True).order_by("name")
+    
+    ctx.update({
+        "active_tab": "costs",
+        "costs": costs[:50],
+        "total_costs": total_costs,
+        "costs_count": costs_count,
+        "category_breakdown": category_breakdown,
+        "active_range": active_range,
+        "range_label": range_label,
+        "all_vehicles": all_vehicles,
+        "selected_vehicle": selected_vehicle,
+    })
+    
+    return render(request, "verticals/car_hire/costs.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+@require_http_methods(["GET", "POST"])
+def costs_add(request: HttpRequest) -> HttpResponse:
+    """Add a cost entry."""
+    from inventory.models_car_hire import CarHireCost, Vehicle
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    
+    if request.method == "POST":
+        try:
+            amount = Decimal(request.POST.get("amount", "0"))
+            if amount <= 0:
+                messages.error(request, "Amount must be greater than 0.")
+                return redirect("/verticals/car_hire/costs/")
+            
+            category = request.POST.get("category", "other")
+            description = request.POST.get("description", "").strip()
+            notes = request.POST.get("notes", "")
+            incurred_on = request.POST.get("incurred_on") or timezone.now().date()
+            vehicle_id = request.POST.get("vehicle_id") or None
+            
+            if not description:
+                messages.error(request, "Description is required.")
+                return redirect("/verticals/car_hire/costs/")
+            
+            vehicle = None
+            if vehicle_id:
+                try:
+                    vehicle = Vehicle.objects.filter(id=int(vehicle_id), business=business).first()
+                except (ValueError, TypeError):
+                    pass
+            
+            cost = CarHireCost.objects.create(
+                business=business,
+                amount=amount,
+                category=category,
+                description=description,
+                notes=notes,
+                incurred_on=incurred_on,
+                vehicle=vehicle,
+                created_by=request.user,
+            )
+            
+            messages.success(request, f"Cost entry added: MWK {amount:,.0f}")
+            return redirect("/verticals/car_hire/costs/")
+        except Exception as e:
+            messages.error(request, f"Error adding cost: {e}")
+            return redirect("/verticals/car_hire/costs/")
+    
+    # GET - render form
+    all_vehicles = Vehicle.objects.filter(business=business, is_active=True).order_by("name")
+    
+    ctx.update({
+        "active_tab": "costs",
+        "all_vehicles": all_vehicles,
+    })
+    return render(request, "verticals/car_hire/costs_add.html", ctx)
