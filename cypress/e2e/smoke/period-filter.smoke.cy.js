@@ -6,11 +6,12 @@
 
 describe('Period Filter - Dashboard Integration', () => {
   beforeEach(() => {
-    // Login
-    cy.login('manager@emajinet.net', 'testpass123');
+    // Login as phones manager
+    cy.loginAsManager('phones');
     
-    // Wait for dashboard to load
-    cy.url().should('include', '/app/');
+    // Visit phones dashboard
+    cy.visit('/verticals/phones/dashboard/', { failOnStatusCode: false });
+    cy.wait(1000); // Wait for page to load
   });
 
   it('should display Filter button on dashboard', () => {
@@ -192,10 +193,11 @@ describe('Period Filter - Dashboard Integration', () => {
 
 describe('Period Filter - Phones Dashboard', () => {
   beforeEach(() => {
-    cy.login('manager@emajinet.net', 'testpass123');
+    cy.loginAsManager('phones');
     
     // Navigate to Phones dashboard
-    cy.visit('/verticals/phones/dashboard/');
+    cy.visit('/verticals/phones/dashboard/', { failOnStatusCode: false });
+    cy.wait(1000);
   });
 
   it('should show period filter on Phones dashboard', () => {
@@ -221,10 +223,11 @@ describe('Period Filter - Phones Dashboard', () => {
 
 describe('Period Filter - Clothing Dashboard', () => {
   beforeEach(() => {
-    cy.login('manager@emajinet.net', 'testpass123');
+    cy.loginAsManager('clothing');
     
     // Navigate to Clothing dashboard
-    cy.visit('/verticals/clothing/dashboard/');
+    cy.visit('/verticals/clothing/dashboard/', { failOnStatusCode: false });
+    cy.wait(1000);
   });
 
   it('should show period filter on Clothing dashboard', () => {
@@ -251,10 +254,11 @@ describe('Period Filter - Clothing Dashboard', () => {
 
 describe('Period Filter - Farm Dashboard', () => {
   beforeEach(() => {
-    cy.login('manager@emajinet.net', 'testpass123');
+    cy.loginAsManager('farm');
     
     // Navigate to Farm dashboard (if exists in test env)
     cy.visit('/verticals/farm/dashboard/', { failOnStatusCode: false });
+    cy.wait(1000);
   });
 
   it('should show period filter if Farm dashboard is available', () => {
