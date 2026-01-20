@@ -190,6 +190,24 @@
   </ul>
   {% endif %}
 
+  {# ================= CAR HIRE SERVICE ================= #}
+  {% if business_kind == "car_hire" %}
+  <div class="menu-group">CAR HIRE SERVICE</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{% url 'verticals:car_hire_dashboard' %}" data-cy="nav-dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li><a class="navlink" href="{% url 'verticals:car_hire_vehicles' %}" data-cy="nav-car-hire-vehicles"><i class="bi bi-truck"></i> Vehicles</a></li>
+    <li><a class="navlink" href="{% url 'verticals:car_hire_vehicle_add' %}" data-cy="nav-car-hire-add-vehicle"><i class="bi bi-plus-square"></i> Add Vehicle</a></li>
+    <li><a class="navlink" href="{% url 'verticals:car_hire_trips' %}" data-cy="nav-car-hire-trips"><i class="bi bi-calendar-check"></i> Trips / Bookings</a></li>
+    <li><a class="navlink" href="{% url 'verticals:car_hire_trip_add' %}" data-cy="nav-car-hire-add-trip"><i class="bi bi-plus-circle"></i> Add Trip</a></li>
+    <li><a class="navlink" href="{% url 'verticals:car_hire_maintenance' %}" data-cy="nav-car-hire-maintenance"><i class="bi bi-wrench-adjustable"></i> Maintenance</a></li>
+  </ul>
+  <div class="menu-group">SUBSCRIPTION</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-car-hire-billing"><i class="bi bi-credit-card-2-front"></i> Billing</a></li>
+    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-car-hire-settings"><i class="bi bi-gear"></i> Settings</a></li>
+  </ul>
+  {% endif %}
+
   {# ================= SHARED: FINANCE ================= #}
   <div class="menu-group">FINANCE</div>
   <ul class="navlist">

@@ -1,0 +1,544 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Fleet - Car Hire - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Premium Fleet Management (Jan 2026) ===== */
+.vehicles-page {
+    --hire-primary: #059669;
+    --hire-primary-light: #d1fae5;
+    --hire-primary-rgb: 5, 150, 105;
+    --hire-blue: #2563eb;
+    --hire-blue-light: #dbeafe;
+    --hire-amber: #d97706;
+    --hire-amber-light: #fef3c7;
+    --hire-green: #16a34a;
+    --hire-green-light: #dcfce7;
+    --hire-red: #dc2626;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+.animate-in { animation: fadeInUp 0.4s ease-out both; }
+
+/* ===== PAGE HEADER ===== */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #10b981 50%, #34d399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.page-stats {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.stat-pill.available { background: var(--hire-green-light); color: var(--hire-green); border-color: var(--hire-green); }
+.stat-pill.on-trip { background: var(--hire-blue-light); color: var(--hire-blue); border-color: var(--hire-blue); }
+.stat-pill.maintenance { background: var(--hire-amber-light); color: var(--hire-amber); border-color: var(--hire-amber); }
+
+/* ===== FILTERS & SEARCH ===== */
+.filters-bar {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.search-box {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.625rem 1rem 0.625rem 2.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--surface);
+    transition: all 0.2s;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--hire-primary);
+    box-shadow: 0 0 0 3px rgba(var(--hire-primary-rgb), 0.15);
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.875rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
+.filter-pills {
+    display: flex;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+}
+
+.filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.filter-pill:hover {
+    border-color: var(--hire-primary);
+    background: var(--hire-primary-light);
+}
+
+.filter-pill.active {
+    background: var(--hire-primary);
+    color: white;
+    border-color: var(--hire-primary);
+}
+
+.filter-pill i { font-size: 0.75rem; }
+
+.filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: var(--hire-primary);
+}
+
+/* ===== VEHICLES GRID ===== */
+.vehicles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+}
+
+/* ===== VEHICLE CARD ===== */
+.vehicle-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: all 0.25s ease;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    position: relative;
+}
+
+.vehicle-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--hire-primary);
+    transform: scaleX(0);
+    transition: transform 0.25s ease;
+    transform-origin: left;
+}
+
+.vehicle-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+    border-color: var(--hire-primary);
+}
+
+.vehicle-card:hover::before {
+    transform: scaleX(1);
+}
+
+.vehicle-card:active {
+    transform: translateY(-2px);
+}
+
+.vehicle-card-header {
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, rgba(var(--hire-primary-rgb), 0.08) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+}
+
+.vehicle-info-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.vehicle-name {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vehicle-plate {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    background: #f3f4f6;
+    border-radius: 4px;
+}
+
+.vehicle-card-body { padding: 1rem 1.25rem; }
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.info-row:last-child { border-bottom: none; }
+.info-label { font-size: 0.8125rem; color: var(--muted); }
+.info-value { font-size: 0.875rem; font-weight: 600; color: var(--ink); }
+.info-value.warning { color: var(--hire-amber); }
+.info-value.danger { color: var(--hire-red); }
+
+.vehicle-card-footer {
+    padding: 0.75rem 1.25rem;
+    background: #fafafa;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+}
+
+.quick-action {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--surface);
+    color: var(--ink);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.quick-action:hover {
+    background: var(--hire-primary-light);
+    border-color: var(--hire-primary);
+    color: var(--hire-primary);
+}
+
+/* ===== STATUS BADGES ===== */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+}
+
+.status-badge.available { background: var(--hire-green-light); color: var(--hire-green); }
+.status-badge.on-trip { background: var(--hire-blue-light); color: var(--hire-blue); }
+.status-badge.maintenance { background: var(--hire-amber-light); color: var(--hire-amber); }
+
+/* ===== BUTTONS ===== */
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.25s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #10b981 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(var(--hire-primary-rgb), 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(var(--hire-primary-rgb), 0.4);
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+    padding: 3rem 2rem;
+    text-align: center;
+    background: var(--surface);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+.empty-state-icon { font-size: 3.5rem; margin-bottom: 1rem; }
+.empty-state-title { font-size: 1.25rem; font-weight: 800; color: var(--ink); margin-bottom: 0.5rem; }
+.empty-state-text { color: var(--muted); margin-bottom: 1.5rem; max-width: 400px; margin-left: auto; margin-right: auto; }
+
+.suggestion-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.suggestion-chip {
+    padding: 0.375rem 0.75rem;
+    background: var(--hire-primary-light);
+    color: var(--hire-primary);
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vehicles-page" data-testid="vehicles-list-page">
+    <div class="page-header animate-in">
+        <div>
+            <h1 class="page-title">
+                <i class="fas fa-car"></i>
+                Fleet Management
+            </h1>
+            <div class="page-stats" style="margin-top: 0.5rem;">
+                <span class="stat-pill">
+                    <i class="fas fa-car"></i>
+                    {{ total_vehicles }} Total
+                </span>
+            </div>
+        </div>
+        <a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" data-testid="btn-add-vehicle">
+            <i class="fas fa-plus"></i> Add Vehicle
+        </a>
+    </div>
+    
+    <!-- Search & Filters -->
+    <form method="get" class="filters-bar animate-in" style="animation-delay: 0.1s" id="filterForm">
+        <div class="search-box">
+            <i class="fas fa-search search-icon"></i>
+            <input type="text" name="q" class="search-input" placeholder="Search vehicles..." value="{{ request.GET.q }}" id="searchInput">
+        </div>
+        
+        <div class="filter-pills">
+            <a href="?{% if make_filter %}make={{ make_filter }}{% endif %}" 
+               class="filter-pill {% if not status_filter %}active{% endif %}">
+                <i class="fas fa-layer-group"></i> All
+            </a>
+            <a href="?status=available{% if make_filter %}&make={{ make_filter }}{% endif %}" 
+               class="filter-pill {% if status_filter == 'available' %}active{% endif %}">
+                <i class="fas fa-check-circle"></i> Available
+            </a>
+            <a href="?status=on_trip{% if make_filter %}&make={{ make_filter }}{% endif %}" 
+               class="filter-pill {% if status_filter == 'on_trip' %}active{% endif %}">
+                <i class="fas fa-route"></i> On Trip
+            </a>
+            <a href="?status=maintenance{% if make_filter %}&make={{ make_filter }}{% endif %}" 
+               class="filter-pill {% if status_filter == 'maintenance' %}active{% endif %}">
+                <i class="fas fa-tools"></i> Maintenance
+            </a>
+        </div>
+        
+        <select name="make" class="filter-select" onchange="this.form.submit()">
+            <option value="">All Makes</option>
+            {% for value, label in VehicleMake.choices %}
+            <option value="{{ value }}" {% if make_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </form>
+    
+    {% if vehicles %}
+    <div class="vehicles-grid">
+        {% for vehicle in vehicles %}
+        <div class="vehicle-card animate-in" style="animation-delay: {{ forloop.counter0|add:2 }}00ms" data-testid="vehicle-card">
+            <a href="/verticals/car_hire/vehicles/{{ vehicle.id }}/" style="text-decoration: none; color: inherit; display: block;">
+                <div class="vehicle-card-header">
+                    <div class="vehicle-info-main">
+                        <div class="vehicle-name">{{ vehicle.display_name }}</div>
+                        <span class="vehicle-plate">
+                            <i class="fas fa-id-card"></i>
+                            {{ vehicle.plate_number }}
+                        </span>
+                    </div>
+                    <span class="status-badge {% if vehicle.status == 'available' %}available{% elif vehicle.status == 'on_trip' %}on-trip{% else %}maintenance{% endif %}">
+                        {% if vehicle.status == 'available' %}
+                        <i class="fas fa-check"></i> Available
+                        {% elif vehicle.status == 'on_trip' %}
+                        <i class="fas fa-route"></i> On Trip
+                        {% else %}
+                        <i class="fas fa-tools"></i> Service
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="vehicle-card-body">
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-tag" style="margin-right: 0.25rem;"></i> Daily Rate</span>
+                        <span class="info-value">MK {{ vehicle.daily_rate|intcomma }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-tachometer-alt" style="margin-right: 0.25rem;"></i> Odometer</span>
+                        <span class="info-value">{{ vehicle.current_odometer|intcomma }} km</span>
+                    </div>
+                    {% if vehicle.next_maintenance_km %}
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-wrench" style="margin-right: 0.25rem;"></i> Next Service</span>
+                        {% if vehicle.is_maintenance_due %}
+                        <span class="info-value danger">⚠️ OVERDUE</span>
+                        {% elif vehicle.km_until_maintenance < 500 %}
+                        <span class="info-value warning">{{ vehicle.km_until_maintenance|intcomma }} km</span>
+                        {% else %}
+                        <span class="info-value">{{ vehicle.km_until_maintenance|intcomma }} km</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if vehicle.color %}
+                    <div class="info-row">
+                        <span class="info-label"><i class="fas fa-palette" style="margin-right: 0.25rem;"></i> Color</span>
+                        <span class="info-value">{{ vehicle.color }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </a>
+            <div class="vehicle-card-footer">
+                <a href="/verticals/car_hire/vehicles/{{ vehicle.id }}/" class="quick-action">
+                    <i class="fas fa-eye"></i> View
+                </a>
+                {% if vehicle.status == 'available' %}
+                <a href="/verticals/car_hire/trips/new/?vehicle={{ vehicle.id }}" class="quick-action" style="color: var(--hire-primary);">
+                    <i class="fas fa-calendar-plus"></i> Book
+                </a>
+                {% endif %}
+                <a href="/verticals/car_hire/maintenance/new/?vehicle={{ vehicle.id }}" class="quick-action">
+                    <i class="fas fa-wrench"></i> Service
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state animate-in">
+        <div class="empty-state-icon">🚗</div>
+        <h3 class="empty-state-title">{% if status_filter or make_filter %}No vehicles match filters{% else %}No vehicles yet{% endif %}</h3>
+        <p class="empty-state-text">
+            {% if status_filter or make_filter %}
+            Try adjusting your filters or add more vehicles to your fleet.
+            {% else %}
+            Add your first vehicle to start managing your car hire fleet.
+            {% endif %}
+        </p>
+        {% if not status_filter and not make_filter %}
+        <div class="suggestion-chips">
+            <span class="suggestion-chip">🚙 Toyota Fortuner</span>
+            <span class="suggestion-chip">🛻 Ford Ranger</span>
+            <span class="suggestion-chip">🚐 Toyota Hiace</span>
+        </div>
+        {% endif %}
+        <a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" style="margin-top: 1.5rem;">
+            <i class="fas fa-plus"></i> Add Vehicle
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Live search filtering (client-side for small datasets)
+document.getElementById('searchInput').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const cards = document.querySelectorAll('.vehicle-card');
+    
+    cards.forEach(card => {
+        const name = card.querySelector('.vehicle-name')?.textContent.toLowerCase() || '';
+        const plate = card.querySelector('.vehicle-plate')?.textContent.toLowerCase() || '';
+        const visible = name.includes(query) || plate.includes(query);
+        card.style.display = visible ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

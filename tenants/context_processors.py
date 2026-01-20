@@ -70,6 +70,13 @@ _VERTICAL_ALIASES = {
     "welding": "welding",
     "welder": "welding",
     "fabrication": "welding",
+    # Car Hire Service
+    "car_hire": "car_hire",
+    "car hire": "car_hire",
+    "car hire service": "car_hire",
+    "vehicle rental": "car_hire",
+    "car rental": "car_hire",
+    "fleet": "car_hire",
 }
 
 PRODUCT_MODE_SESSION_KEY = "product_mode"

@@ -12,6 +12,7 @@ from django.urls import path
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.verticals import (
+    car_hire,
     cement,
     clothing,
     clothing_v2,
@@ -283,6 +284,25 @@ urlpatterns = [
     path("welding/reports/", welding.reports, name="welding_reports"),
     path("welding/simulator/", welding.job_simulator, name="welding_job_simulator"),
     path("welding/simulator/to-quote/", welding.simulator_to_quote, name="welding_simulator_to_quote"),
+    
+    # ==================== CAR HIRE VERTICAL ====================
+    path("car_hire/dashboard/", car_hire.dashboard, name="car_hire_dashboard"),
+    
+    # Vehicles (Fleet)
+    path("car_hire/vehicles/", car_hire.vehicles_list, name="car_hire_vehicles"),
+    path("car_hire/vehicles/new/", car_hire.vehicle_add, name="car_hire_vehicle_add"),
+    path("car_hire/vehicles/<int:vehicle_id>/", car_hire.vehicle_detail, name="car_hire_vehicle_detail"),
+    
+    # Trips / Bookings
+    path("car_hire/trips/", car_hire.trips_list, name="car_hire_trips"),
+    path("car_hire/trips/new/", car_hire.trip_add, name="car_hire_trip_add"),
+    path("car_hire/trips/<int:trip_id>/", car_hire.trip_detail, name="car_hire_trip_detail"),
+    path("car_hire/trips/<int:trip_id>/start/", car_hire.trip_start, name="car_hire_trip_start"),
+    path("car_hire/trips/<int:trip_id>/complete/", car_hire.trip_complete, name="car_hire_trip_complete"),
+    
+    # Maintenance
+    path("car_hire/maintenance/", car_hire.maintenance_list, name="car_hire_maintenance"),
+    path("car_hire/maintenance/add/", car_hire.maintenance_add, name="car_hire_maintenance_add"),
     
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),

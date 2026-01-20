@@ -17,6 +17,7 @@ GYM = "gym"
 CEMENT = "cement"
 FARM = "farm"
 WELDING = "welding"
+CAR_HIRE = "car_hire"
 GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -72,6 +73,14 @@ _ALIASES: Dict[str, str] = {
     "welding workshop": WELDING,
     "fabrication": WELDING,
     "metalwork": WELDING,
+    # car hire / fleet
+    "car_hire": CAR_HIRE,
+    "car hire": CAR_HIRE,
+    "car hire service": CAR_HIRE,
+    "vehicle rental": CAR_HIRE,
+    "car rental": CAR_HIRE,
+    "fleet": CAR_HIRE,
+    "fleet management": CAR_HIRE,
 }
 
 # Which fields on Business we will probe to determine vertical

@@ -33,6 +33,7 @@ class BusinessKind(models.TextChoices):
     CEMENT = "cement", "Cement / Building Materials"  # Legacy: Kept for backward compatibility
     FARM = "farm", "Farm Manager"  # NEW: Farm profitability tracking
     WELDING = "welding", "Welding Workshop"  # NEW: Welding job estimation & invoicing
+    CAR_HIRE = "car_hire", "Car Hire Service"  # NEW: Fleet management & trip bookings
 
 
 __all__ = ["BusinessKind"]

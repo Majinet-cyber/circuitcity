@@ -1,0 +1,660 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Add Vehicle - Car Hire - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Add Vehicle Premium Page (Jan 2026) ===== */
+.add-vehicle-page {
+    --hire-primary: #059669;
+    --hire-primary-light: #d1fae5;
+    --hire-primary-rgb: 5, 150, 105;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ringPulse {
+    0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.5); }
+    70% { box-shadow: 0 0 0 10px rgba(5, 150, 105, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+.animate-in { animation: fadeInUp 0.4s ease-out both; }
+
+/* ===== PAGE HEADER ===== */
+.page-header {
+    margin-bottom: 1.5rem;
+}
+
+.page-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #10b981 50%, #34d399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.page-subtitle {
+    color: var(--muted);
+    font-size: 0.9375rem;
+    margin-top: 0.25rem;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+    transition: color 0.2s;
+}
+
+.back-link:hover { color: var(--hire-primary); }
+
+/* ===== QUICK ADD SECTION ===== */
+.quick-add-section {
+    margin-bottom: 2rem;
+}
+
+.section-label {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--hire-primary);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-label i { opacity: 0.7; }
+
+/* ===== QUICK ADD CARDS GRID ===== */
+.quick-add-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+    .quick-add-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 768px) {
+    .quick-add-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+}
+
+/* ===== QUICK ADD CARD ===== */
+.quick-add-card {
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.quick-add-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--hire-primary);
+    transform: scaleX(0);
+    transition: transform 0.25s ease;
+}
+
+.quick-add-card:hover {
+    border-color: var(--hire-primary);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+}
+
+.quick-add-card:hover::before {
+    transform: scaleX(1);
+}
+
+.quick-add-card.selected {
+    border-color: var(--hire-primary);
+    background: var(--hire-primary-light);
+    animation: ringPulse 0.6s ease-out;
+}
+
+.quick-add-card.selected::before {
+    transform: scaleX(1);
+}
+
+.quick-add-card.selected::after {
+    content: '✓';
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    width: 24px;
+    height: 24px;
+    background: var(--hire-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    animation: scaleIn 0.2s ease-out;
+}
+
+.quick-add-card:active {
+    transform: translateY(-2px) scale(0.98);
+}
+
+.quick-add-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.quick-add-make {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 0.125rem;
+}
+
+.quick-add-model {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 0.25rem;
+}
+
+.quick-add-description {
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 1.3;
+}
+
+.quick-add-rate {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(var(--hire-primary-rgb), 0.1);
+    color: var(--hire-primary);
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+}
+
+/* Custom card */
+.quick-add-card.custom {
+    border-style: dashed;
+}
+
+.quick-add-card.custom .quick-add-icon {
+    color: var(--muted);
+}
+
+/* Color variants */
+.quick-add-card[data-color="emerald"]:hover,
+.quick-add-card[data-color="emerald"].selected { --card-accent: #059669; }
+.quick-add-card[data-color="blue"]:hover,
+.quick-add-card[data-color="blue"].selected { --card-accent: #2563eb; }
+.quick-add-card[data-color="amber"]:hover,
+.quick-add-card[data-color="amber"].selected { --card-accent: #d97706; }
+.quick-add-card[data-color="orange"]:hover,
+.quick-add-card[data-color="orange"].selected { --card-accent: #ea580c; }
+.quick-add-card[data-color="teal"]:hover,
+.quick-add-card[data-color="teal"].selected { --card-accent: #0d9488; }
+.quick-add-card[data-color="indigo"]:hover,
+.quick-add-card[data-color="indigo"].selected { --card-accent: #4f46e5; }
+
+.quick-add-card[data-color]:hover,
+.quick-add-card[data-color].selected {
+    border-color: var(--card-accent, var(--hire-primary));
+}
+
+.quick-add-card[data-color]:hover::before,
+.quick-add-card[data-color].selected::before {
+    background: var(--card-accent, var(--hire-primary));
+}
+
+.quick-add-card[data-color].selected::after {
+    background: var(--card-accent, var(--hire-primary));
+}
+
+.quick-add-card[data-color].selected {
+    background: color-mix(in srgb, var(--card-accent, var(--hire-primary)) 10%, white);
+}
+
+/* ===== FORM CARD ===== */
+.form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-sm);
+}
+
+.form-section {
+    margin-bottom: 1.5rem;
+}
+
+.form-section-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 0.375rem;
+}
+
+.form-label .required { color: #dc2626; }
+
+.form-input, .form-select {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.9375rem;
+    background: var(--surface);
+    transition: all 0.2s;
+}
+
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--hire-primary);
+    box-shadow: 0 0 0 3px rgba(var(--hire-primary-rgb), 0.15);
+}
+
+.form-input.filled {
+    background: var(--hire-primary-light);
+    border-color: var(--hire-primary);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+@media (max-width: 480px) {
+    .form-row { grid-template-columns: 1fr; }
+}
+
+.form-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+}
+
+/* ===== SUBMIT BUTTON ===== */
+.btn-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    background: linear-gradient(135deg, var(--hire-primary) 0%, #10b981 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    box-shadow: 0 4px 12px rgba(var(--hire-primary-rgb), 0.3);
+}
+
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(var(--hire-primary-rgb), 0.4);
+}
+
+.btn-submit:active {
+    transform: translateY(0);
+}
+
+/* ===== SELECTION INDICATOR ===== */
+.selection-indicator {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--hire-primary-light);
+    border: 1px solid var(--hire-primary);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+    color: var(--hire-primary);
+    font-weight: 600;
+}
+
+.selection-indicator.show { display: flex; }
+
+.selection-indicator i { font-size: 1rem; }
+
+.clear-selection {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: var(--hire-primary);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.clear-selection:hover { text-decoration: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="add-vehicle-page" data-testid="add-vehicle-page">
+    <a href="/verticals/car_hire/vehicles/" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Fleet
+    </a>
+    
+    <div class="page-header animate-in">
+        <h1 class="page-title">
+            <i class="fas fa-plus-circle"></i>
+            Add Vehicle
+        </h1>
+        <p class="page-subtitle">Add a new vehicle to your fleet. Choose a popular option or add a custom vehicle.</p>
+    </div>
+    
+    <!-- Quick Add Section -->
+    <div class="quick-add-section animate-in" style="animation-delay: 0.1s">
+        <div class="section-label">
+            <i class="fas fa-bolt"></i>
+            Quick Add - Popular Malawian Fleet Vehicles
+        </div>
+        
+        <div class="quick-add-grid" data-testid="quick-add-grid">
+            {% for vehicle in quick_add_vehicles %}
+            <div class="quick-add-card" 
+                 data-testid="quick-add-card"
+                 data-id="{{ vehicle.id }}"
+                 data-make="{{ vehicle.make }}"
+                 data-model="{{ vehicle.model }}"
+                 data-seats="{{ vehicle.seats }}"
+                 data-fuel="{{ vehicle.fuel }}"
+                 data-rate="{{ vehicle.suggested_rate }}"
+                 data-color="{{ vehicle.color }}"
+                 onclick="selectQuickAdd(this)">
+                <span class="quick-add-icon">{{ vehicle.icon }}</span>
+                <div class="quick-add-make">{{ vehicle.make|title }}</div>
+                <div class="quick-add-model">{{ vehicle.model }}</div>
+                <div class="quick-add-description">{{ vehicle.description }}</div>
+                <div class="quick-add-rate">
+                    <i class="fas fa-tag"></i>
+                    MK {{ vehicle.suggested_rate|intcomma }}/day
+                </div>
+            </div>
+            {% endfor %}
+            
+            <!-- Custom Card -->
+            <div class="quick-add-card custom" 
+                 data-testid="quick-add-custom"
+                 data-id="custom"
+                 onclick="selectQuickAdd(this)">
+                <span class="quick-add-icon">➕</span>
+                <div class="quick-add-make">&nbsp;</div>
+                <div class="quick-add-model">Custom</div>
+                <div class="quick-add-description">Add any vehicle make & model</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Selection Indicator -->
+    <div class="selection-indicator" id="selectionIndicator">
+        <i class="fas fa-check-circle"></i>
+        <span id="selectionText">Selected: Toyota Fortuner</span>
+        <button type="button" class="clear-selection" onclick="clearSelection()">Clear</button>
+    </div>
+    
+    <!-- Form -->
+    <form method="post" class="form-card animate-in" style="animation-delay: 0.2s" id="vehicleForm">
+        {% csrf_token %}
+        
+        <div class="form-section">
+            <div class="form-section-title">Vehicle Details</div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Make <span class="required">*</span></label>
+                    <select name="make" id="makeSelect" class="form-select" required>
+                        {% for value, label in VehicleMake.choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Model <span class="required">*</span></label>
+                    <input type="text" name="model" id="modelInput" class="form-input" placeholder="e.g., Fortuner, Hiace, Ranger" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Year</label>
+                    <input type="number" name="year" id="yearInput" class="form-input" placeholder="e.g., 2019" min="1990" max="2030">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Plate Number <span class="required">*</span></label>
+                    <input type="text" name="plate_number" class="form-input" placeholder="e.g., MW 1234" required style="text-transform: uppercase;">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Display Name</label>
+                <input type="text" name="name" id="nameInput" class="form-input" placeholder="Leave blank to auto-generate">
+                <div class="form-hint">e.g., "Toyota Fortuner 2019" - will be generated from make/model/year if left blank</div>
+            </div>
+        </div>
+        
+        <div class="form-section">
+            <div class="form-section-title">Rental & Tracking</div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Daily Rate (MK) <span class="required">*</span></label>
+                    <input type="number" name="daily_rate" id="rateInput" class="form-input" placeholder="e.g., 50000" min="0" step="100" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Current Odometer (km)</label>
+                    <input type="number" name="current_odometer" class="form-input" placeholder="e.g., 45000" min="0" value="0">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Color</label>
+                    <input type="text" name="color" class="form-input" placeholder="e.g., White, Silver">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Seats</label>
+                    <input type="number" name="seats" id="seatsInput" class="form-input" placeholder="e.g., 5, 8, 15" min="1" max="50">
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Fuel Type</label>
+                    <select name="fuel_type" id="fuelSelect" class="form-select">
+                        <option value="petrol">Petrol</option>
+                        <option value="diesel">Diesel</option>
+                        <option value="hybrid">Hybrid</option>
+                        <option value="electric">Electric</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Next Service (km)</label>
+                    <input type="number" name="next_maintenance_km" class="form-input" placeholder="e.g., 50000" min="0">
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-input" rows="3" placeholder="Any additional notes about this vehicle..."></textarea>
+        </div>
+        
+        <button type="submit" class="btn-submit" data-testid="submit-vehicle">
+            <i class="fas fa-check"></i> Add Vehicle
+        </button>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Quick Add Selection Logic
+let selectedCard = null;
+
+function selectQuickAdd(card) {
+    // Deselect previous
+    if (selectedCard) {
+        selectedCard.classList.remove('selected');
+    }
+    
+    // Select new card
+    card.classList.add('selected');
+    selectedCard = card;
+    
+    // Get data
+    const id = card.dataset.id;
+    const make = card.dataset.make;
+    const model = card.dataset.model;
+    const seats = card.dataset.seats;
+    const fuel = card.dataset.fuel;
+    const rate = card.dataset.rate;
+    
+    // Update form fields
+    const makeSelect = document.getElementById('makeSelect');
+    const modelInput = document.getElementById('modelInput');
+    const seatsInput = document.getElementById('seatsInput');
+    const fuelSelect = document.getElementById('fuelSelect');
+    const rateInput = document.getElementById('rateInput');
+    
+    if (id !== 'custom') {
+        // Auto-fill for preset vehicles
+        makeSelect.value = make;
+        modelInput.value = model;
+        if (seats) seatsInput.value = seats;
+        if (fuel) fuelSelect.value = fuel;
+        if (rate) rateInput.value = rate;
+        
+        // Add filled class for visual feedback
+        modelInput.classList.add('filled');
+        rateInput.classList.add('filled');
+        
+        // Show selection indicator
+        const indicator = document.getElementById('selectionIndicator');
+        const text = document.getElementById('selectionText');
+        text.textContent = 'Selected: ' + make.charAt(0).toUpperCase() + make.slice(1) + ' ' + model;
+        indicator.classList.add('show');
+        
+        // Scroll to form
+        document.getElementById('vehicleForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        // Custom - clear and focus on make
+        clearFormFields();
+        makeSelect.focus();
+        
+        // Show indicator
+        const indicator = document.getElementById('selectionIndicator');
+        const text = document.getElementById('selectionText');
+        text.textContent = 'Custom vehicle - fill in details below';
+        indicator.classList.add('show');
+    }
+}
+
+function clearSelection() {
+    if (selectedCard) {
+        selectedCard.classList.remove('selected');
+        selectedCard = null;
+    }
+    
+    clearFormFields();
+    
+    // Hide indicator
+    document.getElementById('selectionIndicator').classList.remove('show');
+}
+
+function clearFormFields() {
+    const modelInput = document.getElementById('modelInput');
+    const seatsInput = document.getElementById('seatsInput');
+    const rateInput = document.getElementById('rateInput');
+    
+    document.getElementById('makeSelect').value = 'toyota';
+    modelInput.value = '';
+    modelInput.classList.remove('filled');
+    seatsInput.value = '';
+    document.getElementById('fuelSelect').value = 'petrol';
+    rateInput.value = '';
+    rateInput.classList.remove('filled');
+}
+
+// Form validation enhancement
+document.getElementById('vehicleForm').addEventListener('submit', function(e) {
+    const btn = this.querySelector('.btn-submit');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    btn.disabled = true;
+});
+</script>
+{% endblock %}

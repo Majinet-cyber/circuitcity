@@ -150,6 +150,92 @@ class TestManagerWizardBusinessKindPersistence:
         assert summary["business_kind"] == "hardware"
         assert summary["business_kind_display"] == "Hardware & General Dealers"
 
+    def test_step2_to_step3_car_hire_persistence(self):
+        """
+        CRITICAL: Selecting 'car_hire' in Step 2 must show 'Car Hire Service' in Step 3.
+        
+        REGRESSION TEST: This prevents the car_hire option from being missing
+        from the signup dropdown or incorrectly saved.
+        """
+        client = Client()
+        
+        # Step 1: Account details
+        response = client.post(
+            reverse("accounts:signup_manager") + "?step=1",
+            {
+                "action": "next",
+                "email": "carhiretest@test.com",
+                "full_name": "Car Hire Test User",
+                "password1": "SecurePass123!@#",
+                "password2": "SecurePass123!@#",
+            },
+        )
+        assert response.status_code == 302, "Step 1 should redirect to step 2"
+        assert "step=2" in response.url
+        
+        # Step 2: Store basics with CAR_HIRE selected
+        response = client.post(
+            reverse("accounts:signup_manager") + "?step=2",
+            {
+                "action": "next",
+                "business_name": "My Car Hire Fleet",
+                "business_kind": "car_hire",  # CRITICAL: car_hire selected
+                "subdomain": "",
+            },
+        )
+        assert response.status_code == 302, "Step 2 should redirect to step 3"
+        assert "step=3" in response.url
+        
+        # Step 3: Review & Create - verify car_hire is displayed
+        response = client.get(reverse("accounts:signup_manager") + "?step=3")
+        assert response.status_code == 200
+        
+        # CRITICAL: Step 3 must show "Car Hire Service", not "—"
+        content = response.content.decode("utf-8")
+        assert "Car Hire Service" in content, "Step 3 MUST display 'Car Hire Service' for car_hire business_kind"
+        assert "My Car Hire Fleet" in content, "Store name should be shown"
+        
+        # Verify the summary context has correct data
+        summary = response.context["summary"]
+        assert summary["business_kind"] == "car_hire", "Summary must contain business_kind='car_hire'"
+        assert summary["business_kind_display"] == "Car Hire Service", "Display name must be 'Car Hire Service'"
+
+    def test_step2_car_hire_option_present_in_dropdown(self):
+        """
+        CRITICAL: car_hire must be present in the Step 2 business type dropdown.
+        
+        This test ensures the SSOT (CANONICAL_BUSINESS_KINDS) includes car_hire
+        and it is properly rendered in the template.
+        """
+        client = Client()
+        
+        # Step 1: Account details
+        client.post(
+            reverse("accounts:signup_manager") + "?step=1",
+            {
+                "action": "next",
+                "email": "carhiredropdown@test.com",
+                "full_name": "Dropdown Test User",
+                "password1": "SecurePass123!@#",
+                "password2": "SecurePass123!@#",
+            },
+        )
+        
+        # GET Step 2 to check dropdown options
+        response = client.get(reverse("accounts:signup_manager") + "?step=2")
+        assert response.status_code == 200
+        
+        # Check that car_hire is in the business_kinds context
+        business_kinds = response.context.get("business_kinds", [])
+        car_hire_kinds = [k for k in business_kinds if k.get("key") == "car_hire"]
+        assert len(car_hire_kinds) == 1, "car_hire must be present in business_kinds context"
+        assert car_hire_kinds[0]["display_name"] == "Car Hire Service"
+        
+        # Check that it's in the rendered HTML
+        content = response.content.decode("utf-8")
+        assert "car_hire" in content, "car_hire value must be in the HTML"
+        assert "Car Hire Service" in content, "Car Hire Service label must be in the HTML"
+
     @pytest.mark.parametrize(
         "business_kind,expected_display",
         [
@@ -163,6 +249,7 @@ class TestManagerWizardBusinessKindPersistence:
             ("farm", "Farm Manager"),
             ("welding", "Welding Workshop"),
             ("hardware", "Hardware & General Dealers"),
+            ("car_hire", "Car Hire Service"),  # NEW: Car Hire Service vertical
         ],
     )
     def test_all_business_kinds_display_correctly(self, business_kind, expected_display):
@@ -405,4 +492,110 @@ class TestManagerWizardBusinessKindCreation(TransactionTestCase):
             f"CRITICAL: Welding business should NOT redirect to /verticals/none/. "
             f"Got: {final_url}"
         )
+
+    def test_created_business_has_car_hire_kind(self):
+        """
+        CRITICAL: Completing wizard with 'car_hire' must create Business with business_kind='car_hire'.
+        
+        REGRESSION TEST: Ensures car_hire is properly saved to the database.
+        """
+        client = Client()
+        
+        client.post(
+            reverse("accounts:signup_manager") + "?step=1",
+            {
+                "action": "next",
+                "email": "carhirecreate@test.com",
+                "full_name": "Car Hire Creator",
+                "password1": "SecurePass123!@#",
+                "password2": "SecurePass123!@#",
+            },
+        )
+        
+        client.post(
+            reverse("accounts:signup_manager") + "?step=2",
+            {
+                "action": "next",
+                "business_name": "Car Hire Creation Test",
+                "business_kind": "car_hire",
+                "subdomain": "",
+            },
+        )
+        
+        response = client.post(
+            reverse("accounts:signup_manager") + "?step=3",
+            {
+                "action": "create",
+                "agree": "on",
+            },
+            follow=True,
+        )
+        
+        assert response.status_code == 200, "Creation should succeed"
+        
+        # Verify Business was created with correct business_kind
+        business = Business.objects.filter(name="Car Hire Creation Test").first()
+        assert business is not None, "Business should be created"
+        assert business.business_kind == "car_hire", (
+            f"Business.business_kind MUST be 'car_hire', got '{business.business_kind}'"
+        )
+        
+        # Verify user was created and assigned
+        user = User.objects.filter(email="carhirecreate@test.com").first()
+        assert user is not None
+        membership = Membership.objects.filter(user=user, business=business).first()
+        assert membership is not None
+        assert membership.role == "MANAGER"
+
+    def test_post_create_redirect_not_verticals_none_for_car_hire(self):
+        """
+        CRITICAL: After creating a car_hire business, redirect should NOT go to /verticals/none/.
+        
+        REGRESSION TEST: Ensures proper routing for the car_hire vertical.
+        """
+        client = Client()
+        
+        client.post(
+            reverse("accounts:signup_manager") + "?step=1",
+            {
+                "action": "next",
+                "email": "carhireredirect@test.com",
+                "full_name": "Car Hire Redirect Test",
+                "password1": "SecurePass123!@#",
+                "password2": "SecurePass123!@#",
+            },
+        )
+        
+        client.post(
+            reverse("accounts:signup_manager") + "?step=2",
+            {
+                "action": "next",
+                "business_name": "Car Hire Redirect Test Store",
+                "business_kind": "car_hire",
+                "subdomain": "",
+            },
+        )
+        
+        response = client.post(
+            reverse("accounts:signup_manager") + "?step=3",
+            {
+                "action": "create",
+                "agree": "on",
+            },
+            follow=True,
+        )
+        
+        final_url = response.redirect_chain[-1][0] if response.redirect_chain else response.request["PATH_INFO"]
+        
+        assert "/verticals/none" not in final_url, (
+            f"CRITICAL: Car Hire business should NOT redirect to /verticals/none/. "
+            f"Got: {final_url}"
+        )
+        
+        # Should redirect to car_hire dashboard or inventory dashboard
+        assert (
+            "/verticals/car_hire" in final_url
+            or "/inventory/dashboard" in final_url
+            or "/dashboard" in final_url
+        ), f"Should redirect to valid dashboard, got: {final_url}"
 

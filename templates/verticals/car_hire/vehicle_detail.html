@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ vehicle.name }} - Car Hire - {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.vehicle-detail-page {
+    --hire-primary: #059669;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+.back-link:hover { color: var(--ink); }
+
+.vehicle-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.vehicle-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+}
+
+.vehicle-plate {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--muted);
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+.status-badge.available { background: #dcfce7; color: #16a34a; }
+.status-badge.on-trip { background: #dbeafe; color: #2563eb; }
+.status-badge.maintenance { background: #fef3c7; color: #d97706; }
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.25rem;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+}
+
+.section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.section-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.section-title i { color: var(--hire-primary); }
+
+.section-body { padding: 1rem 1.25rem; }
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.info-item-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.125rem;
+}
+
+.info-item-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.list-empty {
+    padding: 2rem;
+    text-align: center;
+    color: var(--muted);
+}
+
+.trip-item, .maintenance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.trip-item:last-child, .maintenance-item:last-child { border-bottom: none; }
+
+.trip-info { flex: 1; }
+.trip-customer { font-weight: 600; color: var(--ink); }
+.trip-details { font-size: 0.8125rem; color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="vehicle-detail-page">
+    <a href="/verticals/car_hire/vehicles/" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Fleet
+    </a>
+    
+    <div class="vehicle-header">
+        <div>
+            <h1 class="vehicle-title">{{ vehicle.display_name }}</h1>
+            <div class="vehicle-plate">{{ vehicle.plate_number }}</div>
+        </div>
+        <span class="status-badge {% if vehicle.status == 'available' %}available{% elif vehicle.status == 'on_trip' %}on-trip{% else %}maintenance{% endif %}">
+            {{ vehicle.get_status_display }}
+        </span>
+    </div>
+    
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Trips</div>
+            <div class="stat-value">{{ total_trips|default:0 }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Revenue</div>
+            <div class="stat-value">MK {{ total_revenue|intcomma }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Daily Rate</div>
+            <div class="stat-value">MK {{ vehicle.daily_rate|intcomma }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Odometer</div>
+            <div class="stat-value">{{ vehicle.current_odometer|intcomma }} km</div>
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title"><i class="fas fa-info-circle"></i> Vehicle Details</h2>
+        </div>
+        <div class="section-body">
+            <div class="info-grid">
+                <div>
+                    <div class="info-item-label">Make</div>
+                    <div class="info-item-value">{{ vehicle.get_make_display }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Model</div>
+                    <div class="info-item-value">{{ vehicle.model }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Year</div>
+                    <div class="info-item-value">{{ vehicle.year|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Color</div>
+                    <div class="info-item-value">{{ vehicle.color|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Seats</div>
+                    <div class="info-item-value">{{ vehicle.seats|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Fuel Type</div>
+                    <div class="info-item-value">{{ vehicle.get_fuel_type_display }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Next Service</div>
+                    <div class="info-item-value">
+                        {% if vehicle.next_maintenance_km %}
+                            {% if vehicle.is_maintenance_due %}
+                            <span style="color: #dc2626;">OVERDUE</span>
+                            {% else %}
+                            {{ vehicle.km_until_maintenance|intcomma }} km
+                            {% endif %}
+                        {% else %}
+                        —
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% if vehicle.notes %}
+            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                <div class="info-item-label">Notes</div>
+                <div class="info-item-value">{{ vehicle.notes }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title"><i class="fas fa-route"></i> Recent Trips</h2>
+        </div>
+        <div class="section-body">
+            {% if trips %}
+            {% for trip in trips %}
+            <a href="/verticals/car_hire/trips/{{ trip.id }}/" class="trip-item" style="text-decoration: none;">
+                <div class="trip-info">
+                    <div class="trip-customer">{{ trip.customer_name }}</div>
+                    <div class="trip-details">{{ trip.destination }} — {{ trip.start_datetime|date:"M j, Y" }}</div>
+                </div>
+                <span class="status-badge {{ trip.status }}">{{ trip.get_status_display }}</span>
+            </a>
+            {% endfor %}
+            {% else %}
+            <div class="list-empty">No trips recorded yet</div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <h2 class="section-title"><i class="fas fa-wrench"></i> Maintenance History</h2>
+        </div>
+        <div class="section-body">
+            {% if maintenance %}
+            {% for record in maintenance %}
+            <div class="maintenance-item">
+                <div class="trip-info">
+                    <div class="trip-customer">{{ record.get_maintenance_type_display }}</div>
+                    <div class="trip-details">{{ record.description|truncatechars:50 }} — {{ record.date|date:"M j, Y" }}</div>
+                </div>
+                <span style="font-weight: 600;">MK {{ record.cost|intcomma }}</span>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="list-empty">No maintenance records yet</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+

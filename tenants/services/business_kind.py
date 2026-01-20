@@ -86,6 +86,12 @@ CANONICAL_BUSINESS_KINDS = {
         "description": "Welding job estimation, invoicing, workshop management",
         "dashboard_route": "verticals:welding_dashboard",  # Welding has its own dashboard
     },
+    "car_hire": {
+        "display_name": "Car Hire Service",
+        "icon": "🚗",
+        "description": "Vehicle rental, fleet management, trip bookings",
+        "dashboard_route": "verticals:car_hire_dashboard",  # Car Hire has its own dashboard
+    },
 }
 
 
@@ -201,6 +207,17 @@ def normalize_business_kind(value: str | None) -> str | None:
         "metal work": "welding",
         "metalwork": "welding",
         "fabrication": "welding",
+        # Car Hire Service (NEW)
+        "car_hire": "car_hire",
+        "car hire": "car_hire",
+        "car hire service": "car_hire",
+        "car rental": "car_hire",
+        "vehicle hire": "car_hire",
+        "vehicle rental": "car_hire",
+        "fleet": "car_hire",
+        "fleet management": "car_hire",
+        "taxi": "car_hire",
+        "transport": "car_hire",
     }
 
     # Return canonical code if mapped, otherwise return normalized input

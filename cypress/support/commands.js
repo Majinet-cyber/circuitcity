@@ -324,6 +324,19 @@ Cypress.Commands.add('loginAsManager', (verticalKey = 'phones') => {
 });
 
 // ============================================================================
+// LOGIN - Alias for loginAsManager for convenience
+// ============================================================================
+/**
+ * Alias for loginAsManager. Accepts a vertical key or role (only 'manager' supported).
+ * @param {string} verticalOrRole - Vertical key (e.g., 'phones') or 'manager' (defaults to phones)
+ */
+Cypress.Commands.add('login', (verticalOrRole = 'phones') => {
+  // If passed 'manager', use default vertical (phones)
+  const vertical = verticalOrRole === 'manager' ? 'phones' : verticalOrRole;
+  return cy.loginAsManager(vertical);
+});
+
+// ============================================================================
 // STOCK IN FOR VERTICAL - Stock in with vertical-specific fields
 // ============================================================================
 /**

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Trip - {{ trip.customer_name }} - Car Hire{% endblock %}
+
+{% block extra_css %}
+<style>
+.trip-detail-page {
+    --hire-primary: #059669;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+}
+.back-link:hover { color: var(--ink); }
+
+.trip-header {
+    padding: 1.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+}
+
+.trip-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.trip-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--ink);
+    margin: 0 0 0.25rem 0;
+}
+
+.trip-destination {
+    font-size: 1rem;
+    color: var(--muted);
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+.status-badge.upcoming { background: #dbeafe; color: #2563eb; }
+.status-badge.active { background: #d1fae5; color: #059669; }
+.status-badge.completed { background: #dcfce7; color: #16a34a; }
+.status-badge.cancelled { background: #f3f4f6; color: #6b7280; }
+
+.trip-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+}
+.btn-primary { background: var(--hire-primary); color: white; }
+.btn-primary:hover { background: #047857; }
+.btn-outline { background: transparent; color: var(--hire-primary); border: 1px solid var(--hire-primary); }
+
+.section-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
+.section-header {
+    padding: 0.75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: #f9fafb;
+}
+
+.section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--hire-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.section-body { padding: 1rem 1.25rem; }
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+@media (max-width: 480px) { .info-grid { grid-template-columns: 1fr; } }
+
+.info-item-label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.125rem;
+}
+
+.info-item-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.payment-summary {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border);
+}
+.payment-summary:last-child { border-bottom: none; }
+
+.payment-label { color: var(--muted); }
+.payment-value { font-weight: 700; color: var(--ink); }
+.payment-value.balance { color: #dc2626; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="trip-detail-page">
+    <a href="/verticals/car_hire/trips/" class="back-link">
+        <i class="fas fa-arrow-left"></i> Back to Trips
+    </a>
+    
+    <div class="trip-header">
+        <div class="trip-header-top">
+            <div>
+                <h1 class="trip-title">{{ trip.customer_name }}</h1>
+                <div class="trip-destination">
+                    <i class="fas fa-map-marker-alt"></i> {{ trip.destination }}
+                </div>
+            </div>
+            <span class="status-badge {{ trip.status }}">{{ trip.get_status_display }}</span>
+        </div>
+        
+        <div class="trip-actions">
+            {% if trip.status == 'upcoming' %}
+            <form method="post" action="/verticals/car_hire/trips/{{ trip.id }}/start/" style="display: inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn-action btn-primary">
+                    <i class="fas fa-play"></i> Start Trip
+                </button>
+            </form>
+            {% elif trip.status == 'active' %}
+            <form method="post" action="/verticals/car_hire/trips/{{ trip.id }}/complete/" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="end_odometer" value="">
+                <button type="submit" class="btn-action btn-primary">
+                    <i class="fas fa-check"></i> Complete Trip
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-title">Customer Details</span>
+        </div>
+        <div class="section-body">
+            <div class="info-grid">
+                <div>
+                    <div class="info-item-label">Name</div>
+                    <div class="info-item-value">{{ trip.customer_name }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Phone</div>
+                    <div class="info-item-value">{{ trip.customer_phone|default:"—" }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">ID Number</div>
+                    <div class="info-item-value">{{ trip.customer_id_number|default:"—" }}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-title">Vehicle & Trip</span>
+        </div>
+        <div class="section-body">
+            <div class="info-grid">
+                <div>
+                    <div class="info-item-label">Vehicle</div>
+                    <div class="info-item-value">{{ trip.vehicle.display_name }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Plate Number</div>
+                    <div class="info-item-value">{{ trip.vehicle.plate_number }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Trip Type</div>
+                    <div class="info-item-value">{{ trip.get_trip_type_display }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Destination</div>
+                    <div class="info-item-value">{{ trip.destination }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Start</div>
+                    <div class="info-item-value">{{ trip.start_datetime|date:"M j, Y H:i" }}</div>
+                </div>
+                <div>
+                    <div class="info-item-label">End</div>
+                    <div class="info-item-value">{{ trip.end_datetime|date:"M j, Y H:i"|default:"—" }}</div>
+                </div>
+                {% if trip.start_odometer %}
+                <div>
+                    <div class="info-item-label">Start Odometer</div>
+                    <div class="info-item-value">{{ trip.start_odometer|intcomma }} km</div>
+                </div>
+                {% endif %}
+                {% if trip.end_odometer %}
+                <div>
+                    <div class="info-item-label">End Odometer</div>
+                    <div class="info-item-value">{{ trip.end_odometer|intcomma }} km</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-title">Payment</span>
+        </div>
+        <div class="section-body">
+            <div class="payment-summary">
+                <span class="payment-label">Total Price</span>
+                <span class="payment-value">MK {{ trip.price_total|intcomma }}</span>
+            </div>
+            <div class="payment-summary">
+                <span class="payment-label">Deposit Paid</span>
+                <span class="payment-value">MK {{ trip.deposit_paid|intcomma }}</span>
+            </div>
+            <div class="payment-summary">
+                <span class="payment-label">Balance Due</span>
+                <span class="payment-value balance">MK {{ trip.balance_due|intcomma }}</span>
+            </div>
+        </div>
+    </div>
+    
+    {% if trip.notes %}
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-title">Notes</span>
+        </div>
+        <div class="section-body">
+            <p style="margin: 0;">{{ trip.notes }}</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

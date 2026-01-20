@@ -57,6 +57,7 @@ def _get_vertical_dashboard_url(business_kind: str) -> str:
         'liquor': 'liquor:dashboard',
         'farm': 'verticals:farm_dashboard',  # Farm Manager vertical
         'welding': 'verticals:welding_dashboard',  # Welding Workshop vertical
+        'car_hire': 'verticals:car_hire_dashboard',  # Car Hire Service vertical
     }
     
     dashboard_url_name = VERTICAL_DASHBOARDS.get(
@@ -281,6 +282,14 @@ def get_vertical_urls_for_nav(business_kind: str) -> dict:
             'jobs': 'verticals:welding_jobs_list',
             'materials': 'verticals:welding_materials_list',
             'stock_in': 'verticals:welding_stock_in',
+        },
+        'car_hire': {
+            'home': 'verticals:car_hire_dashboard',
+            'vehicles': 'verticals:car_hire_vehicles',
+            'trips': 'verticals:car_hire_trips',
+            'add_vehicle': 'verticals:car_hire_vehicle_add',
+            'add_trip': 'verticals:car_hire_trip_add',
+            'maintenance': 'verticals:car_hire_maintenance',
         },
     }
     

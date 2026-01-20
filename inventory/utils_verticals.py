@@ -43,7 +43,7 @@ def get_vertical_kind(business) -> str:
     kind = str(kind).strip().lower()
 
     # Map to known verticals
-    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement", "farm", "welding"]
+    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement", "farm", "welding", "car_hire"]
     if kind in valid_kinds:
         return kind
 
@@ -70,6 +70,7 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "cement": "verticals:cement_dashboard",  # Cement has its own dashboard
         "farm": "verticals:farm_dashboard",  # Farm vertical
         "welding": "verticals:welding_dashboard",  # Welding vertical
+        "car_hire": "verticals:car_hire_dashboard",  # Car Hire Service vertical
         "generic": "inventory:generic_dashboard",  # Fallback for unrecognized verticals
         # "phones" uses the default dashboard at /inventory/dashboard/
     }
@@ -228,6 +229,7 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "cement": "Cement / Building Materials",  # Legacy: Cement vertical
         "farm": "Farm Manager",  # Farm profitability tracking
         "welding": "Welding Workshop",  # Welding job estimation
+        "car_hire": "Car Hire Service",  # Vehicle rental and fleet management
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
@@ -2076,6 +2078,116 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
                 "group": "more",
+            },
+        ]
+
+    elif business_kind == "car_hire":
+        return [
+            # MAIN section - Car Hire Service vertical (GREEN theme - fleet management)
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:car_hire_dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/car_hire/dashboard",
+                "active_pattern": "/verticals/car_hire/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "vehicles",
+                "url": "verticals:car_hire_vehicles",
+                "label": "Vehicles",
+                "icon": "bi-truck",
+                "active_prefix": "/verticals/car_hire/vehicles",
+                "active_pattern": "/verticals/car_hire/vehicles",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-vehicles",
+            },
+            {
+                "section": "MAIN",
+                "key": "add_vehicle",
+                "url": "verticals:car_hire_vehicle_add",
+                "label": "Add Vehicle",
+                "icon": "bi-plus-square",
+                "active_prefix": "/verticals/car_hire/vehicles/new",
+                "active_pattern": "/verticals/car_hire/vehicles/new",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-add-vehicle",
+            },
+            {
+                "section": "MAIN",
+                "key": "trips",
+                "url": "verticals:car_hire_trips",
+                "label": "Trips / Bookings",
+                "icon": "bi-calendar-check",
+                "active_prefix": "/verticals/car_hire/trips",
+                "active_pattern": "/verticals/car_hire/trips",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-trips",
+            },
+            {
+                "section": "MAIN",
+                "key": "add_trip",
+                "url": "verticals:car_hire_trip_add",
+                "label": "Add Trip",
+                "icon": "bi-plus-circle",
+                "active_prefix": "/verticals/car_hire/trips/new",
+                "active_pattern": "/verticals/car_hire/trips/new",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-add-trip",
+            },
+            {
+                "section": "MAIN",
+                "key": "maintenance",
+                "url": "verticals:car_hire_maintenance",
+                "label": "Maintenance",
+                "icon": "bi-wrench-adjustable",
+                "active_prefix": "/verticals/car_hire/maintenance",
+                "active_pattern": "/verticals/car_hire/maintenance",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-maintenance",
+            },
+            # SUBSCRIPTION section (manager-only)
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-hire-settings",
             },
         ]
 

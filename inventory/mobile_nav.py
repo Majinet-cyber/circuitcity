@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 
-from .helpers_core import CEMENT, CLOTHING, FARM, GYM, LIQUOR, PHARMACY, PHONES, WELDING, business_vertical
+from .helpers_core import CAR_HIRE, CEMENT, CLOTHING, FARM, GYM, LIQUOR, PHARMACY, PHONES, WELDING, business_vertical
 
 
 def _safe_reverse(url_name: str, fallback: str = "#") -> str:
@@ -434,6 +434,51 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "icon_class": "bi-cash-coin",
                 "url": _safe_reverse_any(["verticals:welding_revenue"], "/verticals/welding/revenue/"),
                 "active_prefix": "/verticals/welding/revenue",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "More",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == CAR_HIRE:
+        # Car Hire Service vertical - fleet management & bookings
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["verticals:car_hire_dashboard"], "/verticals/car_hire/dashboard/"),
+                "active_prefix": "/verticals/car_hire/dashboard",
+                "is_menu": False,
+            },
+            {
+                "key": "vehicles",
+                "label": "Vehicles",
+                "icon_class": "bi-truck",
+                "url": _safe_reverse_any(["verticals:car_hire_vehicles"], "/verticals/car_hire/vehicles/"),
+                "active_prefix": "/verticals/car_hire/vehicles",
+                "is_menu": False,
+            },
+            {
+                "key": "trips",
+                "label": "Trips",
+                "icon_class": "bi-calendar-check",
+                "url": _safe_reverse_any(["verticals:car_hire_trips"], "/verticals/car_hire/trips/"),
+                "active_prefix": "/verticals/car_hire/trips",
+                "is_menu": False,
+            },
+            {
+                "key": "add_trip",
+                "label": "Book",
+                "icon_class": "bi-plus-circle",
+                "url": _safe_reverse_any(["verticals:car_hire_trip_add"], "/verticals/car_hire/trips/new/"),
+                "active_prefix": "/verticals/car_hire/trips/new",
                 "is_menu": False,
             },
             {

@@ -442,3 +442,83 @@ if GrocerySale:
         raw_id_fields = ("product", "sold_by")
         readonly_fields = ("profit",)
         list_per_page = 50
+
+
+# ==============================================================================
+# CAR HIRE ADMINS
+# ==============================================================================
+
+try:
+    from .models_car_hire import (
+        Vehicle,
+        Trip,
+        MaintenanceRecord,
+    )
+except ImportError:
+    Vehicle = Trip = MaintenanceRecord = None
+
+
+if Vehicle:
+
+    @admin.register(Vehicle)
+    class VehicleAdmin(admin.ModelAdmin):
+        list_display = (
+            "name",
+            "plate_number",
+            "make",
+            "model",
+            "year",
+            "status",
+            "daily_rate",
+            "current_odometer",
+            "is_active",
+        )
+        list_filter = ("status", "make", "is_active", "created_at")
+        search_fields = ("name", "plate_number", "model")
+        ordering = ("-created_at",)
+        list_select_related = ("business",)
+        raw_id_fields = ("business", "created_by")
+        list_per_page = 50
+
+
+if Trip:
+
+    @admin.register(Trip)
+    class TripAdmin(admin.ModelAdmin):
+        list_display = (
+            "customer_name",
+            "vehicle",
+            "destination",
+            "start_datetime",
+            "end_datetime",
+            "status",
+            "price_total",
+        )
+        list_filter = ("status", "trip_type", "start_datetime")
+        search_fields = ("customer_name", "customer_phone", "destination", "vehicle__name")
+        date_hierarchy = "start_datetime"
+        ordering = ("-start_datetime",)
+        list_select_related = ("vehicle", "business", "created_by")
+        raw_id_fields = ("vehicle", "business", "created_by")
+        list_per_page = 50
+
+
+if MaintenanceRecord:
+
+    @admin.register(MaintenanceRecord)
+    class MaintenanceRecordAdmin(admin.ModelAdmin):
+        list_display = (
+            "vehicle",
+            "maintenance_type",
+            "date",
+            "cost",
+            "odometer",
+            "vendor",
+        )
+        list_filter = ("maintenance_type", "date")
+        search_fields = ("vehicle__name", "vehicle__plate_number", "description", "vendor")
+        date_hierarchy = "date"
+        ordering = ("-date",)
+        list_select_related = ("vehicle", "created_by")
+        raw_id_fields = ("vehicle", "created_by")
+        list_per_page = 50
