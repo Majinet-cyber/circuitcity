@@ -337,6 +337,56 @@ class Trip(models.Model):
         help_text="Driver/agent assigned to this trip",
     )
     
+    # Enhanced booking fields (Part 6 requirements)
+    pickup_location = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Pickup location/address",
+    )
+    dropoff_location = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Dropoff location/address (if different from pickup)",
+    )
+    daily_rate = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Daily rental rate (for reference/calculation)",
+    )
+    num_days = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of rental days (for multi-day bookings)",
+    )
+    fuel_policy = models.CharField(
+        max_length=50,
+        choices=[
+            ("full_to_full", "Full to Full"),
+            ("same_level", "Same Level Return"),
+            ("prepaid", "Prepaid Fuel"),
+            ("no_fuel", "No Fuel (Driver provides)"),
+        ],
+        default="full_to_full",
+        help_text="Fuel policy for this booking",
+    )
+    fuel_level_out = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Fuel level at pickup (e.g., 'Full', '3/4', '1/2')",
+    )
+    fuel_level_in = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+        help_text="Fuel level at return",
+    )
+    
     # Audit
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

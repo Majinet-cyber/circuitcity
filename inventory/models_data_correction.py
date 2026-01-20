@@ -20,8 +20,9 @@ from tenants.models import Business
 
 
 class CorrectionType(models.TextChoices):
-    """Types of corrections that can be made."""
+    """Types of corrections that can be made across all verticals."""
     
+    # Phones vertical
     EDIT_SALE = "EDIT_SALE", "Edit Sale"
     EDIT_STOCK_IN = "EDIT_STOCK_IN", "Edit Stock-In"
     EDIT_ACCESSORY = "EDIT_ACCESSORY", "Edit Accessory"
@@ -29,6 +30,36 @@ class CorrectionType(models.TextChoices):
     VOID_STOCK_IN = "VOID_STOCK_IN", "Void Stock-In"
     VOID_ACCESSORY = "VOID_ACCESSORY", "Void Accessory"
     RESTORE = "RESTORE", "Restore Voided Record"
+    
+    # Liquor vertical
+    EDIT_LIQUOR_SALE = "EDIT_LIQUOR_SALE", "Edit Liquor Sale"
+    VOID_LIQUOR_SALE = "VOID_LIQUOR_SALE", "Void Liquor Sale"
+    EDIT_LIQUOR_STOCK = "EDIT_LIQUOR_STOCK", "Edit Liquor Stock"
+    VOID_LIQUOR_STOCK = "VOID_LIQUOR_STOCK", "Void Liquor Stock"
+    
+    # Welding vertical
+    EDIT_WELDING_QUOTE = "EDIT_WELDING_QUOTE", "Edit Welding Quote"
+    VOID_WELDING_QUOTE = "VOID_WELDING_QUOTE", "Void Welding Quote"
+    EDIT_WELDING_JOB = "EDIT_WELDING_JOB", "Edit Welding Job"
+    VOID_WELDING_JOB = "VOID_WELDING_JOB", "Void Welding Job"
+    EDIT_WELDING_INVOICE = "EDIT_WELDING_INVOICE", "Edit Welding Invoice"
+    
+    # Farm vertical
+    EDIT_FARM_ENTRY = "EDIT_FARM_ENTRY", "Edit Farm Entry"
+    VOID_FARM_ENTRY = "VOID_FARM_ENTRY", "Void Farm Entry"
+    EDIT_POULTRY_RECORD = "EDIT_POULTRY_RECORD", "Edit Poultry Record"
+    EDIT_PIG_RECORD = "EDIT_PIG_RECORD", "Edit Pig Record"
+    
+    # Car Hire vertical
+    EDIT_CAR_HIRE_TRIP = "EDIT_CAR_HIRE_TRIP", "Edit Trip/Booking"
+    VOID_CAR_HIRE_TRIP = "VOID_CAR_HIRE_TRIP", "Void Trip/Booking"
+    EDIT_VEHICLE = "EDIT_VEHICLE", "Edit Vehicle"
+    
+    # Generic
+    EDIT_EXPENSE = "EDIT_EXPENSE", "Edit Expense"
+    VOID_EXPENSE = "VOID_EXPENSE", "Void Expense"
+    EDIT_COST = "EDIT_COST", "Edit Cost"
+    VOID_COST = "VOID_COST", "Void Cost"
 
 
 class DataCorrectionLog(models.Model):

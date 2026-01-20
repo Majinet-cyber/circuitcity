@@ -64,6 +64,22 @@ except Exception:
     FarmLivestockBatch = None
     FarmLivestockEvent = None
 
+# Re-export Farm Livestock models (PART 5: Separate Poultry/Pigs modules)
+try:
+    from .models_farm_livestock import (  # noqa: F401
+        PoultryBatch,
+        PoultryDailyRecord,
+        PigPen,
+        PigDailyRecord,
+        FarmCashbookEntry,
+    )
+except Exception:
+    PoultryBatch = None
+    PoultryDailyRecord = None
+    PigPen = None
+    PigDailyRecord = None
+    FarmCashbookEntry = None
+
 # Re-export Welding models for syncdb table creation
 try:
     from .models_welding import (  # noqa: F401

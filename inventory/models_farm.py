@@ -844,3 +844,539 @@ class FarmAsset(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.get_condition_display()})"
+
+
+# ==============================================================================
+# POULTRY MANAGEMENT (Broilers / Layers)
+# ==============================================================================
+
+
+class PoultryType(models.TextChoices):
+    """Types of poultry birds"""
+    BROILERS = "broilers", "Broilers"
+    LAYERS = "layers", "Layers"
+    INDIGENOUS = "indigenous", "Indigenous/Village Chickens"
+    DUCKS = "ducks", "Ducks"
+    TURKEYS = "turkeys", "Turkeys"
+    OTHER = "other", "Other"
+
+
+class PoultryBatch(models.Model):
+    """
+    A batch/flock of poultry birds.
+    Tracks bird count, mortality, feed usage, and production (eggs for layers).
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="poultry_batches",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="poultry_batches",
+    )
+    
+    # Batch identification
+    name = models.CharField(
+        max_length=100,
+        help_text="Batch name, e.g. 'Broilers Batch 1 - Jan 2026'",
+    )
+    poultry_type = models.CharField(
+        max_length=20,
+        choices=PoultryType.choices,
+        default=PoultryType.BROILERS,
+        db_index=True,
+    )
+    
+    # Initial setup
+    start_date = models.DateField(
+        default=timezone.now,
+        help_text="Date batch was started/received",
+    )
+    initial_birds = models.PositiveIntegerField(
+        default=0,
+        help_text="Initial number of birds in batch",
+    )
+    
+    # Current state (updated by daily records)
+    current_birds = models.PositiveIntegerField(
+        default=0,
+        help_text="Current number of birds alive",
+    )
+    total_deaths = models.PositiveIntegerField(
+        default=0,
+        help_text="Total deaths to date",
+    )
+    total_feed_kg = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Total feed consumed in kg",
+    )
+    total_eggs = models.PositiveIntegerField(
+        default=0,
+        help_text="Total eggs collected (for layers)",
+    )
+    
+    # Financial tracking
+    total_cost = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Total costs incurred (feed, meds, chicks, etc.)",
+    )
+    total_sales = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Total sales revenue",
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True, db_index=True)
+    closed_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="poultry_batches_created",
+    )
+    
+    class Meta:
+        ordering = ["-start_date", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "poultry_type"]),
+        ]
+        verbose_name = "Poultry Batch"
+        verbose_name_plural = "Poultry Batches"
+    
+    def __str__(self):
+        return f"{self.name} ({self.current_birds} birds)"
+    
+    @property
+    def mortality_rate(self) -> Decimal:
+        """Calculate mortality rate as percentage."""
+        if self.initial_birds == 0:
+            return Decimal("0")
+        return (Decimal(self.total_deaths) / Decimal(self.initial_birds)) * Decimal("100")
+    
+    @property
+    def feed_per_bird_kg(self) -> Decimal:
+        """Calculate average feed per bird."""
+        if self.current_birds == 0:
+            return Decimal("0")
+        return self.total_feed_kg / Decimal(self.current_birds)
+    
+    @property
+    def profit(self) -> Decimal:
+        """Calculate profit/loss."""
+        return self.total_sales - self.total_cost
+
+
+class PoultryDailyRecord(models.Model):
+    """
+    Daily record for a poultry batch.
+    Tracks mortality, feed, medication, eggs, and remarks.
+    """
+    batch = models.ForeignKey(
+        PoultryBatch,
+        on_delete=models.CASCADE,
+        related_name="daily_records",
+    )
+    
+    # Date
+    date = models.DateField(default=timezone.now, db_index=True)
+    
+    # Bird count
+    birds_alive = models.PositiveIntegerField(
+        help_text="Number of birds alive at end of day",
+    )
+    deaths = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of deaths today",
+    )
+    
+    # Feed
+    feed_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Feed given today in kg",
+    )
+    
+    # For layers: egg production
+    eggs_collected = models.PositiveIntegerField(
+        default=0,
+        help_text="Eggs collected today (for layers)",
+    )
+    
+    # Health
+    medication = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Medication/vaccination given today",
+    )
+    
+    # Notes
+    remarks = models.TextField(blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="poultry_daily_records_created",
+    )
+    
+    class Meta:
+        ordering = ["-date"]
+        unique_together = [("batch", "date")]
+        indexes = [
+            models.Index(fields=["batch", "-date"]),
+        ]
+        verbose_name = "Poultry Daily Record"
+        verbose_name_plural = "Poultry Daily Records"
+    
+    def __str__(self):
+        return f"{self.batch.name} - {self.date}: {self.birds_alive} birds"
+    
+    def save(self, *args, **kwargs):
+        """Update batch totals on save."""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        # Update batch stats
+        if is_new:
+            self.batch.current_birds = self.birds_alive
+            self.batch.total_deaths += self.deaths
+            self.batch.total_feed_kg += self.feed_kg
+            self.batch.total_eggs += self.eggs_collected
+            self.batch.save(update_fields=[
+                "current_birds", "total_deaths", "total_feed_kg", "total_eggs", "updated_at"
+            ])
+
+
+# ==============================================================================
+# PIG MANAGEMENT
+# ==============================================================================
+
+
+class PigPen(models.Model):
+    """
+    A pig pen/sty for organizing pigs.
+    Pens can contain different pig categories (sows, boars, growers, finishers).
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="pig_pens",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="pig_pens",
+    )
+    
+    # Pen identification
+    name = models.CharField(
+        max_length=100,
+        help_text="Pen name, e.g. 'Pen A', 'Farrowing 1', 'Grower House 2'",
+    )
+    pen_type = models.CharField(
+        max_length=50,
+        choices=[
+            ("farrowing", "Farrowing (Sows with piglets)"),
+            ("grower", "Grower"),
+            ("finisher", "Finisher"),
+            ("boar", "Boar"),
+            ("gilt", "Gilt (Young females)"),
+            ("general", "General"),
+        ],
+        default="general",
+        db_index=True,
+    )
+    
+    # Capacity
+    capacity = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Maximum pigs this pen can hold",
+    )
+    
+    # Current state (updated by daily records)
+    current_pigs = models.PositiveIntegerField(
+        default=0,
+        help_text="Current number of pigs in pen",
+    )
+    
+    # Status
+    is_active = models.BooleanField(default=True, db_index=True)
+    notes = models.TextField(blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pig_pens_created",
+    )
+    
+    class Meta:
+        ordering = ["name"]
+        unique_together = [("business", "name")]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "pen_type"]),
+        ]
+        verbose_name = "Pig Pen"
+        verbose_name_plural = "Pig Pens"
+    
+    def __str__(self):
+        return f"{self.name} ({self.current_pigs} pigs)"
+    
+    @property
+    def utilization_pct(self) -> Decimal | None:
+        """Calculate pen utilization percentage."""
+        if not self.capacity or self.capacity == 0:
+            return None
+        return (Decimal(self.current_pigs) / Decimal(self.capacity)) * Decimal("100")
+
+
+class PigDailyRecord(models.Model):
+    """
+    Daily record for a pig pen.
+    Tracks count, feed, health, weights, and events.
+    """
+    pen = models.ForeignKey(
+        PigPen,
+        on_delete=models.CASCADE,
+        related_name="daily_records",
+    )
+    
+    # Date
+    date = models.DateField(default=timezone.now, db_index=True)
+    
+    # Pig count
+    pigs_count = models.PositiveIntegerField(
+        help_text="Number of pigs in pen at end of day",
+    )
+    
+    # Feed
+    feed_kg = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0"),
+        help_text="Total feed given to pen today in kg",
+    )
+    
+    # Weight tracking (optional, for monitoring growth)
+    average_weight_kg = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Average weight per pig in kg (if weighed)",
+    )
+    
+    # Health
+    treatment = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Treatment/medication given today",
+    )
+    
+    # Events (births, deaths, transfers)
+    births = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of piglets born today",
+    )
+    deaths = models.PositiveIntegerField(
+        default=0,
+        help_text="Number of deaths today",
+    )
+    transfers_in = models.PositiveIntegerField(
+        default=0,
+        help_text="Pigs transferred into this pen",
+    )
+    transfers_out = models.PositiveIntegerField(
+        default=0,
+        help_text="Pigs transferred out of this pen",
+    )
+    sales = models.PositiveIntegerField(
+        default=0,
+        help_text="Pigs sold from this pen today",
+    )
+    
+    # Notes
+    notes = models.TextField(blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pig_daily_records_created",
+    )
+    
+    class Meta:
+        ordering = ["-date"]
+        unique_together = [("pen", "date")]
+        indexes = [
+            models.Index(fields=["pen", "-date"]),
+        ]
+        verbose_name = "Pig Daily Record"
+        verbose_name_plural = "Pig Daily Records"
+    
+    def __str__(self):
+        return f"{self.pen.name} - {self.date}: {self.pigs_count} pigs"
+    
+    def save(self, *args, **kwargs):
+        """Update pen count on save."""
+        super().save(*args, **kwargs)
+        
+        # Update pen current count
+        self.pen.current_pigs = self.pigs_count
+        self.pen.save(update_fields=["current_pigs", "updated_at"])
+
+
+# ==============================================================================
+# FARM CASHBOOK
+# ==============================================================================
+
+
+class FarmCashbookCategory(models.TextChoices):
+    """Categories for farm cashbook entries"""
+    FEED = "feed", "Feed"
+    MEDICATION = "medication", "Medication/Vaccines"
+    CHICKS = "chicks", "Day-old Chicks/Piglets"
+    LABOUR = "labour", "Labour/Wages"
+    UTILITIES = "utilities", "Utilities (Water/Electricity)"
+    TRANSPORT = "transport", "Transport"
+    EQUIPMENT = "equipment", "Equipment/Tools"
+    SALES_BIRDS = "sales_birds", "Sales - Birds"
+    SALES_EGGS = "sales_eggs", "Sales - Eggs"
+    SALES_PIGS = "sales_pigs", "Sales - Pigs"
+    SALES_CROPS = "sales_crops", "Sales - Crops"
+    OTHER_INCOME = "other_income", "Other Income"
+    OTHER_EXPENSE = "other_expense", "Other Expense"
+
+
+class FarmCashbook(models.Model):
+    """
+    Farm cashbook for tracking all financial transactions.
+    Links optionally to poultry batches or pig pens for attribution.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="farm_cashbook_entries",
+        db_index=True,
+    )
+    
+    # Transaction details
+    date = models.DateField(default=timezone.now, db_index=True)
+    category = models.CharField(
+        max_length=30,
+        choices=FarmCashbookCategory.choices,
+        default=FarmCashbookCategory.OTHER_EXPENSE,
+        db_index=True,
+    )
+    description = models.CharField(max_length=255)
+    
+    # Amount (positive for income, negative for expense)
+    amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        help_text="Amount in MWK (positive for income, negative for expense)",
+    )
+    
+    # Optional links to livestock
+    poultry_batch = models.ForeignKey(
+        PoultryBatch,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cashbook_entries",
+        help_text="Link to poultry batch if applicable",
+    )
+    pig_pen = models.ForeignKey(
+        PigPen,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cashbook_entries",
+        help_text="Link to pig pen if applicable",
+    )
+    
+    # Notes
+    notes = models.TextField(blank=True, default="")
+    
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farm_cashbook_created",
+    )
+    
+    class Meta:
+        ordering = ["-date", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-date"]),
+            models.Index(fields=["business", "category"]),
+        ]
+        verbose_name = "Farm Cashbook Entry"
+        verbose_name_plural = "Farm Cashbook Entries"
+    
+    def __str__(self):
+        sign = "+" if self.amount >= 0 else ""
+        return f"{self.date}: {sign}{self.amount:,.0f} MWK - {self.description}"
+    
+    @property
+    def is_income(self) -> bool:
+        """Check if this is an income entry."""
+        return self.amount >= 0
+    
+    @property
+    def is_expense(self) -> bool:
+        """Check if this is an expense entry."""
+        return self.amount < 0
+    
+    def save(self, *args, **kwargs):
+        """Update linked batch/pen costs on save."""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        # Update poultry batch total cost/sales
+        if is_new and self.poultry_batch:
+            if self.is_expense:
+                self.poultry_batch.total_cost += abs(self.amount)
+            else:
+                self.poultry_batch.total_sales += self.amount
+            self.poultry_batch.save(update_fields=["total_cost", "total_sales", "updated_at"])

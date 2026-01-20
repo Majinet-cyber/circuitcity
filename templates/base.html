@@ -1967,6 +1967,9 @@
 {# ===== Sidebar More Features Toggle ===== #}
 <script src="{% static 'js/sidebar-more-features.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 
+{# ===== Shared Navbar Dropdown Init (PART 3 FIX: Works after HTMX nav) ===== #}
+<script src="{% static 'js/shared-navbar-init.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
+
 {# ===== PWA Install Banner (2025-12-25) ===== #}
 <script src="{% static 'js/pwa-install.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 

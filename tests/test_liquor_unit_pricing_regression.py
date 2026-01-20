@@ -81,15 +81,15 @@ class TestLiquorUnitPricingHelper:
         assert unit_info["label"] == "Bottles"
 
     def test_cider_per_bottle_pricing(self, liquor_business):
-        """Cider should be priced per bottle"""
+        """Cider should be priced per bottle (6-pack)"""
         cider = MerchProduct.objects.create(
             business=liquor_business,
             name="Hunters Dry Cider",
             kind=BusinessKind.LIQUOR,
             category="Cider",
-            selling_price=Decimal("48000.00"),  # Per crate
-            cost_price=Decimal("40000.00"),
-            bottles_per_crate=20,
+            selling_price=Decimal("12000.00"),  # Per 6-pack
+            cost_price=Decimal("9000.00"),
+            bottles_per_crate=6,  # Cider uses 6-packs
             quantity_in_stock=3,
             is_active=True
         )
@@ -97,9 +97,9 @@ class TestLiquorUnitPricingHelper:
         unit_info = get_liquor_unit_info(cider)
         
         assert unit_info["sale_unit"] == "bottle"
-        assert unit_info["unit_price"] == Decimal("2400.00")  # 48000 / 20
-        assert unit_info["unit_cost"] == Decimal("2000.00")
-        assert unit_info["max_quantity"] == 60  # 3 * 20
+        assert unit_info["unit_price"] == Decimal("2000.00")  # 12000 / 6
+        assert unit_info["unit_cost"] == Decimal("1500.00")  # 9000 / 6
+        assert unit_info["max_quantity"] == 18  # 3 * 6
 
     def test_spirits_per_shot_pricing(self, liquor_business):
         """Spirits should be priced per shot"""
