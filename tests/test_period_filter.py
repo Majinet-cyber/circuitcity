@@ -1,0 +1,378 @@
+# tests/test_period_filter.py
+"""
+Regression tests for Period Filter functionality (All time + Month picker).
+Ensures dashboard aggregations work correctly across all verticals.
+"""
+from __future__ import annotations
+
+import calendar
+from datetime import date, timedelta
+from decimal import Decimal
+
+import pytest
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+from inventory.business_kinds import BusinessKind
+from tenants.models import Business
+
+User = get_user_model()
+
+
+@pytest.mark.django_db
+class TestPeriodFilterSSoT:
+    """Test the SSOT period filter utility in base.py"""
+
+    def test_parse_period_all_time(self, rf):
+        """Test period=all returns None dates and correct label"""
+        from inventory.verticals.base import parse_date_range_from_request
+
+        request = rf.get("/dashboard/?period=all")
+        result = parse_date_range_from_request(request)
+
+        assert result["period"] == "all"
+        assert result["month"] is None
+        assert result["year"] is None
+        assert result["start_date"] is None
+        assert result["end_date"] is None
+        assert result["range_label"] == "All time"
+
+    def test_parse_period_month_current_year(self, rf):
+        """Test period=month with month param defaults to current year"""
+        from inventory.verticals.base import parse_date_range_from_request
+
+        request = rf.get("/dashboard/?period=month&month=3")  # March
+        result = parse_date_range_from_request(request)
+
+        current_year = timezone.now().year
+
+        assert result["period"] == "month"
+        assert result["month"] == 3
+        assert result["year"] == current_year
+        assert result["start_date"] == date(current_year, 3, 1)
+        assert result["end_date"] == date(current_year, 4, 1)  # First day of next month (exclusive)
+        assert result["range_label"] == f"March {current_year}"
+
+    def test_parse_period_month_with_year(self, rf):
+        """Test period=month with both month and year params"""
+        from inventory.verticals.base import parse_date_range_from_request
+
+        request = rf.get("/dashboard/?period=month&month=12&year=2025")  # December 2025
+        result = parse_date_range_from_request(request)
+
+        assert result["period"] == "month"
+        assert result["month"] == 12
+        assert result["year"] == 2025
+        assert result["start_date"] == date(2025, 12, 1)
+        assert result["end_date"] == date(2026, 1, 1)  # Wraps to next year
+        assert result["range_label"] == "December 2025"
+
+    def test_parse_period_month_invalid_falls_back_to_mtd(self, rf):
+        """Test invalid month param falls back to MTD"""
+        from inventory.verticals.base import parse_date_range_from_request
+
+        request = rf.get("/dashboard/?period=month&month=13")  # Invalid
+        result = parse_date_range_from_request(request)
+
+        # Should fall back to MTD (legacy default)
+        assert result["active_range"] == "mtd"
+        assert result["start_date"] is not None
+        assert result["end_date"] is not None
+
+    def test_parse_legacy_range_backward_compat(self, rf):
+        """Test legacy range params still work (backward compatibility)"""
+        from inventory.verticals.base import parse_date_range_from_request
+
+        request = rf.get("/dashboard/?range=7d")
+        result = parse_date_range_from_request(request)
+
+        assert result["period"] is None  # Legacy mode
+        assert result["active_range"] == "7d"
+        assert result["start_date"] is not None
+        assert result["end_date"] is not None
+        assert result["range_label"] == "Last 7 days"
+
+
+@pytest.mark.django_db
+class TestClothingPeriodFilter:
+    """Test period filter in Clothing vertical"""
+
+    @pytest.fixture
+    def setup_clothing_data(self, db):
+        """Create test business, user, and sales data across different months"""
+        # Create business
+        business = Business.objects.create(
+            name="Test Clothing Store",
+            business_kind=BusinessKind.CLOTHING,
+        )
+
+        # Create test user
+        user = User.objects.create_user(
+            username="testclerk",
+            email="clerk@test.com",
+            password="testpass123",
+        )
+
+        # Import models
+        from inventory.models import MerchProduct
+        from inventory.models_verticals import ClothingSale
+
+        # Create product
+        product = MerchProduct.objects.create(
+            business=business,
+            name="Test T-Shirt",
+            kind=BusinessKind.CLOTHING,
+            selling_price=Decimal("50.00"),
+            cost_price=Decimal("25.00"),
+        )
+
+        # Create sales across different months
+        january_date = timezone.make_aware(timezone.datetime(2025, 1, 15, 10, 0, 0))
+        february_date = timezone.make_aware(timezone.datetime(2025, 2, 15, 10, 0, 0))
+        march_date = timezone.make_aware(timezone.datetime(2025, 3, 15, 10, 0, 0))
+
+        # January: 2 sales, 100 revenue
+        ClothingSale.objects.create(
+            business=business,
+            product=product,
+            quantity=1,
+            total_price=Decimal("50.00"),
+            total_cost=Decimal("25.00"),
+            sold_at=january_date,
+            sold_by=user,
+        )
+        ClothingSale.objects.create(
+            business=business,
+            product=product,
+            quantity=1,
+            total_price=Decimal("50.00"),
+            total_cost=Decimal("25.00"),
+            sold_at=january_date + timedelta(days=1),
+            sold_by=user,
+        )
+
+        # February: 1 sale, 50 revenue
+        ClothingSale.objects.create(
+            business=business,
+            product=product,
+            quantity=1,
+            total_price=Decimal("50.00"),
+            total_cost=Decimal("25.00"),
+            sold_at=february_date,
+            sold_by=user,
+        )
+
+        # March: 3 sales, 150 revenue
+        for i in range(3):
+            ClothingSale.objects.create(
+                business=business,
+                product=product,
+                quantity=1,
+                total_price=Decimal("50.00"),
+                total_cost=Decimal("25.00"),
+                sold_at=march_date + timedelta(days=i),
+                sold_by=user,
+            )
+
+        return {
+            "business": business,
+            "user": user,
+            "product": product,
+        }
+
+    def test_clothing_month_filter_january(self, rf, setup_clothing_data):
+        """Test filtering clothing dashboard by January 2025"""
+        from inventory.verticals.base import clothing_sales_metrics
+
+        business = setup_clothing_data["business"]
+
+        # Call with January 2025
+        result = clothing_sales_metrics(
+            business,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 2, 1),  # Exclusive end
+        )
+
+        # Should only show January sales: 2 sales, 100 revenue, 50 cost
+        assert result["total_sales"] == 2
+        assert result["revenue"] == Decimal("100.00")
+        assert result["cost_of_goods"] == Decimal("50.00")
+
+    def test_clothing_month_filter_march(self, rf, setup_clothing_data):
+        """Test filtering clothing dashboard by March 2025"""
+        from inventory.verticals.base import clothing_sales_metrics
+
+        business = setup_clothing_data["business"]
+
+        # Call with March 2025
+        result = clothing_sales_metrics(
+            business,
+            start_date=date(2025, 3, 1),
+            end_date=date(2025, 4, 1),  # Exclusive end
+        )
+
+        # Should only show March sales: 3 sales, 150 revenue, 75 cost
+        assert result["total_sales"] == 3
+        assert result["revenue"] == Decimal("150.00")
+        assert result["cost_of_goods"] == Decimal("75.00")
+
+    def test_clothing_all_time_filter(self, rf, setup_clothing_data):
+        """Test all-time aggregation (no date filtering)"""
+        from inventory.verticals.base import clothing_sales_metrics
+
+        business = setup_clothing_data["business"]
+
+        # Call with None dates (all-time)
+        result = clothing_sales_metrics(
+            business,
+            start_date=None,
+            end_date=None,
+        )
+
+        # Should show all sales: 6 sales total (2+1+3), 300 revenue, 150 cost
+        assert result["total_sales"] == 6
+        assert result["revenue"] == Decimal("300.00")
+        assert result["cost_of_goods"] == Decimal("150.00")
+
+
+@pytest.mark.django_db
+class TestPhonesPeriodFilter:
+    """Test period filter in Phones vertical"""
+
+    @pytest.fixture
+    def setup_phones_data(self, db):
+        """Create test business, user, and inventory data across different months"""
+        # Create business
+        business = Business.objects.create(
+            name="Test Phone Store",
+            business_kind=BusinessKind.PHONES,
+        )
+
+        # Create test user
+        user = User.objects.create_user(
+            username="testclerk",
+            email="clerk@test.com",
+            password="testpass123",
+        )
+
+        # Import models
+        from inventory.models import InventoryItem, PhoneProduct
+
+        # Create phone product
+        phone = PhoneProduct.objects.create(
+            business=business,
+            brand="Samsung",
+            model="Galaxy S21",
+            variant="128GB",
+        )
+
+        # Create sold phones across different months
+        january_date = timezone.make_aware(timezone.datetime(2025, 1, 15, 10, 0, 0))
+        february_date = timezone.make_aware(timezone.datetime(2025, 2, 15, 10, 0, 0))
+
+        # January: 2 phones sold, 1000 revenue
+        for i in range(2):
+            InventoryItem.objects.create(
+                business=business,
+                product=phone,
+                imei_barcode=f"12345678901234{i}",
+                status="SOLD",
+                order_price=Decimal("300.00"),
+                selling_price=Decimal("500.00"),
+                sold_at=january_date + timedelta(days=i),
+                assigned_agent=user,
+            )
+
+        # February: 1 phone sold, 500 revenue
+        InventoryItem.objects.create(
+            business=business,
+            product=phone,
+            imei_barcode="123456789012345",
+            status="SOLD",
+            order_price=Decimal("300.00"),
+            selling_price=Decimal("500.00"),
+            sold_at=february_date,
+            assigned_agent=user,
+        )
+
+        return {
+            "business": business,
+            "user": user,
+            "phone": phone,
+        }
+
+    def test_phones_month_filter_january(self, rf, setup_phones_data):
+        """Test filtering phones dashboard by January 2025"""
+        from inventory.verticals.base import phone_sales_metrics
+
+        business = setup_phones_data["business"]
+
+        # Call with January 2025
+        result = phone_sales_metrics(
+            business,
+            start_date=date(2025, 1, 1),
+            end_date=date(2025, 2, 1),  # Exclusive end
+        )
+
+        # Should only show January sales: 2 phones, 1000 revenue, 600 cost
+        assert result["units_sold"] == 2
+        assert result["revenue"] == Decimal("1000.00")
+        assert result["cost_of_goods"] == Decimal("600.00")
+
+    def test_phones_all_time_filter(self, rf, setup_phones_data):
+        """Test all-time aggregation for phones"""
+        from inventory.verticals.base import phone_sales_metrics
+
+        business = setup_phones_data["business"]
+
+        # Call with None dates (all-time)
+        result = phone_sales_metrics(
+            business,
+            start_date=None,
+            end_date=None,
+        )
+
+        # Should show all sales: 3 phones, 1500 revenue, 900 cost
+        assert result["units_sold"] == 3
+        assert result["revenue"] == Decimal("1500.00")
+        assert result["cost_of_goods"] == Decimal("900.00")
+
+
+@pytest.mark.django_db
+class TestPeriodFilterQueryString:
+    """Test that query strings are properly constructed and parsed"""
+
+    def test_period_all_query_string(self, client, admin_user):
+        """Test ?period=all works in actual dashboard request"""
+        client.force_login(admin_user)
+
+        # Create business for user
+        business = Business.objects.create(
+            name="Test Business",
+            business_kind=BusinessKind.PHONES,
+        )
+        business.memberships.create(user=admin_user, role="OWNER")
+
+        # Request dashboard with period=all
+        response = client.get("/app/dashboard/?period=all")
+
+        # Should not error (200 or redirect depending on setup)
+        assert response.status_code in [200, 302]
+
+    def test_period_month_query_string(self, client, admin_user):
+        """Test ?period=month&month=5 works in actual dashboard request"""
+        client.force_login(admin_user)
+
+        # Create business for user
+        business = Business.objects.create(
+            name="Test Business",
+            business_kind=BusinessKind.CLOTHING,
+        )
+        business.memberships.create(user=admin_user, role="OWNER")
+
+        # Request dashboard with period=month&month=5 (May)
+        response = client.get("/app/dashboard/?period=month&month=5")
+
+        # Should not error
+        assert response.status_code in [200, 302]
+

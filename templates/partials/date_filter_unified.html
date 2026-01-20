@@ -1,7 +1,7 @@
 {% comment %}
-Unified Date Filter Component
+Unified Date Filter Component with Period Filter
 Mobile-first, premium glass design
-Usage: {% include "partials/date_filter_unified.html" with range_key=range_key start_date=start_date end_date=end_date %}
+Usage: {% include "partials/date_filter_unified.html" with range_key=range_key period=period month=month year=year start_date=start_date end_date=end_date %}
 {% endcomment %}
 
 <!-- Filter Button -->
@@ -18,69 +18,134 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   <div class="filter-panel" data-filter-panel>
     <div class="filter-panel-content">
       <div class="filter-header">
-        <h3>Date Range</h3>
+        <h3>Dashboard Filters</h3>
         <button type="button" class="filter-close" data-filter-close aria-label="Close">
           <i class="bi bi-x-lg"></i>
         </button>
       </div>
 
       <div class="filter-body">
-        <!-- Preset Options -->
-        <div class="filter-presets">
-          <a href="?range=today" class="filter-preset-item {% if range_key == 'today' %}active{% endif %}">
-            <i class="bi bi-calendar-day"></i>
-            <span>Today</span>
-          </a>
-          <a href="?range=yesterday" class="filter-preset-item {% if range_key == 'yesterday' %}active{% endif %}">
-            <i class="bi bi-calendar-check"></i>
-            <span>Yesterday</span>
-          </a>
-          <a href="?range=7d" class="filter-preset-item {% if range_key == '7d' %}active{% endif %}">
-            <i class="bi bi-calendar-week"></i>
-            <span>Last 7 days</span>
-          </a>
-          <a href="?range=30d" class="filter-preset-item {% if range_key == '30d' %}active{% endif %}">
-            <i class="bi bi-calendar-range"></i>
-            <span>Last 30 days</span>
-          </a>
-          <a href="?range=month" class="filter-preset-item {% if range_key == 'month' %}active{% endif %}">
-            <i class="bi bi-calendar-month"></i>
-            <span>This month</span>
-          </a>
-          <button type="button" class="filter-preset-item {% if range_key == 'custom' %}active{% endif %}" data-custom-toggle>
-            <i class="bi bi-calendar2-range"></i>
-            <span>Custom range</span>
-          </button>
+        <!-- PERIOD FILTER (NEW) -->
+        <div class="filter-section">
+          <h4 class="filter-section-title">Period</h4>
+          <div class="filter-presets">
+            <a href="?period=all" class="filter-preset-item {% if period == 'all' %}active{% endif %}" data-period-option>
+              <i class="bi bi-infinity"></i>
+              <span>All time</span>
+            </a>
+            <button type="button" class="filter-preset-item {% if period == 'month' %}active{% endif %}" data-period-month-toggle>
+              <i class="bi bi-calendar-month"></i>
+              <span>Month</span>
+            </button>
+          </div>
+
+          <!-- Month Picker (shown when Month is selected) -->
+          <form method="get" class="filter-month-form" data-month-form style="display:{% if period == 'month' %}block{% else %}none{% endif %}">
+            <input type="hidden" name="period" value="month">
+            
+            <div class="filter-form-group">
+              <label for="filterMonth">Select month</label>
+              <select id="filterMonth" name="month" required class="filter-select" data-cy="month-select">
+                <option value="">Choose...</option>
+                <option value="1" {% if month == 1 %}selected{% endif %}>January</option>
+                <option value="2" {% if month == 2 %}selected{% endif %}>February</option>
+                <option value="3" {% if month == 3 %}selected{% endif %}>March</option>
+                <option value="4" {% if month == 4 %}selected{% endif %}>April</option>
+                <option value="5" {% if month == 5 %}selected{% endif %}>May</option>
+                <option value="6" {% if month == 6 %}selected{% endif %}>June</option>
+                <option value="7" {% if month == 7 %}selected{% endif %}>July</option>
+                <option value="8" {% if month == 8 %}selected{% endif %}>August</option>
+                <option value="9" {% if month == 9 %}selected{% endif %}>September</option>
+                <option value="10" {% if month == 10 %}selected{% endif %}>October</option>
+                <option value="11" {% if month == 11 %}selected{% endif %}>November</option>
+                <option value="12" {% if month == 12 %}selected{% endif %}>December</option>
+              </select>
+            </div>
+
+            <div class="filter-form-group" style="display:none">
+              <label for="filterYear">Year (optional)</label>
+              <input type="number" id="filterYear" name="year" 
+                     value="{% if year %}{{ year }}{% endif %}" 
+                     placeholder="Current year" 
+                     min="2000" 
+                     max="2100"
+                     class="filter-input">
+            </div>
+
+            <div class="filter-actions">
+              <button type="submit" class="btn-filter-apply" data-cy="apply-month-filter">
+                <i class="bi bi-check-circle"></i> Apply
+              </button>
+            </div>
+          </form>
         </div>
 
-        <!-- Custom Range Form -->
-        <form method="get" class="filter-custom-form" data-custom-form style="display:{% if range_key == 'custom' %}block{% else %}none{% endif %}">
-          <input type="hidden" name="range" value="custom">
-          
-          <div class="filter-form-row">
-            <div class="filter-form-group">
-              <label for="filterStartDate">Start date</label>
-              <input type="date" id="filterStartDate" name="start" 
-                     value="{% if range_key == 'custom' and start_date %}{{ start_date|date:'Y-m-d' }}{% endif %}" 
-                     required>
-            </div>
-            <div class="filter-form-group">
-              <label for="filterEndDate">End date</label>
-              <input type="date" id="filterEndDate" name="end" 
-                     value="{% if range_key == 'custom' and end_date %}{{ end_date|date:'Y-m-d' }}{% endif %}" 
-                     required>
-            </div>
+        <!-- LEGACY RANGE FILTER (backward compatibility, can be hidden if not needed) -->
+        <div class="filter-section" style="display:none">
+          <h4 class="filter-section-title">Quick Ranges</h4>
+          <div class="filter-presets">
+            <a href="?range=today" class="filter-preset-item {% if range_key == 'today' %}active{% endif %}">
+              <i class="bi bi-calendar-day"></i>
+              <span>Today</span>
+            </a>
+            <a href="?range=yesterday" class="filter-preset-item {% if range_key == 'yesterday' %}active{% endif %}">
+              <i class="bi bi-calendar-check"></i>
+              <span>Yesterday</span>
+            </a>
+            <a href="?range=7d" class="filter-preset-item {% if range_key == '7d' %}active{% endif %}">
+              <i class="bi bi-calendar-week"></i>
+              <span>Last 7 days</span>
+            </a>
+            <a href="?range=30d" class="filter-preset-item {% if range_key == '30d' %}active{% endif %}">
+              <i class="bi bi-calendar-range"></i>
+              <span>Last 30 days</span>
+            </a>
+            <a href="?range=month" class="filter-preset-item {% if range_key == 'month' %}active{% endif %}">
+              <i class="bi bi-calendar-month"></i>
+              <span>This month</span>
+            </a>
+            <button type="button" class="filter-preset-item {% if range_key == 'custom' %}active{% endif %}" data-custom-toggle>
+              <i class="bi bi-calendar2-range"></i>
+              <span>Custom range</span>
+            </button>
           </div>
 
-          <div class="filter-actions">
-            <button type="submit" class="btn-filter-apply">
-              <i class="bi bi-check-circle"></i> Apply
-            </button>
-            <button type="button" class="btn-filter-clear" data-filter-clear>
-              <i class="bi bi-arrow-counterclockwise"></i> Clear
-            </button>
-          </div>
-        </form>
+          <!-- Custom Range Form -->
+          <form method="get" class="filter-custom-form" data-custom-form style="display:{% if range_key == 'custom' %}block{% else %}none{% endif %}">
+            <input type="hidden" name="range" value="custom">
+            
+            <div class="filter-form-row">
+              <div class="filter-form-group">
+                <label for="filterStartDate">Start date</label>
+                <input type="date" id="filterStartDate" name="start" 
+                       value="{% if range_key == 'custom' and start_date %}{{ start_date|date:'Y-m-d' }}{% endif %}" 
+                       required>
+              </div>
+              <div class="filter-form-group">
+                <label for="filterEndDate">End date</label>
+                <input type="date" id="filterEndDate" name="end" 
+                       value="{% if range_key == 'custom' and end_date %}{{ end_date|date:'Y-m-d' }}{% endif %}" 
+                       required>
+              </div>
+            </div>
+
+            <div class="filter-actions">
+              <button type="submit" class="btn-filter-apply">
+                <i class="bi bi-check-circle"></i> Apply
+              </button>
+              <button type="button" class="btn-filter-clear" data-filter-clear>
+                <i class="bi bi-arrow-counterclockwise"></i> Clear
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Clear All Action -->
+        <div class="filter-actions" style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.06)">
+          <button type="button" class="btn-filter-clear" data-filter-clear-all>
+            <i class="bi bi-arrow-counterclockwise"></i> Reset to All time
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -199,12 +264,30 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   color: var(--ink, #0f172a);
 }
 
+/* Filter Section */
+.filter-section {
+  margin-bottom: 20px;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted, #64748b);
+}
+
 /* Filter Presets */
 .filter-presets {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .filter-preset-item {
@@ -240,6 +323,42 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   font-size: 16px;
 }
 
+/* Month Form */
+.filter-month-form {
+  padding-top: 12px;
+}
+
+.filter-form-group {
+  margin-bottom: 14px;
+}
+
+.filter-form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+
+.filter-select,
+.filter-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
 /* Custom Form */
 .filter-custom-form {
   padding-top: 16px;
@@ -251,14 +370,6 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 16px;
-}
-
-.filter-form-group label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted, #64748b);
 }
 
 .filter-form-group input[type="date"] {
@@ -285,7 +396,8 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
 }
 
 .btn-filter-apply,
-.btn-filter-clear {
+.btn-filter-clear,
+.btn-filter-clear-all {
   flex: 1;
   display: flex;
   align-items: center;
@@ -311,12 +423,14 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
 }
 
-.btn-filter-clear {
+.btn-filter-clear,
+.btn-filter-clear-all {
   background: rgba(0, 0, 0, 0.05);
   color: var(--muted, #64748b);
 }
 
-.btn-filter-clear:hover {
+.btn-filter-clear:hover,
+.btn-filter-clear-all:hover {
   background: rgba(0, 0, 0, 0.1);
   color: var(--ink, #0f172a);
 }
@@ -401,6 +515,9 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   const customToggle = filterContainer.querySelector('[data-custom-toggle]');
   const customForm = filterContainer.querySelector('[data-custom-form]');
   const clearBtn = filterContainer.querySelector('[data-filter-clear]');
+  const clearAllBtn = filterContainer.querySelector('[data-filter-clear-all]');
+  const periodMonthToggle = filterContainer.querySelector('[data-period-month-toggle]');
+  const monthForm = filterContainer.querySelector('[data-month-form]');
   
   // Open filter
   function openFilter() {
@@ -427,7 +544,23 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
     }
   }
   
-  // Clear filters
+  // Toggle month form
+  function toggleMonthForm() {
+    if (monthForm.style.display === 'none' || !monthForm.style.display) {
+      monthForm.style.display = 'block';
+      periodMonthToggle.classList.add('active');
+    } else {
+      monthForm.style.display = 'none';
+      periodMonthToggle.classList.remove('active');
+    }
+  }
+  
+  // Clear all filters (reset to all-time)
+  function clearAllFilters() {
+    window.location.href = window.location.pathname + '?period=all';
+  }
+  
+  // Clear filters (legacy)
   function clearFilters() {
     window.location.href = window.location.pathname;
   }
@@ -438,6 +571,8 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
   if (backdrop) backdrop.addEventListener('click', closeFilter);
   if (customToggle) customToggle.addEventListener('click', toggleCustomForm);
   if (clearBtn) clearBtn.addEventListener('click', clearFilters);
+  if (clearAllBtn) clearAllBtn.addEventListener('click', clearAllFilters);
+  if (periodMonthToggle) periodMonthToggle.addEventListener('click', toggleMonthForm);
   
   // Close on Escape
   document.addEventListener('keydown', function(e) {
@@ -446,16 +581,18 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
     }
   });
   
-  // Preserve other query params when clicking presets
+  // Preserve other query params when clicking period/preset links
+  const periodLinks = filterContainer.querySelectorAll('[data-period-option]');
   const presetLinks = filterContainer.querySelectorAll('.filter-preset-item[href]');
-  presetLinks.forEach(link => {
+  
+  [].concat(Array.from(periodLinks), Array.from(presetLinks)).forEach(link => {
     link.addEventListener('click', function(e) {
       e.preventDefault();
       const url = new URL(window.location.href);
       const targetUrl = new URL(this.href, window.location.origin);
       
       // Preserve location, agent, etc. params
-      const preserveParams = ['location', 'agent', 'staff_id', 'payment_method'];
+      const preserveParams = ['location', 'agent', 'staff_id', 'payment_method', 'category'];
       preserveParams.forEach(param => {
         const value = url.searchParams.get(param);
         if (value) {
@@ -466,6 +603,34 @@ Usage: {% include "partials/date_filter_unified.html" with range_key=range_key s
       window.location.href = targetUrl.toString();
     });
   });
+  
+  // Preserve other query params when submitting month form
+  if (monthForm) {
+    monthForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const url = new URL(window.location.href);
+      const formData = new FormData(this);
+      
+      // Build new URL with form data
+      const newUrl = new URL(window.location.pathname, window.location.origin);
+      formData.forEach((value, key) => {
+        if (value) {
+          newUrl.searchParams.set(key, value);
+        }
+      });
+      
+      // Preserve other params
+      const preserveParams = ['location', 'agent', 'staff_id', 'payment_method', 'category'];
+      preserveParams.forEach(param => {
+        const value = url.searchParams.get(param);
+        if (value) {
+          newUrl.searchParams.set(param, value);
+        }
+      });
+      
+      window.location.href = newUrl.toString();
+    });
+  }
 })();
 </script>
 

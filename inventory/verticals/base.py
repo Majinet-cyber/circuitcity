@@ -188,21 +188,103 @@ def _compute_date_range(period: str = "mtd", date_str: Optional[str] = None) -> 
 def parse_date_range_from_request(request) -> Dict[str, Any]:
     """
     Parse date range parameters from request and return normalized data.
+    NOW SUPPORTS PERIOD FILTERING: All time + Month picker.
 
     This is a reusable helper for all vertical dashboards to parse date filters
     from GET parameters in a consistent way.
+
+    Query Parameters:
+        - period: "all" | "month" (new filtering dimension)
+        - month: 1..12 (required when period=month)
+        - year: YYYY (optional, defaults to current year when period=month)
+        - range: "today" | "7d" | "30d" | "mtd" | "date" (legacy, still supported)
+        - date: YYYY-MM-DD (for range=date)
 
     Args:
         request: Django HttpRequest object
 
     Returns:
         Dictionary with:
-            - active_range: str ("today" | "7d" | "mtd" | "date")
-            - start_date: date object (inclusive)
-            - end_date: date object (exclusive for range queries)
+            - period: str ("all" | "month" | None)
+            - month: int (1-12) or None
+            - year: int or None
+            - active_range: str ("today" | "7d" | "mtd" | "date" | "all")
+            - start_date: date object (inclusive) or None (for period=all)
+            - end_date: date object (exclusive for range queries) or None (for period=all)
             - selected_date: date object or None (for "date" range only)
             - date_param: str or None (ISO date string for "date" range)
+            - range_label: str (human-readable label)
     """
+    now = timezone.now()
+    today = now.date()
+
+    # ===== NEW PERIOD FILTER (All time / Month) =====
+    period_param = request.GET.get("period", "")  # "" means not set, use legacy range
+    month_param = request.GET.get("month", "")
+    year_param = request.GET.get("year", "")
+
+    # If period=all is explicitly set, return all-time range (no date filtering)
+    if period_param == "all":
+        return {
+            "period": "all",
+            "month": None,
+            "year": None,
+            "active_range": "all",
+            "start_date": None,
+            "end_date": None,
+            "selected_date": None,
+            "date_param": None,
+            "range_label": "All time",
+        }
+
+    # If period=month, parse month/year and compute range
+    if period_param == "month":
+        try:
+            month = int(month_param)
+            # Validate month
+            if not (1 <= month <= 12):
+                raise ValueError("Invalid month")
+
+            # Year: optional, defaults to current year
+            if year_param:
+                year = int(year_param)
+                # Sanity check year
+                if not (1900 <= year <= 2100):
+                    year = today.year
+            else:
+                year = today.year
+
+            # Compute month range: first day of month at 00:00:00 to first day of next month
+            start_date = date(year, month, 1)
+
+            # End date: first day of next month (exclusive)
+            if month == 12:
+                end_date = date(year + 1, 1, 1)
+            else:
+                end_date = date(year, month + 1, 1)
+
+            # Month name for label
+            import calendar
+            month_name = calendar.month_name[month]
+            range_label = f"{month_name} {year}"
+
+            return {
+                "period": "month",
+                "month": month,
+                "year": year,
+                "active_range": "month",
+                "start_date": start_date,
+                "end_date": end_date,
+                "selected_date": None,
+                "date_param": None,
+                "range_label": range_label,
+            }
+
+        except (ValueError, TypeError):
+            # Invalid month/year, fall back to MTD
+            pass
+
+    # ===== LEGACY RANGE FILTER (backward compatibility) =====
     # Parse filter parameters from request
     range_param = request.GET.get("range", "mtd")  # Default to MTD
     date_param = request.GET.get("date", "")  # Specific date for "date" range
@@ -231,12 +313,33 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
     # Compute date range
     start_date, end_date = _compute_date_range(range_param, date_param)
 
+    # Generate human-readable label
+    if range_param == "today":
+        range_label = "Today"
+    elif range_param == "7d":
+        range_label = "Last 7 days"
+    elif range_param == "30d":
+        range_label = "Last 30 days"
+    elif range_param == "mtd":
+        range_label = "This month"
+    elif range_param == "date":
+        if selected_date:
+            range_label = selected_date.strftime("%b %d, %Y")
+        else:
+            range_label = "Selected date"
+    else:
+        range_label = "This month"
+
     return {
+        "period": None,  # Legacy mode, no period filtering
+        "month": None,
+        "year": None,
         "active_range": range_param,
         "start_date": start_date,
         "end_date": end_date,
         "selected_date": selected_date,
         "date_param": date_param,
+        "range_label": range_label,
     }
 
 
@@ -255,8 +358,8 @@ def clothing_sales_queryset(
     Args:
         business: Business instance
         location: Optional location filter
-        start_date: Optional explicit start date (inclusive)
-        end_date: Optional explicit end date (exclusive)
+        start_date: Optional explicit start date (inclusive), None means no date filtering
+        end_date: Optional explicit end date (exclusive), None means no date filtering
         period: One of "today", "7d", "mtd", "date" (used if start/end not provided)
         date_str: Specific date string for period="date"
 
@@ -267,15 +370,18 @@ def clothing_sales_queryset(
     from inventory.models_verticals import ClothingSale
 
     # Determine date range
-    if start_date is None or end_date is None:
+    if start_date is None and end_date is None:
         start_date, end_date = _compute_date_range(period, date_str)
 
-    # Build base sales queryset with timezone-aware datetime filtering
-    sales_qs = ClothingSale.objects.filter(
-        business=business,
-        sold_at__gte=timezone.make_aware(datetime.combine(start_date, datetime.min.time())),
-        sold_at__lt=timezone.make_aware(datetime.combine(end_date, datetime.min.time())),
-    )
+    # Build base sales queryset
+    sales_qs = ClothingSale.objects.filter(business=business)
+
+    # Apply date filtering ONLY if dates are provided (support all-time queries)
+    if start_date is not None and end_date is not None:
+        sales_qs = sales_qs.filter(
+            sold_at__gte=timezone.make_aware(datetime.combine(start_date, datetime.min.time())),
+            sold_at__lt=timezone.make_aware(datetime.combine(end_date, datetime.min.time())),
+        )
 
     if location:
         # If ClothingSale has location field, filter by it
@@ -300,8 +406,8 @@ def clothing_sales_metrics(
     Args:
         business: Business instance
         location: Optional location filter
-        start_date: Optional explicit start date (inclusive)
-        end_date: Optional explicit end date (exclusive)
+        start_date: Optional explicit start date (inclusive), None means no date filtering
+        end_date: Optional explicit end date (exclusive), None means no date filtering
         period: One of "today", "7d", "mtd", "date" (used if start/end not provided)
         date_str: Specific date string for period="date"
 
@@ -310,8 +416,8 @@ def clothing_sales_metrics(
     """
     from inventory.models_verticals import ClothingSale
 
-    # Determine date range
-    if start_date is None or end_date is None:
+    # Determine date range (only if both are None)
+    if start_date is None and end_date is None:
         start_date, end_date = _compute_date_range(period, date_str)
 
     # Build base sales queryset using unified helper
@@ -339,8 +445,13 @@ def clothing_sales_metrics(
     try:
         from wallet.utils import compute_business_costs
 
-        overhead_data = compute_business_costs(business, start_date, end_date - timedelta(days=1))
-        overhead_costs = overhead_data["total"]
+        # Only compute overhead costs if we have a date range
+        if start_date is not None and end_date is not None:
+            overhead_data = compute_business_costs(business, start_date, end_date - timedelta(days=1))
+            overhead_costs = overhead_data["total"]
+        else:
+            # All-time: sum all overhead costs (no date filter)
+            overhead_costs = Decimal("0.00")  # TODO: implement all-time overhead computation if needed
     except Exception:
         # Gracefully degrade if wallet module not available
         overhead_costs = Decimal("0.00")
@@ -411,27 +522,41 @@ def clothing_sales_metrics(
                 "count": day_data["count"] or 0,
             }
 
-    # Fill missing days in Python (no row-iteration, just date range iteration)
+    # Fill missing days in Python (only if we have a date range)
     sales_trend = []
-    current_date = start_date
-    while current_date < end_date:
-        date_key = current_date.isoformat()
-        day_data = sales_by_date.get(
-            date_key, {"revenue": 0.0, "cost": 0.0, "profit": 0.0, "units_sold": 0, "count": 0}
-        )
+    if start_date is not None and end_date is not None:
+        current_date = start_date
+        while current_date < end_date:
+            date_key = current_date.isoformat()
+            day_data = sales_by_date.get(
+                date_key, {"revenue": 0.0, "cost": 0.0, "profit": 0.0, "units_sold": 0, "count": 0}
+            )
 
-        sales_trend.append(
-            {
-                "date": current_date.strftime("%Y-%m-%d"),
-                "date_short": current_date.strftime("%b %d"),
-                "revenue": day_data["revenue"],
-                "profit": day_data["profit"],
-                "units_sold": day_data["units_sold"],
-                "count": day_data["count"],
-            }
-        )
+            sales_trend.append(
+                {
+                    "date": current_date.strftime("%Y-%m-%d"),
+                    "date_short": current_date.strftime("%b %d"),
+                    "revenue": day_data["revenue"],
+                    "profit": day_data["profit"],
+                    "units_sold": day_data["units_sold"],
+                    "count": day_data["count"],
+                }
+            )
 
-        current_date += timedelta(days=1)
+            current_date += timedelta(days=1)
+    else:
+        # All-time: just return the data we have (no gap filling)
+        for date_key, day_data in sales_by_date.items():
+            sales_trend.append(
+                {
+                    "date": date_key,
+                    "date_short": date.fromisoformat(date_key).strftime("%b %d"),
+                    "revenue": day_data["revenue"],
+                    "profit": day_data["profit"],
+                    "units_sold": day_data["units_sold"],
+                    "count": day_data["count"],
+                }
+            )
 
     return {
         "revenue": revenue,
@@ -529,8 +654,8 @@ def phone_sales_metrics(
     Args:
         business: Business instance
         location: Optional location filter
-        start_date: Optional explicit start date (inclusive)
-        end_date: Optional explicit end date (exclusive)
+        start_date: Optional explicit start date (inclusive), None means no date filtering (all-time)
+        end_date: Optional explicit end date (exclusive), None means no date filtering (all-time)
         period: One of "today", "7d", "mtd", "date" (used if start/end not provided)
         date_str: Specific date string for period="date"
 
@@ -540,13 +665,17 @@ def phone_sales_metrics(
     from django.db.models.functions import Coalesce
     from inventory.models import InventoryItem
 
-    # Determine date range
-    if start_date is None or end_date is None:
+    # Determine date range (only if both are None)
+    if start_date is None and end_date is None:
         start_date, end_date = _compute_date_range(period, date_str)
 
-    # Convert dates to timezone-aware datetimes for filtering
-    start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
-    end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time()))
+    # Convert dates to timezone-aware datetimes for filtering (only if dates provided)
+    if start_date is not None and end_date is not None:
+        start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
+        end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time()))
+    else:
+        start_dt = None
+        end_dt = None
 
     # Base queryset for sold items
     # CRITICAL FIX: Include ALL sold items, not just those with sold_at timestamp
@@ -556,11 +685,15 @@ def phone_sales_metrics(
         business=business,
         status="SOLD",
         is_active=True,  # Exclude voided items
-    ).filter(
-        # Include items with sold_at in range OR items with null sold_at but received_at in range
-        Q(sold_at__gte=start_dt, sold_at__lt=end_dt) |
-        Q(sold_at__isnull=True, received_at__gte=start_date, received_at__lt=end_date)
     ).select_related("product", "assigned_agent")
+
+    # Apply date filtering if dates are provided
+    if start_dt is not None and end_dt is not None:
+        sold_items = sold_items.filter(
+            # Include items with sold_at in range OR items with null sold_at but received_at in range
+            Q(sold_at__gte=start_dt, sold_at__lt=end_dt) |
+            Q(sold_at__isnull=True, received_at__gte=start_date, received_at__lt=end_date)
+        )
 
     if location:
         sold_items = sold_items.filter(current_location=location)
@@ -582,8 +715,13 @@ def phone_sales_metrics(
     try:
         from wallet.utils import compute_business_costs
 
-        overhead_data = compute_business_costs(business, start_date, end_date - timedelta(days=1))
-        overhead_costs = overhead_data["total"]
+        # Only compute overhead costs if we have a date range
+        if start_date is not None and end_date is not None:
+            overhead_data = compute_business_costs(business, start_date, end_date - timedelta(days=1))
+            overhead_costs = overhead_data["total"]
+        else:
+            # All-time: sum all overhead costs (no date filter)
+            overhead_costs = Decimal("0.00")  # TODO: implement all-time overhead computation if needed
     except Exception:
         overhead_costs = Decimal("0.00")
 

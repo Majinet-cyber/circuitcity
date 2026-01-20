@@ -130,9 +130,21 @@ def dashboard(request):
     ctx["IS_AGENT"] = is_agent
 
     # ==========================================================================
-    # DATE RANGE PARSING
+    # DATE RANGE PARSING (NEW PERIOD SUPPORT)
     # ==========================================================================
-    range_key, start_date, end_date, range_label = _parse_date_range(request)
+    # Use shared date range parser with period support
+    date_range_ctx = base.parse_date_range_from_request(request)
+    
+    # Extract all values for context
+    period = date_range_ctx.get("period")
+    month = date_range_ctx.get("month")
+    year = date_range_ctx.get("year")
+    range_key = date_range_ctx["active_range"]
+    selected_date = date_range_ctx["selected_date"]
+    date_param = date_range_ctx["date_param"]
+    start_date = date_range_ctx["start_date"]
+    end_date = date_range_ctx["end_date"]
+    range_label = date_range_ctx["range_label"]
 
     # Current datetime for other calculations
     now = timezone.now()
@@ -176,11 +188,16 @@ def dashboard(request):
     # Use sold_at if available, otherwise fall back to received_at (as datetime)
     # Note: received_at is a DateField, sold_at is a DateTimeField
     # We need to compare both as dates for proper filtering
-    range_sales = sold_items.filter(
-        Q(sold_at__gte=start_date, sold_at__lt=end_date) |
-        Q(sold_at__isnull=True, received_at__gte=start_date.date() if hasattr(start_date, 'date') else start_date, 
-          received_at__lt=end_date.date() if hasattr(end_date, 'date') else end_date)
-    )
+    # If start_date/end_date are None (all-time), don't apply date filtering
+    if start_date is not None and end_date is not None:
+        range_sales = sold_items.filter(
+            Q(sold_at__gte=start_date, sold_at__lt=end_date) |
+            Q(sold_at__isnull=True, received_at__gte=start_date.date() if hasattr(start_date, 'date') else start_date, 
+              received_at__lt=end_date.date() if hasattr(end_date, 'date') else end_date)
+        )
+    else:
+        # All-time: include all sold items
+        range_sales = sold_items
 
     # Units sold in selected range
     units_sold = range_sales.count()
@@ -236,9 +253,14 @@ def dashboard(request):
     # CRITICAL: Agents should NOT see global business costs unless assignable to them
     from wallet.models import WalletTransaction, Ledger, TxnType
 
-    # Convert datetime to date for effective_date comparison
-    period_start_date = start_date.date() if hasattr(start_date, "date") else start_date
-    period_end_date = end_date.date() if hasattr(end_date, "date") else end_date
+    # Convert datetime to date for effective_date comparison (only if dates provided)
+    if start_date is not None and end_date is not None:
+        period_start_date = start_date.date() if hasattr(start_date, "date") else start_date
+        period_end_date = end_date.date() if hasattr(end_date, "date") else end_date
+    else:
+        # All-time: no date filtering
+        period_start_date = None
+        period_end_date = None
 
     if is_manager:
         # Managers see all business costs
@@ -246,9 +268,12 @@ def dashboard(request):
             business=business,
             ledger=Ledger.COMPANY,
             type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-            effective_date__gte=period_start_date,
-            effective_date__lt=period_end_date,
         )
+        if period_start_date is not None and period_end_date is not None:
+            business_costs_query = business_costs_query.filter(
+                effective_date__gte=period_start_date,
+                effective_date__lt=period_end_date,
+            )
         business_costs_sum = business_costs_query.aggregate(
             total=Coalesce(Sum("amount"), Decimal("0.00"), output_field=DecimalField())
         )["total"] or Decimal("0.00")
@@ -262,9 +287,12 @@ def dashboard(request):
             business=business,
             ledger=Ledger.COMPANY,
             type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-            effective_date__gte=period_start_date,
-            effective_date__lt=period_end_date,
         )
+        if period_start_date is not None and period_end_date is not None:
+            business_costs_query = business_costs_query.filter(
+                effective_date__gte=period_start_date,
+                effective_date__lt=period_end_date,
+            )
 
         # Try to scope costs to agent if possible
         if hasattr(WalletTransaction, "assigned_to"):
@@ -361,10 +389,14 @@ def dashboard(request):
     # CRITICAL FIX: Revenue KPI MUST show sales revenue (not stock value)
     # This ensures Revenue matches Payment Mix totals (both derived from range_sales)
     dashboard_kpis = {
+        # Period filter state (NEW)
+        "period": period,
+        "month": month,
+        "year": year,
         "range_key": range_key,
         "range_label": range_label,
-        "start_date": start_date.date() if hasattr(start_date, "date") else start_date,
-        "end_date": end_date.date() if hasattr(end_date, "date") else end_date,
+        "start_date": start_date.date() if start_date and hasattr(start_date, "date") else start_date,
+        "end_date": end_date.date() if end_date and hasattr(end_date, "date") else end_date,
         "units_sold": units_sold,
         "stock_on_hand": stock_on_hand,
         # PRIMARY KPIs: All derived from range_sales (sold items in period)
