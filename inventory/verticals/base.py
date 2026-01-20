@@ -512,7 +512,9 @@ def clothing_sales_queryset(
         business: Business instance
         location: Optional location filter
         start_date: Optional explicit start date (inclusive), None means no date filtering
+                    Can be date or datetime object
         end_date: Optional explicit end date (exclusive), None means no date filtering
+                  Can be date or datetime object
         period: One of "today", "7d", "mtd", "date" (used if start/end not provided)
         date_str: Specific date string for period="date"
 
@@ -531,9 +533,26 @@ def clothing_sales_queryset(
 
     # Apply date filtering ONLY if dates are provided (support all-time queries)
     if start_date is not None and end_date is not None:
+        # Convert to timezone-aware datetime if needed
+        if isinstance(start_date, date) and not isinstance(start_date, datetime):
+            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+        elif isinstance(start_date, datetime) and timezone.is_aware(start_date):
+            start_dt = start_date
+        else:
+            # Naive datetime, make aware
+            start_dt = timezone.make_aware(start_date)
+        
+        if isinstance(end_date, date) and not isinstance(end_date, datetime):
+            end_dt = timezone.make_aware(datetime.combine(end_date, datetime.min.time()))
+        elif isinstance(end_date, datetime) and timezone.is_aware(end_date):
+            end_dt = end_date
+        else:
+            # Naive datetime, make aware
+            end_dt = timezone.make_aware(end_date)
+        
         sales_qs = sales_qs.filter(
-            sold_at__gte=timezone.make_aware(datetime.combine(start_date, datetime.min.time())),
-            sold_at__lt=timezone.make_aware(datetime.combine(end_date, datetime.min.time())),
+            sold_at__gte=start_dt,
+            sold_at__lt=end_dt,
         )
 
     if location:
@@ -824,8 +843,22 @@ def phone_sales_metrics(
 
     # Convert dates to timezone-aware datetimes for filtering (only if dates provided)
     if start_date is not None and end_date is not None:
-        start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
-        end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.min.time()))
+        # Handle both date and datetime inputs
+        if isinstance(start_date, date) and not isinstance(start_date, datetime):
+            start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+        elif isinstance(start_date, datetime) and timezone.is_aware(start_date):
+            start_dt = start_date
+        else:
+            # Naive datetime, make aware
+            start_dt = timezone.make_aware(start_date)
+        
+        if isinstance(end_date, date) and not isinstance(end_date, datetime):
+            end_dt = timezone.make_aware(datetime.combine(end_date, datetime.min.time()))
+        elif isinstance(end_date, datetime) and timezone.is_aware(end_date):
+            end_dt = end_date
+        else:
+            # Naive datetime, make aware
+            end_dt = timezone.make_aware(end_date)
     else:
         start_dt = None
         end_dt = None
@@ -845,7 +878,7 @@ def phone_sales_metrics(
         sold_items = sold_items.filter(
             # Include items with sold_at in range OR items with null sold_at but received_at in range
             Q(sold_at__gte=start_dt, sold_at__lt=end_dt) |
-            Q(sold_at__isnull=True, received_at__gte=start_date, received_at__lt=end_date)
+            Q(sold_at__isnull=True, received_at__gte=start_dt, received_at__lt=end_dt)
         )
 
     if location:
