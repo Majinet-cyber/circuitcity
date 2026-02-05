@@ -53,13 +53,18 @@ class TestGymDashboardContextWiring:
         This tests the service layer directly.
         """
         # Create payments with substantial amounts
+        today = timezone.localdate()
+        # Use noon to avoid timezone edge cases
+        paid_at_time = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time().replace(hour=12)))
+        
         GymPayment.objects.create(
             member=member,
             membership_amount=Decimal("55000.00"),
             trainer_fee=Decimal("10000.00"),
             payment_method=PaymentMethod.CASH,
-            start_date=timezone.now().date(),
-            end_date=timezone.now().date() + timedelta(days=30),
+            start_date=today,
+            end_date=today + timedelta(days=30),
+            paid_at=paid_at_time,
             is_active=True,
         )
 
@@ -68,19 +73,44 @@ class TestGymDashboardContextWiring:
             membership_amount=Decimal("55000.00"),
             trainer_fee=Decimal("5000.00"),
             payment_method=PaymentMethod.MOBILE_MONEY,
-            start_date=timezone.now().date(),
-            end_date=timezone.now().date() + timedelta(days=30),
+            start_date=today,
+            end_date=today + timedelta(days=30),
+            paid_at=paid_at_time,
             is_active=True,
         )
 
         # Call metrics service
-        today = timezone.now().date()
         metrics = get_gym_dashboard_metrics(business, today, today)
 
+        # Debug: Check if payments exist
+        from datetime import datetime as dt_class
+        payment_count_db = GymPayment.objects.filter(member__business=business, is_active=True).count()
+        payments = GymPayment.objects.filter(member__business=business, is_active=True)
+        
+        # Check date range
+        start_dt = timezone.make_aware(dt_class.combine(today, dt_class.min.time()))
+        end_dt = timezone.make_aware(dt_class.combine(today, dt_class.max.time()))
+        payments_in_range = GymPayment.objects.filter(
+            member__business=business, 
+            is_active=True,
+            paid_at__gte=start_dt,
+            paid_at__lte=end_dt
+        ).count()
+        
+        print(f"\nDEBUG: Payments in DB: {payment_count_db}")
+        print(f"DEBUG: Payments in date range: {payments_in_range}")
+        print(f"DEBUG: Metrics payment count: {metrics['payments_count']}")
+        print(f"DEBUG: Today: {today}")
+        print(f"DEBUG: paid_at_time: {paid_at_time}")
+        print(f"DEBUG: start_dt: {start_dt}")
+        print(f"DEBUG: end_dt: {end_dt}")
+        for p in payments:
+            print(f"DEBUG: Payment {p.id}: paid_at={p.paid_at}, paid_at.date()={p.paid_at.date()}, in_range={start_dt <= p.paid_at <= end_dt}")
+        
         # CRITICAL: Revenue must be > 0
         revenue = metrics["revenue"]
         assert revenue is not None, "revenue is None from metrics service"
-        assert revenue > Decimal("0.00"), f"Revenue is {revenue}, expected > 0"
+        assert revenue > Decimal("0.00"), f"Revenue is {revenue}, expected > 0, payment_count={metrics['payments_count']}"
         # Expected: 55000 + 10000 + 55000 + 5000 = 125000
         assert revenue == Decimal("125000.00"), f"Revenue is {revenue}, expected 125000.00"
 
@@ -114,13 +144,18 @@ class TestGymDashboardContextWiring:
         REGRESSION TEST: Even if amount field is 0, metrics must show correct revenue.
         """
         # Create payment
+        today = timezone.localdate()
+        # Use noon to avoid timezone edge cases
+        paid_at_time = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time().replace(hour=12)))
+        
         payment = GymPayment.objects.create(
             member=member,
             membership_amount=Decimal("865000.00"),
             trainer_fee=Decimal("5000.00"),
             payment_method=PaymentMethod.CASH,
-            start_date=timezone.now().date(),
-            end_date=timezone.now().date() + timedelta(days=30),
+            start_date=today,
+            end_date=today + timedelta(days=30),
+            paid_at=paid_at_time,
             is_active=True,
         )
 
@@ -128,7 +163,6 @@ class TestGymDashboardContextWiring:
         GymPayment.objects.filter(id=payment.id).update(amount=0)
 
         # Call metrics service
-        today = timezone.now().date()
         metrics = get_gym_dashboard_metrics(business, today, today)
 
         # CRITICAL: Revenue must STILL be correct (computed from components)

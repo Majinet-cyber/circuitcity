@@ -252,7 +252,7 @@ class TestVerticalsGymDashboardCosts(TestCase):
         """
         Test that costs are correctly filtered by time period (today, yesterday, this month).
         """
-        today = timezone.now().date()
+        today = timezone.localdate()
         yesterday = today - timedelta(days=1)
         last_month = today - timedelta(days=35)
         

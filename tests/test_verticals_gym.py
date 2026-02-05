@@ -122,10 +122,15 @@ class TestGymPayment:
         """Test payment creates exactly 30-day membership"""
         start = date.today()
         payment = GymPayment.objects.create(
-            member=gym_member, amount=Decimal("50000.00"), start_date=start, paid_by=manager
+            member=gym_member, 
+            membership_amount=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
+            start_date=start, 
+            paid_by=manager
         )
 
-        expected_end = start + timedelta(days=30)
+        # With new proration logic: end_date = start + 29 days (30 days inclusive)
+        expected_end = start + timedelta(days=29)
         assert payment.end_date == expected_end
 
     def test_days_left_calculation(self, gym_member, manager):
@@ -139,7 +144,7 @@ class TestGymPayment:
         # Refresh from DB
         gym_member.refresh_from_db()
 
-        days_left = gym_member.days_left()
+        days_left = gym_member.days_left
         # Days left includes both start and end date, so it's 31 days total
         assert days_left >= 30
 
@@ -154,7 +159,7 @@ class TestGymPayment:
         # Refresh from DB
         gym_member.refresh_from_db()
 
-        days_left = gym_member.days_left()
+        days_left = gym_member.days_left
         # Should be around 20-21 days (depending on inclusive/exclusive logic)
         assert 19 <= days_left <= 21
 
@@ -170,7 +175,7 @@ class TestGymPayment:
         gym_member.refresh_from_db()
         gym_member.update_status()
 
-        days_left = gym_member.days_left()
+        days_left = gym_member.days_left
         status = gym_member.membership_status()
 
         assert days_left == 0
@@ -195,16 +200,25 @@ class TestGymPayment:
         # First payment
         start1 = date.today()
         payment1 = GymPayment.objects.create(
-            member=gym_member, amount=Decimal("50000.00"), start_date=start1, paid_by=manager
+            member=gym_member, 
+            membership_amount=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
+            start_date=start1, 
+            paid_by=manager
         )
 
         # Second payment (should start after first ends)
         start2 = start1 + timedelta(days=30)
         payment2 = GymPayment.objects.create(
-            member=gym_member, amount=Decimal("50000.00"), start_date=start2, paid_by=manager
+            member=gym_member, 
+            membership_amount=Decimal("50000.00"),
+            trainer_fee=Decimal("0.00"),
+            start_date=start2, 
+            paid_by=manager
         )
 
-        assert payment2.end_date == start2 + timedelta(days=30)
+        # With new proration logic: end_date = start + 29 days (30 days inclusive)
+        assert payment2.end_date == start2 + timedelta(days=29)
 
 
 @pytest.mark.django_db
@@ -232,7 +246,11 @@ class TestGymWalletEntry:
     def test_create_income_from_payment(self, business, gym_member, manager):
         """Test creating wallet entry from payment"""
         payment = GymPayment.objects.create(
-            member=gym_member, amount=Decimal("50000.00"), start_date=date.today(), paid_by=manager
+            member=gym_member, 
+            membership_amount=Decimal("50000.00"),
+            trainer_fee=Decimal("5000.00"),
+            start_date=date.today(), 
+            paid_by=manager
         )
 
         entry = GymWalletEntry.objects.create(
@@ -245,7 +263,8 @@ class TestGymWalletEntry:
         )
 
         assert entry.entry_type == "income"
-        assert entry.amount == Decimal("50000.00")
+        # amount is now calculated as membership_amount + trainer_fee
+        assert entry.amount == Decimal("55000.00")
         assert entry.related_payment == payment
 
 
@@ -408,12 +427,12 @@ class TestGymRegressionProtection:
         # Refresh from DB
         gym_member.refresh_from_db()
 
-        # Verify end date is exactly 30 days after start
-        expected_end = start + timedelta(days=30)
+        # Verify end date is exactly 30 days after start (inclusive, so 29 days added)
+        expected_end = start + timedelta(days=29)
         assert gym_member.membership_end == expected_end
 
         # Verify days left calculation (may include both start and end date)
-        days_left = gym_member.days_left()
+        days_left = gym_member.days_left
         assert days_left >= 30
 
         # Verify status
@@ -434,7 +453,7 @@ class TestGymRegressionProtection:
         gym_member.update_status()
 
         # Member should be in arrears (Behind Schedule)
-        days_left = gym_member.days_left()
+        days_left = gym_member.days_left
         status = gym_member.membership_status()
 
         assert days_left == 0
