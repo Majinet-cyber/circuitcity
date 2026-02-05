@@ -215,35 +215,51 @@ def compute_next_payment_date(last_payment_date: Optional[date], duration_days: 
     return last_payment_date + timedelta(days=duration_days)
 
 
-def calculate_prorated_days(amount: Decimal) -> int:
+def calculate_prorated_days(amount: Decimal, monthly_fee: Optional[Decimal] = None) -> int:
     """
     Calculate the number of days granted for a payment amount.
 
-    Gym pricing: MWK 55,000 for 30 days
-    Daily rate: 55,000 / 30 = 1,833.33...
+    Formula: days = amount / (monthly_fee / 30), with ROUND_HALF_UP rounding
 
-    Formula: days = ROUND_HALF_UP(amount / daily_rate), minimum 1 day
+    Business rules:
+    - Daily rate = monthly_fee / 30
+    - Days granted = amount / daily_rate
+    - If amount >= monthly_fee, grant at least 30 days
+    - Minimum 1 day for any positive payment
 
-    Examples:
-        - 55,000 MWK => 30 days
-        - 110,000 MWK => 60 days
-        - 100,000 MWK => 55 days (100,000 / 1,833.33 = 54.545... => 55)
+    Examples (with monthly_fee=50,000):
+        - 50,000 MWK => 30 days (exactly one month)
+        - 55,000 MWK => 33 days (55,000 / (50,000/30) = 33)
+        - 100,000 MWK => 60 days (2 months)
+        - 25,000 MWK => 15 days (half month)
         - 1,000 MWK => 1 day (minimum)
 
     Args:
         amount: Payment amount in MWK
+        monthly_fee: Monthly membership fee (defaults to GYM_MONTHLY_FEE if not provided)
 
     Returns:
-        Number of days to grant (minimum 1)
+        Number of days to grant (minimum 1, minimum 30 if amount >= monthly_fee)
     """
     if amount <= 0:
         return 1
 
+    # Use provided monthly_fee or fall back to global constant
+    if monthly_fee is None or monthly_fee <= 0:
+        monthly_fee = GYM_MONTHLY_FEE
+
+    # Calculate daily rate: monthly_fee / 30 days
+    daily_rate = monthly_fee / Decimal("30")
+
     # Calculate days with ROUND_HALF_UP
-    days_decimal = (amount / GYM_DAILY_RATE).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    days_decimal = (amount / daily_rate).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     days = int(days_decimal)
 
-    # Ensure minimum 1 day
+    # Ensure minimum 30 days if paying full monthly fee or more
+    if amount >= monthly_fee:
+        days = max(30, days)
+
+    # Ensure minimum 1 day for any payment
     return max(1, days)
 
 
@@ -267,26 +283,31 @@ def calculate_membership_period(
         Tuple of (new_start, new_end, days_granted)
 
     Examples:
-        Member inactive, paying 55,000 on Jan 1:
+        Member inactive, monthly_fee=50,000, paying 50,000 on Jan 1:
         - new_start = Jan 1
         - new_end = Jan 30 (30 days inclusive)
         - days_granted = 30
 
+        Member inactive, monthly_fee=50,000, paying 55,000 on Jan 1:
+        - new_start = Jan 1
+        - new_end = Feb 2 (33 days inclusive)
+        - days_granted = 33
+
         Member active until Jan 30, paying 55,000 on Jan 15:
         - new_start = Jan 31 (current_end + 1)
-        - new_end = Feb 29 (Jan 31 + 29 days)
-        - days_granted = 30
+        - new_end = Mar 4 (Jan 31 + 32 days)
+        - days_granted = 33
 
-        Member inactive, paying 100,000 on Jan 1:
+        Member inactive, monthly_fee=50,000, paying 100,000 on Jan 1:
         - new_start = Jan 1
-        - new_end = Feb 24 (55 days inclusive)
-        - days_granted = 55
+        - new_end = Mar 1 (60 days inclusive)
+        - days_granted = 60
     """
     if today is None:
         today = timezone.now().date()
 
-    # Calculate days to grant based on amount
-    days_granted = calculate_prorated_days(amount)
+    # Calculate days to grant based on amount and member's monthly fee
+    days_granted = calculate_prorated_days(amount, monthly_fee=member.membership_fee)
 
     # Determine start date based on auto-extension logic
     if member.membership_end and member.membership_end >= today:

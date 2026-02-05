@@ -1184,7 +1184,7 @@ class GymMember(models.Model):
             membership_fee: Membership fee to snapshot (optional)
             trainer_fee: Trainer fee to snapshot (optional)
             paid_by: User who processed the payment
-            amount: Total payment amount for proration calculation (if None, uses membership_fee + trainer_fee)
+            amount: Payment amount for proration calculation (if None, uses membership_fee + trainer_fee)
         """
         from datetime import timedelta
 
@@ -1193,15 +1193,22 @@ class GymMember(models.Model):
         if payment_date is None:
             payment_date = timezone.now().date()
 
+        # Update fees FIRST if provided (needed for proration calculation)
+        if membership_fee is not None:
+            self.membership_fee = membership_fee
+        if trainer_fee is not None:
+            self.trainer_fee = trainer_fee
+
         # Calculate total amount
         if amount is None:
-            total_amount = (membership_fee or self.membership_fee or Decimal("0.00")) + (
-                trainer_fee or self.trainer_fee or Decimal("0.00")
+            total_amount = (self.membership_fee or Decimal("0.00")) + (
+                self.trainer_fee or Decimal("0.00")
             )
         else:
             total_amount = amount
 
         # Calculate prorated membership period with auto-extension
+        # Now uses member's actual monthly fee for proration calculation
         new_start, new_end, days_granted = calculate_membership_period(
             amount=total_amount, member=self, start_date=payment_date, today=payment_date
         )
@@ -1211,12 +1218,6 @@ class GymMember(models.Model):
         self.membership_start = new_start
         self.membership_end = new_end
         self.status = GymMemberStatus.ACTIVE
-
-        # Update fees if provided
-        if membership_fee is not None:
-            self.membership_fee = membership_fee
-        if trainer_fee is not None:
-            self.trainer_fee = trainer_fee
 
         self.save(
             update_fields=[

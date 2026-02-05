@@ -167,10 +167,10 @@ def member_add(request):
     except GymSettings.DoesNotExist:
         gym_settings = GymSettings.objects.create(business=business)
 
-    # Set initial fee values from settings
+    # Set initial fee values from settings (guard against None)
     initial_data = {
-        "membership_fee": gym_settings.default_membership_price,
-        "trainer_fee": gym_settings.default_trainer_fee,
+        "membership_fee": gym_settings.default_membership_price or Decimal("0.00"),
+        "trainer_fee": gym_settings.default_trainer_fee or Decimal("0.00"),
     }
 
     if request.method == "POST":
@@ -180,13 +180,13 @@ def member_add(request):
                 member = form.save(commit=False)
                 member.business = business
 
-                # Set fees from form (editable) or defaults from settings
-                member.membership_fee = form.cleaned_data.get("membership_fee") or gym_settings.default_membership_price
+                # Set fees from form (editable) or defaults from settings (guard against None)
+                member.membership_fee = form.cleaned_data.get("membership_fee") or gym_settings.default_membership_price or Decimal("0.00")
 
                 # Set has_trainer based on whether a trainer is assigned
                 if member.trainer:
                     member.has_trainer = True
-                    member.trainer_fee = form.cleaned_data.get("trainer_fee") or gym_settings.default_trainer_fee
+                    member.trainer_fee = form.cleaned_data.get("trainer_fee") or gym_settings.default_trainer_fee or Decimal("0.00")
                 else:
                     member.has_trainer = False
                     member.trainer_fee = Decimal("0.00")
@@ -534,10 +534,10 @@ def member_set_paid(request, member_id):
         gym_settings = GymSettings.objects.create(business=business)
 
     with transaction.atomic():
-        # Update fees based on current settings
-        member.membership_fee = gym_settings.default_membership_price
+        # Update fees based on current settings (guard against None)
+        member.membership_fee = gym_settings.default_membership_price or Decimal("0.00")
         if member.has_trainer:
-            member.trainer_fee = gym_settings.default_trainer_fee
+            member.trainer_fee = gym_settings.default_trainer_fee or Decimal("0.00")
         else:
             member.trainer_fee = Decimal("0.00")
 
@@ -553,10 +553,10 @@ def member_set_paid(request, member_id):
             amount=total_amount,
         )
 
-        # Calculate days granted for message
+        # Calculate days granted for message (based on membership fee only, not trainer fee)
         from inventory.utils_gym import calculate_prorated_days
 
-        days_granted = calculate_prorated_days(total_amount)
+        days_granted = calculate_prorated_days(member.membership_fee, monthly_fee=member.membership_fee)
 
         # Log the renewal
         GymMemberLog.objects.create(
@@ -858,10 +858,10 @@ def add_payment(request):
     """Record a new gym membership payment with optional trainer fee"""
     business = get_active_business(request)
 
-    # Get default price from settings
+    # Get default price from settings (guard against None)
     try:
         gym_settings = GymSettings.objects.get(business=business)
-        default_membership_price = gym_settings.default_membership_price
+        default_membership_price = gym_settings.default_membership_price or Decimal("55000.00")
     except GymSettings.DoesNotExist:
         default_membership_price = Decimal("55000.00")
 
