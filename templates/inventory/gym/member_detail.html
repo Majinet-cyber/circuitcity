@@ -497,6 +497,9 @@
                             <a href="{% url 'gym:member_qr_print' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-printer me-2"></i> Print QR
                             </a>
+                            <a href="{% url 'gym:member_whatsapp_forward' member.qr_uuid %}" class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-whatsapp me-2"></i> WhatsApp
+                            </a>
                         </div>
                         <div class="mt-2">
                             <a href="{% url 'gym:member_qr_status_public' member.qr_uuid %}" target="_blank" class="btn btn-sm btn-outline-secondary">

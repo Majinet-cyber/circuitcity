@@ -158,6 +158,13 @@
         opacity: 0.4;
         margin-bottom: 1rem;
     }
+
+    /* Checkbox styling */
+    .member-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
 </style>
 {% endblock %}
 
@@ -171,9 +178,26 @@
                     <h2>Gym Members</h2>
                     <p class="text-muted mb-0">Manage your gym members and memberships</p>
                 </div>
-                <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Member
-                </a>
+                <div class="d-flex gap-2">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-qr-code"></i> Bulk QR Download
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><h6 class="dropdown-header">Download QR Stickers</h6></li>
+                            <li><a class="dropdown-item" href="{% url 'gym:bulk_qr_pdf' %}?all=1&filter={{ filter_type }}">
+                                <i class="bi bi-download"></i> All {{ filter_type|default:"members" }}
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="downloadSelected(); return false;">
+                                <i class="bi bi-check2-square"></i> Selected members
+                            </a></li>
+                        </ul>
+                    </div>
+                    <a href="{% url 'gym:member_add' %}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Member
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -201,6 +225,9 @@
                 <table class="premium-table table mb-0">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" class="member-checkbox" id="select-all" onclick="toggleSelectAll(this)">
+                            </th>
                             <th>Name</th>
                             <th>Phone</th>
                             <th>Trainer</th>
@@ -215,6 +242,9 @@
                     <tbody>
                         {% for member in members %}
                         <tr>
+                            <td>
+                                <input type="checkbox" class="member-checkbox member-select" data-member-id="{{ member.id }}" onclick="updateSelectAllState()">
+                            </td>
                             <td>
                                 <a href="{% url 'gym:member_detail' member.id %}" class="fw-semibold text-decoration-none text-primary">{{ member.name }}</a>
                             </td>
@@ -344,4 +374,44 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+// Toggle all checkboxes
+function toggleSelectAll(selectAllCheckbox) {
+    const checkboxes = document.querySelectorAll('.member-select');
+    checkboxes.forEach(cb => {
+        cb.checked = selectAllCheckbox.checked;
+    });
+}
+
+// Update "select all" checkbox state based on individual selections
+function updateSelectAllState() {
+    const selectAllCheckbox = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.member-select');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    const someChecked = Array.from(checkboxes).some(cb => cb.checked);
+    
+    selectAllCheckbox.checked = allChecked;
+    selectAllCheckbox.indeterminate = someChecked && !allChecked;
+}
+
+// Download selected members
+function downloadSelected() {
+    const checkboxes = document.querySelectorAll('.member-select:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('Please select at least one member to download QR codes.');
+        return;
+    }
+    
+    // Collect selected member IDs
+    const memberIds = Array.from(checkboxes).map(cb => cb.dataset.memberId);
+    
+    // Build download URL
+    const url = "{% url 'gym:bulk_qr_pdf' %}?members=" + memberIds.join(',');
+    
+    // Trigger download
+    window.location.href = url;
+}
+</script>
 {% endblock %}

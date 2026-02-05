@@ -44,8 +44,6 @@ from tenants.utils import require_business
 class GymMemberForm(forms.ModelForm):
     """Form for adding/editing gym members with editable fees"""
 
-    from core.validators import validate_no_digits, validate_phone_number_format, validate_positive_decimal
-
     mark_as_paid = forms.BooleanField(
         required=False, initial=False, label="Mark as paid now", help_text="Check to activate membership for 30 days"
     )
@@ -56,7 +54,6 @@ class GymMemberForm(forms.ModelForm):
         required=False,
         label="Membership Fee (MWK)",
         help_text="Monthly membership fee (editable)",
-        validators=[validate_positive_decimal],
         widget=forms.NumberInput(
             attrs={"class": "form-control", "step": "0.01", "placeholder": "e.g., 55000.00", "min": "0"}
         ),
@@ -68,7 +65,6 @@ class GymMemberForm(forms.ModelForm):
         required=False,
         label="Trainer Fee (MWK)",
         help_text="Optional trainer fee if trainer is assigned",
-        validators=[validate_positive_decimal],
         widget=forms.NumberInput(
             attrs={"class": "form-control", "step": "0.01", "placeholder": "e.g., 20000.00", "min": "0"}
         ),
@@ -109,18 +105,19 @@ class GymMemberForm(forms.ModelForm):
 
     def clean_name(self):
         """Validate member name (text only, no digits)"""
+        from core.validators import validate_no_digits
         name = self.cleaned_data.get("name", "").strip()
         if name:
-            self.validate_no_digits(name)
+            validate_no_digits(name)
         return name
 
     def clean_phone(self):
         """Validate phone number format"""
+        from core.validators import validate_phone_number_format, clean_phone_number
         phone = self.cleaned_data.get("phone", "").strip()
         if phone:
-            self.validate_phone_number_format(phone)
+            validate_phone_number_format(phone)
             # Clean and normalize
-            from core.validators import clean_phone_number
 
             phone = clean_phone_number(phone)
         return phone
@@ -283,7 +280,12 @@ def member_edit(request, member_id):
             messages.success(request, f"Member '{member.name}' updated successfully.")
             return redirect("gym:member_detail", member_id=member.id)
     else:
-        form = GymMemberForm(business, instance=member)
+        # IMPORTANT: On edit, show member's existing fees (NOT defaults from settings)
+        initial_data = {
+            "membership_fee": member.membership_fee,
+            "trainer_fee": member.trainer_fee,
+        }
+        form = GymMemberForm(business, instance=member, initial=initial_data)
 
     return render(
         request,
@@ -1475,12 +1477,21 @@ def gym_settings_view(request):
     # Get or create settings
     gym_settings, created = GymSettings.objects.get_or_create(business=business)
 
+    # Ensure default trainers exist (idempotent)
+    default_trainers = ["Lester", "Steve", "Philip", "Ben"]
+    for trainer_name in default_trainers:
+        GymTrainer.objects.get_or_create(
+            business=business,
+            name=trainer_name,
+            defaults={"is_active": True}
+        )
+
     if request.method == "POST":
         form = GymSettingsForm(request.POST, instance=gym_settings)
         if form.is_valid():
             form.save()
             messages.success(request, "Gym settings updated.")
-            return redirect("gym:dashboard")
+            return redirect("gym:settings")
     else:
         form = GymSettingsForm(instance=gym_settings)
 

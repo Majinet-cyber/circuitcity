@@ -715,6 +715,10 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
         unit_price = request.POST.get("unit_price")
         notes = request.POST.get("notes", "")
         
+        # Validation: quantity must be > 0
+        if quantity <= 0:
+            return JsonResponse({"success": False, "error": "Quantity must be greater than 0"}, status=400)
+        
         # Get material
         material = get_object_or_404(WeldingMaterial, id=material_id, business=business)
         
@@ -722,6 +726,9 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
         unit_price_decimal = None
         if unit_price and unit_price.strip():
             unit_price_decimal = Decimal(unit_price)
+            # Validation: price must be >= 0
+            if unit_price_decimal < 0:
+                return JsonResponse({"success": False, "error": "Unit price cannot be negative"}, status=400)
         
         # Create line item
         from inventory.models_welding import WeldingQuoteLineItem
@@ -831,6 +838,10 @@ def quote_add_cost(request: HttpRequest, quote_id: int) -> JsonResponse:
         description = request.POST.get("description", "")
         amount = Decimal(request.POST.get("amount", "0"))
         notes = request.POST.get("notes", "")
+        
+        # Validation: amount must be >= 0
+        if amount < 0:
+            return JsonResponse({"success": False, "error": "Amount cannot be negative"}, status=400)
         
         from inventory.models_welding import WeldingQuoteCost
         cost = WeldingQuoteCost.objects.create(

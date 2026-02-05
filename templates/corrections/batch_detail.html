@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Page Header -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-2">
+            <li class="breadcrumb-item"><a href="{% url 'corrections:dashboard' vertical=vertical %}">Data Corrections</a></li>
+            <li class="breadcrumb-item active">Batch #{{ batch.pk }}</li>
+        </ol>
+    </nav>
+    
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h4 class="mb-1">{{ hero_title }}</h4>
+            <span class="badge bg-{{ batch.status|lower }}">{{ batch.get_status_display }}</span>
+        </div>
+        <div>
+            {% if batch.can_be_applied %}
+            <form method="post" action="{% url 'corrections:batch_apply' vertical=vertical batch_id=batch.pk %}" class="d-inline" onsubmit="return confirm('Are you sure you want to apply this batch? This action cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg"></i> Apply Batch
+                </button>
+            </form>
+            {% endif %}
+            
+            {% if batch.can_be_rolled_back %}
+            <form method="post" action="{% url 'corrections:batch_rollback' vertical=vertical batch_id=batch.pk %}" class="d-inline" onsubmit="return confirm('Are you sure you want to rollback this batch? This will restore all original values.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning">
+                    <i class="bi bi-arrow-counterclockwise"></i> Rollback
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Batch Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Batch Information</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Created By</dt>
+                        <dd class="col-sm-8">{{ batch.created_by.get_full_name|default:batch.created_by.username }}</dd>
+                        
+                        <dt class="col-sm-4">Created At</dt>
+                        <dd class="col-sm-8">{{ batch.created_at|date:"M d, Y H:i" }}</dd>
+                        
+                        {% if batch.applied_by %}
+                        <dt class="col-sm-4">Applied By</dt>
+                        <dd class="col-sm-8">{{ batch.applied_by.get_full_name|default:batch.applied_by.username }}</dd>
+                        
+                        <dt class="col-sm-4">Applied At</dt>
+                        <dd class="col-sm-8">{{ batch.applied_at|date:"M d, Y H:i" }}</dd>
+                        {% endif %}
+                        
+                        <dt class="col-sm-4">Reason</dt>
+                        <dd class="col-sm-8">{{ batch.reason }}</dd>
+                        
+                        {% if batch.notes %}
+                        <dt class="col-sm-4">Notes</dt>
+                        <dd class="col-sm-8">{{ batch.notes }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Impact Summary</h6>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-6">Total Items</dt>
+                        <dd class="col-sm-6">{{ batch.items_count }}</dd>
+                        
+                        <dt class="col-sm-6">Items Applied</dt>
+                        <dd class="col-sm-6 text-success">{{ batch.items_applied }}</dd>
+                        
+                        <dt class="col-sm-6">Items Failed</dt>
+                        <dd class="col-sm-6 text-danger">{{ batch.items_failed }}</dd>
+                        
+                        <dt class="col-sm-6">Revenue Impact</dt>
+                        <dd class="col-sm-6">{{ batch.revenue_impact|floatformat:2 }} MWK</dd>
+                        
+                        <dt class="col-sm-6">Profit Impact</dt>
+                        <dd class="col-sm-6">{{ batch.profit_impact|floatformat:2 }} MWK</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Correction Items -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="mb-0">Correction Items</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Entity</th>
+                            <th>Object ID</th>
+                            <th>Field</th>
+                            <th>Old Value</th>
+                            <th>New Value</th>
+                            <th>Impact</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.entity_label }}</td>
+                            <td>{{ item.object_id }}</td>
+                            <td>{{ item.field_name }}</td>
+                            <td><code>{{ item.old_value }}</code></td>
+                            <td><code>{{ item.new_value }}</code></td>
+                            <td>
+                                {% if item.revenue_impact %}
+                                    <small>R: {{ item.revenue_impact|floatformat:2 }}</small><br>
+                                {% endif %}
+                                {% if item.profit_impact %}
+                                    <small>P: {{ item.profit_impact|floatformat:2 }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.is_applied %}
+                                    <span class="badge bg-success">Applied</span>
+                                {% elif item.is_failed %}
+                                    <span class="badge bg-danger" title="{{ item.error }}">Failed</span>
+                                {% elif item.is_rolled_back %}
+                                    <span class="badge bg-warning">Rolled Back</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

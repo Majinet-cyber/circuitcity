@@ -93,6 +93,10 @@
         </div>
 
         <button onclick="window.print()" class="print-button no-print">Print QR Code</button>
+        
+        <a href="{% url 'gym:member_whatsapp_forward' member.qr_uuid %}" class="print-button no-print" style="display: inline-block; text-decoration: none; margin-top: 10px; background: #25D366;">
+            <i style="font-size: 18px;">📱</i> Send via WhatsApp
+        </a>
     </div>
 </body>
 </html>

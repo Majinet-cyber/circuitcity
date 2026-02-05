@@ -1565,7 +1565,7 @@ class GymSettings(models.Model):
         help_text="Default monthly membership fee (30 days)",
     )
     default_trainer_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("30000.00"), help_text="Default trainer fee per month"
+        max_digits=10, decimal_places=2, default=Decimal("50000.00"), help_text="Default trainer fee per month"
     )
 
     # Other settings

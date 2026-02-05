@@ -127,6 +127,8 @@ urlpatterns = [
     path("sales/", include(("sales.urls", "sales"), namespace="sales")),
     # Accounts app (login, password reset, avatars, etc.)
     path("accounts/", include("accounts.urls")),
+    # Corrections framework (vertical-aware data corrections)
+    path("corrections/", include(("corrections.urls", "corrections"), namespace="corrections")),
     # Global hard aliases so these NEVER 404 even if the app's urls module differs
     re_path(r"^login/?$", login_view_alias),
     path("password/forgot/", forgot_request_view),

@@ -107,7 +107,7 @@
                 <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
                     <h6 class="mb-0"><i class="bi bi-hammer"></i> Materials</h6>
                     {% if is_editable %}
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#materialPickerModal">
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#materialPickerModal" data-testid="welding-add-materials">
                         <i class="bi bi-plus-circle"></i> Add Material
                     </button>
                     {% endif %}
@@ -189,7 +189,7 @@
                         <i class="bi bi-inbox display-1 text-muted"></i>
                         <p class="text-muted mt-3">No materials added yet.</p>
                         {% if is_editable %}
-                        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#materialPickerModal">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#materialPickerModal" data-testid="welding-add-materials">
                             <i class="bi bi-plus-circle"></i> Add First Material
                         </button>
                         {% endif %}
@@ -203,7 +203,7 @@
                 <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
                     <h6 class="mb-0"><i class="bi bi-currency-dollar"></i> Costs & Profit</h6>
                     {% if is_editable %}
-                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#costPickerModal">
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#costPickerModal" data-testid="welding-add-cost">
                         <i class="bi bi-plus-circle"></i> Add Cost
                     </button>
                     {% endif %}
@@ -241,7 +241,7 @@
                         <i class="bi bi-wallet2 display-4 text-muted"></i>
                         <p class="text-muted mt-2">No costs added yet.</p>
                         {% if is_editable %}
-                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#costPickerModal">
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#costPickerModal" data-testid="welding-add-cost">
                             <i class="bi bi-plus-circle"></i> Add Labour/Transport/Profit
                         </button>
                         {% endif %}
@@ -329,7 +329,7 @@
 
 <!-- Material Picker Modal -->
 {% if is_editable %}
-<div class="modal fade" id="materialPickerModal" tabindex="-1">
+<div class="modal fade" id="materialPickerModal" tabindex="-1" data-testid="welding-action-modal">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -341,7 +341,7 @@
                 <div class="row g-3" id="materialGrid">
                     {% for material in materials %}
                     <div class="col-md-6 material-item" data-name="{{ material.name|lower }}" data-category="{{ material.category }}">
-                        <div class="card material-card h-100" onclick="selectMaterial({{ material.id }}, '{{ material.name|escapejs }}', '{{ material.unit }}', '{{ material.price_mwk }}')">
+                        <div class="card material-card h-100" onclick="selectMaterial({{ material.id }}, '{{ material.name|escapejs }}', '{{ material.unit }}', '{{ material.price_mwk }}')" data-testid="material-card-{{ material.id }}">
                             <div class="card-body">
                                 <h6 class="mb-1">{{ material.name }}</h6>
                                 <p class="text-muted mb-1"><small>{{ material.get_category_display }}</small></p>
@@ -361,7 +361,7 @@
 </div>
 
 <!-- Cost Picker Modal -->
-<div class="modal fade" id="costPickerModal" tabindex="-1">
+<div class="modal fade" id="costPickerModal" tabindex="-1" data-testid="welding-cost-modal">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -390,7 +390,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Cost</button>
+                    <button type="submit" class="btn btn-primary" data-testid="welding-save-cost">Add Cost</button>
                 </div>
             </form>
         </div>
@@ -403,49 +403,169 @@
 {% block extra_js %}
 {% if is_editable %}
 <script>
-// CRITICAL: Ensure Bootstrap modals are initialized after Bootstrap loads
+// ==============================================================================
+// WELDING QUOTE MODAL FIX (Feb 2026) - BULLETPROOF VERSION
+// ==============================================================================
+// PROBLEM: "Add Material" and "Add Cost" buttons only blink/flash, nothing happens
+//
+// ROOT CAUSES:
+// 1. Bootstrap.js loads with 'defer' attribute, creating race condition
+// 2. No error handling when modal opening fails
+// 3. Possible conflict with other page scripts
+//
+// SOLUTION: 
+// - Robust Bootstrap availability polling
+// - Event delegation to survive DOM changes
+// - Comprehensive error handling and logging
+// - Explicit button type="button" enforcement
+// ==============================================================================
 (function() {
+  'use strict';
+  
+  // ==============================================================================
+  // PHASE 1: INITIALIZATION GUARD
+  // ==============================================================================
+  if (window.__WELDING_QUOTE_MODALS_INITIALIZED__) {
+    console.log('[Welding Quote] ✓ Modals already initialized, skipping duplicate init');
+    return;
+  }
+  window.__WELDING_QUOTE_MODALS_INITIALIZED__ = true;
+  console.log('[Welding Quote] Starting modal initialization...');
+  
+  // ==============================================================================
+  // PHASE 2: WAIT FOR BOOTSTRAP
+  // ==============================================================================
+  var MAX_RETRIES = 200; // 10 seconds total (50ms * 200)
+  var retryCount = 0;
+  
+  function waitForBootstrap(callback) {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      console.log('[Welding Quote] ✓ Bootstrap.Modal available (waited ' + (retryCount * 50) + 'ms)');
+      callback();
+    } else if (retryCount < MAX_RETRIES) {
+      retryCount++;
+      setTimeout(function() { waitForBootstrap(callback); }, 50);
+    } else {
+      console.error('[Welding Quote] ✗ CRITICAL: Bootstrap failed to load after ' + (MAX_RETRIES * 50) + 'ms');
+      alert('Error: Page scripts failed to load. Please refresh the page.');
+    }
+  }
+  
+  // ==============================================================================
+  // PHASE 3: INITIALIZE MODAL CLICK HANDLERS
+  // ==============================================================================
   function initializeModals() {
-    // Wait for Bootstrap to be available
-    if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-      setTimeout(initializeModals, 50);
-      return;
+    console.log('[Welding Quote] Initializing modal click handlers...');
+    
+    // Verify modals exist in DOM
+    var materialModal = document.getElementById('materialPickerModal');
+    var costModal = document.getElementById('costPickerModal');
+    
+    if (!materialModal) {
+      console.error('[Welding Quote] ✗ Material picker modal not found in DOM');
+    } else {
+      console.log('[Welding Quote] ✓ Material picker modal found');
     }
     
-    // Explicitly initialize modal triggers
-    // This ensures buttons work even if Bootstrap's automatic initialization fails
-    document.querySelectorAll('[data-bs-toggle="modal"]').forEach(function(trigger) {
-      trigger.addEventListener('click', function(e) {
-        e.preventDefault();
-        var targetSelector = trigger.getAttribute('data-bs-target');
-        if (!targetSelector) return;
-        
-        var targetModal = document.querySelector(targetSelector);
-        if (!targetModal) {
-          console.error('[Welding Quote] Modal not found:', targetSelector);
-          return;
-        }
-        
-        // Get or create Bootstrap Modal instance
+    if (!costModal) {
+      console.error('[Welding Quote] ✗ Cost picker modal not found in DOM');
+    } else {
+      console.log('[Welding Quote] ✓ Cost picker modal found');
+    }
+    
+    // Get all modal trigger buttons
+    var modalTriggers = document.querySelectorAll('[data-bs-toggle="modal"]');
+    console.log('[Welding Quote] Found ' + modalTriggers.length + ' modal trigger buttons');
+    
+    // Ensure all triggers have type="button" (prevent form submission)
+    modalTriggers.forEach(function(trigger) {
+      if (!trigger.hasAttribute('type') && trigger.tagName === 'BUTTON') {
+        trigger.setAttribute('type', 'button');
+        console.log('[Welding Quote] ⚠ Fixed missing type attribute on button');
+      }
+    });
+    
+    // ==============================================================================
+    // PHASE 4: EVENT DELEGATION FOR MODAL CLICKS
+    // ==============================================================================
+    // Using event delegation on document.body ensures:
+    // - Survives partial page reloads (HTMX/Turbo/etc)
+    // - Works with dynamically added buttons
+    // - Single listener instead of N listeners
+    // ==============================================================================
+    document.body.addEventListener('click', function(e) {
+      var trigger = e.target.closest('[data-bs-toggle="modal"]');
+      
+      if (!trigger) return; // Not a modal trigger, ignore
+      
+      // CRITICAL: Prevent default behavior (form submission, navigation)
+      e.preventDefault();
+      e.stopPropagation();
+      
+      var targetSelector = trigger.getAttribute('data-bs-target');
+      if (!targetSelector) {
+        console.error('[Welding Quote] ✗ Button missing data-bs-target attribute:', trigger);
+        alert('Error: Modal configuration missing. Please contact support.');
+        return;
+      }
+      
+      var targetModal = document.querySelector(targetSelector);
+      if (!targetModal) {
+        console.error('[Welding Quote] ✗ Modal element not found:', targetSelector);
+        alert('Error: Modal not found on page. Please refresh and try again.');
+        return;
+      }
+      
+      console.log('[Welding Quote] → Opening modal:', targetSelector);
+      
+      try {
+        // Get existing instance or create new one
         var modalInstance = bootstrap.Modal.getInstance(targetModal);
         if (!modalInstance) {
-          modalInstance = new bootstrap.Modal(targetModal);
+          console.log('[Welding Quote] Creating new Modal instance for', targetSelector);
+          modalInstance = new bootstrap.Modal(targetModal, {
+            backdrop: true,  // Dismiss on backdrop click
+            keyboard: true,  // Dismiss on ESC key
+            focus: true      // Focus modal on open
+          });
         }
         
         // Show the modal
         modalInstance.show();
-      });
-    });
+        console.log('[Welding Quote] ✓ Modal opened successfully:', targetSelector);
+        
+      } catch (err) {
+        console.error('[Welding Quote] ✗ CRITICAL ERROR opening modal:', err);
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          targetSelector: targetSelector,
+          bootstrapAvailable: typeof bootstrap !== 'undefined',
+          modalClass: typeof bootstrap !== 'undefined' ? typeof bootstrap.Modal : 'N/A'
+        });
+        alert('Error opening modal: ' + err.message + '\n\nPlease refresh the page and try again.');
+      }
+    }, false); // Use capture=false (bubble phase)
     
-    console.log('[Welding Quote] Modals initialized successfully');
+    console.log('[Welding Quote] ✓ Modal system initialized successfully');
   }
   
-  // Initialize on DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeModals);
-  } else {
-    initializeModals();
-  }
+  // ==============================================================================
+  // PHASE 5: START INITIALIZATION
+  // ==============================================================================
+  waitForBootstrap(function() {
+    // Ensure DOM is ready before initializing
+    if (document.readyState === 'loading') {
+      console.log('[Welding Quote] Waiting for DOMContentLoaded...');
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log('[Welding Quote] DOM ready, initializing modals');
+        initializeModals();
+      }, false);
+    } else {
+      console.log('[Welding Quote] DOM already ready, initializing modals immediately');
+      initializeModals();
+    }
+  });
 })();
 
 // Material search

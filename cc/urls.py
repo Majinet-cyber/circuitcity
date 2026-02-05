@@ -708,6 +708,8 @@ urlpatterns += [
     path("notifications/", include_or_raise("notifications.urls", "notifications")),
     # Backups & Data Export
     path("backups/", include_or_raise("backups.urls", "backups")),
+    # Data Corrections (vertical-aware)
+    path("corrections/", include_or_raise("corrections.urls", "corrections")),
     # Debug views (staff-only)
     path("debug/", include_or_raise("core.urls_debug", "debug")),
 ]

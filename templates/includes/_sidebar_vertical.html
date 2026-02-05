@@ -145,12 +145,19 @@
 
   {# ================= GYM / FITNESS ================= #}
   {% if business_kind == "gym" %}
+  {% url 'gym:dashboard' as url_gym_dashboard %}
+  {% url 'gym:members_list' as url_gym_members %}
+  {% url 'gym:checkin_page' as url_gym_checkin %}
+  {% url 'gym:add_payment' as url_gym_payments %}
+  {% url 'gym:settings' as url_gym_settings %}
+  
   <div class="menu-group">GYM &amp; FITNESS</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_gym_dash|default:'/inventory/verticals/gym/' }}" data-cy="nav-dashboard"><i class="bi bi-heart-pulse"></i> Gym Dashboard</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-members"><i class="bi bi-people"></i> Members</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-attendance"><i class="bi bi-calendar-check"></i> Attendance</a></li>
-    <li><a class="navlink" href="#" data-cy="nav-gym-memberships"><i class="bi bi-credit-card"></i> Memberships</a></li>
+    <li><a class="navlink" href="{{ url_gym_dashboard|default:'/gym/' }}" data-cy="nav-dashboard"><i class="bi bi-heart-pulse"></i> Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_gym_members|default:'/gym/members/' }}" data-cy="nav-gym-members"><i class="bi bi-people"></i> Members</a></li>
+    <li><a class="navlink" href="{{ url_gym_checkin|default:'/gym/checkin/' }}" data-cy="nav-gym-attendance"><i class="bi bi-calendar-check"></i> Check-ins</a></li>
+    <li><a class="navlink" href="{{ url_gym_payments|default:'/gym/payment/add/' }}" data-cy="nav-gym-payments"><i class="bi bi-credit-card"></i> Payments</a></li>
+    <li><a class="navlink" href="{{ url_gym_settings|default:'/gym/settings/' }}" data-cy="nav-gym-settings"><i class="bi bi-gear"></i> Settings</a></li>
   </ul>
   {% endif %}
 

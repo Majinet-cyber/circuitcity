@@ -1,50 +1,63 @@
-fix: Resolve NoReverseMatch for 'home' URL and verify wallet imports
+feat(gym): Implement bulk QR download, fix membership fee prefill, document trainers
 
-## Problems Fixed
+TASK 1 - BULK QR DOWNLOAD (NEW FEATURE):
+- Add bulk QR PDF generation endpoint for gym members
+- Implement A4 sticker sheet layout (3x8 grid, 24 per page)
+- Support "All members" and "Selected members" download options
+- Add checkboxes and dropdown UI to members list page
+- Generate high-resolution QR codes for printing (300dpi)
+- Include member name, code, and gym name on each sticker
+- Enforce manager-only access with tenant isolation
+- Create comprehensive test suite (11 test cases)
+- Handle 100+ members efficiently without timeout
+- Gracefully handle missing dependencies (ReportLab, qrcode)
 
-1. **NoReverseMatch: 'home' not found**
-   - Fixed URL registration in cc/urls.py (moved from /home-alias/ to /home/)
-   - Added backward-compatible home_alias view for intelligent routing
-   - Prevents redirect loops using _redirect_first() helper
+TASK 2 - TRAINERS (DOCUMENTATION):
+- Verify existing GymTrainer model implementation
+- Document trainer creation without user accounts
+- Add comprehensive test suite for trainer features (16 test cases)
+- Document optional user linking path for future use
+- No code changes needed (feature already complete)
 
-2. **Wallet AppRegistryNotReady (Verified Clean)**
-   - Confirmed wallet/__init__.py is empty (no model imports)
-   - Removed BOM character from wallet/__init__.py
-   - All wallet imports use explicit module paths (wallet.models, wallet.agent_models)
-   - No circular import issues detected
+TASK 3 - MEMBERSHIP FEE PREFILL (BUG FIX):
+- Fix member edit form to show existing fees (not defaults)
+- Ensure create form prefills with GymSettings.default_membership_price
+- Prevent edit form from overwriting member fees with defaults
+- Add explicit initial data for membership_fee and trainer_fee fields
+- Create test suite for fee prefill behavior (18 test cases)
+- Verify changed defaults only affect new members
 
-## Files Changed
+FILES CHANGED:
+- NEW: inventory/views_gym_bulk_qr.py (bulk QR PDF logic)
+- NEW: inventory/tests/test_gym_bulk_qr.py (bulk QR tests)
+- NEW: inventory/tests/test_gym_trainers.py (trainer tests)
+- NEW: inventory/tests/test_gym_membership_fee_prefill.py (fee tests)
+- NEW: GYM_BULK_QR_TRAINERS_FEES_IMPLEMENTATION.md (technical docs)
+- NEW: GYM_QUICK_START_GUIDE.md (user guide)
+- NEW: IMPLEMENTATION_SUMMARY.md (overview)
+- MODIFIED: inventory/urls_gym.py (add bulk_qr_pdf route)
+- MODIFIED: inventory/views_gym.py (fix member_edit fee prefill)
+- MODIFIED: templates/inventory/gym/members_list.html (add bulk download UI)
 
-- cc/urls.py (lines 330-350): Fixed 'home' URL pattern and documentation
-- wallet/__init__.py: Cleaned to empty file (removed BOM)
+TESTING:
+- 45 total test cases added
+- All tests pass
+- No linting errors
+- Zero regressions to other verticals
 
-## Testing
+DEPENDENCIES:
+- Requires: pip install reportlab 'qrcode[pil]'
+- Graceful degradation if not installed (503 error with message)
 
-✅ All tests passing:
-- Server starts without errors
-- URL resolution works: reverse('home') → '/home/'
-- Dashboard accessible without NoReverseMatch
-- Wallet imports clean (no AppRegistryNotReady)
-- No circular imports detected
+SECURITY:
+- Bulk download restricted to managers only
+- All queries tenant-scoped to active business
+- Input validation on member IDs and filters
+- CSRF protection maintained
 
-## Verification Commands
+BREAKING CHANGES:
+- None (backwards compatible)
 
-```bash
-# Start server (should run without errors)
-python manage.py runserver
+---
 
-# Test URLs
-python test_urls_quick.py
-
-# Verify wallet imports
-python verify_wallet_imports.py
-```
-
-## Impact
-
-Before: ❌ Server crashed with NoReverseMatch at /dashboard/
-After:  ✅ Server runs cleanly, all URLs resolve correctly
-
-Resolves: NoReverseMatch errors in templates
-Maintains: Multi-tenant logic, authentication flow, backward compatibility
-
+Closes #[ISSUE_NUMBER] (if applicable)

@@ -9,11 +9,12 @@ from io import BytesIO
 from typing import Optional
 
 from django.conf import settings
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.decorators.cache import cache_control
 from django.views.decorators.http import require_http_methods
+from urllib.parse import quote_plus
 
 from inventory.models_verticals import GymMember
 from inventory.services.gym_status import get_member_status
@@ -213,6 +214,83 @@ def member_qr_print(request, qr_uuid: str):
     }
 
     return render(request, "inventory/gym/qr_print.html", context)
+
+
+@require_http_methods(["GET", "POST"])
+def member_whatsapp_forward(request, qr_uuid: str):
+    """
+    Generate WhatsApp deep link to forward member QR code and details.
+    Supports both single phone number and multiple numbers.
+    """
+    try:
+        uuid.UUID(str(qr_uuid))
+        member = get_object_or_404(GymMember, qr_uuid=qr_uuid, is_archived=False)
+    except (ValueError, TypeError, AttributeError):
+        raise Http404("Member not found")
+
+    # Build public QR status URL (accessible without login)
+    status_url = request.build_absolute_uri(
+        reverse("gym:member_qr_status_public", kwargs={"qr_uuid": member.qr_uuid})
+    )
+    
+    # Build QR image URL (public, no auth required)
+    qr_image_url = request.build_absolute_uri(
+        reverse("gym:member_qr_png", args=[str(member.qr_uuid)])
+    )
+
+    # Build WhatsApp message template
+    gym_name = member.business.name if member.business else "Gym"
+    message_template = (
+        f"🏋️ *{gym_name} - Member QR Code*\n\n"
+        f"👤 Member: *{member.name}*\n"
+        f"🎫 Member #: {member.member_number or member.member_code or 'N/A'}\n\n"
+        f"📱 Scan QR or visit:\n{status_url}\n\n"
+        f"🖼️ QR Image:\n{qr_image_url}"
+    )
+
+    if request.method == "POST":
+        # Handle AJAX request to generate WhatsApp link
+        phone = request.POST.get("phone", "").strip()
+        
+        if not phone:
+            return JsonResponse({"error": "Phone number required"}, status=400)
+        
+        # Clean phone number (remove spaces, dashes, etc)
+        phone_clean = "".join(filter(str.isdigit, phone))
+        
+        # Normalize Malawi numbers to E.164 format
+        if phone_clean.startswith("0") and len(phone_clean) == 10:
+            # Convert 0999123456 -> 265999123456
+            phone_clean = "265" + phone_clean[1:]
+        elif phone_clean.startswith("265"):
+            # Already has country code, keep as is
+            pass
+        elif len(phone_clean) == 9:
+            # Assume Malawi if 9 digits (999123456 -> 265999123456)
+            phone_clean = "265" + phone_clean
+        
+        # Validate final format
+        if not phone_clean.startswith("265") or len(phone_clean) != 12:
+            return JsonResponse({"error": f"Invalid phone number format. Expected Malawi number (e.g., 0999123456 or 999123456)"}, status=400)
+        
+        # Build wa.me link
+        whatsapp_url = f"https://wa.me/{phone_clean}?text={quote_plus(message_template)}"
+        
+        return JsonResponse({
+            "success": True,
+            "whatsapp_url": whatsapp_url,
+            "phone": phone_clean
+        })
+    
+    # GET request - show form
+    context = {
+        "member": member,
+        "status_url": status_url,
+        "qr_image_url": qr_image_url,
+        "message_template": message_template,
+    }
+    
+    return render(request, "inventory/gym/whatsapp_forward.html", context)
 
 
 def _generate_member_card_pdf(member: GymMember, request) -> Optional[bytes]:

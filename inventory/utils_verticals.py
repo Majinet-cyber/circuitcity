@@ -235,6 +235,45 @@ def get_vertical_display_name(vertical_kind: str) -> str:
     return display_names.get(vertical_kind, vertical_kind.title())
 
 
+def _get_data_correction_menu_item(vertical: str) -> dict:
+    """
+    Helper: Generate a Data Correction menu item for any vertical.
+    
+    This is a manager-only feature that allows safe correction of erroneous data
+    with full audit trail, preview, and rollback support.
+    
+    Args:
+        vertical: Vertical key (phones, gym, clothing, etc.)
+    
+    Returns:
+        Sidebar menu item dict for Data Correction
+    """
+    # Check if this vertical is registered in the corrections framework
+    try:
+        from corrections.registry import registry
+        adapter = registry.get_adapter(vertical)
+        if not adapter:
+            # Vertical not registered, don't show menu item
+            return None
+    except ImportError:
+        # Corrections framework not available
+        return None
+    
+    return {
+        "section": "MAIN",
+        "key": "data_correction",
+        "url": f"/corrections/{vertical}/",  # Direct URL (no named route needed)
+        "label": "Data Correction",
+        "icon": "bi-pencil-square",
+        "active_prefix": f"/corrections/{vertical}/",
+        "active_pattern": f"/corrections/{vertical}/",
+        "require_manager": True,
+        "is_menu": False,
+        "is_header": False,
+        "testid": f"nav-{vertical}-data-correction",
+    }
+
+
 def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
     """
     Returns a list of sidebar navigation items for the given business kind.
@@ -289,7 +328,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         ]
 
     if business_kind == "gym":
-        return [
+        items = [
             # MAIN section - gym-specific operations (membership-based, NOT inventory)
             {
                 "section": "MAIN",
@@ -422,11 +461,24 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {
                 "section": "MORE",
                 "key": "trainers",
-                "url": "tenants:manager_review_agents",
+                "url": "gym:trainers_list",
                 "label": "Trainers",
                 "icon": "bi-people",
-                "active_prefix": "/tenants/manager/agents/",
-                "active_pattern": "/tenants/manager/agents/",
+                "active_prefix": "/gym/trainers/",
+                "active_pattern": "/gym/trainers/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "settings",
+                "url": "gym:settings",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/gym/settings",
+                "active_pattern": "/gym/settings",
                 "require_manager": True,
                 "is_menu": False,
                 "is_header": False,
@@ -485,9 +537,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "gym")
 
     elif business_kind == "clothing":
-        return [
+        items = [
             # MAIN section
             {
                 "section": "MAIN",
@@ -719,9 +773,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "clothing")
 
     elif business_kind == "liquor":
-        return [
+        items = [
             # MAIN section
             {
                 "section": "MAIN",
@@ -1007,9 +1063,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "liquor")
 
     elif business_kind == "pharmacy":
-        return [
+        items = [
             # MAIN section - pharmacy & cosmetics vertical-aware flows
             {
                 "section": "MAIN",
@@ -1228,9 +1286,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "pharmacy")
 
     elif business_kind == "grocery":
-        return [
+        items = [
             # MAIN section - Groceries vertical
             {
                 "section": "MAIN",
@@ -1373,9 +1433,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "grocery")
 
     elif business_kind == "cement":
-        return [
+        items = [
             # MAIN section - Hardware & General Dealers vertical (Premium Experience)
             {
                 "section": "MAIN",
@@ -1567,9 +1629,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "cement")
 
     elif business_kind == "hardware":
-        return [
+        items = [
             # MAIN section - Hardware & General Dealers vertical
             {
                 "section": "MAIN",
@@ -1776,9 +1840,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "hardware")
 
     elif business_kind == "farm":
-        return [
+        items = [
             # MAIN section - Farm Manager vertical (GREEN theme) - CLEAN NAVIGATION
             {
                 "section": "MAIN",
@@ -1912,9 +1978,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "testid": "nav-farm-settings",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "farm")
 
     elif business_kind == "welding":
-        return [
+        items = [
             # MAIN section - Welding Workshop vertical
             {
                 "section": "MAIN",
@@ -2080,9 +2148,11 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "welding")
 
     elif business_kind == "car_hire":
-        return [
+        items = [
             # MAIN section - Car Hire Service vertical (GREEN theme - fleet management)
             {
                 "section": "MAIN",
@@ -2218,7 +2288,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         ]
 
     else:  # "phones" or default
-        return [
+        items = [
             # MAIN section - Phones Dashboard is the primary entry point
             {
                 "section": "MAIN",
@@ -2353,20 +2423,6 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_header": False,
                 "group": "more",
                 "testid": "sidebar-sales-history",
-            },
-            # DATA CORRECTION (Manager-only - critical adoption feature)
-            {
-                "section": "MAIN",
-                "key": "data_correction",
-                "url": "verticals:phones_data_correction",
-                "label": "Data Correction",
-                "icon": "bi-pencil-square",
-                "active_prefix": "/verticals/phones/data-correction/",
-                "active_pattern": "/verticals/phones/data-correction/",
-                "require_manager": True,
-                "is_menu": False,
-                "is_header": False,
-                "testid": "nav-phones-data-correction",
             },
             # MORE section - Collapsible tools (Wallet & Time Logs accessible to all, manager tools below)
             {
@@ -2528,6 +2584,37 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "group": "more",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "phones")
+
+
+def _inject_data_correction_into_sidebar(items: list[dict], vertical: str) -> list[dict]:
+    """
+    Helper function to inject Data Correction menu item into any vertical's sidebar.
+    
+    This ensures ALL verticals get the Data Correction feature without duplicating code.
+    
+    Args:
+        items: List of sidebar menu items for a vertical
+        vertical: Vertical key (phones, gym, clothing, etc.)
+    
+    Returns:
+        Updated list with Data Correction item injected (if vertical is registered)
+    """
+    correction_item = _get_data_correction_menu_item(vertical)
+    if correction_item:
+        # Insert after the last MAIN section item, before MORE section
+        main_items = [i for i in items if i.get("section") == "MAIN"]
+        if main_items:
+            # Find the index of the last MAIN item
+            last_main_idx = len(items) - 1 - items[::-1].index(main_items[-1])
+            # Insert Data Correction right after
+            items.insert(last_main_idx + 1, correction_item)
+        else:
+            # No MAIN section, just append
+            items.append(correction_item)
+    
+    return items
 
 
 __all__ = [

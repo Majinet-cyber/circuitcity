@@ -1,0 +1,435 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Premium Corrections Dashboard - Gym-inspired */
+    .corrections-page {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 18px;
+    }
+    
+    .corrections-hero {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 24px;
+        border-radius: 20px;
+        color: #fff;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 18px;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+    }
+    
+    .corrections-hero h1 {
+        margin: 0;
+        font-size: clamp(24px, 3vw, 32px);
+        font-weight: 700;
+    }
+    
+    .corrections-hero p {
+        margin: 8px 0 0;
+        opacity: 0.95;
+        font-size: 1rem;
+    }
+    
+    .hero-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .hero-actions a {
+        border-radius: 12px;
+        padding: 10px 20px;
+        font-weight: 700;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .hero-actions .btn-light {
+        background: #fff;
+        color: #667eea;
+        border: 2px solid #fff;
+    }
+    
+    .hero-actions .btn-light:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Warning Banner */
+    .correction-warning-banner {
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        border-left: 5px solid #f59e0b;
+        padding: 16px 20px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+    }
+    
+    .correction-warning-banner i {
+        font-size: 1.5rem;
+        color: #d97706;
+        flex-shrink: 0;
+    }
+    
+    .correction-warning-banner strong {
+        color: #92400e;
+        display: block;
+        margin-bottom: 4px;
+    }
+    
+    .correction-warning-banner div {
+        color: #92400e;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+    
+    .stat-card {
+        background: white;
+        border-radius: 18px;
+        padding: 24px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        text-align: center;
+        transition: all 0.3s ease;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stat-card h3 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        margin: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    .stat-card p {
+        margin: 8px 0 0;
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Entity Cards */
+    .entity-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+    }
+    
+    .entity-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease;
+        border-left: 4px solid #667eea;
+        text-decoration: none;
+        display: block;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .entity-card:hover {
+        transform: translateX(4px);
+        box-shadow: 0 6px 24px rgba(102, 126, 234, 0.15);
+        border-left-color: #764ba2;
+    }
+    
+    .entity-card h5 {
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #334155;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .entity-card p {
+        margin: 0 0 12px 0;
+        color: #64748b;
+        font-size: 0.875rem;
+        line-height: 1.5;
+    }
+    
+    .entity-card small {
+        color: #94a3b8;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    /* Section Headers */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    
+    .section-header h5 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #334155;
+    }
+    
+    .section-header i {
+        color: #667eea;
+        font-size: 1.5rem;
+    }
+    
+    /* Batch Items */
+    .batch-list {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+    }
+    
+    .batch-item {
+        padding: 20px;
+        border-bottom: 1px solid #f1f5f9;
+        transition: all 0.2s ease;
+    }
+    
+    .batch-item:last-child {
+        border-bottom: none;
+    }
+    
+    .batch-item:hover {
+        background: linear-gradient(90deg, #f8fafc 0%, #ffffff 100%);
+    }
+    
+    .batch-item h6 {
+        margin-bottom: 8px;
+        font-weight: 700;
+    }
+    
+    .batch-item h6 a {
+        color: #667eea;
+        text-decoration: none;
+        transition: color 0.2s ease;
+    }
+    
+    .batch-item h6 a:hover {
+        color: #764ba2;
+    }
+    
+    .batch-status {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    
+    .batch-status.draft {
+        background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+        color: #c05621;
+    }
+    
+    .batch-status.preview {
+        background: linear-gradient(135deg, #bfdbfe 0%, #93c5fd 100%);
+        color: #1e40af;
+    }
+    
+    .batch-status.applied {
+        background: linear-gradient(135deg, #bbf7d0 0%, #86efac 100%);
+        color: #15803d;
+    }
+    
+    .batch-status.rolled_back {
+        background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+        color: #b91c1c;
+    }
+    
+    .batch-status.failed {
+        background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%);
+        color: #991b1b;
+    }
+    
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: #94a3b8;
+    }
+    
+    .empty-state i {
+        font-size: 3rem;
+        opacity: 0.4;
+        margin-bottom: 1rem;
+        display: block;
+    }
+    
+    @media (max-width: 768px) {
+        .corrections-page {
+            padding: 12px;
+        }
+        
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .entity-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="corrections-page">
+    <!-- Hero Header -->
+    <header class="corrections-hero">
+        <div>
+            <h1>{{ hero_title }}</h1>
+            <p>{{ hero_blurb }}</p>
+        </div>
+        <div class="hero-actions">
+            <a href="{% url 'corrections:audit_trail' vertical=vertical %}" class="btn-light">
+                <i class="bi bi-clock-history"></i> Audit Trail
+            </a>
+        </div>
+    </header>
+    
+    <!-- Warning Banner -->
+    {% if show_warning_banner %}
+    <div class="correction-warning-banner">
+        <i class="bi bi-shield-check"></i>
+        <div>
+            <strong>All corrections are logged for accountability.</strong>
+            Changes to data affect dashboards and reports immediately. Use with caution.
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Quick Stats -->
+    <section>
+        <div class="section-header">
+            <i class="bi bi-bar-chart"></i>
+            <h5>Overview</h5>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{{ total_batches }}</h3>
+                <p>Total Batches</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ applied_batches }}</h3>
+                <p>Applied</p>
+            </div>
+            <div class="stat-card">
+                <h3>{{ pending_batches }}</h3>
+                <p>Pending</p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Correctable Entities -->
+    <section>
+        <div class="section-header">
+            <i class="bi bi-database"></i>
+            <h5>Correctable Entities</h5>
+        </div>
+        {% if entities %}
+        <div class="entity-grid">
+            {% for entity in entities %}
+            <a href="{% url 'corrections:browse_entity' vertical=vertical entity_label=entity.entity_label %}" class="entity-card">
+                <h5>
+                    <i class="bi bi-pencil-square"></i>
+                    {{ entity.label }}
+                </h5>
+                <p>{{ entity.description }}</p>
+                <small>{{ entity.field_count }} correctable field{{ entity.field_count|pluralize }}</small>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="batch-list">
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>No correctable entities registered for this vertical yet.</p>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    
+    <!-- Recent Batches -->
+    <section>
+        <div class="section-header">
+            <i class="bi bi-layers"></i>
+            <h5>Recent Correction Batches</h5>
+        </div>
+        {% if batches %}
+        <div class="batch-list">
+            {% for batch in batches %}
+            <div class="batch-item">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                    <div style="flex: 1; min-width: 200px;">
+                        <h6>
+                            <a href="{% url 'corrections:batch_detail' vertical=vertical batch_id=batch.pk %}">
+                                <i class="bi bi-file-earmark-text"></i> Batch #{{ batch.pk }}
+                            </a>
+                        </h6>
+                        <p class="mb-2 text-muted" style="font-size: 0.9rem;">{{ batch.reason|truncatewords:20 }}</p>
+                        <small class="text-muted">
+                            <i class="bi bi-person"></i> By {{ batch.created_by.get_full_name|default:batch.created_by.username }}
+                            <span style="margin: 0 8px;">·</span>
+                            <i class="bi bi-calendar3"></i> {{ batch.created_at|date:"M d, Y" }}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <span class="batch-status {{ batch.status|lower }}">{{ batch.get_status_display }}</span>
+                        <div class="mt-2">
+                            <small class="text-muted" style="font-weight: 600;">
+                                <i class="bi bi-list-check"></i> {{ batch.items_count }} item{{ batch.items_count|pluralize }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="batch-list">
+            <div class="empty-state">
+                <i class="bi bi-inbox"></i>
+                <p>No correction batches yet. Click on an entity above to start correcting data.</p>
+            </div>
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

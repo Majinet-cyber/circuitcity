@@ -1100,7 +1100,11 @@
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
 
+<!-- EMAJINET UI INITIALIZATION SYSTEM (Feb 2026 - BFCache + Vertical Navigation fix) -->
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/emajinet-ui-init.js' %}?v={{ v }}{% endwith %}" defer></script>
+
 <!-- ROBUST UI CLEANUP: Modal/Dropdown/Overlay State Management (Jan 2026 - BFCache fix) -->
+<!-- NOTE: This legacy cleanup code is now superseded by emajinet-ui-init.js but kept for compatibility -->
 <script>
   /* ================================================================
      UI CLEANUP SYSTEM v5 — BFCache/pageshow fix + click functionality (Jan 2026)

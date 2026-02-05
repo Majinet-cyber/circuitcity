@@ -274,6 +274,7 @@ INSTALLED_APPS = [
     "audit",  # audit logs UI
     "staticpages",  # Public home page with hero section
     "backups",  # data backup & export system
+    "corrections.apps.CorrectionsConfig",  # vertical-aware data corrections (Feb 2026)
     # Email backend
     "anymail",  # SendGrid email backend via django-anymail
 ]

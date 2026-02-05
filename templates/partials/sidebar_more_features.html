@@ -61,6 +61,15 @@
   </li>
   {% endif %}
   
+  {# Data Corrections - Managers only #}
+  {% if request.user.is_staff or request.user|is_manager %}
+  <li>
+    <a class="navlink submenu-item" href="{% url 'corrections:dashboard' vertical=business_kind %}" data-cy="nav-corrections">
+      <i class="bi bi-pencil-square"></i> Data Corrections
+    </a>
+  </li>
+  {% endif %}
+  
   {# Simulator - Feature flag #}
   {% if FEATURES.SIMULATOR %}
   <li>

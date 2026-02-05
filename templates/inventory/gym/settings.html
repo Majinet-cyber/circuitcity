@@ -22,7 +22,8 @@
 
     <div class="row">
         <div class="col-12 col-lg-8">
-            <div class="glass-card p-4">
+            <!-- Gym Settings Form -->
+            <div class="glass-card p-4 mb-4">
                 <form method="post">
                     {% csrf_token %}
                     
@@ -72,6 +73,19 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="{{ form.default_trainer_fee.id_for_label }}" class="form-label">
+                            Default Trainer Fee (MWK)
+                        </label>
+                        {{ form.default_trainer_fee }}
+                        <small class="form-text text-muted">
+                            Default trainer fee for 30-day period
+                        </small>
+                        {% if form.default_trainer_fee.errors %}
+                            <div class="text-danger small mt-1">{{ form.default_trainer_fee.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
                         <label for="{{ form.arrears_message.id_for_label }}" class="form-label">
                             Arrears Message
                         </label>
@@ -93,6 +107,31 @@
                         </a>
                     </div>
                 </form>
+            </div>
+
+            <!-- Trainers Management -->
+            <div class="glass-card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="mb-0">Gym Trainers</h5>
+                    <a href="{% url 'gym:trainers_list' %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-list"></i> Manage All
+                    </a>
+                </div>
+                
+                <p class="text-muted small mb-3">
+                    Quick access to trainer management. Add default trainers below.
+                </p>
+
+                <!-- Default Trainers Info -->
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Default Trainers:</strong> Lester, Steve, Philip, Ben
+                    <br><small>These trainers are created automatically if they don't exist.</small>
+                </div>
+
+                <a href="{% url 'gym:trainers_list' %}" class="btn btn-primary w-100">
+                    <i class="bi bi-people"></i> View All Trainers
+                </a>
             </div>
         </div>
 

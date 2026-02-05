@@ -721,11 +721,16 @@ class TestDataCorrectionSidebar:
         assert dc_item["require_manager"] is True, "Data Correction should require manager"
         assert "data-correction" in dc_item["url"].lower() or "data_correction" in dc_item["url"].lower()
     
-    def test_data_correction_not_in_other_verticals(self):
-        """Data Correction is specific to phones, not in other verticals."""
+    def test_data_correction_in_all_registered_verticals(self):
+        """Data Correction now appears in ALL verticals (if registered in corrections framework)."""
         from inventory.utils_verticals import get_vertical_sidebar_items
+        from corrections.registry import registry
         
-        for vertical in ["gym", "clothing", "liquor", "pharmacy"]:
+        # Get all registered verticals from corrections framework
+        registered_verticals = [v['key'] for v in registry.list_verticals()]
+        
+        # Data Correction should appear in all registered verticals
+        for vertical in registered_verticals:
             items = get_vertical_sidebar_items(vertical)
             
             data_correction_items = [
@@ -733,7 +738,11 @@ class TestDataCorrectionSidebar:
                 if item.get("key") == "data_correction"
             ]
             
-            assert len(data_correction_items) == 0, f"Data Correction should NOT be in {vertical} sidebar"
+            assert len(data_correction_items) == 1, f"Data Correction SHOULD be in {vertical} sidebar (registered vertical)"
+            
+            dc_item = data_correction_items[0]
+            assert dc_item["require_manager"] is True
+            assert f"/corrections/{vertical}/" in dc_item["url"]
 
 
 class TestDataCorrectionURLResolves(TestCase):
