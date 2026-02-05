@@ -879,7 +879,7 @@ def phone_sales_metrics(
         sold_items = sold_items.filter(
             # Include items with sold_at in range OR items with null sold_at but received_at in range
             Q(sold_at__gte=start_dt, sold_at__lt=end_dt) |
-            Q(sold_at__isnull=True, received_at__gte=start_dt, received_at__lt=end_dt)
+            Q(sold_at__isnull=True, received_at__gte=start_dt.date(), received_at__lt=end_dt.date())
         )
 
     if location:

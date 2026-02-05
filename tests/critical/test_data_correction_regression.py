@@ -719,7 +719,7 @@ class TestDataCorrectionSidebar:
         
         dc_item = data_correction_items[0]
         assert dc_item["require_manager"] is True, "Data Correction should require manager"
-        assert "data-correction" in dc_item["url"].lower() or "data_correction" in dc_item["url"].lower()
+        assert "/corrections/phones/" in dc_item["url"]
     
     def test_data_correction_in_all_registered_verticals(self):
         """Data Correction now appears in ALL verticals (if registered in corrections framework)."""
@@ -1146,6 +1146,10 @@ class TestPhonesDashboardKPIsReflectSalesData:
         """
         # Create sold phone WITHOUT sold_at (legacy data scenario)
         # Note: We bypass the model's save() which auto-sets sold_at
+        # Ensure received_at is within current month by using max(today-5, month_start)
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        received_date = max(date.today() - timedelta(days=5), month_start.date())
         item = InventoryItem(
             business=phones_business,
             imei="171717171717171",
@@ -1155,7 +1159,7 @@ class TestPhonesDashboardKPIsReflectSalesData:
             selling_price=Decimal("150000"),
             status="SOLD",
             sold_at=None,  # NULL sold_at (legacy data)
-            received_at=date.today() - timedelta(days=5),  # Within MTD
+            received_at=received_date,  # Within MTD
             is_active=True,
         )
         # Use update_fields to bypass the save() auto-setting of sold_at

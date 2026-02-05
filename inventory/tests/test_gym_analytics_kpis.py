@@ -270,6 +270,10 @@ class GymAnalyticsKPIsTestCase(TestCase):
         # Create payment this month
         month_start = self.today.replace(day=1)
         month_start_dt = timezone.make_aware(timezone.datetime.combine(month_start, timezone.datetime.min.time()))
+        
+        # Ensure paid_at is within current month and before today_end
+        # Use max(month_start + 2 days, today - 1 day) to ensure it's always valid
+        paid_at = month_start_dt + timedelta(days=min(2, (self.today - month_start).days - 1)) if (self.today - month_start).days > 2 else month_start_dt + timedelta(hours=12)
 
         GymPayment.objects.create(
             member=member,
@@ -280,7 +284,7 @@ class GymAnalyticsKPIsTestCase(TestCase):
             start_date=self.today,
             end_date=self.today + timedelta(days=30),
             paid_by=self.user,
-            paid_at=month_start_dt + timedelta(days=5),
+            paid_at=paid_at,
         )
 
         kpis = self.adapter.kpis(

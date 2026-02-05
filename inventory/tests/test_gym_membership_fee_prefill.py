@@ -81,11 +81,12 @@ class TestMembershipFeePrefillOnCreate:
             default_trainer_fee=None,
         )
         
-        from inventory.models import BusinessMembership, BusinessRole
-        BusinessMembership.objects.create(
+        from tenants.models import Membership
+        Membership.objects.create(
             user=manager_user,
             business=business,
-            role=BusinessRole.MANAGER,
+            role="MANAGER",
+            status="ACTIVE",
         )
         
         client.force_login(manager_user)

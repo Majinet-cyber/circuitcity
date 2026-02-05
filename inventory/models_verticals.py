@@ -621,6 +621,17 @@ class GymTrainer(models.Model):
     def __str__(self):
         return f"{self.name} ({self.business.name})"
 
+    def clean(self):
+        """Validate trainer data"""
+        super().clean()
+        if not self.name or not self.name.strip():
+            raise ValidationError({"name": "Trainer name is required."})
+
+    def save(self, *args, **kwargs):
+        """Override save to call full_clean()"""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def total_fees_earned(self) -> Decimal:
         """Calculate total trainer fees earned from all payments"""
         from django.db.models import Sum
@@ -1561,11 +1572,18 @@ class GymSettings(models.Model):
     default_membership_price = models.DecimalField(
         max_digits=10,
         decimal_places=2,
+        null=True,
+        blank=True,
         default=Decimal("50000.00"),
         help_text="Default monthly membership fee (30 days)",
     )
     default_trainer_fee = models.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("50000.00"), help_text="Default trainer fee per month"
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=Decimal("50000.00"),
+        help_text="Default trainer fee per month"
     )
 
     # Other settings

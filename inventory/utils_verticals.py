@@ -2286,6 +2286,8 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "testid": "nav-car-hire-settings",
             },
         ]
+        
+        return _inject_data_correction_into_sidebar(items, "car_hire")
 
     else:  # "phones" or default
         items = [

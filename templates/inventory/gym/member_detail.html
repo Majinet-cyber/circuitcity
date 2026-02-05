@@ -350,6 +350,16 @@
                     <div class="info-value">{{ member.email|default:"-" }}</div>
                 </div>
                 <div class="mb-3">
+                    <div class="info-label">Membership Fee</div>
+                    <div class="info-value">
+                        {% if member.membership_fee %}
+                            {{ business.currency }} {{ member.membership_fee|floatformat:0 }}
+                        {% else %}
+                            <span class="text-muted">Not set</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="mb-3">
                     <div class="info-label">Joined</div>
                     <div class="info-value">
                         {% if member_joined_at %}
