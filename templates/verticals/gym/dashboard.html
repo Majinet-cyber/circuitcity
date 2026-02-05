@@ -90,7 +90,10 @@
       <p>{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ members_url|default:'/gym/members/' }}">Manage members</a>
+      <a class="primary" href="{{ members_url|default:'/gym/members/' }}">
+        Manage members
+        <span class="badge bg-light text-primary ms-1" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">{{ total_members|default:0 }}</span>
+      </a>
       <a class="ghost" href="{{ add_payment_url|default:'/gym/payment/add/' }}">Record payment</a>
       {% include "partials/vertical_more_dropdown.html" %}
     </div>
@@ -116,7 +119,7 @@
   <section class="recent-block" style="margin-bottom: 18px;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
       <h2 style="margin:0;font-size:1.1rem">Filter</h2>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
         <a href="?range=today"
            class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
            style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
@@ -131,6 +134,22 @@
            class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
            style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
           MTD
+        </a>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          <input type="month" 
+                 id="monthPicker" 
+                 value="{{ selected_month }}"
+                 class="form-control form-control-sm"
+                 style="border-radius: 20px; padding: 6px 12px; font-size: 0.9rem; max-width: 150px;"
+                 onchange="window.location.href='?range=month&month='+this.value">
+          {% if range_key == 'month' %}
+          <span class="badge bg-primary" style="font-size: 0.75rem;">Active</span>
+          {% endif %}
+        </div>
+        <a href="?range=all_time"
+           class="btn {% if range_key == 'all_time' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
+           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+          All Time
         </a>
       </div>
     </div>

@@ -25,8 +25,8 @@ def get_gym_dashboard_metrics(business, start_date, end_date):
 
     Args:
         business: Business instance
-        start_date: Start date (date object)
-        end_date: End date (date object, inclusive)
+        start_date: Start date (date object) or None for all time
+        end_date: End date (date object, inclusive) or None for all time
 
     Returns:
         dict with keys:
@@ -34,26 +34,28 @@ def get_gym_dashboard_metrics(business, start_date, end_date):
             - revenue: Decimal
             - payment_mix: list of dicts with 'method', 'count', 'amount'
     """
-    # Build timezone-aware datetime range
-    # Use localdate to avoid timezone conversion issues
-    if isinstance(start_date, datetime):
-        start_date = start_date.date()
-    if isinstance(end_date, datetime):
-        end_date = end_date.date()
-
-    # Ensure timezone-aware datetime boundaries
-    start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
-    # End date is inclusive, so use 23:59:59.999999
-    end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
-
     # CRITICAL: Filter by is_active=True to exclude cancelled/refunded payments
     # This is the single source of truth queryset
     payments_qs = GymPayment.objects.filter(
         member__business=business,
         is_active=True,
-        paid_at__gte=start_dt,
-        paid_at__lte=end_dt,
     )
+
+    # Apply date filtering only if dates are provided (not all_time)
+    if start_date is not None and end_date is not None:
+        # Build timezone-aware datetime range
+        # Use localdate to avoid timezone conversion issues
+        if isinstance(start_date, datetime):
+            start_date = start_date.date()
+        if isinstance(end_date, datetime):
+            end_date = end_date.date()
+
+        # Ensure timezone-aware datetime boundaries
+        start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+        # End date is inclusive, so use 23:59:59.999999
+        end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+
+        payments_qs = payments_qs.filter(paid_at__gte=start_dt, paid_at__lte=end_dt)
 
     # Payment count
     payments_count = payments_qs.count()

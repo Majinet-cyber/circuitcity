@@ -69,7 +69,7 @@ def dashboard(request):
     members_in_arrears = in_arrears
 
     # ============================================================================
-    # DATE RANGE FILTER: Parse querystring (today/last7/mtd)
+    # DATE RANGE FILTER: Parse querystring (today/last7/mtd/month/all_time)
     # ============================================================================
     range_param = request.GET.get("range", "mtd").lower()
     now = timezone.now()
@@ -85,6 +85,37 @@ def dashboard(request):
         start_date = today - timedelta(days=6)  # Last 7 days including today
         end_date = today
         range_label = "Last 7 Days"
+    elif range_param == "month":
+        # Specific month picker: ?range=month&month=2026-01
+        month_str = request.GET.get("month", "")
+        if month_str:
+            try:
+                # Parse YYYY-MM format
+                year, month = map(int, month_str.split("-"))
+                start_date = today.replace(year=year, month=month, day=1)
+                # Get last day of month
+                if month == 12:
+                    end_date = start_date.replace(year=year + 1, month=1, day=1) - timedelta(days=1)
+                else:
+                    end_date = start_date.replace(month=month + 1, day=1) - timedelta(days=1)
+                range_label = start_date.strftime("%B %Y")
+            except (ValueError, TypeError):
+                # Invalid month format, fall back to MTD
+                start_date = today.replace(day=1)
+                end_date = today
+                range_label = "Month to Date"
+                range_param = "mtd"
+        else:
+            # No month specified, fall back to MTD
+            start_date = today.replace(day=1)
+            end_date = today
+            range_label = "Month to Date"
+            range_param = "mtd"
+    elif range_param == "all_time":
+        # All time: no date constraints
+        start_date = None
+        end_date = None
+        range_label = "All Time"
     else:  # mtd (default)
         start_date = today.replace(day=1)
         end_date = today
@@ -99,8 +130,13 @@ def dashboard(request):
     yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
 
     # Calculate datetime boundaries for selected range
-    range_start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
-    range_end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+    if start_date is not None and end_date is not None:
+        range_start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+        range_end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+    else:
+        # All time: use None to indicate no date filtering
+        range_start_dt = None
+        range_end_dt = None
 
     # ============================================================================
     # FINANCIAL KPIs: Revenue, Costs, Profit, MRR
@@ -114,6 +150,9 @@ def dashboard(request):
     revenue = range_metrics["revenue"]
     payment_count = range_metrics["payments_count"]
     payment_mix = range_metrics.get("payment_mix", [])
+    
+    # Store selected month for template (if month picker was used)
+    selected_month = request.GET.get("month", "") if range_param == "month" else ""
 
     # Also get month metrics for MRR
     # MRR (Monthly Recurring Revenue) = total revenue THIS MONTH (month-to-date)
@@ -134,7 +173,20 @@ def dashboard(request):
     costs_this_month = get_business_costs_for_period(business, month_start.date(), today)
     
     # CRITICAL FIX: Calculate costs for the selected filter range (not just MTD)
-    costs_selected_range = get_business_costs_for_period(business, start_date, end_date)
+    # For all_time, sum all costs (no date filter)
+    if start_date is not None and end_date is not None:
+        costs_selected_range = get_business_costs_for_period(business, start_date, end_date)
+    else:
+        # All time: sum all costs without date filtering
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        
+        admin_costs_qs = WalletTransaction.objects.filter(
+            business=business,
+            ledger=Ledger.COMPANY,
+            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+        )
+        costs_agg = admin_costs_qs.aggregate(total=Coalesce(Sum("amount"), Decimal("0.00")))
+        costs_selected_range = abs(costs_agg.get("total") or Decimal("0.00"))
 
     # ============================================================================
     # REVENUE: Calculate from GymPayment for today, yesterday, this month
@@ -314,6 +366,16 @@ def dashboard(request):
         # Gracefully degrade if helpers not available
         pass
 
+    # Recent payments: respect the selected filter
+    recent_payments_qs = GymPayment.objects.filter(member__business=business).select_related("member", "paid_by")
+    
+    # Apply date filtering to recent payments based on selected range
+    if range_start_dt is not None and range_end_dt is not None:
+        recent_payments_qs = recent_payments_qs.filter(paid_at__gte=range_start_dt, paid_at__lte=range_end_dt)
+    # For all_time, no date filter is applied (shows all payments)
+    
+    recent_payments = recent_payments_qs.order_by("-paid_at")[:10]
+
     ctx.update(
         {
             "active_tab": "dashboard",  # For navigation highlighting
@@ -348,10 +410,9 @@ def dashboard(request):
             # Date range filter
             "range_key": range_param,
             "range_label": range_label,
-            # Recent payments
-            "recent_payments": GymPayment.objects.filter(member__business=business)
-            .select_related("member", "paid_by")
-            .order_by("-paid_at")[:10],
+            "selected_month": selected_month,  # For month picker
+            # Recent payments (filtered by selected range)
+            "recent_payments": recent_payments,
             # Session KPIs
             "sessions_today": sessions_today,
             "sessions_this_week": sessions_this_week,
