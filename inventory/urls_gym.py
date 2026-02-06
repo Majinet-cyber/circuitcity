@@ -28,6 +28,12 @@ urlpatterns = [
     path("member/<int:member_id>/restore/", views_gym.member_restore, name="member_restore"),
     path("member/<int:member_id>/set-paid/", views_gym.member_set_paid, name="member_set_paid"),
     path("member/<int:member_id>/checkin/", views_gym.member_checkin, name="member_checkin"),
+    path("member/<int:member_id>/delete/", views_gym.member_delete, name="member_delete"),
+    path("member/<int:member_id>/purge/", views_gym.member_purge, name="member_purge"),
+    path("member/<int:source_id>/merge/", views_gym.member_merge, name="member_merge"),
+    # Bulk operations
+    path("members/bulk-add/", views_gym.members_bulk_add, name="members_bulk_add"),
+    path("members/bulk-add/results/", views_gym.members_bulk_add_results, name="members_bulk_add_results"),
     # QR Code routes (public, no auth required)
     path("qr/<uuid:qr_uuid>/", views_gym_qr.member_qr_status_public, name="member_qr_status_public"),
     path("qr/<uuid:qr_uuid>/image.png", views_gym_qr.member_qr_png, name="member_qr_png"),

@@ -328,6 +328,14 @@
                         </button>
                     </form>
                     {% endif %}
+                    <button type="button" 
+                            class="btn btn-danger js-delete-member"
+                            data-member-id="{{ member.id }}"
+                            data-member-name="{{ member.name }}"
+                            data-delete-url="{% url 'gym:member_purge' member.id %}"
+                            title="Delete Member">
+                        <i class="bi bi-trash-fill"></i> <span class="d-none d-lg-inline">Delete</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -671,6 +679,8 @@
 {% endblock %}
 
 {% block extra_js %}
+{{ block.super }}
+<script src="{% static 'js/gym-member-delete.js' %}"></script>
 <script>
 // Enlarge QR on mobile tap
 function enlargeQR() {

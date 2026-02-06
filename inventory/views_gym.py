@@ -10,7 +10,7 @@ from decimal import Decimal
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.db.models import DecimalField, Sum, Value
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
@@ -176,64 +176,99 @@ def member_add(request):
     if request.method == "POST":
         form = GymMemberForm(business, request.POST)
         if form.is_valid():
-            with transaction.atomic():
-                member = form.save(commit=False)
-                member.business = business
+            try:
+                with transaction.atomic():
+                    member = form.save(commit=False)
+                    member.business = business
 
-                # Set fees from form (editable) or defaults from settings (guard against None)
-                member.membership_fee = form.cleaned_data.get("membership_fee") or gym_settings.default_membership_price or Decimal("0.00")
+                    # Set fees from form (editable) or defaults from settings (guard against None)
+                    member.membership_fee = form.cleaned_data.get("membership_fee") or gym_settings.default_membership_price or Decimal("0.00")
 
-                # Set has_trainer based on whether a trainer is assigned
-                if member.trainer:
-                    member.has_trainer = True
-                    member.trainer_fee = form.cleaned_data.get("trainer_fee") or gym_settings.default_trainer_fee or Decimal("0.00")
-                else:
-                    member.has_trainer = False
-                    member.trainer_fee = Decimal("0.00")
+                    # Set has_trainer based on whether a trainer is assigned
+                    if member.trainer:
+                        member.has_trainer = True
+                        member.trainer_fee = form.cleaned_data.get("trainer_fee") or gym_settings.default_trainer_fee or Decimal("0.00")
+                    else:
+                        member.has_trainer = False
+                        member.trainer_fee = Decimal("0.00")
 
-                member.save()
+                    member.save()
 
-                # If marked as paid, activate membership for 30 days
-                mark_as_paid = form.cleaned_data.get("mark_as_paid", False)
-                if mark_as_paid:
-                    member.set_paid(
-                        payment_date=None,  # Today
-                        membership_fee=member.membership_fee,
-                        trainer_fee=member.trainer_fee,
-                        paid_by=request.user,
+                    # If marked as paid, activate membership for 30 days
+                    mark_as_paid = form.cleaned_data.get("mark_as_paid", False)
+                    if mark_as_paid:
+                        member.set_paid(
+                            payment_date=None,  # Today
+                            membership_fee=member.membership_fee,
+                            trainer_fee=member.trainer_fee,
+                            paid_by=request.user,
+                        )
+                        messages.success(
+                            request,
+                            f"Member '{member.name}' added and activated. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}.",
+                        )
+                    else:
+                        member.status = GymMemberStatus.PENDING_PAYMENT
+                        member.save(update_fields=["status"])
+                        messages.success(
+                            request, f"Member '{member.name}' added. Remember to mark as paid when payment is received."
+                        )
+
+                    # Log the creation
+                    GymMemberLog.objects.create(
+                        member=member,
+                        action=GymMemberAction.CREATED,
+                        changes={
+                            "name": member.name,
+                            "phone": member.phone,
+                            "email": member.email,
+                            "trainer": member.trainer.name if member.trainer else None,
+                            "marked_as_paid": mark_as_paid,
+                        },
+                        performed_by=request.user,
                     )
-                    messages.success(
+
+                    # Send QR code PDF email if member has email (after transaction commit)
+                    if member.email:
+                        from inventory.services.gym_qr_email import send_member_qr_email
+
+                        transaction.on_commit(lambda: send_member_qr_email(member, request))
+
+                return redirect("gym:member_detail", member_id=member.id)
+            
+            except IntegrityError as e:
+                # Handle duplicate member name
+                from inventory.models_verticals import normalize_member_name
+                from inventory.utils_schema import safe_filter_by_field
+                
+                canonical = normalize_member_name(form.cleaned_data.get("name", ""))
+                
+                # Find existing member with same name (safe - handles missing name_canonical field)
+                base_qs = GymMember.objects.filter(business=business)
+                existing = safe_filter_by_field(base_qs, "name_canonical", name_canonical=canonical).first()
+                
+                if existing:
+                    messages.error(
                         request,
-                        f"Member '{member.name}' added and activated. Membership valid until {member.membership_end.strftime('%Y-%m-%d')}.",
+                        f"Member already exists: <a href='{reverse('gym:member_detail', args=[existing.id])}'>{existing.name}</a> "
+                        f"(joined {existing.joined_at.strftime('%Y-%m-%d')}). "
+                        f"If this is a duplicate, you can merge them.",
+                        extra_tags="safe"
                     )
                 else:
-                    member.status = GymMemberStatus.PENDING_PAYMENT
-                    member.save(update_fields=["status"])
-                    messages.success(
-                        request, f"Member '{member.name}' added. Remember to mark as paid when payment is received."
-                    )
-
-                # Log the creation
-                GymMemberLog.objects.create(
-                    member=member,
-                    action=GymMemberAction.CREATED,
-                    changes={
-                        "name": member.name,
-                        "phone": member.phone,
-                        "email": member.email,
-                        "trainer": member.trainer.name if member.trainer else None,
-                        "marked_as_paid": mark_as_paid,
+                    messages.error(request, f"Error creating member: {str(e)}")
+                
+                # Re-render form with data
+                return render(
+                    request,
+                    "inventory/gym/member_form.html",
+                    {
+                        "form": form,
+                        "business": business,
+                        "gym_settings": gym_settings,
+                        "title": "Add New Member",
                     },
-                    performed_by=request.user,
                 )
-
-                # Send QR code PDF email if member has email (after transaction commit)
-                if member.email:
-                    from inventory.services.gym_qr_email import send_member_qr_email
-
-                    transaction.on_commit(lambda: send_member_qr_email(member, request))
-
-            return redirect("gym:member_detail", member_id=member.id)
     else:
         form = GymMemberForm(business, initial=initial_data)
 
@@ -1826,4 +1861,443 @@ def gym_scan_lookup(request):
                 "trainer_fee": float(member.trainer_fee) if member.trainer_fee else 0,
             },
         }
+    )
+
+
+# ==============================================================================
+# GYM MEMBER DELETE / MERGE
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@require_POST
+def member_delete(request, member_id):
+    """
+    Soft delete a gym member with safety checks.
+    
+    Rules:
+    - Only allowed if member has no payments/check-ins (i.e., no history)
+    - Otherwise, must merge into another member instead
+    - Any logged-in gym user can delete members in their tenant
+    """
+    from django.http import JsonResponse
+    
+    business = get_active_business(request)
+    member = get_object_or_404(GymMember, pk=member_id, business=business)
+    
+    # Safety check: does member have history?
+    payment_count = GymPayment.objects.filter(member=member).count()
+    checkin_count = GymCheckIn.objects.filter(member=member).count()
+    
+    if payment_count > 0 or checkin_count > 0:
+        messages.error(
+            request,
+            f"Cannot delete member '{member.name}' because they have {payment_count} payment(s) and {checkin_count} check-in(s). "
+            f"Please merge this member into another member instead to preserve history."
+        )
+        return redirect("gym:member_detail", member_id=member.id)
+    
+    # Get delete reason and notes from form
+    reason = request.POST.get("delete_reason", "").strip()
+    notes = request.POST.get("delete_notes", "").strip()
+    
+    if not reason:
+        messages.error(request, "Delete reason is required")
+        return redirect("gym:member_detail", member_id=member.id)
+    
+    # Perform soft delete
+    member.is_deleted = True
+    member.deleted_at = timezone.now()
+    member.deleted_by = request.user
+    member.delete_reason = reason
+    member.delete_notes = notes
+    member.save(
+        update_fields=["is_deleted", "deleted_at", "deleted_by", "delete_reason", "delete_notes"]
+    )
+    
+    # Log deletion
+    GymMemberLog.objects.create(
+        member=member,
+        action=GymMemberAction.DELETED,
+        changes={
+            "reason": reason,
+            "notes": notes,
+        },
+        performed_by=request.user,
+    )
+    
+    messages.success(request, f"Member '{member.name}' has been deleted.")
+    return redirect("gym:members_list")
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@require_POST
+def member_purge(request, member_id):
+    """
+    Permanently delete a gym member and ALL related records.
+    
+    This is a destructive operation that:
+    - Deletes all payments (including wallet entries)
+    - Deletes all check-ins
+    - Deletes all logs
+    - Deletes the member record itself
+    
+    Requires:
+    - User authentication (any logged-in gym user)
+    - Tenant scoping (member must belong to current business)
+    - Reason for deletion
+    - Confirmation (handled by frontend modal)
+    """
+    from django.http import JsonResponse
+    from inventory.services_gym_purge import purge_member, can_purge_member
+    
+    business = get_active_business(request)
+    
+    # Get member with tenant scoping
+    try:
+        member = get_object_or_404(GymMember.all_objects, pk=member_id, business=business)
+    except Exception:
+        return JsonResponse(
+            {"ok": False, "error": "Member not found or access denied"},
+            status=404
+        )
+    
+    # Get reason and notes from POST data
+    reason = request.POST.get("reason", "").strip()
+    notes = request.POST.get("notes", "").strip()
+    confirmation = request.POST.get("confirmation", "").strip()
+    
+    # Validate reason
+    if not reason:
+        return JsonResponse(
+            {"ok": False, "error": "Deletion reason is required"},
+            status=400
+        )
+    
+    # Validate confirmation (user must type DELETE or member name)
+    expected_confirmations = ["DELETE", member.name]
+    if confirmation not in expected_confirmations:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"Please type 'DELETE' or the member's name ('{member.name}') to confirm"
+            },
+            status=400
+        )
+    
+    # Check if user can purge this member
+    can_purge, error_msg = can_purge_member(member, request.user)
+    if not can_purge:
+        return JsonResponse(
+            {"ok": False, "error": error_msg or "Cannot purge this member"},
+            status=403
+        )
+    
+    # Perform the purge
+    try:
+        result = purge_member(
+            member=member,
+            user=request.user,
+            reason=reason,
+            notes=notes,
+        )
+        
+        # Return success with details
+        return JsonResponse({
+            "ok": True,
+            "message": result["message"],
+            "deleted_counts": result["deleted_counts"],
+        })
+        
+    except ValueError as e:
+        return JsonResponse(
+            {"ok": False, "error": str(e)},
+            status=400
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error purging member {member_id}: {e}", exc_info=True)
+        
+        return JsonResponse(
+            {"ok": False, "error": f"Failed to delete member: {str(e)}"},
+            status=500
+        )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+@manager_required
+def member_merge(request, source_id):
+    """
+    Merge a duplicate member into another member (canonical).
+    
+    GET: Show form to select target member
+    POST: Perform merge
+    """
+    from inventory.services.gym_member_operations import merge_members, find_duplicate_members
+    
+    business = get_active_business(request)
+    source_member = get_object_or_404(GymMember, pk=source_id, business=business)
+    
+    if request.method == "POST":
+        target_id = request.POST.get("target_member_id")
+        reason = request.POST.get("merge_reason", "").strip()
+        notes = request.POST.get("merge_notes", "").strip()
+        
+        if not target_id:
+            messages.error(request, "Please select a target member to merge into")
+            return redirect("gym:member_merge", source_id=source_id)
+        
+        if not reason:
+            messages.error(request, "Merge reason is required")
+            return redirect("gym:member_merge", source_id=source_id)
+        
+        try:
+            target_member = GymMember.objects.get(pk=target_id, business=business)
+            
+            # Perform merge
+            with transaction.atomic():
+                stats = merge_members(
+                    source_member=source_member,
+                    target_member=target_member,
+                    user=request.user,
+                    reason=reason,
+                    notes=notes,
+                )
+            
+            messages.success(
+                request,
+                f"Successfully merged '{source_member.name}' into '{target_member.name}'. "
+                f"Moved {stats['payments_moved']} payment(s) and {stats['checkins_moved']} check-in(s)."
+            )
+            return redirect("gym:member_detail", member_id=target_member.id)
+        
+        except GymMember.DoesNotExist:
+            messages.error(request, "Target member not found")
+            return redirect("gym:member_merge", source_id=source_id)
+        except ValueError as e:
+            messages.error(request, str(e))
+            return redirect("gym:member_merge", source_id=source_id)
+        except Exception as e:
+            messages.error(request, f"Error during merge: {str(e)}")
+            return redirect("gym:member_merge", source_id=source_id)
+    
+    # GET: Show form with suggested targets (other members with similar names)
+    from inventory.models_verticals import normalize_member_name
+    from inventory.utils_schema import safe_filter_by_field
+    
+    canonical = normalize_member_name(source_member.name)
+    
+    # Find potential targets (members with similar canonical names)
+    # Safe filter - handles missing name_canonical field gracefully
+    base_qs = GymMember.objects.filter(business=business).exclude(id=source_id)
+    suggested_targets = safe_filter_by_field(base_qs, "name_canonical", name_canonical=canonical).order_by("joined_at")
+    
+    # Also show all other members as options
+    all_members = GymMember.objects.filter(
+        business=business,
+    ).exclude(id=source_id).order_by("name")
+    
+    # Get member stats
+    payment_count = GymPayment.objects.filter(member=source_member).count()
+    checkin_count = GymCheckIn.objects.filter(member=source_member).count()
+    
+    return render(
+        request,
+        "inventory/gym/member_merge.html",
+        {
+            "business": business,
+            "source_member": source_member,
+            "suggested_targets": suggested_targets,
+            "all_members": all_members,
+            "payment_count": payment_count,
+            "checkin_count": checkin_count,
+        },
+    )
+
+
+# ==============================================================================
+# GYM MEMBER BULK ADD
+# ==============================================================================
+
+
+class BulkMemberForm(forms.Form):
+    """Form for bulk adding members"""
+    
+    # Bulk paste input
+    bulk_data = forms.CharField(
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 15,
+                "placeholder": "Paste member data here (one per line):\nName, Phone, Email\nOr:\nName | Phone | Email\n\nExample:\nJohn Doe, 0999123456, john@example.com\nJane Smith, 0888765432\nBob Wilson",
+            }
+        ),
+        required=False,
+        label="Paste Member Data",
+        help_text="Paste multiple members (one per line). Formats supported: CSV or pipe-separated",
+    )
+    
+    # Default trainer for all members
+    default_trainer = forms.ModelChoiceField(
+        queryset=GymTrainer.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Default Trainer (optional)",
+        help_text="Assign this trainer to all members in the batch",
+    )
+    
+    def __init__(self, business=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if business:
+            self.fields["default_trainer"].queryset = GymTrainer.objects.filter(
+                business=business, is_active=True
+            ).order_by("name")
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+def members_bulk_add(request):
+    """
+    Bulk add multiple gym members at once.
+    
+    Supports:
+    - Pasting CSV or pipe-separated data
+    - Name, Phone, Email columns
+    - Optional default trainer for all
+    - Duplicate detection and skipping
+    - Per-row validation with error reporting
+    """
+    from inventory.services.gym_member_operations import bulk_create_members
+    import re
+    
+    business = get_active_business(request)
+    
+    if request.method == "POST":
+        form = BulkMemberForm(business, request.POST)
+        if form.is_valid():
+            bulk_data = form.cleaned_data.get("bulk_data", "").strip()
+            default_trainer = form.cleaned_data.get("default_trainer")
+            
+            if not bulk_data:
+                messages.error(request, "Please paste member data")
+                return redirect("gym:members_bulk_add")
+            
+            # Parse bulk data
+            lines = bulk_data.split("\n")
+            members_data = []
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Try to parse as CSV or pipe-separated
+                if "|" in line:
+                    parts = [p.strip() for p in line.split("|")]
+                else:
+                    parts = [p.strip() for p in line.split(",")]
+                
+                # Extract fields
+                name = parts[0] if len(parts) > 0 else ""
+                phone = parts[1] if len(parts) > 1 else ""
+                email = parts[2] if len(parts) > 2 else ""
+                
+                if name:  # Only add if name is present
+                    members_data.append({
+                        "name": name,
+                        "phone": phone,
+                        "email": email,
+                        "trainer_id": default_trainer.id if default_trainer else None,
+                        "notes": "",
+                    })
+            
+            if not members_data:
+                messages.error(request, "No valid member data found")
+                return redirect("gym:members_bulk_add")
+            
+            # Bulk create members
+            results = bulk_create_members(
+                business=business,
+                members_data=members_data,
+                user=request.user,
+                skip_duplicates=True,
+            )
+            
+            # Show results
+            created_count = len(results["created"])
+            skipped_count = len(results["skipped_duplicates"])
+            error_count = len(results["errors"])
+            
+            if created_count > 0:
+                messages.success(request, f"Successfully created {created_count} member(s)")
+            
+            if skipped_count > 0:
+                skipped_names = [item["name"] for item in results["skipped_duplicates"][:5]]
+                more = f" and {skipped_count - 5} more" if skipped_count > 5 else ""
+                messages.warning(
+                    request,
+                    f"Skipped {skipped_count} duplicate(s): {', '.join(skipped_names)}{more}"
+                )
+            
+            if error_count > 0:
+                error_msgs = [f"{item['name']}: {item['error']}" for item in results["errors"][:5]]
+                more = f" and {error_count - 5} more" if error_count > 5 else ""
+                messages.error(
+                    request,
+                    f"{error_count} error(s): {'; '.join(error_msgs)}{more}"
+                )
+            
+            # Store detailed results in session for results page
+            request.session["bulk_add_results"] = {
+                "created": [{"id": m.id, "name": m.name, "phone": m.phone} for m in results["created"]],
+                "skipped_duplicates": results["skipped_duplicates"],
+                "errors": results["errors"],
+            }
+            
+            return redirect("gym:members_bulk_add_results")
+    else:
+        form = BulkMemberForm(business)
+    
+    return render(
+        request,
+        "inventory/gym/members_bulk_add.html",
+        {
+            "form": form,
+            "business": business,
+            "title": "Bulk Add Members",
+        },
+    )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GYM)
+def members_bulk_add_results(request):
+    """Show detailed results of bulk member creation"""
+    business = get_active_business(request)
+    
+    results = request.session.get("bulk_add_results")
+    if not results:
+        messages.info(request, "No bulk add results to display")
+        return redirect("gym:members_list")
+    
+    # Clear from session
+    del request.session["bulk_add_results"]
+    
+    return render(
+        request,
+        "inventory/gym/members_bulk_add_results.html",
+        {
+            "business": business,
+            "results": results,
+            "title": "Bulk Add Results",
+        },
     )

@@ -3,6 +3,10 @@
 
 {% block title %}Members - {{ business.name }}{% endblock %}
 
+{% block extra_js %}
+<script src="{% static 'js/gym-member-delete.js' %}"></script>
+{% endblock %}
+
 {% block extra_css %}
 <style>
     /* Premium Gym Members List Styling */
@@ -241,7 +245,7 @@
                     </thead>
                     <tbody>
                         {% for member in members %}
-                        <tr>
+                        <tr data-member-id="{{ member.id }}">
                             <td>
                                 <input type="checkbox" class="member-checkbox member-select" data-member-id="{{ member.id }}" onclick="updateSelectAllState()">
                             </td>
@@ -344,6 +348,15 @@
                                             </button>
                                         </form>
                                     {% endif %}
+                                    <button type="button" 
+                                            class="action-btn btn-sm js-delete-member" 
+                                            style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);"
+                                            data-member-id="{{ member.id }}"
+                                            data-member-name="{{ member.name }}"
+                                            data-delete-url="{% url 'gym:member_purge' member.id %}"
+                                            title="Delete Member">
+                                        <i class="bi bi-trash-fill"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>

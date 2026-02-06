@@ -571,4 +571,9 @@
     </div>
 </div>
 {% endif %}
+
+{% block extra_js %}
+<!-- Corrections Modal Handler - Ensures delete modal works in production -->
+<script src="{% static 'js/corrections-modal.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}" defer></script>
+{% endblock %}
 {% endblock %}

@@ -644,6 +644,38 @@ class GymTrainer(models.Model):
         return GymPayment.objects.filter(trainer=self, is_active=True).count()
 
 
+def normalize_member_name(name: str) -> str:
+    """
+    Normalize member name for duplicate detection.
+    
+    Rules:
+    - Strip leading/trailing whitespace
+    - Collapse internal whitespace runs to single space
+    - Casefold (unicode-safe lowercase)
+    
+    This ensures "Lydia Majawa", "lydia majawa", and "LYDIA  MAJAWA" 
+    are all treated as the same canonical name.
+    """
+    import re
+    if not name:
+        return ""
+    # Strip and collapse whitespace, then casefold
+    normalized = re.sub(r"\s+", " ", name.strip()).casefold()
+    return normalized
+
+
+class GymMemberManager(models.Manager):
+    """Default manager: excludes soft-deleted members"""
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class GymMemberAllManager(models.Manager):
+    """Manager that includes soft-deleted members (for admin/audit views)"""
+    def get_queryset(self):
+        return super().get_queryset()
+
+
 class GymMember(models.Model):
     """
     Gym member with 30-day rolling membership.
@@ -653,6 +685,14 @@ class GymMember(models.Model):
 
     # Member info
     name = models.CharField(max_length=120)
+    name_canonical = models.CharField(
+        max_length=120,
+        db_index=True,
+        editable=False,
+        blank=True,
+        default="",
+        help_text="Normalized name for duplicate detection (auto-populated)"
+    )
     phone = models.CharField(max_length=20, blank=True, null=True, default=None)
     email = models.EmailField(blank=True, default="")
 
@@ -726,6 +766,46 @@ class GymMember(models.Model):
     is_active = models.BooleanField(default=True, db_index=True)
     is_archived = models.BooleanField(default=False, db_index=True)
 
+    # Soft delete (for duplicate removal / data cleanup)
+    is_deleted = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Soft delete flag - set when member is deleted or merged into another member"
+    )
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="When this member was soft-deleted"
+    )
+    deleted_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="gym_members_deleted",
+        help_text="User who deleted this member"
+    )
+    delete_reason = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Reason for deletion (e.g., 'duplicate', 'entered_by_mistake', 'merged_into_X')"
+    )
+    delete_notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Additional notes about why this member was deleted"
+    )
+    merged_into = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="merged_duplicates",
+        help_text="If this member was merged, reference to the canonical member"
+    )
+
     # Metadata
     joined_at = models.DateTimeField(default=timezone.now)
     archived_at = models.DateTimeField(null=True, blank=True)
@@ -765,6 +845,10 @@ class GymMember(models.Model):
         help_text="Achievement badge based on check-in consistency",
     )
 
+    # Managers
+    objects = GymMemberManager()  # Default: excludes soft-deleted
+    all_objects = GymMemberAllManager()  # Includes soft-deleted (for admin)
+
     class Meta:
         unique_together = [("business", "phone"), ("business", "member_code")]
         ordering = ["-joined_at"]
@@ -776,13 +860,26 @@ class GymMember(models.Model):
             models.Index(fields=["qr_token"]),
             models.Index(fields=["qr_uuid"]),
             models.Index(fields=["badge_level"]),
+            models.Index(fields=["business", "name_canonical"]),
+            models.Index(fields=["is_deleted"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["business", "name_canonical"],
+                condition=models.Q(is_deleted=False),
+                name="unique_gym_member_name_per_business",
+            )
         ]
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
 
     def save(self, *args, **kwargs):
-        """Auto-generate member_number, qr_token, qr_uuid, public_token, and legacy member_code if not present"""
+        """Auto-generate member_number, qr_token, qr_uuid, public_token, legacy member_code, and name_canonical if not present"""
+        # ALWAYS normalize name to canonical form (critical for duplicate prevention)
+        if self.name:
+            self.name_canonical = normalize_member_name(self.name)
+        
         if not self.member_number and self.business_id:
             self.member_number = self._generate_unique_member_number()
         if not self.qr_token:
@@ -1578,6 +1675,7 @@ class GymMemberAction(models.TextChoices):
     CREATED = "created", "Created"
     UPDATED = "updated", "Updated"
     DELETED = "deleted", "Deleted"
+    PURGED = "purged", "Purged"
     ARCHIVED = "archived", "Archived"
     RESTORED = "restored", "Restored"
 
