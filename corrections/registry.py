@@ -124,12 +124,14 @@ class EntityConfig:
         label: str,
         fields: Dict[str, FieldConfig],
         description: str = '',
+        business_filter_path: str = 'business',
     ):
         self.entity_label = entity_label
         self.model = model
         self.label = label
         self.fields = fields
         self.description = description
+        self.business_filter_path = business_filter_path  # e.g., 'business' or 'member__business'
     
     def get_field(self, field_name: str) -> Optional[FieldConfig]:
         """Get field config by name."""

@@ -557,3 +557,5 @@ class TestWeldingQuoteJavaScriptInitialization:
         assert 'document.body.addEventListener' in html or 'body.addEventListener' in html, \
             "Missing event delegation - buttons won't survive DOM changes!"
 
+
+

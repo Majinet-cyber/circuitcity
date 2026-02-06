@@ -35,6 +35,13 @@ urlpatterns = [
         name='edit_record',
     ),
     
+    # Single record delete (for duplicates/errors)
+    path(
+        '<str:vertical>/entity/<str:entity_label>/<int:object_id>/delete/',
+        views.delete_record,
+        name='delete_record',
+    ),
+    
     # Batch operations
     path(
         '<str:vertical>/batch/<int:batch_id>/',

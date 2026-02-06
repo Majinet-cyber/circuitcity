@@ -37,6 +37,7 @@ from tenants.utils import require_business
 from corrections.models import CorrectionBatch, CorrectionItem, CorrectionAuditLog, CorrectionStatus
 from corrections.registry import registry
 from corrections.service import CorrectionService
+from corrections.utils import get_tenant_scoped_queryset
 from inventory.verticals.base import base_context
 from tenants.utils import get_active_business
 
@@ -134,17 +135,29 @@ def browse_entity(request: HttpRequest, vertical: str, entity_label: str) -> Htt
     - Show potentially erroneous entries (from adapter.find_erroneous_entries)
     - Bulk select for batch creation
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     ctx = base_context(request)
     business = ctx.get("business")
     
     # Validate vertical and entity
     adapter = registry.get_adapter(vertical)
     if not adapter:
+        logger.warning(
+            f"Corrections: Unknown vertical '{vertical}' requested by user {request.user.id}",
+            extra={'request_id': getattr(request, 'request_id', 'N/A')}
+        )
         messages.error(request, f'Vertical "{vertical}" is not registered.')
         return redirect('inventory:inventory_dashboard')
     
     entity_config = adapter.get_entities().get(entity_label)
     if not entity_config:
+        logger.warning(
+            f"Corrections: Unknown entity '{entity_label}' for vertical '{vertical}' "
+            f"requested by user {request.user.id}",
+            extra={'request_id': getattr(request, 'request_id', 'N/A')}
+        )
         messages.error(request, f'Entity "{entity_label}" not found in {vertical}.')
         return redirect('corrections:dashboard', vertical=vertical)
     
@@ -153,30 +166,45 @@ def browse_entity(request: HttpRequest, vertical: str, entity_label: str) -> Htt
     show_errors_only = request.GET.get('errors_only', '') == '1'
     page = request.GET.get('page', 1)
     
-    # Get queryset
-    if show_errors_only:
-        # Use adapter's find_erroneous_entries heuristic
-        queryset = adapter.find_erroneous_entries(
-            entity_label=entity_label,
-            business=business,
-            limit=100,
-        )
-    else:
-        # Show all records for this entity (scoped to business)
-        queryset = entity_config.model.objects.filter(business=business)
-        
-        # Apply search if provided
-        if search_query:
-            # Build Q object for searching across text fields
-            q_filter = Q()
-            for field_name, field_config in entity_config.fields.items():
-                if field_config.field_type == 'string':
-                    q_filter |= Q(**{f'{field_name}__icontains': search_query})
+    # Get queryset (with defensive error handling)
+    try:
+        if show_errors_only:
+            # Use adapter's find_erroneous_entries heuristic
+            queryset = adapter.find_erroneous_entries(
+                entity_label=entity_label,
+                business=business,
+                limit=100,
+            )
+        else:
+            # Show all records for this entity (scoped to business)
+            # Use business_filter_path to handle models with indirect business relation
+            business_filter_key = entity_config.business_filter_path
+            queryset = entity_config.model.objects.filter(**{business_filter_key: business})
             
-            if q_filter:
-                queryset = queryset.filter(q_filter)
-        
-        queryset = queryset.order_by('-id')[:200]
+            # Apply search if provided
+            if search_query:
+                # Build Q object for searching across text fields
+                q_filter = Q()
+                for field_name, field_config in entity_config.fields.items():
+                    if field_config.field_type == 'string':
+                        q_filter |= Q(**{f'{field_name}__icontains': search_query})
+                
+                if q_filter:
+                    queryset = queryset.filter(q_filter)
+            
+            queryset = queryset.order_by('-id')[:200]
+    except Exception as e:
+        logger.error(
+            f"Corrections: Failed to fetch {entity_label} records for {vertical}: {str(e)}",
+            extra={'request_id': getattr(request, 'request_id', 'N/A')},
+            exc_info=True
+        )
+        messages.error(
+            request,
+            f'Error loading {entity_config.label} records. Please contact support. '
+            f'Reference: {getattr(request, "request_id", "N/A")}'
+        )
+        return redirect('corrections:dashboard', vertical=vertical)
     
     # Paginate
     paginator = Paginator(queryset, 25)
@@ -233,12 +261,14 @@ def edit_record(request: HttpRequest, vertical: str, entity_label: str, object_i
         messages.error(request, f'Entity "{entity_label}" not found.')
         return redirect('corrections:dashboard', vertical=vertical)
     
-    # Get the record
-    obj = get_object_or_404(
-        entity_config.model.objects.select_related(),
-        pk=object_id,
+    # Get the record (tenant-scoped using entity's business_filter_path)
+    queryset = get_tenant_scoped_queryset(
+        model=entity_config.model,
+        entity_config=entity_config,
         business=business,
+        queryset=entity_config.model.objects.select_related(),
     )
+    obj = get_object_or_404(queryset, pk=object_id)
     
     if request.method == 'POST':
         return _handle_edit_post(request, vertical, entity_label, object_id, adapter, entity_config, obj, ctx)
@@ -493,11 +523,114 @@ def audit_trail(request: HttpRequest, vertical: str) -> HttpResponse:
     return render(request, 'corrections/audit_trail.html', ctx)
 
 
+# =============================================================================
+# RECORD DELETION (for duplicates/errors)
+# =============================================================================
+
+@csrf_protect
+@require_POST
+@login_required
+@require_business
+@manager_required
+def delete_record(request: HttpRequest, vertical: str, entity_label: str, object_id: int) -> HttpResponse:
+    """
+    Delete a single record (for duplicates or errors).
+    
+    This is a destructive action that:
+    1. Soft-deletes the record (marks as deleted, preserves for audit)
+    2. Reverses any related effects (wallet entries, ledger, etc.)
+    3. Logs the action with full audit trail
+    
+    Requires:
+    - POST with reason and optional notes
+    - Manager permission
+    - Tenant isolation (record must belong to current business)
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    ctx = base_context(request)
+    business = ctx.get("business")
+    
+    # Validate vertical and entity
+    adapter = registry.get_adapter(vertical)
+    if not adapter:
+        messages.error(request, f'Vertical "{vertical}" is not registered.')
+        return redirect('inventory:inventory_dashboard')
+    
+    entity_config = adapter.get_entities().get(entity_label)
+    if not entity_config:
+        messages.error(request, f'Entity "{entity_label}" not found.')
+        return redirect('corrections:dashboard', vertical=vertical)
+    
+    # Get the record (tenant-scoped)
+    queryset = get_tenant_scoped_queryset(
+        model=entity_config.model,
+        entity_config=entity_config,
+        business=business,
+    )
+    obj = get_object_or_404(queryset, pk=object_id)
+    
+    # Get reason and notes
+    reason = request.POST.get('reason', '').strip()
+    notes = request.POST.get('notes', '').strip()
+    
+    if not reason:
+        messages.error(request, 'Deletion reason is required.')
+        return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
+    
+    # Perform deletion based on entity type
+    # Currently only GymPayment is supported
+    if entity_label == 'gym_payment':
+        from corrections.services_deletion import GymPaymentDeletionService
+        
+        service = GymPaymentDeletionService(business=business, user=request.user)
+        result = service.delete_payment(
+            payment=obj,
+            reason=reason,
+            notes=notes,
+            hard_delete=False,  # Always soft delete for safety
+        )
+        
+        if result.success:
+            messages.success(
+                request,
+                f'{entity_config.label} #{object_id} deleted successfully. '
+                f'{result.wallet_entries_removed} wallet entries removed.'
+            )
+            logger.info(
+                f"User {request.user.id} deleted {entity_label} #{object_id} "
+                f"(reason: {reason})",
+                extra={
+                    'user_id': request.user.id,
+                    'business_id': business.id,
+                    'entity_label': entity_label,
+                    'object_id': object_id,
+                    'reason': reason,
+                }
+            )
+            return redirect('corrections:browse_entity', vertical=vertical, entity_label=entity_label)
+        else:
+            messages.error(request, f'Failed to delete: {result.message}')
+            for error in result.errors[:3]:  # Show first 3 errors
+                messages.warning(request, error)
+            return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
+    else:
+        # Entity type doesn't support deletion yet
+        messages.error(
+            request,
+            f'Deletion is not yet supported for {entity_config.label}. '
+            f'Please contact support if you need to remove this record.'
+        )
+        return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
+
+
 # Export views
 __all__ = [
     'corrections_dashboard',
     'browse_entity',
     'edit_record',
+    'delete_record',
     'batch_detail',
     'batch_apply',
     'batch_rollback',

@@ -501,6 +501,161 @@ class TestCorrectionsViewRendering(TestCase):
         self.assertContains(response, 'Gym Member')
 
 
+class TestGymPaymentCorrections(TestCase):
+    """
+    Regression test for gym_payment entity corrections.
+    
+    This tests the fix for the error boundary issue where GymPayment
+    has no direct 'business' field (it's accessed via member__business).
+    """
+    
+    def setUp(self):
+        """Create test user, business, and gym payment data."""
+        self.user = User.objects.create_user(
+            username='manager@test.com',
+            email='manager@test.com',
+            password='testpass123'
+        )
+        self.business = Business.objects.create(
+            name='Test Gym',
+            business_kind='gym',
+        )
+        self.location = Location.objects.create(
+            business=self.business,
+            name='Main Location',
+        )
+        # Create manager membership
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role='MANAGER',
+            is_active=True,
+        )
+        self.client = Client()
+        self.client.login(username='manager@test.com', password='testpass123')
+        
+        # Set active business in session
+        session = self.client.session
+        session['active_business_id'] = self.business.id
+        session['biz_id'] = self.business.id
+        session.save()
+        
+        # Create a gym member
+        from datetime import date, timedelta
+        self.member = GymMember.objects.create(
+            business=self.business,
+            name='Jane Smith',
+            phone='0999888777',
+            membership_fee=Decimal('55000.00'),
+        )
+        
+        # Create a gym payment
+        today = date.today()
+        self.payment = GymPayment.objects.create(
+            member=self.member,
+            membership_amount=Decimal('55000.00'),
+            trainer_fee=Decimal('10000.00'),
+            amount=Decimal('65000.00'),
+            payment_method='CASH',
+            start_date=today,
+            end_date=today + timedelta(days=30),
+            paid_by=self.user,
+        )
+    
+    def test_gym_payment_entity_registered(self):
+        """Test that gym_payment entity is registered in gym adapter."""
+        adapter = registry.get_adapter('gym')
+        entities = adapter.get_entities()
+        
+        self.assertIn('gym_payment', entities)
+        
+        # Check entity config
+        gym_payment = entities['gym_payment']
+        self.assertEqual(gym_payment.model, GymPayment)
+        self.assertEqual(gym_payment.business_filter_path, 'member__business')
+    
+    def test_browse_gym_payment_entity_no_crash(self):
+        """
+        Regression test: /corrections/gym/entity/gym_payment/ should not crash.
+        
+        This was causing "We hit a snag" error because GymPayment has no direct
+        business field - it's accessed via member__business.
+        """
+        url = reverse('corrections:browse_entity', kwargs={
+            'vertical': 'gym',
+            'entity_label': 'gym_payment'
+        })
+        response = self.client.get(url)
+        
+        # Should return 200, not 500
+        self.assertEqual(
+            response.status_code, 
+            200,
+            f"Expected 200, got {response.status_code}. "
+            f"This indicates the business_filter_path fix is not working."
+        )
+        
+        # Should contain expected content
+        self.assertContains(response, 'Gym Payment')
+        self.assertContains(response, 'Jane Smith')
+    
+    def test_browse_gym_payment_filters_by_business(self):
+        """Test that gym_payment browse only shows payments for current business."""
+        # Create another business with its own member and payment
+        other_business = Business.objects.create(
+            name='Other Gym',
+            business_kind='gym',
+        )
+        other_member = GymMember.objects.create(
+            business=other_business,
+            name='Other Member',
+            phone='0111222333',
+            membership_fee=Decimal('50000.00'),
+        )
+        from datetime import date, timedelta
+        today = date.today()
+        other_payment = GymPayment.objects.create(
+            member=other_member,
+            membership_amount=Decimal('50000.00'),
+            trainer_fee=Decimal('0.00'),
+            amount=Decimal('50000.00'),
+            payment_method='CASH',
+            start_date=today,
+            end_date=today + timedelta(days=30),
+        )
+        
+        # Browse gym_payment for our business
+        url = reverse('corrections:browse_entity', kwargs={
+            'vertical': 'gym',
+            'entity_label': 'gym_payment'
+        })
+        response = self.client.get(url)
+        
+        # Should show our payment
+        self.assertContains(response, 'Jane Smith')
+        
+        # Should NOT show other business's payment
+        self.assertNotContains(response, 'Other Member')
+    
+    def test_unknown_entity_shows_friendly_error(self):
+        """Test that unknown entity slug shows friendly error, not crash."""
+        url = reverse('corrections:browse_entity', kwargs={
+            'vertical': 'gym',
+            'entity_label': 'unknown_entity_xyz'
+        })
+        response = self.client.get(url)
+        
+        # Should redirect with error message, not crash
+        self.assertEqual(response.status_code, 302)
+        
+        # Follow redirect
+        response = self.client.get(url, follow=True)
+        
+        # Should show error message
+        messages_list = list(response.context['messages'])
+        self.assertTrue(any('not found' in str(m).lower() for m in messages_list))
+
+
 class TestCorrectionsSidebarGeneration(TestCase):
     """Test that sidebar link for Data Correction is generated correctly."""
     

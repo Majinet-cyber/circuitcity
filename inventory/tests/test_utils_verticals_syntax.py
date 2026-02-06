@@ -152,3 +152,5 @@ class UtilsVerticalsSyntaxTest(TestCase):
                         f"{vertical} sidebar item #{idx} missing '{required_key}': {item}"
                     )
 
+
+

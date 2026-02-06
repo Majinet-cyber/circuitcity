@@ -173,6 +173,59 @@
         background: #f8fafc;
     }
     
+    .btn-premium-danger {
+        background: white;
+        color: #dc2626;
+        padding: 12px 32px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        border: 2px solid #fecaca;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .btn-premium-danger:hover {
+        border-color: #dc2626;
+        background: #fef2f2;
+        color: #dc2626;
+    }
+    
+    /* Delete Modal */
+    .delete-modal .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .delete-modal .modal-header {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-bottom: 2px solid #dc2626;
+        border-radius: 20px 20px 0 0;
+        padding: 20px 24px;
+    }
+    
+    .delete-modal .modal-title {
+        color: #991b1b;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .delete-modal .modal-body {
+        padding: 24px;
+    }
+    
+    .delete-modal .alert-danger {
+        background: #fef2f2;
+        border: 2px solid #fecaca;
+        border-radius: 12px;
+        color: #991b1b;
+    }
+    
     /* History Card */
     .history-card {
         background: white;
@@ -392,7 +445,7 @@
                             {% endfor %}
                         </div>
                         
-                        <div class="d-flex gap-3 mt-4">
+                        <div class="d-flex gap-3 mt-4 flex-wrap">
                             <button type="submit" class="btn-premium-primary">
                                 <i class="bi bi-check-lg"></i> Apply Correction
                             </button>
@@ -400,6 +453,14 @@
                                class="btn-premium-secondary">
                                 <i class="bi bi-x-lg"></i> Cancel
                             </a>
+                            
+                            {% if entity_label == 'gym_payment' %}
+                            <!-- Delete button (for duplicates) -->
+                            <button type="button" class="btn-premium-danger ms-auto" 
+                                    data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                <i class="bi bi-trash"></i> Delete (Duplicate)
+                            </button>
+                            {% endif %}
                         </div>
                     </form>
                 </div>
@@ -441,4 +502,73 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+{% if entity_label == 'gym_payment' %}
+<div class="modal fade delete-modal" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Delete Payment Record
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger" role="alert">
+                    <strong><i class="bi bi-shield-exclamation"></i> Warning:</strong> This will permanently remove the payment and revert any linked wallet/ledger effects.
+                </div>
+                
+                <form method="post" action="{% url 'corrections:delete_record' vertical=vertical entity_label=entity_label object_id=obj.pk %}" id="deleteForm">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="delete_reason" class="form-label fw-bold">
+                            Reason for Deletion <span class="text-danger">*</span>
+                        </label>
+                        <select name="reason" id="delete_reason" class="form-select" required>
+                            <option value="">-- Select reason --</option>
+                            <option value="duplicate">Duplicate Payment</option>
+                            <option value="wrong_member">Wrong Member</option>
+                            <option value="wrong_amount">Wrong Amount</option>
+                            <option value="data_entry_error">Data Entry Error</option>
+                            <option value="other">Other (specify in notes)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="delete_notes" class="form-label fw-bold">
+                            Additional Notes
+                        </label>
+                        <textarea name="notes" id="delete_notes" class="form-control" rows="3" 
+                                  placeholder="Provide additional details about why this payment is being deleted..."></textarea>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> This will be logged in the audit trail.
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-warning" role="alert">
+                        <strong><i class="bi bi-info-circle"></i> What will happen:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Payment record will be marked as deleted</li>
+                            <li>Related wallet entries will be removed</li>
+                            <li>Action will be logged with full audit trail</li>
+                            <li>Record can be reviewed by admins later</li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </button>
+                <button type="submit" form="deleteForm" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Confirm Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

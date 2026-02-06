@@ -113,6 +113,7 @@ class GymAdapter(VerticalAdapter):
                 model=GymPayment,
                 label='Gym Payment',
                 description='Membership payment with optional trainer fee',
+                business_filter_path='member__business',  # GymPayment has no direct business field
                 fields={
                     'membership_amount': FieldConfig(
                         field_name='membership_amount',

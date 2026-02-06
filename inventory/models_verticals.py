@@ -1423,6 +1423,22 @@ class GymMember(models.Model):
         return badges
 
 
+class GymPaymentManager(models.Manager):
+    """Manager for GymPayment that excludes soft-deleted records by default."""
+    
+    def get_queryset(self):
+        """Exclude soft-deleted payments by default."""
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class GymPaymentAllManager(models.Manager):
+    """Manager that includes soft-deleted payments (for admin/audit views)."""
+    
+    def get_queryset(self):
+        """Include all payments, even soft-deleted ones."""
+        return super().get_queryset()
+
+
 class GymPayment(models.Model):
     """
     Records a membership payment with optional trainer fee.
@@ -1488,6 +1504,42 @@ class GymPayment(models.Model):
     )
     paid_at = models.DateTimeField(default=timezone.now, db_index=True)
     notes = models.TextField(blank=True, default="")
+
+    # Soft delete fields (for corrections framework)
+    is_deleted = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Soft delete flag - set by corrections when payment is removed as duplicate"
+    )
+    deleted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="When this payment was soft-deleted"
+    )
+    deleted_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="gym_payments_deleted",
+        help_text="User who deleted this payment"
+    )
+    delete_reason = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text="Reason for deletion (e.g., 'duplicate', 'wrong_member', 'wrong_amount')"
+    )
+    delete_notes = models.TextField(
+        blank=True,
+        default="",
+        help_text="Additional notes about why this payment was deleted"
+    )
+
+    # Managers
+    objects = GymPaymentManager()  # Default: excludes soft-deleted
+    all_objects = GymPaymentAllManager()  # Includes soft-deleted (for admin)
 
     class Meta:
         ordering = ["-paid_at"]
