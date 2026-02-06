@@ -2,12 +2,16 @@
 """
 Gamified wizard flow for adding gym members.
 """
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 
+from core.validators import clean_phone_number
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
@@ -109,14 +113,16 @@ def _wizard_step_details(request, business, gym_settings):
         phone = request.POST.get("phone", "").strip()
         email = request.POST.get("email", "").strip()
 
+        # Normalize phone using system helper
+        phone = clean_phone_number(phone) if phone else None
+
         # Validation
         errors = []
         if not name:
             errors.append("Name is required")
-        if not phone:
-            errors.append("Phone number is required")
+        # Phone is now optional - removed requirement check
 
-        # Check for duplicate phone
+        # Check for duplicate phone (only if phone provided)
         if phone and GymMember.objects.filter(business=business, phone=phone, is_archived=False).exists():
             errors.append(f"A member with phone {phone} already exists")
 
@@ -205,34 +211,77 @@ def _wizard_step_confirm(request, business, gym_settings):
     """Step 3: Confirm and create member"""
     wizard_data = _get_wizard_data(request)
 
-    # Check if previous steps completed
-    if not wizard_data.get("name") or not wizard_data.get("phone"):
+    # Check if previous steps completed (name is required, phone is optional)
+    if not wizard_data.get("name"):
         return redirect(f"{request.path}?step=1")
 
     if request.method == "POST":
         mark_as_paid = request.POST.get("mark_as_paid") == "yes"
 
-        # Create member
-        with transaction.atomic():
-            member = GymMember(
+        # Normalize phone from wizard data
+        phone = wizard_data.get("phone", "").strip() if wizard_data.get("phone") else None
+        phone = clean_phone_number(phone) if phone else None
+
+        # IDEMPOTENT CHECK: If phone provided, check for existing member
+        if phone:
+            existing_member = GymMember.objects.filter(
                 business=business,
-                name=wizard_data["name"],
-                phone=wizard_data["phone"],
-                email=wizard_data.get("email", ""),
-                membership_fee=gym_settings.default_membership_price,
-            )
+                phone=phone,
+                is_archived=False
+            ).first()
+            
+            if existing_member:
+                # Member already exists - redirect to detail page instead of crashing
+                messages.info(
+                    request,
+                    f"Member '{existing_member.name}' with this phone already exists."
+                )
+                # Clear wizard and redirect to member detail
+                _clear_wizard_data(request)
+                return redirect(reverse("gym:member_detail", kwargs={"member_id": existing_member.id}))
 
-            # Set trainer if selected
-            if wizard_data.get("trainer_id"):
-                try:
-                    trainer = GymTrainer.objects.get(id=wizard_data["trainer_id"], business=business)
-                    member.trainer = trainer
-                    member.has_trainer = True
-                    member.trainer_fee = gym_settings.default_trainer_fee
-                except GymTrainer.DoesNotExist:
-                    pass
+        # Create member (with IntegrityError safety net)
+        try:
+            with transaction.atomic():
+                member = GymMember(
+                    business=business,
+                    name=wizard_data["name"],
+                    phone=phone,  # Will be NULL if not provided
+                    email=wizard_data.get("email", ""),
+                    membership_fee=gym_settings.default_membership_price or Decimal("0.00"),
+                )
 
-            member.save()
+                # Set trainer if selected
+                if wizard_data.get("trainer_id"):
+                    try:
+                        trainer = GymTrainer.objects.get(id=wizard_data["trainer_id"], business=business)
+                        member.trainer = trainer
+                        member.has_trainer = True
+                        member.trainer_fee = gym_settings.default_trainer_fee or Decimal("0.00")
+                    except GymTrainer.DoesNotExist:
+                        pass
+
+                member.save()
+        except Exception as e:
+            # Final safety net: if IntegrityError on unique constraint, find existing and redirect
+            from django.db import IntegrityError
+            if isinstance(e, IntegrityError) and phone:
+                existing_member = GymMember.objects.filter(
+                    business=business,
+                    phone=phone,
+                    is_archived=False
+                ).first()
+                
+                if existing_member:
+                    messages.warning(
+                        request,
+                        f"This member already exists. Showing existing record."
+                    )
+                    _clear_wizard_data(request)
+                    return redirect(reverse("gym:member_detail", kwargs={"member_id": existing_member.id}))
+            
+            # Re-raise if not the duplicate case we can handle
+            raise
 
             # Activate membership if paid
             if mark_as_paid:

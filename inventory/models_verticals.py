@@ -653,7 +653,7 @@ class GymMember(models.Model):
 
     # Member info
     name = models.CharField(max_length=120)
-    phone = models.CharField(max_length=20, blank=True, default="")
+    phone = models.CharField(max_length=20, blank=True, null=True, default=None)
     email = models.EmailField(blank=True, default="")
 
     # Unique identifiers for member

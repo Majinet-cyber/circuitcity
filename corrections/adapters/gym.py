@@ -226,40 +226,55 @@ class GymAdapter(VerticalAdapter):
         """
         if entity_label == 'gym_payment':
             # Find payments with calculation errors
+            # DEFENSIVE: Handle cases where member might be None or duplicate
             today = timezone.now().date()
-            return GymPayment.objects.filter(
-                member__business=business,
-                is_active=True,
-            ).annotate(
-                calculated_total=F('membership_amount') + F('trainer_fee')
-            ).filter(
-                # Amount doesn't match sum (with 1 MWK tolerance for rounding)
-                Q(amount__lt=F('calculated_total') - Decimal('1')) |
-                Q(amount__gt=F('calculated_total') + Decimal('1')) |
-                # Start date is in the future (data error)
-                Q(start_date__gt=today)
-            ).select_related('member', 'trainer').order_by('-paid_at')[:limit]
+            try:
+                return GymPayment.objects.filter(
+                    member__business=business,
+                    member__isnull=False,  # Skip orphaned payments
+                    is_active=True,
+                ).annotate(
+                    calculated_total=F('membership_amount') + F('trainer_fee')
+                ).filter(
+                    # Amount doesn't match sum (with 1 MWK tolerance for rounding)
+                    Q(amount__lt=F('calculated_total') - Decimal('1')) |
+                    Q(amount__gt=F('calculated_total') + Decimal('1')) |
+                    # Start date is in the future (data error)
+                    Q(start_date__gt=today)
+                ).select_related('member', 'trainer').order_by('-paid_at')[:limit]
+            except Exception:
+                # If query fails (e.g., due to data integrity issues), return empty queryset
+                return GymPayment.objects.none()
         
         elif entity_label == 'gym_member':
             # Find members with data issues
+            # DEFENSIVE: Handle cases where data might be corrupted
             today = timezone.now().date()
-            return GymMember.objects.filter(
-                business=business,
-                is_active=True,
-            ).filter(
-                Q(membership_fee__lt=0) |  # Negative fee
-                Q(trainer_fee__lt=0) |  # Negative trainer fee
-                Q(membership_end__lt=today, status='ACTIVE')  # Expired but still active
-            ).order_by('-joined_at')[:limit]
+            try:
+                return GymMember.objects.filter(
+                    business=business,
+                    is_active=True,
+                ).filter(
+                    Q(membership_fee__lt=0) |  # Negative fee
+                    Q(trainer_fee__lt=0) |  # Negative trainer fee
+                    Q(membership_end__lt=today, status='ACTIVE')  # Expired but still active
+                ).order_by('-joined_at')[:limit]
+            except Exception:
+                # If query fails, return empty queryset
+                return GymMember.objects.none()
         
         elif entity_label == 'gym_trainer':
             # Find trainers with missing contact info
-            return GymTrainer.objects.filter(
-                business=business,
-                is_active=True,
-            ).filter(
-                Q(phone='') & Q(email='')  # No contact info at all
-            ).order_by('-created_at')[:limit]
+            try:
+                return GymTrainer.objects.filter(
+                    business=business,
+                    is_active=True,
+                ).filter(
+                    Q(phone='') & Q(email='')  # No contact info at all
+                ).order_by('-joined_at')[:limit]
+            except Exception:
+                # If query fails, return empty queryset
+                return GymTrainer.objects.none()
         
         else:
             return GymMember.objects.none()
