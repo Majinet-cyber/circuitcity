@@ -92,15 +92,66 @@ def dashboard(request):
     expected_margin = inventory_data["expected_margin"]
 
     # ===== STOCK SUMMARY BY CATEGORY =====
-    # Group products by category and sum quantities
-    stock_summary = (
-        MerchProduct.objects.filter(business=business, kind=BusinessKind.CLOTHING, is_active=True, is_archived=False)
-        .values("category")
-        .annotate(total_items=Count("id"), total_quantity=Sum("quantity_in_stock"))
-        .order_by("-total_quantity")
+    # FIXED: Aggregate BOTH tracked units (ClothingBarcodeUnit) AND common stock (MerchProduct.quantity_in_stock)
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    from collections import defaultdict
+    
+    # Initialize category aggregation storage
+    category_data = defaultdict(lambda: {"tracked_units": 0, "tracked_styles": set(), "common_units": 0, "common_styles": set()})
+    
+    # 1. Aggregate tracked units (barcoded items) by category
+    tracked_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",
+        is_active=True,
     )
-
-    # Format for display
+    
+    # Apply location filter if available
+    if location:
+        tracked_query = tracked_query.filter(location=location)
+    
+    # Group by category and count units and distinct products
+    tracked_summary = tracked_query.values("category").annotate(
+        unit_count=Count("id"),
+        style_count=Count("product_id", distinct=True)
+    )
+    
+    for item in tracked_summary:
+        category = (item["category"] or "other").lower()
+        category_data[category]["tracked_units"] = item["unit_count"]
+        # Note: we can't get the set of product_ids from aggregation, so we use the count directly
+        category_data[category]["tracked_styles_count"] = item["style_count"]
+    
+    # 2. Aggregate common stock (non-tracked products with quantity_in_stock) by category
+    common_query = MerchProduct.objects.filter(
+        business=business, 
+        kind=BusinessKind.CLOTHING, 
+        is_active=True, 
+        is_archived=False,
+        quantity_in_stock__gt=0,
+    )
+    
+    # Apply location filter if MerchProduct has location field (currently it doesn't, so this is future-proof)
+    if location and hasattr(MerchProduct, 'location'):
+        common_query = common_query.filter(location=location)
+    
+    # Exclude products that have tracked units (to avoid double counting)
+    # Products with tracked units should only be counted in tracked_units
+    products_with_tracked_units = tracked_query.values_list("product_id", flat=True).distinct()
+    common_query = common_query.exclude(id__in=products_with_tracked_units)
+    
+    # Group by category and sum quantities
+    common_summary = common_query.values("category").annotate(
+        quantity_sum=Sum("quantity_in_stock"),
+        style_count=Count("id")
+    )
+    
+    for item in common_summary:
+        category = (item["category"] or "other").lower()
+        category_data[category]["common_units"] = item["quantity_sum"] or 0
+        category_data[category]["common_styles_count"] = item["style_count"]
+    
+    # 3. Merge and format for display
     stock_summary_display = []
     category_icons = {
         "shoes": "👞",
@@ -117,16 +168,32 @@ def dashboard(request):
         "handbags": "👜",
         "schoolbags": "🎒",
     }
-
-    for item in stock_summary:
-        category = item["category"] or "other"
+    
+    # Sort categories by total stock (tracked + common) descending
+    sorted_categories = sorted(
+        category_data.items(),
+        key=lambda x: x[1]["tracked_units"] + x[1]["common_units"],
+        reverse=True
+    )
+    
+    for category, data in sorted_categories:
+        # Calculate totals
+        total_units = data["tracked_units"] + data["common_units"]
+        total_styles = data.get("tracked_styles_count", 0) + data.get("common_styles_count", 0)
+        
+        # Skip categories with zero stock
+        if total_units == 0:
+            continue
+        
         icon = category_icons.get(category, "👕")
         stock_summary_display.append(
             {
                 "category": category.title(),
                 "icon": icon,
-                "total_items": item["total_items"],
-                "total_quantity": item["total_quantity"] or 0,
+                "total_items": total_styles,  # Total number of distinct product styles
+                "total_quantity": total_units,  # Total units in stock (tracked + common)
+                "tracked_quantity": data["tracked_units"],  # Barcoded units
+                "common_quantity": data["common_units"],  # Common stock units
             }
         )
 
@@ -1104,13 +1171,115 @@ def sales_export_csv(request):
 def fast_sell(request):
     """
     Fast Sell page for clothing - barcode scanner + instant sell.
-    Uses front camera for barcode scanning with BarcodeDetector API fallback.
-
-    Fixed: Ensures all context variables are present to prevent 500 errors.
+    Supports BOTH tracked (barcoded) units AND common stock.
+    
+    FIXED: Now queries and displays barcoded items in stock correctly.
     """
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    
     # Use base_context which provides role flags, business, and all standard context
     ctx = base.base_context(request)
     business = ctx.get("business")
+    location = ctx.get("location")
+
+    # ========================================================================
+    # TRACKED UNITS: Get in-stock barcode units (authoritative source)
+    # ========================================================================
+    barcode_units_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",  # CRITICAL: Must be IN_STOCK (not SOLD)
+        is_active=True,
+    )
+    
+    # Apply location filter if available
+    if location:
+        barcode_units_query = barcode_units_query.filter(location=location)
+    
+    # Get distinct products that have barcoded units in stock
+    # Group by product attributes for display
+    barcode_units = barcode_units_query.select_related("product").order_by("-created_at")[:50]
+    
+    # Build available items list (one entry per unique product/size combo)
+    available_items = []
+    seen_combos = set()
+    
+    for unit in barcode_units:
+        # Create unique key for product + size combination
+        combo_key = (
+            unit.product.id if unit.product else None,
+            unit.size,
+            unit.category,
+            unit.brand,
+        )
+        
+        if combo_key not in seen_combos:
+            seen_combos.add(combo_key)
+            
+            # Count how many units of this combo are in stock
+            units_count = barcode_units_query.filter(
+                product=unit.product if unit.product else None,
+                size=unit.size,
+                category=unit.category,
+                brand=unit.brand,
+            ).count()
+            
+            available_items.append({
+                "product": unit.product,
+                "size": unit.size,
+                "category": unit.category,
+                "brand": unit.brand,
+                "color": unit.color,
+                "selling_price": unit.selling_price,
+                "units_in_stock": units_count,
+                "display_name": f"{unit.brand} {unit.category} - Size {unit.size}" if unit.brand else f"{unit.category} - Size {unit.size}",
+                "kind": "tracked",  # Mark as tracked for template
+            })
+    
+    # Calculate total barcoded units available
+    total_barcoded_units = barcode_units_query.count()
+    
+    # ========================================================================
+    # COMMON STOCK: Get common stock products with quantity > 0
+    # ========================================================================
+    # Build base queryset WITHOUT slicing first
+    common_products_query = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__gt=0,
+    )
+    
+    # Filter out products that have tracked units (to avoid confusion)
+    # Products with tracked units should only be sold via tracked units
+    products_with_tracked_units = barcode_units_query.values_list("product_id", flat=True).distinct()
+    
+    # Apply exclusion BEFORE slicing
+    common_products_query = common_products_query.exclude(id__in=products_with_tracked_units)
+    
+    # Apply ordering and slicing at the very end
+    common_products = common_products_query.order_by("-quantity_in_stock", "name")[:50]
+    
+    # Build common stock items list
+    common_items = []
+    for product in common_products:
+        display_name = product.name
+        if product.size:
+            display_name = f"{display_name} - {product.size}"
+        if product.color:
+            display_name = f"{display_name} ({product.color})"
+        
+        common_items.append({
+            "product": product,
+            "product_id": product.id,
+            "name": display_name,
+            "category": product.category or "",
+            "size": product.size or "",
+            "color": product.color or "",
+            "selling_price": product.selling_price or Decimal("0.00"),
+            "quantity_in_stock": product.quantity_in_stock or 0,
+            "kind": "common",  # Mark as common for template
+        })
 
     # Defensively ensure all required context variables exist
     # This prevents template errors from missing variables in partials
@@ -1132,6 +1301,10 @@ def fast_sell(request):
             "page_title": "Fast Sell",
             "vertical": "clothing",
             "vertical_name": "Clothing",
+            "available_items": available_items,  # Tracked units
+            "common_items": common_items,  # Common stock
+            "total_barcoded_units": total_barcoded_units,
+            "total_common_items": len(common_items),
         }
     )
 
@@ -1388,6 +1561,292 @@ def fast_sell_kpis_api(request):
     )
 
     return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_lookup_unified_api(request):
+    """
+    API: Unified lookup for Fast Sell - supports BOTH tracked units AND common stock.
+    
+    GET /verticals/clothing/api/fast-sell/lookup-unified/?code=XXXX
+    
+    Returns:
+        - found: bool
+        - kind: "tracked_unit" OR "common_item"
+        - item: dict with product/unit details
+        - error: str (if not found)
+    """
+    from django.http import JsonResponse
+    from inventory.services.clothing_barcode_service import lookup_for_fast_sell_unified
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    location = ctx.get("location")
+    
+    code = request.GET.get("code", "").strip()
+    
+    if not code:
+        return JsonResponse({"ok": False, "found": False, "error": "Code required"}, status=400)
+    
+    result = lookup_for_fast_sell_unified(business=business, code=code, location=location)
+    
+    return JsonResponse({"ok": True, **result})
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_sell_unified_api(request):
+    """
+    API: Unified sell endpoint for Fast Sell - handles BOTH tracked units AND common stock.
+    
+    POST /verticals/clothing/api/fast-sell/sell-unified/
+    
+    Payload:
+        - kind: "tracked_unit" OR "common_item"
+        - tracked_unit_id: int (required if kind="tracked_unit")
+        - product_id: int (required if kind="common_item")
+        - quantity: int (optional, default 1, only used for common items)
+        - payment_method: str (optional, default "cash")
+    
+    Returns:
+        - ok: bool
+        - sale_id: int (if ok)
+        - message: str
+        - error: str (if not ok)
+    """
+    from django.http import JsonResponse
+    from django.db import transaction
+    from inventory.services.clothing_barcode_service import create_fast_sell_unified
+    import json
+    
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST required"}, status=405)
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    location = ctx.get("location")
+    
+    if not location:
+        # Try to get default location
+        from inventory.models import Location
+        location = (
+            Location.objects.filter(business=business, is_default=True).first()
+            or Location.objects.filter(business=business).first()
+        )
+        if not location:
+            return JsonResponse({"ok": False, "error": "No location found for this business"}, status=400)
+    
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    
+    kind = data.get("kind", "").strip()
+    tracked_unit_id = data.get("tracked_unit_id")
+    product_id = data.get("product_id")
+    quantity = int(data.get("quantity", 1))
+    payment_method = data.get("payment_method", "cash")
+    
+    # Validation
+    if kind not in ("tracked_unit", "common_item"):
+        return JsonResponse({"ok": False, "error": "Invalid kind. Must be 'tracked_unit' or 'common_item'"}, status=400)
+    
+    if kind == "tracked_unit" and not tracked_unit_id:
+        return JsonResponse({"ok": False, "error": "tracked_unit_id required for tracked unit sale"}, status=400)
+    
+    if kind == "common_item" and not product_id:
+        return JsonResponse({"ok": False, "error": "product_id required for common item sale"}, status=400)
+    
+    # Create sale
+    result = create_fast_sell_unified(
+        business=business,
+        location=location,
+        user=request.user,
+        kind=kind,
+        tracked_unit_id=tracked_unit_id,
+        product_id=product_id,
+        quantity=quantity,
+        payment_method=payment_method,
+    )
+    
+    if not result.get("ok"):
+        return JsonResponse(result, status=400)
+    
+    return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def fast_sell_resolve_product_api(request):
+    """
+    API: Resolve next available tracked unit for a product (used when clicking product cards).
+    
+    GET /verticals/clothing/api/fast-sell/resolve-product/?product_id=X&size=Y&category=Z&brand=W
+    
+    Returns:
+        - found: bool
+        - unit: dict with tracked unit details (tracked_unit_id, barcode, etc.)
+        - error: str (if not found)
+    """
+    from django.http import JsonResponse
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    location = ctx.get("location")
+    
+    product_id = request.GET.get("product_id", "").strip()
+    size = request.GET.get("size", "").strip()
+    category = request.GET.get("category", "").strip()
+    brand = request.GET.get("brand", "").strip()
+    
+    if not product_id:
+        return JsonResponse({"ok": False, "found": False, "error": "product_id required"}, status=400)
+    
+    # Build query for available tracked units matching the criteria
+    query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",
+        is_active=True,
+    )
+    
+    # Filter by product if we have a valid product_id
+    if product_id and product_id != "None":
+        try:
+            query = query.filter(product_id=int(product_id))
+        except (ValueError, TypeError):
+            pass
+    
+    # Additional filters for product attributes
+    if size:
+        query = query.filter(size=size)
+    if category:
+        query = query.filter(category=category)
+    if brand:
+        query = query.filter(brand=brand)
+    
+    # Apply location filter if available
+    if location:
+        query = query.filter(location=location)
+    
+    # Get next available unit (oldest first = FIFO)
+    unit = query.order_by("created_at", "id").first()
+    
+    if not unit:
+        return JsonResponse({
+            "ok": True,
+            "found": False,
+            "error": "No available units found for this product"
+        })
+    
+    # Build display name
+    display_name = f"{unit.category.title() if unit.category else 'Item'} - Size {unit.size}"
+    if unit.brand:
+        display_name = f"{unit.brand} {display_name}"
+    if unit.color:
+        display_name = f"{display_name} ({unit.color})"
+    
+    return JsonResponse({
+        "ok": True,
+        "found": True,
+        "unit": {
+            "tracked_unit_id": unit.id,
+            "barcode": unit.barcode,
+            "name": display_name,
+            "size": unit.size,
+            "category": unit.category,
+            "color": unit.color or "",
+            "brand": unit.brand or "",
+            "selling_price": float(unit.selling_price),
+            "cost_price": float(unit.cost_price),
+        }
+    })
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CLOTHING)
+def tracked_units_list(request, product_id):
+    """
+    Show tracked/barcoded units for a specific product.
+    Accessible from Hub page when user clicks "Tracked (X units)" pill.
+    """
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    location = ctx.get("location")
+    
+    # Get product
+    try:
+        product = MerchProduct.objects.get(
+            pk=product_id,
+            business=business,
+            kind=BusinessKind.CLOTHING,
+            is_active=True,
+        )
+    except MerchProduct.DoesNotExist:
+        messages.error(request, "Product not found")
+        return redirect("verticals:clothing_hub")
+    
+    # Filter by status (default: AVAILABLE)
+    status_filter = request.GET.get("status", "available").lower()
+    
+    # Get tracked units
+    units_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        product=product,
+        is_active=True,
+    )
+    
+    if location:
+        units_query = units_query.filter(location=location)
+    
+    if status_filter == "available":
+        units_query = units_query.filter(status="IN_STOCK")
+    elif status_filter == "sold":
+        units_query = units_query.filter(status="SOLD")
+    # "all" = no filter
+    
+    units = units_query.order_by("-created_at")
+    
+    # Stats
+    total_units = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        product=product,
+        is_active=True,
+    ).count()
+    
+    available_count = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        product=product,
+        status="IN_STOCK",
+        is_active=True,
+    ).count()
+    
+    sold_count = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        product=product,
+        status="SOLD",
+        is_active=True,
+    ).count()
+    
+    ctx.update({
+        "product": product,
+        "units": units,
+        "status_filter": status_filter,
+        "total_units": total_units,
+        "available_count": available_count,
+        "sold_count": sold_count,
+        "page_title": f"Tracked Units - {product.name}",
+        "active_tab": "hub",
+    })
+    
+    return render(request, "verticals/clothing/tracked_units_list.html", ctx)
 
 
 @login_required

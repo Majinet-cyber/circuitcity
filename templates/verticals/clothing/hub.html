@@ -132,7 +132,13 @@
       <!-- Badges: Tracked (barcoded) / Common -->
       <div style="margin-bottom:12px">
         {% if panel.is_tracked %}
-        <span class="badge-tracked">🏷️ Tracked ({{ panel.barcode_units }} units)</span>
+        <a href="{% url 'verticals:clothing_tracked_units_list' panel.product.id %}" 
+           class="badge-tracked" 
+           style="text-decoration:none; cursor:pointer; transition: all 0.2s;"
+           onmouseover="this.style.background='#bfdbfe'; this.style.transform='scale(1.05)'"
+           onmouseout="this.style.background='#dbeafe'; this.style.transform='scale(1)'">
+          🏷️ Tracked ({{ panel.barcode_units }} units)
+        </a>
         {% endif %}
         {% if panel.is_common %}
         <span class="badge-common">📦 Common ({{ panel.common_stock }})</span>

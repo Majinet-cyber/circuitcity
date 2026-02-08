@@ -1,0 +1,1173 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add {{ category_display }} · Clothing{% endblock %}
+
+{% block content %}
+
+<style>
+/* ============================================================================
+   GAMIFIED CLOTHING ADD PRODUCT - Card-based Premium UI
+   ============================================================================ */
+
+:root {
+  --primary: #0ea5e9;
+  --primary-dark: #0284c7;
+  --success: #10b981;
+  --success-dark: #059669;
+  --danger: #ef4444;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.gamified-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  min-height: 100vh;
+}
+
+/* Back Link */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--gray-600);
+  text-decoration: none;
+  font-weight: 600;
+  margin-bottom: 20px;
+  transition: color 0.2s;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+/* Page Header */
+.page-header {
+  background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%);
+  color: white;
+  padding: 32px;
+  border-radius: 24px;
+  margin-bottom: 32px;
+  box-shadow: var(--shadow-xl);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.category-icon-large {
+  font-size: 4rem;
+  line-height: 1;
+}
+
+.header-text h1 {
+  margin: 0 0 8px 0;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 800;
+}
+
+.header-text p {
+  margin: 0;
+  opacity: 0.95;
+  font-size: 1.05rem;
+}
+
+/* Progress Stepper */
+.stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.step-indicator {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  transition: all 0.3s;
+  position: relative;
+  z-index: 2;
+}
+
+.step.active .step-indicator {
+  background: white;
+  color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.step.completed .step-indicator {
+  background: var(--success);
+  color: white;
+}
+
+.step-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+  text-align: center;
+}
+
+.step-line {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  right: -50%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.3);
+  z-index: 1;
+}
+
+.step.completed .step-line {
+  background: var(--success);
+}
+
+.step:last-child .step-line {
+  display: none;
+}
+
+/* Form Steps Container */
+.form-steps {
+  background: white;
+  border-radius: 24px;
+  padding: 40px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--gray-200);
+  margin-bottom: 24px;
+}
+
+.form-step {
+  display: none;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.form-step.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Step Title */
+.step-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.step-subtitle {
+  font-size: 1rem;
+  color: var(--gray-600);
+  margin-bottom: 32px;
+}
+
+/* Card Grid (for brands, types, sizes, colors) */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.card-grid.large {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+
+.card-grid.small {
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+}
+
+.selection-card {
+  background: var(--gray-50);
+  border: 2px solid var(--gray-200);
+  border-radius: 16px;
+  padding: 20px 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-weight: 600;
+  color: var(--gray-700);
+  user-select: none;
+}
+
+.selection-card:hover {
+  border-color: var(--primary);
+  background: white;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+
+.selection-card.selected {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.3);
+  transform: translateY(-2px);
+}
+
+.selection-card.selected:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+}
+
+.selection-card.small {
+  padding: 12px 8px;
+  font-size: 0.9rem;
+}
+
+/* Stock Mode Cards (special styling) */
+.stock-mode-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.stock-mode-card {
+  background: var(--gray-50);
+  border: 3px solid var(--gray-200);
+  border-radius: 20px;
+  padding: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.stock-mode-card:hover {
+  border-color: var(--primary);
+  background: white;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.stock-mode-card.selected {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.2);
+}
+
+.stock-mode-icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.stock-mode-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--gray-900);
+  margin-bottom: 8px;
+}
+
+.stock-mode-desc {
+  font-size: 0.95rem;
+  color: var(--gray-600);
+  line-height: 1.5;
+}
+
+/* Product Name Preview */
+.product-name-preview {
+  background: linear-gradient(135deg, var(--gray-50) 0%, var(--gray-100) 100%);
+  border: 2px dashed var(--gray-300);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.preview-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.preview-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  word-break: break-word;
+}
+
+.preview-name.empty {
+  color: var(--gray-400);
+  font-style: italic;
+}
+
+.regenerate-btn {
+  background: transparent;
+  border: 1px solid var(--gray-300);
+  color: var(--gray-600);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.regenerate-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Text Input Fields */
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-label {
+  display: block;
+  font-weight: 700;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.form-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+.form-input::placeholder {
+  color: var(--gray-400);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.field-help {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  margin-top: 6px;
+}
+
+.optional-badge {
+  display: inline-block;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Navigation Buttons */
+.step-navigation {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.btn {
+  flex: 1;
+  padding: 16px 32px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-secondary {
+  background: white;
+  color: var(--gray-700);
+  border: 2px solid var(--gray-300);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, #3b82f6 100%);
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(14, 165, 233, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
+  color: white;
+  border: none;
+}
+
+.btn-success:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+}
+
+/* Confetti Animation Container */
+.confetti-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.confetti {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  animation: confetti-fall 2s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+  from {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+/* Search Box (for brands) */
+.search-box {
+  margin-bottom: 20px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 14px 18px;
+  border: 2px solid var(--gray-200);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .gamified-container {
+    padding: 16px;
+  }
+
+  .form-steps {
+    padding: 24px;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+  }
+
+  .card-grid.small {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  }
+
+  .stock-mode-cards {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .stepper {
+    gap: 8px;
+  }
+
+  .step-indicator {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+
+  .step-label {
+    font-size: 0.75rem;
+  }
+}
+</style>
+
+<div class="gamified-container">
+  <a href="{% url 'verticals:clothing_quick_add_step1' %}" class="back-link">
+    ← Back to Categories
+  </a>
+
+  <div class="page-header">
+    <div class="header-content">
+      <div class="category-icon-large">{{ category_icon }}</div>
+      <div class="header-text">
+        <h1>Add {{ category_display }}</h1>
+        <p>Click to select • Feel the flow ✨</p>
+      </div>
+    </div>
+
+    <!-- Progress Stepper -->
+    <div class="stepper">
+      <div class="step active" data-step="1">
+        <div class="step-indicator">1</div>
+        <div class="step-label">Basics</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step" data-step="2">
+        <div class="step-indicator">2</div>
+        <div class="step-label">Details</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step" data-step="3">
+        <div class="step-indicator">3</div>
+        <div class="step-label">Pricing</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Form (hidden inputs for backend compatibility) -->
+  <form method="post" id="mainForm">
+    {% csrf_token %}
+    
+    <!-- Hidden inputs that match backend expectations -->
+    <input type="hidden" name="brand" id="hiddenBrand" value="">
+    <input type="hidden" name="name" id="hiddenName" value="">
+    <input type="hidden" name="size" id="hiddenSize" value="">
+    <input type="hidden" name="color" id="hiddenColor" value="">
+    <input type="hidden" name="selling_price" id="hiddenSellingPrice" value="">
+    <input type="hidden" name="cost_price" id="hiddenCostPrice" value="">
+    <input type="hidden" name="quantity" id="hiddenQuantity" value="0">
+    <input type="hidden" name="barcode" id="hiddenBarcode" value="">
+    <input type="hidden" id="hiddenSubtype" value="">
+
+    <!-- Step 1: Basics (Brand, Type, Size, Color) -->
+    <div class="form-steps">
+      <div class="form-step active" data-step="1">
+        <h2 class="step-title">🏷️ Choose Brand & Type</h2>
+        <p class="step-subtitle">Select the brand and specific type for your product</p>
+
+        <!-- Product Name Preview -->
+        <div class="product-name-preview">
+          <div class="preview-label">Product Name Preview</div>
+          <div class="preview-name empty" id="namePreview">Make your selections...</div>
+          <button type="button" class="regenerate-btn" id="regenerateBtn" style="display: none;">↻ Regenerate Name</button>
+        </div>
+
+        <!-- Brand Selection -->
+        <div class="form-group">
+          <label class="form-label">Brand <span class="optional-badge">Optional</span></label>
+          <div class="search-box">
+            <input type="text" class="search-input" id="brandSearch" placeholder="🔍 Search brands...">
+          </div>
+          <div class="card-grid large" id="brandGrid">
+            {% for brand in brands %}
+            <div class="selection-card" data-value="{{ brand }}" onclick="selectBrand('{{ brand }}')">
+              {{ brand }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Type/Subtype Selection -->
+        <div class="form-group" id="subtypeGroup" style="display: none;">
+          <label class="form-label">Type <span class="optional-badge">Optional</span></label>
+          <div class="card-grid" id="subtypeGrid">
+            <!-- Populated dynamically based on category -->
+          </div>
+        </div>
+
+        <!-- Size Selection -->
+        <div class="form-group" id="sizeGroup" style="display: none;">
+          <label class="form-label">Size <span class="optional-badge">Optional</span></label>
+          <div class="card-grid small" id="sizeGrid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Color Selection -->
+        <div class="form-group">
+          <label class="form-label">Color <span class="optional-badge">Optional</span></label>
+          <div class="card-grid small" id="colorGrid">
+            {% for color in colors %}
+            <div class="selection-card small" data-value="{{ color }}" onclick="selectColor('{{ color }}')">
+              {{ color }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="step-navigation">
+          <button type="button" class="btn btn-primary" onclick="nextStep()">
+            Next Step →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: Details (Manual name editing, barcode) -->
+      <div class="form-step" data-step="2">
+        <h2 class="step-title">✏️ Product Details</h2>
+        <p class="step-subtitle">Fine-tune your product name and add optional info</p>
+
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" class="form-input" id="productName" placeholder="e.g., Nike Sneakers Size 40 Black" required>
+          <div class="field-help">Auto-generated from your selections. Edit if needed.</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Stock Quantity Now <span class="optional-badge">Optional</span></label>
+          <input type="number" class="form-input" id="stockQuantity" min="0" value="0" placeholder="0">
+          <div class="field-help">How many units to add initially (can stock more later)</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Barcode <span class="optional-badge">Optional</span></label>
+          <input type="text" class="form-input" id="barcode" placeholder="Scan or enter barcode (optional)">
+          <div class="field-help">System auto-generates SKU if left blank</div>
+        </div>
+
+        <div class="step-navigation">
+          <button type="button" class="btn btn-secondary" onclick="prevStep()">
+            ← Back
+          </button>
+          <button type="button" class="btn btn-primary" onclick="nextStep()">
+            Next Step →
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 3: Pricing -->
+      <div class="form-step" data-step="3">
+        <h2 class="step-title">💰 Set Pricing</h2>
+        <p class="step-subtitle">Enter cost and selling prices for this product</p>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cost Price (K) *</label>
+            <input type="number" class="form-input" id="costPrice" step="0.01" min="0" placeholder="0.00" required>
+            <div class="field-help">What you pay for it</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Selling Price (K) *</label>
+            <input type="number" class="form-input" id="sellingPrice" step="0.01" min="0" placeholder="0.00" required>
+            <div class="field-help">What customers pay</div>
+          </div>
+        </div>
+
+        <!-- Profit Margin Preview -->
+        <div class="product-name-preview" id="profitPreview" style="display: none;">
+          <div class="preview-label">Profit Margin</div>
+          <div class="preview-name" id="profitText">—</div>
+        </div>
+
+        <div class="step-navigation">
+          <button type="button" class="btn btn-secondary" onclick="prevStep()">
+            ← Back
+          </button>
+          <button type="submit" class="btn btn-success" id="submitBtn">
+            ✅ Add Product
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Confetti Container -->
+<div class="confetti-container" id="confettiContainer"></div>
+
+<script>
+// ============================================================================
+// STATE MANAGEMENT
+// ============================================================================
+
+const state = {
+  currentStep: 1,
+  brand: '',
+  subtype: '',
+  size: '',
+  color: '',
+  name: '',
+  userEditedName: false,  // Track if user manually edited name
+};
+
+// Category and available options (from Django context)
+const CATEGORY = '{{ category }}';
+const SUBTYPES = {{ subtypes_json|safe }};
+const SIZES = {{ sizes_json|safe }};
+const ALL_BRANDS = {{ brands_json|safe }};
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Show subtypes if available
+  if (SUBTYPES && SUBTYPES.length > 0) {
+    populateSubtypes();
+    document.getElementById('subtypeGroup').style.display = 'block';
+  }
+  
+  // Show sizes if available
+  if (SIZES && SIZES.length > 0) {
+    populateSizes();
+    document.getElementById('sizeGroup').style.display = 'block';
+  }
+
+  // Brand search
+  document.getElementById('brandSearch').addEventListener('input', filterBrands);
+
+  // Product name manual edit tracking
+  document.getElementById('productName').addEventListener('input', function() {
+    state.userEditedName = true;
+  });
+
+  // Profit calculation
+  document.getElementById('costPrice').addEventListener('input', calculateProfit);
+  document.getElementById('sellingPrice').addEventListener('input', calculateProfit);
+
+  // Regenerate name button
+  document.getElementById('regenerateBtn').addEventListener('click', function() {
+    state.userEditedName = false;
+    updateProductName();
+  });
+
+  // Enter key to advance steps
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
+      e.preventDefault();
+      if (state.currentStep < 3 && canProceedToNextStep()) {
+        nextStep();
+      }
+    }
+  });
+});
+
+// ============================================================================
+// POPULATE DYNAMIC OPTIONS
+// ============================================================================
+
+function populateSubtypes() {
+  const grid = document.getElementById('subtypeGrid');
+  grid.innerHTML = '';
+  
+  SUBTYPES.forEach(subtype => {
+    const card = document.createElement('div');
+    card.className = 'selection-card';
+    card.setAttribute('data-value', subtype);
+    card.textContent = subtype;
+    card.onclick = () => selectSubtype(subtype);
+    grid.appendChild(card);
+  });
+}
+
+function populateSizes() {
+  const grid = document.getElementById('sizeGrid');
+  grid.innerHTML = '';
+  
+  SIZES.forEach(size => {
+    const card = document.createElement('div');
+    card.className = 'selection-card small';
+    card.setAttribute('data-value', size);
+    card.textContent = size;
+    card.onclick = () => selectSize(size);
+    grid.appendChild(card);
+  });
+}
+
+// ============================================================================
+// SELECTION HANDLERS
+// ============================================================================
+
+function selectBrand(brand) {
+  // Toggle selection
+  const card = event.target;
+  const wasSelected = card.classList.contains('selected');
+  
+  // Clear all brand selections
+  document.querySelectorAll('#brandGrid .selection-card').forEach(c => {
+    c.classList.remove('selected');
+  });
+  
+  if (wasSelected) {
+    state.brand = '';
+  } else {
+    card.classList.add('selected');
+    state.brand = brand;
+  }
+  
+  updateProductName();
+}
+
+function selectSubtype(subtype) {
+  const card = event.target;
+  const wasSelected = card.classList.contains('selected');
+  
+  // Clear all subtype selections
+  document.querySelectorAll('#subtypeGrid .selection-card').forEach(c => {
+    c.classList.remove('selected');
+  });
+  
+  if (wasSelected) {
+    state.subtype = '';
+  } else {
+    card.classList.add('selected');
+    state.subtype = subtype;
+  }
+  
+  updateProductName();
+}
+
+function selectSize(size) {
+  const card = event.target;
+  const wasSelected = card.classList.contains('selected');
+  
+  // Clear all size selections
+  document.querySelectorAll('#sizeGrid .selection-card').forEach(c => {
+    c.classList.remove('selected');
+  });
+  
+  if (wasSelected) {
+    state.size = '';
+  } else {
+    card.classList.add('selected');
+    state.size = size;
+  }
+  
+  updateProductName();
+}
+
+function selectColor(color) {
+  const card = event.target;
+  const wasSelected = card.classList.contains('selected');
+  
+  // Clear all color selections
+  document.querySelectorAll('#colorGrid .selection-card').forEach(c => {
+    c.classList.remove('selected');
+  });
+  
+  if (wasSelected) {
+    state.color = '';
+  } else {
+    card.classList.add('selected');
+    state.color = color;
+  }
+  
+  updateProductName();
+}
+
+// ============================================================================
+// PRODUCT NAME AUTO-GENERATION
+// ============================================================================
+
+function updateProductName() {
+  if (state.userEditedName) {
+    // Show regenerate button if user has edited name
+    document.getElementById('regenerateBtn').style.display = 'inline-block';
+    return;
+  }
+
+  const parts = [];
+  
+  // Build name: Brand · Type · Category · Size · Color
+  if (state.brand && state.brand !== 'Other') {
+    parts.push(state.brand);
+  }
+  
+  if (state.subtype) {
+    parts.push(state.subtype);
+  } else {
+    // Use category display name
+    parts.push('{{ category_display }}');
+  }
+  
+  if (state.size) {
+    parts.push('Size ' + state.size);
+  }
+  
+  if (state.color && state.color !== 'Other') {
+    parts.push(state.color);
+  }
+  
+  const generatedName = parts.join(' · ');
+  state.name = generatedName;
+  
+  // Update preview
+  const preview = document.getElementById('namePreview');
+  if (generatedName) {
+    preview.textContent = generatedName;
+    preview.classList.remove('empty');
+  } else {
+    preview.textContent = 'Make your selections...';
+    preview.classList.add('empty');
+  }
+  
+  // Update actual input (on step 2)
+  document.getElementById('productName').value = generatedName;
+  
+  // Hide regenerate button
+  document.getElementById('regenerateBtn').style.display = 'none';
+}
+
+// ============================================================================
+// BRAND SEARCH FILTER
+// ============================================================================
+
+function filterBrands() {
+  const searchTerm = document.getElementById('brandSearch').value.toLowerCase();
+  const cards = document.querySelectorAll('#brandGrid .selection-card');
+  
+  cards.forEach(card => {
+    const brandName = card.getAttribute('data-value').toLowerCase();
+    if (brandName.includes(searchTerm)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+// ============================================================================
+// PROFIT CALCULATION
+// ============================================================================
+
+function calculateProfit() {
+  const cost = parseFloat(document.getElementById('costPrice').value) || 0;
+  const selling = parseFloat(document.getElementById('sellingPrice').value) || 0;
+  
+  if (cost > 0 && selling > 0) {
+    const profit = selling - cost;
+    const margin = ((profit / selling) * 100).toFixed(1);
+    
+    const preview = document.getElementById('profitPreview');
+    const text = document.getElementById('profitText');
+    
+    preview.style.display = 'block';
+    
+    if (profit > 0) {
+      text.innerHTML = `<span style="color: var(--success);">+K${profit.toFixed(2)} (${margin}% margin)</span>`;
+    } else if (profit < 0) {
+      text.innerHTML = `<span style="color: var(--danger);">-K${Math.abs(profit).toFixed(2)} (LOSS)</span>`;
+    } else {
+      text.textContent = 'No profit';
+    }
+  } else {
+    document.getElementById('profitPreview').style.display = 'none';
+  }
+}
+
+// ============================================================================
+// STEP NAVIGATION
+// ============================================================================
+
+function canProceedToNextStep() {
+  // No hard requirements for step 1 (all optional)
+  return true;
+}
+
+function nextStep() {
+  if (state.currentStep >= 3) return;
+  
+  // Confetti on step completion
+  triggerConfetti();
+  
+  // Hide current step
+  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.remove('active');
+  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.add('completed');
+  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('active');
+  
+  // Show next step
+  state.currentStep++;
+  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.add('active');
+  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.add('active');
+  
+  // Scroll to top smoothly
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  
+  // Update hidden inputs
+  updateHiddenInputs();
+}
+
+function prevStep() {
+  if (state.currentStep <= 1) return;
+  
+  // Hide current step
+  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.remove('active');
+  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('active');
+  
+  // Show previous step
+  state.currentStep--;
+  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.add('active');
+  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('completed');
+  
+  // Scroll to top smoothly
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ============================================================================
+// FORM SUBMISSION
+// ============================================================================
+
+function updateHiddenInputs() {
+  document.getElementById('hiddenBrand').value = state.brand;
+  document.getElementById('hiddenSubtype').value = state.subtype;
+  document.getElementById('hiddenSize').value = state.size;
+  document.getElementById('hiddenColor').value = state.color;
+  
+  // Name from input
+  const nameValue = document.getElementById('productName').value;
+  document.getElementById('hiddenName').value = nameValue;
+  
+  // Other fields
+  document.getElementById('hiddenQuantity').value = document.getElementById('stockQuantity').value || '0';
+  document.getElementById('hiddenBarcode').value = document.getElementById('barcode').value || '';
+  document.getElementById('hiddenCostPrice').value = document.getElementById('costPrice').value || '';
+  document.getElementById('hiddenSellingPrice').value = document.getElementById('sellingPrice').value || '';
+}
+
+document.getElementById('mainForm').addEventListener('submit', function(e) {
+  // Update all hidden inputs before submission
+  updateHiddenInputs();
+  
+  // Validate required fields
+  const name = document.getElementById('productName').value.trim();
+  const costPrice = document.getElementById('costPrice').value;
+  const sellingPrice = document.getElementById('sellingPrice').value;
+  
+  if (!name) {
+    e.preventDefault();
+    alert('❌ Please enter a product name');
+    return false;
+  }
+  
+  if (!costPrice || parseFloat(costPrice) < 0) {
+    e.preventDefault();
+    alert('❌ Please enter a valid cost price');
+    return false;
+  }
+  
+  if (!sellingPrice || parseFloat(sellingPrice) <= 0) {
+    e.preventDefault();
+    alert('❌ Please enter a valid selling price');
+    return false;
+  }
+  
+  // Big confetti on successful submission prep
+  triggerConfetti(30);
+  
+  // Disable submit button to prevent double submission
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent = '⏳ Adding Product...';
+});
+
+// ============================================================================
+// CONFETTI ANIMATION
+// ============================================================================
+
+function triggerConfetti(count = 15) {
+  const container = document.getElementById('confettiContainer');
+  const colors = ['#0ea5e9', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+  
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const confetti = document.createElement('div');
+      confetti.className = 'confetti';
+      confetti.style.left = Math.random() * 100 + '%';
+      confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      confetti.style.animationDelay = Math.random() * 0.3 + 's';
+      confetti.style.animationDuration = (Math.random() * 1 + 1.5) + 's';
+      
+      container.appendChild(confetti);
+      
+      setTimeout(() => {
+        confetti.remove();
+      }, 2500);
+    }, i * 50);
+  }
+}
+</script>
+
+{% endblock %}
+

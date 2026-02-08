@@ -146,6 +146,113 @@ CLOTHING_COLORS = [
 
 
 # ============================================================================
+# CLOTHING BRANDS (for gamified UI)
+# ============================================================================
+
+CLOTHING_BRANDS = [
+    # Sportswear & Athletic
+    "Nike",
+    "Adidas",
+    "Puma",
+    "Reebok",
+    "Under Armour",
+    "New Balance",
+    "Skechers",
+    "Converse",
+    "Vans",
+    "Jordan",
+    "Fila",
+    "Asics",
+    
+    # Fashion & Premium
+    "Gucci",
+    "Louis Vuitton",
+    "Balenciaga",
+    "Versace",
+    "Prada",
+    "Dior",
+    "Chanel",
+    "Burberry",
+    "Givenchy",
+    
+    # Casual & Fast Fashion
+    "Zara",
+    "H&M",
+    "Forever 21",
+    "Uniqlo",
+    "Gap",
+    "Pull & Bear",
+    
+    # Denim & Streetwear
+    "Levi's",
+    "Diesel",
+    "Wrangler",
+    "Lee",
+    "G-Star",
+    "Guess",
+    
+    # Footwear Specialists
+    "Timberland",
+    "Clarks",
+    "Dr. Martens",
+    "Crocs",
+    "Birkenstock",
+    
+    # Other/Generic
+    "Other",
+]
+
+
+# ============================================================================
+# CLOTHING SUBTYPES (type within category)
+# ============================================================================
+
+CLOTHING_SUBTYPES = {
+    # Footwear
+    "sneaker": ["Sneakers", "Running Shoes", "Basketball Shoes", "Lifestyle Sneakers", "High Tops", "Low Tops"],
+    "boot": ["Ankle Boots", "Combat Boots", "Chelsea Boots", "Work Boots", "Fashion Boots"],
+    "office-shoe": ["Formal Shoes", "Loafers", "Derby", "Oxford", "Brogues"],
+    "sports-shoe": ["Football Boots", "Running Shoes", "Training Shoes", "Tennis Shoes"],
+    
+    # Apparel - Dresses
+    "dress": ["Evening Dress", "Casual Dress", "Office Dress", "Traditional Dress", "Maxi Dress", "Mini Dress", "Midi Dress"],
+    
+    # Apparel - Shirts
+    "shirt": ["Formal Shirt", "Casual Shirt", "Button-Up", "Flannel", "Denim Shirt"],
+    "t-shirt": ["Crew Neck", "V-Neck", "Polo Shirt", "Henley", "Tank Top", "Long Sleeve Tee"],
+    
+    # Apparel - Pants
+    "trouser": ["Formal Trousers", "Chinos", "Dress Pants", "Cargo Pants"],
+    "jeans": ["Skinny Jeans", "Slim Fit", "Regular Fit", "Bootcut", "Straight Leg", "Relaxed Fit"],
+    "shorts": ["Casual Shorts", "Cargo Shorts", "Athletic Shorts", "Board Shorts", "Denim Shorts"],
+    
+    # Apparel - Jackets
+    "jacket": ["Bomber Jacket", "Leather Jacket", "Blazer", "Denim Jacket", "Windbreaker", "Parka", "Coat", "Puffer Jacket"],
+    
+    # Apparel - Other
+    "suit": ["Two-Piece Suit", "Three-Piece Suit", "Tuxedo", "Business Suit"],
+    "jersey": ["Football Jersey", "Basketball Jersey", "Rugby Jersey", "Team Jersey"],
+    "skirt": ["Mini Skirt", "Midi Skirt", "Maxi Skirt", "Pencil Skirt", "A-Line Skirt"],
+    
+    # Accessories
+    "belt": ["Leather Belt", "Casual Belt", "Formal Belt", "Designer Belt"],
+    "bag": ["Backpack", "Crossbody Bag", "Tote Bag", "Messenger Bag", "Duffel Bag"],
+    "handbag": ["Clutch", "Shoulder Bag", "Hobo Bag", "Satchel"],
+    "schoolbag": ["Backpack", "School Bag", "Laptop Bag"],
+    "hat": ["Baseball Cap", "Beanie", "Fedora", "Bucket Hat", "Snapback"],
+    "socks": ["Ankle Socks", "Crew Socks", "Knee High Socks", "No-Show Socks"],
+    
+    # Fragrance
+    "perfume": ["Eau de Parfum", "Eau de Toilette", "Cologne", "Body Spray", "Roll-On"],
+}
+
+
+def get_subtypes_for_category(category_value: str) -> List[str]:
+    """Get subtypes for a given category"""
+    return CLOTHING_SUBTYPES.get(category_value, [])
+
+
+# ============================================================================
 # AUTO-GENERATED SKU SYSTEM
 # ============================================================================
 

@@ -1903,6 +1903,7 @@ class ClothingProductLog(models.Model):
 class ClothingSale(models.Model):
     """
     Records a sale of clothing product.
+    Supports both tracked/barcoded units and common stock.
     """
 
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="clothing_sales", db_index=True)
@@ -1913,6 +1914,17 @@ class ClothingSale(models.Model):
         null=True,
         blank=True,
         help_text="Product sold (may be null for barcode-based sales where unit has all info)",
+    )
+
+    # Link to tracked barcode unit (if this sale is for a tracked item)
+    barcode_unit = models.ForeignKey(
+        "inventory.ClothingBarcodeUnit",
+        on_delete=models.PROTECT,
+        related_name="sales",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Barcode unit sold (null for common stock sales)",
     )
 
     # Sale details

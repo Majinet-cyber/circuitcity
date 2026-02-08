@@ -64,6 +64,12 @@ urlpatterns = [
         name="clothing_fast_sell_create_product_api",
     ),
     path("clothing/api/fast-sell/kpis/", clothing.fast_sell_kpis_api, name="clothing_fast_sell_kpis_api"),
+    # NEW: Unified Fast Sell endpoints (supports both tracked units AND common stock)
+    path("clothing/api/fast-sell/lookup-unified/", clothing.fast_sell_lookup_unified_api, name="clothing_fast_sell_lookup_unified_api"),
+    path("clothing/api/fast-sell/sell-unified/", clothing.fast_sell_sell_unified_api, name="clothing_fast_sell_sell_unified_api"),
+    path("clothing/api/fast-sell/resolve-product/", clothing.fast_sell_resolve_product_api, name="clothing_fast_sell_resolve_product_api"),
+    # NEW: Tracked units list (clickable from Hub)
+    path("clothing/products/<int:product_id>/tracked-units/", clothing.tracked_units_list, name="clothing_tracked_units_list"),
     # Clothing V2 (PREMIUM - New gamified experience)
     path("clothing/v2/dashboard/", clothing_v2.dashboard_v2, name="clothing_dashboard_v2"),
     path("clothing/add/", clothing_v2.quick_add_step1, name="clothing_quick_add_step1"),

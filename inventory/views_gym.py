@@ -704,17 +704,22 @@ def checkin_page(request):
 @require_business_kind(BusinessKind.GYM)
 @require_POST
 def member_checkin(request, member_id):
-    """Check in a gym member with gamification"""
+    """Check in a gym member with gamification - renders dedicated success page"""
     business = get_active_business(request)
     member = get_object_or_404(GymMember, pk=member_id, business=business)
 
     # Check if already checked in today
     today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    existing = GymCheckIn.objects.filter(business=business, member=member, timestamp__gte=today_start).exists()
+    existing_checkin = GymCheckIn.objects.filter(business=business, member=member, timestamp__gte=today_start).first()
 
-    if existing:
-        messages.info(request, f"Member '{member.name}' already checked in today.")
-        celebration_data = None
+    if existing_checkin:
+        # Already checked in - show success page with existing data
+        already_checked_in = True
+        checkin_time = existing_checkin.timestamp
+        old_streak = member.streak_days
+        old_badge = member.badge_level
+        show_celebration = False
+        badges_earned = []
     else:
         # Store old stats for comparison
         old_streak = member.streak_days
@@ -724,6 +729,7 @@ def member_checkin(request, member_id):
         checkin = GymCheckIn.objects.create(
             business=business, member=member, checked_in_by=request.user, notes=request.POST.get("notes", "")
         )
+        checkin_time = checkin.timestamp
 
         # Update gamification stats
         member.update_checkin_stats(checkin_date=timezone.now().date())
@@ -731,19 +737,14 @@ def member_checkin(request, member_id):
         # Refresh from DB
         member.refresh_from_db()
 
-        # Success message with gamification feedback
-        badge_info = member.get_badge_display()
-        streak_msg = f" 🔥 {member.streak_days}-day streak!" if member.streak_days > 1 else ""
-        badge_msg = f" {badge_info['icon']} {badge_info['label']}!" if badge_info["icon"] else ""
-
-        messages.success(request, f"✓ {member.name} checked in!{streak_msg}{badge_msg}")
-
-        # Prepare celebration data for modal (if milestone reached)
-        celebration_data = None
-        show_celebration = False
+        already_checked_in = False
 
         # Check for celebration-worthy events
         badges_earned = []
+        show_celebration = False
+        
+        badge_info = member.get_badge_display()
+        
         if old_badge != member.badge_level and member.badge_level != "none":
             badges_earned.append(
                 {
@@ -762,33 +763,30 @@ def member_checkin(request, member_id):
         if member.total_checkins == 1:
             show_celebration = True
 
-        if show_celebration:
-            celebration_data = {
-                "show_celebration": True,
-                "streak_days": member.streak_days,
-                "monthly_checkins": member.monthly_checkins,
-                "total_checkins": member.total_checkins,
-                "badge_level": member.badge_level,
-                "badge_display": badge_info,
-                "badges_earned": badges_earned,
-                "member_name": member.name,
-            }
+    # Get membership status
+    membership_status = "Active" if member.is_active_membership else "Expired"
+    
+    # Get badge display
+    badge_info = member.get_badge_display()
 
-    # Return to checkin page or member detail based on referrer
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "gym:checkin_page"
+    # Render dedicated success page
+    context = {
+        "active_tab": "checkins",
+        "business": business,
+        "member": member,
+        "member_name": member.name,
+        "checked_in_at": checkin_time,
+        "streak_days": member.streak_days,
+        "monthly_checkins": member.monthly_checkins,
+        "total_checkins": member.total_checkins,
+        "membership_status": membership_status,
+        "badge_display": badge_info,
+        "show_celebration": show_celebration,
+        "badges_earned": badges_earned,
+        "already_checked_in": already_checked_in,
+    }
 
-    # Build redirect URL with celebration data if applicable
-    if celebration_data and "checkin" in next_url:
-        import json
-        from urllib.parse import quote
-
-        celebration_json = quote(json.dumps(celebration_data))
-        return redirect(f"{reverse('gym:checkin_page')}?celebration={celebration_json}")
-    elif "checkin" in next_url:
-        return redirect("gym:checkin_page")
-    elif "member_detail" in next_url or f"/member/{member_id}/" in next_url:
-        return redirect("gym:member_detail", member_id=member.id)
-    return redirect("gym:members_list")
+    return render(request, "inventory/gym/checkin_success.html", context)
 
 
 # ==============================================================================

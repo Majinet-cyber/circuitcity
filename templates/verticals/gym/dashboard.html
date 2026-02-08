@@ -1,8 +1,13 @@
 {% extends "base.html" %}
+{% load static %}
 {% load humanize %}
 {% load money %}
 
 {% block title %}Gym · Emajinet{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/gym/dashboard.css' %}">
+{% endblock %}
 
 {% block content %}
 {% url 'gym:members_list' as members_url %}
@@ -17,70 +22,6 @@
 
 {% comment %}Yesterday summary (shows once per day){% endcomment %}
 {% include "partials/dashboard_yesterday_summary.html" %}
-
-<style>
-  .vertical-page{display:flex;flex-direction:column;gap:18px;padding:18px}
-  .vertical-hero{background:linear-gradient(135deg,#2563eb,#10b981);padding:24px;border-radius:20px;color:#fff;display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between}
-  .vertical-hero h1{margin:0;font-size:clamp(24px,3vw,32px)}
-  .vertical-hero p{margin:4px 0 0}
-  .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-actions a{border-radius:999px;padding:10px 16px;font-weight:700;text-decoration:none}
-  .hero-actions .primary{background:#fff;color:#0f172a}
-  .hero-actions .ghost{border:1px solid rgba(255,255,255,.8);color:#fff}
-  /* Mobile-first dashboard fixes */
-  .metrics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;min-width:0;overflow:visible}
-  .metric-card{background:#fff;border-radius:18px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08);text-align:center;height:auto !important;min-height:90px;min-width:0;overflow:visible;position:relative}
-  .metric-card h3{margin:0;font-size:.9rem;text-transform:uppercase;color:#64748b;white-space:normal !important;line-height:1.2;word-wrap:break-word;overflow-wrap:break-word}
-  .metric-card p{margin:6px 0 0;font-size:2rem;font-weight:800;color:#0f172a;min-width:0}
-  .metric-card small{display:block;margin-top:4px;font-size:.85rem;color:#64748b;min-width:0;overflow-wrap:break-word}
-  
-  /* KPI Card Color Accents */
-  .kpi-revenue{border-top:4px solid #3b82f6;background:linear-gradient(180deg,#eff6ff 0%,#fff 40px)}
-  .kpi-revenue h3{color:#1e40af}
-  .kpi-revenue p{color:#2563eb}
-  
-  .kpi-costs{border-top:4px solid #ef4444;background:linear-gradient(180deg,#fef2f2 0%,#fff 40px)}
-  .kpi-costs h3{color:#991b1b}
-  .kpi-costs p{color:#dc2626}
-  
-  .kpi-profit{border-top:4px solid #16a34a;background:linear-gradient(180deg,#f0fdf4 0%,#fff 40px)}
-  .kpi-profit h3{color:#166534}
-  
-  .kpi-mrr{border-top:4px solid #8b5cf6;background:linear-gradient(180deg,#faf5ff 0%,#fff 40px)}
-  .kpi-mrr h3{color:#6b21a8}
-  .kpi-mrr p{color:#7c3aed}
-  
-  /* Payment Method Cards with Progress Bars */
-  .payment-method-card{position:relative;overflow:visible}
-  .payment-percentage{position:absolute;top:18px;right:18px;font-weight:800;font-size:1.25rem;opacity:0.85}
-  .payment-bar-container{width:100%;height:8px;background:#f1f5f9;border-radius:4px;margin-top:10px;overflow:hidden}
-  .payment-bar{height:100%;border-radius:4px;transition:width 0.5s ease}
-  
-  /* Payment Method Colors */
-  .payment-method-cash{border-top:4px solid #10b981;background:linear-gradient(180deg,#f0fdf4 0%,#fff 40px)}
-  .payment-method-cash h3{color:#166534}
-  .payment-method-cash .payment-percentage{color:#059669}
-  .payment-bar-cash{background:linear-gradient(90deg,#10b981,#059669)}
-  
-  .payment-method-mobile-money{border-top:4px solid #f59e0b;background:linear-gradient(180deg,#fffbeb 0%,#fff 40px)}
-  .payment-method-mobile-money h3{color:#92400e}
-  .payment-method-mobile-money .payment-percentage{color:#d97706}
-  .payment-bar-mobile-money{background:linear-gradient(90deg,#f59e0b,#d97706)}
-  
-  .payment-method-bank{border-top:4px solid #3b82f6;background:linear-gradient(180deg,#eff6ff 0%,#fff 40px)}
-  .payment-method-bank h3{color:#1e40af}
-  .payment-method-bank .payment-percentage{color:#2563eb}
-  .payment-bar-bank{background:linear-gradient(90deg,#3b82f6,#2563eb)}
-  
-  @media (max-width:640px){
-    .metric-card p{font-size:clamp(1.5rem,5vw,2rem)}
-    .metrics-grid{grid-template-columns:1fr}
-    .payment-percentage{font-size:1.1rem}
-  }
-  .recent-block{background:#fff;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(15,23,42,.08)}
-  .recent-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
-  .recent-item{display:flex;justify-content:space-between;gap:12px;border:1px solid #e2e8f0;border-radius:16px;padding:12px}
-</style>
 
 <div class="vertical-page">
   <header class="vertical-hero">
@@ -103,15 +44,15 @@
   <section class="metrics-grid">
     <article class="metric-card">
       <h3>Total Members</h3>
-      <p>{{ total_members|default:"0"|intcomma }}</p>
+      <p data-count="{{ total_members|default:'0'|intcomma }}">{{ total_members|default:"0"|intcomma }}</p>
     </article>
     <article class="metric-card">
       <h3>Active Members</h3>
-      <p style="color:#16a34a">{{ members_active_count|default:"0"|intcomma }}</p>
+      <p style="color:#16a34a" data-count="{{ members_active_count|default:'0'|intcomma }}">{{ members_active_count|default:"0"|intcomma }}</p>
     </article>
     <article class="metric-card">
       <h3>In Arrears</h3>
-      <p style="color:#dc2626">{{ members_in_arrears|default:"0"|intcomma }}</p>
+      <p style="color:#dc2626" data-count="{{ members_in_arrears|default:'0'|intcomma }}">{{ members_in_arrears|default:"0"|intcomma }}</p>
     </article>
   </section>
 
@@ -165,22 +106,22 @@
     <div class="metrics-grid">
       <article class="metric-card kpi-revenue" data-bs-toggle="tooltip" data-bs-placement="top" title="Total membership payments recorded in selected range">
         <h3>Revenue</h3>
-        <p>{{ revenue|default:0|money }}</p>
-        <small>{{ payment_count|default:"0"|intcomma }} payment{{ payment_count|pluralize }}</small>
+        <p data-count="{{ revenue|default:0|money }}">{{ revenue|default:0|money }}</p>
+        <small><span data-count="{{ payment_count|default:'0'|intcomma }}">{{ payment_count|default:"0"|intcomma }}</span> payment{{ payment_count|pluralize }}</small>
       </article>
       <article class="metric-card kpi-costs" data-bs-toggle="tooltip" data-bs-placement="top" title="Costs recorded in Admin Wallet for selected range">
         <h3>Costs</h3>
-        <p>{{ costs|default:0|money }}</p>
+        <p data-count="{{ costs|default:0|money }}">{{ costs|default:0|money }}</p>
         <small>From admin wallet</small>
       </article>
       <article class="metric-card kpi-profit" data-bs-toggle="tooltip" data-bs-placement="top" title="Revenue minus Costs">
         <h3>Profit</h3>
-        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">{{ profit|default:0|money }}</p>
+        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}" data-count="{{ profit|default:0|money }}">{{ profit|default:0|money }}</p>
         <small>Revenue - Costs</small>
       </article>
       <article class="metric-card kpi-mrr" data-bs-toggle="tooltip" data-bs-placement="top" title="Monthly recurring revenue estimate for selected range">
         <h3>MRR</h3>
-        <p>{{ mrr|default:0|money }}</p>
+        <p data-count="{{ mrr|default:0|money }}">{{ mrr|default:0|money }}</p>
         <small>Monthly Recurring Revenue</small>
       </article>
     </div>
@@ -216,23 +157,23 @@
     <div class="metrics-grid">
       <article class="metric-card">
         <h3>Today</h3>
-        <p>{{ sessions_today|default:"0"|intcomma }}</p>
+        <p data-count="{{ sessions_today|default:'0'|intcomma }}">{{ sessions_today|default:"0"|intcomma }}</p>
         <small>check-ins</small>
       </article>
       <article class="metric-card">
         <h3>This Week</h3>
-        <p>{{ sessions_this_week|default:"0"|intcomma }}</p>
+        <p data-count="{{ sessions_this_week|default:'0'|intcomma }}">{{ sessions_this_week|default:"0"|intcomma }}</p>
         <small>check-ins</small>
       </article>
       <article class="metric-card">
         <h3>Today's Check-ins</h3>
-        <p style="color:#10b981">{{ checkins_today|default:"0"|intcomma }}</p>
+        <p style="color:#10b981" data-count="{{ checkins_today|default:'0'|intcomma }}">{{ checkins_today|default:"0"|intcomma }}</p>
         <small>gym check-ins</small>
       </article>
       {% if top_streak_name %}
       <article class="metric-card">
         <h3>Top Streak</h3>
-        <p style="color:#f59e0b">{{ top_streak_days|default:"0"|intcomma }}</p>
+        <p style="color:#f59e0b" data-count="{{ top_streak_days|default:'0'|intcomma }}">{{ top_streak_days|default:"0"|intcomma }}</p>
         <small>{{ top_streak_name|truncatewords:3 }}</small>
       </article>
       {% endif %}
@@ -263,52 +204,8 @@
     {% endif %}
   </section>
 </div>
+{% endblock %}
 
-<script>
-// Initialize Bootstrap tooltips
-document.addEventListener('DOMContentLoaded', function() {
-  // Initialize tooltips (Bootstrap 5)
-  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-  var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-    return new bootstrap.Tooltip(tooltipTriggerEl);
-  });
-  
-  // Animate payment mix progress bars
-  // Respect prefers-reduced-motion accessibility setting
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  
-  if (!prefersReducedMotion) {
-    // Animate bars on load with staggered timing
-    document.querySelectorAll('.payment-bar').forEach((bar, index) => {
-      const targetWidth = bar.getAttribute('data-width');
-      
-      // Start with 0 width
-      bar.style.width = '0%';
-      bar.style.transition = 'width 200ms cubic-bezier(0.4, 0, 0.2, 1)';
-      
-      // Animate to target width with stagger
-      setTimeout(() => {
-        bar.style.width = targetWidth + '%';
-      }, 100 + (index * 80));
-    });
-  } else {
-    // No animation - set width immediately
-    document.querySelectorAll('.payment-bar').forEach((bar) => {
-      const targetWidth = bar.getAttribute('data-width');
-      bar.style.width = targetWidth + '%';
-    });
-  }
-});
-</script>
-
-<style>
-/* Reduced motion support for animations */
-@media (prefers-reduced-motion: reduce) {
-  .payment-mix-animate,
-  .payment-bar {
-    transition: none !important;
-    animation: none !important;
-  }
-}
-</style>
+{% block extra_js %}
+<script src="{% static 'js/gym/dashboard.js' %}"></script>
 {% endblock %}

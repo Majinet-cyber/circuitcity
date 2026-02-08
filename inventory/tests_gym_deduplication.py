@@ -539,3 +539,7 @@ class DedupeServiceTests(TransactionTestCase):
         # Only 2 active members remain (1 merged)
         self.assertEqual(GymMember.objects.filter(business=self.business).count(), 2)
 
+
+
+
+

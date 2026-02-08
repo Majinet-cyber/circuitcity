@@ -5,7 +5,267 @@
 
 {% block content %}
 
+<!-- Premium Success Toast Container -->
+<div id="premiumToastContainer" class="premium-toast-container">
+  <div id="premiumToast" class="premium-toast">
+    <button type="button" class="toast-close" onclick="closePremiumToast()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    
+    <div class="toast-icon-wrapper">
+      <div class="toast-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="24" cy="24" r="22" stroke="white" stroke-width="3" fill="none" opacity="0.2"/>
+          <path d="M14 24L20 30L34 16" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+    
+    <h2 class="toast-headline">Sale Completed</h2>
+    
+    <div class="toast-product-info">
+      <div class="toast-product-name" id="toastProductName"></div>
+      <div class="toast-badges" id="toastBadges"></div>
+    </div>
+    
+    <div class="toast-amount" id="toastAmount"></div>
+    
+    <div class="toast-meta" id="toastMeta"></div>
+    
+    <div class="toast-ready">Ready for next scan</div>
+  </div>
+</div>
+
 <style>
+#fast-sell-page .sell-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  padding-bottom: 140px;
+}
+
+/* Premium Toast Styles */
+.premium-toast-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease;
+}
+
+.premium-toast-container.active {
+  display: flex;
+}
+
+.premium-toast {
+  position: relative;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 24px;
+  padding: 40px 48px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(16, 185, 129, 0.3), 0 0 0 1px rgba(16, 185, 129, 0.1);
+  text-align: center;
+  animation: slideScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+.toast-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(148, 163, 184, 0.1);
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.toast-close:hover {
+  background: rgba(148, 163, 184, 0.2);
+  color: #475569;
+  transform: scale(1.1);
+}
+
+.toast-icon-wrapper {
+  margin: 0 auto 24px;
+}
+
+.toast-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
+  animation: iconPulse 0.6s ease;
+}
+
+.toast-headline {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 20px;
+  letter-spacing: -0.02em;
+}
+
+.toast-product-info {
+  margin-bottom: 24px;
+}
+
+.toast-product-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.toast-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.toast-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.toast-badge.tracked {
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  color: #1e40af;
+  border: 1.5px solid #93c5fd;
+}
+
+.toast-badge.common {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  color: #065f46;
+  border: 1.5px solid #6ee7b7;
+}
+
+.toast-barcode {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.toast-amount {
+  font-size: 3rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.toast-meta {
+  font-size: 0.9rem;
+  color: #64748b;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.toast-stock-info {
+  font-weight: 600;
+  color: #475569;
+}
+
+.toast-ready {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #10b981;
+  padding: 12px 24px;
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 12px;
+  display: inline-block;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideScaleIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes iconPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideScaleOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+}
+
+.premium-toast.closing {
+  animation: slideScaleOut 0.2s ease forwards;
+}
+
 .sell-container {
   max-width: 900px;
   margin: 0 auto;
@@ -196,7 +456,7 @@
 }
 </style>
 
-<div class="sell-container">
+<div id="fast-sell-page" class="sell-container">
   <div class="page-header">
     <div>
       <h1>🛒 Fast Sell</h1>
@@ -230,25 +490,33 @@
       </button>
     </div>
     <small style="display: block; margin-top: 8px; color: #10b981; font-weight: 700; font-size: 1rem;">
-      ⚡ SCANNER-FIRST: Scan/type barcode → Enter = Instant sale | 
-      <span style="color: #64748b;">Barcoded units: {{ total_barcoded_units }}</span>
+      ⚡ SCANNER-FIRST: Scan/type code → Enter = Instant sale | 
+      <span style="color: #64748b;">Supports tracked + common stock</span>
     </small>
   </div>
 
-  <!-- Discoverable: In-Stock Barcoded Items (optional list) -->
+  <!-- Discoverable: In-Stock Items (tracked + common) -->
   <div id="productsContainer">
+    <!-- TRACKED ITEMS SECTION -->
     {% if available_items %}
     <div style="margin-bottom: 16px;">
       <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 12px;">
-        📦 In Stock Barcoded Items ({{ available_items|length }} types)
+        🏷️ Tracked Items ({{ available_items|length }} types, {{ total_barcoded_units }} units)
       </h3>
     </div>
-    <div class="products-grid" id="productsGrid">
+    <div class="products-grid" id="trackedGrid">
       {% for item in available_items %}
-      <div class="product-card" 
+      <div class="product-card tracked-card" 
+           data-kind="tracked"
            data-item-info="{{ item.display_name }}"
            data-product-price="{{ item.selling_price }}"
-           data-product-stock="{{ item.units_in_stock }}">
+           data-product-stock="{{ item.units_in_stock }}"
+           data-product-id="{{ item.product.id }}"
+           data-size="{{ item.size }}"
+           data-category="{{ item.category }}"
+           data-brand="{{ item.brand }}"
+           onclick="sellTrackedProduct(this)"
+           style="cursor: pointer;">
         <div class="product-name">{{ item.display_name }}</div>
         <div class="product-meta">
           {% if item.color %}{{ item.color }}{% endif %}
@@ -257,19 +525,54 @@
         <div class="product-price">K {{ item.selling_price }}</div>
         <div class="product-stock">{{ item.units_in_stock }} unit{{ item.units_in_stock|pluralize }} in stock</div>
         <div style="margin-top: 8px; padding: 6px 12px; background: #dbeafe; color: #1e40af; border-radius: 8px; font-size: 0.75rem; font-weight: 700; text-align: center;">
-          🏷️ Tracked
+          🏷️ Tracked (Click to sell)
         </div>
       </div>
       {% endfor %}
     </div>
-    {% else %}
+    {% endif %}
+
+    <!-- COMMON STOCK SECTION -->
+    {% if common_items %}
+    <div style="margin-top: 32px; margin-bottom: 16px;">
+      <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0 0 12px;">
+        📦 Common Stock ({{ common_items|length }} products)
+      </h3>
+    </div>
+    <div class="products-grid" id="commonGrid">
+      {% for item in common_items %}
+      <div class="product-card common-card" 
+           data-kind="common"
+           data-product-id="{{ item.product_id }}"
+           data-item-name="{{ item.name }}"
+           data-product-price="{{ item.selling_price }}"
+           data-product-stock="{{ item.quantity_in_stock }}"
+           onclick="sellCommonItem(this)"
+           style="cursor: pointer;">
+        <div class="product-name">{{ item.name }}</div>
+        <div class="product-meta">
+          {% if item.category %}{{ item.category|title }}{% endif %}
+          {% if item.size %} · Size {{ item.size }}{% endif %}
+        </div>
+        <div class="product-price">K {{ item.selling_price }}</div>
+        <div class="product-stock">{{ item.quantity_in_stock }} in stock</div>
+        <div style="margin-top: 8px; padding: 6px 12px; background: #d1fae5; color: #065f46; border-radius: 8px; font-size: 0.75rem; font-weight: 700; text-align: center;">
+          📦 Common (Click to sell)
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- EMPTY STATE (only if both tracked and common are empty) -->
+    {% if not available_items and not common_items %}
     <div class="empty-state">
       <div class="empty-state-icon">📦</div>
-      <h3 style="margin: 0 0 12px; color: #64748b; font-size: 1.4rem;">No barcoded items in stock</h3>
-      <p style="color: #94a3b8; margin-bottom: 8px;">Fast Sell works with barcoded clothing items only.</p>
-      <p style="color: #94a3b8; margin-bottom: 24px; font-size: 0.9rem;">Stock in products with barcodes to use this scanner.</p>
+      <h3 style="margin: 0 0 12px; color: #64748b; font-size: 1.4rem;">No items in stock</h3>
+      <p style="color: #94a3b8; margin-bottom: 8px;">Fast Sell shows tracked (barcoded) and common stock items.</p>
+      <p style="color: #94a3b8; margin-bottom: 24px; font-size: 0.9rem;">Stock in some products to use this feature.</p>
       <a href="{% url 'inventory:clothing_wizard' %}" style="display: inline-block; background: #10b981; color: white; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: 700; margin-right: 12px;">
-        + Add Barcoded Items
+        + Add Items
       </a>
       <a href="{% url 'verticals:clothing_hub' %}" style="display: inline-block; background: #e2e8f0; color: #0f172a; padding: 12px 28px; border-radius: 12px; text-decoration: none; font-weight: 700;">
         ← Back to Hub
@@ -300,53 +603,392 @@ window.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// Barcode instant sale functionality (SCANNER-FIRST)
+// Barcode instant sale functionality (SCANNER-FIRST) - NOW SUPPORTS BOTH TRACKED + COMMON
 document.getElementById('barcodeInput').addEventListener('keydown', async function(e) {
   if (e.key !== 'Enter') return;
   e.preventDefault();
   
-  const barcode = e.target.value.trim();
-  if (!barcode) return;
+  const code = e.target.value.trim();
+  if (!code) {
+    showToast('error', '❌ Please enter a code');
+    return;
+  }
   
-  // Visual feedback
+  // Visual feedback - scanning in progress
   e.target.style.background = '#fef3c7';
+  e.target.style.borderColor = '#f59e0b';
   e.target.disabled = true;
   
   try {
-    const response = await fetch('{% url "verticals:clothing_fast_sell_create_api" %}', {
+    // Step 1: Lookup (supports both tracked units AND common stock)
+    const lookupResponse = await fetch(`{% url "verticals:clothing_fast_sell_lookup_unified_api" %}?code=${encodeURIComponent(code)}`);
+    
+    // Check HTTP status
+    if (!lookupResponse.ok) {
+      throw new Error(`Server error: ${lookupResponse.status}`);
+    }
+    
+    const lookupResult = await lookupResponse.json();
+    
+    if (!lookupResult.ok || !lookupResult.found) {
+      showToast('error', `❌ ${lookupResult.error || 'Not found in stock'}`);
+      e.target.style.background = '#fee2e2';
+      e.target.style.borderColor = '#ef4444';
+      setTimeout(() => {
+        e.target.style.background = '';
+        e.target.style.borderColor = '#10b981';
+        e.target.disabled = false;
+        e.target.select();
+      }, 1000);
+      return;
+    }
+    
+    // Found! Show quick confirmation
+    const item = lookupResult.item;
+    const itemDesc = item.name || 'Item';
+    const price = item.selling_price || 0;
+    
+    // Visual feedback - found
+    e.target.style.background = '#d1fae5';
+    e.target.style.borderColor = '#10b981';
+    
+    // Step 2: Sell (automatically determine if tracked_unit or common_item)
+    const sellPayload = {
+      kind: lookupResult.kind,
+      payment_method: 'cash'
+    };
+    
+    if (lookupResult.kind === 'tracked_unit') {
+      sellPayload.tracked_unit_id = lookupResult.item.tracked_unit_id;
+    } else if (lookupResult.kind === 'common_item') {
+      sellPayload.product_id = lookupResult.item.product_id;
+      sellPayload.quantity = 1;  // Default qty for fast sell
+    }
+    
+    const sellResponse = await fetch('{% url "verticals:clothing_fast_sell_sell_unified_api" %}', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': getCsrfToken()
       },
-      body: JSON.stringify({
-        barcode: barcode,
-        quantity: 1,
-        payment_method: 'cash'
-      })
+      body: JSON.stringify(sellPayload)
+    });
+    
+    if (!sellResponse.ok) {
+      throw new Error(`Server error: ${sellResponse.status}`);
+    }
+    
+    const sellResult = await sellResponse.json();
+    
+    if (sellResult.ok) {
+      // Success - show premium toast!
+      const toastData = {
+        product_name: itemDesc,
+        kind: lookupResult.kind,
+        barcode: lookupResult.kind === 'tracked_unit' ? item.barcode : null,
+        amount: parseFloat(sellResult.amount || price),
+        quantity: lookupResult.kind === 'common_item' ? 1 : null,
+        remaining_stock: sellResult.remaining_stock !== undefined ? sellResult.remaining_stock : null,
+      };
+      
+      showSaleSuccessToast(toastData);
+      
+      e.target.value = '';
+      e.target.style.background = '#d1fae5';
+      
+      // Refresh page after toast dismisses
+      setTimeout(() => location.reload(), 2200);
+    } else {
+      showToast('error', `❌ ${sellResult.error || 'Sale failed'}`);
+      e.target.style.background = '#fee2e2';
+      e.target.style.borderColor = '#ef4444';
+      setTimeout(() => {
+        e.target.style.background = '';
+        e.target.style.borderColor = '#10b981';
+      }, 1000);
+    }
+  } catch (err) {
+    console.error('Fast sell error:', err);
+    showToast('error', `❌ Network error: ${err.message}`);
+    e.target.style.background = '#fee2e2';
+    e.target.style.borderColor = '#ef4444';
+    setTimeout(() => {
+      e.target.style.background = '';
+      e.target.style.borderColor = '#10b981';
+    }, 1000);
+  }
+  
+  e.target.disabled = false;
+  e.target.focus();
+});
+
+// Click-to-sell tracked product items (finds next available unit)
+async function sellTrackedProduct(cardElement) {
+  const productId = cardElement.dataset.productId;
+  const itemInfo = cardElement.dataset.itemInfo;
+  const price = cardElement.dataset.productPrice;
+  const size = cardElement.dataset.size;
+  const category = cardElement.dataset.category;
+  const brand = cardElement.dataset.brand;
+  
+  // Visual feedback
+  cardElement.style.opacity = '0.5';
+  cardElement.style.pointerEvents = 'none';
+  
+  try {
+    // Step 1: Resolve next available tracked unit for this product
+    const resolveResponse = await fetch('{% url "verticals:clothing_fast_sell_resolve_product_api" %}?' + new URLSearchParams({
+      product_id: productId,
+      size: size || '',
+      category: category || '',
+      brand: brand || ''
+    }));
+    
+    const resolveResult = await resolveResponse.json();
+    
+    if (!resolveResult.ok || !resolveResult.found) {
+      showToast('error', `❌ ${resolveResult.error || 'No available units found'}`);
+      cardElement.style.opacity = '1';
+      cardElement.style.pointerEvents = 'auto';
+      return;
+    }
+    
+    // Step 2: Sell the tracked unit (no confirm - instant sell)
+    const sellPayload = {
+      kind: 'tracked_unit',
+      tracked_unit_id: resolveResult.unit.tracked_unit_id,
+      payment_method: 'cash'
+    };
+    
+    const sellResponse = await fetch('{% url "verticals:clothing_fast_sell_sell_unified_api" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify(sellPayload)
+    });
+    
+    const sellResult = await sellResponse.json();
+    
+    if (sellResult.ok) {
+      // Success - show premium toast!
+      const toastData = {
+        product_name: itemInfo,
+        kind: 'tracked',
+        barcode: resolveResult.unit.barcode,
+        amount: parseFloat(sellResult.amount || price),
+        quantity: null,
+        remaining_stock: sellResult.remaining_stock !== undefined ? sellResult.remaining_stock : null,
+      };
+      
+      showSaleSuccessToast(toastData);
+      
+      // Refresh page after toast dismisses
+      setTimeout(() => location.reload(), 2200);
+    } else {
+      showToast('error', `❌ ${sellResult.error || 'Sale failed'}`);
+      cardElement.style.opacity = '1';
+      cardElement.style.pointerEvents = 'auto';
+    }
+  } catch (err) {
+    console.error('Sell tracked error:', err);
+    showToast('error', '❌ Network error');
+    cardElement.style.opacity = '1';
+    cardElement.style.pointerEvents = 'auto';
+  }
+}
+
+// Click-to-sell common stock items
+async function sellCommonItem(cardElement) {
+  const productId = cardElement.dataset.productId;
+  const itemName = cardElement.dataset.itemName;
+  const price = cardElement.dataset.productPrice;
+  
+  // Visual feedback (no confirm - instant sell)
+  cardElement.style.opacity = '0.5';
+  cardElement.style.pointerEvents = 'none';
+  
+  try {
+    const sellPayload = {
+      kind: 'common_item',
+      product_id: parseInt(productId),
+      quantity: 1,
+      payment_method: 'cash'
+    };
+    
+    const response = await fetch('{% url "verticals:clothing_fast_sell_sell_unified_api" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify(sellPayload)
     });
     
     const result = await response.json();
     
     if (result.ok) {
-      // Success toast
-      showToast('success', `✅ Sold! ${result.message || 'Sale complete'}`);
-      e.target.value = '';
-      // Refresh page after short delay
-      setTimeout(() => location.reload(), 1500);
+      // Success - show premium toast!
+      const toastData = {
+        product_name: itemName,
+        kind: 'common',
+        barcode: null,
+        amount: parseFloat(result.amount || price),
+        quantity: 1,
+        remaining_stock: result.remaining_stock !== undefined ? result.remaining_stock : null,
+      };
+      
+      showSaleSuccessToast(toastData);
+      
+      // Refresh page after toast dismisses
+      setTimeout(() => location.reload(), 2200);
     } else {
       showToast('error', `❌ ${result.error || 'Sale failed'}`);
+      cardElement.style.opacity = '1';
+      cardElement.style.pointerEvents = 'auto';
     }
   } catch (err) {
+    console.error('Sell error:', err);
     showToast('error', '❌ Network error');
+    cardElement.style.opacity = '1';
+    cardElement.style.pointerEvents = 'auto';
+  }
+}
+
+// Premium Success Toast Functions
+let toastTimer = null;
+
+function showSaleSuccessToast(saleData) {
+  const container = document.getElementById('premiumToastContainer');
+  const toast = document.getElementById('premiumToast');
+  
+  // Clear any existing timer
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
   }
   
-  e.target.style.background = '';
-  e.target.disabled = false;
-  e.target.focus();
+  // If already showing, reset and replace content
+  if (container.classList.contains('active')) {
+    toast.classList.remove('closing');
+    // Force reflow
+    void toast.offsetWidth;
+  }
+  
+  // Populate toast content
+  const {
+    product_name,
+    kind,
+    barcode,
+    amount,
+    quantity,
+    remaining_stock,
+    size,
+    category,
+    color
+  } = saleData;
+  
+  // Product name
+  document.getElementById('toastProductName').textContent = product_name;
+  
+  // Badges
+  const badgesHtml = [];
+  
+  // Type badge
+  if (kind === 'tracked_unit' || kind === 'tracked') {
+    badgesHtml.push(`
+      <span class="toast-badge tracked">
+        🏷️ Tracked
+      </span>
+    `);
+  } else {
+    badgesHtml.push(`
+      <span class="toast-badge common">
+        📦 Common
+      </span>
+    `);
+  }
+  
+  // Barcode (if tracked and available)
+  if ((kind === 'tracked_unit' || kind === 'tracked') && barcode) {
+    badgesHtml.push(`
+      <span class="toast-barcode">${barcode}</span>
+    `);
+  }
+  
+  // Quantity (if common and > 1)
+  if ((kind === 'common_item' || kind === 'common') && quantity && quantity > 1) {
+    badgesHtml.push(`
+      <span class="toast-badge common">Qty: ${quantity}</span>
+    `);
+  }
+  
+  document.getElementById('toastBadges').innerHTML = badgesHtml.join('');
+  
+  // Amount
+  document.getElementById('toastAmount').textContent = `K ${amount.toLocaleString()}`;
+  
+  // Meta info (remaining stock)
+  let metaHtml = '';
+  if (remaining_stock !== undefined && remaining_stock !== null) {
+    metaHtml = `<div class="toast-stock-info">Remaining stock: ${remaining_stock}</div>`;
+  }
+  document.getElementById('toastMeta').innerHTML = metaHtml;
+  
+  // Show toast
+  container.classList.add('active');
+  
+  // Auto-dismiss after 2 seconds
+  toastTimer = setTimeout(() => {
+    closePremiumToast();
+  }, 2000);
+  
+  // Ensure input stays focused
+  setTimeout(() => {
+    const barcodeInput = document.getElementById('barcodeInput');
+    if (barcodeInput) {
+      barcodeInput.focus();
+    }
+  }, 100);
+}
+
+function closePremiumToast() {
+  const container = document.getElementById('premiumToastContainer');
+  const toast = document.getElementById('premiumToast');
+  
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  
+  // Add closing animation
+  toast.classList.add('closing');
+  
+  // Remove after animation
+  setTimeout(() => {
+    container.classList.remove('active');
+    toast.classList.remove('closing');
+  }, 200);
+  
+  // Refocus input
+  const barcodeInput = document.getElementById('barcodeInput');
+  if (barcodeInput) {
+    barcodeInput.focus();
+  }
+}
+
+// Click outside to close (optional)
+document.addEventListener('DOMContentLoaded', function() {
+  const container = document.getElementById('premiumToastContainer');
+  container.addEventListener('click', function(e) {
+    if (e.target === container) {
+      closePremiumToast();
+    }
+  });
 });
 
-// Toast notification helper
+// Toast notification helper (keep for error messages)
 function showToast(type, message) {
   const toast = document.createElement('div');
   toast.style.cssText = `

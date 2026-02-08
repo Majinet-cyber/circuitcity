@@ -487,16 +487,18 @@ class TestGymPaymentDeletionView(TestCase):
         self.client.force_login(self.user)
     
     def test_delete_payment_via_view(self):
-        """Test deleting payment through the view."""
+        """Test deleting payment through the view (hard delete)."""
         # Set active business in session
         session = self.client.session
         session['active_business_id'] = self.business.id
         session.save()
         
+        payment_id = self.payment.pk
+        
         url = reverse('corrections:delete_record', kwargs={
             'vertical': 'gym',
             'entity_label': 'gym_payment',
-            'object_id': self.payment.pk,
+            'object_id': payment_id,
         })
         
         response = self.client.post(url, {
@@ -507,9 +509,9 @@ class TestGymPaymentDeletionView(TestCase):
         # Should redirect to browse page
         self.assertEqual(response.status_code, 302)
         
-        # Payment should be deleted (need to use all_objects to see soft-deleted)
-        payment_check = GymPayment.all_objects.get(pk=self.payment.pk)
-        self.assertTrue(payment_check.is_deleted)
+        # Payment should be HARD deleted (not exist at all)
+        self.assertFalse(GymPayment.objects.filter(pk=payment_id).exists())
+        self.assertFalse(GymPayment.all_objects.filter(pk=payment_id).exists())
     
     def test_delete_payment_requires_post(self):
         """Test that deletion requires POST method."""
@@ -535,10 +537,12 @@ class TestGymPaymentDeletionView(TestCase):
         session['active_business_id'] = self.business.id
         session.save()
         
+        payment_id = self.payment.pk
+        
         url = reverse('corrections:delete_record', kwargs={
             'vertical': 'gym',
             'entity_label': 'gym_payment',
-            'object_id': self.payment.pk,
+            'object_id': payment_id,
         })
         
         # POST without reason
@@ -549,9 +553,8 @@ class TestGymPaymentDeletionView(TestCase):
         # Should redirect back with error
         self.assertEqual(response.status_code, 302)
         
-        # Payment should NOT be deleted
-        self.payment.refresh_from_db()
-        self.assertFalse(self.payment.is_deleted)
+        # Payment should NOT be deleted (still exists)
+        self.assertTrue(GymPayment.objects.filter(pk=payment_id).exists())
 
 
 # Export

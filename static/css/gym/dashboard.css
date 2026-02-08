@@ -1,0 +1,510 @@
+/**
+ * Gym Dashboard Polish - Premium Styles
+ * Subtle animations, clean spacing, improved micro-interactions
+ */
+
+/* ============================================================================
+   LAYOUT & BASE STYLES
+   ========================================================================== */
+
+.vertical-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+
+/* ============================================================================
+   HERO SECTION
+   ========================================================================== */
+
+.vertical-hero {
+  background: linear-gradient(135deg, #2563eb, #10b981);
+  padding: 24px;
+  border-radius: 20px;
+  color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vertical-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.vertical-hero h1 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.vertical-hero p {
+  margin: 4px 0 0;
+}
+
+/* Hero Actions */
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hero-actions a {
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hero-actions a:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.hero-actions a:active {
+  transform: translateY(0);
+}
+
+.hero-actions .primary {
+  background: #fff;
+  color: #0f172a;
+}
+
+.hero-actions .primary:hover {
+  background: #f8fafc;
+}
+
+.hero-actions .ghost {
+  border: 1px solid rgba(255,255,255,.8);
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(10px);
+}
+
+.hero-actions .ghost:hover {
+  background: rgba(255,255,255,0.2);
+  border-color: #fff;
+}
+
+/* ============================================================================
+   METRICS GRID & CARDS
+   ========================================================================== */
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* Base Metric Card */
+.metric-card {
+  background: #fff;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  text-align: center;
+  height: auto !important;
+  min-height: 90px;
+  min-width: 0;
+  overflow: visible;
+  position: relative;
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 0;
+  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* Hover Effects */
+.metric-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, .12);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+.metric-card:active {
+  transform: translateY(-2px);
+}
+
+/* Staggered Animation */
+.metric-card:nth-child(1) { animation-delay: 0s; }
+.metric-card:nth-child(2) { animation-delay: 0.08s; }
+.metric-card:nth-child(3) { animation-delay: 0.16s; }
+.metric-card:nth-child(4) { animation-delay: 0.24s; }
+.metric-card:nth-child(5) { animation-delay: 0.32s; }
+.metric-card:nth-child(6) { animation-delay: 0.40s; }
+
+/* Card Typography */
+.metric-card h3 {
+  margin: 0;
+  font-size: .9rem;
+  text-transform: uppercase;
+  color: #64748b;
+  white-space: normal !important;
+  line-height: 1.2;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.metric-card p {
+  margin: 6px 0 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  min-width: 0;
+  letter-spacing: -0.02em;
+}
+
+.metric-card small {
+  display: block;
+  margin-top: 4px;
+  font-size: .85rem;
+  color: #64748b;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* ============================================================================
+   KPI CARD COLOR ACCENTS
+   ========================================================================== */
+
+.kpi-revenue {
+  border-top: 4px solid #3b82f6;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 40px);
+}
+
+.kpi-revenue h3 { color: #1e40af; }
+.kpi-revenue p { color: #2563eb; }
+
+.kpi-costs {
+  border-top: 4px solid #ef4444;
+  background: linear-gradient(180deg, #fef2f2 0%, #fff 40px);
+}
+
+.kpi-costs h3 { color: #991b1b; }
+.kpi-costs p { color: #dc2626; }
+
+.kpi-profit {
+  border-top: 4px solid #16a34a;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40px);
+}
+
+.kpi-profit h3 { color: #166534; }
+
+.kpi-mrr {
+  border-top: 4px solid #8b5cf6;
+  background: linear-gradient(180deg, #faf5ff 0%, #fff 40px);
+}
+
+.kpi-mrr h3 { color: #6b21a8; }
+.kpi-mrr p { color: #7c3aed; }
+
+/* ============================================================================
+   PAYMENT METHOD CARDS
+   ========================================================================== */
+
+.payment-method-card {
+  position: relative;
+  overflow: visible;
+}
+
+.payment-percentage {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  font-weight: 800;
+  font-size: 1.25rem;
+  opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+.payment-method-card:hover .payment-percentage {
+  opacity: 1;
+}
+
+.payment-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #f1f5f9;
+  border-radius: 4px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.payment-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.payment-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 2s infinite;
+}
+
+/* Payment Method Colors */
+.payment-method-cash {
+  border-top: 4px solid #10b981;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40px);
+}
+
+.payment-method-cash h3 { color: #166534; }
+.payment-method-cash .payment-percentage { color: #059669; }
+.payment-bar-cash { background: linear-gradient(90deg, #10b981, #059669); }
+
+.payment-method-mobile-money {
+  border-top: 4px solid #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 40px);
+}
+
+.payment-method-mobile-money h3 { color: #92400e; }
+.payment-method-mobile-money .payment-percentage { color: #d97706; }
+.payment-bar-mobile-money { background: linear-gradient(90deg, #f59e0b, #d97706); }
+
+.payment-method-bank {
+  border-top: 4px solid #3b82f6;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 40px);
+}
+
+.payment-method-bank h3 { color: #1e40af; }
+.payment-method-bank .payment-percentage { color: #2563eb; }
+.payment-bar-bank { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+
+/* ============================================================================
+   RECENT BLOCKS
+   ========================================================================== */
+
+.recent-block {
+  background: #fff;
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 0;
+  animation-delay: 0.2s;
+}
+
+.recent-block:hover {
+  box-shadow: 0 15px 35px rgba(15, 23, 42, .1);
+}
+
+.recent-block h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+/* Recent List */
+.recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.recent-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fff;
+}
+
+.recent-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
+  transform: translateX(4px);
+}
+
+/* ============================================================================
+   BUTTONS & INTERACTIVE ELEMENTS
+   ========================================================================== */
+
+.btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+/* ============================================================================
+   ANIMATIONS & KEYFRAMES
+   ========================================================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+/* Countup number animation */
+.metric-card p[data-count] {
+  transition: color 0.3s ease;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .vertical-page {
+    padding: 12px;
+    gap: 16px;
+  }
+
+  .metric-card p {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-percentage {
+    font-size: 1.1rem;
+  }
+
+  .vertical-hero {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions a {
+    flex: 1;
+    text-align: center;
+    min-width: 100px;
+  }
+}
+
+/* ============================================================================
+   ACCESSIBILITY & REDUCED MOTION
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .metric-card,
+  .recent-block,
+  .vertical-hero {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+
+  .payment-bar {
+    transition: none !important;
+  }
+
+  .payment-bar::after {
+    animation: none !important;
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES
+   ========================================================================== */
+
+@media print {
+  .vertical-hero {
+    background: #2563eb !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .metric-card,
+  .recent-block {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    page-break-inside: avoid;
+  }
+
+  .hero-actions {
+    display: none !important;
+  }
+}
+
+
+
+
+

@@ -262,9 +262,15 @@ def quick_add_step1(request):
 @require_business_kind(BusinessKind.CLOTHING)
 def quick_add_step2(request, category):
     """
-    Step 2: Minimal form for product details.
+    Step 2: Gamified card-based product creation.
+    Now uses clickable cards instead of dropdowns for premium UX.
     """
+    import json
     from django import forms
+    from inventory.clothing_config import (
+        CLOTHING_BRANDS,
+        get_subtypes_for_category,
+    )
 
     ctx = base.base_context(request)
     business = ctx.get("business")
@@ -275,8 +281,11 @@ def quick_add_step2(request, category):
 
     # Get appropriate sizes for this category
     size_choices = get_sizes_for_category(category)
+    
+    # Get subtypes for this category
+    subtypes = get_subtypes_for_category(category)
 
-    # Build form dynamically
+    # Build form dynamically (for validation only - UI uses cards)
     class QuickAddForm(forms.Form):
         brand = forms.CharField(
             max_length=100,
@@ -411,10 +420,19 @@ def quick_add_step2(request, category):
             "category_display": category_display,
             "category_icon": category_icon,
             "page_title": f"Add {category_display}",
+            # Gamified UI context
+            "brands": CLOTHING_BRANDS,
+            "subtypes": subtypes,
+            "sizes": size_choices,
+            "colors": CLOTHING_COLORS,
+            # JSON-serialized for JavaScript
+            "brands_json": json.dumps(CLOTHING_BRANDS),
+            "subtypes_json": json.dumps(subtypes),
+            "sizes_json": json.dumps(size_choices),
         }
     )
 
-    return render(request, "verticals/clothing/quick_add_step2.html", ctx)
+    return render(request, "verticals/clothing/quick_add_step2_gamified.html", ctx)
 
 
 @login_required

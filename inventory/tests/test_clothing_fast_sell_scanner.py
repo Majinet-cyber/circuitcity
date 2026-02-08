@@ -110,14 +110,14 @@ class TestFastSellShowsBarcodeStock(TestCase):
         # GET Fast Sell page
         response = self.client.get(reverse("verticals:clothing_fast_sell_v2"))
 
-        # Should NOT show "No products with stock available"
-        self.assertNotContains(response, "No barcoded items in stock")
+        # Should NOT show empty state
+        self.assertNotContains(response, "No items in stock")
         
-        # Should show total barcoded units count
-        self.assertContains(response, "Barcoded units: 2")
+        # Should show support message for both tracked and common
+        self.assertContains(response, "Supports tracked + common stock")
         
-        # Should show available items
-        self.assertContains(response, "In Stock Barcoded Items")
+        # Should show tracked items section
+        self.assertContains(response, "Tracked Items")
 
     def test_fast_sell_empty_when_no_barcode_units(self):
         """Fast Sell should show empty state when no barcode units exist."""
@@ -126,8 +126,8 @@ class TestFastSellShowsBarcodeStock(TestCase):
         response = self.client.get(reverse("verticals:clothing_fast_sell_v2"))
 
         # Should show empty state
-        self.assertContains(response, "No barcoded items in stock")
-        self.assertContains(response, "Fast Sell works with barcoded clothing items only")
+        self.assertContains(response, "No items in stock")
+        self.assertContains(response, "Fast Sell shows tracked (barcoded) and common stock items")
 
 
 @pytest.mark.django_db
@@ -457,3 +457,159 @@ class TestClothingHubShowsTrackingBadges(TestCase):
         # Tracked Jeans should not appear (has no common stock)
         # Note: This may still appear if the filter logic includes it
 
+
+@pytest.mark.django_db
+class TestFastSellQuerysetSlicingRegression(TestCase):
+    """
+    REGRESSION TEST: Fast sell page should not crash with queryset slicing error.
+    
+    Bug: fast_sell was slicing common_products_query before calling .exclude(),
+    which caused: TypeError: Cannot filter a query once a slice has been taken.
+    
+    Fix: Apply all filters/excludes BEFORE slicing. Slice only at the end.
+    """
+
+    def setUp(self):
+        self.business = Business.objects.create(
+            name="Test Clothing Store",
+            kind="clothing",
+        )
+        self.user = User.objects.create_user(
+            username="testuser",
+            password="testpass123",
+        )
+
+        self.location = Location.objects.create(
+            business=self.business,
+            name="Main Store",
+            is_default=True,
+        )
+        
+        # Add user to business
+        from tenants.models import Membership
+        from circuitcity.accounts.models import Profile
+        
+        Membership.objects.create(
+            user=self.user,
+            business=self.business,
+            role="manager",
+            is_active=True,
+        )
+        
+        profile, _ = Profile.objects.get_or_create(user=self.user)
+        profile.active_business = self.business
+        profile.save()
+
+        self.client = Client()
+        self.client.login(username="testuser", password="testpass123")
+
+    def test_fast_sell_page_returns_200_not_500(self):
+        """
+        REGRESSION: Fast sell page should return 200, not 500.
+        
+        Previously crashed with:
+        TypeError: Cannot filter a query once a slice has been taken.
+        """
+        # Create common stock products
+        for i in range(5):
+            MerchProduct.objects.create(
+                business=self.business,
+                name=f"Product {i}",
+                kind=BusinessKind.CLOTHING,
+                selling_price=Decimal("1000.00"),
+                cost_price=Decimal("500.00"),
+                quantity_in_stock=10,
+                is_active=True,
+                is_archived=False,
+            )
+
+        # Create a tracked product
+        product_with_tracking = MerchProduct.objects.create(
+            business=self.business,
+            name="Tracked Product",
+            kind=BusinessKind.CLOTHING,
+            selling_price=Decimal("2000.00"),
+            cost_price=Decimal("1000.00"),
+            quantity_in_stock=5,  # Has common stock too
+            is_active=True,
+            is_archived=False,
+        )
+        
+        # Add tracked unit for the product
+        ClothingBarcodeUnit.objects.create(
+            business=self.business,
+            location=self.location,
+            product=product_with_tracking,
+            barcode="TRACKED001",
+            size="M",
+            category="shirt",
+            selling_price=Decimal("2000.00"),
+            cost_price=Decimal("1000.00"),
+            status="IN_STOCK",
+            is_active=True,
+        )
+
+        # GET Fast Sell page - should NOT crash
+        response = self.client.get(reverse("verticals:clothing_fast_sell_v2"))
+
+        # CRITICAL: Must return 200, not 500
+        # This is the key regression test - the page should not crash with queryset slicing error
+        self.assertEqual(response.status_code, 200)
+        
+        # Page should render successfully (any content is fine, just no 500 error)
+        self.assertIn(b"Fast Sell", response.content)
+
+    def test_fast_sell_with_many_products_no_crash(self):
+        """
+        REGRESSION: Fast sell should handle many products without crashing.
+        
+        This specifically tests that the slicing happens AFTER .exclude(),
+        which was the root cause of the bug.
+        """
+        # Create 60 common stock products (more than the 50 limit)
+        for i in range(60):
+            MerchProduct.objects.create(
+                business=self.business,
+                name=f"Common Product {i:03d}",
+                kind=BusinessKind.CLOTHING,
+                selling_price=Decimal("1000.00"),
+                cost_price=Decimal("500.00"),
+                quantity_in_stock=10,
+                is_active=True,
+                is_archived=False,
+            )
+        
+        # Create some tracked products (10 of them)
+        for i in range(10):
+            tracked_product = MerchProduct.objects.create(
+                business=self.business,
+                name=f"Tracked Product {i:03d}",
+                kind=BusinessKind.CLOTHING,
+                selling_price=Decimal("2000.00"),
+                cost_price=Decimal("1000.00"),
+                quantity_in_stock=5,  # Has common stock but should be excluded
+                is_active=True,
+                is_archived=False,
+            )
+            
+            # Add tracked unit
+            ClothingBarcodeUnit.objects.create(
+                business=self.business,
+                location=self.location,
+                product=tracked_product,
+                barcode=f"TRACKED{i:03d}",
+                size="L",
+                category="jeans",
+                selling_price=Decimal("2000.00"),
+                cost_price=Decimal("1000.00"),
+                status="IN_STOCK",
+                is_active=True,
+            )
+
+        # GET Fast Sell page - this is where the crash happened before
+        response = self.client.get(reverse("verticals:clothing_fast_sell_v2"))
+
+        # CRITICAL: Must return 200, not 500
+        # Before the fix, this would crash with:
+        # TypeError: Cannot filter a query once a slice has been taken.
+        self.assertEqual(response.status_code, 200)

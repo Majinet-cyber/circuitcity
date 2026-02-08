@@ -746,6 +746,92 @@ def clothing_sales_metrics(
     }
 
 
+def compute_clothing_stock_value(business, location=None) -> Decimal:
+    """
+    Compute total stock value (cost basis) for clothing vertical.
+    
+    Stock Value = cost of remaining inventory (tracked + common stock).
+    
+    Tracked Units:
+        - Each AVAILABLE ClothingBarcodeUnit has its own cost_price
+        - Sum all cost_price for units with status="IN_STOCK"
+    
+    Common Stock:
+        - Products with quantity_in_stock > 0
+        - Exclude products that have tracked units (to avoid double counting)
+        - Value = quantity_in_stock * cost_price
+    
+    Args:
+        business: Business instance
+        location: Optional location filter
+    
+    Returns:
+        Decimal: Total stock value (cost basis)
+    """
+    from inventory.models import MerchProduct
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
+    from inventory.business_kinds import BusinessKind
+    
+    # ========================================================================
+    # A) TRACKED UNITS VALUE
+    # ========================================================================
+    tracked_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",  # Only available units
+        is_active=True,
+    )
+    
+    # Apply location filter if provided
+    if location:
+        tracked_query = tracked_query.filter(location=location)
+    
+    # Aggregate: Sum of cost_price for all available tracked units
+    # Use Coalesce to handle any null cost_price values (default to 0)
+    tracked_value_agg = tracked_query.aggregate(
+        total=Coalesce(Sum("cost_price"), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
+    )
+    tracked_value = Decimal(str(tracked_value_agg["total"] or 0))
+    
+    # ========================================================================
+    # B) COMMON STOCK VALUE
+    # ========================================================================
+    common_query = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__gt=0,
+    )
+    
+    # Apply location filter if MerchProduct has location field (future-proof)
+    if location and hasattr(MerchProduct, 'location'):
+        common_query = common_query.filter(location=location)
+    
+    # CRITICAL: Exclude products that have tracked units (avoid double counting)
+    # Products with tracked units are already counted in tracked_value above
+    products_with_tracked_units = tracked_query.values_list("product_id", flat=True).distinct()
+    common_query = common_query.exclude(id__in=products_with_tracked_units)
+    
+    # Aggregate: Sum of (quantity_in_stock * cost_price)
+    # Use ExpressionWrapper for proper field typing
+    common_line_cost = ExpressionWrapper(
+        F("quantity_in_stock") * Coalesce(F("cost_price"), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
+        output_field=DECIMAL_FIELD,
+    )
+    
+    common_value_agg = common_query.aggregate(
+        total=Coalesce(Sum(common_line_cost), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
+    )
+    common_value = Decimal(str(common_value_agg["total"] or 0))
+    
+    # ========================================================================
+    # TOTAL STOCK VALUE
+    # ========================================================================
+    total_stock_value = tracked_value + common_value
+    
+    return total_stock_value
+
+
 def clothing_inventory_metrics(
     business,
     *,
@@ -765,39 +851,62 @@ def clothing_inventory_metrics(
         Dictionary with inventory_value, retail_value, and expected_margin
     """
     from inventory.models import MerchProduct
+    from inventory.models_clothing_barcode import ClothingBarcodeUnit
     from inventory.business_kinds import BusinessKind
 
-    # Build base queryset for clothing products with stock
-    # Exclude archived and qty<=0 products
-    products_qs = MerchProduct.objects.filter(
-        business=business, kind=BusinessKind.CLOTHING, is_active=True, is_archived=False, quantity_in_stock__gt=0
+    # ========================================================================
+    # STOCK VALUE (Cost Basis) - Uses NEW helper function
+    # ========================================================================
+    # This now includes BOTH tracked units AND common stock
+    inventory_value = compute_clothing_stock_value(business, location)
+
+    # ========================================================================
+    # RETAIL VALUE (Potential Revenue)
+    # ========================================================================
+    # A) Tracked units retail value
+    tracked_query = ClothingBarcodeUnit.objects.filter(
+        business=business,
+        status="IN_STOCK",
+        is_active=True,
     )
-
-    # Note: MerchProduct doesn't have a location field in the base model,
-    # but if it's added in the future, we can filter here
-    # if location and hasattr(MerchProduct, 'location'):
-    #     products_qs = products_qs.filter(location=location)
-
-    # Use Coalesce to handle null prices (default to 0)
-    # Calculate inventory value (cost basis) = sum(qty_on_hand * Coalesce(cost_price, 0))
-    # Calculate retail value = sum(qty_on_hand * Coalesce(selling_price, 0))
-    # Use ExpressionWrapper to ensure proper output_field for arithmetic operations
-    line_cost = ExpressionWrapper(
-        F("quantity_in_stock") * Coalesce(F("cost_price"), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
-        output_field=DECIMAL_FIELD,
+    
+    if location:
+        tracked_query = tracked_query.filter(location=location)
+    
+    tracked_retail_agg = tracked_query.aggregate(
+        total=Coalesce(Sum("selling_price"), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
     )
-
-    line_retail = ExpressionWrapper(
+    tracked_retail_value = Decimal(str(tracked_retail_agg["total"] or 0))
+    
+    # B) Common stock retail value
+    common_query = MerchProduct.objects.filter(
+        business=business,
+        kind=BusinessKind.CLOTHING,
+        is_active=True,
+        is_archived=False,
+        quantity_in_stock__gt=0,
+    )
+    
+    if location and hasattr(MerchProduct, 'location'):
+        common_query = common_query.filter(location=location)
+    
+    # Exclude products with tracked units
+    products_with_tracked_units = tracked_query.values_list("product_id", flat=True).distinct()
+    common_query = common_query.exclude(id__in=products_with_tracked_units)
+    
+    # Calculate retail value for common stock
+    common_line_retail = ExpressionWrapper(
         F("quantity_in_stock") * Coalesce(F("selling_price"), DECIMAL_ZERO, output_field=DECIMAL_FIELD),
         output_field=DECIMAL_FIELD,
     )
-
-    inventory_agg = products_qs.aggregate(total=Coalesce(Sum(line_cost), DECIMAL_ZERO, output_field=DECIMAL_FIELD))
-
-    retail_agg = products_qs.aggregate(total=Coalesce(Sum(line_retail), DECIMAL_ZERO, output_field=DECIMAL_FIELD))
-
-    inventory_value = Decimal(str(inventory_agg["total"] or 0))
-    retail_value = Decimal(str(retail_agg["total"] or 0))
+    
+    common_retail_agg = common_query.aggregate(
+        total=Coalesce(Sum(common_line_retail), DECIMAL_ZERO, output_field=DECIMAL_FIELD)
+    )
+    common_retail_value = Decimal(str(common_retail_agg["total"] or 0))
+    
+    # Total retail value
+    retail_value = tracked_retail_value + common_retail_value
 
     # Expected margin = retail_value - inventory_value
     expected_margin = retail_value - inventory_value

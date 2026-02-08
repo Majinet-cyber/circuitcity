@@ -176,9 +176,9 @@ class TestFastSellScannerEnhanced(TestCase):
         self.assertNotIn('No barcoded items in stock', content,
                         "Should not show empty state when items exist")
         
-        # Should show barcoded units count
-        self.assertIn('Barcoded units:', content,
-                     "Should display barcoded units count")
+        # Should show support message for both tracked and common stock
+        self.assertIn('Supports tracked + common stock', content,
+                     "Should display unified support message")
 
 
 @pytest.mark.django_db

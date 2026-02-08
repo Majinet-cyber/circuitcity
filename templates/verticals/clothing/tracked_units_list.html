@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tracked Units · {{ product.name }}{% endblock %}
+
+{% block content %}
+
+<style>
+.units-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.page-header {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 24px 28px;
+  border-radius: 20px;
+  margin-bottom: 24px;
+  box-shadow: 0 12px 40px rgba(59, 130, 246, 0.25);
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.4rem, 3vw, 1.8rem);
+  font-weight: 800;
+}
+
+.page-header .product-info {
+  font-size: 0.95rem;
+  opacity: 0.9;
+  margin-bottom: 16px;
+}
+
+.back-btn {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 8px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.back-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
+/* Stats Cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 8px 0;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-card.available {
+  border-left: 4px solid #10b981;
+}
+
+.stat-card.sold {
+  border-left: 4px solid #6366f1;
+}
+
+.stat-card.total {
+  border-left: 4px solid #3b82f6;
+}
+
+/* Filter Tabs */
+.filter-tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  padding: 10px 20px;
+  border-radius: 12px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  color: #64748b;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.filter-tab:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.filter-tab.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+/* Units Table */
+.units-table-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.units-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.units-table thead {
+  background: #f8fafc;
+}
+
+.units-table th {
+  padding: 16px;
+  text-align: left;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.units-table td {
+  padding: 16px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 0.9rem;
+}
+
+.units-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.barcode-cell {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.copy-btn {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  border: none;
+  font-weight: 700;
+  transition: all 0.2s;
+}
+
+.copy-btn:hover {
+  background: #bae6fd;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.available {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.sold {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.sell-unit-btn {
+  padding: 8px 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sell-unit-btn:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.empty-state-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+</style>
+
+<div class="units-container">
+  <div class="page-header">
+    <h1>🏷️ Tracked Units</h1>
+    <div class="product-info">
+      <strong>{{ product.name }}</strong>
+      {% if product.size %} · Size {{ product.size }}{% endif %}
+      {% if product.color %} · {{ product.color }}{% endif %}
+    </div>
+    <a href="{% url 'verticals:clothing_hub' %}" class="back-btn">← Back to Hub</a>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card available">
+      <div class="stat-label">✅ Available</div>
+      <div class="stat-value">{{ available_count }}</div>
+    </div>
+    <div class="stat-card sold">
+      <div class="stat-label">📦 Sold</div>
+      <div class="stat-value">{{ sold_count }}</div>
+    </div>
+    <div class="stat-card total">
+      <div class="stat-label">📊 Total</div>
+      <div class="stat-value">{{ total_units }}</div>
+    </div>
+  </div>
+
+  <!-- Filter Tabs -->
+  <div class="filter-tabs">
+    <a href="?status=available" class="filter-tab {% if status_filter == 'available' %}active{% endif %}">
+      ✅ Available ({{ available_count }})
+    </a>
+    <a href="?status=sold" class="filter-tab {% if status_filter == 'sold' %}active{% endif %}">
+      📦 Sold ({{ sold_count }})
+    </a>
+    <a href="?status=all" class="filter-tab {% if status_filter == 'all' %}active{% endif %}">
+      📊 All ({{ total_units }})
+    </a>
+  </div>
+
+  <!-- Units Table -->
+  {% if units %}
+  <div class="units-table-container">
+    <table class="units-table">
+      <thead>
+        <tr>
+          <th>Barcode</th>
+          <th>Size</th>
+          <th>Status</th>
+          <th>Price</th>
+          <th>Received</th>
+          <th>Sold Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for unit in units %}
+        <tr>
+          <td class="barcode-cell">
+            {{ unit.barcode }}
+            <button class="copy-btn" onclick="copyToClipboard('{{ unit.barcode }}')">
+              📋 Copy
+            </button>
+          </td>
+          <td>{{ unit.size }}</td>
+          <td>
+            {% if unit.status == "IN_STOCK" %}
+            <span class="status-badge available">✅ Available</span>
+            {% else %}
+            <span class="status-badge sold">📦 Sold</span>
+            {% endif %}
+          </td>
+          <td>
+            <strong>K {{ unit.selling_price }}</strong>
+            {% if unit.cost_price %}
+            <br><small style="color: #64748b;">Cost: K {{ unit.cost_price }}</small>
+            {% endif %}
+          </td>
+          <td>{{ unit.received_at|date:"Y-m-d" }}</td>
+          <td>
+            {% if unit.sold_at %}
+            {{ unit.sold_at|date:"Y-m-d" }}
+            {% else %}
+            <span style="color: #94a3b8;">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if unit.status == "IN_STOCK" %}
+            <button class="sell-unit-btn" onclick="sellUnit({{ unit.id }}, '{{ unit.barcode }}')">
+              💰 Sell
+            </button>
+            {% else %}
+            <span style="color: #94a3b8;">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">📭</div>
+    <h3 style="margin: 0 0 12px; color: #64748b; font-size: 1.4rem;">No units found</h3>
+    <p style="color: #94a3b8;">
+      {% if status_filter == 'available' %}
+      No available units. They may all be sold.
+      {% elif status_filter == 'sold' %}
+      No sold units yet.
+      {% else %}
+      No tracked units for this product.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+// Get CSRF token helper
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  if (meta) return meta.getAttribute('content');
+  const cookies = document.cookie.split(';');
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'csrftoken' || name === 'cc_csrftoken') return value;
+  }
+  return '';
+}
+
+// Copy barcode to clipboard
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('success', `✅ Copied: ${text}`);
+  }).catch(err => {
+    showToast('error', '❌ Failed to copy');
+  });
+}
+
+// Sell unit function
+async function sellUnit(unitId, barcode) {
+  if (!confirm(`Sell unit ${barcode}?`)) return;
+  
+  try {
+    const response = await fetch('{% url "verticals:clothing_fast_sell_sell_unified_api" %}', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCsrfToken()
+      },
+      body: JSON.stringify({
+        kind: 'tracked_unit',
+        tracked_unit_id: unitId,
+        payment_method: 'cash'
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.ok) {
+      showToast('success', `✅ ${result.message || 'Sale complete'}`);
+      // Reload after short delay
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      showToast('error', `❌ ${result.error || 'Sale failed'}`);
+    }
+  } catch (err) {
+    showToast('error', '❌ Network error');
+  }
+}
+
+// Toast notification helper
+function showToast(type, message) {
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 16px 24px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  `;
+  toast.style.background = type === 'success' ? '#10b981' : '#ef4444';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// Add slideIn animation
+if (!document.getElementById('toastStyles')) {
+  const style = document.createElement('style');
+  style.id = 'toastStyles';
+  style.textContent = `
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+</script>
+
+{% endblock %}
+

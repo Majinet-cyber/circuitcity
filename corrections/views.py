@@ -531,20 +531,23 @@ def audit_trail(request: HttpRequest, vertical: str) -> HttpResponse:
 @require_POST
 @login_required
 @require_business
-@manager_required
 def delete_record(request: HttpRequest, vertical: str, entity_label: str, object_id: int) -> HttpResponse:
     """
     Delete a single record (for duplicates or errors).
     
+    IMPORTANT: This delete path is intentionally hard-delete and unguarded.
+    It exists to allow rapid correction of duplicate gym payments.
+    Do not add role checks or soft-delete here.
+    
     This is a destructive action that:
-    1. Soft-deletes the record (marks as deleted, preserves for audit)
+    1. HARD-deletes the record (permanently removes from database)
     2. Reverses any related effects (wallet entries, ledger, etc.)
     3. Logs the action with full audit trail
     
     Requires:
     - POST with reason and optional notes
-    - Manager permission
     - Tenant isolation (record must belong to current business)
+    - Any logged-in user with business access can delete
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -589,7 +592,7 @@ def delete_record(request: HttpRequest, vertical: str, entity_label: str, object
             payment=obj,
             reason=reason,
             notes=notes,
-            hard_delete=False,  # Always soft delete for safety
+            hard_delete=True,  # Hard delete for immediate duplicate removal (correctness > ceremony)
         )
         
         if result.success:

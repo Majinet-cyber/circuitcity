@@ -559,8 +559,6 @@
         </a>
     </div>
 </div>
-
-{% include "components/celebration_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
@@ -626,22 +624,5 @@ function filterByStatus(status) {
         }
     });
 }
-
-// Show celebration modal after check-in (if gamification data in URL)
-document.addEventListener('DOMContentLoaded', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const celebration = urlParams.get('celebration');
-
-    if (celebration) {
-        try {
-            const gamificationData = JSON.parse(decodeURIComponent(celebration));
-            if (typeof showCelebrationModal === 'function') {
-                showCelebrationModal(gamificationData);
-            }
-        } catch (e) {
-            console.log('Could not parse celebration data');
-        }
-    }
-});
 </script>
 {% endblock %}
