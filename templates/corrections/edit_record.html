@@ -424,6 +424,11 @@
                                        class="form-control" value="{{ value|date:'Y-m-d' }}" 
                                        {% if field_config.required %}required{% endif %}>
                                 
+                                {% elif field_config.field_type == 'datetime' %}
+                                <input type="datetime-local" name="{{ field_name }}" id="{{ field_name }}" 
+                                       class="form-control" value="{{ value|date:'Y-m-d\TH:i' }}" 
+                                       {% if field_config.required %}required{% endif %}>
+                                
                                 {% elif field_config.field_type == 'boolean' %}
                                 <select name="{{ field_name }}" id="{{ field_name }}" 
                                         class="form-select" {% if field_config.required %}required{% endif %}>

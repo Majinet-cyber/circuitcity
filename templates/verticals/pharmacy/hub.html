@@ -121,6 +121,42 @@
     line-height:1.5
   }
   
+  /* Badge Counts */
+  .tile-badge{
+    position:absolute;
+    top:16px;
+    right:16px;
+    background:linear-gradient(135deg,#10b981,#059669);
+    color:#fff;
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:.85rem;
+    font-weight:800;
+    box-shadow:0 4px 12px rgba(16,185,129,.3);
+    animation:fadeInBounce .5s ease-out
+  }
+  
+  .tile-badge.warning{
+    background:linear-gradient(135deg,#f59e0b,#d97706);
+    box-shadow:0 4px 12px rgba(245,158,11,.3)
+  }
+  
+  .tile-badge.danger{
+    background:linear-gradient(135deg,#ef4444,#dc2626);
+    box-shadow:0 4px 12px rgba(239,68,68,.3)
+  }
+  
+  .tile-badge.info{
+    background:linear-gradient(135deg,#3b82f6,#2563eb);
+    box-shadow:0 4px 12px rgba(59,130,246,.3)
+  }
+  
+  @keyframes fadeInBounce{
+    0%{opacity:0;transform:scale(.8) translateY(-10px)}
+    60%{opacity:1;transform:scale(1.05) translateY(0)}
+    100%{transform:scale(1)}
+  }
+  
   /* Special colors for specific tiles */
   .nav-tile.primary{border:2px solid #3b82f6}
   .nav-tile.primary:hover{background:linear-gradient(120deg,#eff6ff,#dbeafe)}
@@ -194,40 +230,66 @@
     </a>
     
     <a href="{% url 'pharmacy:batch_list' %}" class="nav-tile purple">
+      {% if active_batches_count %}
+      <span class="tile-badge info">{{ active_batches_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">📋</div>
       <h3 class="nav-tile-title">View Batches</h3>
       <p class="nav-tile-desc">Manage batch numbers, expiry dates, and stock levels</p>
     </a>
     
     <a href="{% url 'pharmacy:batch_list' %}" class="nav-tile purple">
+      {% if products_count %}
+      <span class="tile-badge info">{{ products_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">🏷️</div>
       <h3 class="nav-tile-title">Products & Categories</h3>
       <p class="nav-tile-desc">Browse medicines, cosmetics, and wellness items</p>
     </a>
     
     <a href="{% url 'pharmacy:sale_list' %}" class="nav-tile">
+      {% if recent_sales_count %}
+      <span class="tile-badge info">{{ recent_sales_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">🧾</div>
       <h3 class="nav-tile-title">Sales History</h3>
       <p class="nav-tile-desc">View past transactions and sales records</p>
     </a>
+    
+    {% if user.is_manager %}
+    <a href="/corrections/pharmacy/" class="nav-tile warning">
+      <div class="nav-tile-icon"><i class="bi bi-wrench-adjustable" style="font-size:3rem"></i></div>
+      <h3 class="nav-tile-title">Data Corrections</h3>
+      <p class="nav-tile-desc">Fix wrong batches, sales, expiry dates, and payment data</p>
+    </a>
+    {% endif %}
   </div>
   
   <!-- Alerts & Monitoring -->
   <h2 class="hub-section-title">⚠️ Alerts & Monitoring</h2>
   <div class="hub-nav-grid">
     <a href="{% url 'pharmacy:near_expiry' %}" class="nav-tile warning">
+      {% if near_expiry_count %}
+      <span class="tile-badge warning">{{ near_expiry_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">⏰</div>
       <h3 class="nav-tile-title">Near Expiry</h3>
       <p class="nav-tile-desc">Products expiring within the next 30 days</p>
     </a>
     
     <a href="{% url 'pharmacy:expired' %}" class="nav-tile danger">
+      {% if expired_count %}
+      <span class="tile-badge danger">{{ expired_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">🚨</div>
       <h3 class="nav-tile-title">Expired Batches</h3>
       <p class="nav-tile-desc">Products that have passed their expiry date</p>
     </a>
     
     <a href="{% url 'pharmacy:low_stock' %}" class="nav-tile warning">
+      {% if low_stock_count %}
+      <span class="tile-badge warning">{{ low_stock_count }}</span>
+      {% endif %}
       <div class="nav-tile-icon">📉</div>
       <h3 class="nav-tile-title">Low Stock</h3>
       <p class="nav-tile-desc">Items at or below reorder level</p>

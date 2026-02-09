@@ -3,211 +3,276 @@
 
 {% block title %}Clothing Hub · Emajinet{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/clothing-hub-premium.css' %}?v={{ ASSET_V|default:'1' }}">
+{% endblock %}
+
 {% block content %}
 
 {% comment %}Branded header{% endcomment %}
 {% include "partials/dashboard_brand_header.html" %}
 
-<style>
-  .hub-page{padding:18px;max-width:1400px;margin:0 auto}
-  .hub-header{background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:20px;color:#fff;margin-bottom:24px;box-shadow:0 12px 40px rgba(99,102,241,0.3)}
-  .hub-header h1{margin:0 0 8px;font-size:clamp(24px,3vw,32px);font-weight:800}
-  .hub-header p{margin:0;opacity:.95;font-size:1.05rem}
+<div class="clothing-hub premium-hub">
   
-  /* KPI Cards */
-  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px}
-  .kpi-card{background:#fff;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);transition:transform .2s}
-  .kpi-card:hover{transform:translateY(-2px)}
-  .kpi-icon{font-size:2rem;margin-bottom:8px;display:block}
-  .kpi-value{font-size:2rem;font-weight:800;color:#0f172a;margin:4px 0}
-  .kpi-label{font-size:0.85rem;color:#64748b;text-transform:uppercase;letter-spacing:0.06em;font-weight:600}
-  
-  /* Filter Chips */
-  .filter-chips{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
-  .filter-chip{padding:10px 20px;border-radius:999px;font-weight:700;font-size:0.9rem;cursor:pointer;transition:all .2s;border:2px solid transparent;text-decoration:none;display:inline-block}
-  .filter-chip{background:#f1f5f9;color:#475569}
-  .filter-chip:hover{background:#e2e8f0;color:#1e293b}
-  .filter-chip.active{background:#6366f1;color:#fff;border-color:#4f46e5}
-  
-  /* Product Grid */
-  .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:18px}
-  .product-panel{background:#fff;border-radius:18px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.08);transition:transform .2s,box-shadow .2s}
-  .product-panel:hover{transform:translateY(-2px);box-shadow:0 15px 40px rgba(15,23,42,.12)}
-  .product-name{font-size:1.2rem;font-weight:700;margin:0 0 4px;color:#0f172a}
-  .product-meta{font-size:.85rem;color:#64748b;margin-bottom:16px}
-  
-  /* Badges */
-  .badge-tracked{display:inline-block;padding:4px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#dbeafe;color:#1e40af;margin-right:6px}
-  .badge-common{display:inline-block;padding:4px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:#f0fdf4;color:#15803d}
-  
-  /* Battery */
-  .battery-container{margin:16px 0}
-  .battery-label{font-size:.9rem;color:#64748b;margin-bottom:6px;display:flex;justify-content:space-between}
-  .battery-bar{height:24px;background:#e2e8f0;border-radius:12px;overflow:hidden;position:relative}
-  .battery-fill{height:100%;background:linear-gradient(90deg,#10b981,#059669);transition:width .3s;display:flex;align-items:center;justify-content:flex-end;padding:0 8px}
-  .battery-fill.low{background:linear-gradient(90deg,#f59e0b,#d97706)}
-  .battery-fill.out{background:linear-gradient(90deg,#ef4444,#dc2626)}
-  .battery-text{font-size:.75rem;color:#fff;font-weight:700}
-  
-  /* Stats */
-  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
-  .stat-box{text-align:center}
-  .stat-label{font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em}
-  .stat-value{font-size:1.3rem;font-weight:700;color:#0f172a;margin-top:4px}
-  
-  /* Status badges */
-  .status-badge{display:inline-block;padding:6px 12px;border-radius:20px;font-size:.8rem;font-weight:700;margin-top:8px}
-  .status-badge.hot{background:#fee2e2;color:#dc2626}
-  .status-badge.low{background:#fef3c7;color:#d97706}
-  .status-badge.out{background:#f3f4f6;color:#6b7280}
-  .status-badge.new{background:#dbeafe;color:#2563eb}
-  .status-badge.normal{background:#f0fdf4;color:#15803d}
-  
-  /* Quick Actions */
-  .quick-actions{display:flex;gap:8px;margin-top:12px}
-  .btn-action{flex:1;padding:8px 12px;border-radius:10px;font-weight:700;font-size:0.8rem;text-align:center;text-decoration:none;transition:all .2s;border:none;cursor:pointer}
-  .btn-scan{background:#6366f1;color:#fff}
-  .btn-scan:hover{background:#4f46e5;color:#fff}
-  .btn-stock{background:#f0fdf4;color:#15803d;border:2px solid #bbf7d0}
-  .btn-stock:hover{background:#dcfce7;color:#15803d}
-</style>
-
-<div class="hub-page">
-  <header class="hub-header">
-    <h1>👔 Clothing Hub</h1>
-    <p>Premium Inventory Cockpit — Track common stock & barcoded units</p>
+  <!-- Premium Header with Search & Action -->
+  <header class="hub-premium-header">
+    <div class="hub-header-content">
+      <div class="hub-header-top">
+        <div class="hub-header-text">
+          <h1 class="hub-header-title">Clothing Hub</h1>
+          <p class="hub-header-subtitle">Browse stock • Tap to manage</p>
+        </div>
+        
+        <div class="hub-header-actions">
+          <!-- Search bar (UI only - no backend changes) -->
+          <div class="hub-search-wrapper">
+            <span class="hub-search-icon">🔍</span>
+            <input 
+              type="text" 
+              class="hub-search-input" 
+              placeholder="Search products..."
+              id="hubSearchInput"
+              aria-label="Search products">
+          </div>
+          
+          <!-- Primary action -->
+          <a href="{% url 'inventory:clothing_wizard' %}" class="hub-action-btn">
+            <span>➕</span>
+            <span>Add Item</span>
+          </a>
+        </div>
+      </div>
+    </div>
   </header>
 
+
   <!-- KPI Cards -->
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <span class="kpi-icon">📦</span>
-      <div class="kpi-value">{{ total_products }}</div>
-      <div class="kpi-label">Total Products</div>
+  <div class="hub-kpi-grid">
+    <div class="hub-kpi-card">
+      <span class="hub-kpi-icon">📦</span>
+      <div class="hub-kpi-value">{{ total_products }}</div>
+      <div class="hub-kpi-label">Total Products</div>
     </div>
-    <div class="kpi-card">
-      <span class="kpi-icon">✅</span>
-      <div class="kpi-value">{{ in_stock_common }}</div>
-      <div class="kpi-label">Common Stock</div>
+    <div class="hub-kpi-card">
+      <span class="hub-kpi-icon">✅</span>
+      <div class="hub-kpi-value">{{ in_stock_common }}</div>
+      <div class="hub-kpi-label">Common Stock</div>
     </div>
-    <div class="kpi-card">
-      <span class="kpi-icon">🏷️</span>
-      <div class="kpi-value">{{ barcoded_units_count }}</div>
-      <div class="kpi-label">Barcoded Units</div>
+    <div class="hub-kpi-card">
+      <span class="hub-kpi-icon">🏷️</span>
+      <div class="hub-kpi-value">{{ barcoded_units_count }}</div>
+      <div class="hub-kpi-label">Barcoded Units</div>
     </div>
-    <div class="kpi-card">
-      <span class="kpi-icon">⚠️</span>
-      <div class="kpi-value">{{ low_stock_count }}</div>
-      <div class="kpi-label">Low Stock</div>
+    <div class="hub-kpi-card">
+      <span class="hub-kpi-icon">⚠️</span>
+      <div class="hub-kpi-value">{{ low_stock_count }}</div>
+      <div class="hub-kpi-label">Low Stock</div>
     </div>
   </div>
 
-  <!-- Filter Chips -->
-  <div class="filter-chips">
-    <a href="?filter=all" class="filter-chip {% if filter_type == 'all' %}active{% endif %}">
-      All
+
+  <!-- Premium Tabs -->
+  <nav class="hub-tabs" role="tablist">
+    <a href="?filter=all" 
+       class="hub-tab {% if filter_type == 'all' %}active{% endif %}"
+       role="tab"
+       aria-selected="{% if filter_type == 'all' %}true{% else %}false{% endif %}">
+      <span>All</span>
     </a>
-    <a href="?filter=common" class="filter-chip {% if filter_type == 'common' %}active{% endif %}">
-      Common
+    <a href="?filter=common" 
+       class="hub-tab {% if filter_type == 'common' %}active{% endif %}"
+       role="tab"
+       aria-selected="{% if filter_type == 'common' %}true{% else %}false{% endif %}">
+      <span>Common</span>
     </a>
-    <a href="?filter=barcoded" class="filter-chip {% if filter_type == 'barcoded' %}active{% endif %}">
-      Barcoded
+    <a href="?filter=barcoded" 
+       class="hub-tab {% if filter_type == 'barcoded' %}active{% endif %}"
+       role="tab"
+       aria-selected="{% if filter_type == 'barcoded' %}true{% else %}false{% endif %}">
+      <span>Barcoded</span>
     </a>
-    <a href="?filter=low_stock" class="filter-chip {% if filter_type == 'low_stock' %}active{% endif %}">
-      Low Stock
+    <a href="?filter=low_stock" 
+       class="hub-tab {% if filter_type == 'low_stock' %}active{% endif %}"
+       role="tab"
+       aria-selected="{% if filter_type == 'low_stock' %}true{% else %}false{% endif %}">
+      <span>Low Stock</span>
     </a>
-  </div>
+  </nav>
+
 
   {% if product_panels %}
-  <div class="hub-grid">
+  <div class="hub-cards-grid">
     {% for panel in product_panels %}
-    <article class="product-panel">
-      <h2 class="product-name">{{ panel.product.name }}</h2>
-      <div class="product-meta">
-        {% if panel.product.size %}Size: {{ panel.product.size }}{% endif %}
-        {% if panel.product.color %}{% if panel.product.size %} · {% endif %}{{ panel.product.color }}{% endif %}
-        {% if panel.product.sku %}<br>SKU: {{ panel.product.sku }}{% endif %}
+    <article class="hub-product-card">
+      
+      <!-- Card Header -->
+      <div class="hub-card-header">
+        <h2 class="hub-product-title">{{ panel.product.name }}</h2>
+        <div class="hub-product-meta">
+          {% if panel.product.size %}Size: {{ panel.product.size }}{% endif %}
+          {% if panel.product.color %}{% if panel.product.size %} • {% endif %}{{ panel.product.color }}{% endif %}
+          {% if panel.product.sku %}<br>SKU: {{ panel.product.sku }}{% endif %}
+        </div>
       </div>
 
-      <!-- Badges: Tracked (barcoded) / Common -->
-      <div style="margin-bottom:12px">
+      <!-- Type Badges -->
+      <div class="hub-badges">
         {% if panel.is_tracked %}
         <a href="{% url 'verticals:clothing_tracked_units_list' panel.product.id %}" 
-           class="badge-tracked" 
-           style="text-decoration:none; cursor:pointer; transition: all 0.2s;"
-           onmouseover="this.style.background='#bfdbfe'; this.style.transform='scale(1.05)'"
-           onmouseout="this.style.background='#dbeafe'; this.style.transform='scale(1)'">
-          🏷️ Tracked ({{ panel.barcode_units }} units)
+           class="hub-badge hub-badge-tracked"
+           title="View tracked units">
+          <span>🏷️</span>
+          <span>Tracked ({{ panel.barcode_units }})</span>
         </a>
         {% endif %}
         {% if panel.is_common %}
-        <span class="badge-common">📦 Common ({{ panel.common_stock }})</span>
+        <span class="hub-badge hub-badge-common">
+          <span>📦</span>
+          <span>Common ({{ panel.common_stock }})</span>
+        </span>
         {% endif %}
       </div>
 
-      <div class="battery-container">
-        <div class="battery-label">
+      <!-- Stock Battery -->
+      <div class="hub-battery-section">
+        <div class="hub-battery-label">
           <span>Stock Battery</span>
-          <span><strong>{{ panel.available_stock }}</strong> total</span>
+          <span><strong>{{ panel.available_stock }}</strong> left</span>
         </div>
-        <div class="battery-bar">
-          <div class="battery-fill {% if panel.battery_percentage < 30 %}low{% elif panel.battery_percentage == 0 %}out{% endif %}" 
-               style="width:{{ panel.battery_percentage }}%">
+        <div class="hub-battery-track">
+          <div class="hub-battery-fill {% if panel.battery_percentage < 30 %}low{% elif panel.battery_percentage == 0 %}out{% endif %}" 
+               style="width:{{ panel.battery_percentage }}%"
+               data-battery="{{ panel.battery_percentage }}">
             {% if panel.battery_percentage > 15 %}
-            <span class="battery-text">{{ panel.battery_percentage }}%</span>
+            <span class="hub-battery-text">{{ panel.battery_percentage }}%</span>
             {% endif %}
           </div>
         </div>
       </div>
 
-      <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-label">Sold</div>
-          <div class="stat-value">{{ panel.total_sold }}</div>
+      <!-- Stats Grid (2x2) -->
+      <div class="hub-stats-grid">
+        <div class="hub-stat-box">
+          <div class="hub-stat-label">Sold</div>
+          <div class="hub-stat-value">{{ panel.total_sold }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">Revenue</div>
-          <div class="stat-value">K {{ panel.revenue|floatformat:0 }}</div>
+        <div class="hub-stat-box">
+          <div class="hub-stat-label">Revenue</div>
+          <div class="hub-stat-value">K{{ panel.revenue|floatformat:0 }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">Cost</div>
-          <div class="stat-value">K {{ panel.inventory_cost|floatformat:0 }}</div>
+        <div class="hub-stat-box">
+          <div class="hub-stat-label">Cost</div>
+          <div class="hub-stat-value">K{{ panel.inventory_cost|floatformat:0 }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">Profit</div>
-          <div class="stat-value" style="{% if panel.profit > 0 %}color:#10b981{% elif panel.profit < 0 %}color:#ef4444{% endif %}">
-            K {{ panel.profit|floatformat:0 }}
+        <div class="hub-stat-box">
+          <div class="hub-stat-label">Profit</div>
+          <div class="hub-stat-value {% if panel.profit > 0 %}profit-positive{% elif panel.profit < 0 %}profit-negative{% endif %}">
+            K{{ panel.profit|floatformat:0 }}
           </div>
         </div>
       </div>
 
-      <span class="status-badge {{ panel.status_class }}">{{ panel.status }}</span>
+      <!-- Status Badge -->
+      <span class="hub-status-badge {{ panel.status_class }}">{{ panel.status }}</span>
 
       <!-- Quick Actions -->
-      <div class="quick-actions">
+      <div class="hub-card-actions">
         {% if panel.is_tracked %}
-        <a href="{% url 'verticals:clothing_fast_sell_v2' %}" class="btn-action btn-scan" title="Scan to sell">
-          📷 Scan
+        <a href="{% url 'verticals:clothing_fast_sell_v2' %}" 
+           class="hub-btn hub-btn-primary" 
+           title="Scan barcode to sell">
+          <span>📷</span>
+          <span>Scan</span>
         </a>
         {% endif %}
-        <a href="{% url 'inventory:clothing_wizard' %}" class="btn-action btn-stock" title="Add stock">
-          + Stock-In
+        <a href="{% url 'inventory:clothing_wizard' %}" 
+           class="hub-btn hub-btn-secondary" 
+           title="Add more stock">
+          <span>+</span>
+          <span>Stock-In</span>
         </a>
       </div>
+      
     </article>
     {% endfor %}
   </div>
   {% else %}
-  <div style="text-align:center;padding:80px 20px;background:#fff;border-radius:20px;box-shadow:0 10px 30px rgba(15,23,42,.08)">
-    <div style="font-size:4rem;margin-bottom:20px">📦</div>
-    <h2 style="margin:0 0 12px;color:#0f172a;font-size:1.8rem;font-weight:700">No items yet</h2>
-    <p style="color:#64748b;margin-bottom:32px;font-size:1.1rem">Start adding clothing products to track inventory</p>
-    <a href="{% url 'inventory:clothing_wizard' %}" class="btn-action btn-scan" style="display:inline-block;padding:14px 32px;font-size:1.1rem">
-      + Add First Item
+  <!-- Premium Empty State -->
+  <div class="hub-empty-state">
+    <div class="hub-empty-icon">📦</div>
+    <h2 class="hub-empty-title">No items found</h2>
+    <p class="hub-empty-text">
+      {% if filter_type == 'all' %}
+        Start adding clothing products to track your inventory
+      {% elif filter_type == 'common' %}
+        No common stock items available. Add stock to get started.
+      {% elif filter_type == 'barcoded' %}
+        No barcoded units found. Add tracked items with barcodes.
+      {% elif filter_type == 'low_stock' %}
+        Great! No items are running low on stock right now.
+      {% endif %}
+    </p>
+    <a href="{% url 'inventory:clothing_wizard' %}" class="hub-empty-action">
+      <span>➕</span>
+      <span>Add First Item</span>
     </a>
   </div>
   {% endif %}
+
 </div>
+
+<!-- Optional: Client-side search filter (no backend changes) -->
+<script>
+(function() {
+  'use strict';
+  
+  const searchInput = document.getElementById('hubSearchInput');
+  if (!searchInput) return;
+  
+  const cards = document.querySelectorAll('.hub-product-card');
+  
+  // Debounce helper
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+  
+  // Filter cards by search term
+  function filterCards(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    
+    cards.forEach(card => {
+      if (!term) {
+        card.style.display = '';
+        return;
+      }
+      
+      const title = card.querySelector('.hub-product-title')?.textContent.toLowerCase() || '';
+      const meta = card.querySelector('.hub-product-meta')?.textContent.toLowerCase() || '';
+      const searchableText = title + ' ' + meta;
+      
+      if (searchableText.includes(term)) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+  
+  // Attach event listener with debounce
+  searchInput.addEventListener('input', debounce(function(e) {
+    filterCards(e.target.value);
+  }, 300));
+  
+})();
+</script>
 
 {% endblock %}
 

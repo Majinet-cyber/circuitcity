@@ -179,7 +179,13 @@ def browse_entity(request: HttpRequest, vertical: str, entity_label: str) -> Htt
             # Show all records for this entity (scoped to business)
             # Use business_filter_path to handle models with indirect business relation
             business_filter_key = entity_config.business_filter_path
-            queryset = entity_config.model.objects.filter(**{business_filter_key: business})
+            filter_kwargs = {business_filter_key: business}
+            
+            # Apply base filters (e.g., kind='pharmacy' for MerchProduct)
+            if hasattr(entity_config, 'base_filters') and entity_config.base_filters:
+                filter_kwargs.update(entity_config.base_filters)
+            
+            queryset = entity_config.model.objects.filter(**filter_kwargs)
             
             # Apply search if provided
             if search_query:

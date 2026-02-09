@@ -6,6 +6,7 @@
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{% static 'css/clothing-dashboard-premium.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -88,7 +89,7 @@
   }
 </style>
 
-<div class="vertical-page">
+<div class="vertical-page clothing-dashboard premium-dash">
   <header class="vertical-hero">
     <div>
       <p class="eyebrow">{{ business.name }} · {{ location_label }}</p>
@@ -118,20 +119,20 @@
   <section class="cc-kpi-grid">
     <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff" data-cy="sales-revenue-card">
       <h3 style="color:rgba(255,255,255,.9)">💰 Total Revenue{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ revenue_mtd|floatformat:0|default:"0"|intcomma }}</p>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ revenue_mtd|floatformat:0|default:'0' }}">{{ revenue_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
     </article>
     <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
       <h3 style="color:rgba(255,255,255,.9)">📈 Total Profit{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ profit_mtd|floatformat:0|default:"0"|intcomma }}</p>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ profit_mtd|floatformat:0|default:'0' }}">{{ profit_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
     </article>
     <article class="metric-card" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff">
       <h3 style="color:rgba(255,255,255,.9)">💸 Total Costs{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_costs_mtd|floatformat:0|default:"0"|intcomma }}</p>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ total_costs_mtd|floatformat:0|default:'0' }}">{{ total_costs_mtd|floatformat:0|default:"0"|intcomma }}</span></p>
       <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">COGS + Overhead</small>
     </article>
     <article class="metric-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
       <h3 style="color:rgba(255,255,255,.9)">📦 Stock Value{% if active_range == 'today' %} (Current){% endif %}</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ inventory_value|floatformat:0|default:"0"|intcomma }}</p>
+      <p style="color:#fff;font-size:2rem;font-weight:800">K <span data-countup="true" data-value="{{ inventory_value|floatformat:0|default:'0' }}">{{ inventory_value|floatformat:0|default:"0"|intcomma }}</span></p>
       <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Current inventory</small>
     </article>
   </section>
@@ -197,15 +198,21 @@
     <h2 style="margin:0 0 16px;font-size:1.1rem">📦 Stock Summary</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
       {% for category in stock_summary %}
-      <div style="padding:16px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-radius:14px;border:2px solid #e2e8f0;transition:all 0.2s"
-           onmouseover="this.style.transform='translateY(-2px)';this.style.borderColor='#cbd5e1'"
-           onmouseout="this.style.transform='translateY(0)';this.style.borderColor='#e2e8f0'">
-        <div style="font-size:2rem;margin-bottom:8px">{{ category.icon }}</div>
-        <div style="font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:4px">{{ category.category }}</div>
-        <div style="font-size:1.6rem;font-weight:800;color:#3b82f6;margin-bottom:4px">{{ category.total_quantity|intcomma }}</div>
-        <div style="font-size:0.85rem;color:#64748b">{{ category.total_items }} style{{ category.total_items|pluralize }}</div>
+      <div class="stock-category-card">
+        <span class="category-icon">{{ category.icon }}</span>
+        <span class="category-name">{{ category.category }}</span>
+        <span class="category-quantity">{{ category.total_quantity|intcomma }}</span>
+        <span class="category-styles">{{ category.total_items }} style{{ category.total_items|pluralize }}</span>
       </div>
       {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section class="recent-block">
+    <h2 style="margin:0 0 16px;font-size:1.1rem">📦 Stock Summary</h2>
+    <div class="empty-state">
+      <span class="empty-state-icon">📦</span>
+      <p class="empty-state-text">No stock categories yet. <a href="{% url 'verticals:clothing_scan_in' %}" class="empty-state-link">Add your first items</a></p>
     </div>
   </section>
   {% endif %}
@@ -278,9 +285,9 @@
           <li class="recent-item">
             <div>
               <strong>{{ item.name|default:item.sku|default:"Unnamed" }}</strong>
-              {% if item.sku %}<small style="color:#64748b">SKU · {{ item.sku }}</small>{% endif %}
+              {% if item.sku %}<small style="color:#64748b;display:block;margin-top:4px">SKU · {{ item.sku }}</small>{% endif %}
             </div>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center">
               {% if item.scan_required %}
                 <span class="badge scan"><i class="bi bi-upc-scan"></i>Scan</span>
               {% endif %}
@@ -292,7 +299,10 @@
         {% endfor %}
       </ul>
     {% else %}
-      <p style="margin:0;color:#64748b">Add a few clothing items to see them here.</p>
+      <div class="empty-state">
+        <span class="empty-state-icon">👕</span>
+        <p class="empty-state-text">No drops yet — <a href="{{ clothing_add_url|default:'/inventory/clothing/products/new/v2/' }}" class="empty-state-link">add your first item</a></p>
+      </div>
     {% endif %}
   </section>
 </div>
@@ -565,6 +575,118 @@
       refreshInterval = null;
     }
   });
+})();
+</script>
+
+{% comment %}Premium Dashboard Enhancements - Count-up animations and polish{% endcomment %}
+<script>
+(function() {
+  'use strict';
+  
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  
+  /**
+   * Count-up animation for numbers
+   * Smoothly animates from 0 to target value
+   */
+  function animateCountUp(element, finalValue, duration) {
+    if (prefersReducedMotion) {
+      // Skip animation if reduced motion is preferred
+      element.textContent = formatNumber(finalValue);
+      return;
+    }
+    
+    const startTime = performance.now();
+    const startValue = 0;
+    
+    function updateCount(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function (ease-out cubic)
+      const easedProgress = 1 - Math.pow(1 - progress, 3);
+      
+      const currentValue = Math.floor(startValue + (finalValue - startValue) * easedProgress);
+      element.textContent = formatNumber(currentValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(updateCount);
+      } else {
+        element.textContent = formatNumber(finalValue);
+      }
+    }
+    
+    requestAnimationFrame(updateCount);
+  }
+  
+  /**
+   * Format number with thousands separator
+   */
+  function formatNumber(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  
+  /**
+   * Initialize count-up animations
+   */
+  function initCountUpAnimations() {
+    const elements = document.querySelectorAll('[data-countup="true"]');
+    
+    elements.forEach((element, index) => {
+      const value = parseFloat(element.getAttribute('data-value')) || 0;
+      const delay = index * 100; // Stagger animations by 100ms
+      const duration = 1000; // 1 second animation
+      
+      // Store original content in case we need it
+      element.setAttribute('data-original-content', element.textContent);
+      
+      // Start animation after delay
+      setTimeout(() => {
+        animateCountUp(element, value, duration);
+      }, delay);
+    });
+  }
+  
+  /**
+   * Initialize skeleton loading fade-in
+   * Show skeleton briefly, then fade in actual content
+   */
+  function initSkeletonLoading() {
+    const skeletonElements = document.querySelectorAll('[data-skeleton="true"]');
+    
+    if (skeletonElements.length === 0) {
+      // No skeleton elements, proceed immediately
+      initCountUpAnimations();
+      return;
+    }
+    
+    // Simulate loading time (300ms)
+    setTimeout(() => {
+      skeletonElements.forEach(element => {
+        element.removeAttribute('data-skeleton');
+        element.classList.add('fade-in');
+      });
+      
+      // Start count-up animations after fade-in begins
+      initCountUpAnimations();
+    }, 300);
+  }
+  
+  /**
+   * Initialize all premium dashboard features
+   */
+  function init() {
+    // Start immediately without skeleton (can be enabled by adding data-skeleton="true" to elements)
+    initCountUpAnimations();
+  }
+  
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 

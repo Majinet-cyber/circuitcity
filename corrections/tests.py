@@ -105,8 +105,8 @@ class TestCorrectionsRegistry(TestCase):
     """Test that vertical adapters are registered correctly."""
     
     def test_registry_has_adapters_for_all_verticals(self):
-        """Test that gym, phones, clothing adapters are registered."""
-        expected_verticals = ['gym', 'phones', 'clothing']
+        """Test that gym, phones, clothing, pharmacy adapters are registered."""
+        expected_verticals = ['gym', 'phones', 'clothing', 'pharmacy']
         for vertical in expected_verticals:
             with self.subTest(vertical=vertical):
                 adapter = registry.get_adapter(vertical)
@@ -149,6 +149,36 @@ class TestCorrectionsRegistry(TestCase):
         
         # Should have at least clothing_sale entity
         self.assertIn('clothing_sale', entities)
+    
+    def test_pharmacy_adapter_has_entities(self):
+        """Test that pharmacy adapter exposes correctable entities."""
+        adapter = registry.get_adapter('pharmacy')
+        entities = adapter.get_entities()
+        
+        # Should have pharmacy entities
+        self.assertIn('pharmacy_product', entities)
+        self.assertIn('pharmacy_batch', entities)
+        self.assertIn('pharmacy_sale', entities)
+        
+        # Check entity config structure
+        from inventory.models import MerchProduct
+        from inventory.models_pharmacy import PharmacyBatch, PharmacySale
+        
+        pharmacy_product = entities['pharmacy_product']
+        self.assertEqual(pharmacy_product.model, MerchProduct)
+        self.assertIn('name', pharmacy_product.fields)
+        self.assertIn('category', pharmacy_product.fields)
+        
+        pharmacy_batch = entities['pharmacy_batch']
+        self.assertEqual(pharmacy_batch.model, PharmacyBatch)
+        self.assertIn('batch_number', pharmacy_batch.fields)
+        self.assertIn('expiry_date', pharmacy_batch.fields)
+        self.assertIn('quantity', pharmacy_batch.fields)
+        
+        pharmacy_sale = entities['pharmacy_sale']
+        self.assertEqual(pharmacy_sale.model, PharmacySale)
+        self.assertIn('quantity', pharmacy_sale.fields)
+        self.assertIn('unit_price', pharmacy_sale.fields)
 
 
 class TestCorrectionsViewsVerticalAware(TestCase):

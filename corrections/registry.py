@@ -125,6 +125,7 @@ class EntityConfig:
         fields: Dict[str, FieldConfig],
         description: str = '',
         business_filter_path: str = 'business',
+        base_filters: Optional[Dict[str, Any]] = None,
     ):
         self.entity_label = entity_label
         self.model = model
@@ -132,6 +133,7 @@ class EntityConfig:
         self.fields = fields
         self.description = description
         self.business_filter_path = business_filter_path  # e.g., 'business' or 'member__business'
+        self.base_filters = base_filters or {}  # Additional filters (e.g., kind='pharmacy')
     
     def get_field(self, field_name: str) -> Optional[FieldConfig]:
         """Get field config by name."""
@@ -223,6 +225,33 @@ class VerticalAdapter(ABC):
             'revenue_impact': Decimal('0.00'),
             'profit_impact': Decimal('0.00'),
         }
+    
+    def post_correction_hook(
+        self,
+        entity_label: str,
+        obj,
+        field_name: str,
+        old_value: Any,
+        new_value: Any,
+    ) -> None:
+        """
+        Optional: Post-correction hook called after a field is updated.
+        
+        Use this to:
+        - Recalculate derived fields (e.g., totals from line items)
+        - Validate business rules (e.g., expiry >= manufacture date)
+        - Trigger side effects (e.g., update related records)
+        
+        This is called AFTER the field is saved but within the same transaction.
+        
+        Args:
+            entity_label: Entity being corrected (e.g., 'pharmacy_sale')
+            obj: The model instance that was just updated
+            field_name: Name of the field that was corrected
+            old_value: Previous value
+            new_value: New value
+        """
+        pass  # Default: no action
 
 
 class VerticalRegistry:

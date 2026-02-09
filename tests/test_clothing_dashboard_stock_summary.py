@@ -441,3 +441,6 @@ class TestClothingDashboardStockSummary(TestCase):
         # Should be empty (no stock)
         self.assertEqual(len(stock_summary), 0, "Stock summary should be empty when no stock")
 
+
+
+

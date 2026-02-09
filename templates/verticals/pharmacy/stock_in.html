@@ -7,79 +7,854 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'css/unified-scanner.css' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}">
 <style>
+/* ============================================================================
+   SINGLE-PAGE STOCK-IN FLOW - PREMIUM CARD-BASED UI
+   ============================================================================ */
+
+:root {
+  --primary-gradient: linear-gradient(120deg, #10b981, #3b82f6);
+  --card-shadow: 0 10px 40px rgba(15, 23, 42, 0.1);
+  --hover-shadow: 0 15px 50px rgba(15, 23, 42, 0.15);
+  --selected-glow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Page Container */
+.stock-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* Hero Header */
+.hero-header {
+  background: var(--primary-gradient);
+  padding: 32px;
+  border-radius: 24px;
+  color: #fff;
+  margin-bottom: 32px;
+  box-shadow: var(--card-shadow);
+}
+
+.hero-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.hero-header h1 {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 32px);
+  font-weight: 800;
+}
+
+.hero-header p {
+  margin: 8px 0 0;
+  opacity: 0.95;
+  font-size: 1.1rem;
+}
+
+/* Layout Grid */
+.main-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+@media (min-width: 1024px) {
+  .main-layout {
+    grid-template-columns: 1fr 320px;
+  }
+}
+
+/* Section Card */
+.section-card {
+  background: #fff;
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 24px;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.section-icon {
+  font-size: 2rem;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(120deg, #dbeafe, #e0e7ff);
+  border-radius: 16px;
+}
+
+.section-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1e293b;
+}
+
+.section-header p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* Selected Badge */
+.selected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(120deg, #d1fae5, #dcfce7);
+  border: 2px solid #10b981;
+  border-radius: 999px;
+  color: #065f46;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 16px;
+}
+
+/* Category Grid */
+.category-search {
+  margin-bottom: 20px;
+}
+
+.category-search input {
+  width: 100%;
+  padding: 14px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.category-search input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: var(--selected-glow);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.category-card {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.category-card:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-4px);
+  box-shadow: var(--hover-shadow);
+}
+
+.category-card.selected {
+  border-color: #3b82f6;
+  background: linear-gradient(120deg, #dbeafe, #e0e7ff);
+  transform: translateY(-4px);
+  box-shadow: var(--selected-glow);
+}
+
+.category-card .icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.category-card .label {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.9rem;
+}
+
+.category-card.selected .label {
+  color: #1e40af;
+}
+
+/* Product Cards */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.product-card {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: left;
+}
+
+.product-card:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-4px);
+  box-shadow: var(--hover-shadow);
+}
+
+.product-card.selected {
+  border-color: #10b981;
+  background: linear-gradient(120deg, #d1fae5, #dcfce7);
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+}
+
+.product-card .product-name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.product-card .product-stock {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #dbeafe;
+  color: #1e40af;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.product-card-create {
+  background: linear-gradient(120deg, #f0fdf4, #dbeafe);
+  border: 2px dashed #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  min-height: 120px;
+}
+
+.product-card-create .icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.product-card-create .label {
+  font-weight: 700;
+  color: #059669;
+  font-size: 0.9rem;
+}
+
+.product-card-create:hover {
+  background: linear-gradient(120deg, #dcfce7, #bfdbfe);
+  border-color: #059669;
+}
+
+/* Suggestion Cards (Popular Products) */
+.suggestions-panel {
+  background: linear-gradient(120deg, #fef3c7, #fce7f3);
+  border: 2px solid #fbbf24;
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.suggestions-header {
+  margin-bottom: 16px;
+}
+
+.suggestions-header h3 {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.suggestions-header p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #78350f;
+  opacity: 0.9;
+}
+
+.suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.suggestion-card {
+  background: #fff;
+  border: 2px solid #fde68a;
+  border-radius: 12px;
+  padding: 14px;
+  transition: var(--transition);
+  position: relative;
+}
+
+.suggestion-card:hover {
+  border-color: #fbbf24;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(251, 191, 36, 0.2);
+}
+
+.suggestion-card-header {
+  margin-bottom: 10px;
+}
+
+.suggestion-card-header .name {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.9rem;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.suggestion-card-header .brand {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.suggestion-card-header .unit {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+.suggestion-card .btn-suggestion {
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+}
+
+.suggestion-card .btn-select {
+  background: #10b981;
+  color: #fff;
+}
+
+.suggestion-card .btn-select:hover {
+  background: #059669;
+  transform: scale(1.02);
+}
+
+.suggestion-card .btn-add {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.suggestion-card .btn-add:hover {
+  background: #2563eb;
+  transform: scale(1.02);
+}
+
+.suggestion-card .btn-adding {
+  background: #94a3b8;
+  color: #fff;
+  cursor: wait;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #10b981;
+  color: #fff;
+  padding: 16px 24px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(16, 185, 129, 0.4);
+  font-weight: 600;
+  z-index: 10000;
+  animation: slideIn 0.3s ease, slideOut 0.3s ease 2.7s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
+/* Barcode Choice Cards */
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.choice-card {
+  background: #fff;
+  border: 3px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.choice-card:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-4px);
+  box-shadow: var(--hover-shadow);
+}
+
+.choice-card.selected {
+  border-color: #10b981;
+  background: linear-gradient(120deg, #d1fae5, #dcfce7);
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+}
+
+.choice-card .icon {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.choice-card .title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.choice-card .subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* Barcode Input */
+.barcode-section {
+  margin-top: 24px;
+  padding: 24px;
+  background: #f8fafc;
+  border-radius: 16px;
+  border: 2px dashed #cbd5e1;
+}
+
+.barcode-input-wrapper {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.barcode-input-wrapper input {
+  flex: 1;
+  padding: 14px 20px;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  transition: var(--transition);
+}
+
+.barcode-input-wrapper input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: var(--selected-glow);
+}
+
 .btn-scanner {
   background: linear-gradient(120deg, #667eea, #764ba2);
   color: white;
   border: none;
   border-radius: 12px;
-  padding: 12px 16px;
-  font-size: 1.2rem;
+  padding: 14px 20px;
+  font-size: 1.3rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition);
+  min-width: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 48px;
-  min-height: 48px;
 }
+
 .btn-scanner:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
-.btn-scanner:active {
-  transform: scale(0.95);
+
+/* Form Fields */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-field label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #475569;
+}
+
+.form-field label .required {
+  color: #dc2626;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea {
+  border-radius: 12px;
+  border: 2px solid #e2e8f0;
+  padding: 12px 16px;
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.form-field input:focus,
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: var(--selected-glow);
+}
+
+.form-field small {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+/* Premium Panels */
+.panels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.panel {
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.panel h3 {
+  margin: 0 0 20px;
+  font-size: 1.1rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Price Helpers */
+.price-helpers {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.chip-btn {
+  background: #f1f5f9;
+  border: 2px solid #e2e8f0;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.chip-btn:hover {
+  background: #e0e7ff;
+  border-color: #3b82f6;
+  color: #1e40af;
+  transform: translateY(-2px);
+}
+
+/* Auto-generate Button */
+.btn-auto {
+  background: linear-gradient(120deg, #8b5cf6, #6366f1);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-auto:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+/* Submit Button */
+.submit-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 2px solid #f1f5f9;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.btn-submit {
+  background: linear-gradient(120deg, #10b981, #059669);
+  color: #fff;
+  font-size: 1.1rem;
+  padding: 16px 40px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+}
+
+.btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 16px 32px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background: #e2e8f0;
+  transform: translateY(-2px);
+}
+
+/* Sticky Summary */
+.sticky-summary {
+  position: sticky;
+  top: 24px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: var(--card-shadow);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.sticky-summary h3 {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+  gap: 12px;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-label {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.summary-value {
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: right;
+  word-break: break-word;
+}
+
+@media (max-width: 1023px) {
+  .sticky-summary {
+    position: relative;
+    top: 0;
+    margin-bottom: 24px;
+  }
+}
+
+/* Success Celebration */
+.success-celebration {
+  background: linear-gradient(120deg, #dcfce7, #d1fae5);
+  border: 3px solid #10b981;
+  border-radius: 24px;
+  padding: 32px;
+  text-align: center;
+  margin-bottom: 24px;
+  animation: fadeIn 0.5s ease;
+}
+
+.success-celebration .icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.success-celebration h2 {
+  color: #065f46;
+  margin: 0 0 8px;
+  font-size: 1.8rem;
+}
+
+.success-celebration p {
+  color: #047857;
+  margin: 0 0 20px;
+  font-size: 1.1rem;
+}
+
+.success-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.success-actions a {
+  border-radius: 999px;
+  padding: 12px 24px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.success-actions .primary {
+  background: #10b981;
+  color: #fff;
+}
+
+.success-actions .secondary {
+  background: #fff;
+  color: #10b981;
+  border: 2px solid #10b981;
+}
+
+.success-actions a:hover {
+  transform: translateY(-2px);
+}
+
+/* Hidden utility */
+.hidden {
+  display: none !important;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 640px) {
+  .stock-container {
+    padding: 16px;
+  }
+  
+  .section-card {
+    padding: 20px;
+  }
+  
+  .category-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 12px;
+  }
+  
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+  
+  .choice-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .panels-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .submit-section {
+    flex-direction: column;
+  }
+  
+  .btn-submit,
+  .btn-secondary {
+    width: 100%;
+    justify-content: center;
+    display: flex;
+  }
 }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<style>
-  .stock-in-page{max-width:800px;margin:24px auto;padding:24px}
-  .wizard-header{background:linear-gradient(120deg,#10b981,#3b82f6);padding:32px;border-radius:24px;color:#fff;text-align:center;margin-bottom:24px}
-  .wizard-header h1{margin:0;font-size:clamp(24px,4vw,36px);font-weight:800}
-  .wizard-header p{margin:8px 0 0;opacity:.9}
-  
-  .form-card{background:#fff;border-radius:24px;padding:32px;box-shadow:0 10px 40px rgba(15,23,42,.1)}
-  .form-section{margin-bottom:32px}
-  .form-section h2{font-size:1.2rem;margin:0 0 16px;color:#1e293b;display:flex;align-items:center;gap:8px}
-  .form-section h2 .icon{font-size:1.4rem}
-  
-  .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
-  .form-field{display:flex;flex-direction:column;gap:6px}
-  .form-field label{font-weight:600;font-size:.95rem;color:#475569}
-  .form-field label .required{color:#dc2626}
-  .form-field input,.form-field select,.form-field textarea{border-radius:12px;border:2px solid #e2e8f0;padding:12px 16px;font-size:1rem;transition:border-color .2s}
-  .form-field input:focus,.form-field select:focus,.form-field textarea:focus{outline:none;border-color:#3b82f6}
-  .form-field textarea{resize:vertical;min-height:80px}
-  .form-field small{color:#64748b;font-size:.85rem}
-  
-  .submit-section{display:flex;gap:12px;justify-content:flex-end;padding-top:16px;border-top:2px solid #f1f5f9}
-  .btn-submit{background:linear-gradient(120deg,#10b981,#059669);color:#fff;border:none;border-radius:999px;padding:14px 32px;font-weight:700;font-size:1.1rem;cursor:pointer;transition:transform .2s,box-shadow .2s}
-  .btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(16,185,129,.3)}
-  .btn-cancel{background:#f1f5f9;color:#475569;border:none;border-radius:999px;padding:14px 32px;font-weight:600;cursor:pointer}
-  
-  /* Success celebration */
-  .success-celebration{background:linear-gradient(120deg,#dcfce7,#d1fae5);border:3px solid #10b981;border-radius:24px;padding:32px;text-align:center;margin-bottom:24px;animation:slideDown .5s ease}
-  .success-celebration .icon{font-size:4rem;margin-bottom:16px}
-  .success-celebration h2{color:#065f46;margin:0 0 8px;font-size:1.8rem}
-  .success-celebration p{color:#047857;margin:0 0 20px;font-size:1.1rem}
-  .success-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .success-actions a{border-radius:999px;padding:12px 24px;font-weight:700;text-decoration:none;transition:transform .2s}
-  .success-actions .primary{background:#10b981;color:#fff}
-  .success-actions .secondary{background:#fff;color:#10b981;border:2px solid #10b981}
-  .success-actions a:hover{transform:translateY(-2px)}
-  
-  @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
-  
-  .product-type-toggle{display:flex;gap:12px;margin-top:8px}
-  .product-type-option{flex:1;padding:12px;border:2px solid #e2e8f0;border-radius:12px;cursor:pointer;text-align:center;font-weight:600;transition:all .2s}
-  .product-type-option:hover{border-color:#cbd5e1;background:#f8fafc}
-  .product-type-option.selected{border-color:#3b82f6;background:#dbeafe;color:#1e40af}
-  .product-type-option input[type="radio"]{display:none}
-</style>
-
-<div class="stock-in-page">
+<div class="stock-container">
   
   {% if success_data %}
   <div class="success-celebration">
@@ -94,185 +869,536 @@
   </div>
   {% endif %}
   
-  <header class="wizard-header">
-    <h1>📦 Pharmacy & Cosmetics Stock In</h1>
-    <p>Add medicine, cosmetics, and personal care products</p>
-  </header>
-
-  <form method="post" class="form-card">
-    {% csrf_token %}
+  <!-- Hero Header -->
+  <div class="hero-header">
+    <div class="hero-content">
+      <div>
+        <h1>📦 Stock In (Pharmacy & Cosmetics)</h1>
+        <p>Add new inventory with our streamlined single-page flow</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="main-layout">
     
-    <div class="form-section">
-      <h2><span class="icon">🏷️</span> Product Information</h2>
-      <div class="form-grid">
-        <div class="form-field">
-          <label>Product Name <span class="required">*</span></label>
-          <input type="text" name="product_name" required placeholder="e.g., Paracetamol 500mg">
-          <small>Generic or brand name</small>
+    <!-- Main Content -->
+    <div>
+      
+      <!-- Section 1: Pick Category -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-icon">🏷️</div>
+          <div>
+            <h2>1. Pick Category</h2>
+            <p>Select the type of product you're adding</p>
+          </div>
         </div>
-        <div class="form-field">
-          <label>SKU</label>
-          <input type="text" name="sku" placeholder="Optional">
+        
+        {% if selected_category %}
+        <div class="selected-badge">
+          ✓ Selected: 
+          {% for cat in category_options %}
+            {% if cat.value == selected_category %}{{ cat.label }}{% endif %}
+          {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="category-search">
+          <input 
+            type="text" 
+            id="category-search" 
+            placeholder="🔍 Search categories..."
+            autocomplete="off">
+        </div>
+        
+        <div class="category-grid" id="category-grid">
+          {% for cat in category_options %}
+          <a href="?category={{ cat.value|urlencode }}" 
+             class="category-card {% if selected_category == cat.value %}selected{% endif %}" 
+             data-value="{{ cat.value }}">
+            <span class="icon">
+              {% if cat.value == "medicine" %}💊
+              {% elif cat.value == "supplements" %}🧴
+              {% elif cat.value == "skin_care" %}✨
+              {% elif cat.value == "hair_care" %}💇
+              {% elif cat.value == "body_care" %}🧼
+              {% elif cat.value == "baby_care" %}🍼
+              {% elif cat.value == "oral_care" %}🦷
+              {% elif cat.value == "perfumes" %}🌸
+              {% elif cat.value == "deodorants" %}💨
+              {% elif cat.value == "makeup" %}💄
+              {% elif cat.value == "soap_hygiene" %}🧽
+              {% elif cat.value == "first_aid" %}🩹
+              {% else %}📦{% endif %}
+            </span>
+            <span class="label">{{ cat.label }}</span>
+          </a>
+          {% endfor %}
         </div>
       </div>
       
-      <!-- Category Selection Dropdown -->
-      <div class="form-field" style="margin-top:16px">
-        <label class="form-label fw-semibold">Select Category <span class="required">*</span></label>
-        <select name="category" class="form-select" required>
-          <option value="" selected disabled>Choose category...</option>
-          {% for c in category_options %}
-            <option value="{{ c.value }}">{{ c.label }}</option>
-          {% endfor %}
-        </select>
-        <small class="text-muted d-block mt-1">Choose the closest match (medicine, skin care, perfumes, etc.)</small>
-      </div>
-
-      <!-- Barcode Workflow -->
-      <div class="form-field" style="margin-top:20px">
-        <label style="display:block;margin-bottom:8px;font-weight:600;">Has Barcode?</label>
-        <div style="display:flex;gap:16px;margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="radio" name="has_barcode" value="no" checked style="cursor:pointer;">
-            <span>No</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-            <input type="radio" name="has_barcode" value="yes" style="cursor:pointer;">
-            <span>Yes</span>
-          </label>
+      <!-- Section 2: Pick Product (only shown if category selected) -->
+      {% if selected_category %}
+      <div class="section-card" id="product-section">
+        <div class="section-header">
+          <div class="section-icon">🔍</div>
+          <div>
+            <h2>2. Pick Product (Optional)</h2>
+            <p>Select an existing item or create new below</p>
+          </div>
         </div>
-        <small style="color:#64748b;font-size:0.85rem;">If your product has a printed barcode, choose Yes and scan/type it. If not, choose No.</small>
+        
+        <!-- NEW: Popular Products Panel -->
+        {% if suggested_cards %}
+        <div class="suggestions-panel">
+          <div class="suggestions-header">
+            <h3>
+              <span>✨</span>
+              Popular in 
+              {% for cat in category_options %}
+                {% if cat.value == selected_category %}{{ cat.label }}{% endif %}
+              {% endfor %}
+            </h3>
+            <p>One-click add the common items customers expect</p>
+          </div>
+          
+          <div class="suggestions-grid">
+            {% for card in suggested_cards %}
+            <div class="suggestion-card" 
+                 data-product-id="{{ card.product_id|default:'' }}"
+                 data-name="{{ card.name }}"
+                 data-brand="{{ card.brand }}"
+                 data-category="{{ selected_category }}"
+                 data-unit="{{ card.unit }}"
+                 data-exists="{{ card.exists|yesno:'true,false' }}">
+              <div class="suggestion-card-header">
+                <div class="name">{{ card.name }}</div>
+                {% if card.brand %}
+                <div class="brand">{{ card.brand }}</div>
+                {% endif %}
+                {% if card.unit %}
+                <div class="unit">Unit: {{ card.unit }}</div>
+                {% endif %}
+              </div>
+              
+              {% if card.exists %}
+                <button type="button" class="btn-suggestion btn-select" data-action="select">
+                  ✓ Select
+                </button>
+              {% else %}
+                <button type="button" class="btn-suggestion btn-add" data-action="add">
+                  + Add to Catalog
+                </button>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <!-- END: Popular Products Panel -->
+        
+        <!-- NEW: Create Custom Product Panel (Always Visible) -->
+        <div class="custom-product-panel" style="background: linear-gradient(120deg, #dbeafe, #e0e7ff); border: 2px solid #3b82f6; border-radius: 20px; padding: 24px; margin-bottom: 24px;">
+          <div class="custom-product-header" style="margin-bottom: 16px;">
+            <h3 style="margin: 0 0 4px; font-size: 1.1rem; font-weight: 700; color: #1e40af; display: flex; align-items: center; gap: 8px;">
+              <span>➕</span>
+              Create Your Own Product
+            </h3>
+            <p style="margin: 0; font-size: 0.85rem; color: #1e40af; opacity: 0.9;">
+              Don't see what you need? Add it to your catalog
+            </p>
+          </div>
+          
+          <div style="background: #fff; border-radius: 12px; padding: 20px;">
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr; gap: 16px;">
+              <div class="form-field">
+                <label style="font-weight: 600; font-size: 0.95rem; color: #475569; margin-bottom: 8px; display: block;">
+                  Product Name <span style="color: #dc2626;">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  id="custom-product-name"
+                  placeholder="e.g., Lattafa Khamrah 100ml"
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1rem;"
+                  autocomplete="off">
+              </div>
+              
+              <div class="form-field">
+                <label style="font-weight: 600; font-size: 0.95rem; color: #475569; margin-bottom: 8px; display: block;">
+                  Brand (Optional)
+                </label>
+                <input 
+                  type="text" 
+                  id="custom-product-brand"
+                  placeholder="e.g., Lattafa"
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1rem;"
+                  autocomplete="off">
+              </div>
+              
+              <div class="form-field">
+                <label style="font-weight: 600; font-size: 0.95rem; color: #475569; margin-bottom: 8px; display: block;">
+                  Unit <span style="color: #dc2626;">*</span>
+                </label>
+                <select 
+                  id="custom-product-unit"
+                  style="width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 1rem; background: #fff;">
+                  <option value="ml">ml (milliliters)</option>
+                  <option value="g">g (grams)</option>
+                  <option value="pcs">pcs (pieces)</option>
+                  <option value="tabs">tabs (tablets)</option>
+                  <option value="caps">caps (capsules)</option>
+                  <option value="sachets">sachets</option>
+                  <option value="bottles">bottles</option>
+                </select>
+              </div>
+              
+              <div style="margin-top: 8px;">
+                <button 
+                  type="button" 
+                  id="btn-create-custom-product"
+                  style="width: 100%; background: linear-gradient(120deg, #3b82f6, #2563eb); color: #fff; border: none; padding: 14px 24px; border-radius: 12px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.3s ease;"
+                  onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(59, 130, 246, 0.4)';"
+                  onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                  <span id="custom-btn-text">🚀 Create & Select Product</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- END: Create Custom Product Panel -->
+        
+        {% if products_list %}
+        <div class="category-search" style="margin-bottom: 20px;">
+          <input 
+            type="text" 
+            id="product-search" 
+            placeholder="🔍 Search products..."
+            autocomplete="off">
+        </div>
+        
+        <div class="product-grid" id="products-grid">
+          {% for product in products_list %}
+          <div class="product-card" data-product-id="{{ product.id }}" data-product-name="{{ product.name }}">
+            <div class="product-name">{{ product.name }}</div>
+            {% if product.sku %}
+            <div style="color: #64748b; font-size: 0.8rem; margin-top: 4px;">SKU: {{ product.sku }}</div>
+            {% endif %}
+            <span class="product-stock">In stock: {{ product.quantity_in_stock|default:0 }}</span>
+          </div>
+          {% endfor %}
+          
+          <div class="product-card product-card-create" id="create-new-card">
+            <span class="icon">➕</span>
+            <span class="label">Create New Product</span>
+          </div>
+        </div>
+        {% else %}
+        <div style="text-align: center; padding: 40px; background: #f8fafc; border-radius: 16px; border: 2px dashed #cbd5e1;">
+          <div style="font-size: 2.5rem; margin-bottom: 12px;">📦</div>
+          <h3 style="color: #475569; margin: 0 0 8px;">No products yet in this category</h3>
+          <p style="color: #64748b; margin: 0;">Fill in the form below to create your first product</p>
+        </div>
+        {% endif %}
       </div>
-
-      <div class="form-field" id="barcode-field" style="display:none;margin-top:12px">
-        <label>Barcode <span class="required">*</span></label>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input type="text" name="barcode" id="barcode-input" placeholder="Scan or type barcode" maxlength="100" style="flex:1;">
-          <button type="button" id="openScannerBtn" class="btn-scanner" title="Open camera scanner">
-            <i class="bi bi-upc-scan"></i>
+      
+      <!-- Section 3: Product Form (single form, always visible if category selected) -->
+      <form method="post" id="stock-in-form">
+        {% csrf_token %}
+        
+        <!-- Hidden Fields -->
+        <input type="hidden" name="category" id="category-hidden" value="{{ selected_category }}" required>
+        <input type="hidden" name="has_barcode" id="has-barcode-hidden" value="no">
+        
+        <!-- Barcode Mode -->
+        <div class="section-card">
+          <div class="section-header">
+            <div class="section-icon">📟</div>
+            <div>
+              <h2>3. Barcode Option</h2>
+              <p>Does this product have a barcode?</p>
+            </div>
+          </div>
+          
+          <div class="choice-grid">
+            <div class="choice-card" data-barcode="yes">
+              <div class="icon">📱</div>
+              <div class="title">Scan Barcode</div>
+              <div class="subtitle">Recommended for faster inventory</div>
+            </div>
+            
+            <div class="choice-card selected" data-barcode="no">
+              <div class="icon">🏷️</div>
+              <div class="title">No Barcode</div>
+              <div class="subtitle">Manual entry only</div>
+            </div>
+          </div>
+          
+          <!-- Barcode Input (hidden by default) -->
+          <div class="barcode-section hidden" id="barcode-section">
+            <label style="font-weight: 600; margin-bottom: 12px; display: block;">
+              Enter Barcode <span style="color: #dc2626;">*</span>
+            </label>
+            <div class="barcode-input-wrapper">
+              <input 
+                type="text" 
+                name="barcode" 
+                id="barcode-input" 
+                placeholder="Scan or type barcode" 
+                maxlength="100"
+                autocomplete="off">
+              <button type="button" id="openScannerBtn" class="btn-scanner" title="Open camera scanner">
+                <i class="bi bi-upc-scan"></i>
+              </button>
+            </div>
+            <small style="color: #64748b; display: block; margin-top: 8px;">
+              Scan with camera or type manually
+            </small>
+          </div>
+        </div>
+        
+        <!-- Product Details -->
+        <div class="section-card">
+          <div class="section-header">
+            <div class="section-icon">📝</div>
+            <div>
+              <h2>4. Product Details</h2>
+              <p>Basic product information</p>
+            </div>
+          </div>
+          
+          <div class="form-grid">
+            <div class="form-field">
+              <label>Product Name <span class="required">*</span></label>
+              <input 
+                type="text" 
+                name="product_name" 
+                id="product-name"
+                required 
+                placeholder="e.g., Paracetamol 500mg"
+                autocomplete="off">
+              <small>Generic or brand name</small>
+            </div>
+            
+            <div class="form-field">
+              <label>SKU</label>
+              <input 
+                type="text" 
+                name="sku" 
+                id="sku"
+                placeholder="Optional"
+                autocomplete="off">
+            </div>
+            
+            <div class="form-field">
+              <label>Supplier</label>
+              <input 
+                type="text" 
+                name="supplier" 
+                id="supplier"
+                placeholder="Supplier name"
+                autocomplete="off">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Quantity & Pricing + Batch & Dates -->
+        <div class="section-card">
+          <div class="section-header">
+            <div class="section-icon">💰</div>
+            <div>
+              <h2>5. Quantity, Pricing & Batch Details</h2>
+              <p>Stock quantities, prices, and batch information</p>
+            </div>
+          </div>
+          
+          <div class="panels-grid">
+            <!-- Panel A: Quantity & Pricing -->
+            <div class="panel">
+              <h3>📊 Quantity & Pricing</h3>
+              
+              <div class="form-field">
+                <label>Quantity <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  name="quantity" 
+                  id="quantity"
+                  required 
+                  min="1" 
+                  placeholder="0">
+                <small>Units in stock</small>
+              </div>
+              
+              <div class="form-field" style="margin-top: 16px;">
+                <label>Reorder Level</label>
+                <input 
+                  type="number" 
+                  name="reorder_level" 
+                  id="reorder-level"
+                  value="10" 
+                  min="0">
+                <small>Alert when stock is low</small>
+              </div>
+              
+              <div class="form-field" style="margin-top: 16px;">
+                <label>Cost Price (per unit) <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  name="cost_price" 
+                  id="cost-price"
+                  required 
+                  step="0.01" 
+                  min="0" 
+                  placeholder="0.00">
+                <small>Your purchase price</small>
+              </div>
+              
+              <!-- Price Helpers -->
+              <div style="margin-top: 12px;">
+                <small style="display: block; margin-bottom: 8px; font-weight: 600;">Quick Price Helpers:</small>
+                <div class="price-helpers">
+                  <button type="button" class="chip-btn" data-margin="10">
+                    +10%
+                  </button>
+                  <button type="button" class="chip-btn" data-margin="20">
+                    +20%
+                  </button>
+                  <button type="button" class="chip-btn" data-margin="0">
+                    Match Cost
+                  </button>
+                </div>
+              </div>
+              
+              <div class="form-field" style="margin-top: 16px;">
+                <label>Selling Price (per unit) <span class="required">*</span></label>
+                <input 
+                  type="number" 
+                  name="selling_price" 
+                  id="selling-price"
+                  required 
+                  step="0.01" 
+                  min="0" 
+                  placeholder="0.00">
+                <small>Customer price</small>
+              </div>
+            </div>
+            
+            <!-- Panel B: Batch & Dates -->
+            <div class="panel">
+              <h3>📅 Batch & Dates</h3>
+              
+              <div class="form-field">
+                <label>Batch Number <span class="required">*</span></label>
+                <div style="display: flex; gap: 8px;">
+                  <input 
+                    type="text" 
+                    name="batch_number" 
+                    id="batch-number"
+                    required 
+                    placeholder="e.g., BT-2026-001"
+                    style="flex: 1;">
+                  <button type="button" class="btn-auto" id="auto-batch-btn">
+                    ✨ Auto
+                  </button>
+                </div>
+                <small>Unique batch identifier</small>
+              </div>
+              
+              <div class="form-field" style="margin-top: 16px;">
+                <label>Manufacture Date</label>
+                <input type="date" name="manufacture_date" id="manufacture-date">
+              </div>
+              
+              <div class="form-field" style="margin-top: 16px;">
+                <label>Expiry Date <span class="required">*</span></label>
+                <input 
+                  type="date" 
+                  name="expiry_date" 
+                  id="expiry-date"
+                  required>
+                <small style="color: #dc2626; font-weight: 600;">
+                  ⚠️ Expiry required for pharmacy stock
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Submit Section -->
+        <div class="submit-section">
+          <a href="{% url 'pharmacy:stock_in' %}" class="btn-secondary">Reset Form</a>
+          <button type="submit" class="btn-submit">
+            ✅ Add Stock
           </button>
         </div>
-        <small style="color:#64748b;font-size:0.85rem;">Required when Has Barcode = Yes</small>
-      </div>
-    </div>
-
-    <div class="form-section">
-      <h2><span class="icon">📊</span> Quantity & Pricing</h2>
-      <div class="form-grid">
-        <div class="form-field">
-          <label>Quantity <span class="required">*</span></label>
-          <input type="number" name="quantity" required min="1" placeholder="0">
-          <small>Units in stock</small>
-        </div>
-        <div class="form-field">
-          <label>Reorder Level</label>
-          <input type="number" name="reorder_level" value="10" min="0">
-          <small>Alert when stock is low</small>
+        
+      </form>
+      {% else %}
+      <!-- Prompt to select category -->
+      <div class="section-card">
+        <div style="text-align: center; padding: 40px;">
+          <div style="font-size: 3rem; margin-bottom: 16px;">👆</div>
+          <h3 style="color: #475569; margin: 0 0 8px;">Select a category above to continue</h3>
+          <p style="color: #64748b; margin: 0;">Choose the type of product you want to add</p>
         </div>
       </div>
+      {% endif %}
       
-      <div class="form-grid">
-        <div class="form-field">
-          <label>Cost Price (per unit) <span class="required">*</span></label>
-          <input type="number" name="cost_price" required step="0.01" min="0" placeholder="0.00">
-          <small>Your purchase price</small>
-        </div>
-        <div class="form-field">
-          <label>Selling Price (per unit) <span class="required">*</span></label>
-          <input type="number" name="selling_price" required step="0.01" min="0" placeholder="0.00">
-          <small>Customer price</small>
-        </div>
-      </div>
     </div>
-
-    <div class="form-section">
-      <h2><span class="icon">📅</span> Batch & Dates</h2>
-      <div class="form-grid">
-        <div class="form-field">
-          <label>Batch Number <span class="required">*</span></label>
-          <input type="text" name="batch_number" required placeholder="e.g., BT-2025-001">
+    
+    <!-- Sticky Summary (Desktop Only) -->
+    {% if selected_category %}
+    <aside>
+      <div class="sticky-summary">
+        <h3>📋 Summary</h3>
+        
+        <div class="summary-item">
+          <span class="summary-label">Category</span>
+          <span class="summary-value" id="summary-category">
+            {% for cat in category_options %}
+              {% if cat.value == selected_category %}{{ cat.label }}{% endif %}
+            {% endfor %}
+          </span>
         </div>
-        <div class="form-field">
-          <label>Manufacture Date</label>
-          <input type="date" name="manufacture_date">
+        
+        <div class="summary-item">
+          <span class="summary-label">Barcode Mode</span>
+          <span class="summary-value" id="summary-barcode">No Barcode</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="summary-label">Product Name</span>
+          <span class="summary-value" id="summary-product">—</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="summary-label">Quantity</span>
+          <span class="summary-value" id="summary-quantity">—</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="summary-label">Cost Price</span>
+          <span class="summary-value" id="summary-cost">—</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="summary-label">Selling Price</span>
+          <span class="summary-value" id="summary-selling">—</span>
+        </div>
+        
+        <div class="summary-item">
+          <span class="summary-label">Expiry Date</span>
+          <span class="summary-value" id="summary-expiry">—</span>
         </div>
       </div>
-      
-      <div class="form-field">
-        <label>Expiry Date <span class="required">*</span></label>
-        <input type="date" name="expiry_date" required>
-        <small>Must be after manufacture date</small>
-      </div>
-    </div>
-
-    <div class="form-section">
-      <h2><span class="icon">🏢</span> Supplier & Notes</h2>
-      <div class="form-field">
-        <label>Supplier</label>
-        <input type="text" name="supplier" placeholder="Supplier name">
-      </div>
-      
-      <div class="form-field">
-        <label>Description / Notes</label>
-        <textarea name="description" placeholder="Additional notes about this product..."></textarea>
-      </div>
-    </div>
-
-    <div class="submit-section">
-      <a href="{% url 'pharmacy:dashboard' %}" class="btn-cancel">Cancel</a>
-      <button type="submit" class="btn-submit">💾 Add to Stock</button>
-    </div>
-  </form>
-
+    </aside>
+    {% endif %}
+    
+  </div>
 </div>
 
-<script>
-// Legacy function (kept for compatibility with other product type toggles if any)
-function selectProductType(element, value) {
-  document.querySelectorAll('.product-type-option').forEach(opt => {
-    opt.classList.remove('selected');
-  });
-  element.classList.add('selected');
-  if (element.querySelector('input[type="radio"]')) {
-    element.querySelector('input[type="radio"]').checked = true;
-  }
-}
+<script src="{% static 'js/pharmacy-stock-in.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 
-// Barcode workflow: show/hide barcode field based on radio selection
-function toggleBarcodeField() {
-  const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
-  const barcodeField = document.getElementById('barcode-field');
-  const barcodeInput = document.getElementById('barcode-input');
-  
-  if (hasBarcodeYes && hasBarcodeYes.checked) {
-    barcodeField.style.display = 'block';
-    if (barcodeInput) barcodeInput.required = true;
-  } else {
-    barcodeField.style.display = 'none';
-    if (barcodeInput) {
-      barcodeInput.required = false;
-      barcodeInput.value = '';
-    }
-  }
-}
-
-// Initialize barcode workflow on page load and bfcache restore
-document.addEventListener('DOMContentLoaded', function() {
-  const barcodeRadios = document.querySelectorAll('input[name="has_barcode"]');
-  barcodeRadios.forEach(radio => {
-    radio.addEventListener('change', toggleBarcodeField);
-  });
-  toggleBarcodeField();
-});
-
-window.addEventListener('pageshow', function(event) {
-  if (event.persisted) {
-    toggleBarcodeField();
-  }
-});
-</script>
-
-<!-- Barcode Scanner Integration (Rear Camera) -->
+<!-- Barcode Scanner Integration -->
 <script src="{% static 'js/unified-scanner.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 <script>
 (function() {
@@ -280,19 +1406,275 @@ window.addEventListener('pageshow', function(event) {
   
   let barcodeScanner = null;
   
-  // Initialize scanner when DOM is ready
+  // ==================== SUGGESTION CARDS LOGIC ====================
+  
+  function showToast(message, isSuccess = true) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.style.background = isSuccess ? '#10b981' : '#ef4444';
+    toast.innerHTML = `<span>${isSuccess ? '✅' : '❌'}</span> ${message}`;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  }
+  
+  function initSuggestionCards() {
+    const suggestionCards = document.querySelectorAll('.suggestion-card');
+    
+    suggestionCards.forEach(card => {
+      const button = card.querySelector('.btn-suggestion');
+      if (!button) return;
+      
+      button.addEventListener('click', async function() {
+        const action = this.getAttribute('data-action');
+        const productId = card.getAttribute('data-product-id');
+        const productName = card.getAttribute('data-name');
+        const productBrand = card.getAttribute('data-brand');
+        const productCategory = card.getAttribute('data-category');
+        const productUnit = card.getAttribute('data-unit');
+        const exists = card.getAttribute('data-exists') === 'true';
+        
+        if (action === 'select' && exists) {
+          // Select existing product - prefill the form
+          const productNameInput = document.getElementById('product-name');
+          if (productNameInput) {
+            productNameInput.value = productName;
+            productNameInput.style.borderColor = '#10b981';
+            productNameInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+            
+            // Scroll to form
+            const formSection = document.getElementById('stock-in-form');
+            if (formSection) {
+              formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            
+            setTimeout(() => {
+              productNameInput.style.borderColor = '';
+              productNameInput.style.boxShadow = '';
+            }, 2000);
+          }
+          
+          showToast(`Selected: ${productName}`);
+          
+        } else if (action === 'add' && !exists) {
+          // Add to catalog via API
+          button.textContent = 'Adding...';
+          button.classList.remove('btn-add');
+          button.classList.add('btn-adding');
+          button.disabled = true;
+          
+          try {
+            const response = await fetch('{% url "pharmacy:api_add_product_suggestion" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+              },
+              body: JSON.stringify({
+                category: productCategory,
+                name: productName,
+                brand: productBrand,
+                unit: productUnit
+              })
+            });
+            
+            const data = await response.json();
+            
+            if (data.ok) {
+              // Success - update card to show "Select" button
+              card.setAttribute('data-exists', 'true');
+              card.setAttribute('data-product-id', data.product_id);
+              
+              button.textContent = '✓ Select';
+              button.classList.remove('btn-adding', 'btn-add');
+              button.classList.add('btn-select');
+              button.setAttribute('data-action', 'select');
+              button.disabled = false;
+              
+              showToast(`Added: ${data.name}`);
+              
+              // Auto-select the newly created product
+              const productNameInput = document.getElementById('product-name');
+              if (productNameInput) {
+                productNameInput.value = data.name;
+                productNameInput.style.borderColor = '#10b981';
+                productNameInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+                
+                setTimeout(() => {
+                  productNameInput.style.borderColor = '';
+                  productNameInput.style.boxShadow = '';
+                }, 2000);
+              }
+              
+              // Reload page to update existing products list
+              setTimeout(() => {
+                window.location.href = '?category=' + encodeURIComponent(productCategory);
+              }, 1500);
+              
+            } else {
+              showToast(data.error || 'Failed to add product', false);
+              button.textContent = '+ Add to Catalog';
+              button.classList.remove('btn-adding');
+              button.classList.add('btn-add');
+              button.disabled = false;
+            }
+            
+          } catch (error) {
+            console.error('Error adding product:', error);
+            showToast('Network error. Please try again.', false);
+            button.textContent = '+ Add to Catalog';
+            button.classList.remove('btn-adding');
+            button.classList.add('btn-add');
+            button.disabled = false;
+          }
+        }
+      });
+    });
+  }
+  
+  // ==================== CUSTOM PRODUCT CREATION ====================
+  
+  function initCustomProductCreation() {
+    const createBtn = document.getElementById('btn-create-custom-product');
+    if (!createBtn) return;
+    
+    createBtn.addEventListener('click', async function() {
+      const nameInput = document.getElementById('custom-product-name');
+      const brandInput = document.getElementById('custom-product-brand');
+      const unitSelect = document.getElementById('custom-product-unit');
+      const categoryHidden = document.getElementById('category-hidden');
+      const btnText = document.getElementById('custom-btn-text');
+      
+      if (!nameInput || !unitSelect || !categoryHidden) return;
+      
+      const name = nameInput.value.trim();
+      const brand = brandInput ? brandInput.value.trim() : '';
+      const unit = unitSelect.value;
+      const category = categoryHidden.value;
+      
+      // Validation
+      if (!name) {
+        showToast('Please enter a product name', false);
+        nameInput.focus();
+        nameInput.style.borderColor = '#ef4444';
+        setTimeout(() => {
+          nameInput.style.borderColor = '';
+        }, 2000);
+        return;
+      }
+      
+      if (!category) {
+        showToast('Please select a category first', false);
+        return;
+      }
+      
+      // Disable button and show loading
+      createBtn.disabled = true;
+      btnText.textContent = '⏳ Creating...';
+      
+      try {
+        const response = await fetch('{% url "pharmacy:api_add_product_suggestion" %}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify({
+            category: category,
+            name: name,
+            brand: brand,
+            unit: unit
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.ok) {
+          // Success
+          showToast(`Added to catalog ✅: ${data.name}`);
+          
+          // Auto-select the newly created product in the main form
+          const productNameInput = document.getElementById('product-name');
+          if (productNameInput) {
+            productNameInput.value = data.name;
+            productNameInput.style.borderColor = '#10b981';
+            productNameInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+            
+            // Update summary panel
+            const summaryProduct = document.getElementById('summary-product');
+            if (summaryProduct) {
+              summaryProduct.textContent = data.name;
+            }
+            
+            setTimeout(() => {
+              productNameInput.style.borderColor = '';
+              productNameInput.style.boxShadow = '';
+            }, 2000);
+          }
+          
+          // Clear the custom product inputs
+          nameInput.value = '';
+          if (brandInput) brandInput.value = '';
+          unitSelect.selectedIndex = 0;
+          
+          // Scroll to the main form
+          const formSection = document.getElementById('stock-in-form');
+          if (formSection) {
+            formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          
+          // Reload page after a short delay to update product list
+          setTimeout(() => {
+            window.location.href = '?category=' + encodeURIComponent(category);
+          }, 1500);
+          
+        } else {
+          showToast(data.error || 'Failed to create product', false);
+        }
+        
+      } catch (error) {
+        console.error('Error creating custom product:', error);
+        showToast('Network error. Please try again.', false);
+      } finally {
+        // Re-enable button
+        createBtn.disabled = false;
+        btnText.textContent = '🚀 Create & Select Product';
+      }
+    });
+    
+    // Allow Enter key to submit
+    const nameInput = document.getElementById('custom-product-name');
+    if (nameInput) {
+      nameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          createBtn.click();
+        }
+      });
+    }
+  }
+  
+  // ==================== BARCODE SCANNER LOGIC ====================
+  
   document.addEventListener('DOMContentLoaded', function() {
+    // Initialize suggestion cards
+    initSuggestionCards();
+    
+    // Initialize custom product creation
+    initCustomProductCreation();
+    
+    // Initialize barcode scanner
     const openScannerBtn = document.getElementById('openScannerBtn');
     const barcodeInput = document.getElementById('barcode-input');
     
     if (!openScannerBtn || !barcodeInput) return;
     
-    // Create unified scanner instance
     barcodeScanner = new UnifiedScanner({
       mode: 'barcode',
       targetInput: barcodeInput,
       onSelect: function(barcode) {
-        // Show success feedback (input is already auto-filled by UnifiedScanner)
         barcodeInput.style.borderColor = '#10b981';
         barcodeInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
         setTimeout(() => {
@@ -305,13 +1687,11 @@ window.addEventListener('pageshow', function(event) {
       }
     });
     
-    // Open scanner on button click
     openScannerBtn.addEventListener('click', function() {
       barcodeScanner.open();
     });
   });
   
-  // Cleanup on page unload
   window.addEventListener('beforeunload', function() {
     if (barcodeScanner) {
       barcodeScanner.destroy();
@@ -321,4 +1701,3 @@ window.addEventListener('pageshow', function(event) {
 </script>
 
 {% endblock %}
-

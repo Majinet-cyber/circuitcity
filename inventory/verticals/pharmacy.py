@@ -31,8 +31,13 @@ def hub(request):
     """
     Pharmacy & Cosmetics Hub - Navigation center for the pharmacy vertical.
     Shows tiles/cards for accessing key features: dashboard, stock-in, sell, batches, etc.
+    Enhanced with first-glance badge counts on each category card.
     """
+    from django.utils import timezone
+    from datetime import timedelta
+    
     business: Business = request.business
+    today = timezone.now().date()
 
     # Get basic counts for display
     batches = PharmacyBatch.objects.filter(business=business, is_archived=False).select_related("merch_product")
@@ -44,11 +49,45 @@ def hub(request):
     from inventory.models import MerchProduct
 
     products_count = MerchProduct.objects.filter(business=business, kind="pharmacy", is_active=True).count()
+    
+    # ===== BADGE COUNTS FOR CARDS =====
+    # Near Expiry: batches expiring in next 30 days
+    near_expiry_count = batches.filter(
+        expiry_date__gte=today,
+        expiry_date__lte=today + timedelta(days=30)
+    ).count()
+    
+    # Expired Batches: batches that have already expired
+    expired_count = batches.filter(expiry_date__lt=today).count()
+    
+    # Low Stock: batches at or below reorder threshold
+    from django.db.models import F
+    low_stock_count = batches.filter(quantity__lte=F("reorder_level")).count()
+    
+    # Active batches count (for "View Batches" card)
+    active_batches_count = total_batches
+    
+    # Sales History: last 30 days transaction count
+    thirty_days_ago = today - timedelta(days=30)
+    from inventory.models_pharmacy import PharmacySale
+    recent_sales_count = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date__gte=thirty_days_ago,
+        sold_at__date__lte=today,
+        is_deleted=False,
+        is_reversed=False,
+    ).count()
 
     ctx = {
         "total_batches": total_batches,
         "total_stock_value": total_stock_value,
         "products_count": products_count,
+        # Badge counts for cards
+        "near_expiry_count": near_expiry_count,
+        "expired_count": expired_count,
+        "low_stock_count": low_stock_count,
+        "active_batches_count": active_batches_count,
+        "recent_sales_count": recent_sales_count,
     }
 
     return render(request, "verticals/pharmacy/hub.html", ctx)
@@ -390,7 +429,8 @@ def fast_sell_kpis_api(request):
 def sales_trend_json(request):
     """
     JSON endpoint for pharmacy sales trend data.
-    Returns data suitable for Chart.js.
+    Returns UNIT COUNTS (not revenue) suitable for Chart.js.
+    All values are integers for clean chart display.
     """
     from django.http import JsonResponse
     from datetime import timedelta, datetime
@@ -416,33 +456,42 @@ def sales_trend_json(request):
         start_date = today - timedelta(days=6)
         end_date = today
 
-    # Build sales queryset
-    sales_qs = PharmacySale.objects.filter(business=business)
+    # Build sales queryset (exclude deleted/reversed sales)
+    sales_qs = PharmacySale.objects.filter(
+        business=business,
+        is_deleted=False,
+        is_reversed=False,
+    )
 
     # Generate daily data for the date range
     labels = []
+    units_sold_values = []  # Changed from count_values to be more explicit
     revenue_values = []
-    count_values = []
 
     current_date = start_date
     while current_date <= end_date:
         # Get sales for this day
         day_sales = sales_qs.filter(sold_at__date=current_date)
+        
+        # Units sold = sum of quantity (integer)
+        day_units = day_sales.aggregate(total=Sum("quantity"))["total"] or 0
+        
+        # Revenue for optional display
         day_revenue = day_sales.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
-        day_count = day_sales.count()
 
         labels.append(current_date.strftime("%b %d"))
+        units_sold_values.append(int(day_units))  # Ensure integer
         revenue_values.append(float(day_revenue))
-        count_values.append(day_count)
 
         current_date += timedelta(days=1)
 
-    # Add cache-busting metadata
+    # Return with explicit units_sold key (count is legacy alias)
     return JsonResponse(
         {
             "labels": labels,
-            "revenue": revenue_values,
-            "count": count_values,
+            "units_sold": units_sold_values,  # Primary metric (integer units)
+            "count": units_sold_values,  # Legacy alias for backward compatibility
+            "revenue": revenue_values,  # Optional for dual-axis charts
             "period": range_param,
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),

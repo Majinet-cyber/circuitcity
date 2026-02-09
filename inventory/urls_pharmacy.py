@@ -42,6 +42,8 @@ urlpatterns = [
     # API endpoints
     path("api/batch/<int:batch_id>/", views_pharmacy.api_batch_info, name="api_batch_info"),
     path("api/products/search/", views_pharmacy.api_product_search, name="api_product_search"),
+    path("api/products-by-category/", views_pharmacy.api_products_by_category, name="api_products_by_category"),  # NEW: Get products filtered by category
     path("api/stock-in/", views_pharmacy.api_stock_in, name="api_stock_in"),
     path("api/sell/", views_pharmacy.api_sell, name="api_sell"),
+    path("api/product-suggestions/add/", views_pharmacy.api_add_product_suggestion, name="api_add_product_suggestion"),  # NEW: Add suggested product to catalog
 ]

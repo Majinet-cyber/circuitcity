@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
-from django.db.models import Sum, Count, Q, F
+from django.db.models import Sum, Count, Q, F, DecimalField
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -381,7 +381,70 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
 
     # ===== ADDITIONAL KPIs FOR ENHANCED DASHBOARD =====
     # Calculate stock value at cost (sum of cost_price * quantity for all batches)
-    total_stock_value_cost = sum(b.stock_value_cost for b in batches)
+    # CRITICAL FIX: Use aggregate for efficiency instead of iterating
+    from django.db.models import F as DjangoF
+    from django.db.models.functions import Coalesce
+    
+    # Stock value at cost (safe handling of NULL prices)
+    total_stock_value_cost = batches.aggregate(
+        total=Sum(
+            Coalesce(DjangoF("cost_price"), Decimal("0")) * DjangoF("quantity"),
+            output_field=DecimalField(max_digits=14, decimal_places=2)
+        )
+    )["total"] or Decimal("0")
+    
+    # Potential revenue (stock value at selling price)
+    potential_revenue = batches.aggregate(
+        total=Sum(
+            Coalesce(DjangoF("selling_price"), Decimal("0")) * DjangoF("quantity"),
+            output_field=DecimalField(max_digits=14, decimal_places=2)
+        )
+    )["total"] or Decimal("0")
+    
+    # ===== DETAILED OPERATIONAL SUMMARIES =====
+    # In-stock items (batches with quantity > 0)
+    in_stock_count = batches.filter(quantity__gt=0).count()
+    
+    # Out of stock items (batches with quantity = 0)
+    out_of_stock_count = batches.filter(quantity=0).count()
+    
+    # Total products count (already calculated above as products_count)
+    
+    # Active batches count (non-archived)
+    active_batches_count = batches.count()
+    
+    # Today's sales amount (already calculated if range_param == 'today')
+    today_sales = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date=today,
+        is_deleted=False,
+        is_reversed=False,
+    )
+    today_sales_amount = today_sales.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+    today_sales_count_actual = today_sales.count()
+    
+    # This month's sales amount
+    month_start = today.replace(day=1)
+    month_sales = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date__gte=month_start,
+        sold_at__date__lte=today,
+        is_deleted=False,
+        is_reversed=False,
+    )
+    month_sales_amount = month_sales.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")
+    month_sales_count = month_sales.count()
+    
+    # Last 7 days units sold total
+    seven_days_ago = today - timedelta(days=6)
+    last_7_days_sales = PharmacySale.objects.filter(
+        business=business,
+        sold_at__date__gte=seven_days_ago,
+        sold_at__date__lte=today,
+        is_deleted=False,
+        is_reversed=False,
+    )
+    last_7_days_units = last_7_days_sales.aggregate(total=Sum("quantity"))["total"] or 0
     
     # Top category by revenue (last 30 days)
     thirty_days_ago = today - timedelta(days=30)
@@ -425,8 +488,9 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "active_tab": "home",  # Highlights the dashboard/home tab in mobile nav
         # Stock metrics (current state)
         "total_batches": total_batches,
-        "total_stock_value": total_stock_value,  # At selling price
-        "total_stock_value_cost": total_stock_value_cost,  # At cost price
+        "total_stock_value": total_stock_value,  # At selling price (legacy)
+        "total_stock_value_cost": total_stock_value_cost,  # At cost price (FIXED)
+        "potential_revenue": potential_revenue,  # Stock value at selling price (new key)
         "products_count": products_count,
         "total_products": products_count,  # Alias for template compatibility
         "medicine_count": medicine_count,
@@ -435,6 +499,15 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "near_expiry_count": near_expiry_batches.count(),
         "expired_count": expired_batches.count(),
         "low_stock_count": low_stock_batches.count(),
+        # ===== DETAILED OPERATIONAL SUMMARIES =====
+        "in_stock_count": in_stock_count,  # Items with qty > 0
+        "out_of_stock_count": out_of_stock_count,  # Items with qty = 0
+        "active_batches_count": active_batches_count,  # Non-archived batches
+        "today_sales_amount": today_sales_amount,  # Today's revenue
+        "today_sales_count_actual": today_sales_count_actual,  # Today's transaction count
+        "month_sales_amount": month_sales_amount,  # This month's revenue
+        "month_sales_count": month_sales_count,  # This month's transaction count
+        "last_7_days_units": last_7_days_units,  # Last 7 days units sold total
         # Period metrics (filtered by date range)
         "period_revenue": period_revenue,
         "period_profit": period_profit,
@@ -465,12 +538,13 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         # Subscription (safe - None if not available)
         "subscription": subscription,
         # Backward compatibility (today's metrics for legacy templates)
-        "today_revenue": period_revenue if range_param == "today" else Decimal("0.00"),
+        "today_revenue": today_sales_amount,  # Use actual today's sales
         "today_profit": period_profit if range_param == "today" else Decimal("0.00"),
-        "today_sales_count": period_sales_count if range_param == "today" else 0,
+        "today_sales_count": today_sales_count_actual,  # Use actual today's count
         # ===== ENHANCED DASHBOARD KPIs =====
         "top_category_name": top_category_name,
         "fast_movers_count": fast_movers_count,
+        "fast_movers": list(fast_movers),  # Fast moving products (top 3)
         # What Needs Attention panels
         "expiring_soon_items": expiring_soon_items,
         "out_of_stock_items": out_of_stock_items,
@@ -1283,8 +1357,53 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
     LEGACY: Form-based stock-in (kept as fallback).
     Single-page form for adding new stock with validation and celebration.
     NEW USERS SHOULD USE pharmacy_stock_in_wizard INSTEAD.
+    
+    NOW WITH SERVER-DRIVEN NAVIGATION: Works without JavaScript.
+    Query params: ?step=1&category=medicine
     """
     business: Business = request.business
+    
+    # ===== SERVER-DRIVEN STEP NAVIGATION =====
+    # Read query parameters for step and category
+    step = int(request.GET.get("step", "1"))
+    selected_category = request.GET.get("category", "").strip()
+    
+    # Query products if category is selected (for Step 2)
+    products_list = []
+    suggested_cards = []
+    if selected_category:
+        products_list = MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            category=selected_category,
+            is_active=True
+        ).order_by("name")[:40]  # Limit to 40 products for performance
+        
+        # NEW: Compute suggested products for smart recommendations
+        from inventory.pharmacy_suggestions import get_suggestions_for_category
+        
+        seed = get_suggestions_for_category(selected_category)
+        
+        # Build a lookup dict of existing products by normalized name
+        existing_qs = MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            category=selected_category,
+            is_active=True
+        )
+        existing_by_name = {p.name.strip().lower(): p for p in existing_qs}
+        
+        # Build suggested_cards with exists flag and product_id
+        for s in seed:
+            key = s["name"].strip().lower()
+            p = existing_by_name.get(key)
+            suggested_cards.append({
+                "name": s["name"],
+                "brand": s.get("brand", ""),
+                "unit": s.get("unit", ""),
+                "exists": bool(p),
+                "product_id": p.id if p else None,
+            })
 
     if request.method == "POST":
         # Extract form data
@@ -1499,6 +1618,11 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
     ctx = {
         "success_data": success_data,
         "category_options": category_options,
+        # Server-driven navigation
+        "step": step,
+        "selected_category": selected_category,
+        "products_list": products_list,
+        "suggested_cards": suggested_cards,  # NEW: Smart product suggestions
     }
 
     return render(request, "verticals/pharmacy/stock_in.html", ctx)
@@ -2582,6 +2706,51 @@ def api_product_search(request: HttpRequest) -> JsonResponse:
 
 @login_required
 @require_business
+def api_products_by_category(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint to fetch products filtered by category.
+    Used by stock-in custom form to show existing products after category selection.
+    Returns JSON with product data (id, name, brand, sku, price, in_stock).
+    """
+    business: Business = request.business
+    category = request.GET.get("category", "").strip()
+
+    if not category:
+        return JsonResponse({"error": "Category parameter required"}, status=400)
+
+    # Fetch products for this business + category (limit 40, active only)
+    products = (
+        MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            category=category,
+            is_active=True,
+        )
+        .order_by("name")[:40]
+    )
+
+    products_data = []
+    for p in products:
+        # Calculate total stock from batches
+        total_stock = PharmacyBatch.objects.filter(
+            business=business,
+            merch_product=p,
+        ).aggregate(total=Sum("quantity"))["total"] or 0
+
+        products_data.append({
+            "id": p.id,
+            "name": p.name,
+            "brand": getattr(p, "spec_label", "") or "",  # spec_label is used for brand/variant
+            "sku": p.sku or "",
+            "price": str(p.selling_price) if p.selling_price else "0.00",
+            "in_stock": int(total_stock),
+        })
+
+    return JsonResponse({"products": products_data})
+
+
+@login_required
+@require_business
 @require_POST
 def api_stock_in(request: HttpRequest) -> JsonResponse:
     """
@@ -2727,3 +2896,97 @@ def api_sell(request: HttpRequest) -> JsonResponse:
     except Exception as e:
         logger.error(f"Sell API error: {e}", exc_info=True)
         return JsonResponse({"success": False, "error": "Sale failed"}, status=500)
+
+
+@login_required
+@require_business
+@require_POST
+def api_add_product_suggestion(request: HttpRequest) -> JsonResponse:
+    """
+    API endpoint to add a suggested product to the catalog (idempotent).
+    
+    POST /pharmacy/api/product-suggestions/add/
+    Payload:
+        - category: Category code (e.g., "medicine", "skin_care")
+        - name: Product name
+        - brand: Optional brand name
+        - unit: Optional unit (e.g., "tabs", "ml")
+    
+    Returns:
+        {
+            "ok": true,
+            "product_id": 123,
+            "created": true/false,
+            "name": "Product Name"
+        }
+    """
+    import json
+    
+    business: Business = request.business
+    
+    try:
+        data = json.loads(request.body)
+        category = data.get("category", "").strip()
+        name = data.get("name", "").strip()
+        brand = data.get("brand", "").strip()
+        unit = data.get("unit", "").strip()
+        
+        # Validation
+        if not category:
+            return JsonResponse({"ok": False, "error": "Category is required"}, status=400)
+        if not name:
+            return JsonResponse({"ok": False, "error": "Product name is required"}, status=400)
+        
+        # Validate category against allowed values
+        VALID_CATEGORIES = [
+            "medicine", "supplements", "skin_care", "hair_care", "body_care",
+            "baby_care", "oral_care", "perfumes", "deodorants", "makeup",
+            "soap_hygiene", "first_aid", "other",
+        ]
+        if category not in VALID_CATEGORIES:
+            return JsonResponse({"ok": False, "error": f"Invalid category: {category}"}, status=400)
+        
+        # Check if product already exists (case-insensitive lookup)
+        existing_product = MerchProduct.objects.filter(
+            business=business,
+            kind="pharmacy",
+            category=category,
+            name__iexact=name
+        ).first()
+        
+        if existing_product:
+            # Product already exists - return it
+            return JsonResponse({
+                "ok": True,
+                "product_id": existing_product.id,
+                "created": False,
+                "name": existing_product.name,
+            })
+        
+        # Create new product
+        with transaction.atomic():
+            product = MerchProduct.objects.create(
+                business=business,
+                name=name,
+                kind="pharmacy",
+                category=category,
+                is_active=True,
+                spec_label="",  # Required field
+                unit=unit if unit else "piece",
+            )
+            
+            # Optionally store brand info (if you have a brand field or want to use description)
+            # For now, we'll just create the basic product
+            
+        return JsonResponse({
+            "ok": True,
+            "product_id": product.id,
+            "created": True,
+            "name": product.name,
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+    except Exception as e:
+        logger.error(f"Add product suggestion error: {e}", exc_info=True)
+        return JsonResponse({"ok": False, "error": "Failed to add product"}, status=500)

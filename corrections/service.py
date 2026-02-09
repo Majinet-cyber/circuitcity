@@ -405,9 +405,22 @@ class CorrectionService:
                             business=self.business,
                         )
                         
+                        # Store old value for hook
+                        old_value = self._deserialize_value(item.old_value)
+                        new_value = self._deserialize_value(item.new_value)
+                        
                         # Apply correction
-                        setattr(obj, item.field_name, self._deserialize_value(item.new_value))
+                        setattr(obj, item.field_name, new_value)
                         obj.save(update_fields=[item.field_name, 'updated_at'])
+                        
+                        # Call post-correction hook (for recompute, validation, etc.)
+                        adapter.post_correction_hook(
+                            entity_label=item.entity_label,
+                            obj=obj,
+                            field_name=item.field_name,
+                            old_value=old_value,
+                            new_value=new_value,
+                        )
                         
                         # Mark item as applied
                         item.applied_at = timezone.now()

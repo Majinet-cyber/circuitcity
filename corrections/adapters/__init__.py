@@ -12,6 +12,7 @@ Auto-discovery:
 from corrections.adapters import phones  # noqa: F401
 from corrections.adapters import clothing  # noqa: F401
 from corrections.adapters import gym  # noqa: F401
+from corrections.adapters import pharmacy  # noqa: F401
 
 # TODO: Add more adapters as they're implemented
 # from corrections.adapters import liquor  # noqa: F401
