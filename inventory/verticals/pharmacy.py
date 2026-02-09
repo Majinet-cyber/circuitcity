@@ -428,73 +428,194 @@ def fast_sell_kpis_api(request):
 @require_business_kind(BusinessKind.PHARMACY)
 def sales_trend_json(request):
     """
-    JSON endpoint for pharmacy sales trend data.
-    Returns UNIT COUNTS (not revenue) suitable for Chart.js.
-    All values are integers for clean chart display.
+    JSON endpoint for pharmacy sales trend data (PREMIUM FILTERS).
+    Returns both REVENUE and UNITS suitable for Chart.js with toggle.
+    Supports: today, 7d, 30d, this_month, last_month, this_year, custom + product filtering.
+    Automatically aggregates by day/week/month based on date range.
     """
     from django.http import JsonResponse
     from datetime import timedelta, datetime
+    from dateutil.relativedelta import relativedelta
+    from django.db.models import Sum
+    from django.db.models.functions import TruncDate, TruncWeek, TruncMonth, Coalesce
     from inventory.models_pharmacy import PharmacySale
+    from inventory.models import MerchProduct
 
     business: Business = request.business
 
     # Parse date range from request
-    range_param = request.GET.get("range", "7d")
-
-    # Simple date parsing
+    range_param = request.GET.get("range", "30d")
     from django.utils import timezone as django_tz
 
     today = django_tz.now().date()
 
     if range_param == "today":
-        start_date = today
-        end_date = today
-    elif range_param == "mtd":
-        start_date = today.replace(day=1)
-        end_date = today
-    else:  # Default to 7d
+        start_date = end_date = today
+    elif range_param == "7d":
         start_date = today - timedelta(days=6)
         end_date = today
+    elif range_param == "30d":
+        start_date = today - timedelta(days=29)
+        end_date = today
+    elif range_param == "this_month":
+        start_date = today.replace(day=1)
+        end_date = today
+    elif range_param == "last_month":
+        first_of_this_month = today.replace(day=1)
+        first_of_last_month = first_of_this_month - relativedelta(months=1)
+        last_day_of_last_month = first_of_this_month - timedelta(days=1)
+        start_date = first_of_last_month
+        end_date = last_day_of_last_month
+    elif range_param == "this_year":
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+    elif range_param == "custom":
+        start_str = request.GET.get("start", "")
+        end_str = request.GET.get("end", "")
+        try:
+            start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+            end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+        except (ValueError, TypeError):
+            # Fallback to 30d
+            start_date = today - timedelta(days=29)
+            end_date = today
+            range_param = "30d"
+    elif range_param == "mtd":
+        # Legacy support
+        start_date = today.replace(day=1)
+        end_date = today
+        range_param = "this_month"
+    else:
+        # Default to 30d
+        start_date = today - timedelta(days=29)
+        end_date = today
+        range_param = "30d"
+
+    # Calculate date range span
+    date_span_days = (end_date - start_date).days + 1
+
+    # Determine aggregation level (daily, weekly, or monthly buckets)
+    if date_span_days <= 60:
+        trunc_func = TruncDate
+        date_format = "%b %d"
+        bucket_type = "daily"
+    elif date_span_days <= 365:
+        trunc_func = TruncWeek
+        date_format = "W%U"
+        bucket_type = "weekly"
+    else:
+        trunc_func = TruncMonth
+        date_format = "%b %Y"
+        bucket_type = "monthly"
 
     # Build sales queryset (exclude deleted/reversed sales)
     sales_qs = PharmacySale.objects.filter(
         business=business,
+        sold_at__date__gte=start_date,
+        sold_at__date__lte=end_date,
         is_deleted=False,
         is_reversed=False,
     )
 
-    # Generate daily data for the date range
+    # Apply product filter if specified (premium feature)
+    product_id = request.GET.get("product_id", "")
+    if product_id:
+        try:
+            product_id = int(product_id)
+            # Verify product exists
+            if MerchProduct.objects.filter(id=product_id, business=business, kind="pharmacy").exists():
+                sales_qs = sales_qs.filter(batch__merch_product__id=product_id)
+        except (ValueError, TypeError):
+            pass
+
+    # Aggregate by date bucket
+    from django.db import models
+    
+    aggregated_sales = (
+        sales_qs.annotate(date_bucket=trunc_func("sold_at"))
+        .values("date_bucket")
+        .annotate(
+            revenue=Coalesce(Sum("total_amount"), Decimal("0.00"), output_field=models.DecimalField(max_digits=14, decimal_places=2)),
+            units=Coalesce(Sum("quantity"), 0, output_field=models.IntegerField())
+        )
+        .order_by("date_bucket")
+    )
+
+    # Build lookup dictionary
+    sales_by_bucket = {}
+    for item in aggregated_sales:
+        date_bucket = item["date_bucket"]
+        if date_bucket:
+            # For TruncDate, date_bucket is a date object
+            # For TruncWeek/TruncMonth, it's a datetime object
+            if hasattr(date_bucket, 'date'):
+                key = date_bucket.date().isoformat()
+            else:
+                key = date_bucket.isoformat()
+            sales_by_bucket[key] = {
+                "revenue": float(item["revenue"]),
+                "units": int(item["units"])
+            }
+
+    # Generate complete date series (fill missing buckets with zeros)
     labels = []
-    units_sold_values = []  # Changed from count_values to be more explicit
     revenue_values = []
+    units_sold_values = []
 
-    current_date = start_date
-    while current_date <= end_date:
-        # Get sales for this day
-        day_sales = sales_qs.filter(sold_at__date=current_date)
-        
-        # Units sold = sum of quantity (integer)
-        day_units = day_sales.aggregate(total=Sum("quantity"))["total"] or 0
-        
-        # Revenue for optional display
-        day_revenue = day_sales.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
+    if bucket_type == "daily":
+        current_date = start_date
+        while current_date <= end_date:
+            date_key = current_date.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(current_date.strftime(date_format))
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date += timedelta(days=1)
+    elif bucket_type == "weekly":
+        # Weekly aggregation: group by week start (Monday)
+        current_date = start_date
+        while current_date <= end_date:
+            # Find Monday of this week
+            week_start = current_date - timedelta(days=current_date.weekday())
+            date_key = week_start.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(f"Week {current_date.strftime('%U')}")
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date += timedelta(days=7)
+    else:  # monthly
+        current_date = start_date.replace(day=1)
+        while current_date <= end_date:
+            date_key = current_date.isoformat()
+            data = sales_by_bucket.get(date_key, {"revenue": 0.0, "units": 0})
+            
+            labels.append(current_date.strftime(date_format))
+            revenue_values.append(data["revenue"])
+            units_sold_values.append(data["units"])
+            
+            current_date = (current_date + relativedelta(months=1)).replace(day=1)
 
-        labels.append(current_date.strftime("%b %d"))
-        units_sold_values.append(int(day_units))  # Ensure integer
-        revenue_values.append(float(day_revenue))
-
-        current_date += timedelta(days=1)
+    # Check if there's actual data
+    has_data = any(r > 0 for r in revenue_values) or any(u > 0 for u in units_sold_values)
 
     # Return with explicit units_sold key (count is legacy alias)
     return JsonResponse(
         {
             "labels": labels,
-            "units_sold": units_sold_values,  # Primary metric (integer units)
+            "revenue": revenue_values,
+            "units": units_sold_values,
+            "units_sold": units_sold_values,  # Alias for clarity
             "count": units_sold_values,  # Legacy alias for backward compatibility
-            "revenue": revenue_values,  # Optional for dual-axis charts
+            "has_data": has_data,
+            "bucket_type": bucket_type,
             "period": range_param,
             "start_date": start_date.isoformat(),
             "end_date": end_date.isoformat(),
+            "date_span_days": date_span_days,
             "timestamp": django_tz.now().isoformat(),
         }
     )

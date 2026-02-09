@@ -3,6 +3,17 @@
 
 {% block title %}Pharmacy & Cosmetics Dashboard · Emajinet{% endblock %}
 
+{% block extra_head %}
+<!-- Bootstrap Icons CDN for funnel icon -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- Select2 CDN for product dropdown -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+{% endblock %}
+
 {% block content %}
 
 <style>
@@ -17,7 +28,7 @@
     padding: 16px;
   }
   
-  /* ========== HEADER ========== */
+  /* ========== HEADER WITH FILTER BUTTON ========== */
   .dashboard-header {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     padding: 24px 28px;
@@ -25,6 +36,15 @@
     color: #fff;
     margin-bottom: 24px;
     box-shadow: 0 8px 32px rgba(16, 185, 129, 0.2);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  
+  .dashboard-header-left {
+    flex: 1;
   }
   
   .dashboard-header h1 {
@@ -38,6 +58,173 @@
     margin: 6px 0 0;
     opacity: 0.92;
     font-size: 0.95rem;
+  }
+  
+  .filter-button {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  
+  .filter-button:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .filter-button i {
+    font-size: 1.1rem;
+  }
+  
+  /* Filter Badge (Active Indicator) */
+  .filter-badge {
+    background: #ef4444;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  
+  /* ========== OFFCANVAS FILTER PANEL ========== */
+  .offcanvas-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    padding: 24px;
+  }
+  
+  .offcanvas-title {
+    font-weight: 700;
+    font-size: 1.3rem;
+  }
+  
+  .btn-close {
+    filter: brightness(0) invert(1);
+  }
+  
+  .offcanvas-body {
+    padding: 24px;
+  }
+  
+  .filter-group {
+    margin-bottom: 24px;
+  }
+  
+  .filter-label {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0f172a;
+    margin-bottom: 8px;
+    display: block;
+  }
+  
+  .filter-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  
+  .filter-preset-btn {
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  
+  .filter-preset-btn:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .filter-preset-btn.active {
+    background: #10b981;
+    border-color: #10b981;
+    color: #fff;
+  }
+  
+  .filter-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+  }
+  
+  .filter-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  }
+  
+  .filter-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  
+  .btn-apply {
+    flex: 1;
+    background: #10b981;
+    color: #fff;
+    border: none;
+    padding: 14px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-apply:hover {
+    background: #059669;
+    transform: translateY(-1px);
+  }
+  
+  .btn-reset {
+    background: #f8fafc;
+    color: #475569;
+    border: 2px solid #e2e8f0;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .btn-reset:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+  
+  .custom-date-inputs {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  
+  .custom-date-inputs.show {
+    display: grid;
   }
   
   /* ========== EXECUTIVE ROW (Primary KPIs) ========== */
@@ -97,7 +284,7 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
   }
   
   .kpi-icon {
@@ -128,23 +315,110 @@
     font-weight: 500;
   }
   
-  .kpi-delta {
+  /* Premium: Range Badge */
+  .range-badge {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1e40af;
+    padding: 4px 10px;
+    border-radius: 6px;
     font-size: 0.75rem;
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 6px;
-    display: inline-block;
-    margin-top: 6px;
+    margin-top: 8px;
   }
   
-  .kpi-delta.positive {
-    background: #d1fae5;
-    color: #059669;
+  /* ========== TREND GRAPH CARD (PREMIUM) ========== */
+  .trend-section {
+    margin-bottom: 28px;
   }
   
-  .kpi-delta.neutral {
+  .trend-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    border: 1px solid #e2e8f0;
+  }
+  
+  .trend-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .trend-title-group {
+    flex: 1;
+  }
+  
+  .trend-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .trend-subtitle {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin: 0;
+  }
+  
+  .trend-toggle {
+    display: flex;
     background: #f1f5f9;
+    border-radius: 10px;
+    padding: 4px;
+  }
+  
+  .trend-toggle-btn {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
     color: #64748b;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  
+  .trend-toggle-btn.active {
+    background: #fff;
+    color: #10b981;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .trend-toggle-btn:hover:not(.active) {
+    color: #0f172a;
+  }
+  
+  .chart-wrap {
+    position: relative;
+    height: 350px;
+    width: 100%;
+  }
+  
+  .chart-empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: #94a3b8;
+  }
+  
+  .chart-empty-icon {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+  }
+  
+  .chart-empty-text {
+    font-size: 1rem;
+    line-height: 1.6;
   }
   
   /* ========== OPERATIONAL HEALTH ROW ========== */
@@ -214,121 +488,6 @@
   .op-link:hover {
     color: #2563eb;
     gap: 6px;
-  }
-  
-  /* ========== CHARTS SECTION ========== */
-  .charts-section {
-    margin-bottom: 28px;
-  }
-  
-  .charts-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  
-  @media (min-width: 900px) {
-    .charts-grid {
-      grid-template-columns: 1fr 1fr;
-    }
-  }
-  
-  .chart-card {
-    background: #fff;
-    border-radius: 14px;
-    padding: 24px;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
-    border: 1px solid #e2e8f0;
-  }
-  
-  .chart-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  
-  .chart-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .chart-total {
-    font-size: 0.9rem;
-    font-weight: 700;
-    color: #10b981;
-    background: #d1fae5;
-    padding: 4px 12px;
-    border-radius: 8px;
-  }
-  
-  .chart-empty {
-    text-align: center;
-    padding: 60px 20px;
-    color: #94a3b8;
-  }
-  
-  .chart-empty-icon {
-    font-size: 3rem;
-    margin-bottom: 12px;
-    opacity: 0.3;
-  }
-  
-  .chart-empty-text {
-    font-size: 0.95rem;
-    line-height: 1.6;
-  }
-  
-  /* Payment Mix Legend */
-  .payment-legend {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 16px;
-  }
-  
-  .payment-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 12px;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    transition: all 0.2s;
-  }
-  
-  .payment-item:hover {
-    background: #fff;
-    border-color: #cbd5e1;
-    transform: translateX(4px);
-  }
-  
-  .payment-method {
-    font-weight: 600;
-    color: #0f172a;
-    font-size: 0.9rem;
-  }
-  
-  .payment-stats {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    font-size: 0.85rem;
-  }
-  
-  .payment-amount {
-    color: #64748b;
-    font-weight: 600;
-  }
-  
-  .payment-count {
-    color: #94a3b8;
   }
   
   /* ========== INVENTORY RISK PANEL ========== */
@@ -571,6 +730,11 @@
       margin-bottom: 20px;
     }
     
+    .filter-button {
+      width: 100%;
+      justify-content: center;
+    }
+    
     .kpi-grid {
       grid-template-columns: 1fr;
       gap: 12px;
@@ -578,10 +742,24 @@
     
     .executive-row,
     .operational-row,
-    .charts-section,
+    .trend-section,
     .risk-section,
     .analytics-section {
       margin-bottom: 20px;
+    }
+    
+    .trend-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .trend-toggle {
+      width: 100%;
+    }
+    
+    .trend-toggle-btn {
+      flex: 1;
+      text-align: center;
     }
     
     .data-table {
@@ -600,46 +778,116 @@
 </style>
 
 <div class="pharmacy-dashboard">
-  <!-- ========== HEADER ========== -->
+  <!-- ========== HEADER WITH FILTER BUTTON ========== -->
   <div class="dashboard-header">
-    <h1>💊 Pharmacy & Cosmetics Dashboard</h1>
-    <p>{{ active_business.name }} · {{ active_location.name }}</p>
+    <div class="dashboard-header-left">
+      <h1>💊 Pharmacy & Cosmetics Dashboard</h1>
+      <p>{{ active_business.name }} · {{ active_location.name }}</p>
+    </div>
+    <button class="filter-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+      <i class="bi bi-funnel"></i>
+      <span>Filter</span>
+      {% if product_filter_name or range_param != '30d' %}
+        <span class="filter-badge">Active</span>
+      {% endif %}
+    </button>
+  </div>
+  
+  <!-- ========== FILTER OFFCANVAS PANEL ========== -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="filterPanel" aria-labelledby="filterPanelLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="filterPanelLabel">
+        <i class="bi bi-funnel me-2"></i>Filter Dashboard
+      </h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <form id="filterForm" method="GET" action="">
+        <!-- Date Range Presets -->
+        <div class="filter-group">
+          <label class="filter-label">Date Range</label>
+          <div class="filter-preset-grid">
+            <button type="button" class="filter-preset-btn" data-range="today" {% if range_param == 'today' %}class="filter-preset-btn active"{% endif %}>Today</button>
+            <button type="button" class="filter-preset-btn" data-range="7d" {% if range_param == '7d' %}class="filter-preset-btn active"{% endif %}>Last 7 Days</button>
+            <button type="button" class="filter-preset-btn active" data-range="30d" {% if range_param == '30d' %}class="filter-preset-btn active"{% endif %}>Last 30 Days</button>
+            <button type="button" class="filter-preset-btn" data-range="this_month" {% if range_param == 'this_month' %}class="filter-preset-btn active"{% endif %}>This Month</button>
+            <button type="button" class="filter-preset-btn" data-range="last_month" {% if range_param == 'last_month' %}class="filter-preset-btn active"{% endif %}>Last Month</button>
+            <button type="button" class="filter-preset-btn" data-range="this_year" {% if range_param == 'this_year' %}class="filter-preset-btn active"{% endif %}>This Year</button>
+            <button type="button" class="filter-preset-btn" data-range="custom" {% if range_param == 'custom' %}class="filter-preset-btn active"{% endif %}>Custom</button>
+          </div>
+          
+          <!-- Custom Date Inputs (hidden by default) -->
+          <div id="customDateInputs" class="custom-date-inputs {% if range_param == 'custom' %}show{% endif %}">
+            <div>
+              <label class="filter-label" style="font-size: 0.8rem;">Start Date</label>
+              <input type="date" id="startDate" name="start" class="filter-input" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label class="filter-label" style="font-size: 0.8rem;">End Date</label>
+              <input type="date" id="endDate" name="end" class="filter-input" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+          </div>
+          
+          <!-- Hidden range input -->
+          <input type="hidden" id="rangeInput" name="range" value="{{ range_param }}">
+        </div>
+        
+        <!-- Product Filter -->
+        <div class="filter-group">
+          <label class="filter-label" for="productFilter">Product (Optional)</label>
+          <select id="productFilter" name="product_id" class="filter-input" style="width: 100%;">
+            <option value="">All Products</option>
+            {% for product in products_all %}
+              <option value="{{ product.id }}" {% if product_id == product.id %}selected{% endif %}>{{ product.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <!-- Actions -->
+        <div class="filter-actions">
+          <button type="button" id="resetBtn" class="btn-reset">Reset</button>
+          <button type="submit" class="btn-apply">Apply Filters</button>
+        </div>
+      </form>
+    </div>
   </div>
   
   <!-- ========== EXECUTIVE ROW (Primary KPIs) ========== -->
   <div class="executive-row">
     <h2 class="row-title">📊 Executive Summary</h2>
     <div class="kpi-grid">
-      <!-- Today's Sales -->
+      <!-- Period Revenue -->
       <div class="kpi-card">
         <div class="kpi-header">
           <span class="kpi-icon">💰</span>
-          <p class="kpi-label">Today's Sales</p>
+          <p class="kpi-label">Revenue</p>
         </div>
-        <h3 class="kpi-value">MWK {{ today_sales_amount|default:0|floatformat:0|intcomma }}</h3>
+        <h3 class="kpi-value">MWK {{ period_revenue|default:0|floatformat:0|intcomma }}</h3>
         <p class="kpi-sublabel">
-          {% if today_sales_count_actual %}
-            {{ today_sales_count_actual }} transaction{{ today_sales_count_actual|pluralize }}
+          {% if period_sales_count %}
+            {{ period_sales_count }} transaction{{ period_sales_count|pluralize }}
           {% else %}
-            No sales yet today
+            No sales in this period
           {% endif %}
         </p>
+        <span class="range-badge">{{ period_label }}</span>
       </div>
       
-      <!-- This Month -->
+      <!-- Period Profit -->
       <div class="kpi-card">
         <div class="kpi-header">
           <span class="kpi-icon">📈</span>
-          <p class="kpi-label">This Month</p>
+          <p class="kpi-label">Profit</p>
         </div>
-        <h3 class="kpi-value">MWK {{ month_sales_amount|default:0|floatformat:0|intcomma }}</h3>
+        <h3 class="kpi-value">MWK {{ period_profit|default:0|floatformat:0|intcomma }}</h3>
         <p class="kpi-sublabel">
-          {% if month_sales_count %}
-            {{ month_sales_count }} transaction{{ month_sales_count|pluralize }}
+          {% if period_revenue > 0 %}
+            {% widthratio period_profit period_revenue 100 %}% margin
           {% else %}
-            No sales this month
+            No margin data
           {% endif %}
         </p>
+        <span class="range-badge">{{ period_label }}</span>
       </div>
       
       <!-- Stock Value (Cost) -->
@@ -650,16 +898,49 @@
         </div>
         <h3 class="kpi-value">MWK {{ total_stock_value_cost|default:0|floatformat:0|intcomma }}</h3>
         <p class="kpi-sublabel">Capital invested in inventory</p>
+        <span class="range-badge">Current</span>
       </div>
       
-      <!-- Units Sold (7 days) -->
+      <!-- Units Sold -->
       <div class="kpi-card">
         <div class="kpi-header">
           <span class="kpi-icon">📊</span>
-          <p class="kpi-label">Units Sold (7 days)</p>
+          <p class="kpi-label">Units Sold</p>
         </div>
-        <h3 class="kpi-value">{{ last_7_days_units|default:0|intcomma }}</h3>
-        <p class="kpi-sublabel">Items sold this week</p>
+        <h3 class="kpi-value">
+          {% if period_sales %}
+            {{ period_sales|length|intcomma }}
+          {% else %}
+            0
+          {% endif %}
+        </h3>
+        <p class="kpi-sublabel">Items sold in period</p>
+        <span class="range-badge">{{ period_label }}</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- ========== TREND GRAPH (PREMIUM) ========== -->
+  <div class="trend-section">
+    <div class="trend-card">
+      <div class="trend-header">
+        <div class="trend-title-group">
+          <h3 class="trend-title">
+            <span>📊</span> Sales Trend
+          </h3>
+          <p class="trend-subtitle">{{ period_label }}{% if product_filter_name %} · {{ product_filter_name }}{% endif %}</p>
+        </div>
+        <div class="trend-toggle">
+          <button type="button" class="trend-toggle-btn active" data-metric="revenue">Revenue</button>
+          <button type="button" class="trend-toggle-btn" data-metric="units">Units</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trendChart"></canvas>
+      </div>
+      <div id="trendChartEmpty" class="chart-empty" style="display: none;">
+        <div class="chart-empty-icon">📈</div>
+        <p class="chart-empty-text">No sales recorded for this period.<br>Your trend will appear here after your first sale.</p>
       </div>
     </div>
   </div>
@@ -687,7 +968,7 @@
         </div>
         <h3 class="op-value">{{ out_of_stock_count|default:0|intcomma }}</h3>
         <p class="op-helper">Need immediate restocking</p>
-        <a href="{% url 'pharmacy:stock_in_simple' %}" class="op-link">Restock now →</a>
+        <a href="{% url 'pharmacy:stock_in_choice' %}" class="op-link">Restock now →</a>
       </div>
       
       <!-- Low Stock Alerts -->
@@ -698,7 +979,7 @@
         </div>
         <h3 class="op-value">{{ low_stock_count|default:0|intcomma }}</h3>
         <p class="op-helper">Below reorder threshold</p>
-        <a href="{% url 'pharmacy:low_stock' %}" class="op-link">See details →</a>
+        <a href="{% url 'pharmacy:batch_list' %}" class="op-link">See details →</a>
       </div>
       
       <!-- Near Expiry (30 days) -->
@@ -709,58 +990,7 @@
         </div>
         <h3 class="op-value">{{ near_expiry_count|default:0|intcomma }}</h3>
         <p class="op-helper">Expiring in next 30 days</p>
-        <a href="{% url 'pharmacy:near_expiry' %}" class="op-link">View list →</a>
-      </div>
-    </div>
-  </div>
-  
-  <!-- ========== CHARTS SECTION ========== -->
-  <div class="charts-section">
-    <div class="charts-grid">
-      <!-- Units Sold Chart -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3 class="chart-title">
-            <span>📊</span> Units Sold (Last 7 Days)
-          </h3>
-          <span class="chart-total">{{ last_7_days_units|default:0|intcomma }} units</span>
-        </div>
-        {% if last_7_days_units > 0 %}
-          <canvas id="unitsSoldChart" style="max-height: 250px;"></canvas>
-        {% else %}
-          <div class="chart-empty">
-            <div class="chart-empty-icon">📈</div>
-            <p class="chart-empty-text">No sales recorded yet.<br>Your trend will appear here after your first sale.</p>
-          </div>
-        {% endif %}
-      </div>
-      
-      <!-- Payment Mix Chart -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <h3 class="chart-title">
-            <span>💳</span> Payment Mix (Last 30 Days)
-          </h3>
-        </div>
-        {% if payment_mix %}
-          <canvas id="paymentMixChart" style="max-height: 200px; max-width: 200px; margin: 0 auto;"></canvas>
-          <div class="payment-legend">
-            {% for method in payment_mix %}
-            <div class="payment-item">
-              <span class="payment-method">{{ method.method }}</span>
-              <div class="payment-stats">
-                <span class="payment-amount">MWK {{ method.amount|floatformat:0|intcomma }}</span>
-                <span class="payment-count">{{ method.count }} tx</span>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="chart-empty">
-            <div class="chart-empty-icon">💳</div>
-            <p class="chart-empty-text">No payment data available yet.<br>Complete sales to see payment breakdown.</p>
-          </div>
-        {% endif %}
+        <a href="{% url 'pharmacy:batch_list' %}" class="op-link">View list →</a>
       </div>
     </div>
   </div>
@@ -775,7 +1005,7 @@
         <p class="risk-title">Expired Batches</p>
         <h3 class="risk-value">{{ expired_count|default:0|intcomma }}</h3>
         <p class="risk-helper">Remove immediately</p>
-        <a href="{% url 'pharmacy:expired' %}" class="risk-cta">View expired list →</a>
+        <a href="{% url 'pharmacy:batch_list' %}" class="risk-cta">View expired list →</a>
       </div>
       
       <!-- Expiring Soon (30 days) -->
@@ -784,15 +1014,15 @@
         <p class="risk-title">Expiring Soon (30 days)</p>
         <h3 class="risk-value">{{ near_expiry_count|default:0|intcomma }}</h3>
         <p class="risk-helper">Plan reorder / sell-through</p>
-        <a href="{% url 'pharmacy:near_expiry' %}" class="risk-cta">Plan action →</a>
+        <a href="{% url 'pharmacy:batch_list' %}" class="risk-cta">Plan action →</a>
       </div>
       
       <!-- Fast Movers -->
       <div class="risk-card info">
         <div class="risk-icon">🔥</div>
-        <p class="risk-title">Fast Movers (30 days)</p>
-        {% if fast_movers_count > 0 %}
-          <h3 class="risk-value">{{ fast_movers_count }}</h3>
+        <p class="risk-title">Fast Movers</p>
+        {% if top_products %}
+          <h3 class="risk-value">{{ top_products|length }}</h3>
           <p class="risk-helper">Top selling items</p>
           <div class="fast-movers-list">
             {% for mover in top_products|slice:":3" %}
@@ -812,7 +1042,7 @@
   
   <!-- ========== TOP SELLERS & CATEGORIES ========== -->
   <div class="analytics-section">
-    <h2 class="section-title">🏆 Top Performers (Last 30 Days)</h2>
+    <h2 class="section-title">🏆 Top Performers · {{ period_label }}</h2>
     <div class="analytics-grid">
       <!-- Top Sellers -->
       <div class="table-card">
@@ -846,7 +1076,7 @@
           </table>
         {% else %}
           <div class="table-empty">
-            <p>No sales data yet.<br>Your top sellers will appear here after sales.</p>
+            <p>No sales data for this period.<br>Your top sellers will appear here after sales.</p>
           </div>
         {% endif %}
       </div>
@@ -891,113 +1121,178 @@
   
 </div>
 
-<!-- ========== CHART.JS ========== -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<!-- ========== JAVASCRIPT ========== -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // ========== UNITS SOLD CHART ==========
-  const unitsCtx = document.getElementById('unitsSoldChart');
-  if (unitsCtx) {
-    fetch('{% url "verticals:pharmacy_sales_trend_json" %}?range=7d&t=' + Date.now())
-      .then(response => response.json())
-      .then(data => {
-        const unitsData = data.units_sold || data.count || [];
-        const maxValue = Math.max(...unitsData, 5);
-        
-        new Chart(unitsCtx, {
-          type: 'line',
-          data: {
-            labels: data.labels || [],
-            datasets: [{
-              label: 'Units Sold',
-              data: unitsData,
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.12)',
-              tension: 0.4,
-              fill: true,
-              borderWidth: 3,
-              pointRadius: 5,
-              pointHoverRadius: 7,
-              pointBackgroundColor: '#10b981',
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                mode: 'index',
-                intersect: false,
-                callbacks: {
-                  label: function(context) {
-                    const value = Math.round(context.parsed.y);
-                    return value + ' unit' + (value !== 1 ? 's' : '');
-                  }
-                }
-              }
-            },
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: {
-                  stepSize: 1,
-                  precision: 0,
-                  callback: function(value) {
-                    return Math.round(value);
-                  }
-                },
-                suggestedMax: Math.ceil(maxValue * 1.2)
-              },
-              x: {
-                grid: { display: false }
-              }
-            }
-          }
-        });
-      })
-      .catch(error => {
-        console.error('Error loading units chart:', error);
-      });
-  }
+  // ========== FILTER PANEL LOGIC ==========
+  const filterForm = document.getElementById('filterForm');
+  const rangeInput = document.getElementById('rangeInput');
+  const customDateInputs = document.getElementById('customDateInputs');
+  const presetBtns = document.querySelectorAll('.filter-preset-btn');
+  const resetBtn = document.getElementById('resetBtn');
   
-  // ========== PAYMENT MIX CHART ==========
-  const paymentCtx = document.getElementById('paymentMixChart');
-  if (paymentCtx) {
-    {% if payment_mix %}
-    const paymentData = {
-      labels: [{% for method in payment_mix %}'{{ method.method }}'{% if not forloop.last %}, {% endif %}{% endfor %}],
-      datasets: [{
-        data: [{% for method in payment_mix %}{{ method.amount }}{% if not forloop.last %}, {% endif %}{% endfor %}],
-        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'],
-        borderWidth: 4,
-        borderColor: '#fff'
-      }]
-    };
+  // Handle range preset button clicks
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const range = this.dataset.range;
+      
+      // Update active state
+      presetBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Update hidden input
+      rangeInput.value = range;
+      
+      // Show/hide custom date inputs
+      if (range === 'custom') {
+        customDateInputs.classList.add('show');
+      } else {
+        customDateInputs.classList.remove('show');
+      }
+    });
+  });
+  
+  // Reset button
+  resetBtn.addEventListener('click', function() {
+    window.location.href = window.location.pathname + '?range=30d';
+  });
+  
+  // Initialize Select2 for product filter
+  $('#productFilter').select2({
+    placeholder: 'Search products...',
+    allowClear: true,
+    dropdownParent: $('#filterPanel'),
+    width: '100%'
+  });
+  
+  // ========== TREND CHART ==========
+  let trendChart = null;
+  let trendData = null;
+  let activeMetric = 'revenue';
+  
+  const trendCanvas = document.getElementById('trendChart');
+  const trendEmpty = document.getElementById('trendChartEmpty');
+  const toggleBtns = document.querySelectorAll('.trend-toggle-btn');
+  
+  // Build API URL with current filter params
+  const urlParams = new URLSearchParams(window.location.search);
+  const apiUrl = '{% url "verticals:pharmacy_sales_trend_json" %}?' + urlParams.toString() + '&t=' + Date.now();
+  
+  // Fetch trend data
+  fetch(apiUrl, { credentials: 'same-origin' })
+    .then(response => {
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+        throw new Error('Invalid response');
+      }
+      return response.json();
+    })
+    .then(data => {
+      trendData = data;
+      
+      // Check if there's data
+      if (!data.has_data || !data.labels || data.labels.length === 0) {
+        trendCanvas.style.display = 'none';
+        trendEmpty.style.display = 'block';
+        return;
+      }
+      
+      // Show chart
+      trendCanvas.style.display = 'block';
+      trendEmpty.style.display = 'none';
+      
+      // Render initial chart (revenue)
+      renderTrendChart('revenue');
+    })
+    .catch(error => {
+      console.error('Error loading trend chart:', error);
+      trendCanvas.style.display = 'none';
+      trendEmpty.style.display = 'block';
+    });
+  
+  // Toggle metric (Revenue / Units)
+  toggleBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+      const metric = this.dataset.metric;
+      
+      // Update active state
+      toggleBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Re-render chart with new metric
+      activeMetric = metric;
+      renderTrendChart(metric);
+    });
+  });
+  
+  // Render Chart.js trend chart
+  function renderTrendChart(metric) {
+    if (!trendData || !trendData.labels) return;
     
-    new Chart(paymentCtx, {
-      type: 'doughnut',
-      data: paymentData,
+    const values = metric === 'revenue' ? trendData.revenue : trendData.units;
+    const label = metric === 'revenue' ? 'Revenue (MWK)' : 'Units Sold';
+    const color = metric === 'revenue' ? '#10b981' : '#3b82f6';
+    const bgColor = metric === 'revenue' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)';
+    
+    // Destroy existing chart
+    if (trendChart) {
+      trendChart.destroy();
+    }
+    
+    // Create new chart
+    const ctx = trendCanvas.getContext('2d');
+    trendChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: trendData.labels,
+        datasets: [{
+          label: label,
+          data: values,
+          backgroundColor: bgColor,
+          borderColor: color,
+          borderWidth: 2,
+          borderRadius: 6,
+          maxBarThickness: 50,
+        }]
+      },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
           tooltip: {
+            mode: 'index',
+            intersect: false,
             callbacks: {
               label: function(context) {
-                const label = context.label || '';
-                const value = context.parsed || 0;
-                return label + ': MWK ' + value.toLocaleString();
+                const value = context.parsed.y;
+                if (metric === 'revenue') {
+                  return 'MWK ' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                } else {
+                  return Math.round(value) + ' unit' + (value !== 1 ? 's' : '');
+                }
               }
             }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                if (metric === 'revenue') {
+                  return 'K ' + (value / 1000).toFixed(0);
+                } else {
+                  return Math.round(value);
+                }
+              }
+            }
+          },
+          x: {
+            grid: { display: false }
           }
         }
       }
     });
-    {% endif %}
   }
 });
 </script>

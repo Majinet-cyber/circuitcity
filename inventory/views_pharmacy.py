@@ -49,15 +49,16 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     business: Business = request.business
     today = timezone.now().date()
 
-    # ===== DATE FILTERING =====
-    # Parse date range from query params (Today, 7d, Month, Custom)
+    # ===== DATE FILTERING (PREMIUM) =====
+    # Parse date range from query params (Today, 7d, 30d, This Month, Last Month, This Year, Custom)
     from hq.utils_dates import get_period_from_request
     from datetime import datetime
+    from dateutil.relativedelta import relativedelta
 
-    range_param = request.GET.get("range", "today")
+    range_param = request.GET.get("range", "30d")  # Default to Last 30 Days (premium UX)
     start_date = None
     end_date = None
-    period_label = "Today"
+    period_label = "Last 30 Days"
 
     if range_param == "today":
         start_date = end_date = today
@@ -66,22 +67,67 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         start_date = today - timedelta(days=6)
         end_date = today
         period_label = "Last 7 Days"
-    elif range_param == "month":
+    elif range_param == "30d":
+        start_date = today - timedelta(days=29)
+        end_date = today
+        period_label = "Last 30 Days"
+    elif range_param == "this_month":
         start_date = today.replace(day=1)
         end_date = today
         period_label = "This Month"
+    elif range_param == "last_month":
+        first_of_this_month = today.replace(day=1)
+        first_of_last_month = first_of_this_month - relativedelta(months=1)
+        last_day_of_last_month = first_of_this_month - timedelta(days=1)
+        start_date = first_of_last_month
+        end_date = last_day_of_last_month
+        period_label = f"Last Month ({start_date.strftime('%B %Y')})"
+    elif range_param == "this_year":
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+        period_label = "This Year"
+    elif range_param == "month":
+        # Legacy support for "month" parameter
+        start_date = today.replace(day=1)
+        end_date = today
+        period_label = "This Month"
+        range_param = "this_month"  # Normalize
     elif range_param == "custom":
         start_str = request.GET.get("start", "")
         end_str = request.GET.get("end", "")
         try:
             start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
             end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
-            period_label = f"{start_date} to {end_date}"
+            period_label = f"{start_date.strftime('%b %d, %Y')} to {end_date.strftime('%b %d, %Y')}"
         except (ValueError, TypeError):
-            # Fallback to today
-            start_date = end_date = today
-            period_label = "Today"
-            range_param = "today"
+            # Fallback to 30d
+            start_date = today - timedelta(days=29)
+            end_date = today
+            period_label = "Last 30 Days"
+            range_param = "30d"
+    else:
+        # Fallback to 30d for any invalid range
+        start_date = today - timedelta(days=29)
+        end_date = today
+        period_label = "Last 30 Days"
+        range_param = "30d"
+    
+    # ===== PRODUCT FILTERING (PREMIUM) =====
+    product_id = request.GET.get("product_id", "")
+    product_filter_name = None
+    if product_id:
+        try:
+            product_id = int(product_id)
+            # Verify product exists and belongs to this business
+            filtered_product = MerchProduct.objects.filter(
+                id=product_id, business=business, kind="pharmacy", is_active=True
+            ).first()
+            if filtered_product:
+                product_filter_name = filtered_product.name
+            else:
+                product_id = None  # Invalid product ID, clear filter
+        except (ValueError, TypeError):
+            product_id = None
 
     # Get all active batches (not filtered by date - current stock status)
     batches = PharmacyBatch.objects.filter(business=business, is_archived=False).select_related("merch_product")
@@ -101,7 +147,7 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     # Low stock batches
     low_stock_batches = batches.filter(quantity__lte=F("reorder_level")).order_by("quantity")[:10]
 
-    # ===== SALES METRICS (filtered by selected period) =====
+    # ===== SALES METRICS (filtered by selected period + optional product) =====
     # Convert dates to datetime range for filtering
     start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
     end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
@@ -114,6 +160,10 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         is_deleted=False,  # Exclude soft-deleted sales from metrics
         is_reversed=False,  # Exclude reversed sales from metrics
     )
+    
+    # Apply product filter if specified (premium feature)
+    if product_id:
+        period_sales = period_sales.filter(batch__merch_product__id=product_id)
 
     period_revenue = period_sales.aggregate(total=Sum("total_amount"))["total"] or Decimal("0.00")
     period_sales_count = period_sales.count()
@@ -493,6 +543,7 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "potential_revenue": potential_revenue,  # Stock value at selling price (new key)
         "products_count": products_count,
         "total_products": products_count,  # Alias for template compatibility
+        "products_all": products_all,  # For product filter dropdown
         "medicine_count": medicine_count,
         "other_count": other_count,
         # Alert counts
@@ -516,11 +567,14 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         "period_admin_costs": period_admin_costs,  # Admin wallet costs (rent, salaries, etc.)
         "period_sales_count": period_sales_count,
         "avg_sale_value": avg_sale_value,
-        # Date filter context
+        # Date filter context (premium filters)
         "range_param": range_param,
         "period_label": period_label,
         "start_date": start_date,
         "end_date": end_date,
+        # Product filter context (premium feature)
+        "product_id": product_id,
+        "product_filter_name": product_filter_name,
         # Payment mix for the period (standardized format for shared partial)
         "payment_mix": payment_mix_list,
         # Top products & categories analytics
