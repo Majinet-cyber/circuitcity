@@ -3,13 +3,18 @@
 URL patterns for pharmacy operations.
 """
 from django.urls import path
+from django.shortcuts import redirect
 from . import views_pharmacy
 
 app_name = "pharmacy"
 
+def _redirect_to_pharmacy_dashboard(request):
+    """Redirect /pharmacy/ to the canonical pharmacy dashboard at /verticals/pharmacy/dashboard/"""
+    return redirect("/verticals/pharmacy/dashboard/")
+
 urlpatterns = [
-    # Dashboard
-    path("", views_pharmacy.pharmacy_dashboard, name="dashboard"),
+    # Dashboard - redirect to canonical location
+    path("", _redirect_to_pharmacy_dashboard, name="dashboard"),
     # Gamified vertical-aware flows
     path("stock-in/", views_pharmacy.pharmacy_stock_in_choice, name="stock_in_choice"),  # NEW: Landing page with Pharmacy/Cosmetics choice
     path("stock-in/catalog/save/", views_pharmacy.pharmacy_stock_in_catalog_save, name="stock_in_catalog_save"),  # API endpoint - MUST BE BEFORE generic catalog pattern

@@ -68,8 +68,8 @@ def test_filter_urls():
         
         for name, url in test_cases:
             response = client.get(url)
-            status = "✅" if response.status_code == 200 else "❌"
-            print(f"{status} {name:20s} → {response.status_code} ({url})")
+            status = "OK" if response.status_code == 200 else "FAIL"
+            print(f"{status} {name:20s} -> {response.status_code} ({url})")
             
             if response.status_code != 200:
                 print(f"   Error: {response.content[:200]}")

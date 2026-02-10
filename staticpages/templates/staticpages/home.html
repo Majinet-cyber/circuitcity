@@ -1520,26 +1520,164 @@
       padding: 0.5rem 1rem;
     }
 
-    /* Team Section Avatars */
+    /* Team Section Avatars - Premium Centered Layout */
+    .team-card-head {
+      padding-top: 6px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+
+    .team-avatar-wrap {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
     .team-avatar {
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-      color: var(--white);
+      width: 92px;
+      height: 92px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #f8fafc;
+      border: 3px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 0 10px 28px rgba(16, 24, 40, 0.14);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: 700;
-      font-size: 1.1rem;
-      flex-shrink: 0;
-      margin-right: 0.75rem;
+      position: relative;
+      margin: 0 auto;
     }
 
-    .team-card-header {
+    .team-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .team-avatar-clickable {
+      cursor: zoom-in;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .team-avatar-clickable:hover {
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 14px 34px rgba(16, 24, 40, 0.18);
+    }
+
+    .team-name {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: #0f172a;
+      margin-bottom: 0.25rem;
+    }
+
+    .team-role {
+      font-size: 0.95rem;
+      color: #4f46e5;
+      font-weight: 600;
+    }
+
+    .team-initials {
+      display: none;
+      font-weight: 800;
+      color: #1d4ed8;
+    }
+
+    .team-avatar--fallback .team-initials {
+      display: flex;
+    }
+
+    .team-avatar--fallback .team-avatar-img {
+      display: none;
+    }
+
+    .team-avatar--fallback {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: var(--white);
+    }
+
+    .team-avatar--fallback .team-initials {
+      color: var(--white);
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 576px) {
+      .team-avatar {
+        width: 86px;
+        height: 86px;
+      }
+    }
+
+    /* Team Photo Lightbox */
+    .team-lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 1050;
       display: flex;
       align-items: center;
-      margin-bottom: 1rem;
+      justify-content: center;
+    }
+
+    /* Ensure hidden state always wins */
+    #team-lightbox.d-none {
+      display: none !important;
+    }
+
+    .team-lightbox-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.62);
+      backdrop-filter: none;
+    }
+
+    .team-lightbox-panel {
+      position: relative;
+      z-index: 1;
+      max-width: 92vw;
+      max-height: 88vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+    }
+
+    #team-lightbox-img {
+      max-width: 92vw;
+      max-height: 88vh;
+      border-radius: 18px;
+      box-shadow: 0 30px 90px rgba(0,0,0,0.45);
+      animation: teamZoomIn 0.22s ease;
+    }
+
+    .team-lightbox-close {
+      position: absolute;
+      top: -10px;
+      right: -10px;
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: 0;
+      background: rgba(255,255,255,0.92);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+      font-size: 28px;
+      line-height: 40px;
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    .team-lightbox-close:hover {
+      transform: scale(1.08);
+      background: rgba(255,255,255,1);
+    }
+
+    @keyframes teamZoomIn {
+      from { transform: scale(0.94); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
     }
 
     /* Education List with Show More */
@@ -2066,11 +2204,27 @@
     <div style="max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin-bottom: 3rem;">
       <!-- Paul Chris Mwale -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div class="team-card-header">
-          <div class="team-avatar">PCM</div>
-          <div style="flex: 1; min-width: 0;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Paul Chris Mwale</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">CEO & Co-founder</p>
+        <div class="team-card-head">
+          <div class="team-avatar-wrap">
+            <div
+              class="team-avatar team-avatar-clickable"
+              data-img-src="{% static 'landing/team/paul.jpg' %}"
+              data-img-alt="Paul Chris Mwale"
+            >
+              <img
+                src="{% static 'landing/team/paul.jpg' %}"
+                alt="Paul Chris Mwale"
+                class="team-avatar-img"
+                loading="lazy"
+                onerror="this.style.display='none'; this.parentElement.classList.add('team-avatar--fallback');"
+              />
+              <span class="team-initials">PCM</span>
+            </div>
+          </div>
+
+          <div class="team-card-title">
+            <div class="team-name">Paul Chris Mwale</div>
+            <div class="team-role">CEO &amp; Co-founder</div>
           </div>
         </div>
         <ul class="education-list" data-team-member="pcm">
@@ -2099,13 +2253,72 @@
         <p style="font-size: 0.85rem; color: var(--text-secondary); font-style: italic; margin: 0;">Avid reader and innovator.</p>
       </div>
 
+      <!-- Faith Banda -->
+      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
+        <div class="team-card-head">
+          <div class="team-avatar-wrap">
+            <div
+              class="team-avatar team-avatar-clickable"
+              data-img-src="{% static 'landing/team/faith.jpg' %}"
+              data-img-alt="Faith Banda"
+            >
+              <img
+                src="{% static 'landing/team/faith.jpg' %}"
+                alt="Faith Banda"
+                class="team-avatar-img"
+                loading="lazy"
+                onerror="this.style.display='none'; this.parentElement.classList.add('team-avatar--fallback');"
+              />
+              <span class="team-initials">FB</span>
+            </div>
+          </div>
+
+          <div class="team-card-title">
+            <div class="team-name">Faith Banda</div>
+            <div class="team-role">Executive Director</div>
+          </div>
+        </div>
+        <ul class="education-list" data-team-member="fb">
+          <li>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
+              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
+              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
+            </svg>
+            <span style="overflow: hidden; text-overflow: ellipsis;">Master of Science in Sustainable Energy — University of Strathclyde</span>
+          </li>
+          <li>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
+              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
+              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
+            </svg>
+            <span style="overflow: hidden; text-overflow: ellipsis;">BSc. in Sustainable Energy — MUST</span>
+          </li>
+        </ul>
+      </div>
+
       <!-- Josephy Miamba -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div class="team-card-header">
-          <div class="team-avatar">JM</div>
-          <div style="flex: 1; min-width: 0;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Josephy Miamba</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Head of Marketing</p>
+        <div class="team-card-head">
+          <div class="team-avatar-wrap">
+            <div
+              class="team-avatar team-avatar-clickable"
+              data-img-src="{% static 'landing/team/joseph.jpg' %}"
+              data-img-alt="Josephy Miamba"
+            >
+              <img
+                src="{% static 'landing/team/joseph.jpg' %}"
+                alt="Josephy Miamba"
+                class="team-avatar-img"
+                loading="lazy"
+                onerror="this.style.display='none'; this.parentElement.classList.add('team-avatar--fallback');"
+              />
+              <span class="team-initials">JM</span>
+            </div>
+          </div>
+
+          <div class="team-card-title">
+            <div class="team-name">Josephy Miamba</div>
+            <div class="team-role">Head of Marketing</div>
           </div>
         </div>
         <ul class="education-list" data-team-member="jm">
@@ -2128,11 +2341,27 @@
 
       <!-- Lloyd Chunga -->
       <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div class="team-card-header">
-          <div class="team-avatar">LC</div>
-          <div style="flex: 1; min-width: 0;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Lloyd Chunga</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">CTO</p>
+        <div class="team-card-head">
+          <div class="team-avatar-wrap">
+            <div
+              class="team-avatar team-avatar-clickable"
+              data-img-src="{% static 'landing/team/lloyd.jpg' %}"
+              data-img-alt="Lloyd Chunga"
+            >
+              <img
+                src="{% static 'landing/team/lloyd.jpg' %}"
+                alt="Lloyd Chunga"
+                class="team-avatar-img"
+                loading="lazy"
+                onerror="this.style.display='none'; this.parentElement.classList.add('team-avatar--fallback');"
+              />
+              <span class="team-initials">LC</span>
+            </div>
+          </div>
+
+          <div class="team-card-title">
+            <div class="team-name">Lloyd Chunga</div>
+            <div class="team-role">CTO</div>
           </div>
         </div>
         <ul class="education-list" data-team-member="lc">
@@ -2149,33 +2378,6 @@
               <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
             </svg>
             <span style="overflow: hidden; text-overflow: ellipsis;">BSc in ICT — Mzuzu University</span>
-          </li>
-        </ul>
-      </div>
-
-      <!-- Faith Banda -->
-      <div style="background: var(--white); border-radius: 20px; padding: 2rem; box-shadow: var(--shadow); border: 2px solid rgba(79, 70, 229, 0.1); transition: transform 0.3s ease; min-width: 0;">
-        <div class="team-card-header">
-          <div class="team-avatar">FB</div>
-          <div style="flex: 1; min-width: 0;">
-            <h3 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary); margin: 0 0 0.25rem 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Faith Banda</h3>
-            <p style="font-size: 0.95rem; font-weight: 600; color: var(--primary); margin: 0;">Executive Director</p>
-          </div>
-        </div>
-        <ul class="education-list" data-team-member="fb">
-          <li>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
-              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
-              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
-            </svg>
-            <span style="overflow: hidden; text-overflow: ellipsis;">Master of Science in Sustainable Energy — University of Strathclyde</span>
-          </li>
-          <li>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="var(--secondary)" viewBox="0 0 16 16" style="flex-shrink: 0; margin-top: 0.2rem; margin-right: 0.5rem;">
-              <path d="M8.211 2.047a.5.5 0 0 0-.422 0l-7.5 3.5a.5.5 0 0 0 .025.917l7.5 3a.5.5 0 0 0 .372 0L14 7.14V13a1 1 0 0 0-1 1v2h3v-2a1 1 0 0 0-1-1V6.739l.686-.275a.5.5 0 0 0 .025-.917l-7.5-3.5Z"/>
-              <path d="M4.176 9.032a.5.5 0 0 0-.656.327l-.5 1.7a.5.5 0 0 0 .294.605l4.5 1.8a.5.5 0 0 0 .372 0l4.5-1.8a.5.5 0 0 0 .294-.605l-.5-1.7a.5.5 0 0 0-.656-.327L8 10.466 4.176 9.032Z"/>
-            </svg>
-            <span style="overflow: hidden; text-overflow: ellipsis;">BSc. in Sustainable Energy — MUST</span>
           </li>
         </ul>
       </div>
@@ -3041,6 +3243,11 @@
         const educationLists = document.querySelectorAll('.education-list');
         
         educationLists.forEach(list => {
+          // Skip Paul's card - he always shows everything
+          if (list.getAttribute('data-team-member') === 'pcm') {
+            return;
+          }
+          
           const items = list.querySelectorAll('li');
           if (items.length <= 2) return; // No need for toggle if 2 or fewer items
           
@@ -3086,7 +3293,73 @@
       }
     })();
 
+    // ============================================
+    // TEAM PHOTO LIGHTBOX
+    // ============================================
+    document.addEventListener("DOMContentLoaded", () => {
+      const lightbox = document.getElementById("team-lightbox");
+      const img = document.getElementById("team-lightbox-img");
+      const closeBtn = document.querySelector(".team-lightbox-close");
+      const backdrop = document.querySelector(".team-lightbox-backdrop");
+
+      // Safety check: ensure all elements exist
+      if (!lightbox || !img || !closeBtn || !backdrop) return;
+
+      function openLightbox(src, alt) {
+        if (!src) return; // Don't open if no image source
+        img.src = src;
+        img.alt = alt || "";
+        lightbox.classList.remove("d-none");
+        lightbox.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+      }
+
+      function closeLightbox() {
+        lightbox.classList.add("d-none");
+        lightbox.setAttribute("aria-hidden", "true");
+        img.src = "";
+        img.alt = "";
+        document.body.style.overflow = "";
+      }
+
+      // Click on avatar to open
+      document.querySelectorAll(".team-avatar-clickable").forEach(el => {
+        el.addEventListener("click", () => {
+          const src = el.dataset.imgSrc;
+          const alt = el.dataset.imgAlt;
+          if (!src) return;
+          openLightbox(src, alt);
+        });
+      });
+
+      // Close on backdrop click
+      backdrop.addEventListener("click", closeLightbox);
+
+      // Close on X button
+      closeBtn.addEventListener("click", closeLightbox);
+
+      // ESC key closes
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && !lightbox.classList.contains("d-none")) closeLightbox();
+      });
+
+      // Extra guard: Force lightbox to be hidden on load
+      lightbox.classList.add("d-none");
+      lightbox.setAttribute("aria-hidden", "true");
+      document.body.style.overflow = "";
+    });
+
   </script>
+
+  <!-- Team Photo Lightbox -->
+  <div id="team-lightbox" class="team-lightbox d-none" aria-hidden="true">
+    <div class="team-lightbox-backdrop"></div>
+    <div class="team-lightbox-panel" role="dialog" aria-modal="true">
+      <button type="button" class="team-lightbox-close" aria-label="Close">×</button>
+      <img id="team-lightbox-img" alt="" />
+    </div>
+  </div>
+
 <!-- build: {{ BUILD_SHA|default:"unknown" }} -->
 </body>
 </html>

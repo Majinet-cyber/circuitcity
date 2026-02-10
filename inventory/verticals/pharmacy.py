@@ -316,14 +316,37 @@ def fast_sell(request):
     """
     Fast Sell page for pharmacy - barcode scanner + instant sell.
     Uses front camera for barcode scanning with BarcodeDetector API fallback.
+    Includes barcode datalist prefill for auto-complete.
     """
     from django.http import JsonResponse
     from inventory.utils_scope import get_visible_actor
+    from django.db.models import Q
 
     business: Business = request.business
 
     # Get role flags for template
     is_manager, is_agent, actor_user = get_visible_actor(request)
+    
+    # Get all products with barcodes for datalist prefill (like Clothing)
+    products_with_barcodes = []
+    
+    # Get batches with barcodes (batch-level barcodes)
+    batches_with_barcodes = (
+        PharmacyBatch.objects.filter(
+            business=business,
+            is_archived=False,
+            quantity__gt=0
+        )
+        .exclude(Q(barcode="") | Q(barcode__isnull=True))
+        .select_related("merch_product")
+        .order_by("merch_product__name", "expiry_date")[:100]  # Limit to 100 for performance
+    )
+    
+    for batch in batches_with_barcodes:
+        products_with_barcodes.append({
+            "barcode": batch.barcode,
+            "name": f"{batch.merch_product.name} (Batch: {batch.batch_number or 'N/A'})",
+        })
 
     ctx = {
         "business": business,
@@ -332,6 +355,8 @@ def fast_sell(request):
         "vertical_name": "Pharmacy",
         "IS_MANAGER": is_manager,
         "IS_AGENT": is_agent,
+        "products_with_barcodes": products_with_barcodes,  # NEW: For datalist prefill
+        "body_class": "pharmacy-fast-sell",  # NEW: Scoped body class to override any modal CSS
     }
 
     return render(request, "verticals/pharmacy/fast_sell.html", ctx)
@@ -355,6 +380,80 @@ def fast_sell_lookup_api(request):
     result = lookup_product_by_barcode(business=business, vertical="pharmacy", barcode=barcode)
 
     return JsonResponse(result)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHARMACY)
+def pharmacy_product_by_barcode(request):
+    """
+    API: Look up pharmacy product/batch by barcode for Fast Sell.
+    Similar to Clothing's barcode lookup - returns product details for auto-selection.
+    
+    GET /pharmacy/api/product-by-barcode/?barcode=XXXX
+    
+    Returns:
+        - ok: bool
+        - product: dict with id, name, barcode, sale_price, stock_qty
+        - error: str (if not found)
+    """
+    from django.http import JsonResponse
+    
+    business: Business = request.business
+    barcode = (request.GET.get("barcode") or "").strip()
+    
+    if not barcode:
+        return JsonResponse({"ok": False, "error": "missing_barcode"}, status=400)
+    
+    try:
+        # Try batch barcode first (most specific)
+        batch = (
+            PharmacyBatch.objects.filter(
+                business=business,
+                is_archived=False,
+                barcode=barcode,
+                quantity__gt=0
+            )
+            .select_related("merch_product")
+            .order_by("expiry_date")
+            .first()
+        )
+        
+        # Fall back to product barcode if batch not found
+        if not batch:
+            batch = (
+                PharmacyBatch.objects.filter(
+                    business=business,
+                    is_archived=False,
+                    merch_product__barcode=barcode,
+                    quantity__gt=0
+                )
+                .select_related("merch_product")
+                .order_by("expiry_date")
+                .first()
+            )
+        
+        if not batch:
+            return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+        
+        product = batch.merch_product
+        
+        return JsonResponse({
+            "ok": True,
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "barcode": barcode,
+                "sale_price": str(batch.selling_price),
+                "stock_qty": batch.quantity,
+                "batch_id": batch.id,
+                "batch_number": batch.batch_number or "",
+                "expiry_date": batch.expiry_date.isoformat() if batch.expiry_date else None,
+            }
+        })
+        
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=500)
 
 
 @login_required

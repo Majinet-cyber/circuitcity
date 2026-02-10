@@ -1233,9 +1233,64 @@ document.addEventListener('DOMContentLoaded', function() {
     const color = metric === 'revenue' ? '#10b981' : '#3b82f6';
     const bgColor = metric === 'revenue' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)';
     
+    // Calculate max value for smart tick configuration
+    const maxValue = Math.max(...values, 0);
+    
     // Destroy existing chart
     if (trendChart) {
       trendChart.destroy();
+    }
+    
+    // Build Y-axis configuration based on metric and data range
+    let yAxisConfig = {
+      beginAtZero: true,
+      grace: '5%',  // Add 5% padding at top for better visual
+    };
+    
+    if (metric === 'units') {
+      // UNITS MODE: Force integer ticks, no duplicates
+      yAxisConfig.ticks = {
+        precision: 0,  // No decimal places
+        callback: function(value) {
+          // Only show integer ticks (Chart.js may still generate fractional ones)
+          if (value !== Math.floor(value)) return '';  // Hide fractional ticks
+          
+          if (value >= 1000) {
+            return (value / 1000).toFixed(0) + 'k';
+          } else {
+            return value;
+          }
+        }
+      };
+      
+      // For small datasets, force stepSize = 1 to avoid fractional ticks
+      if (maxValue <= 20) {
+        yAxisConfig.ticks.stepSize = 1;
+        yAxisConfig.max = Math.ceil(maxValue * 1.1);  // Add 10% headroom
+      } else {
+        // For larger values, let Chart.js auto-calculate but keep integers
+        yAxisConfig.ticks.maxTicksLimit = 8;
+      }
+    } else {
+      // REVENUE MODE: Compact format with smart tick limits
+      yAxisConfig.ticks = {
+        maxTicksLimit: 7,  // Limit to ~7 ticks for readability
+        callback: function(value) {
+          // Compact currency formatter
+          if (value >= 1000000) {
+            const millions = value / 1000000;
+            // Only show decimal if meaningful (e.g., 1.2M not 1.0M)
+            return millions % 1 === 0 ? millions.toFixed(0) + 'M' : millions.toFixed(1) + 'M';
+          } else if (value >= 1000) {
+            return (value / 1000).toFixed(0) + 'k';
+          } else if (value === 0) {
+            return '0';
+          } else {
+            // For small values < 1000, show raw number
+            return value.toFixed(0);
+          }
+        }
+      };
     }
     
     // Create new chart
@@ -1275,18 +1330,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         },
         scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                if (metric === 'revenue') {
-                  return 'K ' + (value / 1000).toFixed(0);
-                } else {
-                  return Math.round(value);
-                }
-              }
-            }
-          },
+          y: yAxisConfig,
           x: {
             grid: { display: false }
           }
