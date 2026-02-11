@@ -21,44 +21,44 @@ class HQLayoutConsistencyTest(TestCase):
         self.client = Client()
         self.client.login(username="hqadmin", password="adminpass123")
 
-    def test_hq_home_has_sidebar_and_shell(self):
-        """Test /hq/home/ has hqSidebar and hq-shell."""
+    def test_hq_home_has_sidebar_and_layout(self):
+        """Test /hq/home/ has data-layout=hq, hqSidebar, and hq-layout."""
         response = self.client.get(reverse("hq:home"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
-        # Check for sidebar ID
+        self.assertIn('data-layout="hq"', content)
         self.assertIn('id="hqSidebar"', content)
-        # Check for shell class (dashboard uses "layout hq-shell", others use "hq-shell")
-        self.assertTrue(
-            "hq-shell" in content and ('class="hq-shell"' in content or 'class="layout hq-shell"' in content)
-        )
+        self.assertIn('class="hq-layout"', content)
 
-    def test_hq_agents_has_sidebar_and_shell(self):
-        """Test /hq/agents/ has hqSidebar and hq-shell."""
+    def test_hq_agents_has_sidebar_and_layout(self):
+        """Test /hq/agents/ has data-layout=hq, hqSidebar, and hq-layout."""
         response = self.client.get(reverse("hq:agents"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
+        self.assertIn('data-layout="hq"', content)
         self.assertIn('id="hqSidebar"', content)
-        self.assertIn('class="hq-shell"', content)
+        self.assertIn('class="hq-layout"', content)
 
-    def test_hq_businesses_has_sidebar_and_shell(self):
-        """Test /hq/businesses/ has hqSidebar and hq-shell."""
+    def test_hq_businesses_has_sidebar_and_layout(self):
+        """Test /hq/businesses/ has data-layout=hq, hqSidebar, and hq-layout."""
         response = self.client.get(reverse("hq:business_directory"))
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
+        self.assertIn('data-layout="hq"', content)
         self.assertIn('id="hqSidebar"', content)
-        self.assertIn('class="hq-shell"', content)
+        self.assertIn('class="hq-layout"', content)
 
-    def test_hq_onboarding_has_sidebar_and_shell(self):
-        """Test /landing/onboarding/hq/ has hqSidebar and hq-shell."""
+    def test_hq_onboarding_has_sidebar_and_layout(self):
+        """Test /landing/onboarding/hq/ has data-layout=hq, hqSidebar, and hq-layout."""
         from staticpages.views import onboarding_hq
 
         # The view requires login and staff, which we have
         response = self.client.get("/landing/onboarding/hq/")
         self.assertEqual(response.status_code, 200)
         content = response.content.decode("utf-8")
+        self.assertIn('data-layout="hq"', content)
         self.assertIn('id="hqSidebar"', content)
-        self.assertIn('class="hq-shell"', content)
+        self.assertIn('class="hq-layout"', content)
 
 
 class HQNotificationsAPITest(TestCase):
@@ -104,6 +104,54 @@ class HQNotificationsAPITest(TestCase):
         self.assertIn("since", data)
         # since should be returned in response
         self.assertIsNotNone(data["since"])
+
+
+class HQSidebarAlwaysVisibleTest(TestCase):
+    """Regression: sidebar must be present on every HQ page (never disappears)."""
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="hqadmin_sidebar", email="sidebar@hq.com", password="adminpass123"
+        )
+        self.client = Client()
+        self.client.login(username="hqadmin_sidebar", password="adminpass123")
+
+    # --- helper ---------------------------------------------------------- #
+    def _assert_sidebar(self, url_name, **kwargs):
+        """GET the named URL and assert sidebar, layout wrapper, and CSS are present."""
+        url = reverse(url_name, **kwargs)
+        response = self.client.get(url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn('data-layout="hq"', content,
+                       f"<body data-layout=\"hq\"> missing on {url}")
+        self.assertIn('id="hqSidebar"', content,
+                       f"Sidebar element (id=hqSidebar) missing on {url}")
+        self.assertIn("hq-layout", content,
+                       f"Layout wrapper (hq-layout) missing on {url}")
+        self.assertIn("hq_layout.css", content,
+                       f"Authoritative layout CSS (hq_layout.css) missing on {url}")
+
+    # --- per-page checks ------------------------------------------------- #
+    def test_sidebar_on_hq_dashboard(self):
+        """HQ Dashboard must contain the locked sidebar."""
+        self._assert_sidebar("hq:home")
+
+    def test_sidebar_on_subscriptions(self):
+        """Subscriptions page must contain the locked sidebar."""
+        self._assert_sidebar("hq:subscriptions")
+
+    def test_sidebar_on_businesses(self):
+        """Businesses page must contain the locked sidebar."""
+        self._assert_sidebar("hq:business_directory")
+
+    def test_sidebar_on_agents(self):
+        """Agents page must contain the locked sidebar."""
+        self._assert_sidebar("hq:agents")
+
+    def test_sidebar_on_contracts(self):
+        """Contracts page must contain the locked sidebar."""
+        self._assert_sidebar("hq:contracts_list")
 
 
 class HQ404Test(TestCase):

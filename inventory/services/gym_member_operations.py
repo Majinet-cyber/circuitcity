@@ -472,7 +472,8 @@ def bulk_create_members(
             
             # Create member (transaction per member for isolation)
             with transaction.atomic():
-                member = GymMember.objects.create(
+                # Create member with _skip_welcome_email flag to avoid signal double-send
+                member = GymMember(
                     business=business,
                     name=name,
                     phone=phone,
@@ -481,6 +482,8 @@ def bulk_create_members(
                     notes=notes,
                     status="pending_payment",
                 )
+                member._skip_welcome_email = True
+                member.save()
                 
                 # Log creation
                 GymMemberLog.objects.create(
@@ -495,6 +498,15 @@ def bulk_create_members(
                     },
                     performed_by=user,
                 )
+                
+                # Send welcome email after transaction commits (if email exists)
+                if email:
+                    from inventory.services.gym_qr_email import send_member_qr_email
+                    member_id = member.id
+                    # Note: No request object in bulk import, so PDF won't be attached
+                    transaction.on_commit(lambda mid=member_id: send_member_qr_email(
+                        GymMember.objects.get(id=mid), request=None
+                    ))
                 
                 results["created"].append(member)
         

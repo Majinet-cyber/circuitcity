@@ -206,9 +206,14 @@
             <td>{{ sale.sold_by.username|default:"System" }}</td>
             <td>
               {% if IS_MANAGER %}
-              <button class="btn btn-sm btn-outline-danger" onclick="rollbackSale({{ sale.id }})" title="Rollback sale and restore batch inventory">
-                <i class="bi bi-arrow-counterclockwise"></i>
-              </button>
+              <div style="display:flex;gap:6px">
+                <a href="{% url 'pharmacy:sale_edit' sale.id %}" class="btn btn-sm btn-outline-primary" title="Edit sale" style="padding:6px 12px;border-radius:8px;text-decoration:none;font-size:0.85rem;border:2px solid #3b82f6;color:#3b82f6;background:transparent;transition:all 0.2s">
+                  <i class="bi bi-pencil-square"></i> Edit
+                </a>
+                <button class="btn btn-sm btn-outline-danger" onclick="rollbackSale({{ sale.id }})" title="Rollback sale and restore batch inventory" style="padding:6px 12px;border-radius:8px;font-size:0.85rem;border:2px solid #ef4444;color:#ef4444;background:transparent;transition:all 0.2s">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
               {% else %}
               <span class="text-muted small">—</span>
               {% endif %}

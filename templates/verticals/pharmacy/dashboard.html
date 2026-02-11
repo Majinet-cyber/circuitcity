@@ -400,25 +400,58 @@
   
   .chart-wrap {
     position: relative;
-    height: 350px;
+    height: 400px;
     width: 100%;
+    padding: 8px 0;
   }
   
   .chart-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
-    padding: 80px 20px;
-    color: #94a3b8;
+    padding: 100px 20px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 16px;
+    border: 2px dashed #cbd5e1;
+    min-height: 350px;
   }
   
   .chart-empty-icon {
-    font-size: 4rem;
-    margin-bottom: 16px;
-    opacity: 0.3;
+    font-size: 5rem;
+    margin-bottom: 20px;
+    opacity: 0.25;
+    filter: grayscale(1);
   }
   
   .chart-empty-text {
-    font-size: 1rem;
-    line-height: 1.6;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin: 0 0 24px;
+    color: #64748b;
+    font-weight: 500;
+  }
+  
+  .chart-empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
+    transition: all 0.25s ease;
+  }
+  
+  .chart-empty-cta:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+    color: #fff;
   }
   
   /* ========== OPERATIONAL HEALTH ROW ========== */
@@ -940,7 +973,10 @@
       </div>
       <div id="trendChartEmpty" class="chart-empty" style="display: none;">
         <div class="chart-empty-icon">📈</div>
-        <p class="chart-empty-text">No sales recorded for this period.<br>Your trend will appear here after your first sale.</p>
+        <p class="chart-empty-text">No sales yet for the selected period<br>Your sales trend will appear here after your first transaction</p>
+        <a href="{% url 'pharmacy:sell' %}" class="chart-empty-cta">
+          <span>💊</span> Make a Sale
+        </a>
       </div>
     </div>
   </div>
@@ -1251,6 +1287,14 @@ document.addEventListener('DOMContentLoaded', function() {
       // UNITS MODE: Force integer ticks, no duplicates
       yAxisConfig.ticks = {
         precision: 0,  // No decimal places
+        maxTicksLimit: 8,  // Limit number of ticks for clean display
+        font: {
+          size: 12,
+          weight: '600',
+          family: 'system-ui, -apple-system, sans-serif'
+        },
+        color: '#64748b',
+        padding: 8,
         callback: function(value) {
           // Only show integer ticks (Chart.js may still generate fractional ones)
           if (value !== Math.floor(value)) return '';  // Hide fractional ticks
@@ -1267,16 +1311,20 @@ document.addEventListener('DOMContentLoaded', function() {
       if (maxValue <= 20) {
         yAxisConfig.ticks.stepSize = 1;
         yAxisConfig.max = Math.ceil(maxValue * 1.1);  // Add 10% headroom
-      } else {
-        // For larger values, let Chart.js auto-calculate but keep integers
-        yAxisConfig.ticks.maxTicksLimit = 8;
       }
     } else {
       // REVENUE MODE: Compact format with smart tick limits
       yAxisConfig.ticks = {
         maxTicksLimit: 7,  // Limit to ~7 ticks for readability
+        font: {
+          size: 12,
+          weight: '600',
+          family: 'system-ui, -apple-system, sans-serif'
+        },
+        color: '#64748b',
+        padding: 8,
         callback: function(value) {
-          // Compact currency formatter
+          // Compact currency formatter - PREMIUM STYLE: 10k, 20k, 30k (not "k 30")
           if (value >= 1000000) {
             const millions = value / 1000000;
             // Only show decimal if meaningful (e.g., 1.2M not 1.0M)
@@ -1315,9 +1363,31 @@ document.addEventListener('DOMContentLoaded', function() {
         plugins: {
           legend: { display: false },
           tooltip: {
+            enabled: true,
             mode: 'index',
             intersect: false,
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: 'rgba(226, 232, 240, 0.2)',
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 10,
+            titleFont: {
+              size: 13,
+              weight: '700',
+              family: 'system-ui, -apple-system, sans-serif'
+            },
+            bodyFont: {
+              size: 14,
+              weight: '600',
+              family: 'system-ui, -apple-system, sans-serif'
+            },
+            displayColors: false,
             callbacks: {
+              title: function(context) {
+                return context[0].label;
+              },
               label: function(context) {
                 const value = context.parsed.y;
                 if (metric === 'revenue') {
@@ -1330,10 +1400,46 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         },
         scales: {
-          y: yAxisConfig,
+          y: {
+            ...yAxisConfig,
+            grid: {
+              color: '#f1f5f9',
+              drawBorder: false,
+              lineWidth: 1
+            },
+            border: {
+              display: false
+            }
+          },
           x: {
-            grid: { display: false }
+            grid: { 
+              display: false 
+            },
+            ticks: {
+              font: {
+                size: 11,
+                weight: '600',
+                family: 'system-ui, -apple-system, sans-serif'
+              },
+              color: '#64748b',
+              padding: 8,
+              maxRotation: 0,  // Keep labels horizontal
+              minRotation: 0,
+              autoSkip: true,  // Auto-skip labels if too crowded
+              maxTicksLimit: 12  // Limit to ~12 date labels max
+            },
+            border: {
+              display: false
+            }
           }
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        animation: {
+          duration: 750,
+          easing: 'easeInOutQuart'
         }
       }
     });

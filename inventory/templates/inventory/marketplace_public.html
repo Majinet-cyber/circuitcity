@@ -1,0 +1,270 @@
+{% extends "staticpages/base_public.html" %}
+{% load static %}
+
+{% block title %}Marketplace – Emajinet{% endblock %}
+{% block meta_description %}Browse products and services from businesses across Malawi. Find what you need from verified local businesses.{% endblock %}
+
+{% block styles %}
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --secondary: #10b981;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --bg-light: #f9fafb;
+    --white: #ffffff;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg-light);
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+  }
+
+  .header {
+    background: var(--white);
+    padding: 1.5rem 0;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+  }
+
+  .header h1 {
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    color: var(--text-primary);
+    margin-bottom: 0.5rem;
+  }
+
+  .header p {
+    color: var(--text-secondary);
+    font-size: 1rem;
+  }
+
+  .filter-bar {
+    background: var(--white);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .filter-bar select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+
+  .listings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  .listing-card {
+    background: var(--white);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .listing-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  .listing-media {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: #e5e7eb;
+  }
+
+  .listing-content {
+    padding: 1rem;
+  }
+
+  .listing-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+  }
+
+  .listing-business {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .listing-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 0.75rem;
+  }
+
+  .listing-vertical {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    background: rgba(79, 70, 229, 0.1);
+    color: var(--primary);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .btn {
+    display: inline-block;
+    padding: 0.625rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: var(--white);
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 500;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+  }
+
+  .pagination a, .pagination span {
+    padding: 0.5rem 1rem;
+    background: var(--white);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--text-primary);
+  }
+
+  .pagination .current {
+    background: var(--primary);
+    color: var(--white);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 1rem;
+    color: var(--text-secondary);
+  }
+
+  .empty-state h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="header">
+  <div class="container">
+    <h1>🛒 Marketplace</h1>
+    <p>Browse products and services from businesses across Malawi</p>
+  </div>
+</div>
+
+<div class="container">
+  <div class="filter-bar">
+    <label for="vertical-filter">Filter by category:</label>
+    <select id="vertical-filter" onchange="window.location.href='?vertical=' + this.value">
+      <option value="">All Categories</option>
+      {% for vertical in available_verticals %}
+        <option value="{{ vertical }}" {% if vertical == vertical_filter %}selected{% endif %}>
+          {{ vertical|title }}
+        </option>
+      {% endfor %}
+    </select>
+    {% if vertical_filter %}
+      <a href="{% url 'inventory:marketplace_public' %}" class="btn" style="background: #6b7280;">Clear Filter</a>
+    {% endif %}
+  </div>
+
+  {% if page_obj.object_list %}
+    <div class="listings-grid">
+      {% for listing in page_obj %}
+        <div class="listing-card">
+          {% if listing.media_file %}
+            {% if listing.is_image %}
+              <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-media">
+            {% elif listing.is_video %}
+              <video src="{{ listing.media_file.url }}" class="listing-media" controls></video>
+            {% endif %}
+          {% else %}
+            <div class="listing-media" style="display: flex; align-items: center; justify-content: center; font-size: 3rem;">
+              📦
+            </div>
+          {% endif %}
+
+          <div class="listing-content">
+            <h3 class="listing-title">{{ listing.title }}</h3>
+            <p class="listing-business">{{ listing.business.name }}</p>
+            
+            {% if listing.vertical %}
+              <span class="listing-vertical">{{ listing.vertical|title }}</span>
+            {% endif %}
+
+            {% if listing.price %}
+              <div class="listing-price">MWK {{ listing.price|floatformat:0 }}</div>
+            {% endif %}
+
+            <a href="{% url 'inventory:business_public_page' listing.business.slug %}" class="btn">
+              View Business
+            </a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+      <div class="pagination">
+        {% if page_obj.has_previous %}
+          <a href="?page={{ page_obj.previous_page_number }}{% if vertical_filter %}&vertical={{ vertical_filter }}{% endif %}">Previous</a>
+        {% endif %}
+
+        <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+          <a href="?page={{ page_obj.next_page_number }}{% if vertical_filter %}&vertical={{ vertical_filter }}{% endif %}">Next</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="empty-state">
+      <h2>No listings found</h2>
+      <p>{% if vertical_filter %}Try clearing the filter or{% else %}Check back soon for new listings!{% endif %}</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+

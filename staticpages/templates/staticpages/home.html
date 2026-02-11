@@ -2542,6 +2542,40 @@
     </div>
   </section>
 
+  <!-- Available Verticals Section -->
+  <section class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
+    <div style="text-align: center; margin-bottom: 3rem;">
+      <h2 style="font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">
+        Available Verticals
+      </h2>
+      <p style="font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-secondary); max-width: 700px; margin: 0 auto;">
+        Emajinet supports diverse business types with tailored features for each industry
+      </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto;">
+      {% for vertical in verticals %}
+      <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); transition: transform 0.3s ease, box-shadow 0.3s ease;"
+           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 20px rgba(0, 0, 0, 0.1)';"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0, 0, 0, 0.06)';">
+        <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">{{ vertical.icon }}</div>
+        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+          {{ vertical.name }}
+        </h3>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+          {{ vertical.description }}
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div style="text-align: center; margin-top: 2.5rem;">
+      <p style="font-size: 1rem; color: var(--text-secondary); font-style: italic;">
+        🚀 <strong>More coming soon</strong> – We're constantly expanding to serve more industries
+      </p>
+    </div>
+  </section>
+
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
@@ -2972,12 +3006,29 @@
           return;
         }
 
+        // Check for reduced motion preference
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        
+        // Animation duration (0 if reduced motion is preferred)
+        const animationDuration = prefersReducedMotion ? 0 : 900;
+
         // Mobile-first common options
         const isMobile = window.innerWidth < 769;
         
         const commonOptions = {
           responsive: true,
           maintainAspectRatio: false, // Critical for fixed height containers
+          animation: {
+            duration: 0, // Initially disabled - will be triggered by IntersectionObserver
+            easing: 'easeOutQuart'
+          },
+          interaction: {
+            mode: 'nearest',
+            intersect: false
+          },
+          onHover: function(event, activeElements) {
+            event.native.target.style.cursor = activeElements.length > 0 ? 'pointer' : 'default';
+          },
           plugins: {
             legend: {
               display: !isMobile, // Hide legend on mobile
@@ -3020,7 +3071,10 @@
                   backgroundColor: 'rgba(79, 70, 229, 0.85)',
                   borderColor: 'rgba(79, 70, 229, 1)',
                   borderWidth: 2,
-                  borderRadius: 6
+                  borderRadius: 6,
+                  hoverBackgroundColor: 'rgba(79, 70, 229, 0.95)',
+                  hoverBorderColor: 'rgba(79, 70, 229, 1)',
+                  hoverBorderWidth: 3
                 },
                 {
                   label: 'Not Using',
@@ -3028,7 +3082,10 @@
                   backgroundColor: 'rgba(148, 163, 184, 0.5)',
                   borderColor: 'rgba(148, 163, 184, 0.8)',
                   borderWidth: 2,
-                  borderRadius: 6
+                  borderRadius: 6,
+                  hoverBackgroundColor: 'rgba(148, 163, 184, 0.7)',
+                  hoverBorderColor: 'rgba(148, 163, 184, 1)',
+                  hoverBorderWidth: 3
                 }
               ]
             },
@@ -3101,7 +3158,17 @@
                   'rgba(148, 163, 184, 1)',
                   'rgba(79, 70, 229, 1)'
                 ],
-                borderWidth: 3
+                borderWidth: 3,
+                hoverBackgroundColor: [
+                  'rgba(148, 163, 184, 0.8)',
+                  'rgba(79, 70, 229, 1)'
+                ],
+                hoverBorderColor: [
+                  'rgba(148, 163, 184, 1)',
+                  'rgba(79, 70, 229, 1)'
+                ],
+                hoverBorderWidth: 4,
+                hoverOffset: 8
               }]
             },
             options: {
@@ -3172,7 +3239,18 @@
                   'rgba(168, 85, 247, 1)'
                 ],
                 borderWidth: 2,
-                borderRadius: 6
+                borderRadius: 6,
+                hoverBackgroundColor: [
+                  'rgba(139, 92, 246, 0.95)',
+                  'rgba(79, 70, 229, 1)',
+                  'rgba(168, 85, 247, 0.9)'
+                ],
+                hoverBorderColor: [
+                  'rgba(139, 92, 246, 1)',
+                  'rgba(79, 70, 229, 1)',
+                  'rgba(168, 85, 247, 1)'
+                ],
+                hoverBorderWidth: 3
               }]
             },
             options: {
@@ -3227,11 +3305,67 @@
         }
       }
 
+      // Setup IntersectionObserver for scroll-triggered animations
+      function setupChartAnimations() {
+        // Check for reduced motion preference
+        const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const animationDuration = prefersReducedMotion ? 0 : 900;
+
+        // Track which charts have been animated
+        const animatedCharts = new Set();
+
+        // Create observer to trigger animations when charts enter viewport
+        const observerOptions = {
+          root: null,
+          rootMargin: '0px',
+          threshold: 0.2 // Trigger when 20% of chart is visible
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !animatedCharts.has(entry.target.id)) {
+              const chartId = entry.target.id;
+              const chart = Object.values(charts).find(c => c && c.canvas && c.canvas.id === chartId);
+              
+              if (chart) {
+                // Mark as animated to prevent re-triggering
+                animatedCharts.add(chartId);
+                
+                // Update animation duration and animate
+                chart.options.animation.duration = animationDuration;
+                chart.update('active'); // Use 'active' mode for smooth animation
+                
+                // Unobserve after animation
+                observer.unobserve(entry.target);
+              }
+            }
+          });
+        }, observerOptions);
+
+        // Observe all chart canvases
+        const chartCanvases = [
+          document.getElementById('chartDigitalGap'),
+          document.getElementById('chartInformality'),
+          document.getElementById('chartShrinkage')
+        ];
+
+        chartCanvases.forEach(canvas => {
+          if (canvas) {
+            observer.observe(canvas);
+          }
+        });
+      }
+
       // Initialize on DOM ready
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initStatsCarousel);
+        document.addEventListener('DOMContentLoaded', () => {
+          initStatsCarousel();
+          // Setup animations after a short delay to ensure charts are ready
+          setTimeout(setupChartAnimations, 100);
+        });
       } else {
         initStatsCarousel();
+        setTimeout(setupChartAnimations, 100);
       }
     })();
 

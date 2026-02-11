@@ -191,7 +191,9 @@ def member_add(request):
                     else:
                         member.has_trainer = False
                         member.trainer_fee = Decimal("0.00")
-
+                    
+                    # Skip automatic welcome email from signal - we'll send it manually with PDF
+                    member._skip_welcome_email = True
                     member.save()
 
                     # If marked as paid, activate membership for 30 days
@@ -229,10 +231,15 @@ def member_add(request):
                     )
 
                     # Send QR code PDF email if member has email (after transaction commit)
+                    # Fix: Capture member.id and request explicitly to avoid lambda closure issues
                     if member.email:
                         from inventory.services.gym_qr_email import send_member_qr_email
-
-                        transaction.on_commit(lambda: send_member_qr_email(member, request))
+                        
+                        # Capture member_id explicitly (not member object reference)
+                        member_id = member.id
+                        transaction.on_commit(lambda mid=member_id: send_member_qr_email(
+                            GymMember.objects.get(id=mid), request
+                        ))
 
                 return redirect("gym:member_detail", member_id=member.id)
             

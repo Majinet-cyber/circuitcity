@@ -1,4 +1,4 @@
-﻿# inventory/urls.py
+# inventory/urls.py
 from __future__ import annotations
 
 import importlib
@@ -1814,11 +1814,12 @@ urlpatterns += [
 ]
 
 # ---------------------------------------------------------------------
-# Nested verticals namespace (for inventory:verticals:* URLs)
+# REMOVED: Duplicate verticals namespace registration (2026-02-08)
+# The verticals namespace is already registered in cc/urls.py at /verticals/
+# Having it here at /inventory/verticals/ with the same namespace name "verticals"
+# caused Django's URL resolver to behave unpredictably during template rendering.
+# Legacy path /inventory/verticals/ is handled by inventory.urls_verticals namespace.
 # ---------------------------------------------------------------------
-urlpatterns += [
-    path("verticals/", include(("verticals.urls", "verticals"), namespace="verticals")),
-]
 
 # Gamified Add-Product Wizards
 urlpatterns += [
@@ -1854,6 +1855,31 @@ urlpatterns += [
         name="check_barcode_duplicate",
     ),
 ]
+
+# ======================================================================================
+# MARKETPLACE ROUTES (Public + Manager)
+# ======================================================================================
+try:
+    from . import views_marketplace
+    
+    # Public routes (no login required)
+    urlpatterns += [
+        path("marketplace/", views_marketplace.marketplace_public, name="marketplace_public"),
+        path("public/<slug:business_slug>/", views_marketplace.business_public_page, name="business_public_page"),
+        path("marketplace/enquiry/<int:listing_id>/", views_marketplace.submit_enquiry, name="submit_enquiry"),
+    ]
+    
+    # Manager routes (login + business required)
+    urlpatterns += [
+        path("marketplace/manage/", manager_required(_need_biz(views_marketplace.manage_listings)), name="manage_listings"),
+        path("marketplace/create/", manager_required(_need_biz(views_marketplace.create_listing)), name="create_listing"),
+        path("marketplace/edit/<int:listing_id>/", manager_required(_need_biz(views_marketplace.edit_listing)), name="edit_listing"),
+        path("marketplace/delete/<int:listing_id>/", manager_required(_need_biz(views_marketplace.delete_listing)), name="delete_listing"),
+        path("marketplace/enquiries/", manager_required(_need_biz(views_marketplace.view_enquiries)), name="view_enquiries"),
+        path("marketplace/enquiry/<int:enquiry_id>/read/", manager_required(_need_biz(views_marketplace.mark_enquiry_read)), name="mark_enquiry_read"),
+    ]
+except ImportError:
+    pass  # Marketplace views not available
 
 # ======================================================================================
 # URL COMPATIBILITY ALIASES (SSOT)

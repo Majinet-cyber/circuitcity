@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Create Listing{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <h1 class="mb-4">Create Marketplace Listing</h1>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+          <label for="title" class="form-label">Title *</label>
+          <input type="text" class="form-control" id="title" name="title" required value="{{ form_data.title|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea class="form-control" id="description" name="description" rows="4">{{ form_data.description|default:'' }}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <label for="price" class="form-label">Price (MWK)</label>
+          <input type="number" step="0.01" class="form-control" id="price" name="price" value="{{ form_data.price|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+          <label for="vertical" class="form-label">Category</label>
+          <input type="text" class="form-control" id="vertical" name="vertical" value="{{ form_data.vertical|default:business.business_kind }}">
+          <small class="text-muted">e.g., phones, gym, pharmacy, clothing</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="media_file" class="form-label">Photo or Video</label>
+          <input type="file" class="form-control" id="media_file" name="media_file" accept="image/*,video/*">
+          <small class="text-muted">Max 10 MB. Supported: JPEG, PNG, WEBP, MP4, WEBM</small>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Create Listing</button>
+          <a href="{% url 'inventory:manage_listings' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

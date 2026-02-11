@@ -165,12 +165,23 @@ class InventoryConfig(AppConfig):
         try:
             importlib.import_module("inventory.signals_audit")
             logger.debug("inventory.signals_audit loaded successfully.")
-            self.__class__._signals_loaded = True
         except ModuleNotFoundError:
             if getattr(settings, "DEBUG", False):
                 logger.info("inventory.signals_audit not found; skipping audit signal wiring.")
         except Exception:
             logger.exception("Error loading inventory.signals_audit")
+        
+        # Import gym signals for automatic welcome emails
+        try:
+            importlib.import_module("inventory.signals_gym")
+            logger.debug("inventory.signals_gym loaded successfully.")
+        except ModuleNotFoundError:
+            if getattr(settings, "DEBUG", False):
+                logger.info("inventory.signals_gym not found; skipping gym signal wiring.")
+        except Exception:
+            logger.exception("Error loading inventory.signals_gym")
+        
+        self.__class__._signals_loaded = True
 
     # -----------------------------
     # 3) Auto-create default Location for new stores

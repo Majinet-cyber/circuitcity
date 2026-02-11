@@ -263,3 +263,6 @@ class PharmacyBatchEditTest(TestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.quantity, 100)  # Original value
 
+
+
+

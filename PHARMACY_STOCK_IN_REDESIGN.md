@@ -197,3 +197,6 @@ The pharmacy stock-in page is now:
 
 **The multi-step wizard is dead. Long live the single-page flow!** 🚀
 
+
+
+

@@ -367,3 +367,6 @@ python manage.py test corrections.tests.TestCorrectionsRegistry.test_registry_ha
 
 **The Pharmacy & Cosmetics vertical now has the same premium data correction capabilities as Phones and Gym!**
 
+
+
+

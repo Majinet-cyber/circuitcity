@@ -1,85 +1,10 @@
 /**
- * HQ Admin Layout CSS
- * Clean flex-based layout with no max-width constraints
- * Ensures full-width content and consistent sidebar
+ * HQ Admin Content CSS
+ * Content-level styling (cards, containers, rows).
+ * Layout (shell / sidebar / main) is in hq_sidebar_fix.css — DO NOT duplicate here.
  */
 
-/* ========================================
-   HQ SHELL (Root Container)
-   ======================================== */
-.hq-shell {
-  display: flex;
-  min-height: 100vh;
-  width: 100%;
-  max-width: none;
-  overflow-x: hidden;
-}
-
-/* ========================================
-   SIDEBAR (Fixed Width, Sticky)
-   ======================================== */
-.hq-sidebar,
-#hqSidebar {
-  width: 260px;
-  flex: 0 0 260px;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* Ensure sidebar never collapses on desktop */
-@media (min-width: 992px) {
-  .hq-sidebar,
-  #hqSidebar {
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
-    flex: 0 0 260px !important;
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-}
-
-/* ========================================
-   MAIN CONTENT AREA (Flexible)
-   ======================================== */
-.hq-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: none;
-}
-
-/* ========================================
-   CONTENT (Full Width, No Constraints)
-   ======================================== */
-.hq-content {
-  flex: 1;
-  min-width: 0;
-  width: 100%;
-  max-width: none !important;
-  padding: 1rem;
-  overflow-x: hidden;
-}
-
-@media (min-width: 768px) {
-  .hq-content {
-    padding: 1.25rem 1.5rem;
-  }
-}
-
-@media (min-width: 992px) {
-  .hq-content {
-    padding: 1.5rem 2rem;
-  }
-}
-
-/* Remove any nested container constraints */
+/* Remove nested container max-width constraints inside HQ content */
 .hq-content > .container,
 .hq-content > .container-fluid,
 .hq-content > .container-lg,
@@ -113,13 +38,10 @@
   padding-right: 0.75rem;
 }
 
-/* ========================================
-   UTILITY OVERRIDES
-   ======================================== */
+/* Utility overrides: cards & tables should be full width */
 .hq-content .card,
 .hq-content .table-responsive,
 .hq-content table {
   max-width: none !important;
   width: 100% !important;
 }
-

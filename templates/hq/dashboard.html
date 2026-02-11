@@ -8,6 +8,8 @@
   
   <!-- HQ Mobile-First Responsive CSS -->
   <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
+  <!-- HQ Layout CSS — single source of truth, loaded LAST -->
+  <link href="{% static 'css/hq_layout.css' %}?v=20260211-1" rel="stylesheet">
 
   <style>
     :root{
@@ -241,7 +243,7 @@
     @keyframes reveal{to{opacity:1;transform:none}}
   </style>
 </head>
-<body>
+<body data-layout="hq">
 
   {# Canonical hq URLs #}
   {% url 'hq:dashboard' as dashboard_url %}
@@ -256,7 +258,7 @@
 
   <script id="income-series" type="application/json">{{ income_series_json|default:"[]"|safe }}</script>
 
-  <div class="layout hq-shell">
+  <div class="hq-layout">
     <aside id="hqSidebar" class="sidebar hq-sidebar">
       <div class="brand">
         <div class="dot">HQ</div>
@@ -693,9 +695,9 @@
     </main>
     </div><!-- /.hq-main -->
 
-    <!-- Backdrop for Mobile Sidebar -->
+    <!-- Backdrop for Mobile Sidebar (expanded state only) -->
     <div id="hqBackdrop" class="hq-backdrop" hidden></div>
-  </div><!-- /.hq-shell/.layout -->
+  </div><!-- /.hq-layout -->
 
   <!-- Notifications portal -->
   <div class="panel" id="panel" role="dialog" aria-modal="false" style="display:none">

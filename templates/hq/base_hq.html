@@ -23,65 +23,14 @@
 
   {% block extra_css %}{% endblock %}
   
-  <script>
-    // Mobile sidebar toggle
-    document.addEventListener('DOMContentLoaded', function() {
-      const sidebar = document.getElementById('hqSidebar');
-      const sidebarToggle = document.getElementById('hqSidebarToggle');
-      const sidebarClose = document.getElementById('hqSidebarClose');
-      
-      // Create overlay
-      const overlay = document.createElement('div');
-      overlay.className = 'hq-sidebar-overlay';
-      document.body.appendChild(overlay);
-      
-      // Toggle sidebar
-      function toggleSidebar() {
-        sidebar.classList.toggle('active');
-        overlay.classList.toggle('active');
-        document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-      }
-      
-      if (sidebarToggle) {
-        sidebarToggle.addEventListener('click', toggleSidebar);
-      }
-      
-      if (sidebarClose) {
-        sidebarClose.addEventListener('click', toggleSidebar);
-      }
-      
-      overlay.addEventListener('click', function() {
-        if (sidebar.classList.contains('active')) {
-          toggleSidebar();
-        }
-      });
-      
-      // Close sidebar on escape key
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && sidebar.classList.contains('active')) {
-          toggleSidebar();
-        }
-      });
-      
-      // Close sidebar when navigating (mobile only)
-      if (window.innerWidth < 992) {
-        const sidebarLinks = sidebar.querySelectorAll('.nav a');
-        sidebarLinks.forEach(link => {
-          link.addEventListener('click', function() {
-            if (sidebar.classList.contains('active')) {
-              setTimeout(toggleSidebar, 200);
-            }
-          });
-        });
-      }
-    });
-  </script>
+  <!-- HQ Layout CSS — single source of truth, loaded LAST -->
+  <link href="{% static 'css/hq_layout.css' %}?v=20260211-1" rel="stylesheet">
 </head>
-<body>
+<body data-layout="hq">
 
-<!-- HQ Shell with Mobile-First Layout -->
-<div class="hq-shell">
-  <!-- Sidebar (Off-Canvas on Mobile) -->
+<!-- HQ Layout Wrapper (Grid-based, never collapses) -->
+<div class="hq-layout">
+  <!-- Sidebar (always visible, locked left) -->
   {% include "hq/sidebar_hq.html" %}
 
   <!-- Main Content Area -->
@@ -118,9 +67,9 @@
     </main>
   </div>
 
-  <!-- Backdrop for Mobile Sidebar -->
+  <!-- Backdrop for Mobile Sidebar (expanded state only) -->
   <div id="hqBackdrop" class="hq-backdrop" hidden></div>
-</div>
+</div><!-- /.hq-layout -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 

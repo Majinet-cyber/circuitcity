@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Listing{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <h1 class="mb-4">Edit Listing</h1>
+
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+          <label for="title" class="form-label">Title *</label>
+          <input type="text" class="form-control" id="title" name="title" required value="{{ listing.title }}">
+        </div>
+
+        <div class="mb-3">
+          <label for="description" class="form-label">Description</label>
+          <textarea class="form-control" id="description" name="description" rows="4">{{ listing.description }}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <label for="price" class="form-label">Price (MWK)</label>
+          <input type="number" step="0.01" class="form-control" id="price" name="price" value="{{ listing.price|default:'' }}">
+        </div>
+
+        <div class="mb-3">
+          <label for="vertical" class="form-label">Category</label>
+          <input type="text" class="form-control" id="vertical" name="vertical" value="{{ listing.vertical }}">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Current Media</label>
+          {% if listing.media_file %}
+            {% if listing.is_image %}
+              <div><img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" style="max-width: 200px; border-radius: 8px;"></div>
+            {% elif listing.is_video %}
+              <div><video src="{{ listing.media_file.url }}" controls style="max-width: 200px; border-radius: 8px;"></video></div>
+            {% endif %}
+          {% else %}
+            <p class="text-muted">No media uploaded</p>
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label for="media_file" class="form-label">Replace Photo or Video</label>
+          <input type="file" class="form-control" id="media_file" name="media_file" accept="image/*,video/*">
+          <small class="text-muted">Max 10 MB. Leave empty to keep current media.</small>
+        </div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="is_active" name="is_active" {% if listing.is_active %}checked{% endif %}>
+          <label class="form-check-label" for="is_active">Active (visible on marketplace)</label>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+          <a href="{% url 'inventory:manage_listings' %}" class="btn btn-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

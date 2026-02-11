@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Marketplace Enquiries{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Marketplace Enquiries</h1>
+        <a href="{% url 'inventory:manage_listings' %}" class="btn btn-secondary">← Back to Listings</a>
+      </div>
+
+      {% if page_obj.object_list %}
+        <div class="list-group">
+          {% for enquiry in page_obj %}
+            <div class="list-group-item {% if not enquiry.is_read %}bg-light{% endif %}">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                  <h5 class="mb-1">
+                    {{ enquiry.listing.title }}
+                    {% if not enquiry.is_read %}
+                      <span class="badge bg-primary">New</span>
+                    {% endif %}
+                  </h5>
+                  <p class="mb-1">
+                    <strong>From:</strong> {{ enquiry.name|default:enquiry.email }}
+                    {% if enquiry.name %}({{ enquiry.email }}){% endif %}
+                  </p>
+                  {% if enquiry.phone %}
+                    <p class="mb-1"><strong>Phone:</strong> {{ enquiry.phone }}</p>
+                  {% endif %}
+                  {% if enquiry.message %}
+                    <p class="mb-1"><strong>Message:</strong> {{ enquiry.message }}</p>
+                  {% endif %}
+                  <small class="text-muted">{{ enquiry.created_at|date:"M d, Y g:i A" }}</small>
+                </div>
+                {% if not enquiry.is_read %}
+                  <button class="btn btn-sm btn-outline-primary" onclick="markAsRead({{ enquiry.id }})">Mark as Read</button>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        {% if page_obj.has_other_pages %}
+          <nav class="mt-4">
+            <ul class="pagination">
+              {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+              {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-info">
+          <p class="mb-0">No enquiries yet. When customers submit enquiries, they'll appear here.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function markAsRead(enquiryId) {
+  fetch(`/inventory/marketplace/enquiry/${enquiryId}/read/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}',
+      'Content-Type': 'application/json',
+    },
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.ok) {
+      location.reload();
+    }
+  });
+}
+</script>
+{% endblock %}
+

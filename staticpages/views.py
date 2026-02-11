@@ -36,6 +36,88 @@ def get_cfo_message(total_profit):
         ])
 
 
+def get_all_verticals():
+    """
+    Returns list of all supported verticals (SINGLE SOURCE OF TRUTH).
+    
+    Each vertical has:
+        - code: internal identifier (e.g., 'phones')
+        - name: display name (e.g., 'Phones & Electronics')
+        - description: short 1-line description
+        - icon: emoji or icon representation
+    
+    This is the canonical list used for landing page, docs, and onboarding.
+    """
+    return [
+        {
+            'code': 'phones',
+            'name': 'Phones & Electronics',
+            'description': 'Track phone inventory, accessories, and repairs',
+            'icon': '📱',
+        },
+        {
+            'code': 'gym',
+            'name': 'Gym & Fitness',
+            'description': 'Manage memberships, check-ins, and trainers',
+            'icon': '💪',
+        },
+        {
+            'code': 'pharmacy',
+            'name': 'Pharmacy & Cosmetics',
+            'description': 'Inventory tracking for medicines and cosmetics',
+            'icon': '💊',
+        },
+        {
+            'code': 'clothing',
+            'name': 'Clothing Store',
+            'description': 'Manage apparel inventory with sizes and colors',
+            'icon': '👔',
+        },
+        {
+            'code': 'liquor',
+            'name': 'Liquor Store',
+            'description': 'Track bottles, shots, and bar credit',
+            'icon': '🍺',
+        },
+        {
+            'code': 'grocery',
+            'name': 'Grocery Store',
+            'description': 'General merchandise and daily essentials',
+            'icon': '🛒',
+        },
+        {
+            'code': 'hardware',
+            'name': 'Hardware & General Dealers',
+            'description': 'Building materials and hardware supplies',
+            'icon': '🔨',
+        },
+        {
+            'code': 'cement',
+            'name': 'Cement / Building Materials',
+            'description': 'Specialized cement and construction supplies',
+            'icon': '🏗️',
+        },
+        {
+            'code': 'farm',
+            'name': 'Farm Manager',
+            'description': 'Track crops, livestock, and farm profitability',
+            'icon': '🌾',
+        },
+        {
+            'code': 'welding',
+            'name': 'Welding Workshop',
+            'description': 'Job estimation and welding project invoicing',
+            'icon': '🔥',
+        },
+        {
+            'code': 'car_hire',
+            'name': 'Car Hire Service',
+            'description': 'Fleet management and vehicle rental bookings',
+            'icon': '🚗',
+        },
+    ]
+
+
 @never_cache
 def home(request):
     """
@@ -98,12 +180,16 @@ def home(request):
     show_metrics = show_counters_setting and total_merchants >= min_threshold
     show_agents_counter = total_agents >= min_threshold
     
+    # Get all supported verticals (SSOT)
+    verticals = get_all_verticals()
+    
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
         'total_merchants': total_merchants,
         'total_agents': total_agents,
         'show_metrics': show_metrics,
         'show_agents_counter': show_agents_counter,
+        'verticals': verticals,
     })
 
 

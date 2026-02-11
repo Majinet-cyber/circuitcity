@@ -31,14 +31,16 @@ class HQMobileRenderingTestCase(TestCase):
         self.assertContains(response, "viewport")
 
     def test_hq_mobile_css_included(self):
-        """Test that HQ pages include mobile-first CSS"""
+        """Test that HQ pages include mobile-first responsive CSS"""
         self.client.login(username="staff@test.com", password="testpass123")
 
         response = self.client.get(reverse("hq:dashboard"))
 
-        # Check mobile CSS is linked
+        # Check mobile responsive CSS is linked (either hq-mobile.css or hq-mobile-responsive.css)
         assert response.status_code == 200
-        self.assertContains(response, "hq-mobile.css", msg_prefix="HQ mobile CSS should be included")
+        content = response.content.decode()
+        has_mobile_css = "hq-mobile.css" in content or "hq-mobile-responsive.css" in content
+        self.assertTrue(has_mobile_css, "HQ mobile CSS should be included")
 
     def test_hq_business_directory_renders(self):
         """Test business directory page renders"""
@@ -106,12 +108,12 @@ class HQTableResponsivenessTestCase(TestCase):
         # Template should use .hq-table-responsive or similar classes
         # (This is a sanity check, actual class usage depends on template implementation)
 
-    def test_hq_pages_have_no_horizontal_scroll_indicators(self):
-        """Test that HQ pages use overflow-hidden correctly"""
+    def test_hq_pages_include_layout_css(self):
+        """Test that HQ pages include the authoritative layout CSS (hq_layout.css)"""
         self.client.login(username="staff@test.com", password="testpass123")
 
         response = self.client.get(reverse("hq:dashboard"))
 
         assert response.status_code == 200
-        # Check that overflow-x:hidden or similar is set
-        self.assertContains(response, "overflow-x")
+        # hq_layout.css is the single source of truth for layout (loaded last)
+        self.assertContains(response, "hq_layout.css")
