@@ -144,8 +144,8 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     # Expired batches
     expired_batches = batches.filter(expiry_date__lt=today).order_by("expiry_date")[:10]
 
-    # Low stock batches
-    low_stock_batches = batches.filter(quantity__lte=F("reorder_level")).order_by("quantity")[:10]
+    # Low stock batches (exclude out of stock items)
+    low_stock_batches = batches.filter(quantity__gt=0, quantity__lte=F("reorder_level")).order_by("quantity")[:10]
 
     # ===== SALES METRICS (filtered by selected period + optional product) =====
     # Convert dates to datetime range for filtering

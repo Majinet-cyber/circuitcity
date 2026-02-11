@@ -121,14 +121,12 @@
         <a href="{% url 'verticals:clothing_tracked_units_list' panel.product.id %}" 
            class="hub-badge hub-badge-tracked"
            title="View tracked units">
-          <span>🏷️</span>
-          <span>Tracked ({{ panel.barcode_units }})</span>
+          <span>🏷️ Tracked ({{ panel.barcode_units }} units)</span>
         </a>
         {% endif %}
         {% if panel.is_common %}
         <span class="hub-badge hub-badge-common">
-          <span>📦</span>
-          <span>Common ({{ panel.common_stock }})</span>
+          <span>📦 Common ({{ panel.common_stock }})</span>
         </span>
         {% endif %}
       </div>

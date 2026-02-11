@@ -85,8 +85,8 @@ def stock_in_clothing(
         raise ValidationError("This business is not a clothing business")
 
     # Validate inputs
-    if quantity <= 0:
-        raise ValidationError("Quantity must be greater than 0")
+    if quantity < 0:
+        raise ValidationError("Quantity cannot be negative")
 
     if cost_price < Decimal("0"):
         raise ValidationError("Cost price cannot be negative")

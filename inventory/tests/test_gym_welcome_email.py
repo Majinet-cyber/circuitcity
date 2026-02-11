@@ -352,11 +352,11 @@ class GymWelcomeEmailTestCase(TransactionTestCase):
         self.assertIn("/gym/m/", email.body)
 
 
-class GymWelcomeEmailUITestCase(TestCase):
+class GymWelcomeEmailUITestCase(TransactionTestCase):
     """
     Test welcome email sending through UI views.
     
-    Uses regular TestCase for view testing.
+    Uses TransactionTestCase because email sending happens in transaction.on_commit().
     """
     
     def setUp(self):
@@ -404,7 +404,7 @@ class GymWelcomeEmailUITestCase(TestCase):
         mock_send_email.return_value = True
         
         # Post form data
-        response = self.client.post(reverse('gym:member_add'), {
+        response = self.client.post(reverse('gym:member_add_old'), {
             'name': 'UI Test Member',
             'phone': '0999123456',
             'email': 'uitest@example.com',
@@ -432,7 +432,7 @@ class GymWelcomeEmailUITestCase(TestCase):
         mock_send_email.return_value = True
         
         # Post form data without email
-        response = self.client.post(reverse('gym:member_add'), {
+        response = self.client.post(reverse('gym:member_add_old'), {
             'name': 'No Email UI Member',
             'phone': '0999123456',
             'email': '',  # Blank email

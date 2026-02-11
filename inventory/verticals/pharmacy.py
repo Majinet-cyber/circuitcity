@@ -60,9 +60,9 @@ def hub(request):
     # Expired Batches: batches that have already expired
     expired_count = batches.filter(expiry_date__lt=today).count()
     
-    # Low Stock: batches at or below reorder threshold
+    # Low Stock: batches at or below reorder threshold (but not out of stock)
     from django.db.models import F
-    low_stock_count = batches.filter(quantity__lte=F("reorder_level")).count()
+    low_stock_count = batches.filter(quantity__gt=0, quantity__lte=F("reorder_level")).count()
     
     # Active batches count (for "View Batches" card)
     active_batches_count = total_batches
