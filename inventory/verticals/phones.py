@@ -428,14 +428,13 @@ def dashboard(request):
     # --- SALES TREND - LAST 30 DAYS (line chart, never empty) ---
     # Always generate 30 days of data (with zeros if no sales) so chart always renders
     # CRITICAL FIX: Handle items with NULL sold_at by falling back to received_at
-    # BUGFIX (Jan 2026): Corrected to show proper 30-day window (day -30 through day -1, NOT including today)
-    # This ensures "Last 30 Days" means the completed 30 days before today
+    # BUGFIX (Feb 2026): Include today in the 30-day window (day -29 through today)
+    # so users who make sales today see their data immediately
     sales_trend_data = []
     for i in range(30):
-        day_start = today_start - timedelta(days=30 - i)  # Start from 30 days ago
+        day_start = today_start - timedelta(days=29 - i)  # Start from 29 days ago through today
         day_end = day_start + timedelta(days=1)
         day_date = day_start.date()
-        day_end_date = day_end.date()
         
         # Include items with sold_at in range OR items with null sold_at but received_at in range
         day_sales = sold_items.filter(
@@ -458,6 +457,8 @@ def dashboard(request):
     sales_trend_30d = sales_trend_data
 
     # --- FAST MOVING MODELS - TOP 5 BY UNITS SOLD (SELECTED RANGE) ---
+    # BUGFIX (Feb 2026): If no sales exist in range, fallback to top models by stock count
+    # so users NEVER see "No data" when they have stock/sales records
     fast_models_query = (
         range_sales.values("product__brand", "product__model", "product__variant")
         .annotate(
@@ -467,6 +468,7 @@ def dashboard(request):
     )
 
     fast_models = []
+    fast_models_source = "sales"  # Track data source for template
     for item in fast_models_query:
         brand = item["product__brand"] or "Unknown"
         model = item["product__model"] or "Unknown"
@@ -482,6 +484,32 @@ def dashboard(request):
                 "revenue": item["revenue"],
             }
         )
+
+    # Fallback: if no sold data but stock exists, show top models by stock count
+    if not fast_models and stock_on_hand > 0:
+        fast_models_source = "stock"
+        stock_models_query = (
+            stock_items.values("product__brand", "product__model", "product__variant")
+            .annotate(
+                units=Count("id"),
+                revenue=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField()),
+            )
+            .order_by("-units")[:5]
+        )
+        for item in stock_models_query:
+            brand = item["product__brand"] or "Unknown"
+            model = item["product__model"] or "Unknown"
+            variant = item["product__variant"] or ""
+            ram_rom = variant if variant else "N/A"
+            fast_models.append(
+                {
+                    "brand": brand,
+                    "model": model,
+                    "ram_rom": ram_rom,
+                    "units": item["units"],
+                    "revenue": item["revenue"],
+                }
+            )
 
     # --- TOP AGENTS - TOP 5 BY COMMISSION (SELECTED RANGE) ---
     # Use the centralized agent_earnings service for consistency
@@ -568,6 +596,7 @@ def dashboard(request):
 
     # --- SALES BY PHONE MODEL - TOP 10 BY REVENUE (SELECTED RANGE) ---
     # Group sales by phone brand + model to show which models are selling
+    # BUGFIX (Feb 2026): Fallback to stock data when no sales exist
     sales_by_model_query = (
         range_sales.values("product__brand", "product__model")
         .annotate(
@@ -577,10 +606,10 @@ def dashboard(request):
     )
 
     sales_by_model = []
+    sales_by_model_source = "sales"
     for item in sales_by_model_query:
         brand = item["product__brand"] or "Unknown"
         model = item["product__model"] or "Unknown"
-        # Combine brand and model for display (e.g., "Tecno Pova 5", "Itel A58")
         model_name = f"{brand} {model}".strip()
 
         sales_by_model.append(
@@ -590,6 +619,29 @@ def dashboard(request):
                 "revenue": item["revenue"],
             }
         )
+
+    # Fallback: if no sold data but stock exists, show models by stock count
+    if not sales_by_model and stock_on_hand > 0:
+        sales_by_model_source = "stock"
+        stock_by_model_query = (
+            stock_items.values("product__brand", "product__model")
+            .annotate(
+                units_sold=Count("id"),
+                revenue=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField()),
+            )
+            .order_by("-units_sold")[:10]
+        )
+        for item in stock_by_model_query:
+            brand = item["product__brand"] or "Unknown"
+            model = item["product__model"] or "Unknown"
+            model_name = f"{brand} {model}".strip()
+            sales_by_model.append(
+                {
+                    "model_name": model_name,
+                    "units_sold": item["units_sold"],
+                    "revenue": item["revenue"],
+                }
+            )
 
     # ==========================================================================
     # C) ACCESSORIES KPIs (OPTIONAL - separate system)
@@ -705,10 +757,12 @@ def dashboard(request):
             "sales_trend_30d": sales_trend_30d,
             "sales_trend_json": sales_trend_json,
             "fast_models": fast_models,
+            "fast_models_source": fast_models_source,  # "sales" or "stock"
             "top_agents": top_agents,
             "best_sales_day": best_sales_day,
             # NEW: Sales by phone model (respects date range filter)
             "sales_by_model": sales_by_model,
+            "sales_by_model_source": sales_by_model_source,  # "sales" or "stock"
             # Role-based visibility flags
             "IS_MANAGER": is_manager,
             "IS_AGENT": is_agent,

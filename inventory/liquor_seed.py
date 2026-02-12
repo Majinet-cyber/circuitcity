@@ -132,7 +132,8 @@ def create_default_liquor_catalog(business: Business, location: Optional = None,
                 "is_active": True,
                 "track_inventory": True,
                 "has_shots": has_shots,
-                "bottles_per_crate": 20,  # MALAWI STANDARD: 20 bottles per crate
+                # MALAWI STANDARDS: Beer=20 bottles/crate, Cider=6-pack only, Wine=varies
+                "bottles_per_crate": 6 if category_key == "cider" else 20,
                 "supports_crates": category_key
                 in ["beer", "cider", "wine"],  # Beer/cider/wine support crates; spirits don't
             }

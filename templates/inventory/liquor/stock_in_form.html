@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In: {{ product.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.stock-in-container {
+  max-width: 700px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.page-header .product-name {
+  font-size: 1.3rem;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.form-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.form-control {
+  border-radius: 8px;
+  border: 2px solid #d1d5db;
+  padding: 0.75rem;
+  font-size: 1rem;
+  width: 100%;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.form-control-lg {
+  font-size: 1.2rem;
+  padding: 1rem;
+}
+
+.form-text {
+  color: #6b7280;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+}
+
+.btn-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.btn-back {
+  flex: 1;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border-radius: 8px;
+}
+
+.btn-submit-container {
+  flex: 2;
+}
+
+/* Beer-specific styles */
+.mode-badge {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.calculator-panel {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.calculator-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #065f46;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.calculator-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.calculator-row:last-child {
+  border-bottom: none;
+}
+
+.calc-label {
+  font-weight: 600;
+  color: #047857;
+  font-size: 1rem;
+}
+
+.calc-value {
+  font-weight: 700;
+  color: #065f46;
+  font-size: 1.2rem;
+}
+
+@media (max-width: 640px) {
+  .calculator-panel {
+    padding: 1rem;
+  }
+  
+  .calc-label, .calc-value {
+    font-size: 0.95rem;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- LIQUOR_WIZARD_V2 - Stock-in page proof marker -->
+<div class="d-none" data-proof="LIQUOR_WIZARD_V2"></div>
+
+<div class="stock-in-container">
+  <div class="page-header">
+    <h1>🍾 Stock In</h1>
+    <div class="product-name">{{ product.name }}</div>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="form-card">
+    <form method="post" action="{% url 'inventory:liquor_stock_in_submit' product_id=product.id %}" id="stock-in-form">
+      {% csrf_token %}
+
+      {% if product.category|lower == 'beer' %}
+        <!-- BEER: Crate-based stock-in -->
+        <div class="beer-stock-in-mode">
+          <div class="mode-badge">
+            🍺 Beer Stock-In (By Crates)
+          </div>
+
+          <div class="form-group">
+            <label for="crates" class="form-label">Number of Crates *</label>
+            <input 
+              type="number" 
+              class="form-control form-control-lg" 
+              name="crates" 
+              id="crates" 
+              min="0" 
+              required 
+              autofocus
+              placeholder="e.g., 5"
+              oninput="calculateBeerBottles()"
+            >
+            <div class="form-text">1 crate = 20 bottles</div>
+          </div>
+
+          <div class="form-group">
+            <label for="loose_bottles" class="form-label">Loose Bottles (optional)</label>
+            <input 
+              type="number" 
+              class="form-control" 
+              name="loose_bottles" 
+              id="loose_bottles" 
+              min="0" 
+              value="0"
+              placeholder="e.g., 5"
+              oninput="calculateBeerBottles()"
+            >
+            <div class="form-text">Additional bottles not in crates</div>
+          </div>
+
+          <div class="form-group">
+            <label for="total_cost" class="form-label">Total Cost (MWK) *</label>
+            <input 
+              type="number" 
+              class="form-control" 
+              name="total_cost" 
+              id="total_cost" 
+              step="0.01" 
+              min="0"
+              required
+              placeholder="e.g., 40000.00"
+              oninput="calculateBeerBottles()"
+            >
+            <div class="form-text">Total cost for all crates + loose bottles</div>
+          </div>
+
+          <!-- Live Calculator Panel -->
+          <div class="calculator-panel" id="calculator-panel">
+            <div class="calculator-title">📊 Calculated Values</div>
+            <div class="calculator-row">
+              <span class="calc-label">Total Bottles:</span>
+              <span class="calc-value" id="calc-bottles">0</span>
+            </div>
+            <div class="calculator-row">
+              <span class="calc-label">Cost per Bottle:</span>
+              <span class="calc-value" id="calc-cost-per-bottle">MWK 0.00</span>
+            </div>
+          </div>
+        </div>
+
+      {% else %}
+        <!-- NON-BEER: Bottle-based stock-in (existing behavior) -->
+        <div class="form-group">
+          <label for="quantity" class="form-label">Quantity (Bottles) *</label>
+          <input 
+            type="number" 
+            class="form-control form-control-lg" 
+            name="quantity" 
+            id="quantity" 
+            min="1" 
+            required 
+            autofocus
+            placeholder="e.g., 50"
+          >
+          <div class="form-text">Number of bottles to add to stock</div>
+        </div>
+
+        <div class="form-group">
+          <label for="cost_per_unit" class="form-label">Cost per Bottle (MWK)</label>
+          <input 
+            type="number" 
+            class="form-control" 
+            name="cost_per_unit" 
+            id="cost_per_unit" 
+            step="0.01" 
+            min="0"
+            placeholder="e.g., 800.00"
+          >
+          <div class="form-text">Optional - for profit tracking</div>
+        </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label for="date_received" class="form-label">Date Received</label>
+        <input 
+          type="date" 
+          class="form-control" 
+          name="date_received" 
+          id="date_received"
+        >
+        <div class="form-text">Defaults to today</div>
+      </div>
+
+      <div class="form-group">
+        <label for="notes" class="form-label">Notes</label>
+        <textarea 
+          class="form-control" 
+          name="notes" 
+          id="notes" 
+          rows="2"
+          placeholder="Optional notes (e.g., supplier, invoice number)"
+        ></textarea>
+      </div>
+
+      <div class="form-actions">
+        <a href="{% url 'inventory:liquor_catalog' category=product.category %}" class="btn btn-outline-secondary btn-back">
+          ← Back to Catalog
+        </a>
+        <div class="btn-submit-container">
+          <button type="submit" class="btn-submit" id="submit-btn">
+            ✓ Add to Stock
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Set today's date as default
+document.addEventListener('DOMContentLoaded', function() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date_received').value = today;
+  
+  // Initialize calculator if beer mode
+  if (typeof calculateBeerBottles === 'function') {
+    calculateBeerBottles();
+  }
+});
+
+// Prevent double submission
+document.getElementById('stock-in-form').addEventListener('submit', function() {
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+});
+
+// Live calculator for beer stock-in
+function calculateBeerBottles() {
+  const cratesInput = document.getElementById('crates');
+  const looseInput = document.getElementById('loose_bottles');
+  const totalCostInput = document.getElementById('total_cost');
+  const calcBottles = document.getElementById('calc-bottles');
+  const calcCostPerBottle = document.getElementById('calc-cost-per-bottle');
+  
+  if (!cratesInput || !looseInput || !totalCostInput) return;
+  
+  const crates = parseInt(cratesInput.value) || 0;
+  const looseBottles = parseInt(looseInput.value) || 0;
+  const totalCost = parseFloat(totalCostInput.value) || 0;
+  
+  // Calculate total bottles (1 crate = 20 bottles)
+  const totalBottles = (crates * 20) + looseBottles;
+  
+  // Calculate cost per bottle
+  let costPerBottle = 0;
+  if (totalBottles > 0 && totalCost > 0) {
+    costPerBottle = totalCost / totalBottles;
+  }
+  
+  // Update display
+  calcBottles.textContent = totalBottles;
+  calcCostPerBottle.textContent = totalBottles > 0 
+    ? 'MWK ' + costPerBottle.toFixed(2) 
+    : 'MWK 0.00';
+  
+  // Visual feedback
+  if (totalBottles === 0) {
+    calcBottles.style.color = '#dc2626';
+    calcCostPerBottle.style.color = '#dc2626';
+  } else {
+    calcBottles.style.color = '#065f46';
+    calcCostPerBottle.style.color = '#065f46';
+  }
+}
+</script>
+{% endblock %}
+

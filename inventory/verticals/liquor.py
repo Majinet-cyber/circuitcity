@@ -251,6 +251,15 @@ def dashboard(request):
     # Safely get membership (may not exist)
     membership = getattr(request, "membership", None)
 
+    # ========== Stock Value Calculation (PART A: Consistent with Inventory Costs) ==========
+    # Stock Value = Sum of (on-hand units * average unit cost) per product
+    # This matches the "Inventory Costs" / "Total Costs" logic
+    total_stock_value = Decimal("0.00")
+    for product in liquor_products:
+        on_hand = product.quantity_in_stock or 0
+        unit_cost = product.cost_per_bottle or Decimal("0.00")
+        total_stock_value += Decimal(on_hand) * unit_cost
+
     # ========== GOAL 5: Monthly Sales Target (Stock-Aware) ==========
     # Get current year/month
     year = now.year
@@ -520,6 +529,7 @@ def dashboard(request):
             # Stock KPIs
             "total_bottle_skus": total_bottle_skus,
             "total_bottles_in_stock": total_bottles_in_stock,
+            "total_stock_value": total_stock_value,  # PART A: Consistent stock value
             "days_of_cover": days_of_cover,
             # Safe subscription & membership
             "subscription": subscription,

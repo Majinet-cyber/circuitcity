@@ -1821,10 +1821,48 @@ urlpatterns += [
 # Legacy path /inventory/verticals/ is handled by inventory.urls_verticals namespace.
 # ---------------------------------------------------------------------
 
+# Import new liquor wizard views (clean 2-step flow with Django forms)
+try:
+    from . import views_liquor_wizard as _liquor_wizard
+except Exception:
+    _liquor_wizard = None
+
 # Gamified Add-Product Wizards
 urlpatterns += [
-    # Wizard pages - Direct imports (no fallback stubs)
-    path("wizard/liquor/", manager_required(_need_biz(_wizard_views.liquor_wizard)), name="liquor_wizard"),
+    # Liquor wizard - NEW 2-step flow with Django forms (no JS alerts)
+    path(
+        "wizard/liquor/",
+        manager_required(_need_biz(_liquor_wizard.liquor_wizard_step1 if _liquor_wizard else _wizard_views.liquor_wizard)),
+        name="liquor_wizard"  # Keep old name for backward compatibility
+    ),
+    path(
+        "wizard/liquor/",
+        manager_required(_need_biz(_liquor_wizard.liquor_wizard_step1 if _liquor_wizard else _wizard_views.liquor_wizard)),
+        name="liquor_wizard_step1"  # New name
+    ),
+    path(
+        "wizard/liquor/step2/",
+        manager_required(_need_biz(_liquor_wizard.liquor_wizard_step2 if _liquor_wizard else _wizard_views.liquor_wizard)),
+        name="liquor_wizard_step2"
+    ),
+    # Liquor catalog (new catalog-based flow)
+    path(
+        "liquor/catalog/<str:category>/",
+        manager_required(_need_biz(_liquor_wizard.liquor_catalog if _liquor_wizard else lambda r, category: JsonResponse({"error": "Not implemented"}, status=501))),
+        name="liquor_catalog"
+    ),
+    # Liquor stock-in (with product_id parameter)
+    path(
+        "liquor/stock-in/<int:product_id>/",
+        manager_required(_need_biz(_liquor_wizard.liquor_stock_in_page if _liquor_wizard else lambda r, product_id: JsonResponse({"error": "Not implemented"}, status=501))),
+        name="liquor_stock_in"
+    ),
+    path(
+        "liquor/stock-in/<int:product_id>/submit/",
+        manager_required(_need_biz(_liquor_wizard.liquor_stock_in_submit if _liquor_wizard else lambda r, product_id: JsonResponse({"error": "Not implemented"}, status=501))),
+        name="liquor_stock_in_submit"
+    ),
+    # Other wizards
     path("wizard/phones/", manager_required(_need_biz(_wizard_views.phones_wizard)), name="phones_wizard"),
     path("wizard/pharmacy/", manager_required(_need_biz(_wizard_views.pharmacy_wizard)), name="pharmacy_wizard"),
     path("wizard/clothing/", manager_required(_need_biz(_wizard_views.clothing_wizard)), name="clothing_wizard"),

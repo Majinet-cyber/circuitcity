@@ -7,6 +7,12 @@ from django.http import JsonResponse
 from . import views_liquor
 from . import views_liquor_inventory
 
+# Category-aware stock-in views (PART B, C, D)
+try:
+    from . import views_liquor_stockin_v2
+except Exception:
+    views_liquor_stockin_v2 = None
+
 # Price edit views (manager-only)
 try:
     from . import views_liquor_price_edit
@@ -28,6 +34,10 @@ urlpatterns = [
     path("inventory/", views_liquor_inventory.liquor_inventory_dashboard, name="inventory_dashboard"),
     # Scan In
     path("scan-in/", views_liquor_inventory.liquor_scan_in, name="scan_in"),
+    # Category-aware Stock-In (PART B, C, D)
+    path("stock-in/<str:category>/", views_liquor_stockin_v2.liquor_stock_in_category if views_liquor_stockin_v2 else views_liquor_inventory.liquor_scan_in, name="stock_in_category"),
+    path("stock-in/submit/v2/", views_liquor_stockin_v2.liquor_stock_in_submit_v2 if views_liquor_stockin_v2 else views_liquor_inventory.liquor_scan_in, name="liquor_stock_in_submit_v2"),
+    path("api/stock-in/calculator/", views_liquor_stockin_v2.liquor_stock_in_calculator_api if views_liquor_stockin_v2 else views_liquor_inventory.liquor_scan_in, name="stock_in_calculator"),
     # Stock List (detailed inventory with category filtering)
     path("stock/list/", views_liquor_inventory.liquor_stock_list, name="stock_list"),
     # Stock Overview

@@ -1,0 +1,923 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Stock In — {{ product.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Premium Wizard Styles */
+:root {
+  --primary-color: {{ type_color }};
+  --primary-light: {{ type_color }}20;
+  --primary-dark: {{ type_color }}dd;
+}
+
+body {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  min-height: 100vh;
+}
+
+.wizard-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+/* Wizard Header */
+.wizard-header {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.wizard-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.wizard-title h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+}
+
+.product-name-display {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin-bottom: 1rem;
+}
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--primary-color);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-top: 1.5rem;
+}
+
+.progress-steps {
+  display: flex;
+  justify-content: space-between;
+  position: relative;
+  margin-bottom: 0.5rem;
+}
+
+.progress-line {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.progress-line-fill {
+  height: 100%;
+  background: var(--primary-color);
+  transition: width 0.3s ease;
+}
+
+.progress-step {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.progress-step-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: white;
+  border: 4px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #9ca3af;
+  transition: all 0.3s ease;
+}
+
+.progress-step.active .progress-step-circle {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+}
+
+.progress-step.completed .progress-step-circle {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+}
+
+.progress-step-label {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.progress-step.active .progress-step-label {
+  color: var(--primary-color);
+}
+
+/* Main Content Area */
+.wizard-content {
+  display: flex;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+.wizard-main {
+  flex: 2;
+}
+
+.wizard-sidebar {
+  flex: 1;
+  position: sticky;
+  top: 2rem;
+}
+
+/* Step Cards */
+.step-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: none;
+}
+
+.step-card.active {
+  display: block;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.step-icon {
+  font-size: 2.5rem;
+}
+
+.step-title {
+  flex: 1;
+}
+
+.step-title h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 0.25rem 0;
+}
+
+.step-subtitle {
+  color: #6b7280;
+  font-size: 0.95rem;
+}
+
+/* Form Inputs */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+}
+
+.form-label .required {
+  color: #ef4444;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.875rem;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.form-control-lg {
+  padding: 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.form-hint {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.input-group {
+  display: flex;
+  gap: 1rem;
+}
+
+.input-group .form-group {
+  flex: 1;
+}
+
+/* Calculator Panel */
+.calculator-panel {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  border: 2px solid #10b981;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.calculator-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #065f46;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.calculator-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.calculator-row:last-child {
+  border-bottom: none;
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+  border-top: 2px solid #10b981;
+}
+
+.calc-label {
+  font-weight: 600;
+  color: #047857;
+  font-size: 0.95rem;
+}
+
+.calc-value {
+  font-weight: 700;
+  color: #065f46;
+  font-size: 1.1rem;
+}
+
+.calc-value.total {
+  font-size: 1.3rem;
+  color: #047857;
+}
+
+/* Buttons */
+.wizard-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid #e5e7eb;
+}
+
+.btn {
+  padding: 0.875rem 1.75rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-back {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-back:hover {
+  background: #e5e7eb;
+}
+
+.btn-next, .btn-submit {
+  background: var(--primary-color);
+  color: white;
+  flex: 1;
+}
+
+.btn-next:hover, .btn-submit:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid white;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  display: none;
+}
+
+.btn.loading .btn-spinner {
+  display: inline-block;
+}
+
+.btn.loading .btn-text {
+  display: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Error Messages */
+.error-message {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 0.875rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-weight: 500;
+  display: none;
+}
+
+.error-message.show {
+  display: block;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+  .wizard-content {
+    flex-direction: column;
+  }
+  
+  .wizard-sidebar {
+    position: static;
+    width: 100%;
+  }
+  
+  .input-group {
+    flex-direction: column;
+  }
+  
+  .wizard-actions {
+    flex-direction: column;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wizard-container">
+  <!-- Wizard Header -->
+  <div class="wizard-header">
+    <div class="wizard-title">
+      <h1>🍾 Stock In</h1>
+      <div class="type-badge">
+        <span>{{ type_icon }}</span>
+        <span>{{ type_label }}</span>
+      </div>
+    </div>
+    
+    <div class="product-name-display">{{ product.name }}</div>
+    
+    <!-- Progress Bar -->
+    <div class="progress-bar-container">
+      <div class="progress-steps">
+        <div class="progress-line">
+          <div class="progress-line-fill" id="progress-fill"></div>
+        </div>
+        <div class="progress-step active" id="step-indicator-1">
+          <div class="progress-step-circle">1</div>
+          <div class="progress-step-label">Quantity</div>
+        </div>
+        <div class="progress-step" id="step-indicator-2">
+          <div class="progress-step-circle">2</div>
+          <div class="progress-step-label">Costs</div>
+        </div>
+        <div class="progress-step" id="step-indicator-3">
+          <div class="progress-step-circle">3</div>
+          <div class="progress-step-label">Confirm</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Django Messages -->
+  {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+  {% endif %}
+  
+  <!-- Main Content -->
+  <div class="wizard-content">
+    <div class="wizard-main">
+      <form id="wizard-form" method="post" action="{% url 'inventory:liquor_stock_in_submit' product_id=product.id %}">
+        {% csrf_token %}
+        
+        <!-- Hidden fields for universal data -->
+        <input type="hidden" name="date_received" id="date_received_hidden">
+        <input type="hidden" name="notes" id="notes_hidden">
+        
+        <!-- Step 1: Quantity -->
+        <div class="step-card active" id="step-1" data-step="1">
+          {% include 'inventory/liquor/wizard_steps/'|add:liquor_type|add:'_step1.html' %}
+        </div>
+        
+        <!-- Step 2: Costs -->
+        <div class="step-card" id="step-2" data-step="2">
+          {% include 'inventory/liquor/wizard_steps/'|add:liquor_type|add:'_step2.html' %}
+        </div>
+        
+        <!-- Step 3: Confirm -->
+        <div class="step-card" id="step-3" data-step="3">
+          <div class="step-header">
+            <div class="step-icon">✅</div>
+            <div class="step-title">
+              <h2>Confirm & Save</h2>
+              <div class="step-subtitle">Review your stock-in details and confirm</div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Date Received</label>
+            <input type="date" class="form-control" id="date_received" value="{{ today|date:'Y-m-d' }}">
+            <div class="form-hint">Date when stock was received (default: today)</div>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label">Notes (Optional)</label>
+            <textarea class="form-control" id="notes" rows="3" placeholder="e.g., Supplier name, invoice number, condition notes"></textarea>
+          </div>
+          
+          <!-- Summary Display -->
+          <div style="background: #f9fafb; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; color: #1f2937; margin-bottom: 1rem;">Summary</h3>
+            <div id="summary-content">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+          
+          <div class="wizard-actions">
+            <button type="button" class="btn btn-back" onclick="prevStep()">
+              ← Back
+            </button>
+            <button type="submit" class="btn btn-submit" id="submit-btn">
+              <div class="btn-spinner"></div>
+              <span class="btn-text">✅ Confirm Stock In</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Navigation for Step 1 and 2 -->
+        <div class="wizard-actions" id="step-navigation">
+          <button type="button" class="btn btn-back" onclick="prevStep()" id="back-btn" style="display: none;">
+            ← Back
+          </button>
+          <button type="button" class="btn btn-next" onclick="nextStep()" id="next-btn">
+            <span class="btn-text">Next →</span>
+          </button>
+        </div>
+      </form>
+    </div>
+    
+    <!-- Calculator Sidebar -->
+    <div class="wizard-sidebar">
+      <div class="calculator-panel">
+        <div class="calculator-title">📊 Live Calculator</div>
+        <div id="calculator-content">
+          <!-- Populated by JS based on type -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Wizard state
+let currentStep = 1;
+const totalSteps = 3;
+const liquorType = '{{ liquor_type }}';
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+  updateProgressBar();
+  updateCalculator();
+  
+  // Add input listeners for live calculations
+  const inputs = document.querySelectorAll('.form-control');
+  inputs.forEach(input => {
+    input.addEventListener('input', updateCalculator);
+  });
+  
+  // Set default date to today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('date_received').value = today;
+});
+
+// Navigation
+function nextStep() {
+  if (currentStep < totalSteps) {
+    // Validate current step
+    if (!validateStep(currentStep)) {
+      return;
+    }
+    
+    // Hide current step
+    document.getElementById(`step-${currentStep}`).classList.remove('active');
+    
+    // Show next step
+    currentStep++;
+    document.getElementById(`step-${currentStep}`).classList.add('active');
+    
+    // Update UI
+    updateProgressBar();
+    updateButtons();
+    updateCalculator();
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function prevStep() {
+  if (currentStep > 1) {
+    // Hide current step
+    document.getElementById(`step-${currentStep}`).classList.remove('active');
+    
+    // Show previous step
+    currentStep--;
+    document.getElementById(`step-${currentStep}`).classList.add('active');
+    
+    // Update UI
+    updateProgressBar();
+    updateButtons();
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+}
+
+function updateProgressBar() {
+  // Update step indicators
+  for (let i = 1; i <= totalSteps; i++) {
+    const indicator = document.getElementById(`step-indicator-${i}`);
+    if (i < currentStep) {
+      indicator.classList.add('completed');
+      indicator.classList.remove('active');
+    } else if (i === currentStep) {
+      indicator.classList.add('active');
+      indicator.classList.remove('completed');
+    } else {
+      indicator.classList.remove('active', 'completed');
+    }
+  }
+  
+  // Update progress line
+  const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+  document.getElementById('progress-fill').style.width = progress + '%';
+}
+
+function updateButtons() {
+  const backBtn = document.getElementById('back-btn');
+  const nextBtn = document.getElementById('next-btn');
+  const stepNav = document.getElementById('step-navigation');
+  
+  if (currentStep === 1) {
+    backBtn.style.display = 'none';
+    nextBtn.style.display = 'block';
+    stepNav.style.display = 'flex';
+  } else if (currentStep === totalSteps) {
+    stepNav.style.display = 'none';
+  } else {
+    backBtn.style.display = 'block';
+    nextBtn.style.display = 'block';
+    stepNav.style.display = 'flex';
+  }
+}
+
+function validateStep(step) {
+  const errorMsg = document.getElementById('error-message');
+  if (errorMsg) {
+    errorMsg.classList.remove('show');
+  }
+  
+  if (step === 1) {
+    return validateStep1();
+  } else if (step === 2) {
+    return validateStep2();
+  }
+  return true;
+}
+
+function validateStep1() {
+  if (liquorType === 'beer') {
+    const crates = parseInt(document.getElementById('crates').value) || 0;
+    const loose = parseInt(document.getElementById('loose_bottles').value) || 0;
+    if (crates < 1 && loose < 1) {
+      showError('Please enter at least 1 crate or 1 loose bottle');
+      return false;
+    }
+  } else if (liquorType === 'cider') {
+    const qty = parseInt(document.getElementById('quantity_bottles').value) || 0;
+    if (qty < 1) {
+      showError('Please enter at least 1 bottle');
+      return false;
+    }
+  } else if (liquorType === 'wine') {
+    const bottles = parseInt(document.getElementById('bottles').value) || 0;
+    if (bottles < 1) {
+      showError('Please enter at least 1 bottle');
+      return false;
+    }
+  } else if (liquorType === 'spirits' || liquorType === 'whisky') {
+    const shots = parseInt(document.getElementById('shots_added').value) || 0;
+    if (shots < 1) {
+      showError('Please enter at least 1 shot');
+      return false;
+    }
+  }
+  return true;
+}
+
+function validateStep2() {
+  if (liquorType === 'beer') {
+    const costPerCrate = parseFloat(document.getElementById('cost_per_crate').value) || 0;
+    if (costPerCrate <= 0) {
+      showError('Please enter a valid cost per crate');
+      return false;
+    }
+  } else if (liquorType === 'cider' || liquorType === 'wine') {
+    const costPerBottle = parseFloat(document.getElementById('cost_per_bottle').value) || 0;
+    if (costPerBottle <= 0) {
+      showError('Please enter a valid cost per bottle');
+      return false;
+    }
+  } else if (liquorType === 'spirits' || liquorType === 'whisky') {
+    const costPerShot = parseFloat(document.getElementById('cost_per_shot').value) || 0;
+    const shots = parseInt(document.getElementById('shots_added').value) || 0;
+    const reserved = parseInt(document.getElementById('reserved_barman_shots').value) || 0;
+    
+    if (costPerShot <= 0) {
+      showError('Please enter a valid cost per shot');
+      return false;
+    }
+    if (reserved >= shots) {
+      showError('Reserved shots must be less than total shots');
+      return false;
+    }
+  }
+  return true;
+}
+
+function showError(message) {
+  let errorEl = document.getElementById('error-message');
+  if (!errorEl) {
+    errorEl = document.createElement('div');
+    errorEl.id = 'error-message';
+    errorEl.className = 'error-message';
+    const currentCard = document.querySelector('.step-card.active');
+    currentCard.insertBefore(errorEl, currentCard.firstChild);
+  }
+  errorEl.textContent = message;
+  errorEl.classList.add('show');
+}
+
+function updateCalculator() {
+  const calcContent = document.getElementById('calculator-content');
+  let html = '';
+  
+  if (liquorType === 'beer') {
+    const crates = parseInt(document.getElementById('crates')?.value) || 0;
+    const loose = parseInt(document.getElementById('loose_bottles')?.value) || 0;
+    const costPerCrate = parseFloat(document.getElementById('cost_per_crate')?.value) || 0;
+    
+    const totalBottles = (crates * 20) + loose;
+    const looseCost = (costPerCrate / 20) * loose;
+    const totalCost = (crates * costPerCrate) + looseCost;
+    const unitCost = totalBottles > 0 ? (totalCost / totalBottles) : 0;
+    
+    html = `
+      <div class="calculator-row">
+        <div class="calc-label">Total Bottles</div>
+        <div class="calc-value">${totalBottles.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Unit Cost/Bottle</div>
+        <div class="calc-value">MWK ${unitCost.toFixed(2)}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Total Cost</div>
+        <div class="calc-value total">MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+      </div>
+    `;
+  } else if (liquorType === 'cider') {
+    const qty = parseInt(document.getElementById('quantity_bottles')?.value) || 0;
+    const costPerBottle = parseFloat(document.getElementById('cost_per_bottle')?.value) || 0;
+    const totalCost = qty * costPerBottle;
+    
+    html = `
+      <div class="calculator-row">
+        <div class="calc-label">Total Bottles</div>
+        <div class="calc-value">${qty.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Unit Cost/Bottle</div>
+        <div class="calc-value">MWK ${costPerBottle.toFixed(2)}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Total Cost</div>
+        <div class="calc-value total">MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+      </div>
+    `;
+  } else if (liquorType === 'wine') {
+    const bottles = parseInt(document.getElementById('bottles')?.value) || 0;
+    const costPerBottle = parseFloat(document.getElementById('cost_per_bottle')?.value) || 0;
+    const totalGlasses = bottles * 5;
+    const totalCost = bottles * costPerBottle;
+    const unitCostPerGlass = bottles > 0 ? (costPerBottle / 5) : 0;
+    
+    html = `
+      <div class="calculator-row">
+        <div class="calc-label">Bottles Purchased</div>
+        <div class="calc-value">${bottles.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Total Glasses</div>
+        <div class="calc-value">${totalGlasses.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Unit Cost/Glass</div>
+        <div class="calc-value">MWK ${unitCostPerGlass.toFixed(2)}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Total Cost</div>
+        <div class="calc-value total">MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+      </div>
+    `;
+  } else if (liquorType === 'spirits' || liquorType === 'whisky') {
+    const shotsAdded = parseInt(document.getElementById('shots_added')?.value) || 0;
+    const costPerShot = parseFloat(document.getElementById('cost_per_shot')?.value) || 0;
+    const reserved = parseInt(document.getElementById('reserved_barman_shots')?.value) || 0;
+    const sellableShots = shotsAdded - reserved;
+    const totalCost = shotsAdded * costPerShot;
+    
+    html = `
+      <div class="calculator-row">
+        <div class="calc-label">Total Shots</div>
+        <div class="calc-value">${shotsAdded.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Reserved Shots</div>
+        <div class="calc-value">${reserved.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Sellable Shots</div>
+        <div class="calc-value">${sellableShots.toLocaleString()}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Unit Cost/Shot</div>
+        <div class="calc-value">MWK ${costPerShot.toFixed(2)}</div>
+      </div>
+      <div class="calculator-row">
+        <div class="calc-label">Total Cost</div>
+        <div class="calc-value total">MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+      </div>
+    `;
+  }
+  
+  calcContent.innerHTML = html;
+  
+  // Update summary on step 3
+  if (currentStep === 3) {
+    updateSummary();
+  }
+}
+
+function updateSummary() {
+  const summaryContent = document.getElementById('summary-content');
+  let html = '';
+  
+  if (liquorType === 'beer') {
+    const crates = parseInt(document.getElementById('crates')?.value) || 0;
+    const loose = parseInt(document.getElementById('loose_bottles')?.value) || 0;
+    const costPerCrate = parseFloat(document.getElementById('cost_per_crate')?.value) || 0;
+    const totalBottles = (crates * 20) + loose;
+    const totalCost = (crates * costPerCrate) + ((costPerCrate / 20) * loose);
+    
+    html = `
+      <p><strong>Crates:</strong> ${crates}</p>
+      <p><strong>Loose Bottles:</strong> ${loose}</p>
+      <p><strong>Total Bottles:</strong> ${totalBottles}</p>
+      <p><strong>Cost per Crate:</strong> MWK ${costPerCrate.toLocaleString('en', {minimumFractionDigits: 2})}</p>
+      <p style="font-size: 1.1rem; font-weight: 700; color: #047857; margin-top: 0.5rem;"><strong>Total Cost:</strong> MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+    `;
+  } else if (liquorType === 'cider') {
+    const qty = parseInt(document.getElementById('quantity_bottles')?.value) || 0;
+    const costPerBottle = parseFloat(document.getElementById('cost_per_bottle')?.value) || 0;
+    const totalCost = qty * costPerBottle;
+    
+    html = `
+      <p><strong>Bottles:</strong> ${qty}</p>
+      <p><strong>Cost per Bottle:</strong> MWK ${costPerBottle.toLocaleString('en', {minimumFractionDigits: 2})}</p>
+      <p style="font-size: 1.1rem; font-weight: 700; color: #047857; margin-top: 0.5rem;"><strong>Total Cost:</strong> MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+    `;
+  } else if (liquorType === 'wine') {
+    const bottles = parseInt(document.getElementById('bottles')?.value) || 0;
+    const costPerBottle = parseFloat(document.getElementById('cost_per_bottle')?.value) || 0;
+    const totalGlasses = bottles * 5;
+    const totalCost = bottles * costPerBottle;
+    
+    html = `
+      <p><strong>Bottles:</strong> ${bottles}</p>
+      <p><strong>Total Glasses:</strong> ${totalGlasses} (5 per bottle)</p>
+      <p><strong>Cost per Bottle:</strong> MWK ${costPerBottle.toLocaleString('en', {minimumFractionDigits: 2})}</p>
+      <p style="font-size: 1.1rem; font-weight: 700; color: #047857; margin-top: 0.5rem;"><strong>Total Cost:</strong> MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+    `;
+  } else if (liquorType === 'spirits' || liquorType === 'whisky') {
+    const shotsAdded = parseInt(document.getElementById('shots_added')?.value) || 0;
+    const costPerShot = parseFloat(document.getElementById('cost_per_shot')?.value) || 0;
+    const reserved = parseInt(document.getElementById('reserved_barman_shots')?.value) || 0;
+    const sellableShots = shotsAdded - reserved;
+    const totalCost = shotsAdded * costPerShot;
+    
+    html = `
+      <p><strong>Shots Added:</strong> ${shotsAdded}</p>
+      <p><strong>Reserved Shots:</strong> ${reserved}</p>
+      <p><strong>Sellable Shots:</strong> ${sellableShots}</p>
+      <p><strong>Cost per Shot:</strong> MWK ${costPerShot.toLocaleString('en', {minimumFractionDigits: 2})}</p>
+      <p style="font-size: 1.1rem; font-weight: 700; color: #047857; margin-top: 0.5rem;"><strong>Total Cost:</strong> MWK ${totalCost.toLocaleString('en', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+    `;
+  }
+  
+  summaryContent.innerHTML = html;
+}
+
+// Form submission
+document.getElementById('wizard-form').addEventListener('submit', function(e) {
+  // Copy date and notes to hidden fields
+  document.getElementById('date_received_hidden').value = document.getElementById('date_received').value;
+  document.getElementById('notes_hidden').value = document.getElementById('notes').value;
+  
+  // Show loading state
+  const submitBtn = document.getElementById('submit-btn');
+  submitBtn.classList.add('loading');
+  submitBtn.disabled = true;
+});
+</script>
+{% endblock %}
+

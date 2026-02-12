@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Liquor Product - Step 1{% endblock %}
+
+{% block extra_css %}
+<style>
+.liquor-wizard-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.wizard-progress {
+  height: 4px;
+  background: #e9ecef;
+  border-radius: 2px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.wizard-progress-bar {
+  height: 100%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  transition: width 0.3s ease;
+}
+
+.wizard-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.wizard-header h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.wizard-header p {
+  color: #6b7280;
+  font-size: 1.1rem;
+}
+
+.liquor-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.liquor-card {
+  background: white;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.liquor-card:hover {
+  border-color: #10b981;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.liquor-card input[type="radio"] {
+  display: none;
+}
+
+.liquor-card input[type="radio"]:checked + label {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.liquor-card-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+}
+
+.liquor-card-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 0.25rem;
+}
+
+.liquor-card-desc {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.liquor-card.selected {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.wizard-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn-wizard {
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.alert {
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="liquor-wizard-container">
+  <!-- Progress Bar -->
+  <div class="wizard-progress">
+    <div class="wizard-progress-bar" style="width: 50%;"></div>
+  </div>
+
+  <!-- Header -->
+  <div class="wizard-header">
+    <h1>🍾 Add Liquor Product</h1>
+    <p>Step 1 of 2: Choose liquor type</p>
+  </div>
+
+  <!-- Form Errors -->
+  {% if form.errors %}
+  <div class="alert alert-danger">
+    <strong>Please fix the following errors:</strong>
+    <ul class="mb-0 mt-2">
+      {% for field, errors in form.errors.items %}
+        {% for error in errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- Form -->
+  <form method="post" id="liquor-type-form">
+    {% csrf_token %}
+    
+    <div class="liquor-cards">
+      <div class="liquor-card" onclick="selectCard(this, 'beer')">
+        <input type="radio" name="liquor_type" value="beer" id="type_beer" {% if form.liquor_type.value == 'beer' %}checked{% endif %}>
+        <label for="type_beer" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+          <div class="liquor-card-icon">🍺</div>
+          <div class="liquor-card-name">Beer</div>
+          <div class="liquor-card-desc">Bottle/can or crate (20)</div>
+        </label>
+      </div>
+
+      <div class="liquor-card" onclick="selectCard(this, 'cider')">
+        <input type="radio" name="liquor_type" value="cider" id="type_cider" {% if form.liquor_type.value == 'cider' %}checked{% endif %}>
+        <label for="type_cider" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+          <div class="liquor-card-icon">🍎</div>
+          <div class="liquor-card-name">Cider</div>
+          <div class="liquor-card-desc">Bottle/can or 6-pack</div>
+        </label>
+      </div>
+
+      <div class="liquor-card" onclick="selectCard(this, 'wine')">
+        <input type="radio" name="liquor_type" value="wine" id="type_wine" {% if form.liquor_type.value == 'wine' %}checked{% endif %}>
+        <label for="type_wine" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+          <div class="liquor-card-icon">🍷</div>
+          <div class="liquor-card-name">Wine</div>
+          <div class="liquor-card-desc">Glass (5 per bottle)</div>
+        </label>
+      </div>
+
+      <div class="liquor-card" onclick="selectCard(this, 'spirits')">
+        <input type="radio" name="liquor_type" value="spirits" id="type_spirits" {% if form.liquor_type.value == 'spirits' %}checked{% endif %}>
+        <label for="type_spirits" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+          <div class="liquor-card-icon">🥃</div>
+          <div class="liquor-card-name">Spirits</div>
+          <div class="liquor-card-desc">Shot (30 per bottle)</div>
+        </label>
+      </div>
+
+      <div class="liquor-card" onclick="selectCard(this, 'whisky')">
+        <input type="radio" name="liquor_type" value="whisky" id="type_whisky" {% if form.liquor_type.value == 'whisky' %}checked{% endif %}>
+        <label for="type_whisky" style="cursor: pointer; display: block; width: 100%; height: 100%;">
+          <div class="liquor-card-icon">🥃</div>
+          <div class="liquor-card-name">Whisky</div>
+          <div class="liquor-card-desc">Shot (30 per bottle)</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="wizard-actions">
+      <a href="{% url 'verticals:liquor_dashboard' %}" class="btn btn-outline-secondary btn-wizard">Cancel</a>
+      <button type="submit" class="btn btn-success btn-wizard">Continue →</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function selectCard(card, value) {
+  // Remove selected class from all cards
+  document.querySelectorAll('.liquor-card').forEach(c => c.classList.remove('selected'));
+  
+  // Add selected class to clicked card
+  card.classList.add('selected');
+  
+  // Check the radio button
+  document.getElementById('type_' + value).checked = true;
+  
+  // Auto-submit form (go directly to catalog)
+  document.getElementById('liquor-type-form').submit();
+}
+
+// Pre-select on page load
+document.addEventListener('DOMContentLoaded', function() {
+  const checkedRadio = document.querySelector('input[name="liquor_type"]:checked');
+  if (checkedRadio) {
+    const card = checkedRadio.closest('.liquor-card');
+    if (card) {
+      card.classList.add('selected');
+    }
+  }
+});
+</script>
+{% endblock %}
+

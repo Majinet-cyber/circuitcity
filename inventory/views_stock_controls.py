@@ -63,11 +63,14 @@ def transfer_stock(request: HttpRequest, pk: int) -> HttpResponse:
         return JsonResponse({"ok": False, "error": "agent_id required."}, status=400)
 
     if agent_id in ("none", "unassign", ""):
-        # Transfer to manager pool (unassign)
-        item.assigned_agent = None
-        item.assigned_role = "MANAGER"
-        item.save(update_fields=["assigned_agent", "assigned_role", "updated_at"])
-        messages.success(request, f"Stock {item.imei or item.pk} transferred to manager pool.")
+        # Unassign from agent (return to store / manager oversight)
+        try:
+            item.assigned_agent = None
+            item.assigned_role = "MANAGER"
+            item.save(update_fields=["assigned_agent", "assigned_role", "updated_at"])
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": f"Failed to unassign: {e}"}, status=400)
+        messages.success(request, f"Stock {item.imei or item.pk} unassigned and returned to store.")
         return redirect("inventory:stock_list")
 
     try:
@@ -89,9 +92,12 @@ def transfer_stock(request: HttpRequest, pk: int) -> HttpResponse:
         return JsonResponse({"ok": False, "error": f"Error finding user: {e}"}, status=400)
 
     # Transfer
-    item.assigned_agent = agent
-    item.assigned_role = assigned_role
-    item.save(update_fields=["assigned_agent", "assigned_role", "updated_at"])
+    try:
+        item.assigned_agent = agent
+        item.assigned_role = assigned_role
+        item.save(update_fields=["assigned_agent", "assigned_role", "updated_at"])
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Failed to transfer: {e}"}, status=400)
 
     messages.success(request, f"Stock {item.imei or item.pk} transferred to {agent.get_full_name() or agent.username}.")
     return redirect("inventory:stock_list")
@@ -139,6 +145,8 @@ def edit_imei(request: HttpRequest, pk: int) -> HttpResponse:
         item.save(update_fields=["imei", "updated_at"])
     except ValidationError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Failed to update IMEI: {e}"}, status=400)
 
     messages.success(request, f"IMEI updated from {old_imei or '(none)'} to {new_imei}.")
     return redirect("inventory:stock_list")
@@ -166,10 +174,13 @@ def archive_stock(request: HttpRequest, pk: int) -> HttpResponse:
         return JsonResponse({"ok": False, "error": "Item already archived."}, status=400)
 
     # Archive it
-    item.archived_at = timezone.now()
-    item.archived_by = request.user
-    item.is_active = False  # Also set legacy flag for compatibility
-    item.save(update_fields=["archived_at", "archived_by", "is_active", "updated_at"])
+    try:
+        item.archived_at = timezone.now()
+        item.archived_by = request.user
+        item.is_active = False  # Also set legacy flag for compatibility
+        item.save(update_fields=["archived_at", "archived_by", "is_active", "updated_at"])
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Failed to archive: {e}"}, status=400)
 
     messages.success(request, f"Stock {item.imei or item.pk} archived.")
     return redirect("inventory:stock_list")
@@ -197,10 +208,13 @@ def restore_stock(request: HttpRequest, pk: int) -> HttpResponse:
         return JsonResponse({"ok": False, "error": "Item not archived."}, status=400)
 
     # Restore it
-    item.archived_at = None
-    item.archived_by = None
-    item.is_active = True
-    item.save(update_fields=["archived_at", "archived_by", "is_active", "updated_at"])
+    try:
+        item.archived_at = None
+        item.archived_by = None
+        item.is_active = True
+        item.save(update_fields=["archived_at", "archived_by", "is_active", "updated_at"])
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Failed to restore: {e}"}, status=400)
 
     messages.success(request, f"Stock {item.imei or item.pk} restored.")
     return redirect("inventory:stock_list")
@@ -247,47 +261,44 @@ def edit_price(request: HttpRequest, pk: int) -> HttpResponse:
     # Determine if item is sold
     is_sold = item.status == "SOLD"
 
-    with transaction.atomic():
-        if is_sold:
-            # Update SELLING price
-            old_price = item.selling_price
-            item.selling_price = new_price
-            item.save(update_fields=["selling_price", "updated_at"])
+    try:
+        with transaction.atomic():
+            if is_sold:
+                # Update SELLING price
+                old_price = item.selling_price or Decimal("0")
+                item.selling_price = new_price
+                item.save(update_fields=["selling_price", "updated_at"])
 
-            # Update Sale record if exists
-            try:
-                from sales.models import Sale
-                sale = Sale.objects.select_for_update().get(item=item)
-                sale.price = new_price
-                sale.save(update_fields=["price"])
-                
-                # Note: Sale commission is auto-calculated via @property,
-                # so no need to manually update it. The commission_amount
-                # will automatically reflect the new price.
-                
+                # Update Sale record if exists
+                try:
+                    from sales.models import Sale
+                    sale = Sale.objects.select_for_update().get(item=item)
+                    sale.price = new_price
+                    sale.save(update_fields=["price"])
+                    
+                    messages.success(
+                        request,
+                        f"Selling price updated from {old_price:,.0f} to {new_price:,.0f}. "
+                        f"Stock item and sale record updated."
+                    )
+                except Sale.DoesNotExist:
+                    messages.warning(
+                        request,
+                        f"Selling price updated to {new_price:,.0f}. "
+                        f"Note: No sale record found for this item."
+                    )
+            else:
+                # Update ORDER price (cost)
+                old_price = item.order_price or Decimal("0")
+                item.order_price = new_price
+                item.save(update_fields=["order_price", "updated_at"])
+
                 messages.success(
                     request,
-                    f"Selling price updated from {old_price or 0:,.0f} to {new_price:,.0f}. "
-                    f"Stock item and sale record updated."
+                    f"Order price (cost) updated from {old_price:,.0f} to {new_price:,.0f}."
                 )
-            except Sale.DoesNotExist:
-                # No sale record found, but item marked as SOLD.
-                # This is an edge case - still update the item's selling_price.
-                messages.warning(
-                    request,
-                    f"Selling price updated to {new_price:,.0f}. "
-                    f"Note: No sale record found for this item."
-                )
-        else:
-            # Update ORDER price (cost)
-            old_price = item.order_price
-            item.order_price = new_price
-            item.save(update_fields=["order_price", "updated_at"])
-
-            messages.success(
-                request,
-                f"Order price (cost) updated from {old_price:,.0f} to {new_price:,.0f}."
-            )
+    except Exception as e:
+        return JsonResponse({"ok": False, "error": f"Failed to update price: {e}"}, status=400)
 
     # Redirect to 'next' if provided, else back to stock list
     next_url = request.POST.get("next") or request.GET.get("next")

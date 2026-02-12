@@ -18,7 +18,7 @@ Context required:
         <div class="modal-body">
           <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
           <select name="agent_id" class="form-select" style="width:100%; padding:8px; margin:12px 0;">
-            <option value="unassign">Manager Pool (Unassign)</option>
+            <option value="unassign">Unassign (return to store)</option>
             {% for location_name, memberships in transfer_agents_by_location %}
               <optgroup label="{{ location_name }}">
                 {% for membership in memberships %}
@@ -28,6 +28,8 @@ Context required:
                   </option>
                 {% endfor %}
               </optgroup>
+            {% empty %}
+              <option disabled>No agents available — add team members first</option>
             {% endfor %}
           </select>
         </div>

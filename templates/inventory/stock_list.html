@@ -829,7 +829,7 @@ Each modal is dynamically populated via JS when action button is clicked.
         <div class="modal-body">
           <p class="mb-2">Transfer stock <strong id="transferImei"></strong> to:</p>
           <select name="agent_id" class="form-select" style="padding:.5rem .6rem;border-radius:.55rem;border:1px solid var(--cc-border);background:var(--cc-panel);color:var(--cc-text);min-height:44px">
-            <option value="unassign">Manager Pool (Unassign)</option>
+            <option value="unassign">Unassign (return to store)</option>
             {% for location_name, memberships in transfer_agents_by_location %}
               <optgroup label="{{ location_name }}">
                 {% for membership in memberships %}
@@ -839,6 +839,8 @@ Each modal is dynamically populated via JS when action button is clicked.
                   </option>
                 {% endfor %}
               </optgroup>
+            {% empty %}
+              <option disabled>No agents available — add team members first</option>
             {% endfor %}
           </select>
         </div>
