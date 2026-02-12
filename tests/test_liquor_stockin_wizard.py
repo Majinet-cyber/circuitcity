@@ -30,21 +30,38 @@ def business(db):
 
 @pytest.fixture
 def manager_user(db, business):
-    """Create a manager user"""
+    """Create a manager user with proper permissions"""
+    from tenants.models import Membership
+    
     user = User.objects.create_user(
         username="manager",
         email="manager@test.com",
         password="testpass123"
     )
-    # Assign manager role (implementation depends on your role system)
-    # For now, just return the user
+    user.is_staff = True
+    user.save()
+    
+    # Create business membership with manager role
+    Membership.objects.create(
+        user=user,
+        business=business,
+        role='manager',
+        is_active=True
+    )
+    
     return user
 
 
 @pytest.fixture
-def client_logged_in(client, manager_user):
-    """Return a logged-in client"""
+def client_logged_in(client, manager_user, business):
+    """Return a logged-in client with active business set"""
     client.login(username="manager", password="testpass123")
+    
+    # Set active business in session
+    session = client.session
+    session['active_business_id'] = business.id
+    session.save()
+    
     return client
 
 
@@ -287,11 +304,6 @@ class TestBeerStockInIntegration:
     
     def test_beer_stockin_view_page_loads(self, client_logged_in, beer_product, business):
         """Test that beer stock-in wizard page loads"""
-        # Set active business in session
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in', kwargs={'product_id': beer_product.id})
         response = client_logged_in.get(url)
         
@@ -300,11 +312,6 @@ class TestBeerStockInIntegration:
     
     def test_beer_stockin_submit(self, client_logged_in, beer_product, business):
         """Test beer stock-in submission"""
-        # Set active business in session
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': beer_product.id})
         response = client_logged_in.post(url, {
             'crates': '5',
@@ -328,10 +335,6 @@ class TestCiderStockInIntegration:
     
     def test_cider_stockin_submit(self, client_logged_in, cider_product, business):
         """Test cider stock-in submission"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': cider_product.id})
         response = client_logged_in.post(url, {
             'quantity_bottles': '20',
@@ -352,10 +355,6 @@ class TestWineStockInIntegration:
     
     def test_wine_stockin_submit(self, client_logged_in, wine_product, business):
         """Test wine stock-in submission"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': wine_product.id})
         response = client_logged_in.post(url, {
             'bottles': '2',
@@ -376,10 +375,6 @@ class TestSpiritsStockInIntegration:
     
     def test_spirits_stockin_submit(self, client_logged_in, spirits_product, business):
         """Test spirits stock-in submission"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': spirits_product.id})
         response = client_logged_in.post(url, {
             'shots_added': '60',
@@ -401,10 +396,6 @@ class TestWhiskyStockInIntegration:
     
     def test_whisky_stockin_submit(self, client_logged_in, whisky_product, business):
         """Test whisky stock-in submission (same as spirits)"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': whisky_product.id})
         response = client_logged_in.post(url, {
             'shots_added': '60',
@@ -430,10 +421,6 @@ class TestStockValueCalculation:
     
     def test_stock_value_after_beer_stockin(self, client_logged_in, beer_product, business):
         """Test stock value after beer stock-in"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         # Stock in beer
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': beer_product.id})
         client_logged_in.post(url, {
@@ -453,10 +440,6 @@ class TestStockValueCalculation:
     
     def test_stock_value_after_wine_stockin(self, client_logged_in, wine_product, business):
         """Test stock value after wine stock-in"""
-        session = client_logged_in.session
-        session['active_business_id'] = business.id
-        session.save()
-        
         # Stock in wine
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': wine_product.id})
         client_logged_in.post(url, {
