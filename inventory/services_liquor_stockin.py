@@ -279,7 +279,7 @@ def get_adapter_for_category(category: str) -> StockInAdapter:
     return adapter
 
 
-def save_stock_in_transaction(product, adapted_data: Dict[str, Any], user) -> None:
+def save_stock_in_transaction(product, adapted_data: Dict[str, Any], user, business=None, location=None, date_received=None) -> None:
     """
     Unified stock-in transaction save function.
     
@@ -291,7 +291,11 @@ def save_stock_in_transaction(product, adapted_data: Dict[str, Any], user) -> No
             - total_cost
             - notes
             - metadata
+            - date_received (optional) - business date when stock was received
         user: User performing the transaction
+        business: Business instance (optional, will use product.business)
+        location: Location instance (optional)
+        date_received: Date when stock was received (optional, defaults to today)
     """
     with transaction.atomic():
         # Update product stock
@@ -303,6 +307,27 @@ def save_stock_in_transaction(product, adapted_data: Dict[str, Any], user) -> No
         
         product.save(update_fields=['quantity_in_stock', 'cost_per_bottle'])
         
-        # TODO: Optionally create audit log entry
-        # DataCorrectionEntry.objects.create(...)
+        # Create stock-in transaction log for COGS tracking (Liquor COGS card is inventory purchases cost when sales COGS is unavailable)
+        from inventory.models_verticals import LiquorStockInTransaction
+        from inventory.business_kinds import BusinessKind
+        
+        if product.kind == BusinessKind.LIQUOR:
+            txn_data = {
+                'business': business or product.business,
+                'location': location,
+                'product': product,
+                'quantity_added': adapted_data['quantity_units_added'],
+                'unit_cost': adapted_data['unit_cost'],
+                'total_cost': adapted_data['total_cost'],
+                'notes': adapted_data.get('notes', ''),
+                'created_by': user,
+            }
+            
+            # Use date_received from adapted_data if present, then from parameter, otherwise default to today
+            if 'date_received' in adapted_data and adapted_data['date_received']:
+                txn_data['date_received'] = adapted_data['date_received']
+            elif date_received:
+                txn_data['date_received'] = date_received
+            
+            LiquorStockInTransaction.objects.create(**txn_data)
 

@@ -93,6 +93,30 @@ def dashboard(request):
     ).aggregate(total=Sum("related_sale__total_cost"))["total"] or Decimal("0.00")
     inventory_costs += settled_credits_cost
 
+    # ========== LIQUOR COGS FIX: Inventory Purchases Cost (30 days) ==========
+    # Liquor COGS card is inventory purchases cost when sales COGS is unavailable.
+    # For Liquor vertical, if there are no sales, compute "COGS (30 days)" as 
+    # Inventory Purchases Cost from stock-in records (sum of cost added to inventory in last 30 days).
+    from inventory.models_verticals import LiquorStockInTransaction
+    
+    # Use date_received (business date) for 30-day window
+    start_date_for_stockin = timezone.localdate() - timedelta(days=days_back)
+    
+    inventory_purchases_30d_mwk = LiquorStockInTransaction.objects.filter(
+        business=business,
+        date_received__gte=start_date_for_stockin,
+        date_received__lte=timezone.localdate()
+    ).aggregate(total=Sum("total_cost"))["total"] or Decimal("0.00")
+    
+    # Use inventory purchases if sales COGS is zero or very low (may indicate no sales)
+    # This ensures the COGS card shows meaningful data for Liquor businesses
+    if inventory_costs == Decimal("0.00") or inventory_costs < Decimal("100.00"):
+        # Fallback to inventory purchases cost when there are no/minimal sales
+        display_cogs = inventory_purchases_30d_mwk
+    else:
+        # Use actual sales COGS when sales exist
+        display_cogs = inventory_costs
+
     # Admin costs from wallet (if available)
     admin_costs_period = Decimal("0.00")
     if WalletTransaction and Ledger and TxnType:
@@ -516,7 +540,8 @@ def dashboard(request):
             "revenue": revenue,
             "costs": costs,  # Legacy: inventory costs only
             "profit": profit,  # Legacy: revenue - inventory costs
-            "inventory_costs": inventory_costs,  # New: explicit inventory costs
+            "inventory_costs": display_cogs,  # UPDATED: Shows inventory purchases cost when sales COGS is unavailable (Liquor COGS fix)
+            "inventory_purchases_30d_mwk": inventory_purchases_30d_mwk,  # NEW: Explicit inventory purchases cost for transparency
             "admin_costs": admin_costs_period,  # New: admin/operational costs
             "total_costs": total_costs,  # New: inventory + admin
             "net_profit": net_profit,  # New: revenue - total costs

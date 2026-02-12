@@ -18,6 +18,7 @@ try:
         LiquorWalletEntry,
         LiquorShift,
         LiquorShiftStock,
+        LiquorStockInTransaction,
         # Gym
         GymMember,
         GymPayment,
@@ -38,7 +39,7 @@ try:
 except ImportError:
     # Models not yet migrated
     LiquorSale = LiquorCredit = LiquorCreditPayment = LiquorStockEditRequest = None
-    LiquorExpense = LiquorWalletEntry = LiquorShift = LiquorShiftStock = None
+    LiquorExpense = LiquorWalletEntry = LiquorShift = LiquorShiftStock = LiquorStockInTransaction = None
     GymMember = GymPayment = GymMemberLog = GymSettings = GymWalletEntry = GymTrainer = GymCheckIn = None
     ClothingSale = ClothingProductLog = None
     CementSale = CementCost = None
@@ -148,6 +149,21 @@ if LiquorWalletEntry:
         ordering = ("-created_at",)
         list_select_related = ("business", "created_by")
         list_per_page = 50
+
+
+if LiquorStockInTransaction:
+
+    @admin.register(LiquorStockInTransaction)
+    class LiquorStockInTransactionAdmin(admin.ModelAdmin):
+        list_display = ("product", "quantity_added", "unit_cost", "total_cost", "created_at", "created_by")
+        list_filter = ("created_at",)
+        search_fields = ("product__name", "notes")
+        date_hierarchy = "created_at"
+        ordering = ("-created_at",)
+        list_select_related = ("product", "business", "created_by", "location")
+        raw_id_fields = ("product", "created_by", "location")
+        list_per_page = 50
+        readonly_fields = ("created_at",)
 
 
 if LiquorShift:

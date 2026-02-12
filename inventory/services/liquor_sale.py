@@ -168,6 +168,23 @@ def stock_in_liquor(
 
     product.save()
 
+    # Create stock-in transaction log for COGS tracking (Liquor COGS card is inventory purchases cost when sales COGS is unavailable)
+    from inventory.models_verticals import LiquorStockInTransaction
+    
+    total_cost = cost_per_unit * Decimal(quantity) if cost_per_unit > 0 else Decimal("0.00")
+    unit_cost = cost_per_unit if unit.lower() == "bottle" else (cost_per_unit / Decimal(product.bottles_per_crate or 1))
+    
+    LiquorStockInTransaction.objects.create(
+        business=business,
+        location=location,
+        product=product,
+        quantity_added=sellable_added,
+        unit_cost=unit_cost,
+        total_cost=total_cost,
+        notes=notes or "",
+        created_by=user,
+    )
+
     # Build success message
     base_unit = get_base_unit_default(liquor_kind)
     message = f"✅ Stocked in: {quantity} {unit}(s) = {sellable_added} sellable {base_unit}(s) — {product.name}"

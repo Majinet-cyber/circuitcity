@@ -416,8 +416,26 @@ def liquor_stock_in_submit(request, product_id):
             
             product.save(update_fields=['quantity_in_stock', 'cost_per_bottle'])
             
-            # TODO: Store additional metadata (date_received, notes) in a StockTransaction model if it exists
-            # For now, we just update the product stock and cost
+            # Create stock-in transaction log for COGS tracking
+            from inventory.models_verticals import LiquorStockInTransaction
+            location = getattr(request, 'location', None)
+            
+            txn_data = {
+                'business': business,
+                'location': location,
+                'product': product,
+                'quantity_added': quantity_units_added,
+                'unit_cost': unit_cost,
+                'total_cost': total_cost,
+                'notes': final_notes,
+                'created_by': request.user,
+            }
+            
+            # Use date_received if provided, otherwise default to today
+            if date_received:
+                txn_data['date_received'] = date_received
+            
+            LiquorStockInTransaction.objects.create(**txn_data)
         
         # Success message
         messages.success(

@@ -239,6 +239,57 @@ class LiquorStockAdjustment(models.Model):
         return f"{self.product.name}: {sign}{self.quantity_change} ({self.get_reason_display()})"
 
 
+class LiquorStockInTransaction(models.Model):
+    """
+    Tracks stock-in events for liquor products with cost and timestamp.
+    Used to calculate inventory purchase costs over time periods (e.g., last 30 days).
+    """
+
+    business = models.ForeignKey(
+        Business, on_delete=models.CASCADE, related_name="liquor_stock_in_transactions", db_index=True
+    )
+    location = models.ForeignKey(
+        "inventory.Location", null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_stock_in_transactions"
+    )
+
+    # Product reference
+    product = models.ForeignKey(
+        "inventory.MerchProduct", on_delete=models.CASCADE, related_name="liquor_stock_in_transactions"
+    )
+
+    # Stock-in details
+    quantity_added = models.IntegerField(help_text="Quantity added (in bottles)")
+    unit_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Cost per bottle"
+    )
+    total_cost = models.DecimalField(
+        max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Total cost of this stock-in"
+    )
+
+    # Metadata
+    notes = models.TextField(blank=True, default="")
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="liquor_stock_in_transactions_created"
+    )
+    date_received = models.DateField(
+        default=timezone.localdate,
+        db_index=True,
+        help_text="Business date when stock was received (for 30-day COGS window)"
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-created_at"]),
+            models.Index(fields=["business", "product", "-created_at"]),
+            models.Index(fields=["business", "-date_received"]),
+        ]
+
+    def __str__(self):
+        return f"{self.product.name}: +{self.quantity_added} bottles @ MK {self.unit_cost} (Total: MK {self.total_cost})"
+
+
 class PaymentMethod(models.TextChoices):
     """Payment methods for sales"""
 
