@@ -239,6 +239,87 @@ def dashboard(request):
         total=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField())
     )["total"] or Decimal("0.00")
 
+    # Add electronics (laptops/desktops) to stock and sales totals
+    electronics_stock_count = 0
+    electronics_sold_in_range = 0
+    electronics_revenue = Decimal("0.00")
+    electronics_cog = Decimal("0.00")
+    today_sales_count = sold_items.filter(
+        Q(sold_at__gte=today_start, sold_at__lt=today_end) |
+        Q(sold_at__isnull=True, received_at=now.date())
+    ).count()
+    category_breakdown = {
+        "phones": {"stock": stock_on_hand, "sales_today": today_sales_count, "sales_in_range": units_sold},
+        "laptops": {"stock": 0, "sales_today": 0, "sales_in_range": 0},
+        "desktops": {"stock": 0, "sales_today": 0, "sales_in_range": 0},
+    }
+    try:
+        from inventory.models_phone_products import ElectronicsStockItem, ElectronicsCategory
+
+        e_stock_qs = ElectronicsStockItem.objects.filter(
+            business=business, status="IN_STOCK", is_active=True
+        )
+        if location:
+            e_stock_qs = e_stock_qs.filter(current_location=location)
+
+        e_laptop = e_stock_qs.filter(catalog_product__category=ElectronicsCategory.LAPTOP)
+        e_desktop = e_stock_qs.filter(catalog_product__category=ElectronicsCategory.DESKTOP)
+        electronics_stock_count = e_stock_qs.count()
+        category_breakdown["phones"]["stock"] = stock_on_hand  # phones only
+        category_breakdown["laptops"]["stock"] = e_laptop.count()
+        category_breakdown["desktops"]["stock"] = e_desktop.count()
+
+        e_stock_cost = e_stock_qs.aggregate(
+            total=Coalesce(Sum("order_price"), Decimal("0.00"), output_field=DecimalField())
+        )["total"] or Decimal("0.00")
+        e_stock_selling = e_stock_qs.aggregate(
+            total=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField())
+        )["total"] or Decimal("0.00")
+
+        e_sold_qs = ElectronicsStockItem.objects.filter(
+            business=business, status="SOLD", is_active=True, sold_at__isnull=False
+        )
+        if location:
+            e_sold_qs = e_sold_qs.filter(current_location=location)
+        if start_date is not None and end_date is not None:
+            e_sold_qs = e_sold_qs.filter(sold_at__gte=start_date, sold_at__lt=end_date)
+
+        electronics_sold_in_range = e_sold_qs.count()
+        electronics_revenue = e_sold_qs.aggregate(
+            total=Coalesce(Sum("selling_price"), Decimal("0.00"), output_field=DecimalField())
+        )["total"] or Decimal("0.00")
+        electronics_cog = e_sold_qs.aggregate(
+            total=Coalesce(Sum("order_price"), Decimal("0.00"), output_field=DecimalField())
+        )["total"] or Decimal("0.00")
+
+        e_sold_laptop = e_sold_qs.filter(catalog_product__category=ElectronicsCategory.LAPTOP)
+        e_sold_desktop = e_sold_qs.filter(catalog_product__category=ElectronicsCategory.DESKTOP)
+        category_breakdown["laptops"]["sales_in_range"] = e_sold_laptop.count()
+        category_breakdown["desktops"]["sales_in_range"] = e_sold_desktop.count()
+
+        # Sales today by category (phones already set above)
+        e_today = ElectronicsStockItem.objects.filter(
+            business=business, status="SOLD", is_active=True,
+            sold_at__gte=today_start, sold_at__lt=today_end
+        )
+        if location:
+            e_today = e_today.filter(current_location=location)
+        category_breakdown["laptops"]["sales_today"] = e_today.filter(
+            catalog_product__category=ElectronicsCategory.LAPTOP
+        ).count()
+        category_breakdown["desktops"]["sales_today"] = e_today.filter(
+            catalog_product__category=ElectronicsCategory.DESKTOP
+        ).count()
+
+        stock_on_hand += electronics_stock_count
+        stock_cost_value += e_stock_cost
+        stock_selling_value += e_stock_selling
+        units_sold += electronics_sold_in_range
+        revenue += electronics_revenue
+        cost_of_goods += electronics_cog
+    except Exception:
+        pass
+
     # ==========================================================================
     # COSTS AND PROFIT (unified computation from ONE sales queryset)
     # ==========================================================================
@@ -419,6 +500,8 @@ def dashboard(request):
         "stock_cost_value": stock_cost_value,  # Inventory cost basis
         "stock_selling_value": stock_selling_value,  # Potential stock value
         "stock_potential_profit": stock_potential_profit,  # NEVER negative (max per item)
+        # Category breakdown (Phones / Laptops / Desktops)
+        "category_breakdown": category_breakdown,
     }
 
     # ==========================================================================

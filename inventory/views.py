@@ -1,4 +1,4 @@
-﻿# --- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
+# --- PART 1/3 START (inventory/views.py) ---# --- PART 1/3 â€” circuitcity/inventory/views.py ---
 
 from __future__ import annotations
 
@@ -1628,7 +1628,17 @@ def stock_list(request: HttpRequest, *args, **kwargs) -> HttpResponse:
 
         from tenants.models import Membership
 
-        if request.user.is_staff or getattr(request.user, "is_manager", False) or hasattr(request, "membership"):
+        _is_mgr = (
+            request.user.is_staff
+            or getattr(request, "is_manager_plus", False)
+            or getattr(request.user, "is_manager", False)
+            or hasattr(request, "membership")
+            or Membership.objects.filter(
+                business=biz, user=request.user,
+                role__in=["MANAGER", "ADMIN", "OWNER"], status="ACTIVE"
+            ).exists()
+        )
+        if _is_mgr:
             # Get active agent AND manager memberships for current business
             memberships = (
                 Membership.objects.filter(business=biz, role__in=["AGENT", "MANAGER"], status="ACTIVE")

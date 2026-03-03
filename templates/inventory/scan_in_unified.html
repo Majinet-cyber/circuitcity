@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan In {{ category_label }} · Inventory{% endblock %}
+{% block header_title %}📦 Scan In {{ category_label }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --e-blue:#3b82f6; --e-blue-rgb:59,130,246;
+  --e-green:#10b981; --e-green-rgb:16,185,129;
+  --e-amber:#f59e0b; --e-red:#ef4444;
+  --e-border:#e2e8f0; --e-bg:#f8fafc;
+  --e-text:#0f172a; --e-muted:#64748b;
+  --e-card:#ffffff; --e-shadow:0 4px 16px rgba(15,23,42,.07);
+}
+.si-page { max-width: 880px; margin: 0 auto; padding: clamp(12px,3vw,24px); padding-bottom: 80px; }
+
+.cat-chooser { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
+@media (max-width:520px) { .cat-chooser { grid-template-columns: 1fr; } }
+.cat-card {
+  background: var(--e-card); border: 2.5px solid var(--e-border); border-radius: 18px;
+  padding: 24px 16px; text-align: center; cursor: pointer; transition: all .22s;
+  box-shadow: var(--e-shadow); text-decoration: none; color: inherit; display: block;
+}
+.cat-card:hover { border-color: var(--e-blue); transform: translateY(-4px); box-shadow: 0 10px 24px rgba(var(--e-blue-rgb),.16); }
+.cat-card.selected { border-color: var(--e-blue); background: rgba(var(--e-blue-rgb),.07); }
+.cat-icon { font-size: 2.5rem; margin-bottom: 10px; }
+.cat-name { font-weight: 800; font-size: 1rem; color: var(--e-text); }
+.cat-sub { font-size: .78rem; color: var(--e-muted); margin-top: 2px; }
+
+.si-header {
+  background: linear-gradient(135deg,rgba(59,130,246,.06),rgba(16,185,129,.05));
+  border: 1px solid rgba(0,0,0,.06); border-radius: 16px; padding: 20px; margin-bottom: 24px;
+}
+.si-header h1 { font-size: 1.4rem; font-weight: 800; color: var(--e-text); margin:0 0 4px 0; }
+.si-header p { color: var(--e-muted); margin: 0; font-size: .88rem; }
+
+.model-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap: 10px; margin-bottom: 14px; }
+.model-card {
+  background: var(--e-card); border: 2px solid var(--e-border); border-radius: 12px;
+  overflow: hidden; cursor: pointer; transition: all .2s; box-shadow: var(--e-shadow);
+}
+.model-card:hover { border-color: var(--e-blue); transform: translateY(-2px); }
+.model-card.selected { border-color: var(--e-blue); background: rgba(var(--e-blue-rgb),.06); }
+.mc-thumb {
+  height: 80px; display: flex; align-items: center; justify-content: center;
+  background: var(--e-bg); font-size: 1.8rem; color: var(--e-muted);
+}
+.mc-thumb img { width: 100%; height: 80px; object-fit: cover; }
+.mc-body { padding: 8px 10px; }
+.mc-brand { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing:.05em; color: var(--e-blue); }
+.mc-model { font-weight: 700; font-size: .82rem; color: var(--e-text); }
+.mc-specs { font-size: .72rem; color: var(--e-muted); margin-top: 2px; }
+
+.si-card { background: var(--e-card); border: 1px solid var(--e-border); border-radius: 16px; padding: 22px; margin-bottom: 16px; box-shadow: var(--e-shadow); }
+.si-card-title { font-size: .95rem; font-weight: 700; color: var(--e-text); margin: 0 0 14px 0; }
+.si-label { font-size: .8rem; font-weight: 700; color: #334155; margin-bottom: 5px; display: block; }
+.si-input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--e-border); border-radius: 10px;
+  font-size: .93rem; font-family: inherit; transition: border-color .2s;
+}
+.si-input:focus { outline: none; border-color: var(--e-blue); box-shadow: 0 0 0 3px rgba(var(--e-blue-rgb),.1); }
+.si-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width:480px) { .si-row { grid-template-columns: 1fr; } }
+.serial-input { font-family: monospace; font-size: 1rem; letter-spacing: .04em; }
+.btn-si {
+  width: 100%; padding: 14px; background: linear-gradient(135deg,#10b981,#059669);
+  color: #fff; border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; box-shadow: 0 4px 14px rgba(var(--e-green-rgb),.35); margin-top: 4px;
+}
+.btn-si:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(var(--e-green-rgb),.4); }
+.btn-add { padding: 10px 20px; background: var(--e-blue); color: #fff; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; margin-left: 8px; }
+.btn-add:hover { background: #2563eb; }
+.search-input { position: relative; margin-bottom: 12px; }
+.search-input input { padding-left: 36px; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--e-muted); font-size: .9rem; }
+
+.serial-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; min-height: 36px; }
+.serial-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(var(--e-blue-rgb),.12); color: var(--e-blue);
+  padding: 6px 12px; border-radius: 8px; font-family: monospace; font-size: .85rem;
+}
+.serial-chip .chip-remove { cursor: pointer; font-weight: 700; opacity: .8; }
+.serial-chip .chip-remove:hover { opacity: 1; color: var(--e-red); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="si-page">
+
+  <div class="si-header">
+    <h1>📦 Scan In</h1>
+    <p>Choose the product category, then add units by serial number.</p>
+  </div>
+
+  <!-- CATEGORY CHOOSER -->
+  <div class="cat-chooser">
+    <a href="{{ scan_in_url }}?category=phones" class="cat-card {% if category == 'phones' %}selected{% endif %}">
+      <div class="cat-icon">📱</div>
+      <div class="cat-name">Phones</div>
+      <div class="cat-sub">IMEI-based stock</div>
+    </a>
+    <a href="{{ scan_in_url }}?category=laptops" class="cat-card {% if category == 'laptops' %}selected{% endif %}">
+      <div class="cat-icon">💻</div>
+      <div class="cat-name">Laptops</div>
+      <div class="cat-sub">Serial number stock</div>
+    </a>
+    <a href="{{ scan_in_url }}?category=desktops" class="cat-card {% if category == 'desktops' %}selected{% endif %}">
+      <div class="cat-icon">🖥️</div>
+      <div class="cat-name">Desktops</div>
+      <div class="cat-sub">Serial number stock</div>
+    </a>
+  </div>
+
+  <!-- LAPTOPS/DESKTOPS STOCK IN -->
+  <div id="flow-electronics">
+    {% if catalog_products %}
+    <div class="si-card">
+      <p class="si-card-title">🔍 Choose a model</p>
+      <div class="search-input">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="si-input" id="model-search" placeholder="Search model name…" oninput="filterModels(this.value)">
+      </div>
+      <div class="model-grid" id="model-grid">
+        {% for p in catalog_products %}
+        <div class="model-card" data-product-id="{{ p.id }}"
+             data-cost="{{ p.default_cost_price|default:0 }}"
+             data-sell="{{ p.default_selling_price|default:0 }}"
+             data-label="{{ p.brand }} {{ p.model_name }}"
+             data-category="{{ p.category }}"
+             onclick="selectModel(this)">
+          <div class="mc-thumb">
+            {% if p.main_image %}<img src="{{ p.main_image.url }}" alt="{{ p.display_name }}">{% else %}{% if category == 'laptops' %}💻{% else %}🖥️{% endif %}{% endif %}
+          </div>
+          <div class="mc-body">
+            <div class="mc-brand">{{ p.brand }}</div>
+            <div class="mc-model">{{ p.model_name }}</div>
+            <div class="mc-specs">{{ p.ram_str }}{% if p.ram_str and p.storage_str %} · {% endif %}{{ p.storage_str }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <form method="post" id="stock-in-form" style="display:none">
+      {% csrf_token %}
+      <input type="hidden" name="catalog_id" id="catalog_id_input">
+      <input type="hidden" name="serial_numbers" id="serial_numbers_input">
+
+      <div class="si-card" id="selected-summary" style="border-color:var(--e-blue);background:rgba(var(--e-blue-rgb),.03)">
+        <p class="si-card-title">✅ Selected model</p>
+        <div id="selected-model-name" style="font-weight:700;font-size:1rem;color:var(--e-text)"></div>
+        <div id="selected-model-specs" style="font-size:.82rem;color:var(--e-muted);margin-top:4px"></div>
+        <button type="button" onclick="clearModel()" style="margin-top:10px;font-size:.8rem;color:var(--e-blue);background:none;border:none;cursor:pointer;padding:0">
+          ← Change model
+        </button>
+      </div>
+
+      <div class="si-card">
+        <p class="si-card-title">🔢 Add serial numbers</p>
+        <label class="si-label">Serial number</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="serial-input" class="si-input serial-input" style="flex:1;min-width:180px"
+                 placeholder="Scan or type serial, then Add"
+                 autocomplete="off" autocorrect="off" spellcheck="false">
+          <button type="button" class="btn-add" onclick="addSerial()">Add</button>
+        </div>
+        <div class="serial-chips" id="serial-chips"></div>
+        <p style="font-size:.75rem;color:var(--e-muted);margin-top:8px">No length limit · must be unique per store</p>
+      </div>
+
+      <div class="si-card">
+        <p class="si-card-title">📍 Location &amp; Prices</p>
+        <div style="margin-bottom:14px">
+          <label class="si-label">Location</label>
+          <select name="location_id" class="si-input">
+            {% for loc in locations %}
+            <option value="{{ loc.id }}" {% if default_location and loc.id == default_location.id %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="si-row">
+          <div>
+            <label class="si-label">Cost price (what you paid)</label>
+            <input type="text" name="order_price" id="si_order_price" class="si-input" placeholder="0.00" inputmode="decimal">
+          </div>
+          <div>
+            <label class="si-label">Selling price</label>
+            <input type="text" name="selling_price" id="si_selling_price" class="si-input" placeholder="0.00" inputmode="decimal">
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-si" id="confirm-btn" disabled>📦 Confirm Stock In</button>
+    </form>
+    {% else %}
+    <div class="si-card" style="text-align:center;padding:32px">
+      <p style="font-size:1.5rem;margin-bottom:8px">📭</p>
+      <p style="font-weight:700;color:var(--e-text);margin-bottom:4px">No {{ category_label|lower }} models in catalog</p>
+      <p style="color:var(--e-muted);margin-bottom:20px">Add {{ category_label|lower }} first to stock in.</p>
+      <a href="{% if category == 'laptops' %}{{ add_laptops_url }}{% else %}{{ add_desktops_url }}{% endif %}" class="btn-si"
+         style="display:inline-block;padding:12px 28px;text-decoration:none;border-radius:12px;width:auto">
+        Add {{ category_label }} →
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let serials = [];
+
+function chooseCategory(cat) {
+  window.location.href = '{{ scan_in_url|escapejs }}?category=' + cat;
+}
+
+function selectModel(el) {
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('catalog_id_input').value = el.dataset.productId;
+  document.getElementById('selected-model-name').textContent = el.dataset.label;
+  const specsEl = el.querySelector('.mc-specs');
+  document.getElementById('selected-model-specs').textContent = specsEl ? specsEl.textContent.trim() : '';
+  const cost = el.dataset.cost;
+  const sell = el.dataset.sell;
+  if (cost && cost !== '0') document.getElementById('si_order_price').value = cost;
+  if (sell && sell !== '0') document.getElementById('si_selling_price').value = sell;
+  serials = [];
+  renderSerials();
+  document.getElementById('stock-in-form').style.display = '';
+  document.getElementById('model-grid').parentElement.style.display = 'none';
+  document.getElementById('model-search').closest('.search-input').style.display = 'none';
+}
+
+function clearModel() {
+  document.getElementById('stock-in-form').style.display = 'none';
+  document.getElementById('model-grid').parentElement.style.display = '';
+  document.getElementById('model-search').closest('.search-input').style.display = '';
+  document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('catalog_id_input').value = '';
+  serials = [];
+}
+
+function addSerial() {
+  const inp = document.getElementById('serial-input');
+  const v = (inp.value || '').trim();
+  if (!v) return;
+  if (serials.includes(v)) return;
+  serials.push(v);
+  inp.value = '';
+  inp.focus();
+  renderSerials();
+}
+
+function removeSerial(idx) {
+  serials.splice(idx, 1);
+  renderSerials();
+}
+
+function renderSerials() {
+  const container = document.getElementById('serial-chips');
+  container.innerHTML = serials.map((s, i) =>
+    '<span class="serial-chip">' + s + '<span class="chip-remove" onclick="removeSerial(' + i + ')">×</span></span>'
+  ).join('');
+  document.getElementById('serial_numbers_input').value = serials.join(',');
+  document.getElementById('confirm-btn').disabled = serials.length === 0;
+}
+
+document.getElementById('serial-input')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); addSerial(); }
+});
+
+function filterModels(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.model-card').forEach(card => {
+    const label = card.dataset.label.toLowerCase();
+    card.style.display = label.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

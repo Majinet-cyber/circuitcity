@@ -133,6 +133,26 @@ Requires the 'request' context processor.
   </div>
 </header>
 
+<!-- Category Selector: Phones (active) / Laptops / Desktops -->
+<div style="display:flex;gap:8px;align-items:center;margin:14px 0 10px;flex-wrap:wrap">
+  <span style="font-size:.8rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.06em;margin-right:4px">Category:</span>
+  <a href="{% url 'inventory:stock_list' %}"
+     style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;font-size:.85rem;font-weight:700;text-decoration:none;
+            background:#111827;color:#fff;border:2px solid #111827">
+    📱 Phones — Stock List
+  </a>
+  <a href="{% url 'inventory:electronics_stock_list' %}?category=laptops"
+     style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;font-size:.85rem;font-weight:600;text-decoration:none;
+            background:#fff;color:#374151;border:2px solid #e5e7eb">
+    💻 Laptops
+  </a>
+  <a href="{% url 'inventory:electronics_stock_list' %}?category=desktops"
+     style="display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;font-size:.85rem;font-weight:600;text-decoration:none;
+            background:#fff;color:#374151;border:2px solid #e5e7eb">
+    🖥️ Desktops
+  </a>
+</div>
+
 <form class="filters" method="get">
   <input type="text" name="q" placeholder="Search IMEI/brand/model…" value="{{ q }}">
   <label>Status:

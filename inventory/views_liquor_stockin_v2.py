@@ -229,3 +229,6 @@ def liquor_stock_in_calculator_api(request):
             'error': f'Calculation error: {str(e)}'
         }, status=400)
 
+
+
+

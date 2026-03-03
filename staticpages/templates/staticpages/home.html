@@ -1755,6 +1755,77 @@
       margin-bottom: 2rem;
     }
 
+    /* Product Demo Section */
+    .product-demo-section {
+      padding: 4rem 0;
+      background: var(--white);
+    }
+
+    .product-demo-section .landing-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+
+    @media (max-width: 900px) {
+      .product-demo-section .landing-container {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+    }
+
+    .product-demo-video-wrap {
+      position: relative;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      background: var(--text-primary);
+      aspect-ratio: 16 / 9;
+    }
+
+    .product-demo-section video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .product-demo-content h2 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .product-demo-content .product-demo-subtitle {
+      font-size: 1.0625rem;
+      color: var(--text-secondary);
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+
+    .product-demo-list {
+      list-style: none;
+      margin-bottom: 2rem;
+    }
+
+    .product-demo-list li {
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 0.75rem;
+      font-size: 1rem;
+      color: var(--text-primary);
+    }
+
+    .product-demo-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--secondary);
+      font-weight: 700;
+    }
+
     /* Button consistency */
     .btn {
       height: 44px; /* Consistent button height */
@@ -1921,6 +1992,55 @@
         <img src="{% static 'img/majn.png' %}" alt="Emajinet" class="hero-logo">
       </div>
     </div>
+  </section>
+
+  <!-- Product Demo Section (Emajinet Farm walkthrough) -->
+  <section class="product-demo-section" id="product-demo">
+    <div class="landing-container">
+      <div class="product-demo-video-wrap" id="product-demo-video-wrap">
+        <video
+          id="product-demo-video"
+          src="{% static 'videos/emajinet-farm.mp4' %}"
+          poster="{% static 'img/majn.png' %}"
+          preload="metadata"
+          controls
+          playsinline
+          muted
+          aria-label="Emajinet product demo: fast account setup, Farm Manager, data entry, smart prompts, and dashboards"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      <div class="product-demo-content">
+        <h2>Watch Emajinet in action</h2>
+        <p class="product-demo-subtitle">A quick walkthrough showing fast account setup, Farm Manager, data entry, smart prompts, and dashboards.</p>
+        <ul class="product-demo-list">
+          <li>Create an account in seconds</li>
+          <li>Farm Manager workflow (crops, inputs, records)</li>
+          <li>Fast data entry for daily operations</li>
+          <li>Smart prompts and recommendations</li>
+          <li>Dashboards that show performance</li>
+        </ul>
+      </div>
+    </div>
+    <script>
+      (function() {
+        if (!window.matchMedia || !window.matchMedia('(hover: hover)').matches) return;
+        document.addEventListener('DOMContentLoaded', function() {
+          var wrap = document.getElementById('product-demo-video-wrap');
+          var video = document.getElementById('product-demo-video');
+          if (!wrap || !video) return;
+          wrap.addEventListener('mouseenter', function() {
+            video.muted = true;
+            video.play().catch(function() {});
+          });
+          wrap.addEventListener('mouseleave', function() {
+            video.pause();
+            video.currentTime = 0;
+          });
+        });
+      })();
+    </script>
   </section>
 
   <!-- Section CTA after Stats -->

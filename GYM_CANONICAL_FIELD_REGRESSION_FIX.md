@@ -244,3 +244,6 @@ python manage.py migrate inventory 1033
 
 
 
+
+
+

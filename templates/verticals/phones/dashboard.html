@@ -120,7 +120,7 @@
     </div>
     <div class="hero-actions">
       <a class="primary" href="{% url 'inventory:scan_in' %}"><i class="bi bi-box-arrow-in-down"></i> Scan IN</a>
-      <a class="primary" href="{% url 'inventory:scan_sold' %}"><i class="bi bi-phone"></i> Sell Phone</a>
+      <a class="primary" href="{% url 'inventory:scan_sell_landing' %}"><i class="bi bi-phone"></i> Sell</a>
       <a class="ghost" href="{% url 'inventory:stock_list' %}"><i class="bi bi-list-ul"></i> Stock List</a>
       {% if IS_MANAGER %}
       <a class="ghost" href="{% url 'sales:rollback_home' %}" style="border-color:rgba(251,191,36,.9);color:#fbbf24"><i class="bi bi-arrow-counterclockwise"></i> Rollback Sale</a>
@@ -208,6 +208,27 @@
         {% endif %}
       </p>
     </div>
+
+    {% if dashboard_kpis.category_breakdown %}
+    <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0">
+      <h4 style="margin:0 0 12px;font-size:.95rem;font-weight:700;color:#334155">Stock &amp; Sales by Category</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:.9rem">
+        <thead>
+          <tr style="border-bottom:1px solid #e2e8f0">
+            <th style="text-align:left;padding:8px 12px;color:#64748b;font-weight:600">Category</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Stock</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Sales Today</th>
+            <th style="text-align:right;padding:8px 12px;color:#64748b;font-weight:600">Sales (Period)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:8px 12px">📱 Phones</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.phones.sales_in_range|intcomma }}</td></tr>
+          <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:8px 12px">💻 Laptops</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.laptops.sales_in_range|intcomma }}</td></tr>
+          <tr><td style="padding:8px 12px">🖥️ Desktops</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.stock|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.sales_today|intcomma }}</td><td style="text-align:right;padding:8px 12px">{{ dashboard_kpis.category_breakdown.desktops.sales_in_range|intcomma }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </section>
 
   <!-- BUSINESS PROGRESS CHIPS (Lightweight insights from existing data) -->

@@ -1,4 +1,4 @@
-﻿# circuitcity/inventory/models.py
+# circuitcity/inventory/models.py
 from __future__ import annotations
 
 import json
@@ -44,11 +44,17 @@ try:
 except Exception:
     PhoneStockEditRequest = None  # safe fallback
 
-# Re-export PhoneProductCatalog for phone products catalog
+# Re-export PhoneProductCatalog and Electronics models for phone/electronics catalog
 try:
-    from .models_phone_products import PhoneProductCatalog  # noqa: F401
+    from .models_phone_products import (  # noqa: F401
+        PhoneProductCatalog,
+        ElectronicsCategory,
+        ElectronicsStockItem,
+    )
 except Exception:
     PhoneProductCatalog = None  # safe fallback
+    ElectronicsCategory = None
+    ElectronicsStockItem = None
 
 # Re-export Farm models for syncdb table creation
 try:

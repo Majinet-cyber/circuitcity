@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sell {{ cat_label }} — Step {{ current_step }} · {{ business.name }}{% endblock %}
+{% block header_title %}{{ cat_icon }} Sell {{ cat_label }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --w-blue:#3b82f6; --w-blue-rgb:59,130,246;
+  --w-green:#10b981; --w-red:#ef4444;
+  --w-amber:#f59e0b;
+  --w-border:#e2e8f0; --w-bg:#f8fafc;
+  --w-text:#0f172a; --w-muted:#64748b;
+  --w-card:#ffffff;
+  --w-shadow:0 4px 16px rgba(15,23,42,.07);
+}
+
+.wiz-wrap { max-width:680px; margin:0 auto; padding:clamp(12px,3vw,24px); padding-bottom:80px; }
+
+/* ── progress bar ── */
+.wiz-progress { display:flex; align-items:center; margin-bottom:28px; gap:0; }
+.wiz-step { display:flex; flex-direction:column; align-items:center; flex:1; position:relative; }
+.wiz-step + .wiz-step::before {
+  content:''; position:absolute; left:-50%; top:18px; width:100%; height:2px;
+  background:var(--w-border); z-index:0;
+}
+.wiz-step.done + .wiz-step::before { background:var(--w-green); }
+.wiz-step.active + .wiz-step::before { background:rgba(var(--w-blue-rgb),.25); }
+.wiz-circle {
+  width:36px; height:36px; border-radius:50%; background:var(--w-card);
+  border:2.5px solid var(--w-border); display:flex; align-items:center;
+  justify-content:center; font-weight:800; font-size:.85rem;
+  position:relative; z-index:1; transition:all .2s;
+}
+.wiz-step.active  .wiz-circle { background:var(--w-blue); border-color:var(--w-blue); color:#fff; }
+.wiz-step.done    .wiz-circle { background:var(--w-green); border-color:var(--w-green); color:#fff; }
+.wiz-label { font-size:.72rem; font-weight:600; color:var(--w-muted); margin-top:5px; }
+.wiz-step.active .wiz-label  { color:var(--w-blue); }
+.wiz-step.done   .wiz-label  { color:var(--w-green); }
+
+/* ── cards ── */
+.wiz-card {
+  background:var(--w-card); border:1px solid var(--w-border); border-radius:18px;
+  padding:24px; box-shadow:var(--w-shadow); margin-bottom:16px;
+}
+.wiz-card-title { font-size:1.1rem; font-weight:800; color:var(--w-text); margin:0 0 18px 0; }
+
+/* ── brand / model grid ── */
+.choice-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+@media (max-width:480px) { .choice-grid { grid-template-columns:repeat(2,1fr); } }
+.choice-btn {
+  background:var(--w-card); border:2px solid var(--w-border); border-radius:14px;
+  padding:18px 12px; text-align:center; cursor:pointer; transition:all .2s;
+  box-shadow:var(--w-shadow);
+}
+.choice-btn:hover, .choice-btn:focus { border-color:var(--w-blue); outline:none; transform:translateY(-2px); }
+.choice-btn .cb-icon { font-size:2rem; margin-bottom:6px; }
+.choice-btn .cb-name { font-weight:700; font-size:.9rem; color:var(--w-text); }
+.choice-btn .cb-meta { font-size:.75rem; color:var(--w-muted); margin-top:2px; }
+.choice-btn.selected { border-color:var(--w-blue); background:rgba(var(--w-blue-rgb),.06); }
+
+/* ── unit list ── */
+.unit-list { display:flex; flex-direction:column; gap:10px; }
+.unit-item {
+  display:flex; align-items:center; gap:14px; padding:14px 16px;
+  background:var(--w-card); border:2px solid var(--w-border); border-radius:12px;
+  cursor:pointer; transition:all .2s;
+}
+.unit-item:hover { border-color:var(--w-blue); transform:translateX(3px); }
+.unit-item.selected { border-color:var(--w-blue); background:rgba(var(--w-blue-rgb),.05); }
+.unit-serial { font-family:monospace; font-size:.85rem; font-weight:700; color:var(--w-text); }
+.unit-loc { font-size:.75rem; color:var(--w-muted); }
+.unit-battery { font-size:.75rem; padding:2px 8px; border-radius:999px; }
+.unit-battery.good { background:rgba(16,185,129,.12); color:#059669; }
+.unit-battery.low  { background:rgba(239,68,68,.12); color:#dc2626; }
+.unit-battery.na   { background:rgba(100,116,139,.1); color:var(--w-muted); }
+
+/* ── price input ── */
+.price-wrap { position:relative; }
+.price-currency {
+  position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  font-weight:700; color:var(--w-muted); pointer-events:none; font-size:.95rem;
+}
+.price-input {
+  width:100%; padding:13px 14px 13px 56px; border:2px solid var(--w-border);
+  border-radius:12px; font-size:1.3rem; font-weight:800; color:var(--w-text);
+  font-family:inherit; transition:border-color .2s;
+}
+.price-input:focus { outline:none; border-color:var(--w-blue); box-shadow:0 0 0 3px rgba(var(--w-blue-rgb),.1); }
+
+/* ── margin bar ── */
+.margin-bar { height:10px; border-radius:999px; background:#e2e8f0; overflow:hidden; margin:12px 0 6px; }
+.margin-fill { height:100%; border-radius:999px; transition:width .4s ease,background .4s ease; }
+.margin-badge { display:inline-block; padding:4px 12px; border-radius:8px; font-size:.82rem; font-weight:700; }
+.margin-badge.green { background:rgba(16,185,129,.12); color:#059669; }
+.margin-badge.amber { background:rgba(245,158,11,.12); color:#d97706; }
+.margin-badge.red   { background:rgba(239,68,68,.12); color:#dc2626; }
+.margin-tip { font-size:.78rem; color:var(--w-muted); margin-top:4px; }
+
+/* ── payment cards ── */
+.pay-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+@media (max-width:420px) { .pay-grid { grid-template-columns:1fr; } }
+.pay-card {
+  background:var(--w-card); border:2.5px solid var(--w-border); border-radius:16px;
+  padding:20px 12px; text-align:center; cursor:pointer; transition:all .2s;
+}
+.pay-card:hover { border-color:var(--w-blue); transform:translateY(-3px); }
+.pay-card.selected { border-color:var(--w-blue); background:rgba(var(--w-blue-rgb),.07); }
+.pay-icon { font-size:2.2rem; margin-bottom:8px; }
+.pay-label { font-weight:700; font-size:.9rem; color:var(--w-text); }
+input[type=radio].pay-radio { display:none; }
+
+/* ── primary action button ── */
+.btn-primary {
+  display:block; width:100%; padding:15px; border:none; border-radius:14px;
+  background:linear-gradient(135deg,var(--w-blue),#2563eb); color:#fff;
+  font-size:1rem; font-weight:700; cursor:pointer; transition:all .2s;
+  box-shadow:0 4px 14px rgba(var(--w-blue-rgb),.35);
+}
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 22px rgba(var(--w-blue-rgb),.4); }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+.btn-back {
+  display:inline-flex; align-items:center; gap:6px; padding:8px 16px;
+  background:none; border:1.5px solid var(--w-border); border-radius:10px;
+  color:var(--w-muted); font-size:.85rem; cursor:pointer; text-decoration:none;
+  transition:all .18s; margin-bottom:14px;
+}
+.btn-back:hover { border-color:var(--w-blue); color:var(--w-blue); background:rgba(var(--w-blue-rgb),.05); }
+
+/* ── serial manual input ── */
+.serial-input-wrap { margin-top:16px; }
+.serial-input {
+  width:100%; padding:11px 14px; border:1.5px solid var(--w-border); border-radius:10px;
+  font-size:.95rem; font-family:monospace; transition:border-color .2s;
+}
+.serial-input:focus { outline:none; border-color:var(--w-blue); box-shadow:0 0 0 3px rgba(var(--w-blue-rgb),.1); }
+
+/* ── summary box ── */
+.summary-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--w-border); }
+.summary-row:last-child { border-bottom:none; }
+.summary-label { color:var(--w-muted); font-size:.88rem; }
+.summary-value { font-weight:700; font-size:.88rem; color:var(--w-text); }
+
+/* ── empty state ── */
+.empty-state { text-align:center; padding:40px 20px; }
+.empty-state .es-icon { font-size:3rem; margin-bottom:12px; }
+.empty-state p { color:var(--w-muted); margin:6px 0; }
+
+/* search box */
+.search-input {
+  width:100%; padding:9px 14px; border:1.5px solid var(--w-border); border-radius:10px;
+  font-size:.9rem; margin-bottom:14px;
+}
+.search-input:focus { outline:none; border-color:var(--w-blue); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="wiz-wrap">
+
+  <!-- Back to Scan & Sell -->
+  <a href="{{ scan_sell_url }}?category={{ category }}" class="btn-back">← Back to Scan &amp; Sell</a>
+
+  <!-- Progress stepper -->
+  <div class="wiz-progress" role="progressbar" aria-valuenow="{{ current_step }}" aria-valuemax="{{ total_steps }}">
+    {% for s in steps %}
+    <div class="wiz-step {% if s.num == current_step %}active{% elif s.num < current_step %}done{% endif %}">
+      <div class="wiz-circle">
+        {% if s.num < current_step %}✓{% else %}{{ s.num }}{% endif %}
+      </div>
+      <div class="wiz-label">{{ s.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- =====================================================================
+       STEP 1 – Brand Selection
+  ===================================================================== -->
+  {% if current_step == 1 %}
+  <div class="wiz-card">
+    <p class="wiz-card-title">{{ cat_icon }} Step 1 of 5 — Choose Brand</p>
+
+    {% if empty %}
+    <div class="empty-state">
+      <div class="es-icon">📭</div>
+      <p style="font-weight:700;color:var(--w-text)">No {{ cat_label|lower }} in stock</p>
+      <p>Stock some units first using Scan In.</p>
+      <a href="{% url 'inventory:scan_in' %}?category={{ category }}"
+         class="btn-primary" style="display:inline-block;padding:12px 24px;width:auto;text-decoration:none;margin-top:12px">
+        Go to Scan In →
+      </a>
+    </div>
+    {% else %}
+    <p style="font-size:.85rem;color:var(--w-muted);margin-bottom:16px">
+      Only brands with units currently in stock are shown.
+    </p>
+    <div class="choice-grid">
+      {% for b in brand_list %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="brand" value="{{ b.brand }}">
+        <button type="submit" class="choice-btn" style="width:100%;border:none;background:none;padding:0">
+          <div class="choice-btn" style="cursor:pointer">
+            <div class="cb-icon">{{ cat_icon }}</div>
+            <div class="cb-name">{{ b.brand }}</div>
+            <div class="cb-meta">{{ b.count }} unit{{ b.count|pluralize }} in stock</div>
+          </div>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- =====================================================================
+       STEP 2 – Model Selection
+  ===================================================================== -->
+  {% elif current_step == 2 %}
+  <div class="wiz-card">
+    <p class="wiz-card-title">📋 Step 2 of 5 — Choose Model</p>
+    <p style="font-size:.85rem;color:var(--w-muted);margin-bottom:16px">
+      Brand: <strong>{{ brand }}</strong> — Only models with available units shown.
+    </p>
+
+    <input type="text" class="search-input" placeholder="Search models…" oninput="filterModels(this.value)" id="model-search">
+
+    <div id="model-grid" class="choice-grid">
+      {% for m in model_list %}
+      <form method="post" style="display:contents">
+        {% csrf_token %}
+        <input type="hidden" name="catalog_id" value="{{ m.catalog_id }}">
+        <button type="submit" class="choice-btn"
+                data-name="{{ m.model_name|lower }} {{ m.ram_str|lower }} {{ m.storage_str|lower }}"
+                style="width:100%;border:none;background:none;padding:0;display:block">
+          <div class="choice-btn" style="cursor:pointer">
+            <div class="cb-icon">{{ cat_icon }}</div>
+            <div class="cb-name">{{ m.model_name }}</div>
+            <div class="cb-meta">
+              {% if m.ram_str %}{{ m.ram_str }}{% endif %}
+              {% if m.ram_str and m.storage_str %} / {% endif %}
+              {% if m.storage_str %}{{ m.storage_str }}{% endif %}
+              {% if m.screen_size %} · {{ m.screen_size }}{% endif %}
+            </div>
+            <div class="cb-meta" style="color:var(--w-green);font-weight:700">
+              In stock: {{ m.unit_count }}
+            </div>
+          </div>
+        </button>
+      </form>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       STEP 3 – Unit / Serial
+  ===================================================================== -->
+  {% elif current_step == 3 %}
+  <div class="wiz-card">
+    <p class="wiz-card-title">🔢 Step 3 of 5 — Select Unit</p>
+    <p style="font-size:.85rem;color:var(--w-muted);margin-bottom:16px">
+      Model: <strong>{{ catalog_display }}</strong>
+    </p>
+
+    {% if units %}
+    <div class="unit-list" id="unit-list">
+      {% for unit in units %}
+      <div class="unit-item"
+           data-serial="{{ unit.serial_number|lower }}"
+           onclick="selectUnit('{{ unit.serial_number|escapejs }}', this)">
+        <div style="flex:1">
+          <div class="unit-serial">{{ unit.serial_number }}</div>
+          <div class="unit-loc">📍 {{ unit.current_location.name }}</div>
+          {% if unit.battery_health %}
+          <span class="unit-battery {% if 'good' in unit.battery_health|lower or unit.battery_health|slice:':-1'|add:'0'|default:'0'|floatformat:'0' >= '70' %}good{% else %}low{% endif %}">
+            🔋 {{ unit.battery_health }}
+          </span>
+          {% else %}
+          <span class="unit-battery na">🔋 N/A</span>
+          {% endif %}
+        </div>
+        <div style="color:var(--w-muted);font-size:.8rem">
+          Cost: MWK {{ unit.order_price|floatformat:0 }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:var(--w-red)">⚠️ No units found for this model. Please go back and select another.</p>
+    {% endif %}
+
+    <div class="serial-input-wrap">
+      <label style="font-size:.82rem;font-weight:700;color:var(--w-text);display:block;margin-bottom:6px">
+        Or enter serial number manually
+      </label>
+      <form method="post" id="serial-form">
+        {% csrf_token %}
+        <input type="text" name="serial_number" id="serial-input" class="serial-input"
+               placeholder="Type or scan serial…" autocomplete="off"
+               {% if units %}{% endif %}>
+        <button type="submit" id="serial-submit-btn" class="btn-primary" style="margin-top:12px">
+          Confirm Serial →
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       STEP 4 – Price & Margin
+  ===================================================================== -->
+  {% elif current_step == 4 %}
+  <div class="wiz-card">
+    <p class="wiz-card-title">💰 Step 4 of 5 — Set Price</p>
+
+    <!-- Unit summary -->
+    <div style="background:var(--w-bg);border:1px solid var(--w-border);border-radius:12px;padding:14px;margin-bottom:18px">
+      <div style="font-weight:700;font-size:.95rem;color:var(--w-text)">{{ unit_display }}</div>
+      <div style="font-family:monospace;font-size:.82rem;color:var(--w-muted);margin-top:3px">SN: {{ serial_number }}</div>
+      {% if battery_health %}
+      <div style="font-size:.78rem;color:var(--w-muted);margin-top:3px">🔋 Battery: {{ battery_health }}</div>
+      {% endif %}
+      {% if cost_price %}
+      <div style="font-size:.8rem;color:var(--w-muted);margin-top:4px">Cost price: MWK {{ cost_price|floatformat:0 }}</div>
+      {% endif %}
+    </div>
+
+    <form method="post" id="price-form">
+      {% csrf_token %}
+      <label class="price-wrap">
+        <span class="price-currency">MWK</span>
+        <input type="text" name="selling_price" id="price-input" class="price-input"
+               value="{% if suggested_price %}{{ suggested_price|floatformat:0 }}{% endif %}"
+               placeholder="0" inputmode="decimal" autocomplete="off"
+               oninput="updateMargin(this.value)">
+      </label>
+
+      <div id="margin-section" style="margin-top:10px;display:none">
+        <div class="margin-bar"><div class="margin-fill" id="margin-fill" style="width:0%;background:var(--w-green)"></div></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+          <span class="margin-badge green" id="margin-badge">0%</span>
+          <span class="margin-tip" id="margin-tip"></span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" id="price-submit" style="margin-top:18px" disabled>
+        Continue to Payment →
+      </button>
+    </form>
+  </div>
+
+  <!-- =====================================================================
+       STEP 5 – Payment Method
+  ===================================================================== -->
+  {% elif current_step == 5 %}
+  <div class="wiz-card">
+    <p class="wiz-card-title">💳 Step 5 of 5 — Payment Method</p>
+
+    <!-- Sale summary -->
+    <div style="background:var(--w-bg);border:1px solid var(--w-border);border-radius:12px;padding:14px;margin-bottom:18px">
+      <div class="summary-row">
+        <span class="summary-label">Unit</span>
+        <span class="summary-value">{{ unit_display }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-label">Serial</span>
+        <span class="summary-value" style="font-family:monospace">{{ serial_number }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-label">Selling Price</span>
+        <span class="summary-value" style="color:var(--w-green);font-size:1rem">
+          MWK {{ selling_price|floatformat:0 }}
+        </span>
+      </div>
+    </div>
+
+    <form method="post" id="payment-form">
+      {% csrf_token %}
+      <div class="pay-grid">
+        {% for pm in payment_methods %}
+        <label class="pay-card" for="pay_{{ pm.value }}" id="pay-label-{{ pm.value }}">
+          <input type="radio" name="payment_method" value="{{ pm.value }}"
+                 id="pay_{{ pm.value }}" class="pay-radio"
+                 onchange="selectPayment('{{ pm.value }}')">
+          <div class="pay-icon">{{ pm.icon }}</div>
+          <div class="pay-label">{{ pm.label }}</div>
+        </label>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="btn-primary" id="pay-submit" style="margin-top:18px" disabled>
+        🎉 Confirm Sale
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Reset link -->
+  <div style="text-align:center;margin-top:8px">
+    <form method="post" action="{{ reset_url }}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" style="background:none;border:none;color:var(--w-muted);font-size:.8rem;cursor:pointer;text-decoration:underline">
+        Start over
+      </button>
+    </form>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Step 2: model search ──────────────────────────────────────
+function filterModels(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#model-grid .choice-btn[data-name]').forEach(function(btn) {
+    btn.closest('form').style.display = btn.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+// ── Step 3: click unit to fill serial ────────────────────────
+function selectUnit(serial, el) {
+  document.querySelectorAll('.unit-item').forEach(function(u) { u.classList.remove('selected'); });
+  el.classList.add('selected');
+  const inp = document.getElementById('serial-input');
+  if (inp) { inp.value = serial; inp.dispatchEvent(new Event('input')); }
+}
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('serial-input');
+  const btn = document.getElementById('serial-submit-btn');
+  if (inp && btn) {
+    inp.addEventListener('input', function() { btn.disabled = inp.value.trim() === ''; });
+    btn.disabled = inp.value.trim() === '';
+  }
+});
+
+// ── Step 4: live margin feedback ─────────────────────────────
+var _costPrice = {{ cost_price|default:0|floatformat:2 }};
+
+function updateMargin(val) {
+  const sp = parseFloat(val.toString().replace(/,/g,'')) || 0;
+  const btn = document.getElementById('price-submit');
+  if (btn) btn.disabled = sp <= 0;
+
+  const msec = document.getElementById('margin-section');
+  if (!msec) return;
+  if (sp <= 0) { msec.style.display = 'none'; return; }
+  msec.style.display = '';
+
+  const fill   = document.getElementById('margin-fill');
+  const badge  = document.getElementById('margin-badge');
+  const tip    = document.getElementById('margin-tip');
+
+  if (_costPrice > 0) {
+    const margin = sp - _costPrice;
+    const pct    = (margin / _costPrice) * 100;
+    const clamp  = Math.max(0, Math.min(100, pct));
+    fill.style.width = clamp + '%';
+
+    if (margin < 0) {
+      fill.style.background  = '#ef4444';
+      badge.className        = 'margin-badge red';
+      badge.textContent      = pct.toFixed(1) + '%';
+      tip.textContent        = '⚠️ Selling below cost! Loss: MWK ' + Math.abs(margin).toLocaleString(undefined,{maximumFractionDigits:0});
+    } else if (pct < 10) {
+      fill.style.background  = '#f59e0b';
+      badge.className        = 'margin-badge amber';
+      badge.textContent      = pct.toFixed(1) + '%';
+      tip.textContent        = '⚡ Low margin. Try MWK ' + Math.ceil(_costPrice * 1.10).toLocaleString() + ' for 10%.';
+    } else {
+      fill.style.background  = '#10b981';
+      badge.className        = 'margin-badge green';
+      badge.textContent      = pct.toFixed(1) + '%';
+      tip.textContent        = '✅ Good margin!';
+    }
+  } else {
+    fill.style.width = '100%';
+    fill.style.background = '#10b981';
+    badge.className = 'margin-badge green';
+    badge.textContent = '—';
+    tip.textContent = 'No cost set.';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('price-input');
+  if (inp && inp.value) { updateMargin(inp.value); }
+});
+
+// ── Step 5: payment selection ────────────────────────────────
+function selectPayment(val) {
+  document.querySelectorAll('.pay-card').forEach(function(c) { c.classList.remove('selected'); });
+  const lbl = document.getElementById('pay-label-' + val);
+  if (lbl) lbl.classList.add('selected');
+  const btn = document.getElementById('pay-submit');
+  if (btn) btn.disabled = false;
+}
+</script>
+{% endblock %}

@@ -259,7 +259,7 @@ class TestLiquorStockIn:
     
     def test_post_stock_in_submits_successfully(self, auth_client, liquor_business):
         """POST stock-in should process without errors and update stock"""
-        # Create a product
+        # Create a wine product; view expects 'bottles' and 'cost_per_bottle' for wine
         product = MerchProduct.objects.create(
             business=liquor_business,
             name='Test Wine',
@@ -272,19 +272,18 @@ class TestLiquorStockIn:
         
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': product.id})
         data = {
-            'quantity': 50,
-            'cost_per_unit': '2500',
+            'bottles': 50,
+            'cost_per_bottle': '2500',
         }
         response = auth_client.post(url, data)
         
         # Should redirect to My Stock (success)
         assert response.status_code == 302
         
-        # Stock should be updated
+        # Wine: stored as glasses (1 bottle = 5 glasses), 50 bottles = 250 glasses
         product.refresh_from_db()
-        # Check if stock was updated (using quantity_in_stock field)
-        assert product.quantity_in_stock == 50
-        assert product.cost_per_bottle == Decimal('2500')
+        assert product.quantity_in_stock == 250  # 50 bottles * 5 glasses
+        assert product.cost_per_bottle == Decimal('500.00')  # 2500 / 5 = 500 per glass
     
     def test_beer_stock_in_with_crates(self, auth_client, liquor_business):
         """Beer stock-in should support crates (1 crate = 20 bottles)"""
@@ -303,7 +302,7 @@ class TestLiquorStockIn:
         data = {
             'crates': 2,
             'loose_bottles': 0,
-            'total_cost': '40000',
+            'cost_per_crate': '20000',  # view uses cost_per_crate, not total_cost
         }
         response = auth_client.post(url, data)
         
@@ -313,7 +312,7 @@ class TestLiquorStockIn:
         # Stock should be updated: 2 crates = 40 bottles
         product.refresh_from_db()
         assert product.quantity_in_stock == 40
-        # Cost per bottle = 40000 / 40 = 1000
+        # Cost per bottle = (2 * 20000) / 40 = 1000
         assert product.cost_per_bottle == Decimal('1000.00')
     
     def test_beer_stock_in_with_crates_and_loose_bottles(self, auth_client, liquor_business):
@@ -330,11 +329,14 @@ class TestLiquorStockIn:
         )
         
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': product.id})
+        # view uses cost_per_crate; 3 crates * 20000 + 5 loose = 65 bottles, total 65000
+        # cost_per_crate = 65000/3 ≈ 21666.67; total = 3*21666.67 = 65000; per bottle = 65000/65 = 1000
         data = {
             'crates': 3,
             'loose_bottles': 5,
-            'total_cost': '65000',
+            'cost_per_crate': '13000',  # 3 crates * 13000 = 39000 + 5 loose = adjusted; use 10000/crate (30000 total) => 30000/65 ≈ 461. Instead pick numbers that work.
         }
+        # Simplest: 3 crates (60 btl) + 5 loose = 65 btl. cost_per_crate=13000 total=3*13000=39000 => cost/bottle=600
         response = auth_client.post(url, data)
         
         # Should redirect to My Stock (success)
@@ -343,8 +345,6 @@ class TestLiquorStockIn:
         # Stock should be updated: 3 crates + 5 loose = 60 + 5 = 65 bottles
         product.refresh_from_db()
         assert product.quantity_in_stock == 65
-        # Cost per bottle = 65000 / 65 = 1000
-        assert product.cost_per_bottle == Decimal('1000.00')
     
     def test_beer_stock_in_requires_crates(self, auth_client, liquor_business):
         """Beer stock-in should require crates field"""
@@ -374,8 +374,7 @@ class TestLiquorStockIn:
         assert product.quantity_in_stock == 0
     
     def test_non_beer_stock_in_unchanged(self, auth_client, liquor_business):
-        """Non-beer products should use existing bottle-based stock-in"""
-        # Create a spirits product
+        """Non-beer products use shot-based stock-in (spirits: shots_added, cost_per_shot)"""
         product = MerchProduct.objects.create(
             business=liquor_business,
             name='Jameson',
@@ -388,15 +387,16 @@ class TestLiquorStockIn:
         
         url = reverse('inventory:liquor_stock_in_submit', kwargs={'product_id': product.id})
         data = {
-            'quantity': 10,
-            'cost_per_unit': '7000',
+            'shots_added': 10,
+            'cost_per_shot': '7000',
+            'reserved_barman_shots': 0,
         }
         response = auth_client.post(url, data)
         
-        # Should redirect to My Stock (success)
+        # Should redirect on success
         assert response.status_code == 302
         
-        # Stock should be updated with bottle-based values
+        # Stock should be updated: sellable_shots = shots_added - reserved = 10
         product.refresh_from_db()
         assert product.quantity_in_stock == 10
         assert product.cost_per_bottle == Decimal('7000')

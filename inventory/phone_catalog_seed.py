@@ -206,7 +206,7 @@ def seed_phone_catalog(business: Business, created_by=None) -> int:
         return 0
 
     try:
-        from inventory.models_phone_products import PhoneProductCatalog
+        from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
     except ImportError:
         return 0
 
@@ -222,6 +222,7 @@ def seed_phone_catalog(business: Business, created_by=None) -> int:
         # Create or update (in case of re-seeding)
         product, created = PhoneProductCatalog.objects.get_or_create(
             business=business,
+            category=ElectronicsCategory.PHONE,
             brand=brand,
             model_name=model,
             ram_gb=ram,
@@ -253,18 +254,17 @@ def get_catalog_for_business(business: Business, brand: str = None, active_only:
         QuerySet of PhoneProductCatalog
     """
     try:
-        from inventory.models_phone_products import PhoneProductCatalog
+        from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
     except ImportError:
         return []
 
     qs = PhoneProductCatalog.objects.filter(business=business)
-
     if active_only:
         qs = qs.filter(is_active=True)
-
     if brand:
         qs = qs.filter(brand__iexact=brand.strip())
-
+    # Default to phones only for backward compat
+    qs = qs.filter(category=ElectronicsCategory.PHONE)
     return qs.order_by("brand", "model_name", "ram_gb", "rom_gb")
 
 
@@ -276,12 +276,14 @@ def get_brands_for_business(business: Business) -> List[str]:
         List of brand names (e.g., ["ITEL", "SAMSUNG", "TECNO"])
     """
     try:
-        from inventory.models_phone_products import PhoneProductCatalog
+        from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
     except ImportError:
         return []
 
     brands = (
-        PhoneProductCatalog.objects.filter(business=business, is_active=True)
+        PhoneProductCatalog.objects.filter(
+            business=business, is_active=True, category=ElectronicsCategory.PHONE
+        )
         .values_list("brand", flat=True)
         .distinct()
         .order_by("brand")
@@ -310,12 +312,15 @@ def get_models_for_brand(business: Business, brand: str) -> List[Dict[str, Any]]
         ]
     """
     try:
-        from inventory.models_phone_products import PhoneProductCatalog
+        from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
     except ImportError:
         return []
 
     products = PhoneProductCatalog.objects.filter(
-        business=business, brand__iexact=brand.strip(), is_active=True
+        business=business,
+        brand__iexact=brand.strip(),
+        is_active=True,
+        category=ElectronicsCategory.PHONE,
     ).order_by("model_name", "ram_gb", "rom_gb")
 
     return [

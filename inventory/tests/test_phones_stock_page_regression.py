@@ -398,11 +398,11 @@ class EditPriceNever500TestCase(TransactionTestCase):
         self.product = Product.objects.create(
             code="PRICE-001", name="Test Phone", model="Test",
         )
-        # Item with None order_price (edge case that previously caused 500)
+        # Item with zero order_price (edge case that previously caused 500 when old price was missing)
         self.item_no_price = InventoryItem.objects.create(
             business=self.business, imei="900800700600500",
             product=self.product, current_location=self.location,
-            order_price=None, selling_price=None,
+            order_price=Decimal("0"), selling_price=Decimal("0"),
             status="IN_STOCK",
         )
         # Normal item
@@ -568,6 +568,9 @@ class ArchiveNever500TestCase(TransactionTestCase):
             reverse("inventory:archive_stock", args=[self.item.id]),
         )
         self.assertEqual(response.status_code, 403)
+
+
+
 
 
 

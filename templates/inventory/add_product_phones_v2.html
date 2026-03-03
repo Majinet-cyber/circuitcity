@@ -379,6 +379,13 @@
 
 {% block content %}
 <div class="page-container">
+  <!-- Category tabs -->
+  <div class="tabs-row" style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+    <a href="{% url 'inventory:phone_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; background: #3b82f6; color: #fff;">Phones</a>
+    <a href="{% url 'inventory:laptop_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; color: #64748b; background: #f1f5f9;">Laptops</a>
+    <a href="{% url 'inventory:desktop_products' %}" style="padding: 10px 16px; border-radius: 10px; text-decoration: none; font-weight: 600; color: #64748b; background: #f1f5f9;">Desktops</a>
+  </div>
+
   <!-- Page Header -->
   <div class="page-header">
     <h1>Add Products</h1>

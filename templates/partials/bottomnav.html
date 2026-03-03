@@ -37,7 +37,7 @@
     {% url 'app_router:stock' as url_stock %}
     {% url 'inventory:inventory_dashboard' as url_dashboard_fallback %}
     {% url 'inventory:scan_in' as url_scan_fallback %}
-    {% url 'inventory:phone_sale_wizard' as url_sell_fallback %}
+    {% url 'inventory:scan_sell_landing' as url_sell_fallback %}
     {% url 'inventory:stock_list' as url_stock_fallback %}
     
     <a href="{{ url_home|default:url_dashboard_fallback|default:'/' }}" 

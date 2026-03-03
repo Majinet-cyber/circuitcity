@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Scan &amp; Sell {{ category_label }} · Inventory{% endblock %}
+{% block header_title %}🛒 Scan &amp; Sell {{ category_label }}{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+  --e-blue:#3b82f6; --e-blue-rgb:59,130,246;
+  --e-green:#10b981; --e-green-rgb:16,185,129;
+  --e-amber:#f59e0b; --e-amber-rgb:245,158,11;
+  --e-red:#ef4444; --e-red-rgb:239,68,68;
+  --e-border:#e2e8f0; --e-bg:#f8fafc;
+  --e-text:#0f172a; --e-muted:#64748b;
+  --e-card:#ffffff; --e-shadow:0 4px 16px rgba(15,23,42,.07);
+}
+.ss-page { max-width: 880px; margin: 0 auto; padding: clamp(12px,3vw,24px); padding-bottom: 80px; }
+
+.cat-chooser { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 28px; }
+@media (max-width:520px) { .cat-chooser { grid-template-columns: 1fr; } }
+.cat-card {
+  background: var(--e-card); border: 2.5px solid var(--e-border); border-radius: 18px;
+  padding: 24px 16px; text-align: center; cursor: pointer; transition: all .22s;
+  box-shadow: var(--e-shadow); text-decoration: none; color: inherit; display: block;
+}
+.cat-card:hover { border-color: var(--e-blue); transform: translateY(-4px); box-shadow: 0 10px 24px rgba(var(--e-blue-rgb),.16); }
+.cat-card.selected { border-color: var(--e-blue); background: rgba(var(--e-blue-rgb),.07); }
+.cat-icon { font-size: 2.5rem; margin-bottom: 10px; }
+.cat-name { font-weight: 800; font-size: 1rem; color: var(--e-text); }
+.cat-sub { font-size: .78rem; color: var(--e-muted); margin-top: 2px; }
+
+.ss-header {
+  background: linear-gradient(135deg,rgba(59,130,246,.06),rgba(16,185,129,.05));
+  border: 1px solid rgba(0,0,0,.06); border-radius: 16px; padding: 20px; margin-bottom: 24px;
+}
+.ss-header h1 { font-size: 1.4rem; font-weight: 800; color: var(--e-text); margin:0 0 4px 0; }
+.ss-header p { color: var(--e-muted); margin: 0; font-size: .88rem; }
+
+.ss-card { background: var(--e-card); border: 1px solid var(--e-border); border-radius: 16px; padding: 22px; margin-bottom: 16px; box-shadow: var(--e-shadow); }
+.ss-card-title { font-size: .95rem; font-weight: 700; color: var(--e-text); margin: 0 0 14px 0; }
+.ss-label { font-size: .8rem; font-weight: 700; color: #334155; margin-bottom: 5px; display: block; }
+.ss-input {
+  width: 100%; padding: 11px 14px; border: 1.5px solid var(--e-border); border-radius: 10px;
+  font-size: .93rem; font-family: inherit; transition: border-color .2s;
+}
+.ss-input:focus { outline: none; border-color: var(--e-blue); box-shadow: 0 0 0 3px rgba(var(--e-blue-rgb),.1); }
+
+.item-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 12px; margin-bottom: 16px; }
+.item-card {
+  background: var(--e-card); border: 2px solid var(--e-border); border-radius: 14px;
+  overflow: hidden; cursor: pointer; transition: all .2s; box-shadow: var(--e-shadow);
+}
+.item-card:hover { border-color: var(--e-blue); transform: translateY(-3px); }
+.item-card.selected { border-color: var(--e-blue); background: rgba(var(--e-blue-rgb),.05); }
+.item-thumb {
+  height: 90px; display: flex; align-items: center; justify-content: center;
+  background: var(--e-bg); font-size: 2rem; color: var(--e-muted);
+}
+.item-thumb img { width: 100%; height: 90px; object-fit: cover; }
+.item-body { padding: 10px 12px; }
+.item-brand { font-size: .68rem; text-transform: uppercase; letter-spacing:.05em; color: var(--e-blue); font-weight: 700; }
+.item-model { font-weight: 700; font-size: .85rem; color: var(--e-text); }
+.item-specs { font-size: .75rem; color: var(--e-muted); margin-top: 2px; }
+.item-serial { font-family: monospace; font-size: .72rem; color: var(--e-muted); margin-top: 4px; }
+.item-price { font-weight: 800; font-size: .9rem; color: var(--e-text); margin-top: 6px; }
+
+.margin-bar { height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin: 8px 0; }
+.margin-fill { height: 100%; border-radius: 999px; transition: width .4s ease, background .4s ease; }
+.margin-badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: .8rem; font-weight: 700; }
+.margin-badge.green { background: rgba(16,185,129,.12); color: #059669; }
+.margin-badge.amber { background: rgba(245,158,11,.12); color: #d97706; }
+.margin-badge.red { background: rgba(239,68,68,.12); color: #dc2626; }
+.margin-tip { font-size: .78rem; color: var(--e-muted); margin-top: 4px; }
+
+.btn-sell {
+  width: 100%; padding: 14px; background: linear-gradient(135deg,#3b82f6,#2563eb);
+  color: #fff; border: none; border-radius: 12px; font-size: 1rem; font-weight: 700;
+  cursor: pointer; transition: all .2s; box-shadow: 0 4px 14px rgba(var(--e-blue-rgb),.35);
+}
+.btn-sell:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(var(--e-blue-rgb),.4); }
+.btn-sell:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+
+.search-wrap { position: relative; margin-bottom: 14px; }
+.search-wrap input { padding-left: 36px; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--e-muted); pointer-events:none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ss-page">
+
+  <div class="ss-header">
+    <h1>🛒 Scan &amp; Sell</h1>
+    <p>Choose the product category, select the unit, set the price with live margin feedback, and confirm.</p>
+  </div>
+
+  <!-- CATEGORY CHOOSER -->
+  <div class="cat-chooser">
+    <a href="{{ scan_sell_url }}?category=phones" class="cat-card {% if category == 'phones' %}selected{% endif %}">
+      <div class="cat-icon">📱</div>
+      <div class="cat-name">Phones</div>
+      <div class="cat-sub">IMEI-based sell</div>
+    </a>
+    <a href="{{ scan_sell_url }}?category=laptops" class="cat-card {% if category == 'laptops' %}selected{% endif %}">
+      <div class="cat-icon">💻</div>
+      <div class="cat-name">Laptops</div>
+      <div class="cat-sub">Guided sale wizard</div>
+    </a>
+    <a href="{{ scan_sell_url }}?category=desktops" class="cat-card {% if category == 'desktops' %}selected{% endif %}">
+      <div class="cat-icon">🖥️</div>
+      <div class="cat-name">Desktops</div>
+      <div class="cat-sub">Guided sale wizard</div>
+    </a>
+  </div>
+
+  <!-- LAPTOPS/DESKTOPS SELL FLOW -->
+  <div id="flow-electronics">
+    {% if available_items %}
+    <div class="ss-card">
+      <p class="ss-card-title">📋 In-stock units — click to select</p>
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="ss-input" placeholder="Search by model or serial…" oninput="filterItems(this.value)">
+      </div>
+      <div class="item-grid" id="item-grid">
+        {% for item in available_items %}
+        <div class="item-card"
+             data-item-id="{{ item.id }}"
+             data-cost="{{ item.order_price|default:0 }}"
+             data-sell="{{ item.selling_price|default:0 }}"
+             data-label="{{ item.catalog_product.brand }} {{ item.catalog_product.model_name }}"
+             data-serial="{{ item.serial_number }}"
+             onclick="selectItem(this)">
+          <div class="item-thumb">
+            {% if item.catalog_product.main_image %}
+              <img src="{{ item.catalog_product.main_image.url }}" alt="{{ item.catalog_product.display_name }}">
+            {% else %}
+              {% if category == 'laptops' %}💻{% else %}🖥️{% endif %}
+            {% endif %}
+          </div>
+          <div class="item-body">
+            <div class="item-brand">{{ item.catalog_product.brand }}</div>
+            <div class="item-model">{{ item.catalog_product.model_name }}</div>
+            <div class="item-specs">
+              {{ item.catalog_product.ram_str }}{% if item.catalog_product.ram_str and item.catalog_product.storage_str %} · {% endif %}{{ item.catalog_product.storage_str }}
+            </div>
+            <div class="item-serial">SN: {{ item.serial_number|truncatechars:18 }}</div>
+            {% if item.selling_price %}<div class="item-price">MWK {{ item.selling_price|floatformat:0 }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <form method="post" id="sell-form" style="display:none">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" id="item_id_input">
+
+      <div class="ss-card" style="border-color:var(--e-blue);background:rgba(var(--e-blue-rgb),.03)">
+        <p class="ss-card-title">✅ Selected unit</p>
+        <div id="selected-unit-name" style="font-weight:800;font-size:1rem;color:var(--e-text)"></div>
+        <div id="selected-unit-serial" style="font-family:monospace;font-size:.82rem;color:var(--e-muted);margin-top:4px"></div>
+        <div id="selected-unit-specs" style="font-size:.82rem;color:var(--e-muted);margin-top:2px"></div>
+        <button type="button" onclick="clearItem()" style="margin-top:10px;font-size:.8rem;color:var(--e-blue);background:none;border:none;cursor:pointer;padding:0">
+          ← Choose another unit
+        </button>
+      </div>
+
+      <div class="ss-card">
+        <p class="ss-card-title">💵 Selling Price (with live margin)</p>
+        <label class="ss-label">Selling price (MWK)</label>
+        <input type="text" name="selling_price_display" id="sell_price_input" class="ss-input"
+               placeholder="0.00" inputmode="decimal"
+               style="font-size:1.2rem;font-weight:700"
+               oninput="updateMargin(this.value)">
+        <p style="font-size:.75rem;color:var(--e-muted);margin-top:6px" id="cost-hint"></p>
+
+        <div style="margin-top:14px" id="margin-section" style="display:none">
+          <div class="margin-bar"><div class="margin-fill" id="margin-fill" style="width:0%;background:var(--e-green)"></div></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <span class="margin-badge green" id="margin-badge">0%</span>
+            <span class="margin-tip" id="margin-tip"></span>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-sell" id="sell-btn" disabled>💳 Confirm Sale</button>
+    </form>
+
+    {% else %}
+    <div class="ss-card" style="text-align:center;padding:32px">
+      <p style="font-size:1.5rem;margin-bottom:8px">📭</p>
+      <p style="font-weight:700;color:var(--e-text);margin-bottom:4px">No {{ category_label|lower }} in stock</p>
+      <p style="color:var(--e-muted);margin-bottom:20px">Use Scan In to add units first.</p>
+      <a href="{{ scan_in_url }}?category={{ category }}" class="btn-sell"
+         style="display:inline-block;padding:12px 28px;text-decoration:none;border-radius:12px;width:auto">
+        Go to Scan In →
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let _itemCost = 0;
+
+function chooseCategory(cat) {
+  window.location.href = '{{ scan_sell_url|escapejs }}?category=' + cat;
+}
+
+function selectItem(el) {
+  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('item_id_input').value = el.dataset.itemId;
+  document.getElementById('selected-unit-name').textContent = el.dataset.label;
+  document.getElementById('selected-unit-serial').textContent = 'SN: ' + el.dataset.serial;
+  const specsEl = el.querySelector('.item-specs');
+  document.getElementById('selected-unit-specs').textContent = specsEl ? specsEl.textContent.trim() : '';
+
+  _itemCost = parseFloat(el.dataset.cost) || 0;
+  const defaultSell = parseFloat(el.dataset.sell) || 0;
+  const priceInput = document.getElementById('sell_price_input');
+  priceInput.value = defaultSell > 0 ? defaultSell : '';
+  if (_itemCost > 0) {
+    document.getElementById('cost-hint').textContent = 'Cost price: MWK ' + _itemCost.toLocaleString();
+  } else {
+    document.getElementById('cost-hint').textContent = '';
+  }
+  updateMargin(priceInput.value);
+
+  document.getElementById('sell-form').style.display = '';
+  document.getElementById('item-grid').closest('.ss-card').style.display = 'none';
+}
+
+function clearItem() {
+  document.getElementById('sell-form').style.display = 'none';
+  const grid = document.getElementById('item-grid');
+  if (grid) grid.closest('.ss-card').style.display = '';
+  document.querySelectorAll('.item-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('item_id_input').value = '';
+}
+
+function updateMargin(val) {
+  const sp = parseFloat(val.toString().replace(/,/g,'')) || 0;
+  const sellBtn = document.getElementById('sell-btn');
+  sellBtn.disabled = sp <= 0;
+
+  const mSec = document.getElementById('margin-section');
+  if (sp <= 0) { mSec.style.display = 'none'; return; }
+  mSec.style.display = '';
+
+  const margin = sp - _itemCost;
+  const pct = _itemCost > 0 ? (margin / _itemCost) * 100 : (margin > 0 ? 100 : 0);
+  const fill = document.getElementById('margin-fill');
+  const badge = document.getElementById('margin-badge');
+  const tip = document.getElementById('margin-tip');
+
+  const clampedPct = Math.max(0, Math.min(100, pct));
+  fill.style.width = clampedPct + '%';
+
+  if (margin < 0) {
+    fill.style.background = 'var(--e-red)';
+    badge.className = 'margin-badge red';
+    badge.textContent = pct.toFixed(1) + '%';
+    tip.textContent = '⚠️ Negative margin — selling below cost!';
+    if (_itemCost > 0) tip.textContent += ' Increase above MWK ' + Math.ceil(_itemCost).toLocaleString();
+  } else if (pct < 10) {
+    fill.style.background = 'var(--e-amber)';
+    badge.className = 'margin-badge amber';
+    badge.textContent = pct.toFixed(1) + '%';
+    tip.textContent = '⚡ Low margin. This price gives ~' + pct.toFixed(0) + '% margin.';
+    if (_itemCost > 0) {
+      const min10 = Math.ceil(_itemCost * 1.10);
+      tip.textContent += ' Try at least MWK ' + min10.toLocaleString() + ' for 10% margin.';
+    }
+  } else {
+    fill.style.background = 'var(--e-green)';
+    badge.className = 'margin-badge green';
+    badge.textContent = pct.toFixed(1) + '%';
+    tip.textContent = '✅ Healthy margin — this price gives ~' + pct.toFixed(0) + '% margin.';
+  }
+}
+
+function filterItems(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.item-card').forEach(card => {
+    const label = (card.dataset.label + ' ' + card.dataset.serial).toLowerCase();
+    card.style.display = label.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

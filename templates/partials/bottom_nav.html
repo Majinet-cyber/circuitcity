@@ -3,7 +3,7 @@
     <a class="tab {% if nav_active == 'home' %}active{% endif %}" href="{% url 'dashboard:home' %}">
       <i class="bi bi-speedometer"></i> Home
     </a>
-    <a class="tab {% if nav_active == 'sell' %}active{% endif %}" href="{% url 'inventory:phone_sale_wizard' %}">
+    <a class="tab {% if nav_active == 'sell' %}active{% endif %}" href="{% url 'inventory:scan_sell_landing' %}">
       <i class="bi bi-upc-scan"></i> Sell
     </a>
     <a class="tab {% if nav_active == 'stock' %}active{% endif %}" href="{% url 'inventory:stock_list' %}">

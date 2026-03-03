@@ -2,6 +2,7 @@
 """
 Analytics adapter for phones vertical.
 Phones use InventoryItem with status="SOLD" for sales tracking.
+Laptops/Desktops use ElectronicsStockItem; KPIs and stock include both.
 """
 from __future__ import annotations
 
@@ -22,6 +23,38 @@ from inventory.analytics.common import (
     apply_search_filter,
 )
 from wallet.models import WalletTransaction, Ledger, TxnType
+
+
+def _get_electronics_sold_qs(business, location=None, start_dt=None, end_dt=None):
+    """ElectronicsStockItem SOLD in date range (optional location filter)."""
+    try:
+        from inventory.models_phone_products import ElectronicsStockItem
+    except Exception:
+        return None
+    qs = ElectronicsStockItem.objects.filter(
+        business=business, status="SOLD", is_active=True, sold_at__isnull=False
+    )
+    if location:
+        qs = qs.filter(current_location=location)
+    if start_dt:
+        qs = qs.filter(sold_at__gte=start_dt)
+    if end_dt:
+        qs = qs.filter(sold_at__lt=end_dt)
+    return qs
+
+
+def _get_electronics_stock_qs(business, location=None):
+    """ElectronicsStockItem IN_STOCK."""
+    try:
+        from inventory.models_phone_products import ElectronicsStockItem
+    except Exception:
+        return None
+    qs = ElectronicsStockItem.objects.filter(
+        business=business, status="IN_STOCK", is_active=True
+    )
+    if location:
+        qs = qs.filter(current_location=location)
+    return qs
 
 
 class PhonesAdapter(AnalyticsAdapter):
@@ -96,6 +129,17 @@ class PhonesAdapter(AnalyticsAdapter):
         total_sales = sales_qs.count()
         avg_order_value = revenue / total_sales if total_sales > 0 else Decimal("0.00")
 
+        # Add electronics (laptops/desktops) sold in period
+        electronics_sold = _get_electronics_sold_qs(business, location, start_dt, end_dt)
+        if electronics_sold is not None:
+            e_revenue = electronics_sold.aggregate(total=Coalesce(Sum("selling_price"), Decimal("0.00")))["total"] or Decimal("0.00")
+            e_cog = electronics_sold.aggregate(total=Coalesce(Sum("order_price"), Decimal("0.00")))["total"] or Decimal("0.00")
+            e_count = electronics_sold.count()
+            revenue += e_revenue
+            cost_of_goods += e_cog
+            total_sales += e_count
+            avg_order_value = revenue / total_sales if total_sales > 0 else Decimal("0.00")
+
         # Get costs
         costs_qs = self.get_costs_queryset(business, location)
         costs_qs = costs_qs.filter(
@@ -163,6 +207,37 @@ class PhonesAdapter(AnalyticsAdapter):
             }
             for item in daily_sales
         ]
+
+        # Merge electronics daily sales into trend
+        electronics_sold = _get_electronics_sold_qs(business, location, start_dt, end_dt)
+        if electronics_sold is not None:
+            e_daily = (
+                electronics_sold.annotate(day=TruncDate("sold_at"))
+                .values("day")
+                .annotate(
+                    revenue=Coalesce(Sum("selling_price"), Decimal("0.00")),
+                    cost=Coalesce(Sum("order_price"), Decimal("0.00")),
+                    count=Count("id"),
+                )
+            )
+            day_map = {item["date"]: item for item in sales_trend}
+            for e in e_daily:
+                d = str(e["day"])
+                rev = float(e["revenue"])
+                cost = float(e["cost"])
+                if d in day_map:
+                    day_map[d]["revenue"] += rev
+                    day_map[d]["profit"] += rev - cost
+                    day_map[d]["count"] += e["count"]
+                else:
+                    day_map[d] = {
+                        "date": d,
+                        "date_short": e["day"].strftime("%m/%d") if e["day"] else "",
+                        "revenue": rev,
+                        "profit": rev - cost,
+                        "count": e["count"],
+                    }
+            sales_trend = sorted(day_map.values(), key=lambda x: x["date"])
 
         # Profit trend (same as sales trend but with profit)
         profit_trend = sales_trend  # Already includes profit
@@ -240,17 +315,23 @@ class PhonesAdapter(AnalyticsAdapter):
             for item in top_agents
         ]
 
-        # Stock overview
+        # Stock overview (phones + electronics)
         stock_qs = self.get_stock_queryset(business, location)
         stock_value = stock_qs.aggregate(total=Coalesce(Sum("order_price"), Decimal("0.00")))["total"] or Decimal(
             "0.00"
         )
-
         stock_retail_value = stock_qs.aggregate(total=Coalesce(Sum("selling_price"), Decimal("0.00")))[
             "total"
         ] or Decimal("0.00")
 
-        # Low stock (items with low quantity - for phones, this might mean items without IMEI or specific conditions)
+        electronics_stock = _get_electronics_stock_qs(business, location)
+        if electronics_stock is not None:
+            e_val = electronics_stock.aggregate(total=Coalesce(Sum("order_price"), Decimal("0.00")))["total"] or Decimal("0.00")
+            e_retail = electronics_stock.aggregate(total=Coalesce(Sum("selling_price"), Decimal("0.00")))["total"] or Decimal("0.00")
+            stock_value += e_val
+            stock_retail_value += e_retail
+
+        # Low stock
         # For now, return empty as phones track individual items, not quantities
         low_stock = []
 

@@ -327,6 +327,10 @@ def phone_scan_in(request: HttpRequest) -> HttpResponse:
             "location": location,
             "active_tab": "scan_in",  # For base.html bottom nav highlighting
         }
+        # Category selector when accessed from unified scan-in (Phones/Laptops/Desktops)
+        if getattr(request, "_show_electronics_category_selector", False):
+            context["show_category_selector"] = True
+            context["scan_in_url"] = getattr(request, "_electronics_scan_in_url", reverse("inventory:scan_in"))
         return render(request, "inventory/phones_scan_in.html", context)
 
     # --- POST: Process scan-in ---
@@ -544,11 +548,13 @@ def phone_scan_sell(request: HttpRequest) -> HttpResponse:
             "location": location,
             "active_tab": "sell",  # For base.html bottom nav highlighting
         }
-        
+        # Category selector when accessed from unified scan-sell
+        if getattr(request, "_show_electronics_category_selector", False):
+            context["show_category_selector"] = True
+            context["scan_sell_url"] = getattr(request, "_electronics_scan_sell_url", reverse("inventory:scan_sell"))
         # Apply SSOT defaults to prevent KeyError failures
         from reports.services.context_defaults import apply_default_report_context
         context = apply_default_report_context(context)
-        
         return render(request, "inventory/phones_scan_sell.html", context)
 
     # --- POST: Process sale ---

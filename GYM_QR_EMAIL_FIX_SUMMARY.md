@@ -75,3 +75,6 @@ def send_member_qr_email(member, request=None):
 
 
 
+
+
+

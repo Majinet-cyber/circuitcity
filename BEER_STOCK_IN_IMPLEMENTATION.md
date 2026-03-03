@@ -232,3 +232,6 @@ function calculateBeerBottles() {
 
 Beer stock-in by crates is now live and working locally at `/inventory/liquor/stock-in/<id>/`
 
+
+
+

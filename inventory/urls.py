@@ -84,6 +84,12 @@ try:
 except Exception:
     _phones_views = SimpleNamespace()
 
+# Unified electronics scan-in/scan-sell (Phones + Laptops + Desktops)
+try:
+    from . import views_electronics_unified as _electronics_unified
+except Exception:
+    _electronics_unified = SimpleNamespace()
+
 # Import phone products view (brand-first Add Products)
 try:
     from . import views_phone_products as _phone_products_views
@@ -184,6 +190,7 @@ _need_biz = require_business
 app_name = "inventory"
 
 
+
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
@@ -192,6 +199,11 @@ def _stub(msg: str):
         return JsonResponse({"ok": False, "error": msg}, status=501)
 
     return _fn
+
+# Resolve scan_sell_landing now that _stub and _need_biz are available
+_scan_sell_landing = _need_biz(
+    getattr(_electronics_unified, "scan_sell_landing", _stub("scan_sell_landing not found"))
+)
 
 
 def _safe_reverse(view_name: str, *args, **kwargs) -> Optional[str]:
@@ -1207,9 +1219,31 @@ urlpatterns = [
         name="archive_flow_execute",
     ),
     # Scanning — pages
-    # Main scan-in now uses gamified phone view (with fallback to legacy for non-phone businesses)
-    path("scan-in/", _need_biz(getattr(_phones_views, "phone_scan_in", _scan_in_page_view)), name="scan_in"),
-    path("scan-sold/", _need_biz(_scan_sold_page_view), name="scan_sold"),
+    # Main scan-in: unified category selector (Phones/Laptops/Desktops) -> phone_scan_in or electronics flow
+    path(
+        "scan-in/",
+        _need_biz(
+            getattr(_electronics_unified, "scan_in_unified", getattr(_phones_views, "phone_scan_in", _scan_in_page_view))
+        ),
+        name="scan_in",
+    ),
+    # Scan & Sell Landing: polished 3-card category chooser (Phones / Laptops / Desktops)
+    path("sell-landing/", _scan_sell_landing, name="scan_sell_landing"),
+    # Scan & Sell: unified category selector; scan-sell and scan-sold both use unified view
+    path(
+        "scan-sell/",
+        _need_biz(
+            getattr(_electronics_unified, "scan_sell_unified", _scan_sold_page_view)
+        ),
+        name="scan_sell",
+    ),
+    path(
+        "scan-sold/",
+        _need_biz(
+            getattr(_electronics_unified, "scan_sell_unified", _scan_sold_page_view)
+        ),
+        name="scan_sold",
+    ),
     # NEW — Quick Sell page (no post-sale probe)
     path("sell/quick/", _need_biz(_sell_quick_page), name="sell_quick"),
     # NEW — direct Sell submit endpoint (business-wide; prefers local view)
@@ -1521,9 +1555,19 @@ except Exception:
     _phone_wizard = SimpleNamespace()
 
 try:
+    from . import views_electronics_stock_list as _electronics_stock_list_mod
+except Exception:
+    _electronics_stock_list_mod = SimpleNamespace()
+
+try:
     from . import views_phone_sale_wizard_v2 as _phone_wizard_v2
 except Exception:
     _phone_wizard_v2 = SimpleNamespace()
+
+try:
+    from . import views_electronics_sale_wizard as _electronics_wizard
+except Exception:
+    _electronics_wizard = SimpleNamespace()
 
 urlpatterns += [
     # Phone products management - Use brand-first UI (add_phone_products)
@@ -1593,6 +1637,45 @@ urlpatterns += [
         _need_biz(getattr(_phone_prods, "phone_products_api_models", _stub("phone_products_api_models not found"))),
         name="api_phone_products_models",
     ),
+    # Laptop/Desktop products (Electronics expansion)
+    path(
+        "laptop-products/",
+        manager_required(
+            _need_biz(getattr(_phone_prods, "add_laptop_products", _stub("add_laptop_products not found")))
+        ),
+        name="laptop_products",
+    ),
+    path(
+        "desktop-products/",
+        manager_required(
+            _need_biz(getattr(_phone_prods, "add_desktop_products", _stub("add_desktop_products not found")))
+        ),
+        name="desktop_products",
+    ),
+    path(
+        "electronics/stock-in/",
+        manager_required(
+            _need_biz(getattr(_phone_prods, "electronics_stock_in", _stub("electronics_stock_in not found")))
+        ),
+        name="electronics_stock_in",
+    ),
+    path(
+        "electronics/sell/",
+        _need_biz(getattr(_phone_prods, "electronics_sell", _stub("electronics_sell not found"))),
+        name="electronics_sell",
+    ),
+    # Electronics (laptops/desktops) stock list with category switcher
+    path(
+        "electronics/stock/",
+        _need_biz(
+            getattr(
+                _electronics_stock_list_mod,
+                "electronics_stock_list",
+                _stub("electronics_stock_list not found"),
+            )
+        ),
+        name="electronics_stock_list",
+    ),
     # Gamified phone sale wizard (original 5-step)
     path(
         "phone-sale-wizard/",
@@ -1616,6 +1699,30 @@ urlpatterns += [
             getattr(_phone_wizard_v2, "phone_sale_wizard_v2_reset", _stub("phone_sale_wizard_v2_reset not found"))
         ),
         name="phone_sale_wizard_v2_reset",
+    ),
+    # Gamified 5-step Laptop Sale Wizard
+    path(
+        "laptop-sale-wizard/",
+        _need_biz(getattr(_electronics_wizard, "laptop_sale_wizard", _stub("laptop_sale_wizard not found"))),
+        name="laptop_sale_wizard",
+    ),
+    path(
+        "laptop-sale-wizard/reset/",
+        _need_biz(getattr(_electronics_wizard, "laptop_sale_wizard_reset", _stub("laptop_sale_wizard_reset not found"))),
+        name="laptop_sale_wizard_reset",
+    ),
+    # Gamified 5-step Desktop Sale Wizard
+    path(
+        "desktop-sale-wizard/",
+        _need_biz(getattr(_electronics_wizard, "desktop_sale_wizard", _stub("desktop_sale_wizard not found"))),
+        name="desktop_sale_wizard",
+    ),
+    path(
+        "desktop-sale-wizard/reset/",
+        _need_biz(
+            getattr(_electronics_wizard, "desktop_sale_wizard_reset", _stub("desktop_sale_wizard_reset not found"))
+        ),
+        name="desktop_sale_wizard_reset",
     ),
 ]
 

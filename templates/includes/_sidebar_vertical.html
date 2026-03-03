@@ -10,6 +10,7 @@
 {% url 'inventory:stock_list' as url_stock %}
 {% url 'inventory:scan_in' as url_scan_in %}
 {% url 'inventory:scan_sold' as url_scan_sold %}
+{% url 'inventory:scan_sell_landing' as url_scan_sell_landing %}
 {% url 'inventory:settings' as url_settings_inv %}
 
 {% url 'wallet:agent_wallet' as url_wallet_agent %}
@@ -80,7 +81,7 @@
   <ul class="navlist">
     <li><a class="navlink" href="{{ url_stock|default:'/inventory/list/' }}" data-cy="nav-stock"><i class="bi bi-phone"></i> Stock</a></li>
     <li><a class="navlink" href="{{ url_scan_in|default:'/inventory/scan-in/' }}" data-cy="nav-scan-in"><i class="bi bi-upc-scan"></i> Scan IN</a></li>
-    <li><a class="navlink" href="{{ url_scan_sold|default:'/inventory/scan-sold/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> Sell</a></li>
+    <li><a class="navlink" href="{{ url_scan_sell_landing|default:'/inventory/sell-landing/' }}" data-cy="nav-scan-sell"><i class="bi bi-cart-check"></i> Sell</a></li>
     {% if url_sales %}<li><a class="navlink" href="{{ url_sales }}" data-cy="nav-sales"><i class="bi bi-receipt"></i> Sales</a></li>{% endif %}
   </ul>
 

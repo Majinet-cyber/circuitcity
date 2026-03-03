@@ -258,3 +258,6 @@ class LiquorStockInAdapter:
         else:
             raise ValueError(f'Invalid liquor type: {liquor_type}')
 
+
+
+

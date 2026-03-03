@@ -22,7 +22,7 @@ from django.views.decorators.http import require_http_methods
 
 from tenants.utils import get_active_business, require_business
 from tenants.utils_roles import is_manager
-from inventory.models_phone_products import PhoneProductCatalog
+from inventory.models_phone_products import PhoneProductCatalog, ElectronicsCategory
 from inventory.business_kinds import BusinessKind
 from inventory.authz import require_business_kind
 from core.decorators import manager_required
@@ -99,16 +99,19 @@ def get_brand_config(brand_key: str) -> Dict[str, Any] | None:
     return None
 
 
-def get_recent_models_for_brand(business, brand_display: str, limit: int = 10) -> List[PhoneProductCatalog]:
-    """Get recent models for a brand"""
+def get_recent_models_for_brand(business, brand_display: str, limit: int = 10, category: str = None) -> List[PhoneProductCatalog]:
+    """Get recent models for a brand (default: PHONE category only for backward compat)."""
     if not business:
         return []
 
-    return list(
-        PhoneProductCatalog.objects.filter(business=business, brand__iexact=brand_display, is_active=True).order_by(
-            "-created_at"
-        )[:limit]
+    qs = PhoneProductCatalog.objects.filter(
+        business=business, brand__iexact=brand_display, is_active=True
     )
+    if category:
+        qs = qs.filter(category=category)
+    else:
+        qs = qs.filter(category=ElectronicsCategory.PHONE)
+    return list(qs.order_by("-created_at")[:limit])
 
 
 # =============================================================================
@@ -187,6 +190,7 @@ def add_phone_products(request: HttpRequest) -> HttpResponse:
             with transaction.atomic():
                 product, created = PhoneProductCatalog.objects.update_or_create(
                     business=business,
+                    category=ElectronicsCategory.PHONE,
                     brand=brand_config["display"],
                     model_name=model_name,
                     ram_gb=ram_gb,
@@ -362,6 +366,7 @@ def phone_product_wizard(request: HttpRequest) -> HttpResponse:
             with transaction.atomic():
                 product, created = PhoneProductCatalog.objects.update_or_create(
                     business=business,
+                    category=ElectronicsCategory.PHONE,
                     brand=brand_config["display"],
                     model_name=model_name,
                     ram_gb=ram_gb,
@@ -369,6 +374,7 @@ def phone_product_wizard(request: HttpRequest) -> HttpResponse:
                     defaults={
                         "variant_label": specs,
                         "default_cost_price": cost_price,
+                        "default_selling_price": selling_price,
                         "is_active": True,
                         "created_by": request.user,
                     },
@@ -583,3 +589,360 @@ def update_phone_product_prices(request: HttpRequest, product_id: int) -> JsonRe
 
     except Exception as e:
         return JsonResponse({"ok": False, "error": f"Error updating prices: {str(e)}"}, status=500)
+
+
+# =============================================================================
+# LAPTOP / DESKTOP: Add Products (specs + optional photo)
+# =============================================================================
+ELECTRONICS_BRANDS_LAPTOP = [
+    {"key": "dell", "name": "Dell", "display": "Dell", "color": "#007DB8"},
+    {"key": "lenovo", "name": "Lenovo", "display": "Lenovo", "color": "#E2231A"},
+    {"key": "apple", "name": "Apple", "display": "Apple", "color": "#555555"},
+    {"key": "hp", "name": "HP", "display": "HP", "color": "#0096D6"},
+    {"key": "samsung", "name": "Samsung", "display": "Samsung", "color": "#1428A0"},
+    {"key": "toshiba", "name": "Toshiba", "display": "Toshiba", "color": "#FF0000"},
+    {"key": "acer", "name": "Acer", "display": "Acer", "color": "#83B81A"},
+    {"key": "asus", "name": "Asus", "display": "Asus", "color": "#00529B"},
+]
+
+
+def _get_electronics_brand_config(brand_key: str) -> Dict[str, Any] | None:
+    for b in ELECTRONICS_BRANDS_LAPTOP:
+        if b["key"].lower() == brand_key.lower():
+            return b
+    return None
+
+
+@login_required
+@require_business
+@manager_required
+@require_business_kind(BusinessKind.PHONES)
+@require_http_methods(["GET", "POST"])
+def add_laptop_products(request: HttpRequest) -> HttpResponse:
+    """Add laptop catalog products (specs form, optional photo). Same UX style as phones."""
+    return _add_electronics_products(request, ElectronicsCategory.LAPTOP)
+
+
+@login_required
+@require_business
+@manager_required
+@require_business_kind(BusinessKind.PHONES)
+@require_http_methods(["GET", "POST"])
+def add_desktop_products(request: HttpRequest) -> HttpResponse:
+    """Add desktop catalog products (specs form, optional photo). Same UX style as phones."""
+    return _add_electronics_products(request, ElectronicsCategory.DESKTOP)
+
+
+def _add_electronics_products(request: HttpRequest, category: str) -> HttpResponse:
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("tenants:activate_mine")
+
+    if request.method == "POST":
+        brand_key = request.POST.get("brand", "").strip()
+        model_name = request.POST.get("model_name", "").strip()
+        cpu = request.POST.get("cpu", "").strip()
+        ram_str = request.POST.get("ram_str", "").strip()
+        storage_str = request.POST.get("storage_str", "").strip()
+        screen_size = request.POST.get("screen_size", "").strip()
+        gpu = request.POST.get("gpu", "").strip()
+        os = request.POST.get("os", "").strip()
+        condition = request.POST.get("condition", "").strip()
+        cost_str = request.POST.get("order_price", "").strip()
+        selling_str = request.POST.get("selling_price", "").strip()
+
+        brand_config = _get_electronics_brand_config(brand_key)
+        if not brand_config:
+            messages.error(request, "Invalid brand selected.")
+            return redirect(request.path)
+
+        if not model_name:
+            messages.error(request, "Model name is required.")
+            return redirect(request.path)
+
+        order_price = None
+        if cost_str:
+            try:
+                order_price = Decimal(cost_str.replace(",", "").replace(" ", ""))
+                if order_price < 0:
+                    raise ValueError("negative")
+            except (ValueError, Exception):
+                messages.error(request, "Invalid order price.")
+                return redirect(request.path)
+
+        selling_price = None
+        if selling_str:
+            try:
+                selling_price = Decimal(selling_str.replace(",", "").replace(" ", ""))
+                if selling_price < 0:
+                    raise ValueError("negative")
+            except (ValueError, Exception):
+                messages.error(request, "Invalid selling price.")
+                return redirect(request.path)
+
+        main_image = request.FILES.get("main_image")
+
+        try:
+            with transaction.atomic():
+                product, created = PhoneProductCatalog.objects.update_or_create(
+                    business=business,
+                    category=category,
+                    brand=brand_config["display"],
+                    model_name=model_name,
+                    ram_gb=0,
+                    rom_gb=0,
+                    ram_str=ram_str or "",
+                    storage_str=storage_str or "",
+                    defaults={
+                        "cpu": cpu,
+                        "screen_size": screen_size,
+                        "gpu": gpu,
+                        "os": os,
+                        "condition": condition,
+                        "default_cost_price": order_price,
+                        "default_selling_price": selling_price,
+                        "is_active": True,
+                        "created_by": request.user,
+                    },
+                )
+                if main_image:
+                    product.main_image = main_image
+                    product.save(update_fields=["main_image", "updated_at"])
+
+                if created:
+                    messages.success(request, f"✅ Added {product.display_name} to catalog.")
+                else:
+                    messages.info(request, f"📝 Updated {product.display_name}.")
+        except Exception as e:
+            messages.error(request, f"Error saving product: {e}")
+
+        if category == ElectronicsCategory.LAPTOP:
+            return redirect("inventory:laptop_products")
+        return redirect("inventory:desktop_products")
+
+    # GET: ensure seed then show form
+    try:
+        from inventory.electronics_catalog_seed import seed_laptop_desktop_catalog
+        seed_laptop_desktop_catalog(business, category, created_by=request.user)
+    except Exception:
+        pass
+
+    from inventory.models_phone_products import ElectronicsStockItem as _ESI
+    recent_qs = list(
+        PhoneProductCatalog.objects.filter(
+            business=business, category=category, is_active=True
+        ).order_by("-created_at")[:20]
+    )
+    # annotate in-stock count per catalog product (batch query)
+    product_ids = [m.id for m in recent_qs]
+    stock_counts: dict = {}
+    if product_ids:
+        from django.db.models import Count as _Count
+        for row in _ESI.objects.filter(
+            catalog_product_id__in=product_ids, status="IN_STOCK", is_active=True
+        ).values("catalog_product_id").annotate(cnt=_Count("id")):
+            stock_counts[row["catalog_product_id"]] = row["cnt"]
+    for m in recent_qs:
+        m.stock_count = stock_counts.get(m.id, 0)
+    recent = recent_qs
+
+    category_label = "Laptops" if category == ElectronicsCategory.LAPTOP else "Desktops"
+    context = {
+        "business": business,
+        "category": category,
+        "category_label": category_label,
+        "brands": ELECTRONICS_BRANDS_LAPTOP,
+        "recent_models": recent,
+        "page_title": f"Add {category_label}",
+    }
+
+    return render(request, "inventory/add_product_electronics.html", context)
+
+
+# =============================================================================
+# Electronics (Laptop/Desktop) Stock In and Sell
+# =============================================================================
+@login_required
+@require_business
+@manager_required
+@require_business_kind(BusinessKind.PHONES)
+@require_http_methods(["GET", "POST"])
+def electronics_stock_in(request: HttpRequest) -> HttpResponse:
+    """Stock in a laptop or desktop by serial number. Creates ElectronicsStockItem."""
+    from inventory.models_phone_products import ElectronicsStockItem
+    from inventory.models import Location
+    from tenants.scope import resolve_location_for_user
+
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("tenants:activate_mine")
+
+    location_id = resolve_location_for_user(request)
+    location = None
+    if location_id:
+        try:
+            location = Location.objects.get(pk=location_id, business=business)
+        except Location.DoesNotExist:
+            pass
+    if not location:
+        location = Location.default_for(business) if hasattr(Location, "default_for") else None
+    if not location:
+        try:
+            location = Location.ensure_default_for_business(business)
+        except Exception:
+            pass
+    if not location:
+        messages.error(request, "No location available. Please create a location first.")
+        return redirect("inventory:inventory_dashboard")
+
+    if request.method == "POST":
+        catalog_id = request.POST.get("catalog_id", "").strip()
+        serial_number = request.POST.get("serial_number", "").strip()
+        loc_id = request.POST.get("location_id", "").strip()
+        order_price_str = request.POST.get("order_price", "0").strip()
+        selling_price_str = request.POST.get("selling_price", "").strip()
+
+        if not catalog_id or not serial_number:
+            messages.error(request, "Product and serial number are required.")
+            return redirect("inventory:electronics_stock_in")
+
+        try:
+            catalog_product = PhoneProductCatalog.objects.get(
+                pk=int(catalog_id),
+                business=business,
+                category__in=[ElectronicsCategory.LAPTOP, ElectronicsCategory.DESKTOP],
+                is_active=True,
+            )
+        except (PhoneProductCatalog.DoesNotExist, ValueError):
+            messages.error(request, "Invalid product selected.")
+            return redirect("inventory:electronics_stock_in")
+
+        if ElectronicsStockItem.objects.filter(
+            business=business, serial_number=serial_number, is_active=True
+        ).exists():
+            messages.error(request, f"Serial number '{serial_number[:30]}...' already exists. Use a unique serial.")
+            return redirect("inventory:electronics_stock_in")
+
+        try:
+            order_price = Decimal(order_price_str.replace(",", "").replace(" ", "")) if order_price_str else Decimal("0")
+            selling_price = None
+            if selling_price_str:
+                selling_price = Decimal(selling_price_str.replace(",", "").replace(" ", ""))
+        except Exception:
+            messages.error(request, "Invalid price format.")
+            return redirect("inventory:electronics_stock_in")
+
+        loc = location
+        if loc_id:
+            try:
+                loc = Location.objects.get(pk=int(loc_id), business=business)
+            except (Location.DoesNotExist, ValueError):
+                pass
+
+        if not loc:
+            messages.error(request, "Please select a location.")
+            return redirect("inventory:electronics_stock_in")
+
+        try:
+            with transaction.atomic():
+                ElectronicsStockItem.objects.create(
+                    business=business,
+                    catalog_product=catalog_product,
+                    serial_number=serial_number,
+                    current_location=loc,
+                    order_price=order_price,
+                    selling_price=selling_price or catalog_product.default_selling_price,
+                    status="IN_STOCK",
+                    is_active=True,
+                )
+            messages.success(request, f"✅ {catalog_product.display_name} (SN: {serial_number[:20]}...) stocked.")
+        except Exception as e:
+            messages.error(request, f"Error: {e}")
+
+        return redirect("inventory:electronics_stock_in")
+
+    catalog_products = list(
+        PhoneProductCatalog.objects.filter(
+            business=business,
+            category__in=[ElectronicsCategory.LAPTOP, ElectronicsCategory.DESKTOP],
+            is_active=True,
+        ).order_by("category", "brand", "model_name")[:200]
+    )
+    locations = list(Location.objects.filter(business=business).order_by("name")[:50])
+
+    context = {
+        "business": business,
+        "catalog_products": catalog_products,
+        "locations": locations,
+        "default_location": location,
+        "page_title": "Stock In Laptop / Desktop",
+    }
+    return render(request, "inventory/electronics_stock_in.html", context)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHONES)
+@require_http_methods(["GET", "POST"])
+def electronics_sell(request: HttpRequest) -> HttpResponse:
+    """Sell a laptop or desktop by selecting an in-stock item (by serial or list)."""
+    from inventory.models_phone_products import ElectronicsStockItem
+    from django.utils import timezone
+
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("tenants:activate_mine")
+
+    if request.method == "POST":
+        item_id = request.POST.get("item_id", "").strip()
+        if not item_id:
+            messages.error(request, "Please select an item to sell.")
+            return redirect("inventory:electronics_sell")
+
+        try:
+            item = ElectronicsStockItem.objects.get(
+                pk=int(item_id),
+                business=business,
+                status="IN_STOCK",
+                is_active=True,
+            )
+        except (ElectronicsStockItem.DoesNotExist, ValueError):
+            messages.error(request, "Item not found or already sold.")
+            return redirect("inventory:electronics_sell")
+
+        # Optionally update selling price if provided at sell time
+        sell_price_str = request.POST.get("selling_price_display", "").strip()
+        update_fields = ["status", "sold_at", "sold_by", "updated_at"]
+        if sell_price_str:
+            try:
+                item.selling_price = Decimal(sell_price_str.replace(",", "").replace(" ", ""))
+                update_fields.append("selling_price")
+            except Exception:
+                pass
+
+        with transaction.atomic():
+            item.status = "SOLD"
+            item.sold_at = timezone.now()
+            item.sold_by = request.user
+            item.save(update_fields=update_fields)
+
+        messages.success(request, f"✅ Sold: {item.catalog_product.display_name} (SN: {item.serial_number[:20]}...)")
+        return redirect("inventory:electronics_sell")
+
+    available = list(
+        ElectronicsStockItem.objects.filter(
+            business=business,
+            status="IN_STOCK",
+            is_active=True,
+        ).select_related("catalog_product", "current_location").order_by("catalog_product__brand", "catalog_product__model_name")
+    )
+
+    context = {
+        "business": business,
+        "available_items": available,
+        "page_title": "Sell Laptop / Desktop",
+    }
+    return render(request, "inventory/electronics_sell.html", context)
