@@ -141,14 +141,11 @@ class DailySummarySettingsAdmin(admin.ModelAdmin):
         ),
     )
 
-    inlines = [BusinessEmailRecipientInline]
-
     def get_queryset(self, request):
         return (
             super()
             .get_queryset(request)
             .select_related("business")
-            .prefetch_related("business__daily_summary_recipients")
         )
 
     @admin.display(description="Vertical")

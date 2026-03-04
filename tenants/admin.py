@@ -1,4 +1,4 @@
-﻿# tenants/admin.py
+# tenants/admin.py
 from django.contrib import admin
 from django.contrib import messages
 from django.db import IntegrityError
@@ -9,11 +9,45 @@ from django.utils.html import format_html
 from .models import Business, Membership
 
 
+# ---------------------------------------------------------------------------
+# Inlines from the notifications app.
+# Both models FK/O2O to Business, so they belong on BusinessAdmin —
+# NOT on DailySummarySettingsAdmin (that wiring breaks admin.E202 because
+# BusinessEmailRecipient.business points to Business, not DailySummarySettings).
+# ---------------------------------------------------------------------------
+from notifications.models import (
+    BusinessEmailRecipient as _BusinessEmailRecipient,
+    DailySummarySettings as _DailySummarySettings,
+)
+
+
+class DailySummarySettingsInline(admin.StackedInline):
+    """One-to-one block: enabled toggle, send hour, timezone."""
+    model = _DailySummarySettings
+    extra = 0
+    max_num = 1
+    can_delete = False
+    verbose_name = "Daily Summary Settings"
+    verbose_name_plural = "Daily Summary Settings"
+    fields = ("is_enabled", "send_hour", "timezone", "last_sent_date")
+    readonly_fields = ("last_sent_date",)
+
+
+class BusinessEmailRecipientInline(admin.TabularInline):
+    """Many daily-summary recipients per business."""
+    model = _BusinessEmailRecipient
+    extra = 1
+    fields = ("email", "name", "is_active")
+    verbose_name = "Daily Summary Recipient"
+    verbose_name_plural = "Daily Summary Recipients"
+
+
 @admin.register(Business)
 class BusinessAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "status", "created_by", "created_at")
     list_filter = ("status",)
     search_fields = ("name", "slug", "subdomain")
+    inlines = [DailySummarySettingsInline, BusinessEmailRecipientInline]
 
     actions = ["reset_business_data"]
 
