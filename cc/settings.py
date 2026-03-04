@@ -784,15 +784,42 @@ def _whitenoise_video_headers(headers, path, url):
 WHITENOISE_ADD_HEADERS_FUNCTION = _whitenoise_video_headers
 
 # ---------------------------------------------------------------------------
-# VIDEO_BASE_URL  (Option A: CDN for large video assets)
+# VIDEO_BASE_URL  (CDN base URL for large video assets)
 # ---------------------------------------------------------------------------
-# Set this in production Render env vars to a CDN / object-storage base URL,
-# e.g. "https://pub-<id>.r2.dev" or "https://cdn.emajinet.africa".
-# The landing page template will use `{{ VIDEO_BASE_URL }}/videos/<file>.mp4`
-# when this is set, completely bypassing Gunicorn for video serving.
-# When empty (default), the template falls back to WhiteNoise-served static files
-# (fine for local dev; not recommended for production with large videos).
+# In production this is set automatically by render.yaml to the Render static
+# site URL: "https://emajinet-videos.onrender.com".  That service serves
+# static/videos/ through Cloudflare's CDN — Gunicorn is NEVER invoked.
+#
+# The landing page template uses `{{ VIDEO_BASE_URL }}/emajinet-farm.mp4`.
+# Note: NO `/videos/` sub-path; the static site root IS static/videos/.
+#
+# For any other CDN (R2, S3), set VIDEO_BASE_URL to the base URL of a bucket
+# that contains the mp4 file at its root (e.g. "https://pub-xxx.r2.dev").
+#
+# When empty (local dev), the template falls back to WhiteNoise-served static
+# files via {% static 'videos/emajinet-farm.mp4' %}.
 VIDEO_BASE_URL = os.environ.get("VIDEO_BASE_URL", "").rstrip("/")
+
+# WhiteNoise 6.x already skips compression for the following binary/pre-compressed
+# formats by default (verified in whitenoise.compress.Compressor.SKIP_COMPRESS_EXTENSIONS):
+#   mp4, webm, mov, avi, m4v, mpeg, mpg, 3gp, ...
+# Declaring it here makes the intention explicit and protects against future
+# whitenoise default changes.
+WHITENOISE_SKIP_COMPRESS_EXTENSIONS = (
+    # Images
+    "jpg", "jpeg", "png", "gif", "webp", "ico", "svg",
+    # Fonts
+    "woff", "woff2", "ttf", "eot",
+    # Archives (already compressed)
+    "zip", "gz", "tgz", "bz2", "tbz", "xz", "br",
+    # Video — CRITICAL: do NOT gzip-encode video; it breaks range requests
+    # and inflates file size.  These must be served raw by WhiteNoise.
+    "mp4", "webm", "mov", "avi", "m4v", "mpeg", "mpg", "3gp", "3gpp",
+    # Audio
+    "mp3", "ogg", "flac", "aac",
+    # Misc
+    "swf", "flv",
+)
 
 # --------------------------- auth redirects ---------------------------
 LOGIN_URL = "/accounts/login/"

@@ -1,4 +1,29 @@
 services:
+  # ---------------------------------------------------------------------------
+  # Static media CDN service
+  # ---------------------------------------------------------------------------
+  # Render serves this directory through Cloudflare's edge CDN.
+  # Videos are streamed directly by Cloudflare — Gunicorn is NEVER invoked.
+  # URL: https://emajinet-videos.onrender.com/<filename>
+  # The web service reads VIDEO_BASE_URL and the landing page <video> tag uses
+  # this absolute URL so the browser fetches the MP4 straight from the CDN.
+  - type: static
+    name: emajinet-videos
+    staticPublishPath: static/videos
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+      - path: /*
+        name: Accept-Ranges
+        value: bytes
+
+  # ---------------------------------------------------------------------------
+  # Main Django/Gunicorn web service
+  # ---------------------------------------------------------------------------
   - type: web
     name: circuitcity-main
     env: python
@@ -34,6 +59,10 @@ services:
         value: "https://*.onrender.com"
       - key: WEB_CONCURRENCY
         value: "3"
+      # Point the landing page <video> tag to the CDN static site above so
+      # Gunicorn never serves the MP4.  The URL matches the static service name.
+      - key: VIDEO_BASE_URL
+        value: "https://emajinet-videos.onrender.com"
 
       - key: DATABASE_URL
         fromDatabase:
