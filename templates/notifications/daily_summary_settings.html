@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Daily Summary Settings{% endblock %}
+{% block header_title %}Daily Summary Email{% endblock %}
+
+{% block content %}
+<div style="max-width: 860px; margin: 40px auto; padding: 0 24px 80px;">
+
+  {# Page heading #}
+  <div style="margin-bottom: 28px;">
+    <h1 style="font-size: 1.6rem; font-weight: 700; margin: 0 0 6px;">Daily Summary Email</h1>
+    <p style="color: #64748b; margin: 0;">
+      Configure an automated daily summary that is emailed every morning to your recipients.
+      The content is tailored to your business type: retail businesses receive sales &amp; stock data,
+      gym businesses receive membership metrics, and car-hire businesses receive fleet data.
+    </p>
+  </div>
+
+  {# Django messages #}
+  {% for msg in messages %}
+  <div style="padding: 12px 16px; border-radius: 8px; margin-bottom: 16px;
+    {% if msg.tags == 'success' %}background:#dcfce7; border:1px solid #86efac; color:#166534;
+    {% elif msg.tags == 'error' %}background:#fee2e2; border:1px solid #fca5a5; color:#991b1b;
+    {% else %}background:#dbeafe; border:1px solid #93c5fd; color:#1e40af;{% endif %}">
+    {{ msg }}
+  </div>
+  {% endfor %}
+
+  {# ── Card 1: General Settings ──────────────────────────────────── #}
+  <div style="background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,.07); margin-bottom:24px;">
+
+    <h2 style="margin:0 0 4px; font-size:1.2rem;">General Settings</h2>
+    <p style="color:#64748b; margin:0 0 28px; font-size:.9rem;">
+      Control when the summary is sent and which timezone governs the schedule.
+    </p>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_settings">
+
+      {# Enable toggle #}
+      <div style="display:flex; align-items:flex-start; gap:16px; padding:20px; background:#f8fafc; border-radius:12px; margin-bottom:20px;">
+        <label style="position:relative; display:inline-block; width:52px; height:28px; flex-shrink:0; margin-top:2px;">
+          <input type="checkbox" name="is_enabled" {% if ds.is_enabled %}checked{% endif %}
+            id="id_is_enabled"
+            style="opacity:0; width:0; height:0; position:absolute;"
+            onchange="document.getElementById('toggle_knob').style.transform = this.checked ? 'translateX(24px)' : 'translateX(2px)'; document.getElementById('toggle_track').style.background = this.checked ? '#3b82f6' : '#cbd5e1';">
+          <span id="toggle_track" style="position:absolute; inset:0; border-radius:28px; background:{{ ds.is_enabled|yesno:'#3b82f6,#cbd5e1' }}; transition:background .2s;"></span>
+          <span id="toggle_knob" style="position:absolute; top:4px; width:20px; height:20px; background:#fff; border-radius:50%; box-shadow:0 1px 4px rgba(0,0,0,.2); transition:transform .2s; transform:translateX({{ ds.is_enabled|yesno:'24,2' }}px);"></span>
+        </label>
+        <div>
+          <strong style="font-size:1rem;">Enable Daily Summary</strong><br>
+          <small style="color:#64748b;">When enabled, the summary is sent automatically at the configured time.</small>
+        </div>
+      </div>
+
+      {# Send hour + timezone in a 2-col grid #}
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px;">
+        <div>
+          <label for="id_send_hour" style="display:block; font-weight:600; margin-bottom:8px; font-size:.9rem;">
+            Send Time
+          </label>
+          <select name="send_hour" id="id_send_hour"
+            style="width:100%; padding:10px 14px; border:1px solid #e2e8f0; border-radius:8px; font-size:.95rem; background:#fff; cursor:pointer;">
+            {% for value, label in send_hour_choices %}
+            <option value="{{ value }}" {% if ds.send_hour == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small style="color:#64748b; display:block; margin-top:4px;">
+            Hour at which the email is dispatched (in the selected timezone).
+          </small>
+        </div>
+
+        <div>
+          <label for="id_timezone" style="display:block; font-weight:600; margin-bottom:8px; font-size:.9rem;">
+            Timezone
+          </label>
+          <select name="timezone" id="id_timezone"
+            style="width:100%; padding:10px 14px; border:1px solid #e2e8f0; border-radius:8px; font-size:.95rem; background:#fff; cursor:pointer;">
+            {% for value, label in timezone_choices %}
+            <option value="{{ value }}" {% if ds.timezone == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <small style="color:#64748b; display:block; margin-top:4px;">
+            Timezone used for scheduling and date labels in the email.
+          </small>
+        </div>
+      </div>
+
+      {# Last sent read-only badge #}
+      {% if ds.last_sent_date %}
+      <div style="display:inline-flex; align-items:center; gap:8px; padding:8px 14px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; margin-bottom:24px; font-size:.88rem; color:#1e40af;">
+        <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+        Last sent: <strong>{{ ds.last_sent_date }}</strong>
+      </div>
+      {% endif %}
+
+      <button type="submit"
+        style="padding:11px 28px; background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; border:none; border-radius:10px; font-weight:700; font-size:.95rem; cursor:pointer; box-shadow:0 4px 12px rgba(59,130,246,.3);">
+        Save Settings
+      </button>
+    </form>
+  </div>
+
+  {# ── Card 2: Recipients ────────────────────────────────────────── #}
+  <div style="background:#fff; border-radius:16px; padding:32px; box-shadow:0 4px 20px rgba(0,0,0,.07);">
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h2 style="margin:0 0 4px; font-size:1.2rem;">Recipients</h2>
+        <p style="color:#64748b; margin:0; font-size:.9rem;">
+          Everyone listed here will receive the daily summary when it is enabled.
+          To pause delivery for one person, remove them (they can always be re-added).
+        </p>
+      </div>
+      <span style="padding:4px 12px; background:{% if recipients %}#dcfce7{% else %}#f1f5f9{% endif %}; color:{% if recipients %}#166534{% else %}#64748b{% endif %}; border-radius:20px; font-size:.85rem; font-weight:600; white-space:nowrap;">
+        {{ recipients.count }} recipient{{ recipients.count|pluralize }}
+      </span>
+    </div>
+
+    {# Recipient list #}
+    {% if recipients %}
+    <div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:28px;">
+      {% for r in recipients %}
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;
+        {% if not forloop.last %}border-bottom:1px solid #f1f5f9;{% endif %}
+        {% if not r.is_active %}opacity:.5;{% endif %}
+        gap:12px; flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="font-weight:600; word-break:break-word;">{{ r.email }}</div>
+          {% if r.name %}<div style="font-size:.85rem; color:#64748b;">{{ r.name }}</div>{% endif %}
+          {% if not r.is_active %}
+          <span style="font-size:.78rem; color:#ef4444; font-weight:600;">Inactive</span>
+          {% endif %}
+        </div>
+        <form method="post" action="{% url 'notifications:daily_summary_recipient_remove' r.pk %}"
+          onsubmit="return confirm('Remove {{ r.email }} from daily summary recipients?');"
+          style="flex-shrink:0;">
+          {% csrf_token %}
+          <button type="submit"
+            style="padding:6px 14px; background:#fff; border:1px solid #fca5a5; color:#ef4444; border-radius:8px; font-size:.85rem; font-weight:600; cursor:pointer;">
+            Remove
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center; padding:32px 16px; background:#f8fafc; border-radius:10px; margin-bottom:28px; color:#64748b;">
+      <div style="font-size:2rem; margin-bottom:8px;">📭</div>
+      <p style="margin:0; font-weight:600;">No recipients yet</p>
+      <p style="margin:4px 0 0; font-size:.88rem;">Add at least one recipient below to start receiving summaries.</p>
+    </div>
+    {% endif %}
+
+    {# Add recipient form #}
+    <h3 style="font-size:1rem; font-weight:700; margin:0 0 16px;">Add Recipient</h3>
+    <form method="post" style="display:grid; grid-template-columns:1fr 1fr auto; gap:12px; align-items:end;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_recipient">
+      <div>
+        <label for="id_rec_email" style="display:block; font-size:.85rem; font-weight:600; margin-bottom:6px;">Email *</label>
+        <input type="email" name="email" id="id_rec_email" required placeholder="manager@example.com"
+          style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:.9rem; box-sizing:border-box;">
+      </div>
+      <div>
+        <label for="id_rec_name" style="display:block; font-size:.85rem; font-weight:600; margin-bottom:6px;">Name (optional)</label>
+        <input type="text" name="name" id="id_rec_name" placeholder="e.g. John Banda"
+          style="width:100%; padding:10px 12px; border:1px solid #e2e8f0; border-radius:8px; font-size:.9rem; box-sizing:border-box;">
+      </div>
+      <button type="submit"
+        style="padding:10px 22px; background:#0f172a; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:.9rem; cursor:pointer; white-space:nowrap;">
+        Add
+      </button>
+    </form>
+
+    {# Help note #}
+    <p style="color:#94a3b8; font-size:.82rem; margin:16px 0 0;">
+      Recipients can be external email addresses — they do not need a CircuitCity account.
+      Removing a recipient deactivates delivery but does not delete the address from history.
+      To permanently delete a recipient, use the Django admin.
+    </p>
+
+  </div>
+</div>
+{% endblock %}

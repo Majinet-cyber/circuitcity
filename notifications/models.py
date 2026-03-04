@@ -1,4 +1,4 @@
-﻿# notifications/models.py
+# notifications/models.py
 from __future__ import annotations
 
 from django.conf import settings
@@ -466,3 +466,123 @@ class EmailDeliveryLog(models.Model):
         if self.attempts > 1:
             self.status = 'retrying'
         self.save(update_fields=['attempts', 'status', 'updated_at'])
+
+
+# ==============================================================================
+# Daily Summary Email Recipients
+# ==============================================================================
+
+class BusinessEmailRecipient(models.Model):
+    """
+    One row per recipient email address for a business's daily summary.
+    A business can have many recipients (managers, owners, external stakeholders).
+    """
+    business = models.ForeignKey(
+        'tenants.Business',
+        on_delete=models.CASCADE,
+        related_name='daily_summary_recipients',
+    )
+    email = models.EmailField(
+        help_text="Email address to receive the daily summary.",
+    )
+    name = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Display name (optional, for personalisation).",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Uncheck to stop sending to this address without deleting it.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Daily Summary Recipient"
+        verbose_name_plural = "Daily Summary Recipients"
+        unique_together = [("business", "email")]
+        ordering = ["email"]
+
+    def __str__(self) -> str:
+        label = f" ({self.name})" if self.name else ""
+        active = "" if self.is_active else " [inactive]"
+        return f"{self.email}{label}{active} — {self.business.name}"
+
+
+# ==============================================================================
+# Per-Business Daily Summary Settings
+# ==============================================================================
+
+COMMON_TIMEZONES = [
+    ("Africa/Blantyre", "Africa/Blantyre (UTC+2)"),
+    ("Africa/Nairobi", "Africa/Nairobi (UTC+3)"),
+    ("Africa/Johannesburg", "Africa/Johannesburg (UTC+2)"),
+    ("Africa/Lagos", "Africa/Lagos (UTC+1)"),
+    ("UTC", "UTC"),
+    ("Europe/London", "Europe/London"),
+    ("America/New_York", "America/New_York (EST)"),
+]
+
+SEND_HOUR_CHOICES = [(h, f"{h:02d}:00") for h in range(0, 24)]
+
+
+class DailySummarySettings(models.Model):
+    """
+    Per-business configuration for the automated daily summary email.
+
+    One row per business (OneToOne).  Created on demand the first time
+    a manager opens the settings panel; or created by a migration/signal.
+    """
+    business = models.OneToOneField(
+        'tenants.Business',
+        on_delete=models.CASCADE,
+        related_name='daily_summary_settings',
+    )
+
+    # Master on/off toggle
+    is_enabled = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Enable daily summary emails for this business.",
+    )
+
+    # What hour (in the business timezone) to fire the email
+    send_hour = models.PositiveSmallIntegerField(
+        default=7,
+        choices=SEND_HOUR_CHOICES,
+        help_text="Hour of day (local timezone) to send the summary (0–23).",
+    )
+
+    # Timezone used to interpret send_hour and to label report dates
+    timezone = models.CharField(
+        max_length=64,
+        default="Africa/Blantyre",
+        choices=COMMON_TIMEZONES,
+        help_text="Timezone for scheduling and date labels.",
+    )
+
+    # Idempotency: track last successful send date so we never double-send
+    last_sent_date = models.DateField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Date (in the business timezone) of the last successfully dispatched summary.",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Daily Summary Settings"
+        verbose_name_plural = "Daily Summary Settings"
+
+    def __str__(self) -> str:
+        status = "enabled" if self.is_enabled else "disabled"
+        return f"{self.business.name} — daily summary ({status}, {self.send_hour:02d}:00 {self.timezone})"
+
+    @classmethod
+    def for_business(cls, business) -> "DailySummarySettings":
+        """Get or create settings for a business (idempotent)."""
+        obj, _ = cls.objects.get_or_create(business=business)
+        return obj

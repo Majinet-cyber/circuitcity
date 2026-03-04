@@ -1,4 +1,4 @@
-﻿"""
+"""
 Django settings for cc project.
 """
 import importlib
@@ -704,6 +704,16 @@ try:
         "billing-remind-trials-ending": {
             "task": "billing.tasks.remind_trials_ending_soon",
             "schedule": crontab(hour=10, minute=0),
+            "options": {"timezone": "Africa/Blantyre"},
+        },
+        # ======================================================================
+        # DAILY SUMMARY EMAILS (vertical-aware, per-business schedule)
+        # ======================================================================
+        # Runs every hour; each business's DailySummarySettings.send_hour
+        # determines the actual delivery time in the business's own timezone.
+        "daily-summary-emails": {
+            "task": "notifications.tasks_daily_summary.send_daily_summaries",
+            "schedule": crontab(minute=0),  # top of every hour
             "options": {"timezone": "Africa/Blantyre"},
         },
     }

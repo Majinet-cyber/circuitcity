@@ -1,0 +1,22 @@
+{{ business.name }} — Daily Fleet Summary
+{{ report_date|date:"l, N j, Y" }}
+================================================================================
+
+FLEET OVERVIEW
+--------------
+Rentals Today       :  {{ rentals_today }}
+Revenue Today       :  {{ currency }} {{ revenue_today|floatformat:0 }}
+Fleet Utilisation   :  {{ utilisation_rate }}%
+Overdue Returns     :  {{ overdue_returns }}
+
+HIGHLIGHTS
+----------
+{% if top_vehicle %}Top Vehicle         :  {{ top_vehicle }}
+{% endif %}Maintenance Alerts  :  {{ maintenance_alerts }}
+
+{% if overdue_returns > 0 %}⚠️  {{ overdue_returns }} vehicle{{ overdue_returns|pluralize }} overdue for return. Please follow up immediately.
+{% endif %}{% if maintenance_alerts > 0 %}🔧  {{ maintenance_alerts }} maintenance job{{ maintenance_alerts|pluralize }} require attention.
+{% endif %}
+--------------------------------------------------------------------------------
+Automatically generated for {{ business.name }}.
+To disable, ask your manager to turn off Daily Summary in Settings.

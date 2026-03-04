@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Summary — {{ business.name }}</title>
+  <style>
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body {
+      margin: 0; padding: 0;
+      background-color: #f0f4f8;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: #1a202c;
+    }
+    .wrapper { width: 100%; background-color: #f0f4f8; padding: 32px 0; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+    .header { background: linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%); padding: 32px 40px; text-align: center; }
+    .header h1 { margin: 0; color: #ffffff; font-size: 22px; font-weight: 700; }
+    .header .subtitle { margin: 6px 0 0; color: rgba(255,255,255,0.8); font-size: 14px; }
+    .header .date-badge { display: inline-block; margin-top: 12px; background: rgba(255,255,255,0.2); color: #fff; font-size: 13px; padding: 4px 14px; border-radius: 20px; }
+    .body { padding: 32px 40px; }
+    .kpi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+    @media (max-width: 480px) { .kpi-grid { grid-template-columns: 1fr; } }
+    .kpi-card { background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 10px; padding: 20px; }
+    .kpi-card.revenue { background: #f5f3ff; border-color: #c4b5fd; }
+    .kpi-card.danger  { background: #fef2f2; border-color: #fecaca; }
+    .kpi-value { font-size: 26px; font-weight: 700; color: #7c3aed; line-height: 1.1; }
+    .kpi-card.danger .kpi-value { color: #dc2626; }
+    .kpi-label { font-size: 12px; color: #64748b; margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; }
+    .highlights { margin: 24px 0; }
+    .highlight-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; }
+    .highlight-row:last-child { border-bottom: none; }
+    .highlight-label { color: #64748b; }
+    .highlight-value { font-weight: 600; color: #1a202c; text-align: right; }
+    .alert-banner { background: #fef2f2; border-left: 4px solid #ef4444; padding: 14px 18px; border-radius: 0 8px 8px 0; margin: 24px 0; font-size: 14px; }
+    .alert-banner strong { color: #b91c1c; }
+    .footer { background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 40px; text-align: center; }
+    .footer p { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+  <div class="container">
+
+    <div class="header">
+      <h1>{{ business.name }}</h1>
+      <p class="subtitle">Daily Fleet Summary</p>
+      <span class="date-badge">{{ report_date|date:"l, N j, Y" }}</span>
+    </div>
+
+    <div class="body">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-value">{{ rentals_today }}</div>
+          <div class="kpi-label">Rentals Today</div>
+        </div>
+        <div class="kpi-card revenue">
+          <div class="kpi-value">{{ currency }} {{ revenue_today|floatformat:0 }}</div>
+          <div class="kpi-label">Revenue Today</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-value">{{ utilisation_rate }}%</div>
+          <div class="kpi-label">Fleet Utilisation</div>
+        </div>
+        <div class="kpi-card{% if overdue_returns > 0 %} danger{% endif %}">
+          <div class="kpi-value">{{ overdue_returns }}</div>
+          <div class="kpi-label">Overdue Returns</div>
+        </div>
+      </div>
+
+      <div class="highlights">
+        {% if top_vehicle %}
+        <div class="highlight-row">
+          <span class="highlight-label">Top Vehicle</span>
+          <span class="highlight-value">{{ top_vehicle }}</span>
+        </div>
+        {% endif %}
+        <div class="highlight-row">
+          <span class="highlight-label">Maintenance Alerts</span>
+          <span class="highlight-value">{{ maintenance_alerts }}</span>
+        </div>
+      </div>
+
+      {% if overdue_returns > 0 or maintenance_alerts > 0 %}
+      <div class="alert-banner">
+        🚨 <strong>Action required:</strong>
+        {% if overdue_returns > 0 %}{{ overdue_returns }} vehicle{{ overdue_returns|pluralize }} overdue for return.{% endif %}
+        {% if maintenance_alerts > 0 %}{{ maintenance_alerts }} maintenance job{{ maintenance_alerts|pluralize }} pending.{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="footer">
+      <p>
+        Automatically generated for <strong>{{ business.name }}</strong>.<br>
+        To disable, ask your manager to turn off Daily Summary in Settings.
+      </p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
