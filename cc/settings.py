@@ -12,6 +12,10 @@ from django.core.exceptions import ImproperlyConfigured
 
 # Register .webmanifest MIME type for PWA installability
 mimetypes.add_type("application/manifest+json", ".webmanifest")
+# Ensure video/mp4 is registered so WhiteNoise & Django return the correct
+# Content-Type header.  Some minimal Linux images (Render) omit this entry.
+mimetypes.add_type("video/mp4", ".mp4")
+mimetypes.add_type("video/webm", ".webm")
 
 
 # --------------------------- helpers ---------------------------
@@ -762,6 +766,33 @@ WHITENOISE_MAX_AGE = 0 if DEBUG else (60 * 60 * 24 * 365)
 WHITENOISE_INDEX_FILE = False
 # DO NOT hard-fail on manifest mismatches during rolling deploys.
 WHITENOISE_MANIFEST_STRICT = False
+
+
+def _whitenoise_video_headers(headers, path, url):
+    """
+    Add immutable cache headers for video files so the browser caches them
+    aggressively and never re-fetches after the first successful load.
+
+    WhiteNoise already sets Accept-Ranges: bytes and handles 206 partial-content
+    responses for range requests.  This function only tweaks Cache-Control.
+    """
+    if path and path.lower().endswith((".mp4", ".webm", ".ogg", ".mov")):
+        # max-age=31536000 (1 year) + immutable = browser never revalidates
+        headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+
+WHITENOISE_ADD_HEADERS_FUNCTION = _whitenoise_video_headers
+
+# ---------------------------------------------------------------------------
+# VIDEO_BASE_URL  (Option A: CDN for large video assets)
+# ---------------------------------------------------------------------------
+# Set this in production Render env vars to a CDN / object-storage base URL,
+# e.g. "https://pub-<id>.r2.dev" or "https://cdn.emajinet.africa".
+# The landing page template will use `{{ VIDEO_BASE_URL }}/videos/<file>.mp4`
+# when this is set, completely bypassing Gunicorn for video serving.
+# When empty (default), the template falls back to WhiteNoise-served static files
+# (fine for local dev; not recommended for production with large videos).
+VIDEO_BASE_URL = os.environ.get("VIDEO_BASE_URL", "").rstrip("/")
 
 # --------------------------- auth redirects ---------------------------
 LOGIN_URL = "/accounts/login/"

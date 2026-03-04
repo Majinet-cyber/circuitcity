@@ -1,4 +1,4 @@
-﻿# cc/context_processors.py
+# cc/context_processors.py
 from __future__ import annotations
 
 import os
@@ -290,6 +290,9 @@ def marketing_constants(request) -> Dict[str, Any]:
             "show_counters": show_metrics,
             "show_agents_counter": show_agents_metric,
         },
+        # CDN base URL for large video assets — empty string falls back to WhiteNoise.
+        # Set VIDEO_BASE_URL env var in production to serve MP4s from a CDN.
+        "VIDEO_BASE_URL": getattr(settings, "VIDEO_BASE_URL", ""),
     }
 
 

@@ -101,6 +101,11 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         # Start strict, allow 'self' and inline styles/scripts where needed
         # This is a baseline - adjust based on your actual needs
         if not response.get("Content-Security-Policy"):
+            # media-src must allow 'self' (WhiteNoise static video fallback) plus
+            # any VIDEO_BASE_URL CDN so the browser doesn't block video playback.
+            video_cdn = getattr(settings, "VIDEO_BASE_URL", "").strip()
+            media_src = f"media-src 'self' {video_cdn}" if video_cdn else "media-src 'self'"
+
             csp_directives = [
                 "default-src 'self'",
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com",  # Allow CDN for libraries
@@ -108,6 +113,7 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
                 "img-src 'self' data: https:",  # Allow data: for inline images, https: for external
                 "font-src 'self' data: https://fonts.gstatic.com",
                 "connect-src 'self' https://api.paychangu.com https://api.stripe.com https://graph.facebook.com",  # Allow API calls to payment providers
+                media_src,  # Allow video/audio from self and optional CDN
                 "frame-ancestors 'none'",  # Stronger than X-Frame-Options
                 "base-uri 'self'",  # Prevent base tag injection
                 "form-action 'self'",  # Prevent form submission to external domains

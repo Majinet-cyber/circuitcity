@@ -1998,11 +1998,20 @@
   <section class="product-demo-section" id="product-demo">
     <div class="landing-container">
       <div class="product-demo-video-wrap" id="product-demo-video-wrap">
+        {# preload="none" prevents the browser from issuing range requests on  #}
+        {# page load, which would otherwise tie up a Gunicorn worker for the   #}
+        {# entire ~78MB transfer and trigger a worker timeout (Render bug).    #}
+        {# VIDEO_BASE_URL: when set (production), the MP4 is served from CDN  #}
+        {# and Gunicorn never touches it.  Falls back to WhiteNoise in dev.    #}
         <video
           id="product-demo-video"
+          {% if VIDEO_BASE_URL %}
+          src="{{ VIDEO_BASE_URL }}/videos/emajinet-farm.mp4"
+          {% else %}
           src="{% static 'videos/emajinet-farm.mp4' %}"
+          {% endif %}
           poster="{% static 'img/majn.png' %}"
-          preload="metadata"
+          preload="none"
           controls
           playsinline
           muted
