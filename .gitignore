@@ -89,3 +89,4 @@ restore_all.py
 restore_remaining.ps1
 test_import.py
 verify_compile.py
+test_results.txt
