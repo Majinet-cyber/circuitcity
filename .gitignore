@@ -1,4 +1,4 @@
-﻿# ----------------------------
+# ----------------------------
 # Python / venv
 # ----------------------------
 __pycache__/
@@ -68,8 +68,8 @@ step2_results.txt
 final_analysis.txt
 single_error.txt
 
-# Test reports (auto-generated)
-reports/
+# Test report output only (NOT the reports Django app)
+reports/pytest/
 
 # ----------------------------
 # Editor backups
