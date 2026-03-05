@@ -1,78 +1,248 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Choose Business{% endblock %}
+{% block title %}Choose Workspace · Emajinet{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h2 class="mb-0">Choose Business</h2>
-    <span class="badge rounded-pill text-bg-light">Tenant setup</span>
+<style>
+  .ws-hero{
+    background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);
+    color:#fff; padding:3rem 0 2rem; margin-bottom:2rem;
+  }
+  .ws-hero h1{ font-size:1.75rem; font-weight:800; margin-bottom:.4rem; }
+  .ws-hero p{ opacity:.7; margin:0; }
+
+  .ws-card{
+    background:#fff; border:1.5px solid #e2e8f0; border-radius:16px;
+    padding:1.5rem; display:flex; flex-direction:column; gap:.75rem;
+    transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    text-decoration:none; color:inherit; position:relative; overflow:hidden;
+  }
+  .ws-card:hover{
+    transform:translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,.10);
+    border-color:#6366f1;
+  }
+  .ws-card.active-ws{
+    border-color:#10b981; background:linear-gradient(135deg,#f0fdf4,#fff);
+  }
+  .ws-card.active-ws::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    background:linear-gradient(90deg,#10b981,#059669);
+  }
+  .ws-icon{
+    width:48px; height:48px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:1.4rem; flex-shrink:0;
+  }
+  .ws-name{ font-size:1rem; font-weight:700; color:#0f172a; }
+  .ws-meta{ font-size:.8rem; color:#64748b; }
+  .ws-role-badge{
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.2rem .6rem; border-radius:999px; font-size:.7rem;
+    font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  }
+  .role-manager{ background:#dbeafe; color:#1d4ed8; }
+  .role-agent  { background:#f0fdf4; color:#16a34a; }
+  .role-other  { background:#f1f5f9; color:#475569; }
+  .active-badge{
+    background:#dcfce7; color:#16a34a;
+    font-size:.7rem; font-weight:700; padding:.2rem .6rem;
+    border-radius:999px; letter-spacing:.04em;
+  }
+  .ws-open-btn{
+    margin-top:.5rem; padding:.6rem 1rem; border-radius:10px;
+    border:none; font-weight:700; font-size:.85rem; cursor:pointer;
+    transition:background .15s; display:block; text-align:center;
+    text-decoration:none;
+  }
+  .ws-open-btn-primary{ background:#6366f1; color:#fff; }
+  .ws-open-btn-primary:hover{ background:#4f46e5; color:#fff; }
+  .ws-open-btn-secondary{ background:#f1f5f9; color:#334155; }
+  .ws-open-btn-secondary:hover{ background:#e2e8f0; color:#0f172a; }
+
+  .ws-create-card{
+    background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:16px;
+    padding:1.5rem; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:.6rem; min-height:140px; text-align:center;
+    text-decoration:none; color:#64748b; transition:all .15s ease;
+  }
+  .ws-create-card:hover{
+    border-color:#6366f1; background:#eef2ff; color:#4f46e5;
+    transform:translateY(-2px);
+  }
+  .ws-create-icon{
+    width:44px; height:44px; border-radius:12px;
+    background:#e0e7ff; color:#6366f1;
+    display:flex; align-items:center; justify-content:center; font-size:1.25rem;
+  }
+
+  /* Vertical icons */
+  .icon-phones  { background:#dbeafe; color:#2563eb; }
+  .icon-liquor  { background:#fce7f3; color:#db2777; }
+  .icon-grocery { background:#dcfce7; color:#16a34a; }
+  .icon-pharmacy{ background:#ede9fe; color:#7c3aed; }
+  .icon-gym     { background:#fee2e2; color:#dc2626; }
+  .icon-farm    { background:#d1fae5; color:#059669; }
+  .icon-clothing{ background:#fef3c7; color:#d97706; }
+  .icon-hardware{ background:#e0f2fe; color:#0284c7; }
+  .icon-cement  { background:#f1f5f9; color:#475569; }
+  .icon-welding { background:#fef3c7; color:#b45309; }
+  .icon-car_hire{ background:#e0e7ff; color:#4f46e5; }
+  .icon-generic { background:#f1f5f9; color:#64748b; }
+
+  @media(max-width:576px){
+    .ws-hero{ padding:2rem 0 1.5rem; }
+    .ws-hero h1{ font-size:1.4rem; }
+  }
+</style>
+
+{# ── Hero header ── #}
+<div class="ws-hero">
+  <div class="container">
+    <h1><i class="bi bi-grid-3x3-gap me-2"></i>Your Workspaces</h1>
+    <p>Select a workspace to open, or create a new one.</p>
   </div>
+</div>
+
+<div class="container pb-5">
 
   {% if messages %}
     {% for m in messages %}
-      <div class="alert alert-{{ m.tags|default:'info' }} mb-3">{{ m }}</div>
+      <div class="alert alert-{{ m.tags|default:'info' }} mb-3 rounded-3">{{ m }}</div>
     {% endfor %}
   {% endif %}
 
+  {# ── Superuser: all businesses ── #}
   {% if request.user.is_staff or request.user.is_superuser %}
-    <!-- STAFF VIEW: show ALL ACTIVE BUSINESSES -->
-    <div class="card shadow-sm mb-4">
-      <div class="card-body">
-        <h5 class="card-title mb-3">All active businesses</h5>
-        {% if all_active_businesses %}
-          <div class="list-group">
-            {% for b in all_active_businesses %}
-              <form class="list-group-item d-flex align-items-center justify-content-between gap-2"
-                    method="post" action="{% url 'tenants:choose_business' %}">
-                {% csrf_token %}
-                <div class="d-flex align-items-center gap-2">
-                  <span class="fw-semibold">{{ b.name }}</span>
-                  <span class="text-muted">/ {{ b.slug }}</span>
+    <div class="mb-4">
+      <h5 class="fw-semibold text-muted mb-3" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em">
+        <i class="bi bi-shield-lock me-1"></i> All Active Workspaces
+      </h5>
+      {% if all_active_businesses %}
+        <div class="row g-3">
+          {% for b in all_active_businesses %}
+            <div class="col-12 col-sm-6 col-lg-4">
+              <div class="ws-card{% if b.id == active_business_id %} active-ws{% endif %}">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="ws-icon icon-{{ b.business_kind|default:'generic' }}">
+                    {% if b.business_kind == "phones" %}<i class="bi bi-phone"></i>
+                    {% elif b.business_kind == "liquor" %}<i class="bi bi-cup-straw"></i>
+                    {% elif b.business_kind == "grocery" %}<i class="bi bi-bag"></i>
+                    {% elif b.business_kind == "pharmacy" %}<i class="bi bi-capsule"></i>
+                    {% elif b.business_kind == "gym" %}<i class="bi bi-lightning"></i>
+                    {% elif b.business_kind == "farm" %}<i class="bi bi-flower1"></i>
+                    {% elif b.business_kind == "car_hire" %}<i class="bi bi-car-front"></i>
+                    {% elif b.business_kind == "clothing" %}<i class="bi bi-bag-heart"></i>
+                    {% elif b.business_kind == "welding" %}<i class="bi bi-tools"></i>
+                    {% else %}<i class="bi bi-building"></i>{% endif %}
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <div class="ws-name text-truncate">{{ b.name }}</div>
+                    <div class="ws-meta">{{ b.get_business_kind_display|default:b.business_kind|default:"Business" }}</div>
+                  </div>
+                  {% if b.id == active_business_id %}
+                    <span class="active-badge"><i class="bi bi-check2"></i> Active</span>
+                  {% endif %}
                 </div>
-                <input type="hidden" name="business_id" value="{{ b.id }}">
-                <button class="btn btn-primary btn-sm">Switch</button>
-              </form>
-            {% endfor %}
+                <form method="post" action="{% url 'tenants:choose_business' %}">
+                  {% csrf_token %}
+                  <input type="hidden" name="business_id" value="{{ b.id }}">
+                  <button class="ws-open-btn {% if b.id == active_business_id %}ws-open-btn-secondary{% else %}ws-open-btn-primary{% endif %} w-100">
+                    {% if b.id == active_business_id %}Open Dashboard{% else %}Switch Here{% endif %}
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted">No active businesses found.</p>
+      {% endif %}
+    </div>
+    {% if memberships %}
+      <div class="tenant-divider mb-4"></div>
+    {% endif %}
+  {% endif %}
+
+  {# ── Regular user: their workspaces ── #}
+  {% if memberships %}
+    <h5 class="fw-semibold text-muted mb-3" style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em">
+      <i class="bi bi-person-check me-1"></i> Your Workspaces
+    </h5>
+    <div class="row g-3 mb-4">
+      {% for m in memberships %}
+        <div class="col-12 col-sm-6 col-lg-4">
+          <div class="ws-card{% if m.business.id == active_business_id %} active-ws{% endif %}">
+            <div class="d-flex align-items-center gap-3">
+              <div class="ws-icon icon-{{ m.business.business_kind|default:'generic' }}">
+                {% if m.business.business_kind == "phones" %}<i class="bi bi-phone"></i>
+                {% elif m.business.business_kind == "liquor" %}<i class="bi bi-cup-straw"></i>
+                {% elif m.business.business_kind == "grocery" %}<i class="bi bi-bag"></i>
+                {% elif m.business.business_kind == "pharmacy" %}<i class="bi bi-capsule"></i>
+                {% elif m.business.business_kind == "gym" %}<i class="bi bi-lightning"></i>
+                {% elif m.business.business_kind == "farm" %}<i class="bi bi-flower1"></i>
+                {% elif m.business.business_kind == "car_hire" %}<i class="bi bi-car-front"></i>
+                {% elif m.business.business_kind == "clothing" %}<i class="bi bi-bag-heart"></i>
+                {% elif m.business.business_kind == "welding" %}<i class="bi bi-tools"></i>
+                {% else %}<i class="bi bi-building"></i>{% endif %}
+              </div>
+              <div class="flex-grow-1 min-w-0">
+                <div class="ws-name text-truncate">{{ m.business.name }}</div>
+                <div class="ws-meta">{{ m.business.get_business_kind_display|default:m.business.business_kind|default:"Business" }}</div>
+              </div>
+              {% if m.business.id == active_business_id %}
+                <span class="active-badge"><i class="bi bi-check2"></i> Active</span>
+              {% endif %}
+            </div>
+
+            <div>
+              <span class="ws-role-badge {% if m.role == 'MANAGER' %}role-manager{% elif m.role == 'AGENT' %}role-agent{% else %}role-other{% endif %}">
+                <i class="bi {% if m.role == 'MANAGER' %}bi-shield-check{% elif m.role == 'AGENT' %}bi-person{% else %}bi-person-badge{% endif %}"></i>
+                {{ m.role|title }}
+              </span>
+            </div>
+
+            <a class="ws-open-btn {% if m.business.id == active_business_id %}ws-open-btn-secondary{% else %}ws-open-btn-primary{% endif %}"
+               href="/tenants/set/{{ m.business.id }}/">
+              {% if m.business.id == active_business_id %}Open Dashboard{% else %}Switch &amp; Open{% endif %}
+            </a>
           </div>
-        {% else %}
-          <div class="text-muted">No active businesses found.</div>
-        {% endif %}
+        </div>
+      {% endfor %}
+
+      {# ── Create new workspace card ── #}
+      <div class="col-12 col-sm-6 col-lg-4">
+        <a href="/tenants/create/" class="ws-create-card h-100">
+          <div class="ws-create-icon"><i class="bi bi-plus-lg"></i></div>
+          <div>
+            <div class="fw-bold mb-1" style="color:#334155">New Workspace</div>
+            <small>Start a new business or brand</small>
+          </div>
+        </a>
+      </div>
+    </div>
+
+  {% elif not request.user.is_staff and not request.user.is_superuser %}
+    {# ── Empty state: user has 0 workspaces ── #}
+    <div class="text-center py-5">
+      <div class="mb-3" style="font-size:3.5rem">
+        <span style="opacity:.25">🏢</span>
+      </div>
+      <h4 class="fw-bold mb-2" style="color:#0f172a">You don't have any workspaces yet</h4>
+      <p class="text-muted mb-4" style="max-width:420px;margin:0 auto 1.5rem">
+        A workspace is your private space to manage inventory, sales, and your team.
+        Create one in seconds or join an existing one.
+      </p>
+      <div class="d-flex justify-content-center gap-3 flex-wrap">
+        <a href="/tenants/create/" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold">
+          <i class="bi bi-plus-lg me-1"></i> Create Workspace
+        </a>
+        <a href="/tenants/join/" class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold">
+          <i class="bi bi-person-plus me-1"></i> Join as Agent
+        </a>
       </div>
     </div>
   {% endif %}
 
-  <!-- REGULAR USER VIEW: own memberships -->
-  <div class="card shadow-sm">
-    <div class="card-body">
-      <h5 class="card-title mb-3">Your active memberships</h5>
-
-      {% if memberships %}
-        <div class="list-group">
-          {% for m in memberships %}
-            <form class="list-group-item d-flex align-items-center justify-content-between gap-2"
-                  method="post" action="{% url 'tenants:choose_business' %}">
-              {% csrf_token %}
-              <div class="d-flex align-items-center gap-2">
-                <span class="fw-semibold">{{ m.business.name }}</span>
-                <span class="text-muted">/ {{ m.business.slug }}</span>
-                <span class="badge text-bg-secondary">{{ m.role|title }}</span>
-              </div>
-              <input type="hidden" name="business_id" value="{{ m.business.id }}">
-              <button class="btn btn-outline-primary btn-sm">Switch</button>
-            </form>
-          {% endfor %}
-        </div>
-      {% else %}
-        <div class="text-muted mb-3">No active memberships yet.</div>
-        {% if not request.user.is_staff and not request.user.is_superuser %}
-          <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" href="{% url 'tenants:create_business' %}">Create business</a>
-            <a class="btn btn-outline-primary" href="{% url 'tenants:join_as_agent' %}">Join as agent</a>
-          </div>
-        {% endif %}
-      {% endif %}
-    </div>
-  </div>
 </div>
 {% endblock %}

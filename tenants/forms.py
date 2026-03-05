@@ -1,4 +1,4 @@
-﻿# tenants/forms.py
+# tenants/forms.py
 from __future__ import annotations
 
 from django import forms
@@ -98,23 +98,12 @@ class CreateBusinessForm(forms.ModelForm):
 
     def clean(self):
         """
-        MULTI-TENANCY HARDENING: Enforce one-business-per-user rule.
-        If user already owns/belongs to a business, reject business creation.
+        Multi-workspace: a user may create multiple workspaces.
+        We only validate the business name uniqueness and derive a slug.
         """
         cleaned = super().clean()
         name = (cleaned.get("name") or "").strip()
-        
-        # ONE-BUSINESS-PER-USER VALIDATION
-        if self.user and hasattr(self.user, 'is_authenticated') and self.user.is_authenticated:
-            from .utils import user_has_any_business
-            
-            if user_has_any_business(self.user):
-                raise ValidationError(
-                    "This account is already linked to a business. "
-                    "Each account can only create or belong to one business. "
-                    "Please contact support if you need to transfer or modify your business."
-                )
-        
+
         # Provide a unique slug for views to use (only if model has slug)
         try:
             field_names = {f.name for f in Business._meta.fields}

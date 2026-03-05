@@ -788,16 +788,40 @@
                     {% endif %}
                     <span class="tenant-caret"><i class="bi bi-chevron-down"></i></span>
                   </div>
-                  <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Business menu">
-                    {# MULTI-TENANCY HARDENING: Only show "Switch business" for superusers #}
-                    {# Regular users are locked to their single business #}
-                    {% if request.user.is_superuser %}
-                      <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-arrow-left-right"></i> Switch business</a>
+                  <div class="tenant-menu" id="tenantMenu" role="menu" aria-label="Workspace menu">
+
+                    {# ── Workspace switcher (shown to all users with >1 workspace) ── #}
+                    {% if user_workspaces|length > 1 %}
+                      <div style="padding:.5rem 1rem .25rem;font-size:11px;font-weight:700;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase">Your Workspaces</div>
+                      {% for ws in user_workspaces %}
+                        {% if ws.business.id == active_business_id %}
+                          <div class="tenant-item" style="background:rgba(37,99,235,.07);cursor:default;">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;flex-shrink:0"></span>
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ws.business.name }}</span>
+                            <span style="font-size:11px;opacity:.6;font-weight:400">{{ ws.role|title }}</span>
+                          </div>
+                        {% else %}
+                          <a class="tenant-item" href="/tenants/set/{{ ws.business.id }}/" style="color:var(--ink)">
+                            <span style="width:8px;height:8px;border-radius:50%;background:#cbd5e1;display:inline-block;flex-shrink:0"></span>
+                            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ws.business.name }}</span>
+                            <span style="font-size:11px;opacity:.6;font-weight:400">{{ ws.role|title }}</span>
+                          </a>
+                        {% endif %}
+                      {% endfor %}
+                      <div class="tenant-divider"></div>
                     {% endif %}
-                    {% if membership and membership.role == "MANAGER" or IS_MANAGER or request.user.is_authenticated and request.user.profile.is_manager %}
-                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> {% if BUSINESS_VERTICAL == "gym" %}Trainers{% else %}Agents{% endif %}</a>
+
+                    {# ── Workspace management actions (shown to everyone) ── #}
+                    <a class="tenant-item" href="{{ url_choose_business|default:'/tenants/choose/' }}"><i class="bi bi-grid-3x3-gap"></i> All Workspaces</a>
+                    <a class="tenant-item" href="/tenants/create/"><i class="bi bi-plus-circle"></i> New Workspace</a>
+
+                    {# ── Owner/Admin/Manager only: member management ── #}
+                    {% if request.cc_is_manager or IS_MANAGER %}
+                      <div class="tenant-divider"></div>
+                      <a class="tenant-item" href="{{ url_manager_agents|default:'/tenants/manager/agents/' }}"><i class="bi bi-people"></i> Manage Members</a>
                     {% endif %}
-                    {% if request.user.is_staff %}
+
+                    {% if request.user.is_staff or request.user.is_superuser %}
                       <div class="tenant-divider"></div>
                       <a class="tenant-item" href="{{ url_admin_business }}"><i class="bi bi-shield-lock"></i> Staff approvals</a>
                     {% endif %}
@@ -809,16 +833,16 @@
                     <span class="tenant-role">· Admin</span>
                   </a>
                 {% elif request.user.is_authenticated %}
-                  {# MULTI-TENANCY HARDENING: Redirect to tenant chooser/join page #}
-                  <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/join/' }}">
+                  {# User authenticated but no active workspace — prompt to choose or create #}
+                  <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
                     <span class="tenant-dot" style="background:#f59e0b"></span>
-                    <span class="tenant-name">No active business</span>
+                    <span class="tenant-name">No active workspace</span>
                     <span class="tenant-role">· Set up</span>
                   </a>
                 {% else %}
                   <a class="tenant-pill hover-lift tap" href="{{ url_choose_business|default:'/tenants/choose/' }}">
                     <span class="tenant-dot" style="background:#f59e0b"></span>
-                    <span class="tenant-name">No active business</span>
+                    <span class="tenant-name">No active workspace</span>
                     <span class="tenant-role">· Set up</span>
                   </a>
                 {% endif %}

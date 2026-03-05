@@ -1,4 +1,4 @@
-﻿# tenants/context_processors.py
+# tenants/context_processors.py
 from __future__ import annotations
 
 from typing import Any, Dict
@@ -165,24 +165,39 @@ def tenant_context(request) -> Dict[str, Any]:
     except Exception:
         bid = None
 
-    # MULTI-TENANCY HARDENING: Expose user business status to templates
+    # Expose business status and workspace list to templates
     user_has_business = False
     membership = None
     subscription = None
-    
+    user_workspaces = []  # All workspaces the user belongs to (for switcher dropdown)
+
     try:
         if hasattr(request, "user") and getattr(request.user, "is_authenticated", False):
             from .utils import user_has_any_business
+            from tenants.models import Membership as _Membership
 
             user_has_business = user_has_any_business(request.user)
-            
-            # Get membership for (user, business) if both exist
+
+            # All active workspaces for this user (used in navbar switcher)
+            try:
+                user_workspaces = list(
+                    _Membership.objects.filter(
+                        user=request.user,
+                        status="ACTIVE",
+                        business__status="ACTIVE",
+                    )
+                    .select_related("business")
+                    .order_by("business__name")
+                )
+            except Exception:
+                user_workspaces = []
+
+            # Current membership for (user, active business)
             if biz:
                 try:
-                    from tenants.models import Membership
-                    membership = Membership.objects.filter(
-                        user=request.user, 
-                        business=biz
+                    membership = _Membership.objects.filter(
+                        user=request.user,
+                        business=biz,
                     ).first()
                 except Exception:
                     pass
@@ -273,14 +288,16 @@ def tenant_context(request) -> Dict[str, Any]:
         # New names
         "business": biz,
         "business_id": bid,
-        "membership": membership,  # Membership for (user, business) or None
-        "subscription": subscription,  # business.subscription or None (safe)
+        "membership": membership,        # Membership for (user, active business) or None
+        "subscription": subscription,    # business.subscription or None (safe)
         "PRODUCT_MODE": mode,
-        "BUSINESS_VERTICAL": mode,  # Alias for sidebar compatibility
+        "BUSINESS_VERTICAL": mode,       # Alias for sidebar compatibility
         "sidebar_items": sidebar_items,  # Vertical-aware navigation config
-        "MOBILE_NAV_ITEMS": mobile_nav_items,  # Vertical-aware mobile bottom nav config
-        "currency": currency,  # Currency for templates
-        "user_has_business": user_has_business,  # MULTI-TENANCY HARDENING
+        "MOBILE_NAV_ITEMS": mobile_nav_items,
+        "currency": currency,
+        "user_has_business": user_has_business,
+        # Multi-workspace: all workspaces the user is a member of
+        "user_workspaces": user_workspaces,
         # Legacy-friendly mirrors
         "active_business": biz,
         "active_business_id": bid,

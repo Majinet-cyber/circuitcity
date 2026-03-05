@@ -1,4 +1,4 @@
-﻿# tenants/utils.py
+# tenants/utils.py
 from __future__ import annotations
 
 from functools import wraps
@@ -491,57 +491,84 @@ def user_highest_role(user) -> Optional[str]:
         return None
 
 
-def user_business_membership(user) -> Optional["Membership"]:
+def get_single_business_membership_or_none(user) -> Optional["Membership"]:
     """
-    Return the user's ACTIVE business membership (single source of truth).
-    Returns None if user has no membership or multiple memberships.
-    Prioritizes MANAGER role over AGENT if exactly one exists.
+    Return the user's ACTIVE business membership ONLY when the user belongs to
+    exactly ONE business.  Returns None for multi-workspace users so that callers
+    do not force an arbitrary business onto a user who intentionally has multiple
+    workspaces.
+
+    This is the explicitly-named version of ``user_business_membership``.
+    Prefer this name in new code; the legacy alias is retained for compatibility.
+
+    Returns:
+        Membership  – if user has exactly one active membership (any role)
+        None        – if user has 0 memberships OR memberships in >1 businesses
     """
     if Membership is None or not getattr(user, "is_authenticated", False):
         return None
-    
+
     try:
         qs = Membership.objects.filter(user=user).select_related("business")
         if _membership_has_status_field():
             qs = qs.filter(status__iexact="ACTIVE")
-        
+
         memberships = list(qs.filter(business__status="ACTIVE"))
-        
+
         if len(memberships) == 0:
             return None
         if len(memberships) == 1:
             return memberships[0]
-        
-        # Multiple memberships: prefer MANAGER over AGENT (for same business)
+
+        # Multiple memberships – check how many distinct businesses
+        business_ids = {m.business_id for m in memberships}
+        if len(business_ids) > 1:
+            # Multi-workspace user: cannot determine a single "active" business here.
+            # The caller must use session / explicit selection instead.
+            return None
+
+        # Same business, multiple roles (e.g. MANAGER + AGENT in the same biz).
+        # Prefer MANAGER.
         managers = [m for m in memberships if (m.role or "").upper() == "MANAGER"]
         if len(managers) == 1:
             return managers[0]
-        
-        # Return first if ambiguous
+
         return memberships[0]
     except Exception:
         return None
 
 
+# Legacy alias — kept for backward compatibility with existing callers and tests.
+# New code should use get_single_business_membership_or_none directly.
+user_business_membership = get_single_business_membership_or_none
+
+
 def user_has_any_business(user) -> bool:
     """
-    Returns True if user has ANY active membership or owns/created a business.
-    Used to determine if user should see onboarding vs. being locked to their business.
+    Returns True if user has ANY active membership (regardless of how many workspaces)
+    or has created any business.  Safe for multi-workspace users.
     """
     if not getattr(user, "is_authenticated", False):
         return False
-    
-    # Check membership
-    if user_business_membership(user) is not None:
-        return True
-    
-    # Check if user created any business
+
+    # Direct count check – works for single AND multi-workspace users
+    if Membership is not None:
+        try:
+            qs = Membership.objects.filter(user=user)
+            if _membership_has_status_field():
+                qs = qs.filter(status__iexact="ACTIVE")
+            if qs.filter(business__status="ACTIVE").exists():
+                return True
+        except Exception:
+            pass
+
+    # Fall back: did the user create any business (even if no active membership yet)?
     if Business is not None:
         try:
             return Business.objects.filter(created_by=user).exists()
         except Exception:
             pass
-    
+
     return False
 
 

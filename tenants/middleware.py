@@ -1,4 +1,4 @@
-﻿# circuitcity/tenants/middleware.py
+# circuitcity/tenants/middleware.py
 from __future__ import annotations
 
 from typing import Iterable, Optional
@@ -597,6 +597,19 @@ class TenantResolutionMiddleware(MiddlewareMixin):
             set_current_business_id(None)
         except Exception:
             pass
+
+        # Add X-Active-Workspace header — only for authenticated users with an active workspace.
+        # This allows API consumers and JS to read the current workspace without parsing HTML.
+        # Format: "<id>:<name>" (e.g. "7:Acme Shop")
+        try:
+            user = getattr(request, "user", None)
+            if user and getattr(user, "is_authenticated", False):
+                biz = getattr(request, "business", None)
+                if biz is not None:
+                    response["X-Active-Workspace"] = f"{biz.id}:{biz.name}"
+        except Exception:
+            pass
+
         return response
 
 

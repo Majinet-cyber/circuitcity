@@ -1,4 +1,4 @@
-﻿# circuitcity/tenants/views.py
+# circuitcity/tenants/views.py
 from __future__ import annotations
 
 from typing import Optional, List, Set
@@ -8,7 +8,7 @@ from datetime import timedelta  # <-- FIX: use datetime.timedelta (not timezone.
 from django.contrib import messages
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import NoReverseMatch, reverse
 from django.views.decorators.http import require_http_methods
@@ -23,9 +23,7 @@ from .utils import (
     require_role,
     set_active_business,
     get_active_business,
-    # NEW helpers (added, non-breaking)
     resolve_default_business_for_user,
-    get_manager_bound_business,
     user_highest_role,
     user_has_membership,
     redirect_manager_safe_choose,
@@ -255,23 +253,24 @@ def clear_active(request: HttpRequest) -> HttpResponse:
 
 @login_required
 def set_active(request: HttpRequest, biz_id) -> HttpResponse:
-    """Switch active business for this session (membership required unless superuser)."""
+    """
+    Switch the active workspace for this session.
+
+    Multi-workspace: any authenticated user with an ACTIVE membership in the
+    requested business may switch to it freely.  The old "managers are bound to
+    one business" lock has been removed so that owners / managers who operate
+    multiple workspaces can switch without restriction.
+    """
     b = get_object_or_404(Business, pk=biz_id, status="ACTIVE")
 
     user = request.user
-    if not user.is_superuser:
-        bound = get_manager_bound_business(user)
-        if bound and bound.id != b.id:
-            messages.error(request, "Managers are bound to their original business.")
-            return _home_redirect(request)
-
     if not user.is_superuser:
         has_access = Membership.objects.filter(
             business=b, user=user, status="ACTIVE"
         ).exists()
         if not has_access:
-            messages.error(request, "You do not have access to that business.")
-            return redirect_manager_safe_choose(request)
+            messages.error(request, "You do not have access to that workspace.")
+            return redirect("tenants:choose_business")
 
     _ensure_seed_on_switch(b)
     set_active_business(request, b)
@@ -282,80 +281,35 @@ def set_active(request: HttpRequest, biz_id) -> HttpResponse:
 @login_required
 def choose_business(request: HttpRequest) -> HttpResponse:
     """
-    Chooser page for users with multiple businesses.
-    
-    CRITICAL FIX (Jan 2026): Agents with business memberships should NOT be blocked.
-    They should be auto-redirected to their business dashboard.
-    
-    This view handles:
-    - Superusers: Show business switcher
-    - Regular users with business: Auto-redirect to dashboard
-    - Users without business: Redirect to tenant selection/signup
+    Multi-workspace chooser page.
+
+    Behaviour:
+    - User has 0 workspaces → redirect to activate_mine (join / create flow)
+    - User has exactly 1 workspace and NO active workspace set yet → auto-activate, go to dashboard
+    - User has 1+ workspaces → show chooser so they can pick or switch
+    - Superusers → also see the global list of all ACTIVE businesses
+
+    POST: switch to the chosen workspace (membership check for non-superusers).
     """
     user = request.user
 
-    # Auto-redirect logic for non-superusers
-    if not user.is_superuser:
-        from .utils import user_has_any_business
-        
-        # If user has any business, redirect them to their dashboard
-        if user_has_any_business(user):
-            bound = get_manager_bound_business(user)
-            if bound:
-                _ensure_seed_on_switch(bound)
-                set_active_business(request, bound)
-                messages.info(request, f"Your account is linked to {bound.name}.")
-                return _home_redirect(request)
-            
-            # Get their business membership (agents or managers)
-            memberships_list = list(
-                Membership.objects.filter(user=user, status="ACTIVE")
-                .select_related("business")
-                .order_by("-created_at")
-            )
-            
-            if memberships_list:
-                single_biz = memberships_list[0].business
-                _ensure_seed_on_switch(single_biz)
-                set_active_business(request, single_biz)
-                # No message needed - just redirect to their dashboard
-                home_url = get_business_home_url(user=user, business=single_biz)
-                return redirect(home_url)
-        
-        # No business yet - redirect to tenant selection (activate_mine handles join flow)
-        return redirect("tenants:activate_mine")
-
-    # SUPERUSERS ONLY beyond this point
+    # Gather this user's active memberships
     memberships_qs = (
         Membership.objects.filter(user=user, status="ACTIVE")
         .select_related("business")
-        .order_by("-created_at")
+        .order_by("business__name")
     )
-    
-    # Filter to only ACTIVE businesses
     memberships_list = [
         m for m in memberships_qs
         if getattr(m.business, "status", "ACTIVE") == "ACTIVE"
     ]
 
-    # AUTO-REDIRECT: If user has exactly ONE membership, set it as active and go to their dashboard
-    if len(memberships_list) == 1:
-        single_biz = memberships_list[0].business
-        _ensure_seed_on_switch(single_biz)
-        set_active_business(request, single_biz)
-        # Redirect to appropriate business home (phones dashboard for agents)
-        home_url = get_business_home_url(user=user, business=single_biz)
-        return redirect(home_url)
-
-    all_active_businesses = None
-    if user.is_superuser:
-        all_active_businesses = Business.objects.filter(status="ACTIVE").order_by("name")
-
+    # --- Handle POST (workspace switch) ---
     if request.method == "POST":
         bid = request.POST.get("business_id")
         if not bid:
-            messages.error(request, "No business selected.")
-            return redirect_manager_safe_choose(request)
+            messages.error(request, "No workspace selected.")
+            return redirect("tenants:choose_business")
 
         b = get_object_or_404(Business, pk=bid, status="ACTIVE")
 
@@ -364,19 +318,39 @@ def choose_business(request: HttpRequest) -> HttpResponse:
                 business=b, user=user, status="ACTIVE"
             ).exists()
             if not ok:
-                messages.error(request, "You cannot switch to that business.")
-                return redirect_manager_safe_choose(request)
+                messages.error(request, "You do not have access to that workspace.")
+                return redirect("tenants:choose_business")
 
         _ensure_seed_on_switch(b)
         set_active_business(request, b)
         messages.success(request, f"Switched to {b.name}.")
         return _home_redirect(request)
 
+    # --- Handle GET ---
+
+    # No memberships at all → send to onboarding/join flow
+    if not memberships_list and not user.is_superuser:
+        from .utils import user_has_any_business
+        if not user_has_any_business(user):
+            return redirect("tenants:activate_mine")
+
+    # Exactly one workspace and none currently active → auto-activate (convenience)
+    if len(memberships_list) == 1 and not get_active_business(request):
+        single_biz = memberships_list[0].business
+        _ensure_seed_on_switch(single_biz)
+        set_active_business(request, single_biz)
+        home_url = get_business_home_url(user=user, business=single_biz)
+        return redirect(home_url)
+
+    all_active_businesses = None
+    if user.is_superuser:
+        all_active_businesses = Business.objects.filter(status="ACTIVE").order_by("name")
+
     return render(
         request,
         "tenants/choose_business.html",
         {
-            "memberships": memberships_qs,
+            "memberships": memberships_list,
             "all_active_businesses": all_active_businesses,
         },
     )
@@ -389,25 +363,11 @@ def choose_business(request: HttpRequest) -> HttpResponse:
 @login_required
 def create_business_as_manager(request: HttpRequest) -> HttpResponse:
     """
-    Manager proposes a new Business (PENDING).
-    
-    MULTI-TENANCY HARDENING:
-    - Block users who already have a business
-    - After creation, set active_business to the new business (even if PENDING)
-      so managers will never be offered the agent-join path.
+    Propose a new Business (PENDING status until staff approval).
+
+    Multi-workspace: a user may own or manage multiple businesses.  There is no
+    longer a hard block preventing creation of a second (or third) workspace.
     """
-    # SECURITY: Block users who already have a business
-    from .utils import user_has_any_business
-    
-    if not request.user.is_superuser and user_has_any_business(request.user):
-        messages.error(
-            request,
-            "Your account is already linked to a business. "
-            "Each account can only create or belong to one business. "
-            "Please contact support if you need assistance."
-        )
-        return _home_redirect(request)
-    
     if request.method == "POST":
         form = CreateBusinessForm(request.POST, user=request.user)
         if form.is_valid():
@@ -451,24 +411,10 @@ def join_as_agent(request: HttpRequest) -> HttpResponse:
     if request.user.is_superuser:
         return _superuser_landing(request)
 
-    # SECURITY: Block users who already have a business
-    from .utils import user_has_any_business
-    
-    if user_has_any_business(request.user):
-        messages.error(
-            request,
-            "Your account is already linked to a business. "
-            "Each account can only belong to one business."
-        )
-        return _home_redirect(request)
-
-    # Never show agent-join to managers/owners/admins
-    role = (user_highest_role(request.user) or "").upper()
-    if role in {"OWNER", "MANAGER", "ADMIN"}:
-        return HttpResponseForbidden("Managers and owners cannot join as agents.")
-
     if get_active_business(request):
-        return _home_redirect(request)
+        # User already has an active workspace; they can still join another business
+        # as an agent by continuing through this form.
+        pass
 
     if request.method == "POST":
         form = JoinAsAgentForm(request.POST)
@@ -1077,3 +1023,246 @@ def _invite_invalid_page(reason: str) -> HttpResponse:
 
 def _csrf_input_placeholder() -> str:
     return "__CSRF__PLACEHOLDER__"
+
+
+# -------------------------------------------------------------------
+# JSON API: /api/workspaces/*
+# -------------------------------------------------------------------
+
+import json as _json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.text import slugify as _slugify
+
+
+def _workspace_to_dict(biz, role: str = "", is_active: bool = False) -> dict:
+    return {
+        "id": biz.id,
+        "name": biz.name,
+        "slug": getattr(biz, "slug", ""),
+        "kind": getattr(biz, "business_kind", "") or "",
+        "status": getattr(biz, "status", "ACTIVE"),
+        "role": role,
+        "is_active": is_active,
+    }
+
+
+@login_required
+def api_workspaces_list(request: HttpRequest) -> JsonResponse:
+    """
+    GET  /api/workspaces/   → list the current user's workspaces
+    POST /api/workspaces/   → create a new workspace (JSON body: {name, kind?})
+    """
+    user = request.user
+
+    if request.method == "GET":
+        active_biz = get_active_business(request)
+        active_id = getattr(active_biz, "id", None)
+
+        rows = []
+        for mem in (
+            Membership.objects.filter(user=user, status="ACTIVE", business__status="ACTIVE")
+            .select_related("business")
+            .order_by("business__name")
+        ):
+            rows.append(_workspace_to_dict(
+                mem.business,
+                role=mem.role,
+                is_active=(mem.business.id == active_id),
+            ))
+
+        resp = JsonResponse({"workspaces": rows, "count": len(rows)})
+        if active_biz:
+            resp["X-Active-Workspace"] = f"{active_biz.id}:{active_biz.name}"
+        return resp
+
+    if request.method == "POST":
+        try:
+            body = _json.loads(request.body or "{}")
+        except Exception:
+            body = {}
+        name = (body.get("name") or "").strip()
+        kind = (body.get("kind") or "").strip() or None
+        if not name:
+            return JsonResponse({"error": "name is required"}, status=400)
+
+        from .forms import CreateBusinessForm as _CBF
+        # Ensure unique slug
+        base_slug = _slugify(name)
+        slug = base_slug
+        counter = 1
+        while Business.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+
+        biz = Business(
+            name=name,
+            slug=slug,
+            created_by=user,
+            status="PENDING",
+        )
+        if kind:
+            biz.business_kind = kind
+        biz.save()
+
+        Membership.objects.create(
+            user=user,
+            business=biz,
+            role="MANAGER",
+            status="PENDING",
+        )
+        set_active_business(request, biz)
+        resp = JsonResponse(_workspace_to_dict(biz, role="MANAGER"), status=201)
+        resp["X-Active-Workspace"] = f"{biz.id}:{biz.name}"
+        return resp
+
+    return JsonResponse({"error": "method not allowed"}, status=405)
+
+
+@login_required
+def api_workspaces_set_active(request: HttpRequest) -> JsonResponse:
+    """
+    POST /api/workspaces/active/  {workspace_id: <id>}
+    Switch the active workspace for this session.
+    Returns 403 if user is not a member of that workspace.
+    Returns 409 if no workspace_id provided and user has multiple.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "method not allowed"}, status=405)
+
+    try:
+        body = _json.loads(request.body or "{}")
+    except Exception:
+        body = {}
+
+    wid = body.get("workspace_id")
+    if not wid:
+        # No id given: if user has multiple, return canonical 409
+        count = Membership.objects.filter(
+            user=request.user, status="ACTIVE", business__status="ACTIVE"
+        ).count()
+        if count > 1:
+            return JsonResponse(
+                {
+                    "detail": "No active workspace selected",
+                    "action": "choose_workspace",
+                    "choose_url": "/tenants/choose/",
+                    "hint": "POST workspace_id here, or GET /api/workspaces/ to list options",
+                },
+                status=409,
+            )
+        return JsonResponse({"error": "workspace_id is required"}, status=400)
+
+    user = request.user
+    try:
+        b = Business.objects.get(pk=wid, status="ACTIVE")
+    except Business.DoesNotExist:
+        return JsonResponse({"error": "workspace not found"}, status=404)
+
+    if not user.is_superuser:
+        if not Membership.objects.filter(user=user, business=b, status="ACTIVE").exists():
+            return JsonResponse({"error": "forbidden: not a member"}, status=403)
+
+    _ensure_seed_on_switch(b)
+    set_active_business(request, b)
+    resp = JsonResponse(_workspace_to_dict(b, is_active=True))
+    resp["X-Active-Workspace"] = f"{b.id}:{b.name}"
+    return resp
+
+
+@login_required
+def api_workspaces_members(request: HttpRequest) -> JsonResponse:
+    """
+    GET  /api/workspaces/members/    → list members of the active workspace
+    POST /api/workspaces/members/    → add member by email (must already have an account)
+    """
+    user = request.user
+    biz = get_active_business(request)
+    if not biz:
+        return JsonResponse(
+            {
+                "detail": "No active workspace selected",
+                "action": "choose_workspace",
+                "choose_url": "/tenants/choose/",
+            },
+            status=409,
+        )
+
+    if request.method == "GET":
+        members = []
+        for mem in (
+            Membership.objects.filter(business=biz)
+            .select_related("user")
+            .order_by("-created_at")
+        ):
+            members.append({
+                "id": mem.id,
+                "username": mem.user.username,
+                "email": mem.user.email,
+                "role": mem.role,
+                "status": mem.status,
+                "is_active": mem.is_active,
+            })
+        resp = JsonResponse({"members": members, "count": len(members)})
+        resp["X-Active-Workspace"] = f"{biz.id}:{biz.name}"
+        return resp
+
+    if request.method == "POST":
+        # Only owner/manager can add members
+        is_mgr = Membership.objects.filter(
+            business=biz, user=user, role__in=["MANAGER", "OWNER"], status="ACTIVE"
+        ).exists()
+        if not is_mgr and not user.is_superuser:
+            return JsonResponse({"error": "forbidden: manager role required"}, status=403)
+
+        try:
+            body = _json.loads(request.body or "{}")
+        except Exception:
+            body = {}
+        email = (body.get("email") or "").strip().lower()
+        role = (body.get("role") or "AGENT").upper()
+        if not email:
+            return JsonResponse({"error": "email is required"}, status=400)
+
+        from django.contrib.auth import get_user_model as _gum
+        UserModel = _gum()
+        try:
+            target_user = UserModel.objects.get(email__iexact=email)
+        except UserModel.DoesNotExist:
+            return JsonResponse(
+                {
+                    "error": "user_not_found",
+                    "message": (
+                        "User not found. Ask them to create an Emajinet account first."
+                    ),
+                },
+                status=404,
+            )
+
+        mem, created = Membership.objects.get_or_create(
+            user=target_user,
+            business=biz,
+            defaults={"role": role, "status": "ACTIVE"},
+        )
+        if not created:
+            mem.role = role
+            mem.status = "ACTIVE"
+            mem.save(update_fields=["role", "status"])
+
+        resp = JsonResponse(
+            {
+                "member": {
+                    "id": mem.id,
+                    "username": target_user.username,
+                    "email": target_user.email,
+                    "role": mem.role,
+                    "status": mem.status,
+                },
+                "created": created,
+            },
+            status=201 if created else 200,
+        )
+        resp["X-Active-Workspace"] = f"{biz.id}:{biz.name}"
+        return resp
+
+    return JsonResponse({"error": "method not allowed"}, status=405)

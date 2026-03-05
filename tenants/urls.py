@@ -1,4 +1,4 @@
-﻿# tenants/urls.py
+# tenants/urls.py
 from __future__ import annotations
 
 from django.shortcuts import redirect
@@ -217,6 +217,11 @@ urlpatterns = [
     # Accept invite (used in links shared with agents)
     # NOTE: <str:token> safely carries TimestampSigner tokens (no slashes).
     path("invites/accept/<str:token>/", invite_accept, name="invite_accept"),
+
+    # ── JSON API: workspace management ──────────────────────────────────────────
+    path("api/workspaces/",         views.api_workspaces_list,       name="api_workspaces"),
+    path("api/workspaces/active/",  views.api_workspaces_set_active, name="api_workspaces_active"),
+    path("api/workspaces/members/", views.api_workspaces_members,    name="api_workspaces_members"),
     
     # Location tracking endpoints (for agents)
     path(
