@@ -363,10 +363,10 @@ def choose_business(request: HttpRequest) -> HttpResponse:
 @login_required
 def create_business_as_manager(request: HttpRequest) -> HttpResponse:
     """
-    Propose a new Business (PENDING status until staff approval).
+    Create a new Business — auto-activated immediately (no staff approval required).
 
     Multi-workspace: a user may own or manage multiple businesses.  There is no
-    longer a hard block preventing creation of a second (or third) workspace.
+    hard block preventing creation of a second (or third) workspace.
     """
     if request.method == "POST":
         form = CreateBusinessForm(request.POST, user=request.user)
@@ -374,28 +374,94 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
             b: Business = form.save(commit=False)
             b.slug = form.cleaned_data["slug"]
             b.created_by = request.user
-            b.status = "PENDING"
+            b.status = "ACTIVE"  # auto-activate; no staff approval gate
             b.save()
 
             Membership.objects.create(
                 user=request.user,
                 business=b,
                 role="MANAGER",
-                status="PENDING",
+                status="ACTIVE",  # creator is immediately an active manager
             )
 
-            # NEW: set active business immediately (privacy-safe; it's the creator's)
+            # Seed Location/Warehouse defaults so the workspace is usable right away
+            _ensure_seed_on_switch(b)
+
+            # Put the new workspace in the session so the user lands in it
             set_active_business(request, b)
+
+            # Send congrats / welcome email after transaction commits (safe: no email on rollback)
+            _send_workspace_welcome_email(request, request.user, b)
 
             messages.success(
                 request,
-                "Business submitted. A developer will approve it shortly."
+                f"'{b.name}' workspace created! You can switch between workspaces anytime.",
             )
-            return redirect_manager_safe_choose(request)
+            # Redirect straight into the new workspace dashboard
+            home_url = get_business_home_url(user=request.user, business=b)
+            return redirect(home_url)
     else:
         form = CreateBusinessForm(user=request.user)
 
     return render(request, "tenants/create_business.html", {"form": form})
+
+
+def _send_workspace_welcome_email(request: HttpRequest, user, business: Business) -> None:
+    """
+    Dispatch a WELCOME_MANAGER email after a manager creates a new workspace.
+
+    Uses transaction.on_commit so the email is never sent if the DB transaction
+    rolls back.  Errors are logged (never silently swallowed).
+    """
+    if not user.email:
+        log.warning(
+            "workspace_welcome_email: user %s has no email address; skipping.",
+            user.pk,
+        )
+        return
+
+    from notifications.services import emit_event
+
+    try:
+        login_url = request.build_absolute_uri("/tenants/choose/")
+        support_url = "https://emajinet.africa/support"
+
+        def _emit():
+            try:
+                emit_event(
+                    event_type="WELCOME_MANAGER",
+                    recipients=[user.email],
+                    dedupe_key=f"WELCOME_MANAGER:workspace:{business.pk}:{user.pk}",
+                    payload={
+                        "manager_name": user.get_full_name() or user.username,
+                        "business_name": business.name,
+                        "login_url": login_url,
+                        "support_url": support_url,
+                        "next_steps": [
+                            "Add products to your inventory (Scan In)",
+                            "Process your first sale (Scan & Sell)",
+                            "Invite your team members",
+                        ],
+                    },
+                    business=business,
+                    user=user,
+                )
+            except Exception:
+                log.exception(
+                    "workspace_welcome_email: failed to emit WELCOME_MANAGER "
+                    "for business_id=%s user_id=%s",
+                    business.pk,
+                    user.pk,
+                )
+
+        transaction.on_commit(_emit)
+    except Exception:
+        log.exception(
+            "workspace_welcome_email: unexpected error scheduling welcome email "
+            "for business_id=%s user_id=%s",
+            business.pk,
+            user.pk,
+        )
 
 
 @login_required

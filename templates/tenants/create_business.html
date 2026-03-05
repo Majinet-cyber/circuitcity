@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Create Business{% endblock %}
-{% block header_title %}Create Business (Manager Request){% endblock %}
+{% block title %}Create Workspace{% endblock %}
+{% block header_title %}Create a New Workspace{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
@@ -13,7 +13,7 @@
   <form method="post" class="gcard" data-anim>
     {% csrf_token %}
     <div class="gtitle">Business details</div>
-    <div class="gsub">This name will appear in UI and dashboards. Staff will approve before activation.</div>
+    <div class="gsub">Your workspace is ready instantly — no approval needed. Switch between workspaces anytime.</div>
 
     <div class="gfield" style="margin-top:14px" data-anim>
       <div class="label">Business name</div>
@@ -23,7 +23,7 @@
 
     <div class="gactions">
       <a href="{% url 'tenants:choose_business' %}" class="gbtn">Cancel</a>
-      <button class="gbtn primary" data-anim="pop">Submit for Approval</button>
+      <button class="gbtn primary" data-anim="pop">Create Workspace</button>
     </div>
   </form>
 </section>
