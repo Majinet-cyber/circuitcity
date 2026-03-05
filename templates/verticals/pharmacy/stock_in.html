@@ -860,8 +860,21 @@
   <div class="success-celebration">
     <div class="icon">🎉</div>
     <h2>Stock Updated Successfully!</h2>
-    <p>You added <strong>{{ success_data.quantity }}</strong> units of <strong>{{ success_data.product_name }}</strong></p>
+    <p>
+      Added <strong>{{ success_data.quantity }}</strong> units of
+      <strong>{{ success_data.product_name }}</strong>
+    </p>
+    {% if success_data.new_stock is not None %}
+    <p style="font-size:1.05rem; margin-top:8px; color:#065f46;">
+      Stock:
+      <span style="text-decoration:line-through; color:#94a3b8;">{{ success_data.prev_stock }}</span>
+      &rarr; <strong>{{ success_data.new_stock }}</strong> units now in stock
+    </p>
+    {% endif %}
     <div class="success-actions">
+      {% if success_data.product_id %}
+      <a href="?prefill_id={{ success_data.product_id }}" class="primary">Re-stock Same Product</a>
+      {% endif %}
       <a href="{% url 'pharmacy:stock_in' %}" class="primary">Add Another Product</a>
       <a href="{% url 'pharmacy:sell' %}" class="secondary">Go to Sell</a>
       <a href="{% url 'pharmacy:dashboard' %}" class="secondary">View Dashboard</a>
@@ -982,11 +995,11 @@
               </div>
               
               {% if card.exists %}
-                <button type="button" class="btn-suggestion btn-select" data-action="select">
+                <button type="button" class="btn-suggestion btn-select" data-action="select" data-product-name="{{ card.name }}">
                   ✓ Select
                 </button>
               {% else %}
-                <button type="button" class="btn-suggestion btn-add" data-action="add">
+                <button type="button" class="btn-suggestion btn-add js-add-to-catalog" data-action="add" data-product-name="{{ card.name }}">
                   + Add to Catalog
                 </button>
               {% endif %}
@@ -1083,7 +1096,7 @@
             {% if product.sku %}
             <div style="color: #64748b; font-size: 0.8rem; margin-top: 4px;">SKU: {{ product.sku }}</div>
             {% endif %}
-            <span class="product-stock">In stock: {{ product.quantity_in_stock|default:0 }}</span>
+            <span class="product-stock">In stock: {{ product.batch_stock|default:product.quantity_in_stock|default:0 }}</span>
           </div>
           {% endfor %}
           
@@ -1169,13 +1182,14 @@
           <div class="form-grid">
             <div class="form-field">
               <label>Product Name <span class="required">*</span></label>
-              <input 
-                type="text" 
-                name="product_name" 
+              <input
+                type="text"
+                name="product_name"
                 id="product-name"
-                required 
+                required
                 placeholder="e.g., Paracetamol 500mg"
-                autocomplete="off">
+                autocomplete="off"
+                value="{{ prefill_product.name|default:'' }}">
               <small>Generic or brand name</small>
             </div>
             
@@ -1196,7 +1210,8 @@
                 name="supplier" 
                 id="supplier"
                 placeholder="Supplier name"
-                autocomplete="off">
+                autocomplete="off"
+                value="{{ prefill_last_batch.supplier|default:'' }}">
             </div>
           </div>
         </div>
@@ -1234,21 +1249,22 @@
                   type="number" 
                   name="reorder_level" 
                   id="reorder-level"
-                  value="10" 
+                  value="{{ prefill_last_batch.reorder_level|default:10 }}" 
                   min="0">
                 <small>Alert when stock is low</small>
               </div>
               
               <div class="form-field" style="margin-top: 16px;">
                 <label>Cost Price (per unit) <span class="required">*</span></label>
-                <input 
-                  type="number" 
-                  name="cost_price" 
+                <input
+                  type="number"
+                  name="cost_price"
                   id="cost-price"
-                  required 
-                  step="0.01" 
-                  min="0" 
-                  placeholder="0.00">
+                  required
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value="{{ prefill_last_batch.cost_price|default:prefill_product.cost_price|default:'' }}">
                 <small>Your purchase price</small>
               </div>
               
@@ -1270,14 +1286,15 @@
               
               <div class="form-field" style="margin-top: 16px;">
                 <label>Selling Price (per unit) <span class="required">*</span></label>
-                <input 
-                  type="number" 
-                  name="selling_price" 
+                <input
+                  type="number"
+                  name="selling_price"
                   id="selling-price"
-                  required 
-                  step="0.01" 
-                  min="0" 
-                  placeholder="0.00">
+                  required
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value="{{ prefill_last_batch.selling_price|default:prefill_product.selling_price|default:'' }}">
                 <small>Customer price</small>
               </div>
             </div>
@@ -1333,12 +1350,46 @@
         
       </form>
       {% else %}
+
+      <!-- Recently Stocked Suggestions -->
+      {% if recently_stocked %}
+      <div class="section-card" id="recently-stocked-section">
+        <div class="section-header">
+          <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#10b981,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🕐</div>
+          <div>
+            <h2 style="margin:0;font-size:1.2rem;font-weight:700;">Recently Stocked</h2>
+            <p style="margin:0;color:#64748b;font-size:0.9rem;">Tap a product to stock it again quickly</p>
+          </div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          {% for product in recently_stocked %}
+          <a
+            href="?category={{ product.category }}&prefill_id={{ product.id }}"
+            style="display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:#f0fdf4;border:2px solid #86efac;border-radius:12px;text-decoration:none;color:#166534;font-weight:600;font-size:0.95rem;transition:all 0.2s;white-space:nowrap;"
+            onmouseover="this.style.background='#dcfce7';this.style.borderColor='#4ade80';"
+            onmouseout="this.style.background='#f0fdf4';this.style.borderColor='#86efac';"
+          >
+            <span style="font-size:1.1rem;">💊</span>
+            <span>{{ product.name }}</span>
+            {% if product.category %}
+            <span style="font-size:0.8rem;color:#15803d;background:#bbf7d0;padding:2px 8px;border-radius:20px;">
+              {% for cat in category_options %}{% if cat.value == product.category %}{{ cat.label }}{% endif %}{% endfor %}
+            </span>
+            {% endif %}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Prompt to select category -->
       <div class="section-card">
         <div style="text-align: center; padding: 40px;">
           <div style="font-size: 3rem; margin-bottom: 16px;">👆</div>
           <h3 style="color: #475569; margin: 0 0 8px;">Select a category above to continue</h3>
-          <p style="color: #64748b; margin: 0;">Choose the type of product you want to add</p>
+          <p style="color: #64748b; margin: 0;">
+            {% if recently_stocked %}Or click a recently stocked product above to jump straight in.{% else %}Choose the type of product you want to add.{% endif %}
+          </p>
         </div>
       </div>
       {% endif %}
@@ -1495,12 +1546,28 @@
               
               showToast(`Added: ${data.name}`);
               
-              // Auto-select the newly created product
+              // Auto-select the newly created product and scroll to Step 4
               const productNameInput = document.getElementById('product-name');
               if (productNameInput) {
                 productNameInput.value = data.name;
                 productNameInput.style.borderColor = '#10b981';
                 productNameInput.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.2)';
+                
+                // Dispatch events for any listeners
+                productNameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                productNameInput.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                // Scroll to Step 4 (Product Details section)
+                const step4Section = productNameInput.closest('.section-card');
+                if (step4Section) {
+                  step4Section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                
+                // Focus and select the input
+                setTimeout(() => {
+                  productNameInput.focus();
+                  productNameInput.select();
+                }, 500);
                 
                 setTimeout(() => {
                   productNameInput.style.borderColor = '';

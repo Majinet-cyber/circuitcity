@@ -14,7 +14,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction, IntegrityError
-from django.db.models import Sum, Count, Q, F, DecimalField
+from django.db.models import Sum, Count, Q, F, DecimalField, Max
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -213,9 +213,31 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     )
 
     for item in sales_by_batch:
+        product_id_val = item["batch__merch_product__id"]
         # Calculate profit for this product across all sales in period
-        product_sales = period_sales.filter(batch__merch_product__id=item["batch__merch_product__id"])
+        product_sales = period_sales.filter(batch__merch_product__id=product_id_val)
         product_profit = sum(sale.profit for sale in product_sales)
+
+        # Per-product payment method breakdown
+        payment_breakdown = (
+            product_sales.values("payment_method")
+            .annotate(amount=Sum("total_amount"))
+        )
+        cash_rev = Decimal("0.00")
+        momo_rev = Decimal("0.00")
+        bank_rev = Decimal("0.00")
+        credit_rev = Decimal("0.00")
+        for pb in payment_breakdown:
+            method = (pb["payment_method"] or "CASH").upper()
+            amt = pb["amount"] or Decimal("0.00")
+            if method == "CASH":
+                cash_rev = amt
+            elif method == "MOBILE_MONEY":
+                momo_rev = amt
+            elif method == "BANK":
+                bank_rev = amt
+            elif method == "CREDIT":
+                credit_rev = amt
 
         # Get category display name
         category_code = item["batch__merch_product__category"] or "general"
@@ -230,6 +252,11 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
                 "revenue": item["total_revenue"],
                 "profit": product_profit,
                 "sales_count": item["sales_count"],
+                # Payment breakdown
+                "cash_revenue": cash_rev,
+                "momo_revenue": momo_rev,
+                "bank_revenue": bank_rev,
+                "credit_revenue": credit_rev,
             }
         )
 
@@ -250,6 +277,24 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         category_sales = period_sales.filter(batch__merch_product__category=category_code)
         category_profit = sum(sale.profit for sale in category_sales)
 
+        # Per-category payment method breakdown
+        cat_payment_breakdown = (
+            category_sales.values("payment_method")
+            .annotate(amount=Sum("total_amount"))
+        )
+        cat_cash = cat_momo = cat_bank = cat_credit = Decimal("0.00")
+        for pb in cat_payment_breakdown:
+            method = (pb["payment_method"] or "CASH").upper()
+            amt = pb["amount"] or Decimal("0.00")
+            if method == "CASH":
+                cat_cash = amt
+            elif method == "MOBILE_MONEY":
+                cat_momo = amt
+            elif method == "BANK":
+                cat_bank = amt
+            elif method == "CREDIT":
+                cat_credit = amt
+
         top_categories_data.append(
             {
                 "category": category_display,
@@ -258,6 +303,11 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
                 "revenue": item["total_revenue"],
                 "profit": category_profit,
                 "sales_count": item["sales_count"],
+                # Payment method breakdown
+                "cash_revenue": cat_cash,
+                "momo_revenue": cat_momo,
+                "bank_revenue": cat_bank,
+                "credit_revenue": cat_credit,
             }
         )
 
@@ -1118,11 +1168,25 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
 
                 ctx["items"] = items
             else:
-                # Pharmacy mode: use standard items
-                items = get_items_for_top_category(selected_category)
-                # Safety: if no items found, add a custom option
-                if not items:
-                    items = [{"name": "+ Add Custom Product", "icon": "📝"}]
+                # Pharmacy mode: merge DB products + static prefill items
+                static_items = get_items_for_top_category(selected_category)
+                static_names_normalized = {i["name"].lower().strip() for i in static_items}
+
+                # Pull business-owned pharmacy products not already in static list
+                db_products = list(
+                    MerchProduct.objects.filter(
+                        business=business, kind="pharmacy", is_active=True
+                    ).values_list("name", flat=True)
+                )
+                db_only = [
+                    {"name": name, "icon": "✨"}
+                    for name in db_products
+                    if name.lower().strip() not in static_names_normalized
+                ]
+
+                # DB products first (user's own), then static prefills, then custom
+                items = db_only + list(static_items)
+                items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
                 ctx["items"] = items
 
     elif step == 3:
@@ -1190,8 +1254,24 @@ def pharmacy_stock_in_wizard(request: HttpRequest) -> HttpResponse:
 
             ctx["items"] = items
         else:
-            # For pharmacy mode, use the standard brand items
-            ctx["items"] = get_items_for_subcategory(selected_category, selected_subcategory)
+            # Pharmacy mode: merge DB products + static subcategory items
+            static_items = get_items_for_subcategory(selected_category, selected_subcategory)
+            static_names_normalized = {i["name"].lower().strip() for i in static_items}
+
+            db_products = list(
+                MerchProduct.objects.filter(
+                    business=business, kind="pharmacy", is_active=True
+                ).values_list("name", flat=True)
+            )
+            db_only = [
+                {"name": name, "icon": "✨"}
+                for name in db_products
+                if name.lower().strip() not in static_names_normalized
+            ]
+
+            items = db_only + list(static_items)
+            items.append({"name": "+ Add Custom Product", "icon": "📝", "is_custom": True})
+            ctx["items"] = items
 
     return render(request, "verticals/pharmacy/stock_in_wizard.html", ctx)
 
@@ -1416,22 +1496,62 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
     Query params: ?step=1&category=medicine
     """
     business: Business = request.business
-    
+
+    # ===== RECENTLY STOCKED PRODUCTS (shown as suggestion chips when no category chosen) =====
+    # One query: distinct products ordered by most-recent PharmacyBatch creation date
+    recently_stocked = (
+        MerchProduct.objects.filter(business=business, kind="pharmacy", is_active=True)
+        .annotate(last_stocked_at=Max("pharmacy_batches__created_at"))
+        .filter(last_stocked_at__isnull=False)
+        .order_by("-last_stocked_at")[:20]
+    )
+
+    # ===== PREFILL SUPPORT (clicking a recently-stocked chip pre-fills the form) =====
+    prefill_product = None
+    prefill_last_batch = None
+    prefill_id = request.GET.get("prefill_id", "").strip()
+    if prefill_id and prefill_id.isdigit():
+        prefill_product = MerchProduct.objects.filter(
+            business=business, id=int(prefill_id), kind="pharmacy", is_active=True
+        ).first()
+        if prefill_product:
+            # Fetch last batch for this product so we can prefill cost, reorder, supplier
+            prefill_last_batch = (
+                PharmacyBatch.objects.filter(business=business, merch_product=prefill_product)
+                .order_by("-created_at")
+                .first()
+            )
+
     # ===== SERVER-DRIVEN STEP NAVIGATION =====
     # Read query parameters for step and category
     step = int(request.GET.get("step", "1"))
     selected_category = request.GET.get("category", "").strip()
-    
+
+    # If arriving via recently-stocked prefill, default the category from the product
+    if prefill_product and not selected_category:
+        selected_category = prefill_product.category or ""
+
     # Query products if category is selected (for Step 2)
     products_list = []
     suggested_cards = []
     if selected_category:
-        products_list = MerchProduct.objects.filter(
-            business=business,
-            kind="pharmacy",
-            category=selected_category,
-            is_active=True
-        ).order_by("name")[:40]  # Limit to 40 products for performance
+        # Annotate with the real current stock from active batches so the card
+        # never shows stale/zero values from MerchProduct.quantity_in_stock.
+        products_list = (
+            MerchProduct.objects.filter(
+                business=business,
+                kind="pharmacy",
+                category=selected_category,
+                is_active=True,
+            )
+            .annotate(
+                batch_stock=Sum(
+                    "pharmacy_batches__quantity",
+                    filter=Q(pharmacy_batches__is_archived=False),
+                )
+            )
+            .order_by("name")[:40]
+        )
         
         # NEW: Compute suggested products for smart recommendations
         from inventory.pharmacy_suggestions import get_suggestions_for_category
@@ -1566,57 +1686,90 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
                 messages.error(request, error)
             return redirect(request.path)
 
-        # Create or get product
+        # ── C1: Robust product lookup ──────────────────────────────────────────────
+        # Normalize: strip + collapse internal spaces (case-insensitive compare)
+        def _normalize(s: str) -> str:
+            return " ".join(s.strip().lower().split())
+
+        normalized_input = _normalize(product_name)
+
         with transaction.atomic():
-            product, created = MerchProduct.objects.get_or_create(
-                business=business,
-                name=product_name,
-                kind="pharmacy",
-                defaults={
-                    "sku": sku,
-                    "is_active": True,
-                    "category": category,  # Use category field
-                    "spec_label": "",  # CRITICAL: Always set spec_label (prevents NULL constraint)
-                    "cost_price": cost,
-                    "selling_price": selling,
-                },
+            # Case-insensitive lookup so "Yun", " yun ", "YUN" all map to ONE record.
+            # We check by annotating with Lower(name) rather than iexact so that
+            # collapsed-spaces normalization is handled on the Python side first.
+            from django.db.models.functions import Lower
+
+            product = (
+                MerchProduct.objects.filter(business=business, kind="pharmacy")
+                .annotate(_norm=Lower("name"))
+                .filter(_norm=normalized_input)
+                .first()
             )
 
-            # If product exists, optionally update prices and category
-            if not created:
-                # Update if prices or category changed
-                if product.cost_price != cost or product.selling_price != selling or product.category != category:
-                    product.cost_price = cost
-                    product.selling_price = selling
-                    product.category = category
-                    product.save()
+            created = False
+            if product is None:
+                product = MerchProduct.objects.create(
+                    business=business,
+                    name=product_name.strip(),
+                    kind="pharmacy",
+                    sku=sku,
+                    is_active=True,
+                    category=category,
+                    spec_label="",
+                    cost_price=cost,
+                    selling_price=selling,
+                )
+                created = True
 
-            # NEW: Store barcode if provided
+            # If product exists, update prices/category if they changed
+            if not created:
+                update_fields = []
+                if product.cost_price != cost:
+                    product.cost_price = cost
+                    update_fields.append("cost_price")
+                if product.selling_price != selling:
+                    product.selling_price = selling
+                    update_fields.append("selling_price")
+                if product.category != category:
+                    product.category = category
+                    update_fields.append("category")
+                if update_fields:
+                    product.save(update_fields=update_fields)
+
+            # Store barcode if provided
             if has_barcode == "yes" and barcode_value:
                 from inventory.utils_barcodes import set_barcode
-
                 set_barcode(product, barcode_value)
                 product.save()
 
-            # Check for duplicate batch
+            # ── C2: Additive stock-in ──────────────────────────────────────────────
+            # Capture stock BEFORE this operation for the success message
+            prev_stock = (
+                PharmacyBatch.objects.filter(business=business, merch_product=product, is_archived=False)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+
             existing_batch = PharmacyBatch.objects.filter(
                 business=business, merch_product=product, batch_number=batch_number, expiry_date=expiry_date
             ).first()
 
             if existing_batch:
-                # Update existing batch quantity
+                # Additive: add to existing batch (unarchive if needed)
                 existing_batch.quantity += qty
                 existing_batch.cost_price = cost
                 existing_batch.selling_price = selling
                 if supplier:
                     existing_batch.supplier = supplier
+                if existing_batch.is_archived:
+                    existing_batch.is_archived = False
                 existing_batch.save()
                 messages.success(
-                    request, f"✅ Stock updated! Added {qty} units to existing batch. Total: {existing_batch.quantity}"
+                    request,
+                    f"Stock updated! Added {qty} units to existing batch. Batch total: {existing_batch.quantity}",
                 )
             else:
-                # Create new batch
-                batch = PharmacyBatch.objects.create(
+                # New batch for this product
+                PharmacyBatch.objects.create(
                     business=business,
                     merch_product=product,
                     batch_number=batch_number,
@@ -1629,13 +1782,24 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
                     reorder_level=int(reorder_level),
                 )
                 messages.success(
-                    request, f"🎉 Stock added successfully! {product_name} - {qty} units (Batch: {batch_number})"
+                    request,
+                    f"Stock added! {product_name.strip()} — {qty} units (Batch: {batch_number})",
                 )
 
-            # Store success flag in session for celebration UI
+            # ── C3: Sync MerchProduct.quantity_in_stock with real batch totals ───
+            new_total = (
+                PharmacyBatch.objects.filter(business=business, merch_product=product, is_archived=False)
+                .aggregate(total=Sum("quantity"))["total"] or 0
+            )
+            MerchProduct.objects.filter(pk=product.pk).update(quantity_in_stock=new_total)
+
+            # ── C5: Store context for success banner ───────────────────────────────
             request.session["stock_in_success"] = True
-            request.session["last_product_name"] = product_name
+            request.session["last_product_name"] = product_name.strip()
+            request.session["last_product_id"] = product.pk
             request.session["last_quantity"] = qty
+            request.session["last_prev_stock"] = prev_stock
+            request.session["last_new_stock"] = new_total
 
         return redirect("pharmacy:stock_in")
 
@@ -1644,13 +1808,20 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
     if request.session.get("stock_in_success"):
         success_data = {
             "product_name": request.session.get("last_product_name"),
+            "product_id": request.session.get("last_product_id"),
             "quantity": request.session.get("last_quantity"),
+            "prev_stock": request.session.get("last_prev_stock", 0),
+            "new_stock": request.session.get("last_new_stock", 0),
         }
-        del request.session["stock_in_success"]
-        if "last_product_name" in request.session:
-            del request.session["last_product_name"]
-        if "last_quantity" in request.session:
-            del request.session["last_quantity"]
+        for key in [
+            "stock_in_success",
+            "last_product_name",
+            "last_product_id",
+            "last_quantity",
+            "last_prev_stock",
+            "last_new_stock",
+        ]:
+            request.session.pop(key, None)
 
     # Define 13 pharmacy & cosmetics categories for dropdown
     category_options = [
@@ -1676,7 +1847,12 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         "step": step,
         "selected_category": selected_category,
         "products_list": products_list,
-        "suggested_cards": suggested_cards,  # NEW: Smart product suggestions
+        "suggested_cards": suggested_cards,
+        # Recently stocked suggestions
+        "recently_stocked": recently_stocked,
+        "prefill_product": prefill_product,
+        # C4: prefill last-batch data so user doesn't re-enter cost/reorder/supplier
+        "prefill_last_batch": prefill_last_batch,
     }
 
     return render(request, "verticals/pharmacy/stock_in.html", ctx)
@@ -2220,6 +2396,9 @@ def sale_list(request: HttpRequest) -> HttpResponse:
 
     sales = sales.order_by("-sold_at")[:200]  # Increased limit
 
+    # Determine if the current user can edit/delete sales (managers, owners, staff)
+    can_edit_sales = _is_manager(request, business)
+
     return render(
         request,
         "verticals/pharmacy/sale_list.html",
@@ -2227,6 +2406,7 @@ def sale_list(request: HttpRequest) -> HttpResponse:
             "sales": sales,
             "show_deleted": show_deleted,
             "active_tab": active_tab,
+            "can_edit_sales": can_edit_sales,
         },
     )
 
@@ -2348,14 +2528,16 @@ def api_batch_info(request: HttpRequest, batch_id: int) -> JsonResponse:
 
 def _is_manager(request, business) -> bool:
     """Check if user is a manager for this business."""
+    if request.user.is_staff or request.user.is_superuser:
+        return True
     try:
         from tenants.models import Membership
 
         return Membership.objects.filter(
-            business=business, user=request.user, role__in=["manager", "owner"], status="active"
+            business=business, user=request.user, role__in=["manager", "owner", "MANAGER", "OWNER"], status__in=["active", "ACTIVE"]
         ).exists()
     except Exception:
-        return request.user.is_staff or request.user.is_superuser
+        return False
 
 
 @login_required
@@ -2413,22 +2595,18 @@ def sale_edit(request: HttpRequest, sale_id: int) -> HttpResponse:
 
             # Log the edit in audit logs
             try:
-                from audit.models import AuditLog
+                from audit.utils import log_audit
 
-                AuditLog.objects.create(
-                    business=business,
-                    user=request.user,
+                log_audit(
+                    request=request,
                     action="EDIT_PHARMACY_SALE",
-                    resource_type="PharmacySale",
-                    resource_id=sale.id,
-                    details={
-                        "sale_id": sale.id,
-                        "product": sale.batch.merch_product.name,
-                        "old_quantity": old_qty,
-                        "new_quantity": new_quantity,
-                        "old_payment_method": old_payment,
-                        "new_payment_method": new_payment_method,
-                    },
+                    entity="PharmacySale",
+                    entity_id=str(sale.id),
+                    message=(
+                        f"Sale #{sale.id} ({sale.batch.merch_product.name}): "
+                        f"qty {old_qty}\u2192{new_quantity}, "
+                        f"payment {old_payment}\u2192{new_payment_method}"
+                    ),
                 )
             except Exception:
                 pass  # Audit logging is optional

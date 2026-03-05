@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Sum, Count
 from django.shortcuts import render
 
 from tenants.models import Business
@@ -183,6 +183,20 @@ def sales_history(request):
         total_items=Sum("quantity"),
     )
 
+    # Determine manager status for template permission gates
+    is_manager = request.user.is_staff or request.user.is_superuser
+    if not is_manager:
+        try:
+            from tenants.models import Membership as _Membership
+            is_manager = _Membership.objects.filter(
+                business=business,
+                user=request.user,
+                role__in=["manager", "owner", "MANAGER", "OWNER"],
+                status__in=["active", "ACTIVE"],
+            ).exists()
+        except Exception:
+            pass
+
     ctx = {
         "business": business,
         "sales": sales_page,
@@ -192,6 +206,7 @@ def sales_history(request):
         "highlighted_sale_id": highlighted_sale_id,
         "summary": summary,
         "page_title": "Sales History",
+        "IS_MANAGER": is_manager,
     }
 
     return render(request, "verticals/pharmacy/sales_history.html", ctx)
@@ -765,8 +780,23 @@ def rollback_sale(request, sale_id):
         with transaction.atomic():
             # Restore batch inventory
             batch = sale.batch
-            batch.quantity_remaining += sale.quantity
-            batch.save(update_fields=["quantity_remaining"])
+            batch.quantity += sale.quantity
+            if batch.is_archived:
+                batch.is_archived = False
+            batch.save(update_fields=["quantity", "is_archived", "updated_at"])
+
+            # Sync MerchProduct.quantity_in_stock
+            from django.db.models import Sum as _Sum
+            from inventory.models import MerchProduct as _MP
+            from inventory.models_pharmacy import PharmacyBatch as _PB
+            new_total = (
+                _PB.objects.filter(
+                    business=batch.business,
+                    merch_product=batch.merch_product,
+                    is_archived=False,
+                ).aggregate(t=_Sum("quantity"))["t"] or 0
+            )
+            _MP.objects.filter(pk=batch.merch_product_id).update(quantity_in_stock=new_total)
 
             # Mark sale as deleted
             sale.is_deleted = True
