@@ -331,7 +331,7 @@ class TestPaymentMixWithUnitPricing(TestCase):
         
         self.shift = LiquorShift.objects.create(
             business=self.business,
-            started_by=self.user,
+            barman=self.user,
             started_at=timezone.now()
         )
     

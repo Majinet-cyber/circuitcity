@@ -515,23 +515,168 @@ def convert_sale_to_credit(request, sale_id):
 @require_business
 @require_business_kind(BusinessKind.LIQUOR)
 def credits_list(request):
-    """List all credits"""
+    """List all credits with metrics"""
+    from django.db.models import Sum, Count, Q
+    from decimal import Decimal
+
     business = get_active_business(request)
-    credits = LiquorCredit.objects.filter(business=business).select_related("created_by").order_by("-created_at")
+    credits_qs = LiquorCredit.objects.filter(business=business).select_related("created_by", "related_sale__product").order_by("-created_at")
 
     # Filter by status
     status = request.GET.get("status")
     if status:
-        credits = credits.filter(status=status)
+        credits_qs = credits_qs.filter(status=status)
+
+    # Search
+    search = request.GET.get("search", "").strip()
+    if search:
+        from django.db.models import Q
+        credits_qs = credits_qs.filter(
+            Q(customer_name__icontains=search) | Q(customer_phone__icontains=search)
+        )
+
+    # Credit metrics (all, not filtered)
+    all_credits = LiquorCredit.objects.filter(business=business)
+    outstanding_count = all_credits.filter(status__in=["open", "partial"]).count()
+    outstanding_total = all_credits.filter(status__in=["open", "partial"]).aggregate(
+        total=Sum("amount")
+    )["total"] or Decimal("0.00")
+    outstanding_balance = all_credits.filter(status__in=["open", "partial"]).aggregate(
+        bal=Sum("amount") - Sum("amount_paid")
+    )["bal"] or Decimal("0.00")
+    cleared_this_month = all_credits.filter(
+        status="settled",
+        settled_at__year=timezone.now().year,
+        settled_at__month=timezone.now().month,
+    ).count()
 
     return render(
         request,
         "inventory/liquor/credits_list.html",
         {
-            "credits": credits,
+            "credits": credits_qs,
             "business": business,
+            "outstanding_count": outstanding_count,
+            "outstanding_total": outstanding_total,
+            "outstanding_balance": outstanding_balance,
+            "cleared_this_month": cleared_this_month,
+            "active_status_filter": status,
+            "search_query": search,
         },
     )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
+def record_credit_sale(request):
+    """
+    Dedicated credit sale recording flow.
+    Records a credit directly without going through the POS sell flow.
+    """
+    from decimal import Decimal
+    from inventory.models import MerchProduct
+
+    business = get_active_business(request)
+
+    if request.method == "POST":
+        try:
+            customer_name = request.POST.get("customer_name", "").strip()
+            customer_phone = request.POST.get("customer_phone", "").strip()
+            notes = request.POST.get("notes", "").strip()
+            product_id_raw = request.POST.get("product_id", "").strip()
+            quantity_raw = request.POST.get("quantity", "1").strip()
+            unit_price_raw = request.POST.get("unit_price", "").strip()
+            unit = request.POST.get("unit", "bottle")
+
+            if not customer_name:
+                messages.error(request, "Customer name is required.")
+                return redirect("liquor:record_credit_sale")
+
+            if not product_id_raw:
+                messages.error(request, "Please select a product.")
+                return redirect("liquor:record_credit_sale")
+
+            product = get_object_or_404(MerchProduct, pk=int(product_id_raw), business=business, kind=BusinessKind.LIQUOR)
+            quantity = max(1, int(quantity_raw)) if quantity_raw.isdigit() else 1
+
+            if not unit_price_raw:
+                # Use canonical price
+                from inventory.helpers_liquor_units import get_liquor_unit_info
+                unit_info = get_liquor_unit_info(product)
+                unit_price = unit_info["unit_price"]
+            else:
+                unit_price = Decimal(unit_price_raw)
+
+            if unit_price <= 0:
+                messages.error(request, "Unit price must be greater than zero.")
+                return redirect("liquor:record_credit_sale")
+
+            total = Decimal(quantity) * unit_price
+
+            with transaction.atomic():
+                # Decrement stock
+                from django.db.models import F
+                updated = MerchProduct.objects.filter(
+                    pk=product.pk, quantity_in_stock__gte=quantity
+                ).update(quantity_in_stock=F("quantity_in_stock") - quantity)
+
+                if not updated and product.track_inventory:
+                    messages.error(request, f"Insufficient stock for {product.name}.")
+                    return redirect("liquor:record_credit_sale")
+
+                # Create sale record
+                sale = LiquorSale.objects.create(
+                    business=business,
+                    product=product,
+                    unit=unit,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total,
+                    unit_cost=product.get_cost_for_unit(unit) or Decimal("0.00"),
+                    total_cost=(product.get_cost_for_unit(unit) or Decimal("0.00")) * quantity,
+                    sale_type=LiquorSaleType.CREDIT,
+                    is_credit=True,
+                    sold_by=request.user,
+                    notes=notes,
+                    payment_method="cash",  # placeholder
+                )
+
+                # Create credit record
+                credit = LiquorCredit.objects.create(
+                    business=business,
+                    customer_name=customer_name,
+                    customer_phone=customer_phone,
+                    amount=total,
+                    amount_paid=Decimal("0.00"),
+                    status=LiquorCreditStatus.OPEN,
+                    notes=notes or f"{product.name} - {quantity} {unit}",
+                    related_sale=sale,
+                    created_by=request.user,
+                )
+
+                sale.linked_credit = credit
+                sale.save(update_fields=["linked_credit"])
+
+            messages.success(request, f"Credit sale recorded: {customer_name} owes MK {total:,.0f} for {product.name}.")
+            return redirect("liquor:credits_list")
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Credit sale recording failed: {e}", exc_info=True)
+            messages.error(request, f"Failed to record credit sale: {str(e)}")
+            return redirect("liquor:record_credit_sale")
+
+    # GET: Show form
+    products = MerchProduct.objects.filter(
+        business=business, kind=BusinessKind.LIQUOR, is_active=True, is_archived=False
+    ).order_by("category", "name")
+
+    return render(request, "inventory/liquor/record_credit_sale.html", {
+        "business": business,
+        "products": products,
+        "active_tab": "credits",
+    })
 
 
 @login_required

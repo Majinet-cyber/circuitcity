@@ -368,34 +368,67 @@
                                required>
                     </div>
                     
-                    <!-- Sale Type -->
+                    <!-- Editable Unit Price -->
+                    <div class="mb-3">
+                        <label class="form-label small" id="price-label">Unit Price (MWK)</label>
+                        <div style="display:flex;align-items:center;gap:8px">
+                            <span style="font-size:1rem;opacity:.85">MK</span>
+                            <input type="number" 
+                                   class="form-control" 
+                                   name="unit_price" 
+                                   id="input-unit-price"
+                                   min="0"
+                                   step="1"
+                                   placeholder="Auto from product"
+                                   style="font-size:1.1rem;font-weight:600">
+                        </div>
+                        <div id="price-hint" class="form-text mt-1" style="font-size:.75rem;opacity:.8"></div>
+                    </div>
+
+                    <!-- Payment Type Cards -->
                     <div class="mb-3">
                         <label class="form-label">Payment Type</label>
-                        <select class="form-select" name="sale_type" id="input-sale-type">
-                            <option value="cash">Cash Sale</option>
-                            <option value="credit">Credit Sale</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Payment Mix (only for cash sales) -->
-                    <div id="payment-mix-container" class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="form-label mb-0">Payment Mix</label>
-                            <button type="button" class="btn btn-sm btn-outline-light" id="toggle-payment-mix">
-                                <i class="bi bi-plus-circle"></i> Split Payment
+                        <input type="hidden" name="sale_type" id="input-sale-type" value="cash">
+                        <div id="payment-cards" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                            <button type="button" class="payment-type-card active" data-payment="cash"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.6);border-radius:12px;background:rgba(255,255,255,.25);color:#fff;font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">💵</div>
+                                <div style="font-size:.85rem;margin-top:2px">Cash</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="mobile_money"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">📱</div>
+                                <div style="font-size:.85rem;margin-top:2px">Mobile Money</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="bank"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">🏦</div>
+                                <div style="font-size:.85rem;margin-top:2px">Bank Transfer</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="split"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center">
+                                <div style="font-size:1.4rem">✂️</div>
+                                <div style="font-size:.85rem;margin-top:2px">Split</div>
+                            </button>
+                            <button type="button" class="payment-type-card" data-payment="credit"
+                                style="padding:12px 8px;border:2px solid rgba(255,255,255,.3);border-radius:12px;background:rgba(255,255,255,.1);color:rgba(255,255,255,.8);font-weight:700;cursor:pointer;transition:all .2s;text-align:center;grid-column:1/-1">
+                                <div style="font-size:1.4rem">📋</div>
+                                <div style="font-size:.85rem;margin-top:2px">Credit Sale</div>
                             </button>
                         </div>
-                        
-                        <div id="payment-mix-inputs" class="hidden">
+                    </div>
+                    
+                    <!-- Split Payment inputs (only for split) -->
+                    <div id="payment-mix-container" class="mb-3 hidden">
+                        <div style="background:rgba(0,0,0,.15);border-radius:10px;padding:12px">
+                            <p class="mb-2 small" style="opacity:.9;font-weight:600">Split Payment Details</p>
                             <div class="mb-2">
                                 <label class="form-label small">Cash (MWK)</label>
                                 <input type="number" 
                                        class="form-control form-control-sm" 
                                        name="cash_amount" 
                                        id="input-cash-amount" 
-                                       min="0" 
-                                       step="0.01"
-                                       value="0">
+                                       min="0" step="1" value="0">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label small">Bank Transfer (MWK)</label>
@@ -403,9 +436,7 @@
                                        class="form-control form-control-sm" 
                                        name="bank_amount" 
                                        id="input-bank-amount" 
-                                       min="0" 
-                                       step="0.01"
-                                       value="0">
+                                       min="0" step="1" value="0">
                             </div>
                             <div class="mb-2">
                                 <label class="form-label small">Mobile Money (MWK)</label>
@@ -413,11 +444,9 @@
                                        class="form-control form-control-sm" 
                                        name="mobile_money_amount" 
                                        id="input-mobile-money-amount" 
-                                       min="0" 
-                                       step="0.01"
-                                       value="0">
+                                       min="0" step="1" value="0">
                             </div>
-                            <div class="alert alert-info py-2 px-3 small" id="payment-mix-summary">
+                            <div style="background:rgba(255,255,255,.1);border-radius:8px;padding:8px 12px;font-size:.85rem">
                                 <div class="d-flex justify-content-between">
                                     <span>Total Paid:</span>
                                     <strong id="payment-mix-total">MK 0</strong>
@@ -429,6 +458,7 @@
                             </div>
                         </div>
                     </div>
+                    <div id="payment-mix-inputs" class="hidden"></div>
                     
                     <!-- Credit Customer Details (hidden by default) -->
                     <div id="credit-details-container" class="mb-3 hidden">
@@ -535,6 +565,7 @@
     const inputMode = document.getElementById('input-mode');
     const inputQuantity = document.getElementById('input-quantity');
     const inputSaleType = document.getElementById('input-sale-type');
+    const inputUnitPrice = document.getElementById('input-unit-price');
     const inputCustomerName = document.getElementById('input-customer-name');
     const inputCashAmount = document.getElementById('input-cash-amount');
     const inputBankAmount = document.getElementById('input-bank-amount');
@@ -553,9 +584,55 @@
     const submitText = document.getElementById('submit-text');
     const paymentMixContainer = document.getElementById('payment-mix-container');
     const paymentMixInputs = document.getElementById('payment-mix-inputs');
-    const togglePaymentMixBtn = document.getElementById('toggle-payment-mix');
     const paymentMixTotal = document.getElementById('payment-mix-total');
     const paymentMixRemaining = document.getElementById('payment-mix-remaining');
+    
+    // Payment card state
+    let selectedPayment = 'cash';
+    
+    // Payment card click handler
+    document.querySelectorAll('.payment-type-card').forEach(card => {
+        card.addEventListener('click', function() {
+            selectedPayment = this.dataset.payment;
+            
+            // Update card styles
+            document.querySelectorAll('.payment-type-card').forEach(c => {
+                c.style.border = '2px solid rgba(255,255,255,.3)';
+                c.style.background = 'rgba(255,255,255,.1)';
+                c.style.color = 'rgba(255,255,255,.8)';
+            });
+            this.style.border = '2px solid rgba(255,255,255,.9)';
+            this.style.background = 'rgba(255,255,255,.3)';
+            this.style.color = '#fff';
+            
+            // Update hidden input
+            if (selectedPayment === 'split') {
+                inputSaleType.value = 'cash';
+                paymentMixContainer.classList.remove('hidden');
+                creditDetailsContainer.classList.add('hidden');
+                submitText.textContent = 'Mark as Sold';
+            } else if (selectedPayment === 'credit') {
+                inputSaleType.value = 'credit';
+                paymentMixContainer.classList.add('hidden');
+                creditDetailsContainer.classList.remove('hidden');
+                submitText.textContent = 'Record Credit Sale';
+            } else {
+                inputSaleType.value = selectedPayment;
+                paymentMixContainer.classList.add('hidden');
+                creditDetailsContainer.classList.add('hidden');
+                submitText.textContent = 'Mark as Sold';
+                // Reset payment mix
+                if (inputCashAmount) inputCashAmount.value = '0';
+                if (inputBankAmount) inputBankAmount.value = '0';
+                if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
+            }
+        });
+    });
+    
+    // Unit price input: recalculate total when changed
+    if (inputUnitPrice) {
+        inputUnitPrice.addEventListener('input', updateTotal);
+    }
     
     // State
     let currentProduct = null;
@@ -815,14 +892,41 @@
         const unitLabel = allowedMode === 'shot' ? 'Shots' : (allowedMode === 'glass' ? 'Glasses' : 'Bottles');
         quantityLabel.textContent = `${unitLabel} (max: ${currentProduct.stock})`;
         
+        // Set editable unit price from product canonical price
+        let canonicalPrice = allowedMode === 'shot' ? currentProduct.shotPrice :
+                             (allowedMode === 'glass' ? currentProduct.glassPrice : currentProduct.bottlePrice);
+        if (inputUnitPrice) {
+            inputUnitPrice.value = canonicalPrice > 0 ? Math.round(canonicalPrice) : '';
+            const priceHint = document.getElementById('price-hint');
+            if (priceHint) {
+                priceHint.textContent = canonicalPrice > 0
+                    ? `Default: MK ${canonicalPrice.toLocaleString()} — override if needed`
+                    : 'No price set — enter price above';
+            }
+        }
+        
+        // Reset payment card to Cash
+        selectedPayment = 'cash';
+        document.querySelectorAll('.payment-type-card').forEach(c => {
+            c.style.border = '2px solid rgba(255,255,255,.3)';
+            c.style.background = 'rgba(255,255,255,.1)';
+            c.style.color = 'rgba(255,255,255,.8)';
+        });
+        const cashCard = document.querySelector('[data-payment="cash"]');
+        if (cashCard) {
+            cashCard.style.border = '2px solid rgba(255,255,255,.9)';
+            cashCard.style.background = 'rgba(255,255,255,.3)';
+            cashCard.style.color = '#fff';
+        }
+        inputSaleType.value = 'cash';
+        
         // Reset payment mix
         if (inputCashAmount) inputCashAmount.value = '0';
         if (inputBankAmount) inputBankAmount.value = '0';
         if (inputMobileMoneyAmount) inputMobileMoneyAmount.value = '0';
-        if (paymentMixInputs) paymentMixInputs.classList.add('hidden');
-        if (togglePaymentMixBtn) {
-            togglePaymentMixBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Split Payment';
-        }
+        if (paymentMixContainer) paymentMixContainer.classList.add('hidden');
+        if (creditDetailsContainer) creditDetailsContainer.classList.add('hidden');
+        submitText.textContent = 'Mark as Sold';
         
         updateTotal();
         updatePaymentMix();
@@ -846,22 +950,31 @@
             alert(`⚠️ Only ${currentProduct.stock} bottles available in stock!`);
         }
         
-        // Get price and cost based on mode
-        let price, cost;
+        // Get canonical price and cost based on mode
+        let canonicalPrice, cost;
         if (mode === 'shot') {
-            price = currentProduct.shotPrice;
+            canonicalPrice = currentProduct.shotPrice;
             cost = currentProduct.shotCost;
         } else if (mode === 'glass') {
-            price = currentProduct.glassPrice;
+            canonicalPrice = currentProduct.glassPrice;
             cost = currentProduct.glassCost;
         } else {
-            price = currentProduct.bottlePrice;
+            canonicalPrice = currentProduct.bottlePrice;
             cost = currentProduct.bottleCost;
+        }
+        
+        // Use editable price if provided, otherwise canonical price
+        let price = canonicalPrice;
+        if (inputUnitPrice && inputUnitPrice.value.trim() !== '') {
+            const overridePrice = parseFloat(inputUnitPrice.value);
+            if (!isNaN(overridePrice) && overridePrice > 0) {
+                price = overridePrice;
+            }
         }
         
         const total = quantity * price;
         const totalCost = quantity * cost;
-        estimatedTotal.textContent = total.toFixed(0);
+        estimatedTotal.textContent = Math.round(total).toLocaleString();
         
         // Update pricing intelligence
         updatePricingIntelligence(price, cost, total, totalCost);

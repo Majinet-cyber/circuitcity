@@ -1,436 +1,370 @@
 {% extends "base.html" %}
 
-{% block title %}Liquor Stock List · Emajinet{% endblock %}
+{% block title %}Liquor Stock · {{ business.name }}{% endblock %}
 
 {% block content %}
 <style>
-  .stock-list-page {
-    padding: 18px;
-    max-width: 1400px;
-    margin: 0 auto;
-  }
-  
-  .page-header {
-    background: linear-gradient(120deg, #7c3aed, #db2777);
-    padding: 24px;
-    border-radius: 20px;
-    color: #fff;
-    margin-bottom: 24px;
-  }
-  
-  .page-header h1 {
-    margin: 0;
-    font-size: clamp(24px, 3vw, 32px);
-  }
-  
-  .page-header p {
-    margin: 4px 0 0;
-    opacity: 0.9;
-  }
-  
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  
-  .stat-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 18px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-    text-align: center;
-  }
-  
-  .stat-card h3 {
-    margin: 0;
-    font-size: 0.875rem;
-    text-transform: uppercase;
-    color: #64748b;
-    font-weight: 600;
-  }
-  
-  .stat-card p {
-    margin: 8px 0 0;
-    font-size: 1.75rem;
-    font-weight: 800;
-    color: #0f172a;
-  }
-  
-  .filters-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-    margin-bottom: 24px;
-  }
-  
-  .filters-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 12px;
-    align-items: center;
-  }
-  
-  .search-box {
-    position: relative;
-  }
-  
-  .search-box input {
-    width: 100%;
-    padding: 12px 16px 12px 40px;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 1rem;
-  }
-  
-  .search-box input:focus {
-    outline: none;
-    border-color: #7c3aed;
-  }
-  
-  .search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #94a3b8;
-  }
-  
-  .category-filter select {
-    padding: 12px 16px;
-    border: 2px solid #e2e8f0;
-    border-radius: 12px;
-    font-size: 1rem;
-    min-width: 200px;
-  }
-  
-  .category-filter select:focus {
-    outline: none;
-    border-color: #7c3aed;
-  }
-  
-  .stock-table-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 24px;
-    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-    overflow-x: auto;
-  }
-  
-  .stock-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  
-  .stock-table thead th {
-    text-align: left;
-    padding: 12px;
-    border-bottom: 2px solid #e2e8f0;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-  }
-  
-  .stock-table tbody td {
-    padding: 16px 12px;
-    border-bottom: 1px solid #f1f5f9;
-  }
-  
-  .stock-table tbody tr:hover {
-    background: #fafafa;
-  }
-  
-  .product-name {
-    font-weight: 600;
-    color: #0f172a;
-  }
-  
-  .category-badge {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: capitalize;
-  }
-  
-  .category-beer {
-    background: #fef3c7;
-    color: #92400e;
-  }
-  
-  .category-cider {
-    background: #dbeafe;
-    color: #1e3a8a;
-  }
-  
-  .category-wine {
-    background: #fce7f3;
-    color: #831843;
-  }
-  
-  .category-spirits,
-  .category-whiskey {
-    background: #e0e7ff;
-    color: #3730a3;
-  }
-  
-  .category-soft_drinks,
-  .category-water {
-    background: #dcfce7;
-    color: #14532d;
-  }
-  
-  .category-other {
-    background: #f3f4f6;
-    color: #374151;
-  }
-  
-  .quantity-cell {
-    font-weight: 600;
-  }
-  
-  .quantity-low {
-    color: #ea580c;
-  }
-  
-  .quantity-out {
-    color: #dc2626;
-  }
-  
-  .quantity-ok {
-    color: #059669;
-  }
-  
-  .price-cell {
-    font-family: 'Courier New', monospace;
-    font-weight: 600;
-  }
-  
-  .actions-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 24px;
-  }
-  
-  .btn {
-    padding: 10px 18px;
-    border-radius: 10px;
-    text-decoration: none;
-    font-weight: 600;
-    font-size: 0.875rem;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-  }
-  
-  .btn-primary {
-    background: #7c3aed;
-    color: white;
-  }
-  
-  .btn-primary:hover {
-    background: #6d28d9;
-  }
-  
-  .btn-outline {
-    background: #fff;
-    color: #7c3aed;
-    border: 2px solid #7c3aed;
-  }
-  
-  .btn-outline:hover {
-    background: #faf5ff;
-  }
-  
-  .empty-state {
-    text-align: center;
-    padding: 48px 24px;
-    color: #64748b;
-  }
-  
-  .empty-state i {
-    font-size: 3rem;
-    margin-bottom: 16px;
-    opacity: 0.5;
-  }
-  
-  @media (max-width: 768px) {
-    .filters-row {
-      grid-template-columns: 1fr;
-    }
-    
-    .stock-table {
-      font-size: 0.875rem;
-    }
-    
-    .stock-table thead th,
-    .stock-table tbody td {
-      padding: 10px 8px;
-    }
-  }
+:root {
+  --lq-purple: #7c3aed;
+  --lq-pink: #db2777;
+  --lq-green: #059669;
+  --lq-amber: #d97706;
+  --lq-red: #dc2626;
+}
+
+.stock-page {
+  padding: clamp(12px, 3vw, 24px);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Hero Header */
+.stock-hero {
+  background: linear-gradient(120deg, var(--lq-purple), var(--lq-pink));
+  border-radius: 24px;
+  padding: clamp(20px, 4vw, 32px);
+  color: #fff;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stock-hero::after {
+  content: '🍺';
+  position: absolute;
+  right: -20px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 120px;
+  opacity: 0.12;
+}
+
+.stock-hero h1 { margin: 0; font-size: clamp(1.5rem, 4vw, 2.25rem); font-weight: 800; }
+.stock-hero p { margin: 6px 0 0; opacity: .85; }
+
+.hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.hero-btn-primary {
+  background: #fff; color: var(--lq-purple); border-radius: 999px;
+  padding: 10px 22px; font-weight: 800; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px; font-size: .95rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15); transition: all .2s;
+}
+.hero-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.2); color: var(--lq-purple); }
+.hero-btn-ghost {
+  border: 2px solid rgba(255,255,255,.7); color: #fff; border-radius: 999px;
+  padding: 10px 22px; font-weight: 700; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: all .2s;
+}
+.hero-btn-ghost:hover { background: rgba(255,255,255,.15); color: #fff; }
+
+/* Stats bar */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.stat-chip {
+  background: #fff;
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  transition: all .3s;
+}
+
+.stat-chip:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+.stat-chip .val { font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1.1; }
+.stat-chip .lbl { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 600; margin-top: 4px; }
+
+/* Filters */
+.filter-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+
+.filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.filter-search { flex: 1 1 220px; position: relative; }
+.filter-search input {
+  width: 100%; padding: 10px 14px 10px 38px;
+  border: 2px solid #e2e8f0; border-radius: 12px; font-size: .95rem;
+  transition: border-color .2s;
+}
+.filter-search input:focus { border-color: var(--lq-purple); outline: none; }
+.filter-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; }
+.cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-tab {
+  padding: 8px 14px; border-radius: 999px; font-size: .85rem; font-weight: 600;
+  border: 2px solid #e2e8f0; background: #fff; color: #64748b; cursor: pointer;
+  text-decoration: none; transition: all .2s;
+}
+.cat-tab:hover, .cat-tab.active {
+  background: var(--lq-purple); border-color: var(--lq-purple); color: #fff;
+}
+
+/* Product Cards Grid */
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.product-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 4px 16px rgba(15,23,42,.07);
+  border: 1px solid #e2e8f0;
+  transition: all .3s;
+  position: relative;
+  overflow: hidden;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(15,23,42,.12);
+  border-color: rgba(124,58,237,.2);
+}
+
+/* Stock level accent strip */
+.product-card::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  border-radius: 20px 0 0 20px;
+}
+.product-card.status-ok::before { background: var(--lq-green); }
+.product-card.status-low::before { background: var(--lq-amber); }
+.product-card.status-out::before { background: var(--lq-red); }
+
+.product-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.product-cat { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 12px; }
+
+/* Category badge colors */
+.cat-beer { color: #92400e; }
+.cat-cider { color: #1e3a8a; }
+.cat-wine { color: #831843; }
+.cat-spirits, .cat-whiskey { color: #3730a3; }
+.cat-other { color: #374151; }
+
+/* Stock progress */
+.stock-bar-wrap { margin: 12px 0; }
+.stock-bar-label { display: flex; justify-content: space-between; font-size: .8rem; font-weight: 600; margin-bottom: 5px; }
+.stock-bar { height: 10px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+.stock-bar-fill { height: 100%; border-radius: 999px; transition: width .4s; }
+.fill-ok { background: linear-gradient(90deg, #10b981, #059669); }
+.fill-low { background: linear-gradient(90deg, #f59e0b, #d97706); }
+.fill-out { background: #dc2626; }
+
+/* Status chip */
+.status-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+}
+.chip-ok { background: #dcfce7; color: #15803d; }
+.chip-low { background: #fef3c7; color: #92400e; }
+.chip-out { background: #fee2e2; color: #991b1b; }
+
+/* Price row */
+.price-row { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
+.price-item { font-size: .85rem; }
+.price-label { color: #94a3b8; font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.price-val { font-weight: 700; color: #0f172a; font-size: .95rem; }
+
+/* Quick action buttons */
+.quick-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.qa-btn {
+  flex: 1 1 auto; padding: 8px 12px; border-radius: 10px; font-size: .82rem; font-weight: 700;
+  text-decoration: none; text-align: center; transition: all .2s; border: none; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+}
+.qa-restock { background: #ede9fe; color: var(--lq-purple); }
+.qa-restock:hover { background: var(--lq-purple); color: #fff; }
+.qa-sell { background: #d1fae5; color: var(--lq-green); }
+.qa-sell:hover { background: var(--lq-green); color: #fff; }
+
+/* Empty state */
+.empty-state { text-align: center; padding: 60px 24px; background: #fff; border-radius: 20px; border: 2px dashed #cbd5e1; }
+.empty-state i { font-size: 3rem; opacity: .35; }
+
+@media (max-width: 640px) {
+  .products-grid { grid-template-columns: 1fr; }
+  .stock-hero { flex-direction: column; }
+}
 </style>
 
-<div class="stock-list-page">
-  <!-- Header -->
-  <div class="page-header">
-    <h1>🍺 Liquor Stock List</h1>
-    <p>Detailed inventory of all liquor products</p>
-  </div>
-  
-  <!-- Stats Row -->
-  <div class="stats-row">
-    <div class="stat-card">
-      <h3>Total Products</h3>
-      <p>{{ total_products }}</p>
+<div class="stock-page">
+
+  <!-- Hero Header -->
+  <header class="stock-hero">
+    <div>
+      <p style="margin:0;opacity:.7;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em">{{ business.name }} · Stock View</p>
+      <h1>🍺 Liquor Inventory</h1>
+      <p>{{ total_products }} product{{ total_products|pluralize }} · {{ total_quantity }} bottles in stock</p>
     </div>
-    <div class="stat-card">
-      <h3>Total Bottles</h3>
-      <p>{{ total_quantity }}</p>
-    </div>
-    <div class="stat-card">
-      <h3>Cost Value</h3>
-      <p>K{{ total_cost_value|floatformat:2 }}</p>
-    </div>
-    <div class="stat-card">
-      <h3>Retail Value</h3>
-      <p>K{{ total_retail_value|floatformat:2 }}</p>
-    </div>
-    <div class="stat-card">
-      <h3>Expected Profit</h3>
-      <p style="color: {% if expected_profit > 0 %}#059669{% else %}#dc2626{% endif %}">
-        K{{ expected_profit|floatformat:2 }}
-      </p>
-    </div>
-    <div class="stat-card">
-      <h3>Low Stock</h3>
-      <p style="color: #ea580c">{{ low_stock_count }}</p>
-    </div>
-    <div class="stat-card">
-      <h3>Out of Stock</h3>
-      <p style="color: #dc2626">{{ out_of_stock_count }}</p>
-    </div>
-  </div>
-  
-  <!-- Quick Actions -->
-  <div class="actions-row">
-    <a href="{% url 'liquor:inventory_dashboard' %}" class="btn btn-outline">
-      <i class="bi bi-arrow-left"></i> Back to Hub
-    </a>
-    <a href="{% url 'liquor:scan_in' %}" class="btn btn-primary">
-      <i class="bi bi-plus-circle"></i> Stock In
-    </a>
-    <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
-      <i class="bi bi-cash-coin"></i> Sell
-    </a>
-  </div>
-  
-  <!-- Filters -->
-  <div class="filters-card">
-    <form method="get" class="filters-row">
-      <div class="search-box">
-        <i class="bi bi-search search-icon"></i>
-        <input 
-          type="text" 
-          name="q" 
-          placeholder="Search by name, SKU, or barcode..." 
-          value="{{ search_query|default:'' }}"
-        >
-      </div>
-      <div class="category-filter">
-        <select name="category" onchange="this.form.submit()">
-          <option value="">All Categories</option>
-          {% for cat in categories %}
-          <option value="{{ cat.key }}" {% if selected_category == cat.key %}selected{% endif %}>
-            {{ cat.display }}
-          </option>
-          {% endfor %}
-        </select>
-      </div>
-    </form>
-  </div>
-  
-  <!-- Stock Table -->
-  <div class="stock-table-card">
-    {% if products %}
-    <table class="stock-table">
-      <thead>
-        <tr>
-          <th>Product Name</th>
-          <th>Category</th>
-          <th>SKU</th>
-          <th>Bottles in Stock</th>
-          <th>Cost/Bottle</th>
-          <th>Price/Bottle</th>
-          <th>Total Cost</th>
-          <th>Total Retail</th>
-          <th>Profit Margin</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for product in products %}
-        <tr>
-          <td class="product-name">{{ product.name }}</td>
-          <td>
-            <span class="category-badge category-{{ product.category|lower }}">
-              {{ product.category|default:"other" }}
-            </span>
-          </td>
-          <td style="color: #64748b; font-size: 0.875rem;">
-            {{ product.sku|default:product.internal_sku|default:"—" }}
-          </td>
-          <td class="quantity-cell 
-            {% if product.quantity_in_stock == 0 %}quantity-out
-            {% elif product.quantity_in_stock <= low_stock_threshold %}quantity-low
-            {% else %}quantity-ok{% endif %}">
-            {{ product.quantity_in_stock|default:0 }}
-            {% if product.has_shots and product.shots_per_bottle %}
-              {% with total_shots=product.quantity_in_stock|default:0 %}
-              <span style="font-size: 0.75rem; color: #64748b;">
-                ({% widthratio total_shots 1 product.shots_per_bottle %} shots)
-              </span>
-              {% endwith %}
-            {% endif %}
-          </td>
-          <td class="price-cell">K{{ product.cost_per_bottle|default:0|floatformat:2 }}</td>
-          <td class="price-cell">K{{ product.price_per_bottle|default:0|floatformat:2 }}</td>
-          <td class="price-cell">
-            {% widthratio product.quantity_in_stock 1 product.cost_per_bottle as total_cost %}
-            K{{ total_cost|default:0|floatformat:2 }}
-          </td>
-          <td class="price-cell">
-            {% widthratio product.quantity_in_stock 1 product.price_per_bottle as total_retail %}
-            K{{ total_retail|default:0|floatformat:2 }}
-          </td>
-          <td class="price-cell" style="color: #059669;">
-            {% widthratio product.price_per_bottle|default:0 product.cost_per_bottle|default:1 100 %}%
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <div class="empty-state">
-      <i class="bi bi-inbox"></i>
-      <h3>No Products Found</h3>
-      <p>
-        {% if search_query or selected_category %}
-        Try adjusting your search or filters.
-        {% else %}
-        Start by adding liquor products to your inventory.
-        {% endif %}
-      </p>
-      <a href="{% url 'liquor:scan_in' %}" class="btn btn-primary" style="margin-top: 16px;">
-        <i class="bi bi-plus-circle"></i> Add First Product
+    <div class="hero-btns">
+      <a href="{% url 'liquor:scan_in' %}" class="hero-btn-primary">
+        <i class="bi bi-upc-scan"></i> Scan In
+      </a>
+      <a href="{% url 'liquor:sell' %}" class="hero-btn-ghost">
+        <i class="bi bi-cart-check-fill"></i> Sell
       </a>
     </div>
-    {% endif %}
+  </header>
+
+  <!-- Stats Bar -->
+  <div class="stats-bar">
+    <div class="stat-chip">
+      <div class="val">{{ total_products }}</div>
+      <div class="lbl">Products</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val">{{ total_quantity }}</div>
+      <div class="lbl">Bottles in Stock</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-green)">MK {{ total_retail_value|floatformat:0 }}</div>
+      <div class="lbl">Retail Value</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:#64748b">MK {{ total_cost_value|floatformat:0 }}</div>
+      <div class="lbl">Cost Value</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:{% if expected_profit > 0 %}var(--lq-green){% else %}var(--lq-red){% endif %}">MK {{ expected_profit|floatformat:0 }}</div>
+      <div class="lbl">Expected Profit</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-amber)">{{ low_stock_count }}</div>
+      <div class="lbl">Low Stock</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val" style="color:var(--lq-red)">{{ out_of_stock_count }}</div>
+      <div class="lbl">Out of Stock</div>
+    </div>
   </div>
+
+  <!-- Filters -->
+  <div class="filter-card">
+    <form method="get" class="filter-row">
+      <div class="filter-search">
+        <i class="bi bi-search"></i>
+        <input type="text" name="q" placeholder="Search products…" value="{{ search_query|default:'' }}">
+      </div>
+      <div class="cat-tabs">
+        <a href="?{% if search_query %}q={{ search_query }}&{% endif %}"
+           class="cat-tab {% if not selected_category %}active{% endif %}">All</a>
+        {% for cat in categories %}
+        <a href="?category={{ cat.key }}{% if search_query %}&q={{ search_query }}{% endif %}"
+           class="cat-tab {% if selected_category == cat.key %}active{% endif %}">
+          {{ cat.display }}
+        </a>
+        {% endfor %}
+      </div>
+      <button type="submit" class="qa-btn qa-restock" style="flex:0 0 auto;padding:10px 16px">
+        <i class="bi bi-search"></i> Search
+      </button>
+    </form>
+  </div>
+
+  <!-- Products Grid -->
+  {% if products %}
+  <div class="products-grid">
+    {% for product in products %}
+    {% with qty=product.quantity_in_stock|default:0 %}
+
+    <div class="product-card {% if qty == 0 %}status-out{% elif qty <= low_stock_threshold %}status-low{% else %}status-ok{% endif %}">
+      <!-- Category + status row -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span class="product-cat cat-{{ product.category|default:'other'|lower }}">
+          {% if product.category == "beer" %}🍺{% elif product.category == "cider" %}🥤{% elif product.category == "wine" %}🍷{% elif product.category == "spirits" %}🥃{% elif product.category == "whiskey" %}🥃{% else %}🍶{% endif %}
+          {{ product.category|default:"Other"|title }}
+        </span>
+        <span class="status-chip {% if qty == 0 %}chip-out{% elif qty <= low_stock_threshold %}chip-low{% else %}chip-ok{% endif %}">
+          {% if qty == 0 %}Out of Stock{% elif qty <= low_stock_threshold %}Low Stock{% else %}In Stock{% endif %}
+        </span>
+      </div>
+
+      <!-- Product name -->
+      <div class="product-name">{{ product.name }}</div>
+
+      <!-- Stock progress bar -->
+      <div class="stock-bar-wrap">
+        <div class="stock-bar-label">
+          <span style="color:#64748b;font-size:.78rem">Stock Level</span>
+          <span style="font-weight:800;font-size:1.1rem;color:{% if qty == 0 %}var(--lq-red){% elif qty <= low_stock_threshold %}var(--lq-amber){% else %}var(--lq-green){% endif %}">
+            {{ qty }} bottle{{ qty|pluralize }}
+          </span>
+        </div>
+        <div class="stock-bar">
+          <div class="stock-bar-fill {% if qty == 0 %}fill-out{% elif qty <= low_stock_threshold %}fill-low{% else %}fill-ok{% endif %}"
+               style="width:{% if qty == 0 %}5{% elif qty <= low_stock_threshold %}45{% else %}90{% endif %}%"></div>
+        </div>
+      </div>
+
+      <!-- SKU -->
+      {% if product.sku or product.internal_sku %}
+      <div style="font-size:.75rem;color:#94a3b8;margin-bottom:8px">SKU: {{ product.sku|default:product.internal_sku }}</div>
+      {% endif %}
+
+      <!-- Prices -->
+      <div class="price-row">
+        <div class="price-item">
+          <div class="price-label">Cost</div>
+          <div class="price-val">MK {{ product.cost_per_bottle|default:0|floatformat:0 }}</div>
+        </div>
+        <div class="price-item">
+          <div class="price-label">Sell Price</div>
+          <div class="price-val" style="color:var(--lq-green)">MK {{ product.price_per_bottle|default:0|floatformat:0 }}</div>
+        </div>
+        {% if product.has_shots and product.price_per_shot %}
+        <div class="price-item">
+          <div class="price-label">Per Shot</div>
+          <div class="price-val">MK {{ product.price_per_shot|floatformat:0 }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <a href="{% url 'liquor:scan_in' %}?product={{ product.id }}"
+           class="qa-btn qa-restock">
+          <i class="bi bi-arrow-up-circle"></i> Restock
+        </a>
+        <a href="{% url 'liquor:sell' %}?product={{ product.id }}"
+           class="qa-btn qa-sell">
+          <i class="bi bi-cart-check"></i> Sell
+        </a>
+      </div>
+    </div>
+
+    {% endwith %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <i class="bi bi-inbox"></i>
+    <h3 style="margin:16px 0 8px">No Products Found</h3>
+    <p style="color:#64748b">
+      {% if search_query or selected_category %}Try adjusting your search or category filter.
+      {% else %}Add liquor products to start tracking inventory.{% endif %}
+    </p>
+    <a href="{% url 'liquor:scan_in' %}" class="hero-btn-primary" style="display:inline-flex;margin:16px auto 0">
+      <i class="bi bi-plus-circle"></i> Add First Product
+    </a>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
-

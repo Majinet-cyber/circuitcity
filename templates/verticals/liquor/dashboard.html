@@ -264,9 +264,14 @@
       <p>{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{{ liquor_add_url|default:'/inventory/liquor/products/new/v2/' }}">Add liquor item</a>
-      <a class="ghost" href="/liquor/inventory/">Liquor Hub</a>
-      <a class="ghost" href="/liquor/sell/">Sell</a>
+      <a class="primary" href="{% url 'liquor:sell' %}" style="background:#fff;color:#7c3aed;font-size:1.1rem;padding:14px 28px;border-radius:999px;font-weight:800;box-shadow:0 4px 16px rgba(0,0,0,.15);display:inline-flex;align-items:center;gap:8px">
+        <i class="bi bi-cart-check-fill"></i> Sell Now
+      </a>
+      <a class="primary" href="{% url 'liquor:scan_in' %}" style="background:rgba(255,255,255,.18);color:#fff;border:2px solid rgba(255,255,255,.7);font-size:1rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px">
+        <i class="bi bi-upc-scan"></i> Scan In Stock
+      </a>
+      <a class="ghost" href="{% url 'liquor:stock_list' %}">My Stock</a>
+      <a class="ghost" href="{% url 'liquor:credits_list' %}">Credits</a>
       {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
@@ -275,28 +280,28 @@
   <section class="metrics-grid">
     <article class="metric-card">
       <h3>💰 Revenue ({{ period_days }} days)</h3>
-      <p style="color:#16a34a">MK {{ revenue|floatformat:2|default:"0.00" }}</p>
+      <p style="color:#16a34a">MK {{ revenue|floatformat:0|default:"0" }}</p>
       <small>Total sales revenue</small>
     </article>
     <article class="metric-card">
       <h3>📦 Stock Value</h3>
-      <p>MK {{ total_stock_value|floatformat:2|default:"0.00" }}</p>
+      <p>MK {{ total_stock_value|floatformat:0|default:"0" }}</p>
       <small>Current inventory cost</small>
     </article>
     <article class="metric-card">
       <h3>⚙️ Admin Costs ({{ period_days }} days)</h3>
-      <p>MK {{ admin_costs|floatformat:2|default:"0.00" }}</p>
+      <p>MK {{ admin_costs|floatformat:0|default:"0" }}</p>
       <small>Operational expenses</small>
     </article>
     <article class="metric-card">
       <h3>💸 COGS ({{ period_days }} days)</h3>
-      <p style="color:#dc2626">MK {{ inventory_costs|floatformat:2|default:"0.00" }}</p>
+      <p style="color:#dc2626">MK {{ inventory_costs|floatformat:0|default:"0" }}</p>
       <small>Inventory purchases (last {{ period_days }} days)</small>
       <!-- LIQUOR_DASH_COGS_V3 -->
     </article>
     <article class="metric-card" style="grid-column:span 1">
       <h3>{% if net_profit >= 0 %}✅ Net Profit{% else %}⚠️ Net Loss{% endif %} ({{ period_days }} days)</h3>
-      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">MK {{ net_profit|floatformat:2|default:"0.00" }}</p>
+      <p style="{% if net_profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}">MK {{ net_profit|floatformat:0|default:"0" }}</p>
       <small>Revenue minus all costs</small>
       {% if net_profit < 0 %}
         <div style="margin-top:12px;padding:12px;background:#fef2f2;border-left:3px solid #dc2626;border-radius:8px">
@@ -456,13 +461,16 @@
           loading.style.display = 'none';
           content.style.display = 'block';
           
+          // Format MWK without decimals, with thousands separators
+          function fmtMK(val) {
+            return 'MK ' + Math.round(parseFloat(val || 0)).toLocaleString();
+          }
+          
           // Update quick stats
-          document.getElementById('total-revenue').textContent = 
-            'MK ' + parseFloat(data.total_revenue || 0).toFixed(2);
+          document.getElementById('total-revenue').textContent = fmtMK(data.total_revenue);
           document.getElementById('total-sales-count').textContent = 
             (data.total_sales_count || 0) + ' sales';
-          document.getElementById('stock-value').textContent = 
-            'MK ' + parseFloat(data.total_stock_value || 0).toFixed(2);
+          document.getElementById('stock-value').textContent = fmtMK(data.total_stock_value);
           document.getElementById('stock-alerts').textContent = 
             (data.low_stock_count || 0);
           document.getElementById('stock-alerts-detail').textContent = 
@@ -520,7 +528,7 @@
             tooltip: {
               callbacks: {
                 label: function(context) {
-                  return 'MK ' + context.parsed.y.toFixed(2);
+                  return 'MK ' + Math.round(context.parsed.y).toLocaleString();
                 }
               }
             }
@@ -530,8 +538,10 @@
               beginAtZero: true,
               ticks: {
                 callback: function(value) {
-                  return 'MK ' + value.toLocaleString();
-                }
+                  return 'MK ' + Math.round(value).toLocaleString();
+                },
+                maxTicksLimit: 6,
+                stepSize: undefined
               }
             }
           }
@@ -557,7 +567,7 @@
             </div>
           </div>
           <div style="text-align:right">
-            <div style="font-weight:800;color:#16a34a">MK ${parseFloat(item.revenue).toFixed(0)}</div>
+            <div style="font-weight:800;color:#16a34a">MK ${Math.round(parseFloat(item.revenue)).toLocaleString()}</div>
           </div>
         </li>
       `).join('');
@@ -600,7 +610,7 @@
       {% for pm in payment_mix %}
       <article class="metric-card">
         <h3>{{ pm.method }}</h3>
-        <p>MK {{ pm.amount|floatformat:2 }}</p>
+        <p>MK {{ pm.amount|floatformat:0 }}</p>
         <small style="color:#64748b">{{ pm.count }} transaction{{ pm.count|pluralize }}{% if pm.percent %} · {{ pm.percent }}%{% endif %}</small>
       </article>
       {% endfor %}

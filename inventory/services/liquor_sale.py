@@ -423,6 +423,30 @@ def create_liquor_sale(
             # Don't block sale if wallet entry fails - log and continue
             logger.warning(f"Failed to create wallet entry for sale #{sale.id}: {wallet_err}", exc_info=True)
 
+    # Send sale notification email to manager (non-blocking)
+    try:
+        _send_sale_notification(
+            business=business,
+            sale=sale,
+            product=product,
+            user=user,
+            quantity=quantity,
+            unit=unit,
+            unit_price=unit_price,
+            total=total,
+            is_credit=is_credit,
+            customer_name=customer_name,
+            payment_method=payment_method_enum,
+            cash_amount=cash_amount,
+            bank_amount=bank_amount,
+            mobile_money_amount=mobile_money_amount,
+        )
+    except Exception as email_err:
+        logger.error(
+            f"Sale email notification failed for sale #{sale.id} (business={business.id}): {email_err}",
+            exc_info=True,
+        )
+
     return {
         "ok": True,
         "sale_id": sale.id,
@@ -431,6 +455,76 @@ def create_liquor_sale(
         if not is_credit
         else f"Credit sale recorded: {quantity} × {product.name} ({unit}) for {customer_name}",
     }
+
+
+def _send_sale_notification(
+    *,
+    business,
+    sale,
+    product,
+    user,
+    quantity: int,
+    unit: str,
+    unit_price,
+    total,
+    is_credit: bool,
+    customer_name=None,
+    payment_method=None,
+    cash_amount=None,
+    bank_amount=None,
+    mobile_money_amount=None,
+) -> None:
+    """Send sale notification email to business manager. Non-blocking helper."""
+    from inventory.views_liquor_inventory import _get_manager_email
+    manager_email = _get_manager_email(business)
+    if not manager_email:
+        logger.info(f"No manager email for business {business.id}, skipping sale notification")
+        return
+
+    # Build payment type description
+    if is_credit:
+        payment_desc = "Credit Sale"
+    else:
+        amounts = {}
+        if cash_amount and cash_amount > 0:
+            amounts["Cash"] = cash_amount
+        if bank_amount and bank_amount > 0:
+            amounts["Bank Transfer"] = bank_amount
+        if mobile_money_amount and mobile_money_amount > 0:
+            amounts["Mobile Money"] = mobile_money_amount
+        if len(amounts) > 1:
+            payment_desc = "Split Payment: " + ", ".join(f"{k} MK {v:,.0f}" for k, v in amounts.items())
+        elif amounts:
+            payment_desc = list(amounts.keys())[0]
+        else:
+            payment_desc = str(payment_method or "Cash")
+
+    from cc.services.email_dispatcher import send_event_email, EmailEvent
+    from django.utils import timezone
+    send_event_email(
+        EmailEvent.SALE_OCCURRED,
+        to=manager_email,
+        context={
+            "business_name": business.name,
+            "sale_id": sale.id,
+            "cashier": getattr(user, "get_full_name", lambda: getattr(user, "username", "Unknown"))() or getattr(user, "username", "Unknown"),
+            "product_name": product.name,
+            "product_category": product.category or "Unknown",
+            "quantity": quantity,
+            "unit": unit,
+            "unit_price": str(unit_price),
+            "total_revenue": str(total),
+            "payment_type": payment_desc,
+            "is_credit": is_credit,
+            "customer_name": customer_name or "",
+            "timestamp": timezone.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "subject": f"Sale Completed - {business.name}",
+        },
+        business=business,
+        user=user,
+        force=True,
+    )
+    logger.info(f"Sale notification email sent for sale #{sale.id} to {manager_email}")
 
 
 @transaction.atomic

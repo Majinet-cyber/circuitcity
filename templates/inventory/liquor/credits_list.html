@@ -13,9 +13,14 @@
                     <h2>Credit Sales</h2>
                     <p class="text-muted mb-0">Track customer bar tabs and credit payments</p>
                 </div>
-                <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> New Sale
-                </a>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{% url 'liquor:record_credit_sale' %}" class="btn btn-danger">
+                        <i class="bi bi-plus-circle"></i> Record Credit Sale
+                    </a>
+                    <a href="{% url 'liquor:sell' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-cart-check"></i> POS Sell
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -50,28 +55,33 @@
         </form>
     </div>
 
-    <!-- Credits Summary Cards -->
-    {% if credits %}
-        {% with total_pending=credits|length %}
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-md-3">
-                <div class="glass-card p-3">
-                    <div class="small text-muted mb-1">Total Credits</div>
-                    <div class="h4 mb-0 fw-bold">{{ credits|length }}</div>
-                </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="glass-card p-3">
-                    <div class="small text-muted mb-1">Total Outstanding</div>
-                    <div class="h4 mb-0 fw-bold">
-                        MWK {% widthratio credits.0.business.id 1 1 as dummy %}
-                        {{ credits|length|floatformat:0 }}
-                    </div>
-                </div>
+    <!-- Credits Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 text-center">
+                <div class="small text-muted mb-1">Outstanding Credits</div>
+                <div class="h4 mb-0 fw-bold text-danger">{{ outstanding_count }}</div>
             </div>
         </div>
-        {% endwith %}
-    {% endif %}
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 text-center">
+                <div class="small text-muted mb-1">Total Owed</div>
+                <div class="h4 mb-0 fw-bold text-danger">MK {{ outstanding_balance|floatformat:0 }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 text-center">
+                <div class="small text-muted mb-1">Credit Issued</div>
+                <div class="h4 mb-0 fw-bold">MK {{ outstanding_total|floatformat:0 }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="glass-card p-3 text-center">
+                <div class="small text-muted mb-1">Cleared This Month</div>
+                <div class="h4 mb-0 fw-bold text-success">{{ cleared_this_month }}</div>
+            </div>
+        </div>
+    </div>
 
     <!-- Credits Table -->
     <div class="glass-card p-0">
@@ -233,7 +243,7 @@
                     {% endif %}
                 </p>
                 {% if not request.GET.status and not request.GET.search %}
-                    <a href="{% url 'liquor:sell' %}" class="btn btn-primary">
+                    <a href="{% url 'liquor:record_credit_sale' %}" class="btn btn-danger">
                         <i class="bi bi-plus-circle"></i> Record First Credit Sale
                     </a>
                 {% else %}

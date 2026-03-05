@@ -265,6 +265,11 @@ class LiquorStockInTransaction(models.Model):
     total_cost = models.DecimalField(
         max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Total cost of this stock-in"
     )
+    # Canonical selling price at the time of this stock-in (history tracking + price propagation)
+    selling_price_at_time = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Selling price per bottle set during this stock-in event"
+    )
 
     # Metadata
     notes = models.TextField(blank=True, default="")

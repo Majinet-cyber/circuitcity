@@ -4,6 +4,7 @@ Liquor Inventory Dashboard with category-based "stock batteries"
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 from typing import Dict, List
 
@@ -17,6 +18,74 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
 from tenants.utils import require_business
+
+logger = logging.getLogger(__name__)
+
+
+LOW_STOCK_THRESHOLD = 10  # bottles — alert when stock drops to this or below
+
+
+def _get_manager_email(business) -> str | None:
+    """Get the manager/owner email for a business."""
+    try:
+        # Try to get manager email from membership
+        from tenants.models import Membership
+        mgr = Membership.objects.filter(business=business, role__in=["manager", "owner"]).select_related("user").first()
+        if mgr and mgr.user and mgr.user.email:
+            return mgr.user.email
+    except Exception:
+        pass
+    # Fallback to business owner
+    try:
+        if hasattr(business, "owner") and business.owner and business.owner.email:
+            return business.owner.email
+    except Exception:
+        pass
+    return None
+
+
+def _send_stock_alert_if_needed(product, business) -> None:
+    """Send low-stock or out-of-stock email alert if threshold crossed."""
+    current_qty = product.quantity_in_stock or 0
+    if current_qty > LOW_STOCK_THRESHOLD:
+        return  # Stock is fine, no alert needed
+
+    manager_email = _get_manager_email(business)
+    if not manager_email:
+        logger.warning(f"No manager email found for business {business.id}, skipping stock alert")
+        return
+
+    try:
+        from cc.services.email_dispatcher import send_event_email, EmailEvent
+        if current_qty == 0:
+            subject = f"🚨 OUT OF STOCK: {product.name} — {business.name}"
+            alert_type = "out_of_stock"
+            alert_msg = f"{product.name} is completely OUT OF STOCK."
+        else:
+            subject = f"⚠️ Low Stock Alert: {product.name} — {business.name}"
+            alert_type = "low_stock"
+            alert_msg = f"{product.name} is running LOW — only {current_qty} bottle(s) left."
+
+        send_event_email(
+            EmailEvent.IMPORTANT_ALERT,
+            to=manager_email,
+            context={
+                "alert_title": f"Stock Alert: {product.name}",
+                "alert_type": alert_type,
+                "alert_message": alert_msg,
+                "product_name": product.name,
+                "product_category": product.category or "Unknown",
+                "current_qty": current_qty,
+                "threshold": LOW_STOCK_THRESHOLD,
+                "business_name": business.name,
+                "subject": subject,
+            },
+            business=business,
+            force=True,
+        )
+        logger.info(f"Stock alert email sent for {product.name} (qty={current_qty}) to {manager_email}")
+    except Exception as e:
+        logger.error(f"Failed to send stock alert email for product {product.id}: {e}", exc_info=True)
 
 
 # Category configurations with default capacities
@@ -210,15 +279,18 @@ def liquor_scan_in(request):
                 if cost_per_bottle > 0:
                     product.cost_per_bottle = cost_per_bottle
 
-                # Update selling price per bottle (ALWAYS per bottle, never per crate)
+                # Update selling price per bottle (canonical price — ALWAYS per bottle, never per crate)
                 selling_price_raw = request.POST.get("selling_price", "").strip()
+                selling_price = None
                 if selling_price_raw:
                     try:
                         selling_price = Decimal(selling_price_raw)
                         if selling_price > 0:
                             product.price_per_bottle = selling_price
+                        else:
+                            selling_price = None
                     except (ValueError, Exception):
-                        pass
+                        selling_price = None
 
                 # Handle spirits shots pricing
                 shots_per_bottle_raw = request.POST.get("shots_per_bottle", "").strip()
@@ -241,6 +313,29 @@ def liquor_scan_in(request):
                         pass
 
                 product.save()
+
+                # Record LiquorStockInTransaction for COGS/history tracking
+                from inventory.models_verticals import LiquorStockInTransaction
+                total_cost_calc = cost_per_bottle * Decimal(bottles_to_add) if cost_per_bottle > 0 else Decimal("0.00")
+                LiquorStockInTransaction.objects.create(
+                    business=business,
+                    product=product,
+                    quantity_added=bottles_to_add,
+                    unit_cost=cost_per_bottle,
+                    total_cost=total_cost_calc,
+                    selling_price_at_time=selling_price,
+                    created_by=request.user,
+                    notes=f"Scan-in: {quantity} {'crate(s)' if unit_type == 'crate' else 'bottle(s)'}",
+                )
+
+                # Low stock / out-of-stock email alerts
+                try:
+                    _send_stock_alert_if_needed(product, business)
+                except Exception as _email_err:
+                    import logging as _log
+                    _log.getLogger(__name__).error(
+                        f"Stock alert email failed for product {product.id}: {_email_err}", exc_info=True
+                    )
 
             # Build success message
             if unit_type == "crate":
