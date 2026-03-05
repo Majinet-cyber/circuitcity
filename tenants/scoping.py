@@ -1,4 +1,4 @@
-﻿# tenants/scoping.py
+# tenants/scoping.py
 """
 Tenant Scoping Helpers (Single Source of Truth for IDOR Prevention)
 ====================================================================
@@ -454,6 +454,70 @@ def bind_business_to_object(obj: Model, request: "HttpRequest") -> Model:
 
 
 # --------------------------------------------------------------------------------------
+# Convenience alias: scoped_get_or_404(Model, business=biz, pk=pk, **kwargs)
+# --------------------------------------------------------------------------------------
+
+def scoped_get_or_404(
+    model: Type[T],
+    *,
+    business: Optional["Business"] = None,
+    pk: Optional[int] = None,
+    id: Optional[int] = None,  # noqa: A002
+    extra_filters: Optional[Dict[str, Any]] = None,
+    select_related: Optional[list] = None,
+    prefetch_related: Optional[list] = None,
+) -> T:
+    """
+    Lightweight tenant-scoped get-or-404 that accepts *business* directly.
+
+    Prefer ``scoped_get_object_or_404(Model, request, pk=pk)`` in views where a
+    full request is available.  Use this variant in service-layer code that already
+    has the business object but no request.
+
+    Raises:
+        Http404: if the object is not found or belongs to a different business.
+
+    Example::
+
+        from tenants.scoping import scoped_get_or_404
+        sale = scoped_get_or_404(Sale, business=request.business, pk=sale_id)
+    """
+    object_pk = pk or id
+    if object_pk is None:
+        raise Http404(f"{model.__name__} not found")
+
+    if business is None:
+        logger.warning(
+            "scoped_get_or_404 called without a business — returning 404 "
+            "for model=%s pk=%s", model.__name__, object_pk
+        )
+        raise Http404(f"{model.__name__} not found")
+
+    qs = model.objects.all()
+
+    if select_related:
+        qs = qs.select_related(*select_related)
+    if prefetch_related:
+        qs = qs.prefetch_related(*prefetch_related)
+
+    qs = apply_tenant_scope(qs, business)
+
+    if extra_filters:
+        qs = qs.filter(**extra_filters)
+
+    try:
+        return qs.get(pk=object_pk)
+    except model.DoesNotExist:
+        if model.objects.filter(pk=object_pk).exists():
+            logger.warning(
+                "IDOR attempt blocked (scoped_get_or_404): %s pk=%s "
+                "requested by business_id=%s",
+                model.__name__, object_pk, business.id,
+            )
+        raise Http404(f"{model.__name__} not found")
+
+
+# --------------------------------------------------------------------------------------
 # Exports
 # --------------------------------------------------------------------------------------
 
@@ -472,4 +536,6 @@ __all__ = [
     # Defense in depth
     "assert_tenant_ownership",
     "bind_business_to_object",
+    # Convenience alias (business-direct, no request required)
+    "scoped_get_or_404",
 ]
