@@ -472,7 +472,7 @@ def _complete_sale(request, business, wizard_data, payment_method):
 @require_business
 @require_POST
 def phone_sale_wizard_v2_reset(request):
-    """Reset wizard and start over"""
+    """Reset wizard and start over — always returns to step 1."""
     _clear_wizard(request)
     messages.info(request, "Wizard reset. Starting fresh!")
-    return redirect("inventory:phone_sale_wizard_v2")
+    return redirect(f"{reverse('inventory:phone_sale_wizard_v2')}?step=1")

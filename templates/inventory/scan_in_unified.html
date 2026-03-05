@@ -44,13 +44,22 @@
 .model-card:hover { border-color: var(--e-blue); transform: translateY(-2px); }
 .model-card.selected { border-color: var(--e-blue); background: rgba(var(--e-blue-rgb),.06); }
 .mc-thumb {
-  height: 80px; display: flex; align-items: center; justify-content: center;
+  height: 100px; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
   background: var(--e-bg); font-size: 1.8rem; color: var(--e-muted);
+  border-radius: 10px 10px 0 0;
 }
-.mc-thumb img { width: 100%; height: 80px; object-fit: cover; }
+.mc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mc-body { padding: 8px 10px; }
 .mc-brand { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing:.05em; color: var(--e-blue); }
-.mc-model { font-weight: 700; font-size: .82rem; color: var(--e-text); }
+.mc-model {
+  font-weight: 700; font-size: .82rem; color: var(--e-text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+@media (max-width: 576px) {
+  .mc-thumb { height: 80px; }
+  .model-grid { grid-template-columns: repeat(auto-fill,minmax(140px,1fr)); gap: 8px; }
+}
 .mc-specs { font-size: .72rem; color: var(--e-muted); margin-top: 2px; }
 
 .si-card { background: var(--e-card); border: 1px solid var(--e-border); border-radius: 16px; padding: 22px; margin-bottom: 16px; box-shadow: var(--e-shadow); }
@@ -132,7 +141,14 @@
              data-category="{{ p.category }}"
              onclick="selectModel(this)">
           <div class="mc-thumb">
-            {% if p.main_image %}<img src="{{ p.main_image.url }}" alt="{{ p.display_name }}">{% else %}{% if category == 'laptops' %}💻{% else %}🖥️{% endif %}{% endif %}
+            {% if p.main_image %}
+              <img src="{{ p.main_image.url }}"
+                   alt="{{ p.display_name }}"
+                   width="170" height="100"
+                   onerror="this.onerror=null;this.src='{% static "img/no-product-image.svg" %}'">
+            {% else %}
+              {% if category == 'laptops' %}💻{% else %}🖥️{% endif %}
+            {% endif %}
           </div>
           <div class="mc-body">
             <div class="mc-brand">{{ p.brand }}</div>

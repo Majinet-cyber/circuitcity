@@ -219,8 +219,19 @@ class SafeErrorResponseMiddleware(MiddlewareMixin):
     def process_exception(self, request: HttpRequest, exception: Exception) -> Optional[HttpResponse]:
         """Handle exceptions and return safe error responses."""
 
-        # In development, let Django show the debug page
         if getattr(settings, "DEBUG", False):
+            # In DEBUG mode we still intercept Http404 with our clean template to prevent
+            # Django's technical_404_response from iterating URLResolver objects and
+            # spamming logs with VariableDoesNotExist warnings.
+            if isinstance(exception, Http404):
+                from cc.views import _render_error  # local import avoids circular dep
+                return _render_error(
+                    request,
+                    template="errors/404.html",
+                    status=404,
+                    context={"path": request.get_full_path()},
+                )
+            # All other exceptions: let Django show the normal debug page
             return None
 
         # Let Django handle these specifically (they have safe handlers)

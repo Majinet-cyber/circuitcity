@@ -751,7 +751,121 @@
     color: #94a3b8;
     font-size: 0.9rem;
   }
-  
+
+  /* ========== TOP SELLERS — per-product payment breakdown ========== */
+  .top-sellers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .seller-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .seller-row:last-child { border-bottom: none; }
+
+  .seller-info { flex: 1; min-width: 0; }
+
+  .seller-name {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .seller-meta {
+    display: flex;
+    gap: 8px;
+    margin-top: 3px;
+    flex-wrap: wrap;
+  }
+
+  .seller-category {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 1px 6px;
+  }
+
+  .seller-units {
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  .seller-financials {
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .seller-revenue {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+
+  .seller-payment-chips {
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+
+  .pay-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pay-cash   { background: #dcfce7; color: #166534; }
+  .pay-momo   { background: #fef9c3; color: #854d0e; }
+  .pay-bank   { background: #dbeafe; color: #1e40af; }
+  .pay-credit { background: #fce7f3; color: #9d174d; }
+
+  /* ========== CATEGORY PAYMENT ICONS ========== */
+  .cat-pay-icons {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .cat-pay-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 0.7rem;
+    cursor: default;
+    transition: transform 0.15s ease;
+  }
+
+  .cat-pay-icon:hover {
+    transform: scale(1.2);
+  }
+
+  .cat-pay-cash  { background: #dcfce7; color: #166534; }
+  .cat-pay-momo  { background: #fef9c3; color: #854d0e; }
+  .cat-pay-bank  { background: #dbeafe; color: #1e40af; }
+  .cat-pay-credit{ background: #fce7f3; color: #9d174d; }
+
   /* ========== MOBILE RESPONSIVE ========== */
   @media (max-width: 640px) {
     .pharmacy-dashboard {
@@ -1080,36 +1194,53 @@
   <div class="analytics-section">
     <h2 class="section-title">🏆 Top Performers · {{ period_label }}</h2>
     <div class="analytics-grid">
-      <!-- Top Sellers -->
+      <!-- Top Sellers with Payment Breakdown -->
       <div class="table-card">
         <div class="table-header">
           <h3 class="table-title">
             <span>🥇</span> Top Sellers
           </h3>
-          <p class="table-subtitle">Best performing products by revenue</p>
+          <p class="table-subtitle">Revenue &amp; payment breakdown per product</p>
         </div>
         {% if top_products %}
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th style="text-align: right;">Units</th>
-                <th style="text-align: right;">Revenue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for product in top_products|slice:":5" %}
-              <tr>
-                <td>
-                  <span class="table-product">{{ product.name|truncatewords:4 }}</span>
-                  <span class="table-category">{{ product.category }}</span>
-                </td>
-                <td class="table-number">{{ product.quantity|intcomma }}</td>
-                <td class="table-number">MWK {{ product.revenue|floatformat:0|intcomma }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+          <div class="top-sellers-list">
+            {% for product in top_products|slice:":5" %}
+            <div class="seller-row">
+              <div class="seller-info">
+                <div class="seller-name">{{ product.name|truncatewords:5 }}</div>
+                <div class="seller-meta">
+                  <span class="seller-category">{{ product.category }}</span>
+                  <span class="seller-units">{{ product.quantity|intcomma }} units</span>
+                </div>
+              </div>
+              <div class="seller-financials">
+                <div class="seller-revenue">MWK {{ product.revenue|floatformat:0|intcomma }}</div>
+                <div class="seller-payment-chips">
+                  {% if product.cash_revenue %}
+                  <span class="pay-chip pay-cash" title="Cash">
+                    <i class="bi bi-cash-stack"></i> {{ product.cash_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.momo_revenue %}
+                  <span class="pay-chip pay-momo" title="Mobile Money">
+                    <i class="bi bi-phone"></i> {{ product.momo_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.bank_revenue %}
+                  <span class="pay-chip pay-bank" title="Bank Transfer">
+                    <i class="bi bi-bank"></i> {{ product.bank_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                  {% if product.credit_revenue %}
+                  <span class="pay-chip pay-credit" title="Credit">
+                    <i class="bi bi-clock-history"></i> {{ product.credit_revenue|floatformat:0|intcomma }}
+                  </span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
         {% else %}
           <div class="table-empty">
             <p>No sales data for this period.<br>Your top sellers will appear here after sales.</p>
@@ -1123,7 +1254,7 @@
           <h3 class="table-title">
             <span>📦</span> Top Categories
           </h3>
-          <p class="table-subtitle">Best performing categories by revenue</p>
+          <p class="table-subtitle">Revenue &amp; payment breakdown per category</p>
         </div>
         {% if top_categories %}
           <table class="data-table">
@@ -1132,6 +1263,7 @@
                 <th>Category</th>
                 <th style="text-align: right;">Units</th>
                 <th style="text-align: right;">Revenue</th>
+                <th style="text-align: center; width: 90px;">Pay</th>
               </tr>
             </thead>
             <tbody>
@@ -1142,6 +1274,34 @@
                 </td>
                 <td class="table-number">{{ category.quantity|intcomma }}</td>
                 <td class="table-number">MWK {{ category.revenue|floatformat:0|intcomma }}</td>
+                <td style="text-align: center;">
+                  <div class="cat-pay-icons">
+                    {% if category.cash_revenue %}
+                    <span class="cat-pay-icon cat-pay-cash"
+                          title="Cash · MWK {{ category.cash_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-cash-stack"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.momo_revenue %}
+                    <span class="cat-pay-icon cat-pay-momo"
+                          title="Mobile Money · MWK {{ category.momo_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-phone"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.bank_revenue %}
+                    <span class="cat-pay-icon cat-pay-bank"
+                          title="Bank · MWK {{ category.bank_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-bank"></i>
+                    </span>
+                    {% endif %}
+                    {% if category.credit_revenue %}
+                    <span class="cat-pay-icon cat-pay-credit"
+                          title="Credit · MWK {{ category.credit_revenue|floatformat:0|intcomma }}">
+                      <i class="bi bi-clock-history"></i>
+                    </span>
+                    {% endif %}
+                  </div>
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -1260,141 +1420,106 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
-  // Render Chart.js trend chart
+  // Render Chart.js trend chart — premium smooth line with gradient fill
   function renderTrendChart(metric) {
     if (!trendData || !trendData.labels) return;
-    
-    const values = metric === 'revenue' ? trendData.revenue : trendData.units;
-    const label = metric === 'revenue' ? 'Revenue (MWK)' : 'Units Sold';
-    const color = metric === 'revenue' ? '#10b981' : '#3b82f6';
-    const bgColor = metric === 'revenue' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)';
-    
-    // Calculate max value for smart tick configuration
-    const maxValue = Math.max(...values, 0);
-    
-    // Destroy existing chart
-    if (trendChart) {
-      trendChart.destroy();
+
+    let labels = trendData.labels.slice();
+    let values = (metric === 'revenue' ? trendData.revenue : trendData.units).slice();
+
+    // Single data point: duplicate so the line renders across the chart area
+    if (labels.length === 1) {
+      labels = ['', labels[0], ''];
+      values = [values[0], values[0], values[0]];
     }
-    
-    // Build Y-axis configuration based on metric and data range
-    let yAxisConfig = {
-      beginAtZero: true,
-      grace: '5%',  // Add 5% padding at top for better visual
-    };
-    
-    if (metric === 'units') {
-      // UNITS MODE: Force integer ticks, no duplicates
-      yAxisConfig.ticks = {
-        precision: 0,  // No decimal places
-        maxTicksLimit: 8,  // Limit number of ticks for clean display
-        font: {
-          size: 12,
-          weight: '600',
-          family: 'system-ui, -apple-system, sans-serif'
-        },
-        color: '#64748b',
-        padding: 8,
-        callback: function(value) {
-          // Only show integer ticks (Chart.js may still generate fractional ones)
-          if (value !== Math.floor(value)) return '';  // Hide fractional ticks
-          
-          if (value >= 1000) {
-            return (value / 1000).toFixed(0) + 'k';
-          } else {
-            return value;
-          }
-        }
-      };
-      
-      // For small datasets, force stepSize = 1 to avoid fractional ticks
-      if (maxValue <= 20) {
-        yAxisConfig.ticks.stepSize = 1;
-        yAxisConfig.max = Math.ceil(maxValue * 1.1);  // Add 10% headroom
-      }
-    } else {
-      // REVENUE MODE: Compact format with smart tick limits
-      yAxisConfig.ticks = {
-        maxTicksLimit: 7,  // Limit to ~7 ticks for readability
-        font: {
-          size: 12,
-          weight: '600',
-          family: 'system-ui, -apple-system, sans-serif'
-        },
-        color: '#64748b',
-        padding: 8,
-        callback: function(value) {
-          // Compact currency formatter - PREMIUM STYLE: 10k, 20k, 30k (not "k 30")
-          if (value >= 1000000) {
-            const millions = value / 1000000;
-            // Only show decimal if meaningful (e.g., 1.2M not 1.0M)
-            return millions % 1 === 0 ? millions.toFixed(0) + 'M' : millions.toFixed(1) + 'M';
-          } else if (value >= 1000) {
-            return (value / 1000).toFixed(0) + 'k';
-          } else if (value === 0) {
-            return '0';
-          } else {
-            // For small values < 1000, show raw number
-            return value.toFixed(0);
-          }
-        }
-      };
-    }
-    
-    // Create new chart
+
+    const label     = metric === 'revenue' ? 'Revenue (MWK)' : 'Units Sold';
+    const colorLine = metric === 'revenue' ? '#10b981' : '#3b82f6';
+    const colorFrom = metric === 'revenue' ? 'rgba(16,185,129,0.22)' : 'rgba(59,130,246,0.22)';
+    const colorTo   = metric === 'revenue' ? 'rgba(16,185,129,0)' : 'rgba(59,130,246,0)';
+    const maxValue  = Math.max(...values, 0);
+
+    if (trendChart) trendChart.destroy();
+
     const ctx = trendCanvas.getContext('2d');
+
+    // Gradient fill under the line
+    const gradient = ctx.createLinearGradient(0, 0, 0, trendCanvas.clientHeight || 360);
+    gradient.addColorStop(0, colorFrom);
+    gradient.addColorStop(1, colorTo);
+
+    // Y-axis tick formatter
+    function yTickFmt(value) {
+      if (value !== Math.floor(value) && metric === 'units') return '';
+      if (value >= 1000000) {
+        const m = value / 1000000;
+        return (m % 1 === 0 ? m.toFixed(0) : m.toFixed(1)) + 'M';
+      }
+      if (value >= 1000) return (value / 1000).toFixed(0) + 'k';
+      if (value === 0) return '0';
+      return value.toFixed(0);
+    }
+
+    const yAxisConfig = {
+      beginAtZero: true,
+      grace: '8%',
+      ticks: {
+        maxTicksLimit: metric === 'units' ? 8 : 7,
+        font: { size: 12, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+        color: '#94a3b8',
+        padding: 10,
+        callback: yTickFmt,
+        ...(metric === 'units' && maxValue <= 20 ? { stepSize: 1 } : {}),
+      },
+    };
+
     trendChart = new Chart(ctx, {
-      type: 'bar',
+      type: 'line',
       data: {
-        labels: trendData.labels,
+        labels,
         datasets: [{
-          label: label,
+          label,
           data: values,
-          backgroundColor: bgColor,
-          borderColor: color,
-          borderWidth: 2,
-          borderRadius: 6,
-          maxBarThickness: 50,
+          borderColor: colorLine,
+          borderWidth: 2.5,
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.45,           // smooth bezier curve
+          pointRadius: 0,          // hide points by default
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: colorLine,
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
         plugins: {
           legend: { display: false },
           tooltip: {
             enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            titleColor: '#fff',
+            backgroundColor: 'rgba(15,23,42,0.96)',
+            titleColor: '#e2e8f0',
             bodyColor: '#fff',
-            borderColor: 'rgba(226, 232, 240, 0.2)',
+            borderColor: 'rgba(148,163,184,0.2)',
             borderWidth: 1,
-            padding: 12,
-            cornerRadius: 10,
-            titleFont: {
-              size: 13,
-              weight: '700',
-              family: 'system-ui, -apple-system, sans-serif'
-            },
-            bodyFont: {
-              size: 14,
-              weight: '600',
-              family: 'system-ui, -apple-system, sans-serif'
-            },
+            padding: { top: 10, right: 16, bottom: 10, left: 16 },
+            cornerRadius: 12,
+            caretSize: 6,
+            titleFont: { size: 12, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+            bodyFont:  { size: 15, weight: '700', family: 'system-ui, -apple-system, sans-serif' },
             displayColors: false,
             callbacks: {
-              title: function(context) {
-                return context[0].label;
-              },
-              label: function(context) {
-                const value = context.parsed.y;
-                if (metric === 'revenue') {
-                  return 'MWK ' + value.toLocaleString('en-US', { maximumFractionDigits: 0 });
-                } else {
-                  return Math.round(value) + ' unit' + (value !== 1 ? 's' : '');
-                }
+              title: ctx => ctx[0].label || '',
+              label: ctx => {
+                const v = ctx.parsed.y;
+                return metric === 'revenue'
+                  ? 'MWK ' + v.toLocaleString('en-US', { maximumFractionDigits: 0 })
+                  : Math.round(v) + ' unit' + (Math.round(v) !== 1 ? 's' : '');
               }
             }
           }
@@ -1402,45 +1527,26 @@ document.addEventListener('DOMContentLoaded', function() {
         scales: {
           y: {
             ...yAxisConfig,
-            grid: {
-              color: '#f1f5f9',
-              drawBorder: false,
-              lineWidth: 1
-            },
-            border: {
-              display: false
-            }
+            grid:   { color: '#f1f5f9', lineWidth: 1 },
+            border: { display: false },
           },
           x: {
-            grid: { 
-              display: false 
-            },
+            grid:   { display: false },
+            border: { display: false },
             ticks: {
-              font: {
-                size: 11,
-                weight: '600',
-                family: 'system-ui, -apple-system, sans-serif'
-              },
-              color: '#64748b',
+              font: { size: 11, weight: '600', family: 'system-ui, -apple-system, sans-serif' },
+              color: '#94a3b8',
               padding: 8,
-              maxRotation: 0,  // Keep labels horizontal
+              maxRotation: 0,
               minRotation: 0,
-              autoSkip: true,  // Auto-skip labels if too crowded
-              maxTicksLimit: 12  // Limit to ~12 date labels max
+              autoSkip: true,
+              maxTicksLimit: 12,
             },
-            border: {
-              display: false
-            }
           }
         },
-        interaction: {
-          mode: 'index',
-          intersect: false
-        },
-        animation: {
-          duration: 750,
-          easing: 'easeInOutQuart'
-        }
+        interaction: { mode: 'index', intersect: false },
+        animation: { duration: 600, easing: 'easeInOutCubic' },
+        hover: { intersect: false },
       }
     });
   }

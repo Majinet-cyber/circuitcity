@@ -1687,6 +1687,11 @@ urlpatterns += [
         _need_biz(getattr(_phone_wizard, "phone_sale_wizard_reset", _stub("phone_sale_wizard_reset not found"))),
         name="phone_sale_wizard_reset",
     ),
+    path(
+        "phone-sale-wizard/start-over/",
+        _need_biz(getattr(_phone_wizard, "phone_sale_wizard_start_over", _stub("phone_sale_wizard_start_over not found"))),
+        name="phone_sale_wizard_start_over",
+    ),
     # NEW: Simplified 3-step wizard (IMEI → Price → Payment)
     path(
         "sell-phone/",

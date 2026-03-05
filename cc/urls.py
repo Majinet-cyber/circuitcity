@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import os
 import re
@@ -1090,6 +1090,15 @@ else:
 # If non-namespaced URLs are needed, they should redirect to namespaced versions,
 # not call views directly (which bypasses namespace and breaks current_app).
 
+
+# ======================================================================================
+# Stub / legacy redirects (must be near-last so they don't shadow real routes)
+# ======================================================================================
+# /edit/ has no top-level meaning; redirect browsers & crawlers to home rather than
+# let them hit a noisy Django debug 404 that spams VariableDoesNotExist in logs.
+urlpatterns += [
+    path("edit/", RedirectView.as_view(url="/", permanent=False), name="edit_redirect"),
+]
 
 # ======================================================================================
 # Error handlers

@@ -114,7 +114,7 @@ def phone_sale_wizard(request):
 
 
 def _clear_wizard_session(request):
-    """Clear wizard session data"""
+    """Clear wizard session data (v1 keys)."""
     keys_to_clear = [
         "sale_wizard_step",
         "sale_wizard_brand",
@@ -122,7 +122,7 @@ def _clear_wizard_session(request):
         "sale_wizard_variant",
         "sale_wizard_product_id",
         "sale_wizard_imei",
-        "sale_wizard_stock_item_id",  # Added for stock lookup flow
+        "sale_wizard_stock_item_id",
         "sale_wizard_selling_price",
         "sale_wizard_auto_skip_loop",
         "sale_wizard_auto_skip_loop_model",
@@ -130,6 +130,9 @@ def _clear_wizard_session(request):
     ]
     for key in keys_to_clear:
         request.session.pop(key, None)
+    # Also clear v2 wizard data so start-over is truly clean across both flows
+    request.session.pop("phone_sale_wizard_v2", None)
+    request.session.modified = True
 
 
 def _normalize_brand_item(b):
@@ -609,7 +612,26 @@ def _wizard_step_confirm(request, ctx, business):
 @require_business_kind(BusinessKind.PHONES)
 @require_http_methods(["POST"])
 def phone_sale_wizard_reset(request):
-    """Reset the wizard and start over"""
+    """Reset the wizard and start over (legacy endpoint — kept for backwards compatibility)."""
     _clear_wizard_session(request)
     messages.info(request, "Wizard reset. Starting fresh!")
-    return redirect("inventory:phone_sale_wizard")
+    url = reverse("inventory:phone_sale_wizard")
+    return redirect(f"{url}?step=1")
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.PHONES)
+@require_http_methods(["GET", "POST"])
+def phone_sale_wizard_start_over(request):
+    """
+    Dedicated 'Start Over' endpoint for the phone sale wizard.
+
+    Atomically clears ALL wizard state (v1 + v2) and redirects to step 1.
+    Works from any wizard step and accepts both GET and POST so it is
+    reachable from a link or a form submit.
+    """
+    _clear_wizard_session(request)
+    messages.info(request, "Starting over — wizard cleared.")
+    url = reverse("inventory:phone_sale_wizard")
+    return redirect(f"{url}?step=1")

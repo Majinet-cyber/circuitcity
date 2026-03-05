@@ -1028,15 +1028,13 @@
       {% endif %}
     </form>
 
-    <!-- Reset link -->
+    <!-- Start Over link — dedicated endpoint, clears ALL wizard state, always goes to step 1 -->
     <div style="text-align:center;margin-top:24px">
-      <form method="post" action="{% url 'inventory:phone_sale_wizard_reset' %}" style="display:inline">
-        {% csrf_token %}
-        <button type="submit"
-          style="background:none;border:none;color:#64748b;text-decoration:underline;cursor:pointer;font-size:.9rem">
-          <i class="bi bi-arrow-clockwise"></i> Start Over
-        </button>
-      </form>
+      <a href="{% url 'inventory:phone_sale_wizard_start_over' %}"
+         style="color:#64748b;text-decoration:underline;font-size:.9rem"
+         data-cy="start-over-link">
+        <i class="bi bi-arrow-clockwise"></i> Start Over
+      </a>
     </div>
   </div>
 </div>

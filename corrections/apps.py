@@ -25,7 +25,8 @@ class CorrectionsConfig(AppConfig):
             from corrections.adapters import phones  # noqa: F401
             from corrections.adapters import gym  # noqa: F401
             from corrections.adapters import clothing  # noqa: F401
-            print('[Corrections] Adapters loaded: phones, gym, clothing')
+            from corrections.adapters import pharmacy  # noqa: F401
+            print('[Corrections] Adapters loaded: phones, gym, clothing, pharmacy')
         except ImportError as e:
             print(f'[Corrections] Warning: Failed to load some adapters: {e}')
 

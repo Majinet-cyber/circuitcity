@@ -589,7 +589,6 @@ def delete_record(request: HttpRequest, vertical: str, entity_label: str, object
         return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
     
     # Perform deletion based on entity type
-    # Currently only GymPayment is supported
     if entity_label == 'gym_payment':
         from corrections.services_deletion import GymPaymentDeletionService
         
@@ -624,6 +623,21 @@ def delete_record(request: HttpRequest, vertical: str, entity_label: str, object
             for error in result.errors[:3]:  # Show first 3 errors
                 messages.warning(request, error)
             return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
+
+    elif entity_label == 'pharmacy_sale':
+        return _delete_pharmacy_sale(
+            request=request,
+            vertical=vertical,
+            entity_label=entity_label,
+            entity_config=entity_config,
+            obj=obj,
+            object_id=object_id,
+            business=business,
+            reason=reason,
+            notes=notes,
+            logger=logger,
+        )
+
     else:
         # Entity type doesn't support deletion yet
         messages.error(
@@ -632,6 +646,124 @@ def delete_record(request: HttpRequest, vertical: str, entity_label: str, object
             f'Please contact support if you need to remove this record.'
         )
         return redirect('corrections:edit_record', vertical=vertical, entity_label=entity_label, object_id=object_id)
+
+
+def _delete_pharmacy_sale(
+    request: HttpRequest,
+    vertical: str,
+    entity_label: str,
+    entity_config,
+    obj,
+    object_id: int,
+    business,
+    reason: str,
+    notes: str,
+    logger,
+) -> HttpResponse:
+    """
+    Soft-delete a PharmacySale record.
+
+    Actions:
+    1. Marks sale as is_deleted=True (soft delete — not removed from DB).
+    2. Restores batch stock (batch.quantity += sale.quantity).
+    3. Logs correction audit entry via CorrectionAuditLog.
+    4. Also logs to audit.utils.log_audit if available.
+    """
+    from django.db import transaction as db_transaction
+    from django.utils import timezone as tz
+
+    try:
+        with db_transaction.atomic():
+            batch = obj.batch
+            qty = obj.quantity
+
+            # Soft-delete the sale
+            obj.is_deleted = True
+            obj.deleted_at = tz.now()
+            obj.deleted_by = request.user
+            obj.save(update_fields=['is_deleted', 'deleted_at', 'deleted_by'])
+
+            # Restore batch stock
+            batch.quantity = (batch.quantity or 0) + qty
+            batch.save(update_fields=['quantity'])
+
+            # Log to CorrectionAuditLog via convenience classmethod (best-effort)
+            try:
+                correction_batch = CorrectionBatch.objects.create(
+                    business=business,
+                    vertical=vertical,
+                    status=CorrectionStatus.APPLIED,
+                    created_by=request.user,
+                    applied_by=request.user,
+                    applied_at=tz.now(),
+                    reason=reason,
+                    notes=notes or f'Soft-deleted PharmacySale #{object_id} via data correction',
+                )
+                CorrectionAuditLog.log_action(
+                    business=business,
+                    performed_by=request.user,
+                    action='pharmacy_sale_deleted',
+                    details={
+                        'entity_label': entity_label,
+                        'object_id': object_id,
+                        'reason': reason,
+                        'notes': notes,
+                        'qty_restored': qty,
+                        'batch_id': batch.pk,
+                    },
+                    batch=correction_batch,
+                    request=request,
+                )
+            except Exception as audit_err:
+                logger.warning(
+                    f'CorrectionAuditLog creation failed for pharmacy_sale #{object_id}: {audit_err}'
+                )
+
+            # Also log to audit app if available
+            try:
+                from audit.utils import log_audit
+                log_audit(
+                    request=request,
+                    action='DELETE_PHARMACY_SALE',
+                    entity='PharmacySale',
+                    entity_id=str(object_id),
+                    message=(
+                        f'Sale #{object_id} soft-deleted via data correction. '
+                        f'Reason: {reason}. Batch stock +{qty} restored.'
+                    ),
+                )
+            except Exception:
+                pass
+
+        messages.success(
+            request,
+            f'Sale #{object_id} has been deleted and {qty} unit(s) returned to batch stock.',
+        )
+        logger.info(
+            f"User {request.user.id} soft-deleted PharmacySale #{object_id} (reason: {reason})",
+            extra={
+                'user_id': request.user.id,
+                'business_id': business.id,
+                'entity_label': entity_label,
+                'object_id': object_id,
+                'reason': reason,
+            },
+        )
+        return redirect('corrections:browse_entity', vertical=vertical, entity_label=entity_label)
+
+    except Exception as exc:
+        logger.error(
+            f"Failed to delete PharmacySale #{object_id}: {exc}",
+            exc_info=True,
+            extra={'user_id': request.user.id, 'business_id': business.id},
+        )
+        messages.error(request, f'Failed to delete sale #{object_id}: {exc}')
+        return redirect(
+            'corrections:edit_record',
+            vertical=vertical,
+            entity_label=entity_label,
+            object_id=object_id,
+        )
 
 
 # Export views

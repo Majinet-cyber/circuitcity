@@ -110,7 +110,7 @@
             {% endif %}
           </td>
           <td>
-            <small>{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}</small>
+            <small>{% if sale.sold_by %}{{ sale.sold_by.get_full_name|default:sale.sold_by.username }}{% else %}—{% endif %}</small>
           </td>
           <td>
             <small>{{ sale.sold_at|date:"Y-m-d" }}</small>
@@ -128,10 +128,8 @@
           <td>
             <div class="action-buttons">
               {% if not sale.is_deleted and not sale.is_reversed %}
-                {% if user.is_staff or user.is_superuser or perms.inventory.change_pharmacysale %}
+                {% if can_edit_sales or user.is_staff or user.is_superuser %}
                 <a href="{% url 'pharmacy:sale_edit' sale.id %}" class="btn btn-sm btn-edit">✏️ Edit</a>
-                {% endif %}
-                {% if user.is_staff or user.is_superuser or perms.inventory.delete_pharmacysale %}
                 <form method="post" action="{% url 'pharmacy:sale_undo' sale.id %}" style="display:inline" onsubmit="return confirm('Undo this sale? Stock will be restored.')">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-undo">↩️ Undo</button>

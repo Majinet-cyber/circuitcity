@@ -25,11 +25,13 @@ logger = logging.getLogger(__name__)
 TRANSACTIONAL_EVENTS = {
     "OTP_RESET",
     "OTP_VERIFY",
-    "OTP_CODE",  # All OTP emails are transactional
+    "OTP_CODE",        # All OTP emails are transactional
     "WELCOME_MANAGER",
     "WELCOME_AGENT",
-    "SALE_INSTANT",  # Managers MUST receive sale emails - no preference blocking
-    "SALE_BATCH",    # Managers MUST receive sale emails - no preference blocking
+    "SALE_INSTANT",    # Managers MUST receive sale emails - no preference blocking
+    "SALE_BATCH",      # Managers MUST receive sale emails - no preference blocking
+    "RESTOCK_ALERT",   # Restock alerts are high-importance - always send
+    "PAYMENT_RECORDED",# Payment confirmations are always sent
 }
 
 
@@ -413,6 +415,16 @@ def _get_template_config(event_type: str) -> Optional[Dict[str, Any]]:
             "subject": "Weekly Sales Summary - {business_name}",
             "html_template": "notifications/emails/weekly_digest.html",
             "text_template": "notifications/emails/weekly_digest.txt",
+        },
+        "RESTOCK_ALERT": {
+            "subject": "⚠️ Restock Alert: {product_name} — {business_name}",
+            "html_template": "notifications/emails/restock_alert.html",
+            "text_template": "notifications/emails/restock_alert.txt",
+        },
+        "PAYMENT_RECORDED": {
+            "subject": "💳 Payment Recorded: {product_name} — {business_name}",
+            "html_template": "notifications/emails/sale_instant.html",
+            "text_template": "notifications/emails/sale_instant.txt",
         },
     }
     return configs.get(event_type)
@@ -1462,6 +1474,86 @@ def get_recent_notifications(user, business: Optional[Business] = None, limit: i
         qs = qs.filter(business=business)
 
     return qs.order_by("-created_at")[:limit]
+
+
+def notify_restock_alert_email(product_id: int, business_id: int, alert_type: str = "low_stock") -> None:
+    """
+    Send a restock alert email to business managers.
+
+    Called by the Celery task ``notify_restock_alert``.  Never raises —
+    all errors are logged and swallowed so the caller is never blocked.
+
+    Args:
+        product_id: PK of MerchProduct (pharmacy) or PharmacyBatch.
+        business_id: PK of the Business.
+        alert_type: 'low_stock' | 'out_of_stock'
+    """
+    try:
+        from tenants.models import Business as BusinessModel
+
+        business = BusinessModel.objects.get(pk=business_id)
+    except Exception as e:
+        logger.error(f"notify_restock_alert_email: business {business_id} not found: {e}")
+        return
+
+    try:
+        from inventory.models import MerchProduct
+
+        product = MerchProduct.objects.get(pk=product_id)
+        product_name = product.name
+        current_stock = getattr(product, "quantity_in_stock", 0) or 0
+        threshold = getattr(product, "reorder_level", 0) or 0
+        # Suggest reorder quantity as 2× threshold, minimum 10
+        suggested_reorder = max(threshold * 2, 10)
+    except Exception:
+        # Try PharmacyBatch
+        try:
+            from inventory.models_pharmacy import PharmacyBatch
+
+            batch = PharmacyBatch.objects.get(pk=product_id)
+            product_name = batch.merch_product.name if batch.merch_product else f"Batch #{product_id}"
+            current_stock = batch.quantity
+            threshold = batch.reorder_level
+            suggested_reorder = max(threshold * 2, 10)
+        except Exception as e:
+            logger.error(f"notify_restock_alert_email: product/batch {product_id} not found: {e}")
+            return
+
+    alert_label = "Out of Stock" if alert_type == "out_of_stock" else "Low Stock"
+
+    try:
+        recipients = get_business_manager_emails(
+            business,
+            include_owner=True,
+            event_type="RESTOCK_ALERT",
+        )
+
+        if not recipients:
+            logger.info(f"notify_restock_alert_email: no recipients for business {business_id}")
+            return
+
+        dedupe_key = f"RESTOCK:{business_id}:{product_id}:{alert_type}"
+
+        emit_event(
+            event_type="RESTOCK_ALERT",
+            recipients=recipients,
+            dedupe_key=dedupe_key,
+            payload={
+                "product_name": product_name,
+                "current_stock": current_stock,
+                "threshold": threshold,
+                "suggested_reorder": suggested_reorder,
+                "alert_type": alert_type,
+                "alert_label": alert_label,
+                "business_name": business.name,
+            },
+            business=business,
+        )
+    except Exception as e:
+        logger.error(
+            f"notify_restock_alert_email: failed for product={product_id} business={business_id}: {e}",
+            exc_info=True,
+        )
 
 
 def has_unread_payslip_alert(user, business: Business, days_back: int = 7) -> bool:

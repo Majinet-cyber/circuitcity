@@ -1,4 +1,4 @@
-﻿# accounts/forms.py
+# accounts/forms.py
 from __future__ import annotations
 
 import re
@@ -827,7 +827,7 @@ class ManagerWizardStep2Form(forms.Form):
                 "inputmode": "lowercase",
             }
         ),
-        help_text="yourstore.imajinet.com",
+        help_text="yourstore.emajinet.africa",
     )
 
     def clean_business_name(self):

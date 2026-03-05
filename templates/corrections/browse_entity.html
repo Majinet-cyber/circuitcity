@@ -178,6 +178,38 @@
         box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         color: white;
     }
+
+    .action-btn-delete {
+        background: #fff;
+        color: #dc2626;
+        padding: 0.5rem 0.875rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: all 0.3s ease;
+        border: 2px solid #fecaca;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .action-btn-delete:hover {
+        background: #fef2f2;
+        border-color: #dc2626;
+        color: #dc2626;
+        transform: translateY(-2px);
+    }
+
+    .record-id-link {
+        color: #667eea;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .record-id-link:hover {
+        text-decoration: underline;
+    }
     
     /* Empty State */
     .empty-state-premium {
@@ -353,8 +385,16 @@
                     </thead>
                     <tbody>
                         {% for record in records %}
-                        <tr>
-                            <td><strong>#{{ record.pk }}</strong></td>
+                        <tr data-href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                            onclick="window.location='{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}'"
+                            style="cursor:pointer;">
+                            <td>
+                                <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                                   class="record-id-link"
+                                   onclick="event.stopPropagation()">
+                                    #{{ record.pk }}
+                                </a>
+                            </td>
                             {% for field_name, field_config in entity_config.fields.items %}
                             <td>
                                 {% with value=record|lookup:field_name %}
@@ -362,11 +402,21 @@
                                 {% endwith %}
                             </td>
                             {% endfor %}
-                            <td>
-                                <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}" 
-                                   class="action-btn-edit">
-                                    <i class="bi bi-pencil"></i> Edit
-                                </a>
+                            <td onclick="event.stopPropagation()">
+                                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                    <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}"
+                                       class="action-btn-edit">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </a>
+                                    {% if entity_label == 'pharmacy_sale' or entity_label == 'gym_payment' %}
+                                    <a href="{% url 'corrections:edit_record' vertical=vertical entity_label=entity_label object_id=record.pk %}#delete-section"
+                                       class="action-btn-delete"
+                                       title="Delete this record"
+                                       onclick="event.stopPropagation()">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}

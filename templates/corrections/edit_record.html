@@ -459,11 +459,12 @@
                                 <i class="bi bi-x-lg"></i> Cancel
                             </a>
                             
-                            {% if entity_label == 'gym_payment' %}
-                            <!-- Delete button (for duplicates) -->
+                            {% if entity_label == 'gym_payment' or entity_label == 'pharmacy_sale' %}
+                            <!-- Delete button -->
                             <button type="button" class="btn-premium-danger ms-auto" 
+                                    id="delete-section"
                                     data-bs-toggle="modal" data-bs-target="#deleteModal">
-                                <i class="bi bi-trash"></i> Delete (Duplicate)
+                                <i class="bi bi-trash"></i> Delete Record
                             </button>
                             {% endif %}
                         </div>
@@ -509,21 +510,28 @@
 </div>
 
 <!-- Delete Confirmation Modal -->
-{% if entity_label == 'gym_payment' %}
+{% if entity_label == 'gym_payment' or entity_label == 'pharmacy_sale' %}
 <div class="modal fade delete-modal" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="deleteModalLabel">
                     <i class="bi bi-exclamation-triangle-fill"></i>
-                    Delete Payment Record
+                    {% if entity_label == 'pharmacy_sale' %}Delete Sale Record{% else %}Delete Payment Record{% endif %}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                {% if entity_label == 'pharmacy_sale' %}
+                <div class="alert alert-warning" role="alert">
+                    <strong><i class="bi bi-shield-exclamation"></i> Note:</strong>
+                    This will <strong>soft-delete</strong> the sale record. Stock will be restored to the batch and the action will be logged.
+                </div>
+                {% else %}
                 <div class="alert alert-danger" role="alert">
                     <strong><i class="bi bi-shield-exclamation"></i> Warning:</strong> This will permanently remove the payment and revert any linked wallet/ledger effects.
                 </div>
+                {% endif %}
                 
                 <form method="post" action="{% url 'corrections:delete_record' vertical=vertical entity_label=entity_label object_id=obj.pk %}" id="deleteForm">
                     {% csrf_token %}
@@ -532,6 +540,18 @@
                         <label for="delete_reason" class="form-label fw-bold">
                             Reason for Deletion <span class="text-danger">*</span>
                         </label>
+                        {% if entity_label == 'pharmacy_sale' %}
+                        <select name="reason" id="delete_reason" class="form-select" required>
+                            <option value="">-- Select reason --</option>
+                            <option value="data_entry_error">Data Entry Error</option>
+                            <option value="wrong_product">Wrong Product / Batch</option>
+                            <option value="wrong_quantity">Wrong Quantity</option>
+                            <option value="wrong_price">Wrong Price</option>
+                            <option value="duplicate">Duplicate Sale</option>
+                            <option value="customer_return">Customer Return / Cancelled</option>
+                            <option value="other">Other (specify in notes)</option>
+                        </select>
+                        {% else %}
                         <select name="reason" id="delete_reason" class="form-select" required>
                             <option value="">-- Select reason --</option>
                             <option value="duplicate">Duplicate Payment</option>
@@ -540,6 +560,7 @@
                             <option value="data_entry_error">Data Entry Error</option>
                             <option value="other">Other (specify in notes)</option>
                         </select>
+                        {% endif %}
                     </div>
                     
                     <div class="mb-3">
@@ -547,12 +568,23 @@
                             Additional Notes
                         </label>
                         <textarea name="notes" id="delete_notes" class="form-control" rows="3" 
-                                  placeholder="Provide additional details about why this payment is being deleted..."></textarea>
+                                  placeholder="Provide additional details..."></textarea>
                         <div class="form-text">
                             <i class="bi bi-info-circle"></i> This will be logged in the audit trail.
                         </div>
                     </div>
                     
+                    {% if entity_label == 'pharmacy_sale' %}
+                    <div class="alert alert-info" role="alert">
+                        <strong><i class="bi bi-info-circle"></i> What will happen:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Sale #{{ obj.pk }} will be marked as deleted (soft delete)</li>
+                            <li>Batch stock will be restored by {{ obj.quantity }} unit{{ obj.quantity|pluralize }}</li>
+                            <li>Sale will no longer appear in revenue/profit totals</li>
+                            <li>Action will be logged with full audit trail</li>
+                        </ul>
+                    </div>
+                    {% else %}
                     <div class="alert alert-warning" role="alert">
                         <strong><i class="bi bi-info-circle"></i> What will happen:</strong>
                         <ul class="mb-0 mt-2">
@@ -562,6 +594,7 @@
                             <li>This action CANNOT be undone</li>
                         </ul>
                     </div>
+                    {% endif %}
                 </form>
             </div>
             <div class="modal-footer">

@@ -1,4 +1,4 @@
-﻿# notifications/signals.py
+# notifications/signals.py
 """
 Signal handlers for creating notifications on important events.
 
@@ -199,8 +199,10 @@ def notify_low_stock(sender, instance, created, **kwargs):
     if stock > threshold or stock <= 0 or not business_id:
         return
 
+    alert_type = "out_of_stock" if stock == 0 else "low_stock"
+
     def _create_low_stock_notification():
-        """Create low stock notifications for managers."""
+        """Create low stock notifications for managers and send email."""
         try:
             from tenants.models import Membership
             
@@ -236,7 +238,52 @@ def notify_low_stock(sender, instance, created, **kwargs):
         except Exception:
             logger.exception(f"Failed to create low stock notification for item_id={item_id}")
 
+        # Also queue email notification for restock alert
+        try:
+            from notifications.tasks import notify_restock_alert
+            notify_restock_alert.delay(
+                product_id=item_id,
+                business_id=business_id,
+                alert_type=alert_type,
+            )
+        except Exception:
+            logger.exception(f"Failed to queue restock alert email for item_id={item_id}")
+
     transaction.on_commit(_create_low_stock_notification)
+
+
+@receiver(post_save, sender="inventory.PharmacySale")
+def notify_pharmacy_sale(sender, instance, created, **kwargs):
+    """
+    Notify managers about a new PharmacySale via email.
+
+    Uses transaction.on_commit() to avoid sending for rolled-back transactions.
+    """
+    if not created:
+        return
+
+    sale_id = instance.id
+
+    def _send_pharmacy_sale_email():
+        try:
+            from inventory.models_pharmacy import PharmacySale as _PharmacySale
+            from notifications.services import notify_sale_completion
+
+            sale = _PharmacySale.objects.get(pk=sale_id)
+            notify_sale_completion(sale)
+        except Exception:
+            logger.exception(f"Failed to send pharmacy sale email for sale_id={sale_id}")
+
+    def _queue_payment_recorded():
+        try:
+            from notifications.tasks import notify_payment_recorded
+            notify_payment_recorded.delay(sale_id=sale_id, sale_type="pharmacy")
+        except Exception:
+            logger.exception(f"Failed to queue payment recorded email for sale_id={sale_id}")
+
+    transaction.on_commit(_send_pharmacy_sale_email)
+    # Payment recorded event (same sale, signals payment is captured)
+    transaction.on_commit(_queue_payment_recorded)
 
 
 @receiver(post_save, sender="support.Ticket")
