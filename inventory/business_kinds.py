@@ -34,6 +34,7 @@ class BusinessKind(models.TextChoices):
     FARM = "farm", "Farm Manager"  # NEW: Farm profitability tracking
     WELDING = "welding", "Welding Workshop"  # NEW: Welding job estimation & invoicing
     CAR_HIRE = "car_hire", "Car Hire Service"  # NEW: Fleet management & trip bookings
+    CAR_DEALER = "car_dealer", "Car Dealer"  # NEW: Vehicle dealership & marketplace
 
 
 __all__ = ["BusinessKind"]

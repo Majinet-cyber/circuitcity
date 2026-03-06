@@ -77,18 +77,19 @@
   }
 
   /* Vertical icons */
-  .icon-phones  { background:#dbeafe; color:#2563eb; }
-  .icon-liquor  { background:#fce7f3; color:#db2777; }
-  .icon-grocery { background:#dcfce7; color:#16a34a; }
-  .icon-pharmacy{ background:#ede9fe; color:#7c3aed; }
-  .icon-gym     { background:#fee2e2; color:#dc2626; }
-  .icon-farm    { background:#d1fae5; color:#059669; }
-  .icon-clothing{ background:#fef3c7; color:#d97706; }
-  .icon-hardware{ background:#e0f2fe; color:#0284c7; }
-  .icon-cement  { background:#f1f5f9; color:#475569; }
-  .icon-welding { background:#fef3c7; color:#b45309; }
-  .icon-car_hire{ background:#e0e7ff; color:#4f46e5; }
-  .icon-generic { background:#f1f5f9; color:#64748b; }
+  .icon-phones     { background:#dbeafe; color:#2563eb; }
+  .icon-liquor     { background:#fce7f3; color:#db2777; }
+  .icon-grocery    { background:#dcfce7; color:#16a34a; }
+  .icon-pharmacy   { background:#ede9fe; color:#7c3aed; }
+  .icon-gym        { background:#fee2e2; color:#dc2626; }
+  .icon-farm       { background:#d1fae5; color:#059669; }
+  .icon-clothing   { background:#fef3c7; color:#d97706; }
+  .icon-hardware   { background:#e0f2fe; color:#0284c7; }
+  .icon-cement     { background:#f1f5f9; color:#475569; }
+  .icon-welding    { background:#fef3c7; color:#b45309; }
+  .icon-car_hire   { background:#e0e7ff; color:#4f46e5; }
+  .icon-car_dealer { background:#fdf2f8; color:#9d174d; }
+  .icon-generic    { background:#f1f5f9; color:#64748b; }
 
   @media(max-width:576px){
     .ws-hero{ padding:2rem 0 1.5rem; }
@@ -132,6 +133,7 @@
                     {% elif b.business_kind == "gym" %}<i class="bi bi-lightning"></i>
                     {% elif b.business_kind == "farm" %}<i class="bi bi-flower1"></i>
                     {% elif b.business_kind == "car_hire" %}<i class="bi bi-car-front"></i>
+                    {% elif b.business_kind == "car_dealer" %}<i class="bi bi-car-front-fill"></i>
                     {% elif b.business_kind == "clothing" %}<i class="bi bi-bag-heart"></i>
                     {% elif b.business_kind == "welding" %}<i class="bi bi-tools"></i>
                     {% else %}<i class="bi bi-building"></i>{% endif %}
@@ -182,6 +184,7 @@
                 {% elif m.business.business_kind == "gym" %}<i class="bi bi-lightning"></i>
                 {% elif m.business.business_kind == "farm" %}<i class="bi bi-flower1"></i>
                 {% elif m.business.business_kind == "car_hire" %}<i class="bi bi-car-front"></i>
+                {% elif m.business.business_kind == "car_dealer" %}<i class="bi bi-car-front-fill"></i>
                 {% elif m.business.business_kind == "clothing" %}<i class="bi bi-bag-heart"></i>
                 {% elif m.business.business_kind == "welding" %}<i class="bi bi-tools"></i>
                 {% else %}<i class="bi bi-building"></i>{% endif %}

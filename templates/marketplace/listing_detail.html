@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ listing.title }} – {{ business.name }} | Emajinet</title>
+<meta name="description" content="{{ listing.description|truncatewords:25 }}">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root{--brand:#4f46e5;}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f8fafc;}
+  .gallery-main{width:100%;height:320px;object-fit:cover;border-radius:16px;background:#f1f5f9;}
+  .gallery-main-placeholder{width:100%;height:320px;border-radius:16px;background:linear-gradient(135deg,#e0e7ff,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:5rem;}
+  .thumb-img{width:72px;height:72px;object-fit:cover;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:border-color .15s;}
+  .thumb-img.active{border-color:var(--brand);}
+  .thumb-img:hover{border-color:#a5b4fc;}
+  .listing-price{font-size:1.8rem;font-weight:800;color:#0f172a;}
+  .meta-item{font-size:.85rem;color:#64748b;margin-bottom:.35rem;}
+  .meta-item strong{color:#0f172a;}
+  .enquiry-card{background:#fff;border-radius:16px;border:1.5px solid #e2e8f0;padding:1.5rem;}
+  .submit-btn{background:var(--brand);color:#fff;border:none;border-radius:12px;padding:.75rem 1.5rem;font-weight:700;font-size:1rem;width:100%;cursor:pointer;}
+  .submit-btn:hover{background:#4338ca;}
+  .other-card{border-radius:12px;overflow:hidden;background:#fff;border:1.5px solid #e2e8f0;text-decoration:none;color:inherit;display:block;transition:all .15s;}
+  .other-card:hover{border-color:var(--brand);}
+  .other-img{width:100%;height:120px;object-fit:cover;background:#f1f5f9;}
+  .other-body{padding:.75rem;}
+  .vertical-meta-table{width:100%;border-collapse:collapse;}
+  .vertical-meta-table td{padding:.35rem .5rem;font-size:.85rem;border-bottom:1px solid #f1f5f9;}
+  .vertical-meta-table td:first-child{color:#64748b;width:45%;}
+  .vertical-meta-table td:last-child{font-weight:600;color:#0f172a;}
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark px-3 py-2" style="background:#0f172a;">
+  <a class="navbar-brand fw-bold" href="/marketplace/">🛒 Marketplace</a>
+  <div class="d-flex gap-2 align-items-center">
+    <a href="/marketplace/{{ business.slug }}/" class="text-white-50 text-decoration-none small">{{ business.name }}</a>
+    <a href="/accounts/login/" class="btn btn-outline-light btn-sm rounded-pill">Sign In</a>
+  </div>
+</nav>
+
+<div class="container py-4">
+  {# Breadcrumb #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/marketplace/">Marketplace</a></li>
+      <li class="breadcrumb-item"><a href="/marketplace/{{ business.slug }}/">{{ business.name }}</a></li>
+      <li class="breadcrumb-item active">{{ listing.title }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-4">
+    {# Left: photos + details #}
+    <div class="col-12 col-md-7">
+      {# Main image #}
+      {% if images %}
+        {% with first=images.0 %}
+          <img id="mainImg" src="{{ first.image.url }}" alt="{{ listing.title }}" class="gallery-main d-block mb-2">
+        {% endwith %}
+        {% if images|length > 1 %}
+        <div class="d-flex gap-2 flex-wrap mb-3">
+          {% for img in images %}
+            <img src="{{ img.image.url }}" alt="{{ listing.title }} {{ forloop.counter }}"
+                 class="thumb-img {% if forloop.first %}active{% endif %}"
+                 onclick="setMain(this)">
+          {% endfor %}
+        </div>
+        {% endif %}
+      {% elif listing.media_file %}
+        <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="gallery-main d-block mb-3">
+      {% else %}
+        <div class="gallery-main-placeholder mb-3">
+          {% if listing.vertical == "phones" %}📱{% elif listing.vertical == "car_dealer" %}🏎️
+          {% elif listing.vertical == "clothing" %}👕{% elif listing.vertical == "farm" %}🌾
+          {% else %}📦{% endif %}
+        </div>
+      {% endif %}
+
+      {# Vertical metadata #}
+      {% if listing.vertical_metadata %}
+      <div class="mb-4">
+        <h6 class="fw-bold mb-2">Details</h6>
+        <table class="vertical-meta-table">
+          {% for key, val in listing.vertical_metadata.items %}
+          {% if val %}
+          <tr>
+            <td>{% with label=vertical_config.metadata_labels %}{% if label %}{{ label|default:key }}{% else %}{{ key|capfirst }}{% endif %}{% endwith %}</td>
+            <td>{{ val }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+
+      {# Description #}
+      {% if listing.description %}
+      <div class="mb-4">
+        <h6 class="fw-bold mb-2">Description</h6>
+        <p class="text-muted" style="line-height:1.7;">{{ listing.description|linebreaksbr }}</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Right: price, enquiry form #}
+    <div class="col-12 col-md-5">
+      <div class="enquiry-card sticky-top" style="top:1rem;">
+        <div class="mb-3">
+          <div class="text-muted small text-uppercase fw-bold">{{ business.name }}</div>
+          <h2 style="font-size:1.3rem;font-weight:800;color:#0f172a;margin:.25rem 0;">{{ listing.title }}</h2>
+          {% if listing.price %}
+            <div class="listing-price">{{ business.currency }} {{ listing.price|floatformat:0 }}</div>
+          {% else %}
+            <div class="text-muted">Price on request</div>
+          {% endif %}
+        </div>
+
+        {# Contact info #}
+        {% if listing.contact_phone or listing.contact_email or listing.location_text %}
+        <div class="mb-3 p-3 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+          {% if listing.location_text %}
+            <div class="meta-item"><i class="bi bi-geo-alt me-2 text-primary"></i><strong>{{ listing.location_text }}</strong></div>
+          {% endif %}
+          {% if listing.contact_phone %}
+            <div class="meta-item"><i class="bi bi-telephone me-2 text-success"></i><a href="tel:{{ listing.contact_phone }}" class="text-decoration-none"><strong>{{ listing.contact_phone }}</strong></a></div>
+          {% endif %}
+          {% if listing.contact_email %}
+            <div class="meta-item"><i class="bi bi-envelope me-2 text-primary"></i><a href="mailto:{{ listing.contact_email }}" class="text-decoration-none small">{{ listing.contact_email }}</a></div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# Quick enquiry #}
+        <h6 class="fw-bold mb-2">{{ vertical_config.cta_label|default:"Inquire" }}</h6>
+        {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} small py-2 mb-2">{{ m }}</div>{% endfor %}{% endif %}
+        <form method="post" action="/inventory/marketplace/enquiry/{{ listing.pk }}/">
+          {% csrf_token %}
+          <div class="mb-2">
+            <input type="text" name="name" class="form-control form-control-sm" placeholder="Your name">
+          </div>
+          <div class="mb-2">
+            <input type="email" name="email" class="form-control form-control-sm" placeholder="Email address *" required>
+          </div>
+          <div class="mb-2">
+            <input type="tel" name="phone" class="form-control form-control-sm" placeholder="Phone (optional)">
+          </div>
+          <div class="mb-3">
+            <textarea name="message" class="form-control form-control-sm" rows="2" placeholder="Your message...">Hi, I'm interested in {{ listing.title }}. Please contact me.</textarea>
+          </div>
+          <button type="submit" class="submit-btn">
+            <i class="bi bi-send me-2"></i>{{ vertical_config.cta_label|default:"Send Enquiry" }}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Other listings from same business #}
+  {% if other_listings %}
+  <hr class="my-4">
+  <h5 class="fw-bold mb-3">More from {{ business.name }}</h5>
+  <div class="row g-3">
+    {% for other in other_listings %}
+    <div class="col-6 col-sm-4 col-md-2">
+      <a href="/marketplace/{{ business.slug }}/{{ other.listing_slug }}/" class="other-card">
+        {% if other.primary_image %}
+          <img src="{{ other.primary_image.image.url }}" alt="{{ other.title }}" class="other-img">
+        {% elif other.media_file %}
+          <img src="{{ other.media_file.url }}" alt="{{ other.title }}" class="other-img">
+        {% else %}
+          <div class="other-img d-flex align-items-center justify-content-center" style="background:#f1f5f9;font-size:2rem;">📦</div>
+        {% endif %}
+        <div class="other-body">
+          <div style="font-size:.8rem;font-weight:700;color:#0f172a;" class="text-truncate">{{ other.title }}</div>
+          {% if other.price %}
+            <div style="font-size:.8rem;color:#64748b;">{{ business.currency }} {{ other.price|floatformat:0 }}</div>
+          {% endif %}
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+<footer class="text-center py-4 mt-5" style="background:#f1f5f9;color:#94a3b8;font-size:.8rem;">
+  <p>Powered by <a href="/" class="text-muted fw-bold">Emajinet</a> &mdash; Business OS for Africa</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function setMain(thumb) {
+  document.getElementById('mainImg').src = thumb.src;
+  document.querySelectorAll('.thumb-img').forEach(function(t) { t.classList.remove('active'); });
+  thumb.classList.add('active');
+}
+</script>
+</body>
+</html>

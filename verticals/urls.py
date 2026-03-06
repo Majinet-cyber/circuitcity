@@ -27,6 +27,13 @@ from inventory.verticals import (
     welding,
 )
 
+try:
+    from inventory.verticals import car_dealer as _car_dealer_module
+    _HAS_CAR_DEALER = True
+except ImportError:
+    _car_dealer_module = None  # type: ignore
+    _HAS_CAR_DEALER = False
+
 # Import data correction views
 from inventory import views_data_correction as data_correction
 
@@ -321,3 +328,9 @@ urlpatterns = [
     # Fallback for businesses without a kind
     path("none/", fallback.no_business, name="no_business"),
 ]
+
+# Car Dealer vertical — registered under /verticals/ for dashboard routing
+if _HAS_CAR_DEALER and _car_dealer_module:
+    urlpatterns += [
+        path("car_dealer/dashboard/", _car_dealer_module.car_dealer_dashboard, name="car_dealer_dashboard"),
+    ]

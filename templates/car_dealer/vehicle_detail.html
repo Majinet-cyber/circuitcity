@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ vehicle.display_name }} – {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:880px;">
+  <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+    <a href="{% url 'car_dealer:vehicle_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left me-1"></i>Inventory
+    </a>
+    <div class="flex-grow-1">
+      <h4 class="fw-bold mb-0">{{ vehicle.display_name }}</h4>
+      <div class="d-flex gap-2 align-items-center mt-1 flex-wrap">
+        {% if vehicle.status == "in_stock" %}<span class="badge bg-success">In Stock</span>
+        {% elif vehicle.status == "sold" %}<span class="badge bg-danger">Sold</span>
+        {% elif vehicle.status == "reserved" %}<span class="badge bg-warning text-dark">Reserved</span>
+        {% else %}<span class="badge bg-secondary">{{ vehicle.get_status_display }}</span>{% endif %}
+        {% if vehicle.stock_ref %}<span class="badge bg-light text-dark border">Ref: {{ vehicle.stock_ref }}</span>{% endif %}
+        <span class="text-muted small">Stocked {{ vehicle.date_stocked|date:"d M Y" }}</span>
+      </div>
+    </div>
+    {% if is_manager and vehicle.status == "in_stock" %}
+    <a href="{% url 'car_dealer:sell_vehicle' vehicle.pk %}" class="btn btn-success rounded-pill">
+      <i class="bi bi-cash-coin me-1"></i>Sell This Vehicle
+    </a>
+    {% endif %}
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <div class="row g-4">
+    <div class="col-12 col-md-6">
+      {# Primary image placeholder (no images yet in model) #}
+      <div class="rounded-3 d-flex align-items-center justify-content-center mb-3" style="height:240px;background:linear-gradient(135deg,#fdf2f8,#e0e7ff);font-size:6rem;">
+        🏎️
+      </div>
+    </div>
+    <div class="col-12 col-md-6">
+      {# Price #}
+      {% if vehicle.selling_price %}
+      <div class="mb-4">
+        <div class="text-muted small text-uppercase fw-bold">Selling Price</div>
+        <div style="font-size:2rem;font-weight:800;color:#4f46e5;">{{ business.currency }} {{ vehicle.selling_price|floatformat:0 }}</div>
+        {% if vehicle.buying_price and is_manager %}<div class="text-muted small">Cost: {{ business.currency }} {{ vehicle.buying_price|floatformat:0 }}</div>{% endif %}
+      </div>
+      {% endif %}
+
+      {# Vehicle specs grid #}
+      <table class="table table-sm table-bordered" style="font-size:.85rem;">
+        {% if vehicle.make %}<tr><td class="text-muted">Make</td><td class="fw-semibold">{{ vehicle.make.name }}</td></tr>{% endif %}
+        {% if vehicle.model %}<tr><td class="text-muted">Model</td><td class="fw-semibold">{{ vehicle.model.name }}</td></tr>{% endif %}
+        {% if vehicle.year %}<tr><td class="text-muted">Year</td><td class="fw-semibold">{{ vehicle.year }}</td></tr>{% endif %}
+        {% if vehicle.trim %}<tr><td class="text-muted">Trim</td><td class="fw-semibold">{{ vehicle.trim }}</td></tr>{% endif %}
+        {% if vehicle.body_type %}<tr><td class="text-muted">Body</td><td class="fw-semibold">{{ vehicle.get_body_type_display }}</td></tr>{% endif %}
+        {% if vehicle.transmission %}<tr><td class="text-muted">Transmission</td><td class="fw-semibold">{{ vehicle.get_transmission_display }}</td></tr>{% endif %}
+        {% if vehicle.fuel_type %}<tr><td class="text-muted">Fuel</td><td class="fw-semibold">{{ vehicle.get_fuel_type_display }}</td></tr>{% endif %}
+        {% if vehicle.engine_size %}<tr><td class="text-muted">Engine</td><td class="fw-semibold">{{ vehicle.engine_size }}</td></tr>{% endif %}
+        {% if vehicle.mileage is not None %}<tr><td class="text-muted">Mileage</td><td class="fw-semibold">{{ vehicle.mileage|floatformat:0 }} km</td></tr>{% endif %}
+        {% if vehicle.color %}<tr><td class="text-muted">Colour</td><td class="fw-semibold">{{ vehicle.color }}</td></tr>{% endif %}
+        {% if vehicle.chassis_no %}<tr><td class="text-muted">Chassis/VIN</td><td class="fw-semibold"><code>{{ vehicle.chassis_no }}</code></td></tr>{% endif %}
+        {% if vehicle.location_text %}<tr><td class="text-muted">Location</td><td class="fw-semibold">{{ vehicle.location_text }}</td></tr>{% endif %}
+      </table>
+
+      {% if vehicle.status == "sold" and vehicle.sold_at %}
+      <div class="alert alert-danger py-2">
+        <strong>Sold</strong> on {{ vehicle.sold_at|date:"d M Y" }}
+        {% if vehicle.buyer_name %} to {{ vehicle.buyer_name }}{% endif %}
+        {% if vehicle.sale_price %} for {{ business.currency }} {{ vehicle.sale_price|floatformat:0 }}{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if vehicle.description %}
+  <div class="mt-3">
+    <h6 class="fw-bold">Description</h6>
+    <p class="text-muted">{{ vehicle.description|linebreaksbr }}</p>
+  </div>
+  {% endif %}
+  {% if vehicle.features_notes %}
+  <div class="mt-2">
+    <h6 class="fw-bold">Features &amp; Notes</h6>
+    <p class="text-muted">{{ vehicle.features_notes|linebreaksbr }}</p>
+  </div>
+  {% endif %}
+
+  {# Quick edit for managers #}
+  {% if is_manager and vehicle.status != "sold" %}
+  <hr class="mt-4">
+  <h6 class="fw-bold mb-3">Quick Update</h6>
+  <form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold small">Selling Price</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">{{ business.currency }}</span>
+          <input type="number" name="selling_price" class="form-control" value="{{ vehicle.selling_price|default:'' }}" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold small">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="in_stock" {% if vehicle.status == "in_stock" %}selected{% endif %}>In Stock</option>
+          <option value="reserved" {% if vehicle.status == "reserved" %}selected{% endif %}>Reserved</option>
+          <option value="offline" {% if vehicle.status == "offline" %}selected{% endif %}>Offline</option>
+        </select>
+      </div>
+      <div class="col-md-5">
+        <label class="form-label fw-semibold small">Location</label>
+        <input type="text" name="location_text" class="form-control form-control-sm" value="{{ vehicle.location_text }}">
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary btn-sm rounded-pill">
+          <i class="bi bi-check-lg me-1"></i>Save
+        </button>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

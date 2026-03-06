@@ -1868,3 +1868,30 @@ try:
 except ImportError:
     # Not yet migrated
     pass
+
+
+# ---------------------------------------------------------------------------
+# Marketplace models (public listing + enquiries)
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_marketplace import (  # noqa: F401, E402
+        MarketplaceListing,
+        MarketplaceListingImage,
+        MarketplaceEnquiry,
+        ListingStatus,
+    )
+except ImportError:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Car Dealer vertical models
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_car_dealer import (  # noqa: F401, E402
+        CarMake,
+        CarModel,
+        CarDealerVehicle,
+    )
+except ImportError:
+    pass

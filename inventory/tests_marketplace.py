@@ -40,7 +40,7 @@ class MarketplacePublicTests(TestCase):
             description="Brand new iPhone 13",
             price=Decimal("500000.00"),
             vertical="phones",
-            is_active=True,
+            status='live',
         )
         
         # Create inactive listing
@@ -50,7 +50,7 @@ class MarketplacePublicTests(TestCase):
             description="Inactive listing",
             price=Decimal("100000.00"),
             vertical="phones",
-            is_active=False,
+            status='offline',
         )
         
         self.client = Client()
@@ -188,14 +188,14 @@ class MarketplaceManagerTests(TestCase):
         self.assertEqual(listing.title, 'New Phone')
         self.assertEqual(listing.business, self.business)
         self.assertEqual(listing.created_by, self.user)
-        self.assertTrue(listing.is_active)
+        self.assertEqual(listing.status, "draft")  # new listings start as draft
 
     def test_edit_listing_requires_auth(self):
         """Test editing listing requires authentication."""
         listing = MarketplaceListing.objects.create(
             business=self.business,
             title="Test Listing",
-            is_active=True,
+            status='live',
         )
         
         url = reverse('inventory:edit_listing', args=[listing.id])
@@ -210,7 +210,7 @@ class MarketplaceManagerTests(TestCase):
         listing = MarketplaceListing.objects.create(
             business=self.business,
             title="Test Listing",
-            is_active=True,
+            status='live',
         )
         
         url = reverse('inventory:delete_listing', args=[listing.id])
@@ -230,7 +230,7 @@ class MarketplaceManagerTests(TestCase):
         listing = MarketplaceListing.objects.create(
             business=self.business,
             title="Test Listing",
-            is_active=True,
+            status='live',
         )
         
         url = reverse('inventory:delete_listing', args=[listing.id])
@@ -256,7 +256,7 @@ class MarketplaceManagerTests(TestCase):
         listing = MarketplaceListing.objects.create(
             business=self.business,
             title="Test Listing",
-            is_active=True,
+            status='live',
         )
         
         enquiry = MarketplaceEnquiry.objects.create(
@@ -325,7 +325,7 @@ class MarketplaceSecurityTests(TestCase):
         listing = MarketplaceListing.objects.create(
             business=self.business2,
             title="Business 2 Listing",
-            is_active=True,
+            status='live',
         )
         
         # Login as manager 1
@@ -344,7 +344,7 @@ class MarketplaceSecurityTests(TestCase):
         listing = MarketplaceListing.objects.create(
             business=self.business2,
             title="Business 2 Listing",
-            is_active=True,
+            status='live',
         )
         
         # Login as manager 1

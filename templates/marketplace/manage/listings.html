@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Marketplace Listings – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .status-pill{padding:.25rem .7rem;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.04em;}
+  .status-live{background:#dcfce7;color:#16a34a;}
+  .status-draft{background:#fef9c3;color:#b45309;}
+  .status-offline{background:#f1f5f9;color:#64748b;}
+  .status-sold{background:#fee2e2;color:#dc2626;}
+  .status-out_of_stock{background:#fce7f3;color:#db2777;}
+  .listing-row{border:1.5px solid #e2e8f0;border-radius:12px;padding:1rem;margin-bottom:.75rem;background:#fff;display:flex;align-items:flex-start;gap:1rem;}
+  .listing-thumb{width:72px;height:72px;border-radius:10px;object-fit:cover;flex-shrink:0;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:1.8rem;}
+  .listing-thumb img{width:72px;height:72px;border-radius:10px;object-fit:cover;}
+  .listing-info{flex:1;min-width:0;}
+  .listing-actions{display:flex;gap:.5rem;align-items:center;flex-shrink:0;}
+  .tab-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+  .tab-item{padding:.35rem .8rem;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;font-size:.8rem;font-weight:600;cursor:pointer;color:#64748b;text-decoration:none;}
+  .tab-item.active{background:#4f46e5;border-color:#4f46e5;color:#fff;}
+</style>
+
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-shop me-2 text-primary"></i>Marketplace Listings</h4>
+      <div class="text-muted small">Manage your public listings</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'inventory:view_enquiries' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+        <i class="bi bi-chat-dots me-1"></i>Enquiries
+        {% if unread_count %}<span class="badge bg-danger ms-1">{{ unread_count }}</span>{% endif %}
+      </a>
+      <a href="{% url 'inventory:create_listing' %}" class="btn btn-primary btn-sm rounded-pill">
+        <i class="bi bi-plus-lg me-1"></i>New Listing
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# Status tab bar #}
+  <div class="tab-bar">
+    <a href="?status=all" class="tab-item {% if status_filter == 'all' or not status_filter %}active{% endif %}">All ({{ counts.all }})</a>
+    <a href="?status=live" class="tab-item {% if status_filter == 'live' %}active{% endif %}">🟢 Live ({{ counts.live }})</a>
+    <a href="?status=draft" class="tab-item {% if status_filter == 'draft' %}active{% endif %}">✏️ Draft ({{ counts.draft }})</a>
+    <a href="?status=offline" class="tab-item {% if status_filter == 'offline' %}active{% endif %}">⏸ Offline ({{ counts.offline }})</a>
+    <a href="?status=sold" class="tab-item {% if status_filter == 'sold' %}active{% endif %}">✅ Sold ({{ counts.sold }})</a>
+    <a href="?status=out_of_stock" class="tab-item {% if status_filter == 'out_of_stock' %}active{% endif %}">🔴 Out of Stock ({{ counts.out_of_stock }})</a>
+  </div>
+
+  {# Listing rows #}
+  {% if page_obj.object_list %}
+    {% for listing in page_obj %}
+    <div class="listing-row">
+      <div class="listing-thumb">
+        {% if listing.primary_image %}
+          <img src="{{ listing.primary_image.image.url }}" alt="{{ listing.title }}">
+        {% elif listing.media_file %}
+          <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}">
+        {% else %}
+          {% if listing.vertical == "phones" %}📱{% elif listing.vertical == "car_dealer" %}🏎️
+          {% elif listing.vertical == "clothing" %}👕{% else %}📦{% endif %}
+        {% endif %}
+      </div>
+      <div class="listing-info">
+        <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+          <span class="fw-bold">{{ listing.title }}</span>
+          <span class="status-pill status-{{ listing.status }}">{{ listing.get_status_display }}</span>
+          {% if listing.price %}<span class="text-muted small">{{ business.currency }} {{ listing.price|floatformat:0 }}</span>{% endif %}
+        </div>
+        {% if listing.description %}<div class="text-muted small text-truncate" style="max-width:400px;">{{ listing.description }}</div>{% endif %}
+        <div class="text-muted small mt-1">{{ listing.created_at|date:"d M Y" }}</div>
+      </div>
+      <div class="listing-actions">
+        {# Quick status toggle #}
+        {% if listing.status != 'live' %}
+        <form method="post" action="{% url 'inventory:marketplace_toggle_status' listing.pk %}">
+          {% csrf_token %}<input type="hidden" name="status" value="live">
+          <button class="btn btn-outline-success btn-sm rounded-pill" title="Go Live">
+            <i class="bi bi-play-fill"></i>
+          </button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'inventory:marketplace_toggle_status' listing.pk %}">
+          {% csrf_token %}<input type="hidden" name="status" value="offline">
+          <button class="btn btn-outline-secondary btn-sm rounded-pill" title="Take Offline">
+            <i class="bi bi-pause-fill"></i>
+          </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'inventory:edit_listing' listing.pk %}" class="btn btn-outline-primary btn-sm rounded-pill" title="Edit">
+          <i class="bi bi-pencil"></i>
+        </a>
+        {% if listing.listing_slug %}
+        <a href="/marketplace/{{ business.slug }}/{{ listing.listing_slug }}/" target="_blank" class="btn btn-outline-info btn-sm rounded-pill" title="View Public Page">
+          <i class="bi bi-box-arrow-up-right"></i>
+        </a>
+        {% endif %}
+        <form method="post" action="{% url 'inventory:delete_listing' listing.pk %}" onsubmit="return confirm('Delete this listing?')">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger btn-sm rounded-pill" title="Delete">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    {% if page_obj.has_other_pages %}
+    <nav class="mt-3 d-flex justify-content-center">
+      <ul class="pagination pagination-sm gap-1">
+        {% if page_obj.has_previous %}<li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}">← Prev</a></li>{% endif %}
+        {% if page_obj.has_next %}<li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}">Next →</a></li>{% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3.5rem;opacity:.3">🛒</div>
+    <h5 class="mt-3 text-muted">No listings
+      {% if status_filter and status_filter != 'all' %}with status "{{ status_filter }}"{% endif %}
+    </h5>
+    <a href="{% url 'inventory:create_listing' %}" class="btn btn-primary rounded-pill mt-3">
+      <i class="bi bi-plus-lg me-1"></i>Create Your First Listing
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

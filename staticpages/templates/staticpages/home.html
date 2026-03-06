@@ -1949,10 +1949,10 @@
     <div class="hero-content">
       <div class="hero-text">
         <h1 class="hero-title">
-          Run your <span class="highlight">shop, farm, or gym</span> from one system
+          Your business <span class="highlight">operating system</span> — and marketplace
         </h1>
         <p class="hero-subtitle">
-          Track stock, sales, and expenses. Get smart recommendations on what to do next—restock alerts, margin warnings, seasonal prompts. Mobile-first, built for Malawi.
+          Run your shop, pharmacy, gym, farm, or car dealership from one intelligent platform. Track stock, manage sales, publish to the marketplace, and get AI-powered insights — all mobile-first, built for Africa.
         </p>
         
         <!-- Live Platform Growth Metrics - Uses PUBLIC_SITE_METRICS (SSOT) -->
@@ -1972,20 +1972,20 @@
           </div>
           <div style="text-align: center; margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
             <span style="display: inline-block; width: 8px; height: 8px; background: var(--secondary); border-radius: 50%; margin-right: 0.5rem; animation: pulse 2s infinite;"></span>
-            Shops, farms, gyms, and more across Malawi
+            Shops, gyms, pharmacies, car dealers & more across Africa
           </div>
         </div>
         {% else %}
         <div class="platform-growth-metrics" style="margin-top: 2rem; padding: 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1); text-align: center;">
-          <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Join businesses across Malawi</div>
-          <div style="font-size: 0.875rem; color: var(--text-secondary);">Shops, farms, gyms, and more are already using Emajinet</div>
+          <div style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Join businesses across Africa</div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary);">Shops, farms, gyms, car dealers & more are already using Emajinet</div>
         </div>
         {% endif %}
         
         <!-- Hero CTA Buttons -->
         <div class="hero-buttons" style="margin-top: 2rem;">
-          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
-          <a href="#how-it-works" class="btn btn-secondary">See How It Works</a>
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started Free</a>
+          <a href="#marketplace-showcase" class="btn btn-secondary">See the Marketplace</a>
         </div>
       </div>
       <div class="hero-image">
@@ -2675,10 +2675,10 @@
   <section class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
     <div style="text-align: center; margin-bottom: 3rem;">
       <h2 style="font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">
-        Available Verticals
+        One Platform, Every Business Type
       </h2>
       <p style="font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-secondary); max-width: 700px; margin: 0 auto;">
-        Emajinet supports diverse business types with tailored features for each industry
+        Emajinet is purpose-built for each industry — not a generic tool. From car dealerships to pharmacies, get features tailored to how <em>you</em> operate.
       </p>
     </div>
 
@@ -2705,10 +2705,107 @@
     </div>
   </section>
 
+  <!-- Marketplace Showcase Section -->
+  <section id="marketplace-showcase" style="padding: 5rem 1rem; background: #fff;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 3.5rem;">
+        <div style="display: inline-block; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.35rem 1rem; border-radius: 2rem; margin-bottom: 1rem;">Built-in Marketplace</div>
+        <h2 style="font-size: clamp(1.75rem, 4vw, 2.75rem); font-weight: 800; color: #0f172a; margin-bottom: 1rem; line-height: 1.2;">
+          Sell Online Without a Separate App
+        </h2>
+        <p style="font-size: clamp(1rem, 2vw, 1.2rem); color: #64748b; max-width: 660px; margin: 0 auto; line-height: 1.7;">
+          Every Emajinet business gets a free public storefront. List products, vehicles, or services—customers browse, enquire, and buy. No extra subscription required.
+        </p>
+      </div>
+
+      <!-- Vertical showcase cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+
+        <!-- Car Dealer Card -->
+        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">🏎️</div>
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🏎️</div>
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #a78bfa; margin-bottom: 0.5rem;">Car Dealer</div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Full showroom on the web</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
+            Stock vehicles, track mileage &amp; specs, publish to the public marketplace, capture enquiries, and record sales — all in one dashboard.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Vehicle Inventory</span>
+            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Public Listings</span>
+            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Buyer Enquiries</span>
+          </div>
+        </div>
+
+        <!-- Pharmacy Card -->
+        <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">💊</div>
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💊</div>
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #6ee7b7; margin-bottom: 0.5rem;">Pharmacy</div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Smart stock with expiry tracking</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
+            Track medicines, cosmetics, expiry dates, and restock levels. List over-the-counter products on the marketplace.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Expiry Alerts</span>
+            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Restock Levels</span>
+            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Marketplace</span>
+          </div>
+        </div>
+
+        <!-- Phones & Electronics Card -->
+        <div style="background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">📱</div>
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">📱</div>
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #93c5fd; margin-bottom: 0.5rem;">Phones & Electronics</div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Scan, stock, and sell smarter</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
+            Barcode scanning, IMEI tracking, accessory bundles, and a public marketplace listing for each device.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">Barcode Scan</span>
+            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">IMEI Tracking</span>
+            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">Live Listings</span>
+          </div>
+        </div>
+
+        <!-- Gym Card -->
+        <div style="background: linear-gradient(135deg, #9d174d 0%, #be185d 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
+          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">💪</div>
+          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💪</div>
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #f9a8d4; margin-bottom: 0.5rem;">Gym & Fitness</div>
+          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Members, check-ins & trainers</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
+            Manage memberships, track daily check-ins, assign trainers, and post class or membership packages to the marketplace.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Memberships</span>
+            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Check-ins</span>
+            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Packages</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Marketplace CTA banner -->
+      <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 20px; padding: 2.5rem 2rem; text-align: center; color: #fff;">
+        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🛍️</div>
+        <h3 style="font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 800; margin-bottom: 0.75rem;">Browse the Emajinet Marketplace</h3>
+        <p style="font-size: 1rem; color: rgba(255,255,255,0.85); max-width: 540px; margin: 0 auto 1.5rem; line-height: 1.6;">
+          Discover vehicles, electronics, groceries, and more from verified African businesses — all in one place.
+        </p>
+        <a href="/marketplace/" style="display: inline-block; background: #fff; color: #4f46e5; font-weight: 700; font-size: 1rem; padding: 0.8rem 2.2rem; border-radius: 2rem; text-decoration: none; transition: transform 0.2s;"
+           onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+          Explore Listings →
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA Section -->
   <section class="cta-section">
     <h2 class="cta-title">Ready to Transform Your Business?</h2>
-    <p class="cta-subtitle">{% if show_metrics %}Join {{ total_merchants }}+ businesses{% else %}Join businesses across Malawi{% endif %} already using Emajinet</p>
+    <p class="cta-subtitle">{% if show_metrics %}Join {{ total_merchants }}+ businesses{% else %}Join businesses across Africa{% endif %} already using Emajinet</p>
     <a href="{% url 'accounts:signup_manager' %}" class="btn btn-light" style="margin-top: 1rem;">Start Free Trial</a>
   </section>
 

@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Add Vehicle – {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:800px;">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'car_dealer:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+    <div>
+      <h4 class="fw-bold mb-0">🏎️ Add Vehicle to Inventory</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="row g-4">
+      {# Make & Model #}
+      <div class="col-12">
+        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
+          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Make &amp; Model</h6>
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold small">Make</label>
+              <select name="make_id" class="form-select" id="makeSelect">
+                <option value="">Select make...</option>
+                {% for make in makes %}
+                  <option value="{{ make.pk }}" {% if make.is_popular %}data-popular="1"{% endif %}>{{ make.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-semibold small">Model</label>
+              <select name="model_id" class="form-select" id="modelSelect">
+                <option value="">Select model...</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold small">Year</label>
+              <input type="number" name="year" class="form-control" min="1990" max="{{ current_year }}" placeholder="{{ current_year|add:'-1' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Make (if not in list)</label>
+              <input type="text" name="make_text" class="form-control" placeholder="e.g., BYD">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Model (if not in list)</label>
+              <input type="text" name="model_text" class="form-control" placeholder="e.g., Atto 3">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Trim / Grade</label>
+              <input type="text" name="trim" class="form-control" placeholder="e.g., GL, SE, Touring">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Specs #}
+      <div class="col-12">
+        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
+          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Specifications</h6>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Body Type</label>
+              <select name="body_type" class="form-select">
+                <option value="">Select...</option>
+                <option value="sedan">Sedan</option>
+                <option value="hatchback">Hatchback</option>
+                <option value="suv">SUV / Crossover</option>
+                <option value="pickup">Pickup / Truck</option>
+                <option value="minivan">Minivan / MPV</option>
+                <option value="wagon">Station Wagon</option>
+                <option value="van">Van</option>
+                <option value="bus">Bus / Minibus</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Transmission</label>
+              <select name="transmission" class="form-select">
+                <option value="">Select...</option>
+                <option value="auto">Automatic</option>
+                <option value="manual">Manual</option>
+                <option value="cvt">CVT</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Fuel Type</label>
+              <select name="fuel_type" class="form-select">
+                <option value="">Select...</option>
+                <option value="petrol">Petrol</option>
+                <option value="diesel">Diesel</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="electric">Electric</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Drivetrain</label>
+              <select name="drivetrain" class="form-select">
+                <option value="">Select...</option>
+                <option value="fwd">FWD</option>
+                <option value="rwd">RWD</option>
+                <option value="awd">AWD</option>
+                <option value="4wd">4WD</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Engine Size</label>
+              <input type="text" name="engine_size" class="form-control" placeholder="e.g., 1500cc">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Mileage (km)</label>
+              <input type="number" name="mileage" class="form-control" min="0" placeholder="e.g., 45000">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Colour</label>
+              <input type="text" name="color" class="form-control" placeholder="e.g., White Pearl">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small">Condition</label>
+              <select name="condition" class="form-select">
+                <option value="used" selected>Used</option>
+                <option value="new">New</option>
+                <option value="certified">Certified Pre-Owned</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Pricing #}
+      <div class="col-12">
+        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
+          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Pricing</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Buying Price (cost)</label>
+              <div class="input-group">
+                <span class="input-group-text">{{ business.currency }}</span>
+                <input type="number" name="buying_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <div class="form-text">Internal use only</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Selling Price (asking)</label>
+              <div class="input-group">
+                <span class="input-group-text">{{ business.currency }}</span>
+                <input type="number" name="selling_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small">Stock Reference</label>
+              <input type="text" name="stock_ref" class="form-control" placeholder="e.g., CD-001">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# IDs & location #}
+      <div class="col-12">
+        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
+          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Identity &amp; Location</h6>
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold small">Chassis / VIN Number</label>
+              <input type="text" name="chassis_no" class="form-control" placeholder="e.g., JTNB11HK0J3...">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label fw-semibold small">Location</label>
+              <input type="text" name="location_text" class="form-control" placeholder="e.g., Showroom – Area 25">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small">Import Source Notes</label>
+              <input type="text" name="import_source_notes" class="form-control" placeholder="e.g., Japan direct, Be Forward, 2023">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Description #}
+      <div class="col-12">
+        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
+          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Description &amp; Features</h6>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Description</label>
+            <textarea name="description" class="form-control" rows="3" placeholder="Brief overview..."></textarea>
+          </div>
+          <div>
+            <label class="form-label fw-semibold small">Key Features / Notes</label>
+            <textarea name="features_notes" class="form-control" rows="2" placeholder="e.g., Push-start, reverse camera, alloy wheels, sunroof..."></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">
+        <i class="bi bi-plus-lg me-1"></i>Add Vehicle
+      </button>
+      <a href="{% url 'car_dealer:dashboard' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+var carModelsData = {{ car_models_json|safe }};
+var makeSelect = document.getElementById('makeSelect');
+var modelSelect = document.getElementById('modelSelect');
+if (makeSelect) {
+  makeSelect.addEventListener('change', function() {
+    var makeId = this.value;
+    modelSelect.innerHTML = '<option value="">Select model...</option>';
+    var models = carModelsData[makeId] || [];
+    models.forEach(function(m) {
+      var opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      modelSelect.appendChild(opt);
+    });
+  });
+}
+</script>
+{% endblock %}

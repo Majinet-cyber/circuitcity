@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ business.name }} – Emajinet Marketplace</title>
+<meta name="description" content="Browse products and services from {{ business.name }} on Emajinet Marketplace.">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+  :root{--brand:#4f46e5;}
+  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f8fafc;}
+  .biz-hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;padding:2.5rem 0 2rem;}
+  .biz-logo{width:72px;height:72px;border-radius:18px;object-fit:cover;border:3px solid rgba(255,255,255,.2);}
+  .biz-logo-placeholder{width:72px;height:72px;border-radius:18px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:2rem;flex-shrink:0;}
+  .biz-name{font-size:1.6rem;font-weight:800;line-height:1.2;}
+  .biz-tagline{opacity:.7;font-size:.95rem;margin-top:.25rem;}
+  .listing-card{border-radius:16px;overflow:hidden;background:#fff;border:1.5px solid #e2e8f0;transition:all .15s;text-decoration:none;color:inherit;display:block;height:100%;}
+  .listing-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.1);border-color:var(--brand);}
+  .listing-img{width:100%;height:200px;object-fit:cover;}
+  .listing-img-placeholder{width:100%;height:200px;background:linear-gradient(135deg,#e0e7ff,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:3rem;}
+  .listing-body{padding:1rem;}
+  .listing-title{font-size:.95rem;font-weight:700;color:#0f172a;margin-bottom:.25rem;}
+  .listing-price{font-size:1.05rem;font-weight:800;color:#0f172a;}
+  .listing-price-empty{font-size:.82rem;color:#64748b;}
+  .listing-location{font-size:.75rem;color:#64748b;}
+  .cta-btn{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:.55rem 1rem;font-weight:700;font-size:.85rem;cursor:pointer;width:100%;margin-top:.5rem;text-decoration:none;display:block;text-align:center;}
+  .cta-btn:hover{background:#4338ca;color:#fff;}
+  .enquiry-modal .modal-content{border-radius:16px;}
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark px-3 py-2" style="background:#0f172a;">
+  <a class="navbar-brand fw-bold" href="/marketplace/"><i class="bi bi-shop me-1"></i>Marketplace</a>
+  <a href="/accounts/login/" class="btn btn-outline-light btn-sm rounded-pill">Sign In</a>
+</nav>
+
+{# Business hero #}
+<div class="biz-hero">
+  <div class="container">
+    <div class="d-flex align-items-center gap-3">
+      {% if business.logo %}
+        <img src="{{ business.logo.url }}" alt="{{ business.name }}" class="biz-logo">
+      {% else %}
+        <div class="biz-logo-placeholder">
+          {% if business.business_kind == "phones" %}📱{% elif business.business_kind == "liquor" %}🍺
+          {% elif business.business_kind == "car_dealer" %}🏎️{% elif business.business_kind == "farm" %}🌾
+          {% elif business.business_kind == "clothing" %}👕{% elif business.business_kind == "gym" %}🏋️
+          {% else %}🏪{% endif %}
+        </div>
+      {% endif %}
+      <div>
+        <div class="biz-name">{{ business.name }}</div>
+        <div class="biz-tagline">
+          {% if vertical_config.hero_tagline %}{{ vertical_config.hero_tagline }}{% else %}Browse our marketplace{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="mt-2 text-white-50 small">
+      <span class="badge bg-white bg-opacity-10">{{ page_obj.paginator.count }} listing{{ page_obj.paginator.count|pluralize }}</span>
+      {% if business.currency %}<span class="ms-2">Currency: {{ business.currency }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="container py-4">
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} mb-3 rounded-3">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if page_obj.object_list %}
+  <div class="row g-3">
+    {% for listing in page_obj %}
+    <div class="col-6 col-sm-4 col-md-3">
+      <div class="listing-card">
+        <a href="/marketplace/{{ business.slug }}/{{ listing.listing_slug }}/" style="text-decoration:none;color:inherit;">
+          {% with primary=listing.primary_image %}
+          {% if primary %}
+            <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
+          {% elif listing.media_file %}
+            <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
+          {% else %}
+            <div class="listing-img-placeholder">
+              {% if listing.vertical == "phones" %}📱{% elif listing.vertical == "car_dealer" %}🏎️
+              {% elif listing.vertical == "clothing" %}👕{% else %}📦{% endif %}
+            </div>
+          {% endif %}
+          {% endwith %}
+          <div class="listing-body">
+            <div class="listing-title">{{ listing.title }}</div>
+            {% if listing.price %}
+              <div class="listing-price">{{ business.currency }} {{ listing.price|floatformat:0 }}</div>
+            {% else %}
+              <div class="listing-price-empty">Contact for price</div>
+            {% endif %}
+            {% if listing.location_text %}
+              <div class="listing-location mt-1"><i class="bi bi-geo-alt me-1"></i>{{ listing.location_text }}</div>
+            {% endif %}
+          </div>
+        </a>
+        <div class="px-3 pb-3">
+          <button class="cta-btn" data-bs-toggle="modal" data-bs-target="#enquiryModal"
+                  data-listing-id="{{ listing.pk }}" data-listing-title="{{ listing.title }}">
+            {{ vertical_config.cta_label|default:"Inquire" }}
+          </button>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-4 d-flex justify-content-center">
+    <ul class="pagination pagination-sm gap-1">
+      {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}">← Prev</a></li>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.next_page_number }}">Next →</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3rem;opacity:.3">🛒</div>
+    <h5 class="mt-3 text-muted">No listings yet</h5>
+    <p class="text-muted small">This business hasn't posted any listings yet. Check back soon!</p>
+    <a href="/marketplace/" class="btn btn-outline-primary rounded-pill mt-2">Back to Marketplace</a>
+  </div>
+  {% endif %}
+</div>
+
+{# Enquiry Modal #}
+<div class="modal fade enquiry-modal" id="enquiryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content p-3">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-chat-dots me-2 text-primary"></i>Send Enquiry</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">Interested in <strong id="enquiryListingTitle"></strong>? Send a message to {{ business.name }}.</p>
+        <form id="enquiryForm" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="listing_id_field" id="enquiryListingId">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Your Name</label>
+            <input type="text" name="name" class="form-control" placeholder="John Banda">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Email *</label>
+            <input type="email" name="email" class="form-control" required placeholder="you@email.com">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Phone (optional)</label>
+            <input type="tel" name="phone" class="form-control" placeholder="+265 99x xxx xxx">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Message</label>
+            <textarea name="message" class="form-control" rows="3" placeholder="Hi, I'm interested in..."></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary w-100 rounded-pill fw-bold">Send Enquiry</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+var enquiryModal = document.getElementById('enquiryModal');
+if (enquiryModal) {
+  enquiryModal.addEventListener('show.bs.modal', function(e) {
+    var btn = e.relatedTarget;
+    var listingId = btn.dataset.listingId;
+    var listingTitle = btn.dataset.listingTitle;
+    document.getElementById('enquiryListingId').value = listingId;
+    document.getElementById('enquiryListingTitle').textContent = listingTitle;
+    var form = document.getElementById('enquiryForm');
+    form.action = '/inventory/marketplace/enquiry/' + listingId + '/';
+  });
+}
+</script>
+</body>
+</html>

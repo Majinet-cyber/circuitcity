@@ -4,31 +4,130 @@
 {% block title %}Create Workspace{% endblock %}
 {% block header_title %}Create a New Workspace{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'tenants/tenants.css' %}">
-{% endblock %}
-
 {% block content %}
-<section class="tenants-wrap tenants-narrow">
-  <form method="post" class="gcard" data-anim>
-    {% csrf_token %}
-    <div class="gtitle">Business details</div>
-    <div class="gsub">Your workspace is ready instantly — no approval needed. Switch between workspaces anytime.</div>
+<style>
+  .cb-wrap { max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
+  .cb-card {
+    background: #fff; border-radius: 20px; padding: 2rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,.08); border: 1px solid #e2e8f0;
+  }
+  .cb-title { font-size: 1.3rem; font-weight: 800; color: #0f172a; margin-bottom: .3rem; }
+  .cb-sub { color: #64748b; font-size: .9rem; margin-bottom: 1.5rem; }
+  .cb-label { font-size: .8rem; font-weight: 700; color: #374151; text-transform: uppercase;
+               letter-spacing: .05em; margin-bottom: .4rem; }
+  .cb-field { margin-bottom: 1.25rem; }
+  .cb-err { color: #ef4444; font-size: .8rem; margin-top: .3rem; }
+  .cb-actions { display: flex; gap: .75rem; margin-top: 1.5rem; }
+  .cb-btn { flex: 1; padding: .7rem 1.2rem; border-radius: 10px; font-weight: 700;
+             font-size: .9rem; border: none; cursor: pointer; transition: background .15s; }
+  .cb-btn-primary { background: #4f46e5; color: #fff; }
+  .cb-btn-primary:hover { background: #4338ca; }
+  .cb-btn-cancel { background: #f1f5f9; color: #334155; text-decoration: none;
+                   display: flex; align-items: center; justify-content: center; }
+  .cb-btn-cancel:hover { background: #e2e8f0; color: #0f172a; }
 
-    <div class="gfield" style="margin-top:14px" data-anim>
-      <div class="label">Business name</div>
-      {{ form.name|add_class:"ginput" }}
-      {% if form.name.errors %}<div class="badge badge-warn" style="margin-top:8px">{{ form.name.errors.0 }}</div>{% endif %}
+  .vertical-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-bottom: 1.25rem; }
+  .vk-item {
+    border: 2px solid #e2e8f0; border-radius: 10px; padding: .6rem .4rem;
+    text-align: center; cursor: pointer; transition: all .15s; background: #f8fafc;
+  }
+  .vk-item:hover { border-color: #6366f1; background: #eef2ff; }
+  .vk-item.selected { border-color: #4f46e5; background: #eef2ff; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+  .vk-item input[type=radio] { display: none; }
+  .vk-icon { font-size: 1.4rem; line-height: 1; margin-bottom: .25rem; }
+  .vk-name { font-size: .68rem; font-weight: 700; color: #374151; line-height: 1.2; }
+  @media(max-width: 400px) { .vertical-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<div class="cb-wrap">
+  <form method="post" class="cb-card">
+    {% csrf_token %}
+    <div class="cb-title"><i class="bi bi-plus-circle me-2 text-primary"></i>New Workspace</div>
+    <div class="cb-sub">Your workspace is ready instantly — no approval needed. Switch between workspaces anytime.</div>
+
+    {% if form.non_field_errors %}
+      <div class="alert alert-danger rounded-3 mb-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    {# Business Name #}
+    <div class="cb-field">
+      <div class="cb-label">Business name</div>
+      <input type="text" name="name" class="form-control {% if form.name.errors %}is-invalid{% endif %}"
+             value="{{ form.name.value|default:'' }}"
+             placeholder="e.g., Sunrise Liquor Store Area 25" autofocus>
+      {% if form.name.errors %}
+        <div class="cb-err">{{ form.name.errors.0 }}</div>
+      {% endif %}
     </div>
 
-    <div class="gactions">
-      <a href="{% url 'tenants:choose_business' %}" class="gbtn">Cancel</a>
-      <button class="gbtn primary" data-anim="pop">Create Workspace</button>
+    {# Business Type #}
+    <div class="cb-field">
+      <div class="cb-label">Business type</div>
+      <input type="hidden" name="business_kind" id="business_kind_input" value="{{ form.business_kind.value|default:'' }}">
+      <div class="vertical-grid" id="verticalGrid">
+        {% for val, label in form.business_kind.field.choices %}
+          {% if val %}
+            <label class="vk-item {% if form.business_kind.value == val %}selected{% endif %}" data-kind="{{ val }}">
+              <input type="radio" value="{{ val }}" {% if form.business_kind.value == val %}checked{% endif %}>
+              <div class="vk-icon">
+                {% if val == "phones" %}📱
+                {% elif val == "liquor" %}🍺
+                {% elif val == "grocery" %}🛒
+                {% elif val == "pharmacy" %}💊
+                {% elif val == "clothing" %}👕
+                {% elif val == "gym" %}🏋️
+                {% elif val == "hardware" %}🔧
+                {% elif val == "cement" %}🧱
+                {% elif val == "farm" %}🌾
+                {% elif val == "welding" %}⚡
+                {% elif val == "car_hire" %}🚗
+                {% elif val == "car_dealer" %}🏎️
+                {% else %}📦
+                {% endif %}
+              </div>
+              <div class="vk-name">{{ label }}</div>
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if form.business_kind.errors %}
+        <div class="cb-err">{{ form.business_kind.errors.0 }}</div>
+      {% endif %}
+    </div>
+
+    {# Currency #}
+    <div class="cb-field">
+      <div class="cb-label">Currency</div>
+      <select name="currency" class="form-select">
+        {% for val, label in form.currency.field.choices %}
+          <option value="{{ val }}" {% if form.currency.value == val or val == "MWK" and not form.currency.value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="cb-actions">
+      <a href="{% url 'tenants:choose_business' %}" class="cb-btn cb-btn-cancel">
+        <i class="bi bi-arrow-left me-1"></i> Cancel
+      </a>
+      <button type="submit" class="cb-btn cb-btn-primary">
+        <i class="bi bi-plus-lg me-1"></i> Create Workspace
+      </button>
     </div>
   </form>
-</section>
-{% endblock %}
+</div>
 
-{% block extra_js %}
-<script src="{% static 'tenants/tenants.js' %}"></script>
+<script>
+(function() {
+  var grid = document.getElementById('verticalGrid');
+  var hidden = document.getElementById('business_kind_input');
+  if (!grid || !hidden) return;
+  grid.querySelectorAll('.vk-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      grid.querySelectorAll('.vk-item').forEach(function(i) { i.classList.remove('selected'); });
+      item.classList.add('selected');
+      hidden.value = item.dataset.kind || '';
+    });
+  });
+})();
+</script>
 {% endblock %}

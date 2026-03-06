@@ -590,33 +590,23 @@ class WizardStep2Form(forms.Form):
             }
         ),
     )
-    country = forms.CharField(
-        max_length=100,
-        required=False,
+    country = forms.ChoiceField(
         label="Country",
-        widget=forms.TextInput(
+        required=False,
+        choices=[],  # populated in __init__ from country_currency module
+        widget=forms.Select(
             attrs={
-                "placeholder": "e.g., Zambia",
-                "class": "wizard-input",
-                "autocomplete": "country",
+                "class": "wizard-select",
+                "id": "id_country",
+                "data-auto-currency": "true",
             }
         ),
     )
     currency = forms.ChoiceField(
         label="Currency",
-        choices=[
-            ("ZMW", "ZMW - Zambian Kwacha"),
-            ("USD", "USD - US Dollar"),
-            ("GBP", "GBP - British Pound"),
-            ("EUR", "EUR - Euro"),
-            ("ZAR", "ZAR - South African Rand"),
-            ("KES", "KES - Kenyan Shilling"),
-            ("TZS", "TZS - Tanzanian Shilling"),
-            ("UGX", "UGX - Ugandan Shilling"),
-            ("MWK", "MWK - Malawian Kwacha"),
-        ],
-        initial="ZMW",
-        widget=forms.Select(attrs={"class": "wizard-select"}),
+        choices=[],  # populated in __init__
+        initial="MWK",
+        widget=forms.Select(attrs={"class": "wizard-select", "id": "id_currency"}),
     )
     business_kind = forms.ChoiceField(
         label="Main vertical / business type",
@@ -624,6 +614,40 @@ class WizardStep2Form(forms.Form):
         widget=forms.Select(attrs={"class": "wizard-select"}),
         required=True,
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            from core.country_currency import get_country_choices, get_currency_choices
+            self.fields["country"].choices = get_country_choices()
+            self.fields["currency"].choices = get_currency_choices()
+        except Exception:
+            # Fallback if module not available yet
+            self.fields["country"].choices = [
+                ("", "Select country..."),
+                ("MW", "🇲🇼 Malawi (default)"),
+                ("ZM", "🇿🇲 Zambia"),
+                ("KE", "🇰🇪 Kenya"),
+                ("TZ", "🇹🇿 Tanzania"),
+                ("ZA", "🇿🇦 South Africa"),
+                ("NG", "🇳🇬 Nigeria"),
+                ("GH", "🇬🇭 Ghana"),
+                ("UG", "🇺🇬 Uganda"),
+            ]
+            self.fields["currency"].choices = [
+                ("MWK", "MWK - Malawian Kwacha"),
+                ("ZMW", "ZMW - Zambian Kwacha"),
+                ("USD", "USD - US Dollar"),
+                ("KES", "KES - Kenyan Shilling"),
+                ("TZS", "TZS - Tanzanian Shilling"),
+                ("ZAR", "ZAR - South African Rand"),
+                ("NGN", "NGN - Nigerian Naira"),
+            ]
+        # Default to MW (Malawi) and MWK
+        if not self.initial.get("country") and not self.data.get("country"):
+            self.fields["country"].initial = "MW"
+        if not self.initial.get("currency") and not self.data.get("currency"):
+            self.fields["currency"].initial = "MWK"
 
     def clean_business_kind(self):
         """Validate business_kind is a valid choice and not empty."""

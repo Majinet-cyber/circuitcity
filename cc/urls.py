@@ -694,6 +694,10 @@ urlpatterns += [
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
     path("groceries/", include_or_raise("inventory.urls_groceries", "groceries")),
     path("cement/", include_or_raise("inventory.urls_cement", "cement")),
+    # Car Dealer vertical
+    path("car-dealer/", include_or_raise("inventory.urls_car_dealer", "car_dealer")),
+    # Public marketplace
+    path("marketplace/", include(("inventory.urls_marketplace_public", "marketplace"), namespace="marketplace")),
     # App router for cross-vertical features (analytics, etc.)
     path("app/", include(("core.urls_app_router", "app_router"), namespace="app_router")),
     # Sales app (rollback, commissions, etc.)

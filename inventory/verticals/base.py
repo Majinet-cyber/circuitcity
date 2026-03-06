@@ -76,6 +76,17 @@ def base_context(request) -> Dict[str, Any]:
         url_stock = reverse("inventory:stock_list")  # clothing uses default for now
         url_sell = reverse("inventory:scan_sold")
         url_scan_in = reverse("inventory:scan_in")
+    elif vertical == "car_dealer":
+        try:
+            url_home = reverse("car_dealer:dashboard")
+            url_stock = reverse("car_dealer:vehicle_list")
+            url_sell = reverse("car_dealer:vehicle_list")  # sell from vehicle list
+            url_scan_in = reverse("car_dealer:stock_in")
+        except Exception:
+            url_home = reverse("inventory:inventory_dashboard")
+            url_stock = reverse("inventory:stock_list")
+            url_sell = reverse("inventory:scan_sold")
+            url_scan_in = reverse("inventory:scan_in")
     else:  # phones or default
         url_home = reverse("inventory:inventory_dashboard")
         url_stock = reverse("inventory:stock_list")

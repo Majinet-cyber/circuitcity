@@ -92,6 +92,12 @@ CANONICAL_BUSINESS_KINDS = {
         "description": "Vehicle rental, fleet management, trip bookings",
         "dashboard_route": "verticals:car_hire_dashboard",  # Car Hire has its own dashboard
     },
+    "car_dealer": {
+        "display_name": "Car Dealer",
+        "icon": "🏎️",
+        "description": "Vehicle dealership, inventory management, sales & marketplace",
+        "dashboard_route": "car_dealer:dashboard",  # Car Dealer has its own dashboard
+    },
 }
 
 
@@ -218,6 +224,16 @@ def normalize_business_kind(value: str | None) -> str | None:
         "fleet management": "car_hire",
         "taxi": "car_hire",
         "transport": "car_hire",
+        # Car Dealer (NEW)
+        "car_dealer": "car_dealer",
+        "car dealer": "car_dealer",
+        "dealership": "car_dealer",
+        "car dealership": "car_dealer",
+        "vehicle dealer": "car_dealer",
+        "vehicle dealership": "car_dealer",
+        "auto dealer": "car_dealer",
+        "used cars": "car_dealer",
+        "second hand cars": "car_dealer",
     }
 
     # Return canonical code if mapped, otherwise return normalized input

@@ -19,6 +19,12 @@ from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
 from tenants.utils import require_business
 
+try:
+    from cc.services.email_dispatcher import send_event_email, EmailEvent
+except ImportError:
+    send_event_email = None  # type: ignore[assignment]
+    EmailEvent = None  # type: ignore[assignment]
+
 logger = logging.getLogger(__name__)
 
 

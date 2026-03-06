@@ -22,89 +22,139 @@ try:
 except Exception:  # pragma: no cover
     Location = None  # type: ignore
 
+try:
+    from inventory.business_kinds import BusinessKind
+except Exception:  # pragma: no cover
+    BusinessKind = None  # type: ignore
+
+
+def _get_business_kind_choices():
+    """Return business kind choices including the empty placeholder."""
+    try:
+        from inventory.business_kinds import BusinessKind as BK
+        return [("", "Select your business type...")] + list(BK.choices)
+    except Exception:
+        return [("", "Select your business type...")]
+
+
+CURRENCY_CHOICES = [
+    ("MWK", "MWK - Malawian Kwacha"),
+    ("ZMW", "ZMW - Zambian Kwacha"),
+    ("USD", "USD - US Dollar"),
+    ("KES", "KES - Kenyan Shilling"),
+    ("TZS", "TZS - Tanzanian Shilling"),
+    ("ZAR", "ZAR - South African Rand"),
+    ("NGN", "NGN - Nigerian Naira"),
+    ("GHS", "GHS - Ghanaian Cedi"),
+    ("UGX", "UGX - Ugandan Shilling"),
+    ("ETB", "ETB - Ethiopian Birr"),
+    ("GBP", "GBP - British Pound"),
+    ("EUR", "EUR - Euro"),
+]
+
 
 class CreateBusinessForm(forms.ModelForm):
     """
-    Minimal manager-onboarding form.
-    - Only asks for 'name'
+    Manager-onboarding form for creating a new workspace.
+    - Asks for name, business_kind, and currency
     - Derives a unique slug automatically (appends -2, -3, ... if needed)
-    - SECURITY: Enforces one-business-per-user rule
+    - Multi-workspace: users may create as many businesses as they like
     """
+    business_kind = forms.ChoiceField(
+        label="Business type",
+        choices=_get_business_kind_choices,
+        required=True,
+        widget=forms.Select(attrs={"class": "form-select"}),
+        help_text="Choose the vertical that best describes your business.",
+    )
+    currency = forms.ChoiceField(
+        label="Currency",
+        choices=CURRENCY_CHOICES,
+        initial="MWK",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
+
     class Meta:
         model = Business
-        fields = ["name"]  # add "subdomain" here if you want to collect it at create time
+        fields = ["name"]
 
     def __init__(self, *args, user=None, **kwargs):
         """
-        Pass `user` to enable one-business-per-user validation.
+        Pass `user` to enable per-user validation if needed.
         Example: form = CreateBusinessForm(request.POST, user=request.user)
         """
         super().__init__(*args, **kwargs)
         self.user = user
+        self.fields["name"].widget.attrs.update({"class": "form-control", "placeholder": "e.g., Sunrise Liquor Store"})
 
     def _unique_slug(self, base: str) -> str:
         """
         Ensure the slug is unique without racing: best-effort check here;
-        database unique constraints should still enforce final uniqueness.
+        database unique constraints still enforce final uniqueness.
         """
         base = (base or "").strip("-")
         if not base:
             base = "shop"
         slug = base
-        # Try a few numeric suffixes (cheap, avoids heavy queries)
         for i in range(1, 999):
             try:
                 exists = Business.objects.filter(slug=slug).exists()
             except Exception:
-                # If model lacks slug or DB unavailable at this moment, just return
                 exists = False
             if not exists:
                 return slug
             slug = f"{base}-{i+1}"
-        return slug  # fallback (DB should still reject duplicates)
+        return slug
 
     def clean_name(self):
         """
         Validate business/store name:
         - Not numeric-only
-        - Must be unique (case-insensitive)
+        - Must be unique (case-insensitive) across the platform
         - Must pass basic business name validation
         """
         name = (self.cleaned_data.get("name") or "").strip()
-        
+
         if not name:
             raise ValidationError("Please provide a business/store name.")
-        
-        # Check not numeric-only
+
         try:
             validate_business_name_not_numeric(name)
         except ValidationError as e:
             raise ValidationError(e.messages)
-        
-        # Check uniqueness (case-insensitive)
+
         if Business.objects.filter(name__iexact=name).exists():
             raise ValidationError(
                 "That store name is already in use. Please pick another name or "
                 "contact support if you believe this is an error."
             )
-        
-        # Apply basic business name validation
+
         try:
             validate_business_name(name)
         except ValidationError as e:
             raise ValidationError(e.messages)
-        
+
         return name
 
+    def clean_business_kind(self):
+        kind = (self.cleaned_data.get("business_kind") or "").strip()
+        if not kind:
+            raise ValidationError("Please select your business type.")
+        try:
+            from inventory.business_kinds import BusinessKind as BK
+            valid = [c[0] for c in BK.choices]
+            if kind not in valid:
+                raise ValidationError(f"Invalid business type: {kind}.")
+        except ImportError:
+            pass
+        return kind
+
     def clean(self):
-        """
-        Multi-workspace: a user may create multiple workspaces.
-        We only validate the business name uniqueness and derive a slug.
-        """
+        """Derive a unique slug from the business name."""
         cleaned = super().clean()
         name = (cleaned.get("name") or "").strip()
 
-        # Provide a unique slug for views to use (only if model has slug)
         try:
             field_names = {f.name for f in Business._meta.fields}
         except Exception:
@@ -112,8 +162,7 @@ class CreateBusinessForm(forms.ModelForm):
 
         if "slug" in field_names and name:
             base = slugify(name) or "shop"
-            cleaned_slug = self._unique_slug(base)
-            cleaned["slug"] = cleaned_slug
+            cleaned["slug"] = self._unique_slug(base)
         return cleaned
 
 

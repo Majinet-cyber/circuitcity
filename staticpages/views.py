@@ -115,6 +115,12 @@ def get_all_verticals():
             'description': 'Fleet management and vehicle rental bookings',
             'icon': '🚗',
         },
+        {
+            'code': 'car_dealer',
+            'name': 'Car Dealer',
+            'description': 'Vehicle dealership, stock management, sales & marketplace',
+            'icon': '🏎️',
+        },
     ]
 
 

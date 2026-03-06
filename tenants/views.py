@@ -375,13 +375,28 @@ def create_business_as_manager(request: HttpRequest) -> HttpResponse:
             b.slug = form.cleaned_data["slug"]
             b.created_by = request.user
             b.status = "ACTIVE"  # auto-activate; no staff approval gate
+            # Apply vertical and currency from form
+            business_kind = form.cleaned_data.get("business_kind")
+            if business_kind:
+                b.business_kind = business_kind
+            currency = form.cleaned_data.get("currency")
+            if currency:
+                b.currency = currency
+            # Apply section flags for the chosen vertical
+            try:
+                from tenants.section_defaults import build_section_defaults
+                section_flags = build_section_defaults(b.business_kind or "")
+                for key, val in section_flags.items():
+                    if hasattr(b, key):
+                        setattr(b, key, val)
+            except Exception:
+                pass
             b.save()
 
-            Membership.objects.create(
+            Membership.objects.get_or_create(
                 user=request.user,
                 business=b,
-                role="MANAGER",
-                status="ACTIVE",  # creator is immediately an active manager
+                defaults={"role": "MANAGER", "status": "ACTIVE"},
             )
 
             # Seed Location/Warehouse defaults so the workspace is usable right away

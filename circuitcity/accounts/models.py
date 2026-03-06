@@ -1,4 +1,4 @@
-﻿# accounts/models.py
+# accounts/models.py
 from __future__ import annotations
 
 from datetime import timedelta
@@ -22,13 +22,14 @@ def build_default_profile_fields() -> dict:
     """
     Single source of truth for Profile field defaults.
     CRITICAL: This ensures Profile creation never fails due to NOT NULL constraints.
-    
+
     Returns:
         dict: Default values for all NOT NULL Profile fields
     """
     return {
         "city": getattr(settings, "DEFAULT_PROFILE_CITY", "Lilongwe"),
-        "country": getattr(settings, "DEFAULT_PROFILE_COUNTRY", "Malawi"),
+        # Store ISO-2 code; legacy "Malawi" string is normalised by migration
+        "country": getattr(settings, "DEFAULT_PROFILE_COUNTRY", "MW"),
         "timezone": getattr(settings, "DEFAULT_PROFILE_TIMEZONE", "Africa/Blantyre"),
         "language": getattr(settings, "DEFAULT_PROFILE_LANGUAGE", "English"),
         "display_currency": getattr(settings, "DEFAULT_PROFILE_CURRENCY", "MWK"),
@@ -46,17 +47,23 @@ class Profile(models.Model):
 
     # Settings shown on the Settings Â· Profile page
     display_name = models.CharField(max_length=120, blank=True, default="")
-    country = models.CharField(max_length=80, blank=True, default="Malawi")
+    # country: stores ISO-2 country code (e.g. "MW" for Malawi).
+    # Defaults to "MW". Legacy free-text values ("Malawi") are handled gracefully.
+    country = models.CharField(
+        max_length=10,
+        blank=True,
+        default="MW",
+        help_text="ISO-2 country code (e.g. MW for Malawi, ZM for Zambia).",
+    )
     language = models.CharField(max_length=80, blank=True, default="English")
     timezone = models.CharField(max_length=80, blank=True, default="Africa/Blantyre")
     city = models.CharField(max_length=100, blank=True, default="Lilongwe")
 
-    # Currency display preference
+    # Currency display preference — full African + global list
     display_currency = models.CharField(
-        max_length=3,
-        choices=[("MWK", "MWK"), ("USD", "USD")],
+        max_length=5,
         default="MWK",
-        help_text="Currency to display amounts in (MWK is base currency, USD is converted)",
+        help_text="Preferred display currency (ISO 4217 code, e.g. MWK, USD).",
     )
 
     # ---- Role flag (no need to replace AUTH_USER_MODEL) ----
