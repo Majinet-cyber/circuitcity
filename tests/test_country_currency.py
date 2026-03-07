@@ -75,7 +75,9 @@ class CountryCurrencyHelperTests(TestCase):
 
     def test_get_country_choices_has_tuples(self):
         choices = get_country_choices()
-        for code, label in choices:
+        real_choices = [(code, label) for code, label in choices if code]
+        self.assertGreater(len(real_choices), 0)
+        for code, label in real_choices:
             self.assertIsInstance(code, str)
             self.assertIsInstance(label, str)
             self.assertGreater(len(code), 0)

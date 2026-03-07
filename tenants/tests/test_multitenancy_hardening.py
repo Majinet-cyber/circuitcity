@@ -232,7 +232,7 @@ class TestDuplicatePrevention(TestCase):
             status="ACTIVE",
         )
 
-        form_data = {"name": "Second Store"}
+        form_data = {"name": "Second Store", "business_kind": "phones", "currency": "MWK"}
         form = CreateBusinessForm(data=form_data, user=self.user)
 
         # Form should now be VALID for multi-workspace users

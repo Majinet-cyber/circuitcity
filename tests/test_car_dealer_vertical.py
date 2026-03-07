@@ -16,7 +16,7 @@ User = get_user_model()
 
 def _make_business(slug="test-dealer"):
     return Business.objects.create(
-        name="Test Car Dealer",
+        name=f"Car Dealer {slug}",
         slug=slug,
         business_kind="car_dealer",
     )

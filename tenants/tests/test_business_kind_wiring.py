@@ -264,7 +264,7 @@ class TestBusinessKindInSignupFlow(TestCase):
         form = WizardStep2Form(data={
             "business_name": "Test Farm",
             "business_kind": "farm",
-            "country": "Malawi",
+            "country": "MW",
             "currency": "MWK",
         })
         
@@ -281,7 +281,7 @@ class TestBusinessKindInSignupFlow(TestCase):
         form = WizardStep2Form(data={
             "business_name": "Test Welding Shop",
             "business_kind": "welding",
-            "country": "Malawi",
+            "country": "MW",
             "currency": "MWK",
         })
         

@@ -75,7 +75,7 @@ class CreateBusinessFormTestCase(TestCase):
     
     def test_valid_store_name_accepted(self):
         """Form should accept valid store names."""
-        form = CreateBusinessForm(data={"name": "Mo Touch Electronics"})
+        form = CreateBusinessForm(data={"name": "Mo Touch Electronics", "business_kind": "phones", "currency": "MWK"})
         self.assertTrue(form.is_valid())
 
 
@@ -139,7 +139,7 @@ class WizardSignupValidationTestCase(TestCase):
         
         form = WizardStep2Form(data={
             "business_name": "444444",
-            "country": "Zambia",
+            "country": "ZM",
             "currency": "ZMW",
             "business_kind": "phones"
         })
@@ -170,7 +170,7 @@ class WizardSignupValidationTestCase(TestCase):
         
         form = WizardStep2Form(data={
             "business_name": "Mo Touch Electronics",
-            "country": "Zambia",
+            "country": "ZM",
             "currency": "ZMW",
             "business_kind": "phones"
         })

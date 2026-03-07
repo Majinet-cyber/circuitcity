@@ -74,7 +74,7 @@
         {% elif v == "clothing" %}👕{% elif v == "gym" %}🏋️{% elif v == "farm" %}🌾
         {% elif v == "car_dealer" %}🏎️{% elif v == "car_hire" %}🚗{% elif v == "pharmacy" %}💊
         {% elif v == "hardware" %}🔧{% else %}📦{% endif %}
-        {{ v|capfirst|replace:"_"," " }}
+        {% if v == "car_dealer" %}Car Dealer{% elif v == "car_hire" %}Car Hire{% else %}{{ v|capfirst|cut:"_" }}{% endif %}
       </a>
     {% endfor %}
   </div>
@@ -108,7 +108,7 @@
   <h5 class="fw-bold mb-3" style="color:#0f172a;">
     <i class="bi bi-grid me-2 text-primary"></i>
     {% if search_q %}Results for "{{ search_q }}"
-    {% elif vertical_filter %}{{ vertical_filter|capfirst|replace:"_"," " }} Listings
+    {% elif vertical_filter %}{% if vertical_filter == "car_dealer" %}Car Dealer{% elif vertical_filter == "car_hire" %}Car Hire{% else %}{{ vertical_filter|capfirst }}{% endif %} Listings
     {% else %}Latest Listings{% endif %}
     <small class="text-muted fw-normal">({{ page_obj.paginator.count }})</small>
   </h5>

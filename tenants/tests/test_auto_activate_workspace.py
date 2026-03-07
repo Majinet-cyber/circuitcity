@@ -49,7 +49,7 @@ class TestWorkspaceAutoActivation(TestCase):
 
     def test_created_workspace_is_active_immediately(self):
         """POST /tenants/create/ → Business.status == 'ACTIVE' (never PENDING)."""
-        response = self.client.post(CREATE_URL, {"name": "Car Hire Alpha"}, follow=True)
+        response = self.client.post(CREATE_URL, {"name": "Car Hire Alpha", "business_kind": "car_hire", "currency": "MWK"}, follow=True)
         self.assertEqual(response.status_code, 200)
 
         biz = Business.objects.get(name="Car Hire Alpha")
@@ -57,13 +57,13 @@ class TestWorkspaceAutoActivation(TestCase):
 
     def test_created_workspace_is_active_is_true(self):
         """The is_active property returns True right after creation."""
-        self.client.post(CREATE_URL, {"name": "Car Hire Beta"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Car Hire Beta", "business_kind": "car_hire", "currency": "MWK"}, follow=True)
         biz = Business.objects.get(name="Car Hire Beta")
         self.assertTrue(biz.is_active, "is_active property must be True immediately.")
 
     def test_no_pending_workspace_after_creation(self):
         """Ensure there is no PENDING business with the submitted name."""
-        self.client.post(CREATE_URL, {"name": "CarHire Gamma"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "CarHire Gamma", "business_kind": "car_hire", "currency": "MWK"}, follow=True)
         self.assertFalse(
             Business.objects.filter(name="CarHire Gamma", status="PENDING").exists(),
             "There must be no PENDING workspace after creation.",
@@ -84,7 +84,7 @@ class TestCreatorMembership(TestCase):
 
     def test_creator_has_active_manager_membership(self):
         """After creation, the creator must have role=MANAGER, status=ACTIVE."""
-        self.client.post(CREATE_URL, {"name": "Fresh Ventures"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Fresh Ventures", "business_kind": "phones", "currency": "MWK"}, follow=True)
         biz = Business.objects.get(name="Fresh Ventures")
         mem = Membership.objects.get(user=self.manager, business=biz)
         self.assertEqual(mem.role, "MANAGER")
@@ -92,7 +92,7 @@ class TestCreatorMembership(TestCase):
 
     def test_creator_membership_not_pending(self):
         """Membership must never be PENDING after auto-activation."""
-        self.client.post(CREATE_URL, {"name": "Instant Motors"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Instant Motors", "business_kind": "car_dealer", "currency": "MWK"}, follow=True)
         biz = Business.objects.get(name="Instant Motors")
         pending = Membership.objects.filter(
             user=self.manager, business=biz, status="PENDING"
@@ -117,7 +117,7 @@ class TestWorkspaceAppearsInChooser(TestCase):
         After creation, GET /tenants/choose/ must include the new workspace
         in the manager's membership list (context['memberships']).
         """
-        self.client.post(CREATE_URL, {"name": "Swift Logistics"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Swift Logistics", "business_kind": "grocery", "currency": "MWK"}, follow=True)
         biz = Business.objects.get(name="Swift Logistics")
 
         response = self.client.get(CHOOSE_URL)
@@ -131,7 +131,7 @@ class TestWorkspaceAppearsInChooser(TestCase):
         After creation the user can switch to the new workspace via the chooser.
         POST /tenants/choose/ with business_id of the new workspace must succeed.
         """
-        self.client.post(CREATE_URL, {"name": "Sunrise Cafe"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Sunrise Cafe", "business_kind": "grocery", "currency": "MWK"}, follow=True)
         biz = Business.objects.get(name="Sunrise Cafe")
 
         # Use set_active endpoint (used by chooser template links)
@@ -144,11 +144,11 @@ class TestWorkspaceAppearsInChooser(TestCase):
     def test_multi_workspace_manager_sees_all_own_workspaces(self):
         """A manager with two workspaces sees both in their membership list."""
         # Create first workspace
-        self.client.post(CREATE_URL, {"name": "Alpha Store"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Alpha Store", "business_kind": "phones", "currency": "MWK"}, follow=True)
         biz1 = Business.objects.get(name="Alpha Store")
 
         # Create second workspace
-        self.client.post(CREATE_URL, {"name": "Beta Store"}, follow=True)
+        self.client.post(CREATE_URL, {"name": "Beta Store", "business_kind": "gym", "currency": "MWK"}, follow=True)
         biz2 = Business.objects.get(name="Beta Store")
 
         mems = Membership.objects.filter(
@@ -177,7 +177,7 @@ class TestWelcomeEmailOnCreate(TestCase):
         transaction.on_commit must be called exactly once for the welcome email
         callback after a successful workspace creation.
         """
-        response = self.client.post(CREATE_URL, {"name": "Email Test Shop"}, follow=True)
+        response = self.client.post(CREATE_URL, {"name": "Email Test Shop", "business_kind": "phones", "currency": "MWK"}, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertTrue(
             mock_on_commit.called,
@@ -190,7 +190,7 @@ class TestWelcomeEmailOnCreate(TestCase):
         # We bypass on_commit by patching emit_event directly; call the emit
         # callback synchronously by having on_commit call the function immediately.
         with patch("tenants.views.transaction.on_commit", side_effect=lambda fn: fn()):
-            self.client.post(CREATE_URL, {"name": "DirectEmail Biz"}, follow=True)
+            self.client.post(CREATE_URL, {"name": "DirectEmail Biz", "business_kind": "phones", "currency": "MWK"}, follow=True)
 
         if mock_emit.called:
             call_kwargs = mock_emit.call_args[1] if mock_emit.call_args[1] else {}
@@ -206,7 +206,7 @@ class TestWelcomeEmailOnCreate(TestCase):
         self.client.login(username="noemailmgr", password="Test1234!Strong")
         with patch("tenants.views.transaction.on_commit") as mock_commit:
             response = self.client.post(
-                CREATE_URL, {"name": "NoEmail Workspace"}, follow=True
+                CREATE_URL, {"name": "NoEmail Workspace", "business_kind": "phones", "currency": "MWK"}, follow=True
             )
         self.assertEqual(response.status_code, 200)
         # on_commit should NOT be called because there's no email to send to

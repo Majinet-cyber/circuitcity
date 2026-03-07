@@ -28,8 +28,10 @@ def _signup_user(username="multi_mgr", password="testpass123"):
     )
 
 
-def _create_business_direct(user, name="My Shop", slug="my-shop", kind="phones", currency="MWK"):
+def _create_business_direct(user, name=None, slug="my-shop", kind="phones", currency="MWK"):
     """Create a business directly (bypassing the form), as the view does internally."""
+    if name is None:
+        name = f"Business {slug}"
     biz = Business.objects.create(
         name=name,
         slug=slug,
@@ -56,9 +58,9 @@ class MultiBizCreationTests(TestCase):
         self.user = _signup_user()
 
     def test_user_can_own_multiple_businesses(self):
-        b1 = _create_business_direct(self.user, name="Shop A", slug="shop-a", kind="phones")
-        b2 = _create_business_direct(self.user, name="Shop B", slug="shop-b", kind="gym")
-        b3 = _create_business_direct(self.user, name="Shop C", slug="shop-c", kind="car_dealer")
+        b1 = _create_business_direct(self.user, name="Unique Shop A", slug="shop-a", kind="phones")
+        b2 = _create_business_direct(self.user, name="Unique Shop B", slug="shop-b", kind="gym")
+        b3 = _create_business_direct(self.user, name="Unique Shop C", slug="shop-c", kind="car_dealer")
         memberships = Membership.objects.filter(user=self.user)
         self.assertEqual(memberships.count(), 3)
 
@@ -100,8 +102,8 @@ class MultiBizCreationTests(TestCase):
 
     def test_two_different_users_can_have_same_vertical(self):
         user2 = _signup_user("other_mgr2")
-        b1 = _create_business_direct(self.user, slug="phones-1", kind="phones")
-        b2 = _create_business_direct(user2, slug="phones-2", kind="phones")
+        b1 = _create_business_direct(self.user, name="Alice Phones", slug="phones-1", kind="phones")
+        b2 = _create_business_direct(user2, name="Bob Phones", slug="phones-2", kind="phones")
         self.assertEqual(b1.business_kind, "phones")
         self.assertEqual(b2.business_kind, "phones")
 

@@ -21,7 +21,7 @@ User = get_user_model()
 
 def _make_business(slug="mkt-shop"):
     return Business.objects.create(
-        name="Market Shop",
+        name=f"Market Shop {slug}",
         slug=slug,
         business_kind="phones",
     )
@@ -267,7 +267,7 @@ class ToggleListingStatusTests(TestCase):
         self.client.login(username="mkt_mgr", password="testpass123")
 
     def test_toggle_to_live(self):
-        url = reverse("inventory:toggle_listing_status", args=[self.listing.id])
+        url = reverse("inventory:marketplace_toggle_status", args=[self.listing.id])
         self.client.post(url, {"status": "live"})
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.status, "live")
@@ -275,13 +275,13 @@ class ToggleListingStatusTests(TestCase):
     def test_toggle_to_offline(self):
         self.listing.status = "live"
         self.listing.save()
-        url = reverse("inventory:toggle_listing_status", args=[self.listing.id])
+        url = reverse("inventory:marketplace_toggle_status", args=[self.listing.id])
         self.client.post(url, {"status": "offline"})
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.status, "offline")
 
     def test_toggle_requires_auth(self):
         anon = Client()
-        url = reverse("inventory:toggle_listing_status", args=[self.listing.id])
+        url = reverse("inventory:marketplace_toggle_status", args=[self.listing.id])
         response = anon.post(url, {"status": "live"})
         self.assertEqual(response.status_code, 302)
