@@ -338,6 +338,34 @@
       color: var(--primary);
     }
 
+    .btn-marketplace {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.08), rgba(124, 58, 237, 0.1));
+      color: var(--primary);
+      border: 1.5px solid rgba(79, 70, 229, 0.35);
+      border-radius: 8px;
+      padding: 0.45rem 1rem;
+      font-weight: 600;
+      font-size: 0.92rem;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-marketplace:hover {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.15), rgba(124, 58, 237, 0.18));
+      border-color: rgba(79, 70, 229, 0.6);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    .btn-marketplace:active {
+      transform: translateY(0) scale(0.98);
+    }
+
     /* Hero Section */
     .hero {
       padding: 8rem 2rem 4rem;
@@ -1918,6 +1946,7 @@
         <a href="#how-it-works" class="btn btn-text">How It Works</a>
         <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
         <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
+        <a href="{% url 'marketplace:home' %}" class="btn btn-marketplace">🛍 Marketplace</a>
         <a href="{% url 'login' %}" class="btn btn-text">Login</a>
         <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
       </div>
@@ -1938,6 +1967,7 @@
         <a href="#how-it-works" class="btn btn-text">How It Works</a>
         <a href="{% url 'staticpages:about' %}" class="btn btn-text">About</a>
         <a href="{% url 'staticpages:pricing' %}" class="btn btn-text">Pricing</a>
+        <a href="{% url 'marketplace:home' %}" class="btn btn-marketplace">🛍 Marketplace</a>
         <a href="{% url 'login' %}" class="btn btn-text">Login</a>
         <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
       </div>

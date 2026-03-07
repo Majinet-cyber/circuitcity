@@ -57,27 +57,27 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='marketplacelisting',
-            index=models.Index(fields=['business', 'is_active'], name='inventory_m_busines_e6b7e3_idx'),
+            index=models.Index(fields=['business', 'is_active'], name='inventory_m_busines_b3b99a_idx'),
         ),
         migrations.AddIndex(
             model_name='marketplacelisting',
-            index=models.Index(fields=['vertical', 'is_active'], name='inventory_m_vertica_8f4c2a_idx'),
+            index=models.Index(fields=['vertical', 'is_active'], name='inventory_m_vertica_7bba40_idx'),
         ),
         migrations.AddIndex(
             model_name='marketplacelisting',
-            index=models.Index(fields=['-created_at'], name='inventory_m_created_9d3f1b_idx'),
+            index=models.Index(fields=['-created_at'], name='inventory_m_created_e9d9e2_idx'),
         ),
         migrations.AddIndex(
             model_name='marketplaceenquiry',
-            index=models.Index(fields=['business', 'is_read'], name='inventory_m_busines_7a2d4e_idx'),
+            index=models.Index(fields=['business', 'is_read'], name='inventory_m_busines_595aab_idx'),
         ),
         migrations.AddIndex(
             model_name='marketplaceenquiry',
-            index=models.Index(fields=['listing', '-created_at'], name='inventory_m_listing_5c8b9f_idx'),
+            index=models.Index(fields=['listing', '-created_at'], name='inventory_m_listing_295cdd_idx'),
         ),
         migrations.AddIndex(
             model_name='marketplaceenquiry',
-            index=models.Index(fields=['-created_at'], name='inventory_m_created_1e6a7c_idx'),
+            index=models.Index(fields=['-created_at'], name='inventory_m_created_89aaf6_idx'),
         ),
     ]
 
