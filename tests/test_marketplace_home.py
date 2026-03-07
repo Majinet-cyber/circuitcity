@@ -353,3 +353,212 @@ class LandingPageFarmMarketplaceTests(TestCase):
         response = self.client.get("/", follow=True)
         self.assertNotEqual(response.status_code, 500)
         self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# PART 5: Marketplace UI upgrades — trust band, categories strip, cards
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+class MarketplaceTrustBandTests(TestCase):
+    """
+    The marketplace homepage must include the trust/stats band section.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_trust_band_renders(self):
+        """Trust band section must be present on the marketplace homepage."""
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "trust-band",
+            content,
+            "Marketplace homepage must contain the trust-band section.",
+        )
+
+    def test_trust_band_has_verified_sellers(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Verified", content, "Trust band must mention Verified.")
+
+    def test_trust_band_has_africa_first(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Africa", content, "Trust band must mention Africa.")
+
+    def test_trust_band_has_mobile_ready(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Mobile", content, "Trust band must mention Mobile.")
+
+    def test_trust_band_has_verticals_count(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Vertical", content, "Trust band must mention Verticals.")
+
+
+@pytest.mark.django_db
+class MarketplaceCategoriesStripTests(TestCase):
+    """
+    The marketplace homepage must include the featured categories/verticals strip.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_categories_section_renders(self):
+        """Categories section must be present on the marketplace homepage."""
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "categories-section",
+            content,
+            "Marketplace must contain the categories section.",
+        )
+
+    def test_categories_include_phones(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Phones", content, "Categories must include Phones.")
+
+    def test_categories_include_farm(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Farm", content, "Categories must include Farm.")
+
+    def test_categories_include_gym(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Gym", content, "Categories must include Gym.")
+
+    def test_categories_include_cars(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Cars", content, "Categories must include Cars.")
+
+    def test_categories_include_pharmacy(self):
+        content = self._get_marketplace_content()
+        self.assertIn("Pharmacy", content, "Categories must include Pharmacy.")
+
+    def test_categories_link_to_vertical_filters(self):
+        """Each category card must link to a vertical-filtered marketplace URL."""
+        content = self._get_marketplace_content()
+        self.assertIn("vertical=phones", content, "Must link to phones vertical filter.")
+        self.assertIn("vertical=farm", content, "Must link to farm vertical filter.")
+        self.assertIn("vertical=gym", content, "Must link to gym vertical filter.")
+        self.assertIn("vertical=car_dealer", content, "Must link to car_dealer vertical filter.")
+
+    def test_browse_by_business_type_heading(self):
+        content = self._get_marketplace_content()
+        self.assertIn(
+            "Browse by Business Type",
+            content,
+            "Must show 'Browse by Business Type' heading.",
+        )
+
+
+@pytest.mark.django_db
+class MarketplaceEmptyStateUpgradeTests(TestCase):
+    """
+    The marketplace empty state must be premium — no dashed/dotted borders,
+    must have aspirational CTAs, and must render correctly.
+    """
+
+    def _get_marketplace_content(self):
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode("utf-8")
+
+    def test_empty_state_renders(self):
+        content = self._get_marketplace_content()
+        self.assertIn("empty-state", content, "Empty state must render.")
+
+    def test_empty_state_no_dashed_border(self):
+        """Empty state must NOT use dashed or dotted border style."""
+        content = self._get_marketplace_content()
+        # The empty state wrapper must not use border-style: dashed/dotted
+        self.assertNotIn(
+            "border: 2px dashed",
+            content,
+            "Empty state must not use dashed border.",
+        )
+        self.assertNotIn(
+            "border:2px dashed",
+            content,
+            "Empty state must not use dashed border.",
+        )
+
+    def test_empty_state_has_list_your_business_cta(self):
+        content = self._get_marketplace_content()
+        signup_url = reverse("accounts:signup")
+        self.assertIn(
+            signup_url, content,
+            "Empty state must contain a link to the signup/list-your-business page.",
+        )
+
+    def test_empty_state_aspirational_copy(self):
+        """Empty state must have aspirational, premium copy."""
+        content = self._get_marketplace_content()
+        # Should NOT feel like a dead end
+        self.assertNotIn(
+            "No listings yet",
+            content,
+            "Empty state must not say just 'No listings yet' — must be aspirational.",
+        )
+
+    def test_empty_state_has_features_row(self):
+        """Empty state should show platform benefits."""
+        content = self._get_marketplace_content()
+        self.assertIn("Africa-wide reach", content, "Empty state must highlight Africa-wide reach.")
+
+
+@pytest.mark.django_db
+class MarketplaceListingCardUpgradeTests(TestCase):
+    """
+    Listing cards must render with enhanced content including vertical badge.
+    """
+
+    def setUp(self):
+        self.biz = Business.objects.create(
+            name="Test Card Shop", slug="card-test-shop", business_kind="phones"
+        )
+        self.listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Card Test Item",
+            status="live",
+            vertical="phones",
+        )
+        self.client = Client()
+
+    def test_listing_card_renders_vertical_badge(self):
+        """Listing cards must include a vertical category badge."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            "listing-vertical-badge",
+            content,
+            "Listing cards must render a vertical badge element.",
+        )
+
+    def test_listing_card_renders_view_cue(self):
+        """Listing cards must include a 'View' hover cue."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            "listing-view-cue",
+            content,
+            "Listing cards must render a view cue element.",
+        )
+
+    def test_listing_card_still_links_to_detail(self):
+        """Listing cards must still link to the listing detail page."""
+        url = reverse("marketplace:home")
+        response = self.client.get(url)
+        content = response.content.decode("utf-8")
+        self.assertIn(
+            f"/marketplace/{self.biz.slug}/{self.listing.listing_slug}/",
+            content,
+            "Listing card must link to the listing detail URL.",
+        )

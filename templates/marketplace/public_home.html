@@ -17,16 +17,14 @@
     --bg-light: #f9fafb;
     --white: #ffffff;
     --border: #e5e7eb;
-    --border-light: rgba(79, 70, 229, 0.12);
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.13);
-    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
+    --shadow: 0 10px 30px rgba(0,0,0,.08);
+    --shadow-lg: 0 20px 50px rgba(0,0,0,.13);
+    --shadow-sm: 0 2px 10px rgba(0,0,0,.05);
     --radius-card: 20px;
     --radius-btn: 100px;
-    --radius-badge: 100px;
   }
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  * { margin:0; padding:0; box-sizing:border-box; }
 
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
@@ -38,737 +36,502 @@
 
   /* ── NAVBAR ── */
   .mkt-navbar {
-    position: sticky;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    background: rgba(255, 255, 255, 0.95);
+    position: sticky; top:0; left:0; right:0; z-index:1000;
+    background: rgba(255,255,255,.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
-    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+    box-shadow: 0 2px 16px rgba(0,0,0,.06);
+    border-bottom: 1px solid rgba(229,231,235,.8);
   }
-
   .mkt-navbar-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 0.9rem 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    max-width: 1280px; margin:0 auto;
+    padding: .9rem 2rem;
+    display: flex; justify-content:space-between; align-items:center;
   }
-
   .mkt-brand {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    text-decoration: none;
+    display:flex; align-items:center; gap:.6rem; text-decoration:none;
   }
-
   .mkt-brand-icon {
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 1rem;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
-    flex-shrink: 0;
+    width:36px; height:36px;
+    background: linear-gradient(135deg,var(--primary),var(--primary-dark));
+    border-radius:10px; display:flex; align-items:center; justify-content:center;
+    color:#fff; box-shadow:0 4px 12px rgba(79,70,229,.35); flex-shrink:0;
   }
-
-  .mkt-brand-name {
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: var(--primary);
-    letter-spacing: -0.01em;
-  }
-
+  .mkt-brand-name { font-size:1.15rem; font-weight:800; color:var(--primary); letter-spacing:-.01em; }
   .mkt-brand-sub {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-top: -3px;
+    font-size:.7rem; font-weight:600; color:var(--text-secondary);
+    letter-spacing:.05em; text-transform:uppercase; margin-top:-3px;
   }
-
-  .mkt-nav-actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-  }
-
+  .mkt-nav-actions { display:flex; gap:.75rem; align-items:center; }
   .btn-nav-ghost {
-    font-size: 0.88rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: transparent;
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-btn);
-    padding: 0.45rem 1.1rem;
-    text-decoration: none;
-    transition: all 0.2s ease;
+    font-size:.88rem; font-weight:600; color:var(--text-secondary);
+    background:transparent; border:1.5px solid var(--border);
+    border-radius:var(--radius-btn); padding:.45rem 1.1rem;
+    text-decoration:none; transition:all .2s ease;
   }
-
-  .btn-nav-ghost:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(79, 70, 229, 0.04);
-  }
-
+  .btn-nav-ghost:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.04); }
   .btn-nav-cta {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #fff;
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.92), rgba(67, 56, 202, 0.97));
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--radius-btn);
-    padding: 0.45rem 1.2rem;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    font-size:.88rem; font-weight:700; color:#fff;
+    background: linear-gradient(135deg,rgba(79,70,229,.92),rgba(67,56,202,.97));
+    border:1px solid rgba(255,255,255,.2); border-radius:var(--radius-btn);
+    padding:.45rem 1.2rem; text-decoration:none; transition:all .2s ease;
+    box-shadow:0 4px 14px rgba(79,70,229,.4);
   }
-
   .btn-nav-cta:hover {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
-    color: #fff;
-    text-decoration: none;
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    transform:translateY(-1px); box-shadow:0 6px 20px rgba(79,70,229,.5);
+    color:#fff; text-decoration:none;
   }
 
   /* ── HERO ── */
   .mkt-hero {
     padding: 5.5rem 2rem 4.5rem;
-    background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 55%, #f0fdf4 100%);
-    position: relative;
-    overflow: hidden;
-    text-align: center;
+    background: linear-gradient(135deg,#f9fafb 0%,#e0e7ff 55%,#f0fdf4 100%);
+    position:relative; overflow:hidden; text-align:center;
   }
-
   .mkt-hero::before {
-    content: '';
-    position: absolute;
-    top: -40%;
-    right: -15%;
-    width: 700px;
-    height: 700px;
-    background: radial-gradient(circle, rgba(79, 70, 229, 0.07) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
+    content:''; position:absolute; top:-40%; right:-15%;
+    width:700px; height:700px;
+    background:radial-gradient(circle,rgba(79,70,229,.07) 0%,transparent 70%);
+    border-radius:50%; pointer-events:none;
   }
-
   .mkt-hero::after {
-    content: '';
-    position: absolute;
-    bottom: -30%;
-    left: -10%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
+    content:''; position:absolute; bottom:-30%; left:-10%;
+    width:500px; height:500px;
+    background:radial-gradient(circle,rgba(16,185,129,.06) 0%,transparent 70%);
+    border-radius:50%; pointer-events:none;
   }
-
-  .hero-inner {
-    max-width: 780px;
-    margin: 0 auto;
-    position: relative;
-    z-index: 1;
-  }
-
+  .hero-inner { max-width:780px; margin:0 auto; position:relative; z-index:1; }
   .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: var(--primary);
-    background: rgba(79, 70, 229, 0.08);
-    border: 1.5px solid rgba(79, 70, 229, 0.2);
-    border-radius: var(--radius-badge);
-    padding: 0.3rem 0.95rem;
-    margin-bottom: 1.4rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    display:inline-flex; align-items:center; gap:.4rem;
+    font-size:.78rem; font-weight:700; color:var(--primary);
+    background:rgba(79,70,229,.08); border:1.5px solid rgba(79,70,229,.2);
+    border-radius:var(--radius-btn); padding:.3rem .95rem; margin-bottom:1.4rem;
+    letter-spacing:.06em; text-transform:uppercase;
   }
-
   .hero-title {
-    font-size: clamp(2.1rem, 5.5vw, 3.4rem);
-    font-weight: 800;
-    line-height: 1.1;
-    color: var(--text-primary);
-    margin-bottom: 1.25rem;
-    letter-spacing: -0.02em;
+    font-size:clamp(2.1rem,5.5vw,3.4rem); font-weight:800;
+    line-height:1.1; color:var(--text-primary);
+    margin-bottom:1.25rem; letter-spacing:-.02em;
   }
-
   .hero-title .highlight {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    background:linear-gradient(135deg,var(--primary) 0%,var(--secondary) 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
   }
-
   .hero-subtitle {
-    font-size: 1.15rem;
-    color: var(--text-secondary);
-    max-width: 580px;
-    margin: 0 auto 2.25rem;
-    line-height: 1.75;
+    font-size:1.15rem; color:var(--text-secondary);
+    max-width:580px; margin:0 auto 2.25rem; line-height:1.75;
   }
 
   /* ── SEARCH ── */
-  .hero-search-wrap {
-    max-width: 580px;
-    margin: 0 auto 1.75rem;
-  }
-
+  .hero-search-wrap { max-width:580px; margin:0 auto 1.75rem; }
   .hero-search-box {
-    display: flex;
-    align-items: center;
-    background: var(--white);
-    border: 2px solid var(--border);
-    border-radius: var(--radius-btn);
-    padding: 0.35rem 0.35rem 0.35rem 1.15rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
+    display:flex; align-items:center;
+    background:var(--white); border:2px solid var(--border);
+    border-radius:var(--radius-btn);
+    padding:.35rem .35rem .35rem 1.15rem;
+    box-shadow:0 4px 20px rgba(0,0,0,.08); transition:all .2s ease;
   }
-
   .hero-search-box:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15), 0 0 0 4px rgba(79, 70, 229, 0.08);
+    border-color:var(--primary);
+    box-shadow:0 4px 20px rgba(79,70,229,.15),0 0 0 4px rgba(79,70,229,.08);
   }
-
-  .hero-search-box .search-icon {
-    color: var(--text-secondary);
-    font-size: 1rem;
-    flex-shrink: 0;
-    margin-right: 0.2rem;
-  }
-
+  .hero-search-box .search-icon { color:var(--text-secondary); flex-shrink:0; margin-right:.2rem; }
   .hero-search-box input {
-    border: none;
-    outline: none;
-    flex: 1;
-    font-size: 0.97rem;
-    padding: 0.45rem 0.7rem;
-    background: transparent;
-    color: var(--text-primary);
-    font-family: inherit;
+    border:none; outline:none; flex:1;
+    font-size:.97rem; padding:.45rem .7rem;
+    background:transparent; color:var(--text-primary); font-family:inherit;
   }
-
-  .hero-search-box input::placeholder { color: var(--text-secondary); }
-
+  .hero-search-box input::placeholder { color:var(--text-secondary); }
   .hero-search-box .search-btn {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-btn);
-    padding: 0.6rem 1.5rem;
-    font-size: 0.9rem;
-    font-weight: 700;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
-    font-family: inherit;
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#fff; border:none; border-radius:var(--radius-btn);
+    padding:.6rem 1.5rem; font-size:.9rem; font-weight:700;
+    cursor:pointer; flex-shrink:0; transition:all .2s ease;
+    box-shadow:0 4px 12px rgba(79,70,229,.35); font-family:inherit;
+  }
+  .hero-search-box .search-btn:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(79,70,229,.5); }
+
+  /* ── TRUST BAND ── */
+  .trust-band {
+    background: var(--white);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 2.25rem 2rem;
+  }
+  .trust-band-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4,1fr);
+    gap: 0;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .trust-item {
+    padding: 1.5rem 1.75rem;
+    display: flex; align-items: flex-start; gap: 1rem;
+    border-right: 1px solid var(--border);
+    background: var(--white);
+    transition: background .2s ease;
+  }
+  .trust-item:last-child { border-right: none; }
+  .trust-item:hover { background: rgba(79,70,229,.025); }
+  .trust-item-icon {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .trust-item-icon.indigo { background: rgba(79,70,229,.1); color: var(--primary); }
+  .trust-item-icon.green  { background: rgba(16,185,129,.1); color: #059669; }
+  .trust-item-icon.amber  { background: rgba(245,158,11,.1); color: #d97706; }
+  .trust-item-icon.violet { background: rgba(124,58,237,.1); color: #7c3aed; }
+  .trust-item-body {}
+  .trust-item-value {
+    font-size: 1.3rem; font-weight: 800;
+    color: var(--text-primary); line-height: 1.1;
+    letter-spacing: -.02em; margin-bottom: .2rem;
+  }
+  .trust-item-label {
+    font-size: .8rem; font-weight: 600; color: var(--text-secondary);
+    line-height: 1.4;
   }
 
-  .hero-search-box .search-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.5);
+  /* ── CATEGORY STRIP ── */
+  .categories-section {
+    background: var(--bg-light);
+    padding: 3rem 2rem 3.5rem;
+    border-bottom: 1px solid var(--border);
   }
-
-  .hero-trust-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 1.75rem;
-    flex-wrap: wrap;
+  .categories-inner { max-width: 1280px; margin: 0 auto; }
+  .categories-header {
+    text-align: center; margin-bottom: 2rem;
   }
-
-  .hero-trust-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.84rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+  .categories-eyebrow {
+    font-size: .73rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .09em; color: var(--primary); margin-bottom: .4rem;
   }
-
-  .hero-trust-item .trust-icon {
-    width: 22px;
-    height: 22px;
-    background: rgba(79, 70, 229, 0.1);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--primary);
-    font-size: 0.7rem;
-    flex-shrink: 0;
+  .categories-title {
+    font-size: 1.6rem; font-weight: 800;
+    color: var(--text-primary); letter-spacing: -.02em; line-height: 1.15;
   }
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 1rem;
+  }
+  .cat-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: 16px;
+    padding: 1.25rem 1rem 1.1rem;
+    text-decoration: none; color: inherit;
+    display: flex; flex-direction: column; align-items: flex-start; gap: .55rem;
+    transition: all .22s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    position: relative; overflow: hidden;
+  }
+  .cat-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cat-color-a, var(--primary)), var(--cat-color-b, var(--secondary)));
+    opacity: 0;
+    transition: opacity .22s ease;
+  }
+  .cat-card:hover {
+    border-color: transparent;
+    box-shadow: 0 8px 28px rgba(79,70,229,.13);
+    transform: translateY(-3px);
+    color: inherit; text-decoration: none;
+  }
+  .cat-card:hover::after { opacity: 1; }
+  .cat-icon {
+    width: 48px; height: 48px; border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.55rem; flex-shrink: 0;
+  }
+  .cat-name {
+    font-size: .92rem; font-weight: 800;
+    color: var(--text-primary); line-height: 1.2;
+  }
+  .cat-desc {
+    font-size: .75rem; color: var(--text-secondary);
+    line-height: 1.45;
+  }
+  .cat-arrow {
+    margin-top: auto; padding-top: .35rem;
+    color: var(--text-secondary); font-size: .7rem; font-weight: 600;
+    display: flex; align-items: center; gap: .25rem;
+    transition: color .15s, gap .15s;
+  }
+  .cat-card:hover .cat-arrow { color: var(--primary); gap: .45rem; }
 
   /* ── MAIN CONTENT ── */
-  .mkt-content {
-    max-width: 1280px;
-    margin: 0 auto;
-    padding: 3rem 2rem 4rem;
-  }
+  .mkt-content { max-width:1280px; margin:0 auto; padding:3rem 2rem 4rem; }
 
   /* ── FILTER BAR ── */
   .filter-strip {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 2.5rem;
-    padding: 1.25rem 1.5rem;
-    background: var(--white);
-    border-radius: var(--radius-card);
-    border: 1.5px solid var(--border);
-    box-shadow: var(--shadow-sm);
+    display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:2.5rem;
+    padding:1.1rem 1.25rem;
+    background:var(--white); border-radius:var(--radius-card);
+    border:1.5px solid var(--border); box-shadow:var(--shadow-sm);
   }
-
   .filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.38rem 0.95rem;
-    border-radius: var(--radius-badge);
-    border: 1.5px solid var(--border);
-    background: var(--bg-light);
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    color: var(--text-secondary);
-    text-decoration: none;
-    transition: all 0.2s ease;
-    font-family: inherit;
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.35rem .9rem; border-radius:var(--radius-btn);
+    border:1.5px solid var(--border); background:var(--bg-light);
+    font-size:.82rem; font-weight:600; cursor:pointer;
+    color:var(--text-secondary); text-decoration:none; transition:all .2s ease; font-family:inherit;
   }
-
-  .filter-chip:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(79, 70, 229, 0.06);
-    transform: translateY(-1px);
-  }
-
+  .filter-chip:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.06); transform:translateY(-1px); }
   .filter-chip.active {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    border-color: var(--primary-dark);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    border-color:var(--primary-dark); color:#fff;
+    box-shadow:0 4px 12px rgba(79,70,229,.35);
+  }
+
+  /* ── SECTION LABELS ── */
+  .section-eyebrow {
+    font-size:.75rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--primary); margin-bottom:.3rem;
+  }
+  .section-title {
+    font-size:1.5rem; font-weight:800;
+    color:var(--text-primary); letter-spacing:-.02em; line-height:1.2;
+  }
+  .section-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem;
   }
 
   /* ── FEATURED BUSINESSES ── */
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
-  .section-eyebrow {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--primary);
-    margin-bottom: 0.3rem;
-  }
-
-  .section-title {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-  }
-
   .biz-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 1rem;
-    margin-bottom: 3.5rem;
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+    gap:1rem; margin-bottom:3.5rem;
   }
-
   .biz-card {
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-card);
-    padding: 1.25rem 0.75rem;
-    text-decoration: none;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: 0.6rem;
-    transition: all 0.25s ease;
-    box-shadow: var(--shadow-sm);
+    background:var(--white); border:1.5px solid var(--border);
+    border-radius:var(--radius-card); padding:1.25rem .75rem;
+    text-decoration:none; color:inherit;
+    display:flex; flex-direction:column; align-items:center;
+    text-align:center; gap:.6rem; transition:all .25s ease; box-shadow:var(--shadow-sm);
   }
-
-  .biz-card:hover {
-    border-color: var(--primary);
-    box-shadow: 0 8px 28px rgba(79, 70, 229, 0.15);
-    transform: translateY(-4px);
-    color: inherit;
-    text-decoration: none;
-  }
-
-  .biz-card-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    background: rgba(79, 70, 229, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.6rem;
-    flex-shrink: 0;
-  }
-
-  .biz-card-name {
-    font-weight: 700;
-    color: var(--text-primary);
-    font-size: 0.88rem;
-    line-height: 1.3;
-  }
-
-  .biz-card-count {
-    font-size: 0.73rem;
-    color: var(--text-secondary);
-    background: var(--bg-light);
-    padding: 0.15rem 0.6rem;
-    border-radius: 999px;
-  }
+  .biz-card:hover { border-color:var(--primary); box-shadow:0 8px 28px rgba(79,70,229,.15); transform:translateY(-4px); color:inherit; text-decoration:none; }
+  .biz-card-icon { width:52px; height:52px; border-radius:14px; background:rgba(79,70,229,.08); display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0; }
+  .biz-card-name { font-weight:700; color:var(--text-primary); font-size:.88rem; line-height:1.3; }
+  .biz-card-count { font-size:.73rem; color:var(--text-secondary); background:var(--bg-light); padding:.15rem .6rem; border-radius:999px; }
 
   /* ── LISTINGS SECTION ── */
-  .listings-header-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
+  .listings-header-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem; }
   .listings-count-badge {
-    display: inline-flex;
-    align-items: center;
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    background: var(--bg-light);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-badge);
-    padding: 0.2rem 0.7rem;
-    margin-left: 0.6rem;
+    display:inline-flex; align-items:center; font-size:.8rem; font-weight:600;
+    color:var(--text-secondary); background:var(--bg-light);
+    border:1.5px solid var(--border); border-radius:var(--radius-btn);
+    padding:.2rem .7rem; margin-left:.6rem;
   }
 
+  /* ── LISTING CARDS (SHOWCASE QUALITY) ── */
   .listings-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1.25rem;
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+    gap:1.4rem;
   }
-
   .listing-card {
-    background: var(--white);
-    border: 1.5px solid var(--border);
-    border-radius: var(--radius-card);
-    overflow: hidden;
-    transition: all 0.25s ease;
-    text-decoration: none;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    box-shadow: var(--shadow-sm);
+    background:var(--white); border:1.5px solid var(--border);
+    border-radius:var(--radius-card); overflow:hidden;
+    transition:all .25s ease;
+    text-decoration:none; color:inherit;
+    display:flex; flex-direction:column;
+    box-shadow:0 2px 8px rgba(0,0,0,.06);
+    position:relative;
   }
-
   .listing-card:hover {
-    border-color: var(--primary);
-    box-shadow: 0 12px 35px rgba(79, 70, 229, 0.14);
-    transform: translateY(-4px);
-    color: inherit;
-    text-decoration: none;
+    border-color:rgba(79,70,229,.35);
+    box-shadow:0 14px 40px rgba(79,70,229,.13);
+    transform:translateY(-5px);
+    color:inherit; text-decoration:none;
   }
-
+  .listing-img-wrap { position:relative; flex-shrink:0; overflow:hidden; }
   .listing-img {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    background: var(--bg-light);
-    display: block;
-    flex-shrink: 0;
+    width:100%; height:210px; object-fit:cover;
+    background:var(--bg-light); display:block;
+    transition:transform .35s ease;
   }
-
+  .listing-card:hover .listing-img { transform:scale(1.04); }
   .listing-img-placeholder {
-    width: 100%;
-    height: 200px;
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.07) 0%, rgba(16, 185, 129, 0.05) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 3.2rem;
-    flex-shrink: 0;
+    width:100%; height:210px;
+    background:linear-gradient(135deg,rgba(79,70,229,.07) 0%,rgba(16,185,129,.05) 100%);
+    display:flex; align-items:center; justify-content:center; font-size:3.5rem;
+    flex-shrink:0;
   }
-
+  .listing-vertical-badge {
+    position:absolute; top:.65rem; left:.65rem;
+    font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    color:#fff; padding:.22rem .6rem; border-radius:999px;
+    background:rgba(31,41,55,.55); backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+  }
   .listing-body {
-    padding: 1rem 1rem 1.1rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    padding:1rem 1.1rem 1.2rem; flex:1;
+    display:flex; flex-direction:column; gap:.3rem;
   }
-
   .listing-biz-tag {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--primary);
+    font-size:.67rem; font-weight:700;
+    text-transform:uppercase; letter-spacing:.06em; color:var(--primary);
   }
-
   .listing-title {
-    font-size: 0.93rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    font-size:.94rem; font-weight:700; color:var(--text-primary);
+    line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
   }
-
+  .listing-location {
+    font-size:.72rem; color:var(--text-secondary);
+    display:flex; align-items:center; gap:.25rem; margin-top:.1rem;
+  }
+  .listing-footer {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:auto; padding-top:.6rem;
+    border-top:1px solid var(--border);
+  }
   .listing-price {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    margin-top: auto;
-    padding-top: 0.45rem;
+    font-size:1.05rem; font-weight:800; color:var(--text-primary);
   }
-
   .listing-price-empty {
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    margin-top: auto;
-    padding-top: 0.45rem;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+    font-size:.8rem; color:var(--text-secondary);
+    display:flex; align-items:center; gap:.3rem;
   }
+  .listing-view-cue {
+    font-size:.72rem; font-weight:700; color:var(--primary);
+    display:flex; align-items:center; gap:.2rem;
+    opacity:0; transform:translateX(-4px);
+    transition:all .2s ease;
+  }
+  .listing-card:hover .listing-view-cue { opacity:1; transform:translateX(0); }
 
-  /* ── EMPTY STATE ── */
+  /* ── EMPTY STATE (SHOWCASE QUALITY) ── */
   .empty-state-wrap {
-    padding: 5rem 2rem;
+    padding: 5.5rem 2rem;
     text-align: center;
-    background: var(--white);
-    border: 2px dashed rgba(79, 70, 229, 0.2);
+    background: linear-gradient(135deg,rgba(79,70,229,.03) 0%,rgba(16,185,129,.025) 100%);
     border-radius: var(--radius-card);
-    box-shadow: var(--shadow-sm);
+    border: 1.5px solid rgba(79,70,229,.1);
+    box-shadow: 0 8px 32px rgba(79,70,229,.06);
   }
-
   .empty-icon-ring {
-    width: 88px;
-    height: 88px;
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.5rem;
-    margin: 0 auto 1.5rem;
-    border: 2px solid rgba(79, 70, 229, 0.12);
-  }
-
-  .empty-state-wrap h4 {
-    font-size: 1.4rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    margin-bottom: 0.6rem;
-    letter-spacing: -0.01em;
-  }
-
-  .empty-state-wrap p {
-    color: var(--text-secondary);
-    font-size: 0.97rem;
-    max-width: 420px;
+    width: 96px; height: 96px;
+    background: linear-gradient(135deg,rgba(79,70,229,.1) 0%,rgba(16,185,129,.08) 100%);
+    border-radius: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.8rem;
     margin: 0 auto 1.75rem;
-    line-height: 1.7;
+    box-shadow: 0 8px 24px rgba(79,70,229,.12);
   }
-
-  .empty-cta-row {
-    display: flex;
-    gap: 0.85rem;
-    justify-content: center;
-    flex-wrap: wrap;
+  .empty-state-wrap h4 {
+    font-size: 1.5rem; font-weight: 800;
+    color: var(--text-primary); margin-bottom: .65rem;
+    letter-spacing: -.02em;
   }
+  .empty-state-wrap p {
+    color: var(--text-secondary); font-size: .97rem;
+    max-width: 440px; margin: 0 auto 2rem; line-height: 1.7;
+  }
+  .empty-cta-row { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+  .empty-features-row {
+    display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap;
+    margin-top: 2.5rem; padding-top: 2rem;
+    border-top: 1px solid rgba(79,70,229,.1);
+  }
+  .empty-feature {
+    display: flex; align-items: center; gap: .4rem;
+    font-size: .8rem; font-weight: 600; color: var(--text-secondary);
+  }
+  .empty-feature svg { color: var(--secondary); }
 
-  /* ── PREMIUM BUTTONS ── */
+  /* ── BUTTONS ── */
   .btn-premium {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.7rem 1.6rem;
-    border-radius: var(--radius-btn);
-    font-size: 0.92rem;
-    font-weight: 700;
-    text-decoration: none;
-    cursor: pointer;
-    border: none;
-    transition: all 0.25s ease;
-    font-family: inherit;
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.75rem 1.75rem; border-radius:var(--radius-btn);
+    font-size:.93rem; font-weight:700; text-decoration:none;
+    cursor:pointer; border:none; transition:all .25s ease; font-family:inherit;
   }
-
   .btn-premium-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: #fff;
-    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+    color:#fff; box-shadow:0 4px 14px rgba(79,70,229,.4);
   }
-
-  .btn-premium-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.5);
-    color: #fff;
-    text-decoration: none;
-  }
-
+  .btn-premium-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(79,70,229,.5); color:#fff; text-decoration:none; }
   .btn-premium-outline {
-    background: var(--white);
-    color: var(--primary);
-    border: 2px solid var(--primary);
+    background:var(--white); color:var(--primary); border:2px solid var(--primary);
   }
-
-  .btn-premium-outline:hover {
-    background: var(--primary);
-    color: #fff;
-    transform: translateY(-2px);
-    text-decoration: none;
-  }
+  .btn-premium-outline:hover { background:var(--primary); color:#fff; transform:translateY(-2px); text-decoration:none; }
 
   /* ── PAGINATION ── */
-  .pager-wrap {
-    display: flex;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-top: 2.5rem;
-  }
-
+  .pager-wrap { display:flex; justify-content:center; gap:.5rem; margin-top:2.5rem; }
   .pager-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.55rem 1.2rem;
-    border-radius: var(--radius-btn);
-    border: 1.5px solid var(--border);
-    background: var(--white);
-    color: var(--text-secondary);
-    font-size: 0.86rem;
-    font-weight: 600;
-    text-decoration: none;
-    transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.55rem 1.2rem; border-radius:var(--radius-btn);
+    border:1.5px solid var(--border); background:var(--white);
+    color:var(--text-secondary); font-size:.86rem; font-weight:600;
+    text-decoration:none; transition:all .2s ease; box-shadow:var(--shadow-sm);
   }
-
-  .pager-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: rgba(79, 70, 229, 0.04);
-    transform: translateY(-1px);
-    text-decoration: none;
-  }
+  .pager-btn:hover { border-color:var(--primary); color:var(--primary); background:rgba(79,70,229,.04); transform:translateY(-1px); text-decoration:none; }
 
   /* ── FOOTER ── */
   .mkt-footer {
-    background: var(--text-primary);
-    color: rgba(255, 255, 255, 0.85);
-    padding: 3rem 2rem 2rem;
-    margin-top: 5rem;
+    background:var(--text-primary); color:rgba(255,255,255,.85);
+    padding:3rem 2rem 2rem; margin-top:5rem;
   }
-
-  .mkt-footer-inner {
-    max-width: 1280px;
-    margin: 0 auto;
-  }
-
+  .mkt-footer-inner { max-width:1280px; margin:0 auto; }
   .footer-brand-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1.5rem;
-    padding-bottom: 2rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 2rem;
+    display:flex; align-items:center; justify-content:space-between;
+    flex-wrap:wrap; gap:1.5rem;
+    padding-bottom:2rem; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:2rem;
   }
-
-  .footer-brand-name {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #fff;
-    margin-bottom: 0.25rem;
-  }
-
-  .footer-brand-tagline {
-    font-size: 0.82rem;
-    color: rgba(255, 255, 255, 0.5);
-  }
-
-  .footer-links {
-    display: flex;
-    gap: 1.5rem;
-    flex-wrap: wrap;
-  }
-
-  .footer-links a {
-    color: rgba(255, 255, 255, 0.65);
-    text-decoration: none;
-    font-size: 0.85rem;
-    font-weight: 600;
-    transition: color 0.2s;
-  }
-
-  .footer-links a:hover { color: #fff; }
-
-  .footer-bottom {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .footer-copy {
-    font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.4);
-  }
+  .footer-brand-name { font-size:1.1rem; font-weight:800; color:#fff; margin-bottom:.25rem; }
+  .footer-brand-tagline { font-size:.82rem; color:rgba(255,255,255,.5); }
+  .footer-links { display:flex; gap:1.5rem; flex-wrap:wrap; }
+  .footer-links a { color:rgba(255,255,255,.65); text-decoration:none; font-size:.85rem; font-weight:600; transition:color .2s; }
+  .footer-links a:hover { color:#fff; }
+  .footer-bottom { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem; }
+  .footer-copy { font-size:.78rem; color:rgba(255,255,255,.4); }
 
   /* ── RESPONSIVE ── */
-  @media (max-width: 768px) {
-    .mkt-navbar-inner { padding: 0.8rem 1.25rem; }
-    .mkt-hero { padding: 4rem 1.25rem 3.5rem; }
-    .hero-subtitle { font-size: 1rem; }
-    .mkt-content { padding: 2rem 1.25rem 3rem; }
-    .filter-strip { padding: 1rem 1rem; }
-    .listings-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.9rem; }
-    .biz-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.75rem; }
-    .hero-trust-row { gap: 1.1rem; }
+  @media (max-width:1024px) {
+    .trust-band-inner { grid-template-columns:repeat(2,1fr); }
+    .trust-item:nth-child(2) { border-right:none; }
+    .trust-item:nth-child(3) { border-top:1px solid var(--border); border-right:1px solid var(--border); }
+    .trust-item:nth-child(4) { border-top:1px solid var(--border); }
+    .categories-grid { grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); }
   }
-
-  @media (max-width: 480px) {
-    .mkt-brand-sub { display: none; }
-    .hero-title { font-size: 2rem; }
-    .hero-search-box .search-btn { padding: 0.55rem 1.1rem; font-size: 0.85rem; }
-    .listings-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-    .biz-grid { grid-template-columns: repeat(3, 1fr); }
-    .footer-brand-row { flex-direction: column; }
-    .footer-bottom { flex-direction: column; text-align: center; }
+  @media (max-width:768px) {
+    .mkt-navbar-inner { padding:.8rem 1.25rem; }
+    .mkt-hero { padding:4rem 1.25rem 3.5rem; }
+    .hero-subtitle { font-size:1rem; }
+    .trust-band { padding:1.5rem 1.25rem; }
+    .trust-band-inner { grid-template-columns:repeat(2,1fr); border-radius:14px; }
+    .trust-item { padding:1.1rem 1.25rem; }
+    .categories-section { padding:2.25rem 1.25rem 2.5rem; }
+    .categories-grid { grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:.8rem; }
+    .mkt-content { padding:2rem 1.25rem 3rem; }
+    .filter-strip { padding:.9rem 1rem; }
+    .listings-grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:1rem; }
+    .biz-grid { grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:.75rem; }
+  }
+  @media (max-width:480px) {
+    .mkt-brand-sub { display:none; }
+    .hero-title { font-size:2rem; }
+    .hero-search-box .search-btn { padding:.55rem 1.1rem; font-size:.85rem; }
+    .trust-band-inner { grid-template-columns:1fr 1fr; border-radius:12px; }
+    .trust-item { padding:.9rem 1rem; }
+    .trust-item-value { font-size:1.1rem; }
+    .categories-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
+    .listings-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
+    .listing-img, .listing-img-placeholder { height:160px; }
+    .biz-grid { grid-template-columns:repeat(3,1fr); }
+    .footer-brand-row { flex-direction:column; }
+    .footer-bottom { flex-direction:column; text-align:center; }
+    .empty-features-row { gap:1rem; }
   }
 </style>
 </head>
@@ -800,16 +563,13 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
       Africa's Business Marketplace
     </div>
-
     <h1 class="hero-title">
       Discover <span class="highlight">Local Products</span><br>
       &amp; Services
     </h1>
-
     <p class="hero-subtitle">
       From farms &amp; phones to cars, fashion, gyms &amp; more — find trusted African businesses in one beautiful place.
     </p>
-
     <div class="hero-search-wrap">
       <form class="hero-search-box" method="get">
         <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -818,26 +578,150 @@
         <button type="submit" class="search-btn">Search</button>
       </form>
     </div>
+  </div>
+</section>
 
-    <div class="hero-trust-row">
-      <div class="hero-trust-item">
-        <div class="trust-icon">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        </div>
-        Verified businesses
+<!-- ── TRUST BAND ── -->
+<section class="trust-band" data-testid="trust-band">
+  <div class="trust-band-inner">
+    <div class="trust-item">
+      <div class="trust-item-icon indigo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
-      <div class="hero-trust-item">
-        <div class="trust-icon">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-        </div>
-        Africa-wide
+      <div class="trust-item-body">
+        <div class="trust-item-value">Verified Sellers</div>
+        <div class="trust-item-label">Every business is KYC-checked &amp; accountable</div>
       </div>
-      <div class="hero-trust-item">
-        <div class="trust-icon">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
-        </div>
-        Trusted platform
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon green">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
       </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">9+ Verticals</div>
+        <div class="trust-item-label">Phones, farms, gyms, cars &amp; more categories</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon amber">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">Africa-First</div>
+        <div class="trust-item-label">Built for African SMEs, priced for African markets</div>
+      </div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-item-icon violet">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      </div>
+      <div class="trust-item-body">
+        <div class="trust-item-value">Mobile-Ready</div>
+        <div class="trust-item-label">Buy and sell from any device, anywhere in Africa</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CATEGORIES STRIP ── -->
+<section class="categories-section" data-testid="categories-section">
+  <div class="categories-inner">
+    <div class="categories-header">
+      <div class="categories-eyebrow">Explore</div>
+      <div class="categories-title">Browse by Business Type</div>
+    </div>
+    <div class="categories-grid">
+
+      <a href="/marketplace/?vertical=phones" class="cat-card" style="--cat-color-a:#4f46e5;--cat-color-b:#7c3aed;">
+        <div class="cat-icon" style="background:rgba(79,70,229,.1);">📱</div>
+        <div class="cat-name">Phones &amp; Electronics</div>
+        <div class="cat-desc">Latest handsets, accessories &amp; gadgets</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=clothing" class="cat-card" style="--cat-color-a:#ec4899;--cat-color-b:#f43f5e;">
+        <div class="cat-icon" style="background:rgba(236,72,153,.1);">👕</div>
+        <div class="cat-name">Fashion &amp; Clothing</div>
+        <div class="cat-desc">Apparel, shoes &amp; accessories</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=farm" class="cat-card" style="--cat-color-a:#16a34a;--cat-color-b:#10b981;">
+        <div class="cat-icon" style="background:rgba(22,163,74,.1);">🌾</div>
+        <div class="cat-name">Farm &amp; Agriculture</div>
+        <div class="cat-desc">Fresh produce, livestock &amp; supplies</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=gym" class="cat-card" style="--cat-color-a:#f97316;--cat-color-b:#ef4444;">
+        <div class="cat-icon" style="background:rgba(249,115,22,.1);">🏋️</div>
+        <div class="cat-name">Gym &amp; Fitness</div>
+        <div class="cat-desc">Memberships, classes &amp; equipment</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=car_dealer" class="cat-card" style="--cat-color-a:#0ea5e9;--cat-color-b:#6366f1;">
+        <div class="cat-icon" style="background:rgba(14,165,233,.1);">🏎️</div>
+        <div class="cat-name">Cars for Sale</div>
+        <div class="cat-desc">New &amp; pre-owned vehicles</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=car_hire" class="cat-card" style="--cat-color-a:#6366f1;--cat-color-b:#0ea5e9;">
+        <div class="cat-icon" style="background:rgba(99,102,241,.1);">🚗</div>
+        <div class="cat-name">Car Hire</div>
+        <div class="cat-desc">Daily &amp; long-term vehicle rental</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=pharmacy" class="cat-card" style="--cat-color-a:#10b981;--cat-color-b:#06b6d4;">
+        <div class="cat-icon" style="background:rgba(16,185,129,.1);">💊</div>
+        <div class="cat-name">Pharmacy &amp; Health</div>
+        <div class="cat-desc">Medicine, wellness &amp; care products</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=liquor" class="cat-card" style="--cat-color-a:#f59e0b;--cat-color-b:#d97706;">
+        <div class="cat-icon" style="background:rgba(245,158,11,.1);">🍺</div>
+        <div class="cat-name">Liquor &amp; Bar</div>
+        <div class="cat-desc">Spirits, beers, wines &amp; mixers</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
+      <a href="/marketplace/?vertical=hardware" class="cat-card" style="--cat-color-a:#64748b;--cat-color-b:#475569;">
+        <div class="cat-icon" style="background:rgba(100,116,139,.1);">🔧</div>
+        <div class="cat-name">Hardware &amp; Tools</div>
+        <div class="cat-desc">Building supplies &amp; equipment</div>
+        <div class="cat-arrow">
+          Explore
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </div>
+      </a>
+
     </div>
   </div>
 </section>
@@ -881,7 +765,7 @@
       <div class="section-title">Featured on Marketplace</div>
     </div>
   </div>
-  <div class="biz-grid mb-5">
+  <div class="biz-grid" style="margin-bottom:3.5rem;">
     {% for biz in featured_businesses %}
     <a href="/marketplace/{{ biz.slug }}/" class="biz-card">
       {% if biz.logo %}
@@ -931,34 +815,55 @@
   <div class="listings-grid">
     {% for listing in page_obj %}
     <a href="/marketplace/{{ listing.business.slug }}/{{ listing.listing_slug }}/" class="listing-card">
-      {% with primary=listing.primary_image %}
-      {% if primary %}
-        <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
-      {% elif listing.media_file %}
-        <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
-      {% else %}
-        <div class="listing-img-placeholder">
-          {% if listing.vertical == "phones" %}📱
-          {% elif listing.vertical == "car_dealer" %}🏎️
-          {% elif listing.vertical == "clothing" %}👕
-          {% elif listing.vertical == "farm" %}🌾
-          {% elif listing.vertical == "gym" %}🏋️
-          {% elif listing.vertical == "pharmacy" %}💊
-          {% else %}📦{% endif %}
-        </div>
-      {% endif %}
-      {% endwith %}
+      <div class="listing-img-wrap">
+        {% with primary=listing.primary_image %}
+        {% if primary %}
+          <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
+        {% elif listing.media_file %}
+          <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
+        {% else %}
+          <div class="listing-img-placeholder">
+            {% if listing.vertical == "phones" %}📱
+            {% elif listing.vertical == "car_dealer" %}🏎️
+            {% elif listing.vertical == "clothing" %}👕
+            {% elif listing.vertical == "farm" %}🌾
+            {% elif listing.vertical == "gym" %}🏋️
+            {% elif listing.vertical == "pharmacy" %}💊
+            {% else %}📦{% endif %}
+          </div>
+        {% endif %}
+        {% endwith %}
+        {% if listing.vertical %}
+        <span class="listing-vertical-badge">
+          {% if listing.vertical == "car_dealer" %}Cars
+          {% elif listing.vertical == "car_hire" %}Car Hire
+          {% else %}{{ listing.vertical|capfirst }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
       <div class="listing-body">
         <div class="listing-biz-tag">{{ listing.business.name }}</div>
         <div class="listing-title">{{ listing.title }}</div>
-        {% if listing.price %}
-          <div class="listing-price">{{ listing.business.currency }} {{ listing.price|floatformat:0 }}</div>
-        {% else %}
-          <div class="listing-price-empty">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            Contact for price
+        {% if listing.location_text %}
+          <div class="listing-location">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {{ listing.location_text }}
           </div>
         {% endif %}
+        <div class="listing-footer">
+          {% if listing.price %}
+            <div class="listing-price">{{ listing.business.currency }} {{ listing.price|floatformat:0 }}</div>
+          {% else %}
+            <div class="listing-price-empty">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Contact for price
+            </div>
+          {% endif %}
+          <div class="listing-view-cue">
+            View
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+          </div>
+        </div>
       </div>
     </a>
     {% endfor %}
@@ -983,20 +888,20 @@
   {% endif %}
 
   {% else %}
-  <!-- Empty state -->
-  <div class="empty-state-wrap">
+  <!-- Empty state (showcase quality) -->
+  <div class="empty-state-wrap" data-testid="empty-state">
     <div class="empty-icon-ring">
       {% if search_q %}🔍{% elif vertical_filter %}📦{% else %}🛍️{% endif %}
     </div>
     {% if search_q %}
       <h4>No results for "{{ search_q }}"</h4>
-      <p>Try a different search term or explore all categories below. New businesses join Emajinet Marketplace every week.</p>
+      <p>Try a different search term or explore all business categories. New businesses join Emajinet Marketplace every week.</p>
     {% elif vertical_filter %}
-      <h4>No listings in this category yet</h4>
-      <p>Be the first to list in this category and reach thousands of customers across Africa.</p>
+      <h4>Be first in this category</h4>
+      <p>No listings yet — this is your opportunity to be the first in this space and reach customers across Africa.</p>
     {% else %}
-      <h4>The marketplace is just getting started</h4>
-      <p>Be among the first to list your business on Emajinet and connect with customers across Africa.</p>
+      <h4>The marketplace is opening up</h4>
+      <p>You're early. Be among the first businesses on Emajinet Marketplace and build your customer base from the ground up.</p>
     {% endif %}
     <div class="empty-cta-row">
       <a href="/marketplace/" class="btn-premium btn-premium-outline">Browse All</a>
@@ -1004,6 +909,20 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         List Your Business
       </a>
+    </div>
+    <div class="empty-features-row">
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Free to list
+      </div>
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Africa-wide reach
+      </div>
+      <div class="empty-feature">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        Mobile-ready storefront
+      </div>
     </div>
   </div>
   {% endif %}
