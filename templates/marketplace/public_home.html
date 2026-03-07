@@ -2,179 +2,1035 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Emajinet Marketplace – Browse Local Businesses</title>
-<meta name="description" content="Discover quality products and services from local African businesses on Emajinet Marketplace.">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emajinet Marketplace – Discover Local Businesses Across Africa</title>
+<meta name="description" content="Discover quality products and services from verified local African businesses on Emajinet Marketplace. From phones to farms, find trusted sellers near you.">
+<link rel="icon" href="/static/favicon.ico">
 {% load static %}
 <style>
-  :root{--brand:#4f46e5;--brand-light:#eef2ff;}
-  body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:#f8fafc;}
-  .mkt-hero{background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);color:#fff;padding:3.5rem 0 2.5rem;}
-  .mkt-hero h1{font-size:2.2rem;font-weight:800;line-height:1.2;}
-  .mkt-hero p{opacity:.8;font-size:1.05rem;}
-  .search-bar{background:#fff;border-radius:16px;padding:.5rem .75rem;display:flex;gap:.5rem;max-width:600px;margin:1.5rem auto 0;}
-  .search-bar input{border:none;outline:none;flex:1;font-size:.95rem;}
-  .search-bar button{background:var(--brand);color:#fff;border:none;border-radius:10px;padding:.5rem 1.2rem;font-weight:700;cursor:pointer;}
-  .filter-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.5rem;}
-  .filter-btn{padding:.35rem .8rem;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;font-size:.8rem;font-weight:600;cursor:pointer;color:#64748b;text-decoration:none;}
-  .filter-btn.active{background:var(--brand);border-color:var(--brand);color:#fff;}
-  .listing-card{border-radius:16px;overflow:hidden;background:#fff;border:1.5px solid #e2e8f0;transition:transform .15s,box-shadow .15s;text-decoration:none;color:inherit;display:block;}
-  .listing-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,.1);border-color:var(--brand);}
-  .listing-img{width:100%;height:200px;object-fit:cover;background:#f1f5f9;}
-  .listing-img-placeholder{width:100%;height:200px;background:linear-gradient(135deg,#e0e7ff,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:3rem;}
-  .listing-body{padding:1rem;}
-  .listing-biz{font-size:.75rem;color:#6366f1;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
-  .listing-title{font-size:1rem;font-weight:700;color:#0f172a;margin:.25rem 0;}
-  .listing-price{font-size:1.1rem;font-weight:800;color:#0f172a;}
-  .listing-price-empty{font-size:.85rem;color:#64748b;}
-  .biz-card{border-radius:16px;background:#fff;border:1.5px solid #e2e8f0;padding:1.25rem;text-decoration:none;color:inherit;transition:all .15s;display:block;}
-  .biz-card:hover{border-color:var(--brand);box-shadow:0 8px 24px rgba(0,0,0,.08);}
-  .biz-name{font-weight:700;color:#0f172a;font-size:.95rem;}
-  .biz-count{font-size:.8rem;color:#64748b;}
-  .mkt-footer{text-align:center;padding:3rem 0 1.5rem;color:#94a3b8;font-size:.8rem;}
-  @media(max-width:576px){.mkt-hero h1{font-size:1.6rem;}}
+  :root {
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --secondary: #10b981;
+    --text-primary: #1f2937;
+    --text-secondary: #6b7280;
+    --bg-light: #f9fafb;
+    --white: #ffffff;
+    --border: #e5e7eb;
+    --border-light: rgba(79, 70, 229, 0.12);
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.13);
+    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
+    --radius-card: 20px;
+    --radius-btn: 100px;
+    --radius-badge: 100px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--white);
+    overflow-x: hidden;
+  }
+
+  /* ── NAVBAR ── */
+  .mkt-navbar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 2px 16px rgba(0, 0, 0, 0.06);
+    border-bottom: 1px solid rgba(229, 231, 235, 0.8);
+  }
+
+  .mkt-navbar-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0.9rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .mkt-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    text-decoration: none;
+  }
+
+  .mkt-brand-icon {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 1rem;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    flex-shrink: 0;
+  }
+
+  .mkt-brand-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--primary);
+    letter-spacing: -0.01em;
+  }
+
+  .mkt-brand-sub {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-top: -3px;
+  }
+
+  .mkt-nav-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .btn-nav-ghost {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-btn);
+    padding: 0.45rem 1.1rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .btn-nav-ghost:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(79, 70, 229, 0.04);
+  }
+
+  .btn-nav-cta {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.92), rgba(67, 56, 202, 0.97));
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-btn);
+    padding: 0.45rem 1.2rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  }
+
+  .btn-nav-cta:hover {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.5);
+    color: #fff;
+    text-decoration: none;
+  }
+
+  /* ── HERO ── */
+  .mkt-hero {
+    padding: 5.5rem 2rem 4.5rem;
+    background: linear-gradient(135deg, #f9fafb 0%, #e0e7ff 55%, #f0fdf4 100%);
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+
+  .mkt-hero::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -15%;
+    width: 700px;
+    height: 700px;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.07) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .mkt-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.06) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    max-width: 780px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--primary);
+    background: rgba(79, 70, 229, 0.08);
+    border: 1.5px solid rgba(79, 70, 229, 0.2);
+    border-radius: var(--radius-badge);
+    padding: 0.3rem 0.95rem;
+    margin-bottom: 1.4rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .hero-title {
+    font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    color: var(--text-primary);
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.02em;
+  }
+
+  .hero-title .highlight {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-subtitle {
+    font-size: 1.15rem;
+    color: var(--text-secondary);
+    max-width: 580px;
+    margin: 0 auto 2.25rem;
+    line-height: 1.75;
+  }
+
+  /* ── SEARCH ── */
+  .hero-search-wrap {
+    max-width: 580px;
+    margin: 0 auto 1.75rem;
+  }
+
+  .hero-search-box {
+    display: flex;
+    align-items: center;
+    background: var(--white);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-btn);
+    padding: 0.35rem 0.35rem 0.35rem 1.15rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.2s ease;
+  }
+
+  .hero-search-box:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 4px 20px rgba(79, 70, 229, 0.15), 0 0 0 4px rgba(79, 70, 229, 0.08);
+  }
+
+  .hero-search-box .search-icon {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-right: 0.2rem;
+  }
+
+  .hero-search-box input {
+    border: none;
+    outline: none;
+    flex: 1;
+    font-size: 0.97rem;
+    padding: 0.45rem 0.7rem;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: inherit;
+  }
+
+  .hero-search-box input::placeholder { color: var(--text-secondary); }
+
+  .hero-search-box .search-btn {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-btn);
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    font-family: inherit;
+  }
+
+  .hero-search-box .search-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(79, 70, 229, 0.5);
+  }
+
+  .hero-trust-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.75rem;
+    flex-wrap: wrap;
+  }
+
+  .hero-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  .hero-trust-item .trust-icon {
+    width: 22px;
+    height: 22px;
+    background: rgba(79, 70, 229, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+  }
+
+  /* ── MAIN CONTENT ── */
+  .mkt-content {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 3rem 2rem 4rem;
+  }
+
+  /* ── FILTER BAR ── */
+  .filter-strip {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 2.5rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--white);
+    border-radius: var(--radius-card);
+    border: 1.5px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.38rem 0.95rem;
+    border-radius: var(--radius-badge);
+    border: 1.5px solid var(--border);
+    background: var(--bg-light);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+  }
+
+  .filter-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(79, 70, 229, 0.06);
+    transform: translateY(-1px);
+  }
+
+  .filter-chip.active {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    border-color: var(--primary-dark);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+  }
+
+  /* ── FEATURED BUSINESSES ── */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .section-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary);
+    margin-bottom: 0.3rem;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .biz-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .biz-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 1.25rem 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.6rem;
+    transition: all 0.25s ease;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .biz-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 8px 28px rgba(79, 70, 229, 0.15);
+    transform: translateY(-4px);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .biz-card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(79, 70, 229, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+  }
+
+  .biz-card-name {
+    font-weight: 700;
+    color: var(--text-primary);
+    font-size: 0.88rem;
+    line-height: 1.3;
+  }
+
+  .biz-card-count {
+    font-size: 0.73rem;
+    color: var(--text-secondary);
+    background: var(--bg-light);
+    padding: 0.15rem 0.6rem;
+    border-radius: 999px;
+  }
+
+  /* ── LISTINGS SECTION ── */
+  .listings-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .listings-count-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-light);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-badge);
+    padding: 0.2rem 0.7rem;
+    margin-left: 0.6rem;
+  }
+
+  .listings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+  }
+
+  .listing-card {
+    background: var(--white);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    transition: all 0.25s ease;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .listing-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 12px 35px rgba(79, 70, 229, 0.14);
+    transform: translateY(-4px);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .listing-img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    background: var(--bg-light);
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .listing-img-placeholder {
+    width: 100%;
+    height: 200px;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.07) 0%, rgba(16, 185, 129, 0.05) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.2rem;
+    flex-shrink: 0;
+  }
+
+  .listing-body {
+    padding: 1rem 1rem 1.1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .listing-biz-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--primary);
+  }
+
+  .listing-title {
+    font-size: 0.93rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .listing-price {
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-top: auto;
+    padding-top: 0.45rem;
+  }
+
+  .listing-price-empty {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: auto;
+    padding-top: 0.45rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state-wrap {
+    padding: 5rem 2rem;
+    text-align: center;
+    background: var(--white);
+    border: 2px dashed rgba(79, 70, 229, 0.2);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .empty-icon-ring {
+    width: 88px;
+    height: 88px;
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.1) 0%, rgba(16, 185, 129, 0.08) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    margin: 0 auto 1.5rem;
+    border: 2px solid rgba(79, 70, 229, 0.12);
+  }
+
+  .empty-state-wrap h4 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 0.6rem;
+    letter-spacing: -0.01em;
+  }
+
+  .empty-state-wrap p {
+    color: var(--text-secondary);
+    font-size: 0.97rem;
+    max-width: 420px;
+    margin: 0 auto 1.75rem;
+    line-height: 1.7;
+  }
+
+  .empty-cta-row {
+    display: flex;
+    gap: 0.85rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  /* ── PREMIUM BUTTONS ── */
+  .btn-premium {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.7rem 1.6rem;
+    border-radius: var(--radius-btn);
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: all 0.25s ease;
+    font-family: inherit;
+  }
+
+  .btn-premium-primary {
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  }
+
+  .btn-premium-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(79, 70, 229, 0.5);
+    color: #fff;
+    text-decoration: none;
+  }
+
+  .btn-premium-outline {
+    background: var(--white);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+  }
+
+  .btn-premium-outline:hover {
+    background: var(--primary);
+    color: #fff;
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+
+  /* ── PAGINATION ── */
+  .pager-wrap {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2.5rem;
+  }
+
+  .pager-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.2rem;
+    border-radius: var(--radius-btn);
+    border: 1.5px solid var(--border);
+    background: var(--white);
+    color: var(--text-secondary);
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .pager-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: rgba(79, 70, 229, 0.04);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+
+  /* ── FOOTER ── */
+  .mkt-footer {
+    background: var(--text-primary);
+    color: rgba(255, 255, 255, 0.85);
+    padding: 3rem 2rem 2rem;
+    margin-top: 5rem;
+  }
+
+  .mkt-footer-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .footer-brand-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 2rem;
+  }
+
+  .footer-brand-name {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.25rem;
+  }
+
+  .footer-brand-tagline {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-links a {
+    color: rgba(255, 255, 255, 0.65);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: color 0.2s;
+  }
+
+  .footer-links a:hover { color: #fff; }
+
+  .footer-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .footer-copy {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    .mkt-navbar-inner { padding: 0.8rem 1.25rem; }
+    .mkt-hero { padding: 4rem 1.25rem 3.5rem; }
+    .hero-subtitle { font-size: 1rem; }
+    .mkt-content { padding: 2rem 1.25rem 3rem; }
+    .filter-strip { padding: 1rem 1rem; }
+    .listings-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.9rem; }
+    .biz-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.75rem; }
+    .hero-trust-row { gap: 1.1rem; }
+  }
+
+  @media (max-width: 480px) {
+    .mkt-brand-sub { display: none; }
+    .hero-title { font-size: 2rem; }
+    .hero-search-box .search-btn { padding: 0.55rem 1.1rem; font-size: 0.85rem; }
+    .listings-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .biz-grid { grid-template-columns: repeat(3, 1fr); }
+    .footer-brand-row { flex-direction: column; }
+    .footer-bottom { flex-direction: column; text-align: center; }
+  }
 </style>
 </head>
 <body>
 
-{# Navigation #}
-<nav class="navbar navbar-dark px-3 py-2" style="background:#0f172a;">
-  <a class="navbar-brand fw-bold" href="/marketplace/">🛒 Emajinet Marketplace</a>
-  <div class="d-flex gap-2">
-    <a href="/accounts/login/" class="btn btn-outline-light btn-sm rounded-pill">Sign In</a>
-    <a href="/accounts/signup/wizard/" class="btn btn-primary btn-sm rounded-pill">List Your Business</a>
+<!-- Navigation -->
+<nav class="mkt-navbar">
+  <div class="mkt-navbar-inner">
+    <a class="mkt-brand" href="/marketplace/">
+      <div class="mkt-brand-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      <div>
+        <div class="mkt-brand-name">Emajinet</div>
+        <div class="mkt-brand-sub">Marketplace</div>
+      </div>
+    </a>
+    <div class="mkt-nav-actions">
+      <a href="{% url 'accounts:login' %}" class="btn-nav-ghost">Sign In</a>
+      <a href="{% url 'accounts:signup' %}" class="btn-nav-cta">List Your Business</a>
+    </div>
   </div>
 </nav>
 
-{# Hero #}
-<div class="mkt-hero">
-  <div class="container text-center">
-    <h1>Discover Local Products &amp; Services</h1>
-    <p>From phones &amp; electronics to farm produce, cars, fashion &amp; more — all in one marketplace.</p>
-    <form class="search-bar shadow-sm" method="get">
-      <i class="bi bi-search text-muted"></i>
-      <input type="text" name="q" value="{{ search_q }}" placeholder="Search listings, businesses...">
-      {% if vertical_filter %}<input type="hidden" name="vertical" value="{{ vertical_filter }}">{% endif %}
-      <button type="submit">Search</button>
-    </form>
-  </div>
-</div>
-
-<div class="container py-4">
-
-  {# Vertical filters #}
-  {% if available_verticals %}
-  <div class="filter-bar mb-4">
-    <a href="/marketplace/" class="filter-btn {% if not vertical_filter %}active{% endif %}">All</a>
-    {% for v in available_verticals %}
-      <a href="/marketplace/?vertical={{ v }}" class="filter-btn {% if vertical_filter == v %}active{% endif %}">
-        {% if v == "phones" %}📱{% elif v == "liquor" %}🍺{% elif v == "grocery" %}🛒
-        {% elif v == "clothing" %}👕{% elif v == "gym" %}🏋️{% elif v == "farm" %}🌾
-        {% elif v == "car_dealer" %}🏎️{% elif v == "car_hire" %}🚗{% elif v == "pharmacy" %}💊
-        {% elif v == "hardware" %}🔧{% else %}📦{% endif %}
-        {% if v == "car_dealer" %}Car Dealer{% elif v == "car_hire" %}Car Hire{% else %}{{ v|capfirst|cut:"_" }}{% endif %}
-      </a>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {# Featured businesses #}
-  {% if featured_businesses and not search_q and not vertical_filter %}
-  <h5 class="fw-bold mb-3" style="color:#0f172a;">
-    <i class="bi bi-shop me-2 text-primary"></i>Featured Businesses
-  </h5>
-  <div class="row g-3 mb-5">
-    {% for biz in featured_businesses %}
-    <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-      <a href="/marketplace/{{ biz.slug }}/" class="biz-card h-100 text-center">
-        {% if biz.logo %}<img src="{{ biz.logo.url }}" alt="{{ biz.name }}" class="rounded-circle mb-2" width="48" height="48" style="object-fit:cover;">
-        {% else %}<div class="mx-auto mb-2 rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;background:#e0e7ff;font-size:1.4rem;">
-          {% if biz.business_kind == "phones" %}📱{% elif biz.business_kind == "liquor" %}🍺
-          {% elif biz.business_kind == "car_dealer" %}🏎️{% elif biz.business_kind == "farm" %}🌾
-          {% elif biz.business_kind == "clothing" %}👕{% elif biz.business_kind == "gym" %}🏋️
-          {% else %}🏪{% endif %}
-        </div>{% endif %}
-        <div class="biz-name">{{ biz.name }}</div>
-        <div class="biz-count">{{ biz.listing_count }} listing{{ biz.listing_count|pluralize }}</div>
-      </a>
+<!-- Hero -->
+<section class="mkt-hero">
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+      Africa's Business Marketplace
     </div>
+
+    <h1 class="hero-title">
+      Discover <span class="highlight">Local Products</span><br>
+      &amp; Services
+    </h1>
+
+    <p class="hero-subtitle">
+      From farms &amp; phones to cars, fashion, gyms &amp; more — find trusted African businesses in one beautiful place.
+    </p>
+
+    <div class="hero-search-wrap">
+      <form class="hero-search-box" method="get">
+        <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" name="q" value="{{ search_q }}" placeholder="Search listings, businesses…" autocomplete="off">
+        {% if vertical_filter %}<input type="hidden" name="vertical" value="{{ vertical_filter }}">{% endif %}
+        <button type="submit" class="search-btn">Search</button>
+      </form>
+    </div>
+
+    <div class="hero-trust-row">
+      <div class="hero-trust-item">
+        <div class="trust-icon">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        Verified businesses
+      </div>
+      <div class="hero-trust-item">
+        <div class="trust-icon">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        Africa-wide
+      </div>
+      <div class="hero-trust-item">
+        <div class="trust-icon">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>
+        </div>
+        Trusted platform
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main content -->
+<main class="mkt-content">
+
+  <!-- Vertical filter chips -->
+  {% if available_verticals %}
+  <div class="filter-strip">
+    <a href="/marketplace/" class="filter-chip {% if not vertical_filter %}active{% endif %}">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      All
+    </a>
+    {% for v in available_verticals %}
+      <a href="/marketplace/?vertical={{ v }}" class="filter-chip {% if vertical_filter == v %}active{% endif %}">
+        {% if v == "phones" %}📱
+        {% elif v == "liquor" %}🍺
+        {% elif v == "grocery" %}🛒
+        {% elif v == "clothing" %}👕
+        {% elif v == "gym" %}🏋️
+        {% elif v == "farm" %}🌾
+        {% elif v == "car_dealer" %}🏎️
+        {% elif v == "car_hire" %}🚗
+        {% elif v == "pharmacy" %}💊
+        {% elif v == "hardware" %}🔧
+        {% else %}📦{% endif %}
+        {% if v == "car_dealer" %}Car Dealer
+        {% elif v == "car_hire" %}Car Hire
+        {% else %}{{ v|capfirst }}{% endif %}
+      </a>
     {% endfor %}
   </div>
   {% endif %}
 
-  {# Listings grid #}
-  <h5 class="fw-bold mb-3" style="color:#0f172a;">
-    <i class="bi bi-grid me-2 text-primary"></i>
-    {% if search_q %}Results for "{{ search_q }}"
-    {% elif vertical_filter %}{% if vertical_filter == "car_dealer" %}Car Dealer{% elif vertical_filter == "car_hire" %}Car Hire{% else %}{{ vertical_filter|capfirst }}{% endif %} Listings
-    {% else %}Latest Listings{% endif %}
-    <small class="text-muted fw-normal">({{ page_obj.paginator.count }})</small>
-  </h5>
+  <!-- Featured Businesses -->
+  {% if featured_businesses and not search_q and not vertical_filter %}
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Top Businesses</div>
+      <div class="section-title">Featured on Marketplace</div>
+    </div>
+  </div>
+  <div class="biz-grid mb-5">
+    {% for biz in featured_businesses %}
+    <a href="/marketplace/{{ biz.slug }}/" class="biz-card">
+      {% if biz.logo %}
+        <img src="{{ biz.logo.url }}" alt="{{ biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
+      {% else %}
+        <div class="biz-card-icon">
+          {% if biz.business_kind == "phones" %}📱
+          {% elif biz.business_kind == "liquor" %}🍺
+          {% elif biz.business_kind == "car_dealer" %}🏎️
+          {% elif biz.business_kind == "farm" %}🌾
+          {% elif biz.business_kind == "clothing" %}👕
+          {% elif biz.business_kind == "gym" %}🏋️
+          {% elif biz.business_kind == "pharmacy" %}💊
+          {% else %}🏪{% endif %}
+        </div>
+      {% endif %}
+      <div class="biz-card-name">{{ biz.name }}</div>
+      <div class="biz-card-count">{{ biz.listing_count }} listing{{ biz.listing_count|pluralize }}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Listings heading -->
+  <div class="listings-header-bar">
+    <div>
+      <div class="section-eyebrow">Browse</div>
+      <div class="section-title" style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+        {% if search_q %}Results for "{{ search_q }}"
+        {% elif vertical_filter %}
+          {% if vertical_filter == "car_dealer" %}Car Dealer
+          {% elif vertical_filter == "car_hire" %}Car Hire
+          {% else %}{{ vertical_filter|capfirst }}{% endif %} Listings
+        {% else %}Latest Listings{% endif %}
+        <span class="listings-count-badge">{{ page_obj.paginator.count }}</span>
+      </div>
+    </div>
+    {% if vertical_filter or search_q %}
+    <a href="/marketplace/" class="filter-chip" style="align-self:flex-end;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Clear filter
+    </a>
+    {% endif %}
+  </div>
 
   {% if page_obj.object_list %}
-  <div class="row g-3">
+  <div class="listings-grid">
     {% for listing in page_obj %}
-    <div class="col-6 col-sm-4 col-md-3">
-      <a href="/marketplace/{{ listing.business.slug }}/{{ listing.listing_slug }}/" class="listing-card h-100">
-        {% with primary=listing.primary_image %}
-        {% if primary %}
-          <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
-        {% elif listing.media_file %}
-          <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
+    <a href="/marketplace/{{ listing.business.slug }}/{{ listing.listing_slug }}/" class="listing-card">
+      {% with primary=listing.primary_image %}
+      {% if primary %}
+        <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
+      {% elif listing.media_file %}
+        <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
+      {% else %}
+        <div class="listing-img-placeholder">
+          {% if listing.vertical == "phones" %}📱
+          {% elif listing.vertical == "car_dealer" %}🏎️
+          {% elif listing.vertical == "clothing" %}👕
+          {% elif listing.vertical == "farm" %}🌾
+          {% elif listing.vertical == "gym" %}🏋️
+          {% elif listing.vertical == "pharmacy" %}💊
+          {% else %}📦{% endif %}
+        </div>
+      {% endif %}
+      {% endwith %}
+      <div class="listing-body">
+        <div class="listing-biz-tag">{{ listing.business.name }}</div>
+        <div class="listing-title">{{ listing.title }}</div>
+        {% if listing.price %}
+          <div class="listing-price">{{ listing.business.currency }} {{ listing.price|floatformat:0 }}</div>
         {% else %}
-          <div class="listing-img-placeholder">
-            {% if listing.vertical == "phones" %}📱{% elif listing.vertical == "car_dealer" %}🏎️
-            {% elif listing.vertical == "clothing" %}👕{% elif listing.vertical == "farm" %}🌾
-            {% else %}📦{% endif %}
+          <div class="listing-price-empty">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Contact for price
           </div>
         {% endif %}
-        {% endwith %}
-        <div class="listing-body">
-          <div class="listing-biz">{{ listing.business.name }}</div>
-          <div class="listing-title text-truncate">{{ listing.title }}</div>
-          {% if listing.price %}
-            <div class="listing-price">{{ listing.business.currency }} {{ listing.price|floatformat:0 }}</div>
-          {% else %}
-            <div class="listing-price-empty">Contact for price</div>
-          {% endif %}
-        </div>
-      </a>
-    </div>
+      </div>
+    </a>
     {% endfor %}
   </div>
 
-  {# Pagination #}
+  <!-- Pagination -->
   {% if page_obj.has_other_pages %}
-  <nav class="mt-4 d-flex justify-content-center">
-    <ul class="pagination pagination-sm gap-1">
-      {% if page_obj.has_previous %}
-        <li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.previous_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">← Prev</a></li>
-      {% endif %}
-      {% if page_obj.has_next %}
-        <li class="page-item"><a class="page-link rounded" href="?page={{ page_obj.next_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">Next →</a></li>
-      {% endif %}
-    </ul>
-  </nav>
+  <div class="pager-wrap">
+    {% if page_obj.has_previous %}
+      <a class="pager-btn" href="?page={{ page_obj.previous_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,19 5,12 12,5"/></svg>
+        Previous
+      </a>
+    {% endif %}
+    {% if page_obj.has_next %}
+      <a class="pager-btn" href="?page={{ page_obj.next_page_number }}{% if vertical_filter %}&amp;vertical={{ vertical_filter }}{% endif %}{% if search_q %}&amp;q={{ search_q }}{% endif %}">
+        Next
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    {% endif %}
+  </div>
   {% endif %}
 
   {% else %}
-  <div class="text-center py-5">
-    <div style="font-size:3rem;opacity:.3">🛒</div>
-    <h5 class="mt-3 text-muted">No listings found</h5>
-    <p class="text-muted small">Try a different search or browse all categories.</p>
-    <a href="/marketplace/" class="btn btn-primary rounded-pill mt-2">Browse All</a>
+  <!-- Empty state -->
+  <div class="empty-state-wrap">
+    <div class="empty-icon-ring">
+      {% if search_q %}🔍{% elif vertical_filter %}📦{% else %}🛍️{% endif %}
+    </div>
+    {% if search_q %}
+      <h4>No results for "{{ search_q }}"</h4>
+      <p>Try a different search term or explore all categories below. New businesses join Emajinet Marketplace every week.</p>
+    {% elif vertical_filter %}
+      <h4>No listings in this category yet</h4>
+      <p>Be the first to list in this category and reach thousands of customers across Africa.</p>
+    {% else %}
+      <h4>The marketplace is just getting started</h4>
+      <p>Be among the first to list your business on Emajinet and connect with customers across Africa.</p>
+    {% endif %}
+    <div class="empty-cta-row">
+      <a href="/marketplace/" class="btn-premium btn-premium-outline">Browse All</a>
+      <a href="{% url 'accounts:signup' %}" class="btn-premium btn-premium-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        List Your Business
+      </a>
+    </div>
   </div>
   {% endif %}
 
-</div>
+</main>
 
+<!-- Footer -->
 <footer class="mkt-footer">
-  <p>Emajinet Marketplace &mdash; Connecting African businesses with customers.</p>
-  <p><a href="/" class="text-muted">Home</a> &middot; <a href="/accounts/signup/wizard/" class="text-muted">List Your Business</a></p>
+  <div class="mkt-footer-inner">
+    <div class="footer-brand-row">
+      <div>
+        <div class="footer-brand-name">Emajinet Marketplace</div>
+        <div class="footer-brand-tagline">Connecting African businesses with customers across the continent.</div>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="{% url 'accounts:signup' %}">List Your Business</a>
+        <a href="{% url 'accounts:login' %}">Sign In</a>
+        <a href="/marketplace/">Marketplace</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">&copy; Emajinet. Business OS for Africa.</div>
+      <div class="footer-copy">Built in Malawi 🇲🇼</div>
+    </div>
+  </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

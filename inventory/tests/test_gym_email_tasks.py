@@ -1,7 +1,19 @@
 # inventory/tests/test_gym_email_tasks.py
 """
 Tests for gym email notification tasks.
+Requires celery to be installed. Skipped automatically when celery is missing.
 """
+import pytest
+
+try:
+    import celery  # noqa: F401
+    HAS_CELERY = True
+except ImportError:
+    HAS_CELERY = False
+
+if not HAS_CELERY:
+    pytest.skip("celery not installed — skipping gym email task tests", allow_module_level=True)
+
 from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import MagicMock, patch

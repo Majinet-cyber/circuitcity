@@ -10,6 +10,12 @@ from tenants.models import Business
 from inventory.models_verticals import GymMember, GymCheckIn, GymSettings
 from inventory.business_kinds import BusinessKind
 
+try:
+    import qrcode  # noqa: F401
+    HAS_QRCODE = True
+except ImportError:
+    HAS_QRCODE = False
+
 User = get_user_model()
 
 
@@ -47,6 +53,7 @@ class TestGymQRCodeGeneration:
         # Verify codes are different
         assert member1.member_code != member2.member_code
 
+    @pytest.mark.skipif(not HAS_QRCODE, reason="qrcode library not installed")
     def test_qr_code_generation(self):
         """Test that QR code can be generated for member"""
         owner = User.objects.create_user(username="gym_owner3", email="gym3@test.com", password="testpass123!")
