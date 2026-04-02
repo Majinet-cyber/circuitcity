@@ -1895,3 +1895,19 @@ try:
     )
 except ImportError:
     pass
+
+
+# ---------------------------------------------------------------------------
+# Renewable Energy vertical models
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_energy import (  # noqa: F401, E402
+        EnergySite,
+        EnergyAsset,
+        AssetMaintenanceRecord,
+        EnergyReading,
+        SavingsRecord,
+        EnergyAlert,
+    )
+except ImportError:
+    pass

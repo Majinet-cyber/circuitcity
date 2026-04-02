@@ -1,4 +1,4 @@
-﻿# inventory/helpers.py
+# inventory/helpers.py
 from __future__ import annotations
 
 from typing import Dict, Iterable, Optional
@@ -18,6 +18,8 @@ CEMENT = "cement"
 FARM = "farm"
 WELDING = "welding"
 CAR_HIRE = "car_hire"
+CAR_DEALER = "car_dealer"
+ENERGY = "energy"
 GENERIC = "generic"
 
 # Synonyms / legacy labels -> canonical keys
@@ -81,6 +83,20 @@ _ALIASES: Dict[str, str] = {
     "car rental": CAR_HIRE,
     "fleet": CAR_HIRE,
     "fleet management": CAR_HIRE,
+    # car dealer / dealership
+    "car_dealer": CAR_DEALER,
+    "car dealer": CAR_DEALER,
+    "car dealership": CAR_DEALER,
+    "vehicle dealership": CAR_DEALER,
+    "auto dealer": CAR_DEALER,
+    "dealership": CAR_DEALER,
+    # renewable energy
+    "energy": ENERGY,
+    "renewable energy": ENERGY,
+    "solar": ENERGY,
+    "solar energy": ENERGY,
+    "energy management": ENERGY,
+    "renewable": ENERGY,
 }
 
 # Which fields on Business we will probe to determine vertical

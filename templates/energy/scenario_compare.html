@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Scenario Comparison · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:1400px;margin:0 auto;padding:16px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0}
+.compare-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+.scenario-card{background:#fff;border-radius:16px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:2px solid transparent;transition:all .2s}
+.scenario-card.recommended{border-color:#10b981;box-shadow:0 4px 20px rgba(16,185,129,.15)}
+.scenario-card .badge-rec{background:#10b981;color:#fff;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:600}
+.scenario-card h3{font-size:1.1rem;font-weight:700;margin:12px 0 4px;color:#1e293b}
+.scenario-card .objective{color:#64748b;font-size:.85rem;margin-bottom:16px}
+.metric-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.9rem}
+.metric-row:last-child{border:none}
+.metric-row .label{color:#64748b}
+.metric-row .value{font-weight:600;color:#1e293b}
+.metric-row .value.positive{color:#10b981}
+.metric-row .value.negative{color:#ef4444}
+.summary-box{background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:16px;padding:24px;margin-bottom:24px}
+.summary-box h3{color:#fff;font-size:1.2rem;margin:0 0 8px}
+.summary-box p{opacity:.9;margin:0;font-size:.95rem}
+.actions{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.actions .btn{padding:8px 16px;border-radius:8px;font-size:.85rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.btn-outline{border:1px solid #cbd5e1;background:#fff;color:#475569}
+.btn-primary-sm{background:#2563eb;color:#fff;border:none}
+.sensitivity{margin-top:24px;background:#f8fafc;border-radius:12px;padding:20px}
+.sensitivity h4{font-size:1rem;font-weight:700;margin:0 0 12px;color:#1e293b}
+.sens-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.sens-item{text-align:center;padding:12px;border-radius:8px;background:#fff}
+.sens-item .label{font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+.sens-item .val{font-size:1.1rem;font-weight:700;margin-top:4px;color:#1e293b}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-bar-chart-steps"></i> Scenario Comparison</h2>
+    <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Back to Sizing</a>
+  </div>
+
+  {% if recommended %}
+  <div class="summary-box">
+    <h3><i class="bi bi-trophy"></i> Recommended: {{ recommended.scenario_label }}</h3>
+    <p>Based on balanced scoring of NPV, payback period, and ROI, the <strong>{{ recommended.scenario_label }}</strong> scenario offers the best overall value proposition.</p>
+  </div>
+  {% endif %}
+
+  <div class="compare-grid">
+    {% for s in scenarios %}
+    <div class="scenario-card {% if s.is_recommended_scenario %}recommended{% endif %}">
+      {% if s.is_recommended_scenario %}<span class="badge-rec"><i class="bi bi-star-fill"></i> Recommended</span>{% endif %}
+      <h3>{{ s.scenario_label|default:s.title }}</h3>
+      <div class="objective">{{ s.get_design_objective_display }}</div>
+
+      <div class="metric-row"><span class="label">CapEx</span><span class="value">MWK {{ s.estimated_capex|default:0|floatformat:0|intcomma }}</span></div>
+      <div class="metric-row"><span class="label">Solar Array</span><span class="value">{{ s.recommended_array_kw|default:0|floatformat:1 }} kW</span></div>
+      <div class="metric-row"><span class="label">Battery Bank</span><span class="value">{{ s.recommended_battery_kwh|default:0|floatformat:1 }} kWh</span></div>
+      <div class="metric-row"><span class="label">Inverter</span><span class="value">{{ s.recommended_inverter_kw|default:0|floatformat:0 }} kW</span></div>
+      <div class="metric-row"><span class="label">Autonomy</span><span class="value">{{ s.autonomy_days|default:1 }} day(s)</span></div>
+      <div class="metric-row"><span class="label">Payback</span><span class="value {% if s.payback_years and s.payback_years < 6 %}positive{% elif s.payback_years and s.payback_years > 10 %}negative{% endif %}">{{ s.payback_years|default:"N/A" }} yrs</span></div>
+      <div class="metric-row"><span class="label">ROI</span><span class="value {% if s.roi_pct and s.roi_pct > 50 %}positive{% endif %}">{{ s.roi_pct|default:"N/A" }}%</span></div>
+      <div class="metric-row"><span class="label">NPV</span><span class="value {% if s.npv and s.npv > 0 %}positive{% else %}negative{% endif %}">MWK {{ s.npv|default:0|floatformat:0|intcomma }}</span></div>
+      <div class="metric-row"><span class="label">IRR</span><span class="value">{{ s.irr_pct|default:"N/A" }}%</span></div>
+      <div class="metric-row"><span class="label">Growth Headroom</span><span class="value">{{ s.growth_headroom_pct|default:0|floatformat:0 }}%</span></div>
+      <div class="metric-row"><span class="label">Unmet Load Risk</span><span class="value {% if s.unmet_load_risk_pct and s.unmet_load_risk_pct > 10 %}negative{% else %}positive{% endif %}">{{ s.unmet_load_risk_pct|default:0|floatformat:0 }}%</span></div>
+
+      {% if s.sensitivity_summary %}
+      <div class="sensitivity">
+        <h4>Sensitivity Analysis</h4>
+        <div class="sens-grid">
+          {% for key, val in s.sensitivity_summary.items %}
+          <div class="sens-item">
+            <div class="label">{{ key }}</div>
+            <div class="val">{{ val.payback_years|default:"—" }} yr payback</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="actions">
+        <a href="{% url 'verticals:energy_sizing_detail' run_id=s.id %}" class="btn btn-outline"><i class="bi bi-eye"></i> Details</a>
+        <a href="{% url 'verticals:energy_sizing_pdf' run_id=s.id %}" class="btn btn-primary-sm"><i class="bi bi-file-pdf"></i> PDF</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

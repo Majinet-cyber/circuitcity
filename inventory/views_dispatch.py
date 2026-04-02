@@ -1,4 +1,4 @@
-﻿# inventory/views_dispatch.py
+# inventory/views_dispatch.py
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect
 from django.urls import NoReverseMatch, reverse
@@ -19,6 +19,12 @@ from .helpers import (
     product_new_url_for_business,
 )
 
+try:
+    from .helpers_core import CAR_DEALER, ENERGY
+except ImportError:
+    CAR_DEALER = "car_dealer"
+    ENERGY = "energy"
+
 _VERTICAL_ROUTES = {
     CLOTHING: "verticals:clothing_dashboard",
     LIQUOR: "verticals:liquor_dashboard",
@@ -28,6 +34,8 @@ _VERTICAL_ROUTES = {
     FARM: "verticals:farm_dashboard",
     WELDING: "verticals:welding_dashboard",
     CEMENT: "verticals:cement_dashboard",
+    CAR_DEALER: "car_dealer:dashboard",
+    ENERGY: "verticals:energy_dashboard",
 }
 _DEFAULT_ROUTE = "verticals:no_business"
 

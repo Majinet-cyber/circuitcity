@@ -1,4 +1,4 @@
-﻿# circuitcity/dashboard/urls.py
+# circuitcity/dashboard/urls.py
 from django.urls import path
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
@@ -68,6 +68,8 @@ urlpatterns = [
     path("api/profit-bar/", profit_bar_v2, name="profit_bar"),
     path("api/agent-trend/v2/", agent_trend_v2, name="agent_trend_v2"),
     path("api/cash-overview/", cash_overview_v2, name="cash_overview"),
+    # ==== Business OS Dashboard (Phase 2 — Cross-Vertical) ====
+    path("business-os/", views.business_os_dashboard, name="business_os"),
     # ==== Soft redirects & health ====
     path("inventory/", admin_dash_proxy, name="inventory_dashboard_redirect"),
     path("proxy/agent/", agent_dash_proxy, name="agent_dashboard_redirect"),

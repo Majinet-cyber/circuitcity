@@ -121,6 +121,12 @@ def get_all_verticals():
             'description': 'Vehicle dealership, stock management, sales & marketplace',
             'icon': '🏎️',
         },
+        {
+            'code': 'energy',
+            'name': 'Renewable Energy',
+            'description': 'Monitor solar sites, assets, maintenance, and energy economics',
+            'icon': '⚡',
+        },
     ]
 
 

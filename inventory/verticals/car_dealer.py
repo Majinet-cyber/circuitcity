@@ -38,6 +38,9 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
     biz = get_active_business(request)
     CarMake, CarModel, CarDealerVehicle = _get_car_models()
 
+    now = timezone.now()
+    today = now.date()
+
     stats = {
         "total": 0,
         "in_stock": 0,
@@ -45,35 +48,81 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         "reserved": 0,
         "revenue_this_month": Decimal("0"),
         "avg_selling_price": Decimal("0"),
+        "inventory_value": Decimal("0"),
+        "aging_30": 0,
+        "aging_60": 0,
+        "aging_90_plus": 0,
     }
     recent_vehicles = []
+    vehicles_by_make = []
+    vehicles_by_fuel = []
+    recent_sold = []
 
     if CarDealerVehicle:
+        from django.db.models import Count, Sum
+
         qs = CarDealerVehicle.objects.filter(business=biz)
         stats["total"] = qs.count()
-        stats["in_stock"] = qs.filter(status="in_stock").count()
+
+        in_stock_qs = qs.filter(status="in_stock")
+        stats["in_stock"] = in_stock_qs.count()
         stats["reserved"] = qs.filter(status="reserved").count()
 
-        now = timezone.now()
+        # Revenue and sales this month
         sold_this_month = qs.filter(
             status="sold",
             sold_at__year=now.year,
             sold_at__month=now.month,
         )
         stats["sold_this_month"] = sold_this_month.count()
-        revenue = sum(
+        stats["revenue_this_month"] = sum(
             (v.sale_price or v.selling_price or Decimal("0"))
             for v in sold_this_month
         )
-        stats["revenue_this_month"] = revenue
 
-        recent_vehicles = qs.filter(status="in_stock").order_by("-created_at")[:12]
-
-        in_stock_prices = [
-            v.selling_price for v in qs.filter(status="in_stock") if v.selling_price
-        ]
+        # Average selling price on current stock
+        in_stock_prices = [v.selling_price for v in in_stock_qs if v.selling_price]
         if in_stock_prices:
             stats["avg_selling_price"] = sum(in_stock_prices) / len(in_stock_prices)
+
+        # Total inventory value (sum of selling prices in stock)
+        stats["inventory_value"] = sum(in_stock_prices)
+
+        # Stock aging (days since created_at)
+        from datetime import timedelta
+        cutoff_30 = today - timedelta(days=30)
+        cutoff_60 = today - timedelta(days=60)
+        cutoff_90 = today - timedelta(days=90)
+        stats["aging_30"] = in_stock_qs.filter(created_at__date__lte=cutoff_30, created_at__date__gt=cutoff_60).count()
+        stats["aging_60"] = in_stock_qs.filter(created_at__date__lte=cutoff_60, created_at__date__gt=cutoff_90).count()
+        stats["aging_90_plus"] = in_stock_qs.filter(created_at__date__lte=cutoff_90).count()
+
+        # Vehicles by make (top 6); include free-text fallback via make_text
+        vehicles_by_make = (
+            in_stock_qs
+            .values("model__make__name", "make_text")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:6]
+        )
+
+        # Vehicles by fuel type
+        vehicles_by_fuel = (
+            in_stock_qs
+            .exclude(fuel_type="")
+            .values("fuel_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:5]
+        )
+
+        # Recent 12 in-stock vehicles
+        recent_vehicles = in_stock_qs.select_related("car_model__make").order_by("-created_at")[:12]
+
+        # 5 most recent sales
+        recent_sold = (
+            qs.filter(status="sold")
+            .select_related("car_model__make")
+            .order_by("-sold_at")[:5]
+        )
 
     return render(
         request,
@@ -81,6 +130,9 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         {
             "stats": stats,
             "recent_vehicles": recent_vehicles,
+            "recent_sold": recent_sold,
+            "vehicles_by_make": vehicles_by_make,
+            "vehicles_by_fuel": vehicles_by_fuel,
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
         },

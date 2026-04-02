@@ -43,7 +43,10 @@ def get_vertical_kind(business) -> str:
     kind = str(kind).strip().lower()
 
     # Map to known verticals
-    valid_kinds = ["phones", "gym", "clothing", "liquor", "pharmacy", "grocery", "hardware", "cement", "farm", "welding", "car_hire"]
+    valid_kinds = [
+        "phones", "gym", "clothing", "liquor", "pharmacy", "grocery",
+        "hardware", "cement", "farm", "welding", "car_hire", "car_dealer", "energy",
+    ]
     if kind in valid_kinds:
         return kind
 
@@ -71,6 +74,8 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
         "farm": "verticals:farm_dashboard",  # Farm vertical
         "welding": "verticals:welding_dashboard",  # Welding vertical
         "car_hire": "verticals:car_hire_dashboard",  # Car Hire Service vertical
+        "car_dealer": "car_dealer:dashboard",  # Car Dealer vertical
+        "energy": "verticals:energy_dashboard",  # Renewable Energy vertical
         "generic": "inventory:generic_dashboard",  # Fallback for unrecognized verticals
         # "phones" uses the default dashboard at /inventory/dashboard/
     }
@@ -188,6 +193,50 @@ def get_onboarding_steps(vertical_kind: str, request=None) -> List[Dict[str, str
             },
         ]
 
+    elif vertical_kind == "car_dealer":
+        return [
+            {
+                "number": "1",
+                "label": "Add vehicles to inventory",
+                "url": safe_url("car_dealer:stock_in", "/car-dealer/stock-in/"),
+                "icon": "bi-car-front",
+            },
+            {
+                "number": "2",
+                "label": "List vehicles on marketplace",
+                "url": safe_url("inventory:manage_listings", "/inventory/marketplace/listings/"),
+                "icon": "bi-shop",
+            },
+            {
+                "number": "3",
+                "label": "Process vehicle sales",
+                "url": safe_url("car_dealer:vehicle_list", "/car-dealer/vehicles/"),
+                "icon": "bi-receipt",
+            },
+        ]
+
+    elif vertical_kind == "energy":
+        return [
+            {
+                "number": "1",
+                "label": "Add your first energy site",
+                "url": safe_url("verticals:energy_sites", "/verticals/energy/sites/"),
+                "icon": "bi-geo-alt",
+            },
+            {
+                "number": "2",
+                "label": "Register assets (panels, batteries, inverters)",
+                "url": safe_url("verticals:energy_assets", "/verticals/energy/assets/"),
+                "icon": "bi-cpu",
+            },
+            {
+                "number": "3",
+                "label": "Review dashboard and alerts",
+                "url": safe_url("verticals:energy_dashboard", "/verticals/energy/dashboard/"),
+                "icon": "bi-speedometer2",
+            },
+        ]
+
     else:  # "phones" or default
         return [
             {
@@ -230,6 +279,8 @@ def get_vertical_display_name(vertical_kind: str) -> str:
         "farm": "Farm Manager",  # Farm profitability tracking
         "welding": "Welding Workshop",  # Welding job estimation
         "car_hire": "Car Hire Service",  # Vehicle rental and fleet management
+        "car_dealer": "Car Dealer",  # Vehicle dealership and marketplace
+        "energy": "Renewable Energy",  # Solar, battery, and energy management
         "generic": "Business",
     }
     return display_names.get(vertical_kind, vertical_kind.title())
@@ -1352,6 +1403,45 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
             },
+            {
+                "section": "MAIN",
+                "key": "intelligence",
+                "url": "groceries:inventory_intelligence",
+                "label": "Intelligence",
+                "icon": "bi-bar-chart-line",
+                "active_prefix": "/groceries/intelligence",
+                "active_pattern": "/groceries/intelligence",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-groceries-intelligence",
+            },
+            {
+                "section": "MAIN",
+                "key": "sales_analytics",
+                "url": "groceries:sales_analytics",
+                "label": "Sales Analytics",
+                "icon": "bi-graph-up",
+                "active_prefix": "/groceries/sales-analytics",
+                "active_pattern": "/groceries/sales-analytics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-groceries-sales-analytics",
+            },
+            {
+                "section": "MAIN",
+                "key": "restocking",
+                "url": "groceries:smart_restocking",
+                "label": "Smart Restocking",
+                "icon": "bi-arrow-repeat",
+                "active_prefix": "/groceries/restocking",
+                "active_pattern": "/groceries/restocking",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-groceries-restocking",
+            },
             # MORE section
             {
                 "section": "MORE",
@@ -2081,6 +2171,32 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_menu": False,
                 "is_header": False,
             },
+            {
+                "section": "MAIN",
+                "key": "intelligence",
+                "url": "verticals:welding_intelligence",
+                "label": "Intelligence",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/welding/intelligence",
+                "active_pattern": "/verticals/welding/intelligence",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-intelligence",
+            },
+            {
+                "section": "MAIN",
+                "key": "clients",
+                "url": "verticals:welding_clients",
+                "label": "Clients",
+                "icon": "bi-people",
+                "active_prefix": "/verticals/welding/clients",
+                "active_pattern": "/verticals/welding/clients",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-clients",
+            },
             # MORE section
             {
                 "section": "MORE",
@@ -2288,6 +2404,315 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         ]
         
         return _inject_data_correction_into_sidebar(items, "car_hire")
+
+    elif business_kind == "car_dealer":
+        items = [
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "car_dealer:dashboard",
+                "label": "Dashboard",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/car-dealer/",
+                "active_pattern": "/car-dealer/",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "vehicles",
+                "url": "car_dealer:vehicle_list",
+                "label": "Vehicles",
+                "icon": "bi-car-front",
+                "active_prefix": "/car-dealer/vehicles",
+                "active_pattern": "/car-dealer/vehicles",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-vehicles",
+            },
+            {
+                "section": "MAIN",
+                "key": "stock_in",
+                "url": "car_dealer:stock_in",
+                "label": "Stock In Vehicle",
+                "icon": "bi-box-arrow-in-down",
+                "active_prefix": "/car-dealer/stock-in",
+                "active_pattern": "/car-dealer/stock-in",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-stock-in",
+            },
+            {
+                "section": "MAIN",
+                "key": "marketplace",
+                "url": "inventory:manage_listings",
+                "label": "Marketplace Listings",
+                "icon": "bi-shop",
+                "active_prefix": "/inventory/marketplace",
+                "active_pattern": "/inventory/marketplace",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-marketplace",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-car-dealer-settings",
+            },
+        ]
+        return _inject_data_correction_into_sidebar(items, "car_dealer")
+
+    elif business_kind == "energy":
+        items = [
+            {
+                "section": "MAIN",
+                "key": "dashboard",
+                "url": "verticals:energy_dashboard",
+                "label": "Overview",
+                "icon": "bi-speedometer2",
+                "active_prefix": "/verticals/energy/dashboard",
+                "active_pattern": "/verticals/energy/dashboard",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-dashboard",
+            },
+            {
+                "section": "MAIN",
+                "key": "sites",
+                "url": "verticals:energy_sites",
+                "label": "Sites",
+                "icon": "bi-geo-alt",
+                "active_prefix": "/verticals/energy/sites",
+                "active_pattern": "/verticals/energy/sites",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-sites",
+            },
+            {
+                "section": "MAIN",
+                "key": "assets",
+                "url": "verticals:energy_assets",
+                "label": "Assets",
+                "icon": "bi-cpu",
+                "active_prefix": "/verticals/energy/assets",
+                "active_pattern": "/verticals/energy/assets",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-assets",
+            },
+            {
+                "section": "MAIN",
+                "key": "monitoring",
+                "url": "verticals:energy_monitoring",
+                "label": "Monitoring",
+                "icon": "bi-display",
+                "active_prefix": "/verticals/energy/monitoring",
+                "active_pattern": "/verticals/energy/monitoring",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-monitoring",
+            },
+            {
+                "section": "MAIN",
+                "key": "maintenance",
+                "url": "verticals:energy_maintenance",
+                "label": "Predictive Maintenance",
+                "icon": "bi-wrench-adjustable",
+                "active_prefix": "/verticals/energy/maintenance",
+                "active_pattern": "/verticals/energy/maintenance",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-maintenance",
+            },
+            {
+                "section": "MAIN",
+                "key": "forecasting",
+                "url": "verticals:energy_forecasting",
+                "label": "Demand Forecasting",
+                "icon": "bi-graph-up-arrow",
+                "active_prefix": "/verticals/energy/forecasting",
+                "active_pattern": "/verticals/energy/forecasting",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-forecasting",
+            },
+            {
+                "section": "MAIN",
+                "key": "load_management",
+                "url": "verticals:energy_load_management",
+                "label": "Load Management",
+                "icon": "bi-bar-chart-steps",
+                "active_prefix": "/verticals/energy/load-management",
+                "active_pattern": "/verticals/energy/load-management",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-load-management",
+            },
+            {
+                "section": "MAIN",
+                "key": "sizing",
+                "url": "verticals:energy_sizing_list",
+                "label": "System Sizing",
+                "icon": "bi-calculator",
+                "active_prefix": "/verticals/energy/sizing",
+                "active_pattern": "/verticals/energy/sizing",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-sizing",
+            },
+            {
+                "section": "MAIN",
+                "key": "economics",
+                "url": "verticals:energy_economics",
+                "label": "Costs & Savings",
+                "icon": "bi-cash-coin",
+                "active_prefix": "/verticals/energy/economics",
+                "active_pattern": "/verticals/energy/economics",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-economics",
+            },
+            {
+                "section": "MAIN",
+                "key": "alerts",
+                "url": "verticals:energy_alerts",
+                "label": "Alerts & Incidents",
+                "icon": "bi-bell",
+                "active_prefix": "/verticals/energy/alerts",
+                "active_pattern": "/verticals/energy/alerts",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-alerts",
+            },
+            {
+                "section": "MAIN",
+                "key": "technicians",
+                "url": "verticals:energy_technicians",
+                "label": "Technicians",
+                "icon": "bi-person-badge",
+                "active_prefix": "/verticals/energy/technicians",
+                "active_pattern": "/verticals/energy/technicians",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-technicians",
+            },
+            {
+                "section": "MAIN",
+                "key": "portfolio",
+                "url": "verticals:energy_portfolio",
+                "label": "Portfolio",
+                "icon": "bi-building-gear",
+                "active_prefix": "/verticals/energy/portfolio",
+                "active_pattern": "/verticals/energy/portfolio",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-portfolio",
+            },
+            {
+                "section": "MAIN",
+                "key": "copilot",
+                "url": "verticals:energy_copilot",
+                "label": "Energy Copilot",
+                "icon": "bi-cpu",
+                "active_prefix": "/verticals/energy/copilot",
+                "active_pattern": "/verticals/energy/copilot",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-copilot",
+            },
+            {
+                "section": "MAIN",
+                "key": "data_upload",
+                "url": "verticals:energy_data_upload",
+                "label": "Data Upload",
+                "icon": "bi-cloud-upload",
+                "active_prefix": "/verticals/energy/data-upload",
+                "active_pattern": "/verticals/energy/data-upload",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-data-upload",
+            },
+            {
+                "section": "MAIN",
+                "key": "reports",
+                "url": "verticals:energy_reports",
+                "label": "Reports",
+                "icon": "bi-file-earmark-bar-graph",
+                "active_prefix": "/verticals/energy/reports",
+                "active_pattern": "/verticals/energy/reports",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-reports",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "billing",
+                "url": "billing:plans",
+                "label": "Billing",
+                "icon": "bi-credit-card-2-front",
+                "active_prefix": "/billing/",
+                "active_pattern": "/billing/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-billing",
+            },
+            {
+                "section": "SUBSCRIPTION",
+                "key": "settings",
+                "url": "settings_root",
+                "label": "Settings",
+                "icon": "bi-gear",
+                "active_prefix": "/settings/",
+                "active_pattern": "/settings/",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-energy-settings",
+            },
+        ]
+        return _inject_data_correction_into_sidebar(items, "energy")
 
     else:  # "phones" or default
         items = [

@@ -67,6 +67,9 @@ class HQMobileFirstTests(TestCase):
         # Django dev server serves static files with 200 or 304
         self.assertIn(response.status_code, [200, 304, 404])
         # In production with collectstatic, this would be 200
+        # Explicitly close any streaming response to release file handles
+        if hasattr(response, "close"):
+            response.close()
 
     def test_hq_business_directory_includes_mobile_css(self):
         """HQ business directory should include hq-mobile.css"""
@@ -150,7 +153,7 @@ class UIFixesIntegrationTests(TestCase):
             try:
                 response = self.client.get(url)
                 self.assertIn(response.status_code, [200, 302], f"{url} should be accessible")
-            except Exception as e:
+            except Exception:
                 # Skip if URL pattern doesn't exist
                 pass
 

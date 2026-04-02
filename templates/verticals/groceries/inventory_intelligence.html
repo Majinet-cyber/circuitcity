@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Inventory Intelligence · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:1400px;margin:0 auto;padding:16px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0 0 8px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px}
+.kpi-card{background:#fff;border-radius:14px;padding:18px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.kpi-card .num{font-size:1.5rem;font-weight:800;color:#1e293b}
+.kpi-card .lbl{color:#64748b;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.kpi-card.danger .num{color:#ef4444}
+.kpi-card.success .num{color:#10b981}
+.section-card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}
+.section-card h3{font-size:1.05rem;font-weight:700;margin:0 0 14px;color:#1e293b}
+.product-table{width:100%;border-collapse:collapse}
+.product-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:.78rem;text-transform:uppercase;color:#64748b}
+.product-table td{padding:10px 12px;border-top:1px solid #f1f5f9;font-size:.88rem;color:#1e293b}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:768px){.two-col{grid-template-columns:1fr}}
+.tag-fast{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600}
+.tag-slow{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:600}
+.turnover-badge{display:inline-flex;align-items:center;gap:6px;background:#ede9fe;color:#5b21b6;padding:8px 16px;border-radius:20px;font-weight:600;font-size:.9rem;margin-bottom:20px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-bar-chart-line"></i> Inventory Intelligence</h2>
+  </div>
+
+  {% with i=intel %}
+  <div class="turnover-badge"><i class="bi bi-arrow-repeat"></i> Stock Turnover Rate: {{ i.turnover_rate|default:"0" }}x per month</div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="num">{{ i.total_products|default:0 }}</div><div class="lbl">Total Products</div></div>
+    <div class="kpi-card success"><div class="num">{{ i.in_stock|default:0 }}</div><div class="lbl">In Stock</div></div>
+    <div class="kpi-card danger"><div class="num">{{ i.out_of_stock|default:0 }}</div><div class="lbl">Out of Stock</div></div>
+    <div class="kpi-card"><div class="num">{{ i.low_stock|default:0 }}</div><div class="lbl">Low Stock</div></div>
+    <div class="kpi-card"><div class="num">MWK {{ i.stock_value|default:0|floatformat:0|intcomma }}</div><div class="lbl">Stock Value</div></div>
+    <div class="kpi-card"><div class="num">{{ i.total_sold_30d|default:0|intcomma }}</div><div class="lbl">Units Sold (30d)</div></div>
+  </div>
+
+  <div class="two-col">
+    {% if i.fast_movers %}
+    <div class="section-card">
+      <h3><i class="bi bi-rocket-takeoff text-success"></i> Fast-Moving Items</h3>
+      <table class="product-table">
+        <thead><tr><th>Product</th><th>Sold</th><th>Revenue</th></tr></thead>
+        <tbody>
+        {% for p in i.fast_movers %}
+        <tr>
+          <td>{{ p.product__name }} <span class="tag-fast">Fast</span></td>
+          <td>{{ p.total_sold }}</td>
+          <td>MWK {{ p.revenue|default:0|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if i.slow_movers %}
+    <div class="section-card">
+      <h3><i class="bi bi-hourglass-split text-danger"></i> Slow-Moving Items</h3>
+      <table class="product-table">
+        <thead><tr><th>Product</th><th>Stock</th><th>Cost Price</th></tr></thead>
+        <tbody>
+        {% for p in i.slow_movers %}
+        <tr>
+          <td>{{ p.name }} <span class="tag-slow">Slow</span></td>
+          <td>{{ p.stock }}</td>
+          <td>MWK {{ p.cost_price|default:0|floatformat:0|intcomma }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if i.category_performance %}
+  <div class="section-card">
+    <h3><i class="bi bi-grid-3x3-gap"></i> Category Performance (30d)</h3>
+    <table class="product-table">
+      <thead><tr><th>Category</th><th>Revenue</th><th>Units</th><th>Avg Profit/Sale</th></tr></thead>
+      <tbody>
+      {% for c in i.category_performance %}
+      <tr>
+        <td>{{ c.product__category|default:"Other"|title }}</td>
+        <td>MWK {{ c.total_revenue|default:0|floatformat:0|intcomma }}</td>
+        <td>{{ c.total_units|default:0 }}</td>
+        <td>MWK {{ c.avg_profit|default:0|floatformat:0|intcomma }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endwith %}
+</div>
+{% endblock %}

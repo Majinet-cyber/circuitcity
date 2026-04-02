@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Data Upload · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:900px;margin:0 auto;padding:16px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0 0 8px}
+.upload-card{background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:24px}
+.upload-card h3{font-size:1.1rem;font-weight:700;color:#1e293b;margin:0 0 16px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-weight:600;color:#475569;margin-bottom:6px;font-size:.9rem}
+.form-group select,.form-group input[type="file"]{width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.9rem}
+.btn-upload{background:#2563eb;color:#fff;border:none;padding:12px 28px;border-radius:10px;font-weight:600;font-size:1rem;cursor:pointer}
+.btn-upload:hover{background:#1d4ed8}
+.format-info{background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px;margin-bottom:24px}
+.format-info h4{margin:0 0 8px;color:#0369a1;font-size:.95rem}
+.format-info code{background:#e0f2fe;padding:2px 6px;border-radius:4px;font-size:.85rem}
+.upload-history{margin-top:32px}
+.upload-row{display:flex;align-items:center;gap:16px;padding:14px 16px;background:#fff;border-radius:10px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+.upload-row .file{font-weight:600;flex:1;color:#1e293b}
+.upload-row .stats{font-size:.85rem;color:#64748b}
+.quality-badge{padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:600}
+.q-high{background:#d1fae5;color:#065f46}
+.q-med{background:#fef3c7;color:#92400e}
+.q-low{background:#fee2e2;color:#991b1b}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-cloud-upload"></i> Data Upload</h2>
+    <p style="color:#64748b;margin:0">Import energy readings via CSV for bulk data ingestion.</p>
+  </div>
+
+  <div class="format-info">
+    <h4><i class="bi bi-info-circle"></i> CSV Format</h4>
+    <p>Required columns: <code>date</code> (YYYY-MM-DD), <code>generation_kwh</code>, <code>consumption_kwh</code>. Optional: <code>battery_soc_pct</code>.</p>
+  </div>
+
+  <div class="upload-card">
+    <h3><i class="bi bi-file-earmark-arrow-up"></i> Upload CSV File</h3>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="site_id">Site</label>
+        <select name="site_id" id="site_id" required>
+          <option value="">— Select site —</option>
+          {% for s in sites %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="csv_file">CSV File</label>
+        <input type="file" name="csv_file" id="csv_file" accept=".csv" required>
+      </div>
+      <button type="submit" class="btn-upload"><i class="bi bi-upload"></i> Upload & Import</button>
+    </form>
+  </div>
+
+  {% if uploads %}
+  <div class="upload-history">
+    <h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="bi bi-clock-history"></i> Recent Uploads</h3>
+    {% for u in uploads %}
+    <div class="upload-row">
+      <div class="file">{{ u.filename|default:"Upload" }}</div>
+      <div class="stats">{{ u.rows_imported }}/{{ u.rows_total }} rows · {{ u.created_at|date:"M d, Y H:i" }}</div>
+      <span class="quality-badge {% if u.data_quality_score >= 80 %}q-high{% elif u.data_quality_score >= 50 %}q-med{% else %}q-low{% endif %}">{{ u.data_quality_score|default:0 }}% quality</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

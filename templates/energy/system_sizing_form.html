@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ action }} System Sizing – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .sizing-section{background:#fff;border-radius:16px;padding:1.5rem;border:1.5px solid #e2e8f0;margin-bottom:1.5rem;}
+  .sizing-section h6{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:2px solid #e2e8f0;}
+  .form-label{font-size:.8rem;font-weight:600;color:#475569;}
+  .form-control,.form-select{border-radius:10px;border:1.5px solid #e2e8f0;font-size:.88rem;}
+  .form-control:focus,.form-select:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15);}
+  .appliance-row{background:#f8fafc;border-radius:12px;padding:.8rem;margin-bottom:.5rem;border:1px solid #e2e8f0;}
+  .btn-add-appliance{border:2px dashed #10b981;color:#10b981;background:transparent;border-radius:12px;padding:.8rem;font-weight:600;width:100%;transition:all .15s;}
+  .btn-add-appliance:hover{background:#f0fdf4;color:#059669;}
+  .catalog-btn{font-size:.75rem;padding:.25rem .6rem;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;transition:all .1s;}
+  .catalog-btn:hover{border-color:#10b981;background:#f0fdf4;}
+</style>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-calculator me-2" style="color:#10b981;"></i>{{ action }} System Sizing</h4>
+      <div class="text-muted small">Design a complete renewable energy system</div>
+    </div>
+    <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
+      <i class="bi bi-arrow-left me-1"></i>Back
+    </a>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <form method="post" id="sizingForm">
+    {% csrf_token %}
+
+    {# === PROJECT DETAILS === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-file-earmark-text me-2"></i>Project Details</h6>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Proposal Title *</label>
+          <input type="text" name="title" class="form-control" placeholder="e.g. Lilongwe Office Solar System" required>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Linked Site (optional)</label>
+          <select name="site" class="form-select">
+            <option value="">— No linked site —</option>
+            {% for s in sites %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {# === CUSTOMER === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-person me-2"></i>Customer Information</h6>
+      <div class="row g-3">
+        <div class="col-12 col-md-6"><label class="form-label">Customer Name</label><input type="text" name="customer_name" class="form-control"></div>
+        <div class="col-12 col-md-6"><label class="form-label">Phone</label><input type="text" name="customer_phone" class="form-control"></div>
+        <div class="col-12 col-md-6"><label class="form-label">Email</label><input type="email" name="customer_email" class="form-control"></div>
+        <div class="col-12 col-md-6"><label class="form-label">Address</label><input type="text" name="customer_address" class="form-control"></div>
+      </div>
+    </div>
+
+    {# === DESIGN CONFIGURATION === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-sliders me-2"></i>Design Configuration</h6>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Design Objective</label>
+          <select name="design_objective" class="form-select">
+            {% for val, label in objectives %}<option value="{{ val }}" {% if val == "balanced" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label">System Architecture</label>
+          <select name="system_architecture" class="form-select">
+            {% for val, label in architectures %}<option value="{{ val }}" {% if val == "solar_battery" %}selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="form-check mt-4">
+            <input class="form-check-input" type="checkbox" name="has_grid_access" id="hasGrid" checked>
+            <label class="form-check-label" for="hasGrid">Has grid access</label>
+          </div>
+          <div class="form-check mt-1">
+            <input class="form-check-input" type="checkbox" name="has_generator" id="hasGen">
+            <label class="form-check-label" for="hasGen">Has generator backup</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# === SOLAR & BATTERY PARAMETERS === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-sun me-2"></i>Solar & Battery Parameters</h6>
+      <div class="row g-3">
+        <div class="col-6 col-md-3"><label class="form-label">Peak Sun Hours/Day</label><input type="number" step="0.1" name="peak_sun_hours" value="5.0" class="form-control"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Panel Wattage (Wp)</label><input type="number" name="panel_wattage" value="550" class="form-control"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Panel Derating (%)</label><input type="number" name="panel_efficiency_pct" value="85" class="form-control" min="50" max="100"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Battery DoD (%)</label><input type="number" name="battery_dod_pct" value="80" class="form-control" min="20" max="100"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Battery Voltage (V)</label>
+          <select name="battery_voltage" class="form-select"><option value="12">12V</option><option value="24">24V</option><option value="48" selected>48V</option></select>
+        </div>
+        <div class="col-6 col-md-3"><label class="form-label">Autonomy Days</label><input type="number" step="0.5" name="autonomy_days" value="1.0" class="form-control" min="0.5"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Diversity Factor</label><input type="number" step="0.01" name="diversity_factor" value="0.80" class="form-control" min="0.1" max="1.0"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Simultaneity Factor</label><input type="number" step="0.01" name="simultaneity_factor" value="0.70" class="form-control" min="0.1" max="1.0"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Growth Allowance (%)</label><input type="number" name="future_growth_pct" value="20" class="form-control" min="0" max="100"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Safety Margin (%)</label><input type="number" name="safety_margin_pct" value="15" class="form-control" min="0" max="50"></div>
+      </div>
+    </div>
+
+    {# === APPLIANCE / LOAD SCHEDULE === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-lightning-charge me-2"></i>Appliance / Load Schedule</h6>
+      <p class="text-muted" style="font-size:.8rem;margin-bottom:1rem;">Add each appliance or load. Click quick-add buttons for common appliances, or add custom loads.</p>
+
+      {# Quick-add catalog #}
+      <div class="d-flex flex-wrap gap-1 mb-3" id="catalogBtns">
+        <button type="button" class="catalog-btn" onclick="addCatalog('LED Lights','lighting',10,6)">💡 LED Lights (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('TV (LED 40\\'\\')','entertainment',80,5)">📺 TV (80W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Fridge/Freezer','refrigeration',150,24)">🧊 Fridge (150W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Desktop Computer','computing',200,8)">💻 Computer (200W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Laptop','computing',65,8)">💻 Laptop (65W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Printer','computing',50,2)">🖨️ Printer (50W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('WiFi Router','telecom',15,24)">📡 Router (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Ceiling Fan','hvac',75,10)">🌀 Fan (75W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('AC Unit (1HP)','hvac',750,8)">❄️ AC 1HP (750W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Water Pump','pumping',750,3)">💧 Pump (750W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Phone Charging','charging',10,4)">🔌 Phone Charger (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('POS Terminal','computing',15,12)">🏷️ POS (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Security Camera','security',15,24)">📷 Camera (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Welding Machine','industrial',3500,4)">⚡ Welder (3500W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Borehole Pump','pumping',1500,6)">🕳️ Borehole (1500W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Cold Room','refrigeration',2000,24)">🏭 Cold Room (2000W)</button>
+      </div>
+
+      <div id="applianceRows"></div>
+
+      <button type="button" class="btn-add-appliance mt-2" onclick="addRow()">
+        <i class="bi bi-plus-circle me-2"></i>Add Custom Appliance
+      </button>
+    </div>
+
+    {# === NOTES === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-journal-text me-2"></i>Notes & Assumptions</h6>
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Any additional notes..."></textarea>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label">Assumptions</label>
+          <textarea name="assumptions" class="form-control" rows="3" placeholder="Key assumptions for this design..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mb-5">
+      <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+      <button type="submit" class="btn btn-success btn-lg rounded-pill px-4">
+        <i class="bi bi-calculator me-2"></i>Compute & Save Sizing
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+let rowIdx = 0;
+const categories = [{% for val, label in appliance_categories %}["{{ val }}","{{ label }}"],{% endfor %}];
+const priorities = [{% for val, label in priorities %}["{{ val }}","{{ label }}"],{% endfor %}];
+
+function addRow(name='', cat='custom', wattage='', hours='', qty=1) {
+  const i = rowIdx++;
+  const catOpts = categories.map(c => `<option value="${c[0]}" ${c[0]===cat?'selected':''}>${c[1]}</option>`).join('');
+  const priOpts = priorities.map(p => `<option value="${p[0]}" ${p[0]==='medium'?'selected':''}>${p[1]}</option>`).join('');
+  const html = `
+    <div class="appliance-row" id="row_${i}">
+      <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3"><label class="form-label" style="font-size:.72rem;">Appliance</label><input type="text" name="appliance_name" value="${name}" class="form-control form-control-sm" placeholder="Name" required></div>
+        <div class="col-6 col-md-1"><label class="form-label" style="font-size:.72rem;">Qty</label><input type="number" name="appliance_quantity" value="${qty}" class="form-control form-control-sm" min="1"></div>
+        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Wattage (W)</label><input type="number" name="appliance_wattage" value="${wattage}" class="form-control form-control-sm" min="1" required></div>
+        <div class="col-6 col-md-1"><label class="form-label" style="font-size:.72rem;">Hrs/Day</label><input type="number" name="appliance_hours" value="${hours}" step="0.5" class="form-control form-control-sm" min="0.5" max="24"></div>
+        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Category</label><select name="appliance_category" class="form-select form-select-sm">${catOpts}</select></div>
+        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Priority</label><select name="appliance_priority" class="form-select form-select-sm">${priOpts}</select></div>
+        <div class="col-3 col-md-1 d-flex align-items-end">
+          <input type="hidden" name="appliance_period" value="both">
+          <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="document.getElementById('row_${i}').remove()"><i class="bi bi-trash"></i></button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('applianceRows').insertAdjacentHTML('beforeend', html);
+}
+
+function addCatalog(name, cat, watts, hours) {
+  addRow(name, cat, watts, hours, 1);
+}
+</script>
+{% endblock %}

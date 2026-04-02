@@ -1,4 +1,4 @@
-﻿# circuitcity/accounts/views.py
+# circuitcity/accounts/views.py
 from __future__ import annotations
 
 import hashlib
@@ -1557,6 +1557,26 @@ def _clear_manager_wizard_data(request):
     if MANAGER_WIZARD_SESSION_KEY in request.session:
         del request.session[MANAGER_WIZARD_SESSION_KEY]
         request.session.modified = True
+
+
+@never_cache
+def signup_entry(request):
+    """
+    Canonical signup entry point — unifies Home and Marketplace "Get Started" CTAs.
+
+    Redirects to signup_manager (the canonical 3-step wizard).
+    Preserves any `source` query parameter for analytics/tracking.
+    Both Home page and Marketplace CTAs now route through here.
+    """
+    if request.user.is_authenticated:
+        return redirect(
+            _safe_redirect("inventory:inventory_dashboard", "dashboard:home", default="/inventory/dashboard/")
+        )
+    source = request.GET.get("source", "")
+    target_url = reverse("accounts:signup_manager")
+    if source:
+        target_url = f"{target_url}?source={source}"
+    return redirect(target_url)
 
 
 @ensure_csrf_cookie

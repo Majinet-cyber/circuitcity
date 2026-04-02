@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ action }} Energy Site – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width:680px;">
+  <div class="d-flex align-items-center gap-2 mb-4">
+    <a href="{% url 'verticals:energy_sites' %}" class="btn btn-outline-secondary btn-sm rounded-pill">← Back</a>
+    <h4 class="fw-bold mb-0">{{ action }} Energy Site</h4>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body p-4">
+      <form method="post">
+        {% csrf_token %}
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">Site Name *</label>
+            <input type="text" name="name" class="form-control rounded-3" required value="{{ site.name|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Site Type</label>
+            <select name="site_type" class="form-select rounded-3">
+              {% for val, label in site_types %}
+                <option value="{{ val }}" {% if site.site_type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Installed Capacity (kW)</label>
+            <input type="number" name="installed_capacity_kw" class="form-control rounded-3" step="0.01" min="0" value="{{ site.installed_capacity_kw|default:'' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Location / Address</label>
+            <input type="text" name="location" class="form-control rounded-3" value="{{ site.location|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Customer Name</label>
+            <input type="text" name="customer_name" class="form-control rounded-3" value="{{ site.customer_name|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Customer Phone</label>
+            <input type="text" name="customer_phone" class="form-control rounded-3" value="{{ site.customer_phone|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Customer Email</label>
+            <input type="email" name="customer_email" class="form-control rounded-3" value="{{ site.customer_email|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Commissioning Date</label>
+            <input type="date" name="commissioning_date" class="form-control rounded-3" value="{{ site.commissioning_date|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Installation Cost ({{ business.currency }})</label>
+            <input type="number" name="installation_cost" class="form-control rounded-3" step="0.01" min="0" value="{{ site.installation_cost|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Monthly Grid Bill Before Solar ({{ business.currency }})</label>
+            <input type="number" name="monthly_grid_bill_before" class="form-control rounded-3" step="0.01" min="0" value="{{ site.monthly_grid_bill_before|default:'' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Energy Sources</label>
+            <div class="d-flex gap-3 flex-wrap">
+              {% for src in "solar,battery,grid,generator,hybrid,wind"|split:"," %}
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="energy_sources" value="{{ src }}" id="src_{{ src }}"
+                  {% if site and src in site.energy_sources %}checked{% endif %}>
+                <label class="form-check-label text-capitalize" for="src_{{ src }}">{{ src }}</label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">Notes</label>
+            <textarea name="notes" class="form-control rounded-3" rows="3">{{ site.notes|default:'' }}</textarea>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-4">
+          <button type="submit" class="btn btn-success rounded-pill px-4">{{ action }} Site</button>
+          <a href="{% url 'verticals:energy_sites' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

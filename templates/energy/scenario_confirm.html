@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Generate Scenarios · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:700px;margin:40px auto;padding:16px}
+.confirm-card{background:#fff;border-radius:16px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.confirm-card h2{font-size:1.4rem;font-weight:700;margin:0 0 8px;color:#1e293b}
+.confirm-card p{color:#64748b;line-height:1.6}
+.scenario-list{margin:20px 0;padding:0;list-style:none}
+.scenario-list li{padding:10px 16px;background:#f8fafc;border-radius:8px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.scenario-list li i{color:#2563eb}
+.actions{display:flex;gap:12px;margin-top:24px}
+.btn-lg{padding:12px 28px;border-radius:10px;font-size:1rem;font-weight:600;text-decoration:none}
+.btn-primary-lg{background:#2563eb;color:#fff;border:none;cursor:pointer}
+.btn-outline-lg{border:1px solid #cbd5e1;background:#fff;color:#475569}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="confirm-card">
+    <h2><i class="bi bi-bar-chart-steps"></i> Create Scenario Comparison</h2>
+    <p>This will create <strong>3 design scenarios</strong> from your sizing run <strong>"{{ run.title }}"</strong> for side-by-side comparison:</p>
+
+    <ul class="scenario-list">
+      <li><i class="bi bi-currency-dollar"></i> <strong>Low Cost</strong> — minimized CapEx, basic reliability</li>
+      <li><i class="bi bi-balance-scale"></i> <strong>Balanced</strong> — optimal cost-performance trade-off</li>
+      <li><i class="bi bi-shield-check"></i> <strong>High Reliability</strong> — maximum uptime and resilience</li>
+    </ul>
+
+    <p>Each scenario will be fully calculated with engineering outputs, financial metrics (NPV, IRR), and intelligent recommendations.</p>
+
+    <form method="post" class="actions">
+      {% csrf_token %}
+      <button type="submit" class="btn-lg btn-primary-lg"><i class="bi bi-lightning-charge"></i> Generate Scenarios</button>
+      <a href="{% url 'verticals:energy_sizing_detail' run_id=run.id %}" class="btn-lg btn-outline-lg">Cancel</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1747,6 +1747,29 @@ def api_recommendations(request):
 @require_GET
 def dashboard_healthz_proxy(request):
     return JsonResponse({"ok": True, "time": timezone.now().isoformat()})
-# NOTE: The `home()` function is defined above with vertical routing.
-# It was previously duplicated here but has been removed to prevent
-# shadowing the vertical-aware dashboard routing logic.
+
+
+# ---------------------------------------------------------------------------
+# Business OS Dashboard — Cross-Vertical Intelligence Layer (Phase 2)
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def business_os_dashboard(request):
+    """
+    Unified Business OS dashboard showing cross-vertical analytics.
+    Aggregates metrics from all active verticals for executive overview.
+    """
+    business = request.business
+
+    try:
+        from inventory.services.business_os import get_business_os_metrics
+        metrics = get_business_os_metrics(business)
+    except Exception:
+        metrics = {"business": business, "verticals_active": [], "insights": [], "vertical_metrics": {}}
+
+    ctx = {
+        "business": business,
+        **metrics,
+    }
+    return render(request, "dashboard/business_os.html", ctx)

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Monitoring – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .mon-card{background:#fff;border-radius:16px;padding:1.2rem;border:1.5px solid #e2e8f0;margin-bottom:1rem;}
+  .health-bar{height:8px;border-radius:4px;background:#e2e8f0;overflow:hidden;}
+  .health-fill{height:100%;border-radius:4px;transition:width .4s;}
+  .site-metric{text-align:center;padding:.5rem 0;}
+  .site-metric-val{font-size:1.3rem;font-weight:800;line-height:1.1;}
+  .site-metric-label{font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:.15rem;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:.35rem;}
+  .dot-ok{background:#10b981;}
+  .dot-warn{background:#f59e0b;}
+  .dot-danger{background:#ef4444;}
+</style>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-display me-2" style="color:#6366f1;"></i>Site Monitoring</h4>
+      <div class="text-muted small">Real-time overview of all active energy sites — {{ business.name }}</div>
+    </div>
+    <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  {% if sites_data %}
+    {% for sd in sites_data %}
+      <div class="mon-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div>
+            <span class="status-dot {% if sd.active_alerts > 0 %}dot-danger{% elif sd.avg_health < 60 %}dot-warn{% else %}dot-ok{% endif %}"></span>
+            <a href="{% url 'verticals:energy_site_detail' sd.site.id %}" class="fw-bold text-decoration-none" style="font-size:1rem;color:#0f172a;">{{ sd.site.name }}</a>
+            <span class="text-muted" style="font-size:.78rem;"> · {{ sd.site.get_site_type_display }}</span>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            {% if sd.active_alerts > 0 %}<span class="badge bg-danger rounded-pill" style="font-size:.7rem;">{{ sd.active_alerts }} alert{{ sd.active_alerts|pluralize }}</span>{% endif %}
+            <span class="text-muted" style="font-size:.72rem;">{{ sd.asset_count }} assets</span>
+          </div>
+        </div>
+
+        <div class="row g-2">
+          <div class="col-6 col-md-2">
+            <div class="site-metric">
+              <div class="site-metric-val" style="color:#059669;">{{ sd.gen_7d|floatformat:1 }}</div>
+              <div class="site-metric-label">Gen 7d (kWh)</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-2">
+            <div class="site-metric">
+              <div class="site-metric-val" style="color:#6366f1;">{{ sd.cons_7d|floatformat:1 }}</div>
+              <div class="site-metric-label">Cons 7d (kWh)</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-2">
+            <div class="site-metric">
+              <div class="site-metric-val">{{ sd.capacity_kw|floatformat:1 }}</div>
+              <div class="site-metric-label">Capacity (kW)</div>
+            </div>
+          </div>
+          <div class="col-6 col-md-2">
+            <div class="site-metric">
+              <div class="site-metric-val" style="color:{% if sd.avg_health >= 70 %}#10b981{% elif sd.avg_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ sd.avg_health }}%</div>
+              <div class="site-metric-label">Avg Health</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-4">
+            <div style="font-size:.72rem;color:#64748b;margin-bottom:.3rem;">Asset Health</div>
+            <div class="health-bar">
+              <div class="health-fill" style="width:{{ sd.avg_health }}%;background:{% if sd.avg_health >= 70 %}#10b981{% elif sd.avg_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+            </div>
+            {% if sd.latest_reading %}
+              <div style="font-size:.7rem;color:#94a3b8;margin-top:.3rem;">Last reading: {{ sd.latest_reading.reading_date }}</div>
+            {% else %}
+              <div style="font-size:.7rem;color:#ef4444;margin-top:.3rem;">No readings yet</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-center py-5">
+      <div style="font-size:4rem;opacity:.15;">📡</div>
+      <h5 class="text-muted mt-2">No active sites to monitor</h5>
+      <p class="text-muted small">Add sites and start entering readings to see monitoring data.</p>
+    </div>
+  {% endif %}
+
+  <div class="mt-3 p-3 rounded-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
+    <div style="font-size:.78rem;color:#059669;">
+      <i class="bi bi-robot me-1"></i> <strong>IoT Ready:</strong> Connect smart meters, inverter APIs, and battery BMS for real-time automated monitoring. Manual readings work until sensors are connected.
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Maintenance – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">🔧 Maintenance</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+    <a href="{% url 'verticals:energy_maintenance_create' %}" class="btn btn-warning btn-sm rounded-pill">
+      <i class="bi bi-plus-lg me-1"></i>Log Maintenance
+    </a>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {% if overdue_assets %}
+  <div class="alert alert-danger rounded-3 mb-4">
+    <strong>⚠️ {{ overdue_assets|length }} asset{{ overdue_assets|length|pluralize }} overdue for maintenance:</strong>
+    <ul class="mb-0 mt-1">
+      {% for a in overdue_assets %}<li>{{ a }} — due {{ a.next_maintenance_date|date:"M d, Y" }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if records %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" style="font-size:.85rem;">
+      <thead class="table-light">
+        <tr><th>Date</th><th>Asset</th><th>Site</th><th>Type</th><th>Technician</th><th>Cost</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td class="text-nowrap">{{ r.performed_at|date:"M d, Y" }}</td>
+          <td>{{ r.asset }}</td>
+          <td class="text-muted">{{ r.asset.site.name }}</td>
+          <td><span class="badge bg-light text-dark">{{ r.get_maintenance_type_display }}</span></td>
+          <td class="text-muted">{{ r.technician.get_full_name|default:r.technician.username|default:"–" }}</td>
+          <td>{% if r.cost %}{{ business.currency }} {{ r.cost|floatformat:0 }}{% else %}–{% endif %}</td>
+          <td class="text-muted text-truncate" style="max-width:200px;">{{ r.description|truncatechars:60 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3rem;opacity:.2">🔧</div>
+    <h5 class="mt-3 text-muted">No maintenance records yet</h5>
+    <a href="{% url 'verticals:energy_maintenance_create' %}" class="btn btn-warning rounded-pill mt-2">Log First Record</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

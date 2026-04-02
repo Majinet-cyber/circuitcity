@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Technician Operations – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .tech-card{background:#fff;border-radius:16px;padding:1.2rem;border:1.5px solid #e2e8f0;}
+  .visit-row{padding:.65rem .75rem;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;}
+  .visit-row.overdue{border-color:#fca5a5;background:#fff1f2;}
+  .visit-row.upcoming{border-color:#bbf7d0;background:#f0fdf4;}
+  .visit-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+  .visit-status{font-size:.68rem;font-weight:700;padding:.15rem .5rem;border-radius:6px;text-transform:uppercase;}
+  .vs-scheduled{background:#dbeafe;color:#1e40af;}
+  .vs-in_progress{background:#fef3c7;color:#92400e;}
+  .vs-completed{background:#d1fae5;color:#065f46;}
+  .vs-cancelled{background:#f1f5f9;color:#64748b;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .kpi-card{background:#fff;border-radius:16px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;}
+  .kpi-val{font-size:1.6rem;font-weight:800;color:#0f172a;}
+  .kpi-label{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;}
+</style>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-person-badge me-2" style="color:#6366f1;"></i>Technician Operations</h4>
+      <div class="text-muted small">Field visits, maintenance assignments, and service records — {{ business.name }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+      <a href="{% url 'verticals:energy_technician_create' %}" class="btn btn-success btn-sm rounded-pill"><i class="bi bi-plus-lg me-1"></i>Schedule Visit</a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# KPIs #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card"><div class="kpi-val" style="color:#ef4444;">{{ overdue|length }}</div><div class="kpi-label">Overdue</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card"><div class="kpi-val" style="color:#10b981;">{{ upcoming|length }}</div><div class="kpi-label">Upcoming (14d)</div></div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card"><div class="kpi-val">{{ visits|length }}</div><div class="kpi-label">Total Visits</div></div>
+    </div>
+  </div>
+
+  {# Overdue #}
+  {% if overdue %}
+    <div class="tech-card mb-3">
+      <div class="section-head" style="color:#ef4444;">🔴 Overdue Visits</div>
+      {% for v in overdue %}
+        <div class="visit-row overdue">
+          <div class="visit-icon" style="background:#fef2f2;">🔴</div>
+          <div style="flex:1;min-width:0;">
+            <div class="fw-semibold text-truncate" style="font-size:.88rem;">{{ v.get_visit_type_display }} — {{ v.site.name }}</div>
+            <div class="text-muted" style="font-size:.75rem;">Scheduled {{ v.scheduled_date }} · {% if v.technician %}{{ v.technician.get_full_name|default:v.technician.username }}{% else %}Unassigned{% endif %}</div>
+          </div>
+          <span class="visit-status vs-{{ v.status }}">{{ v.get_status_display }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {# Upcoming #}
+  {% if upcoming %}
+    <div class="tech-card mb-3">
+      <div class="section-head" style="color:#10b981;">🟢 Upcoming Visits</div>
+      {% for v in upcoming %}
+        <div class="visit-row upcoming">
+          <div class="visit-icon" style="background:#f0fdf4;">📅</div>
+          <div style="flex:1;min-width:0;">
+            <div class="fw-semibold text-truncate" style="font-size:.88rem;">{{ v.get_visit_type_display }} — {{ v.site.name }}</div>
+            <div class="text-muted" style="font-size:.75rem;">{{ v.scheduled_date }} · {% if v.technician %}{{ v.technician.get_full_name|default:v.technician.username }}{% else %}Unassigned{% endif %}</div>
+          </div>
+          <span class="visit-status vs-{{ v.status }}">{{ v.get_status_display }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {# All Visits #}
+  <div class="tech-card">
+    <div class="section-head">All Visits</div>
+    {% if visits %}
+      {% for v in visits %}
+        <div class="visit-row">
+          <div class="visit-icon" style="background:{% if v.status == 'completed' %}#f0fdf4{% elif v.status == 'cancelled' %}#f8fafc{% else %}#eff6ff{% endif %};">
+            {% if v.visit_type == "installation" %}🔌
+            {% elif v.visit_type == "repair" %}🔧
+            {% elif v.visit_type == "inspection" %}🔍
+            {% else %}📋{% endif %}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="fw-semibold text-truncate" style="font-size:.85rem;">{{ v.get_visit_type_display }} — {{ v.site.name }}</div>
+            <div class="text-muted" style="font-size:.72rem;">
+              {{ v.scheduled_date }} · {% if v.technician %}{{ v.technician.get_full_name|default:v.technician.username }}{% else %}Unassigned{% endif %}
+              {% if v.description %} · {{ v.description|truncatechars:60 }}{% endif %}
+            </div>
+          </div>
+          <span class="visit-status vs-{{ v.status }}">{{ v.get_status_display }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="text-center py-4">
+        <div style="font-size:3rem;opacity:.15;">👷</div>
+        <div class="text-muted small mt-1">No visits recorded yet</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

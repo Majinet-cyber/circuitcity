@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Economics & Savings – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">💰 Economics & Savings</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+  </div>
+
+  {# Totals #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#4f46e5;">{{ business.currency }} {{ totals.cumulative_savings|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Cumulative Savings</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ totals.installation_cost|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Total Investment</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:#15803d;">{{ business.currency }} {{ totals.monthly_savings|floatformat:0 }}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">This Month's Savings</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;text-align:center;">
+        <div style="font-size:1.5rem;font-weight:800;color:{% if totals.roi_pct %}#4f46e5{% else %}#94a3b8{% endif %};">{% if totals.roi_pct %}{{ totals.roi_pct }}%{% else %}–{% endif %}</div>
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Portfolio ROI</div>
+      </div>
+    </div>
+  </div>
+
+  {# Per-site breakdown #}
+  {% if sites_data %}
+  <div class="table-responsive">
+    <table class="table align-middle" style="font-size:.87rem;">
+      <thead class="table-light">
+        <tr><th>Site</th><th>Installation Cost</th><th>Cumulative Savings</th><th>This Month</th><th>ROI</th><th>Est. Payback</th></tr>
+      </thead>
+      <tbody>
+        {% for row in sites_data %}
+        <tr>
+          <td><a href="{% url 'verticals:energy_site_detail' row.site.id %}" class="text-decoration-none fw-semibold">{{ row.site.name }}</a></td>
+          <td>{{ business.currency }} {{ row.installation_cost|floatformat:0 }}</td>
+          <td style="color:#15803d;font-weight:600;">{{ business.currency }} {{ row.cumulative_savings|floatformat:0 }}</td>
+          <td>{{ business.currency }} {{ row.monthly_savings|floatformat:0 }}</td>
+          <td>{% if row.roi_pct %}<span style="color:#4f46e5;font-weight:700;">{{ row.roi_pct }}%</span>{% else %}<span class="text-muted">–</span>{% endif %}</td>
+          <td>{% if row.payback_months %}~{{ row.payback_months }} months{% else %}<span class="text-muted">–</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3rem;opacity:.2">💰</div>
+    <h5 class="mt-3 text-muted">No economic data yet</h5>
+    <p class="text-muted small">Add sites with installation costs and log savings records to see economics.</p>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill mt-1">Add First Site</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

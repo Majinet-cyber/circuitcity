@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Demand Forecasting – {{ business.name }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">📈 Demand Forecasting</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+  </div>
+
+  <div class="alert alert-info rounded-3 mb-4" style="border-color:#bae6fd;background:#f0f9ff;">
+    <strong>🤖 AI/IoT Ready:</strong> This module currently uses simple historical averages.
+    Connect live sensor data and a machine learning model to unlock precision forecasting.
+    <a href="{% url 'verticals:energy_assets' %}" class="ms-1 text-decoration-none">Register assets →</a>
+  </div>
+
+  {% if forecasts %}
+  <div class="row g-3">
+    {% for fc in forecasts %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div style="background:#fff;border-radius:14px;padding:1.2rem;border:1.5px solid #e2e8f0;">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span style="font-size:1.2rem;">🏡</span>
+          <a href="{% url 'verticals:energy_site_detail' fc.site.id %}" class="fw-bold text-decoration-none" style="font-size:.95rem;">{{ fc.site.name }}</a>
+          {% if fc.trend %}
+          <span class="ms-auto badge rounded-pill" style="font-size:.65rem;background:{% if fc.trend == 'increasing' %}#dcfce7;color:#15803d{% elif fc.trend == 'decreasing' %}#fee2e2;color:#dc2626{% else %}#e2e8f0;color:#475569{% endif %};">
+            {% if fc.trend == "increasing" %}↑ Increasing{% elif fc.trend == "decreasing" %}↓ Decreasing{% else %}→ Stable{% endif %}
+          </span>
+          {% endif %}
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;">Next 7 Days Gen.</div>
+            <div style="font-size:1.2rem;font-weight:800;">{{ fc.next_7_gen|default:"–" }} <small style="font-size:.65rem;color:#94a3b8;">kWh</small></div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;">Next 30 Days Gen.</div>
+            <div style="font-size:1.2rem;font-weight:800;">{{ fc.next_30_gen|default:"–" }} <small style="font-size:.65rem;color:#94a3b8;">kWh</small></div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;">Daily Avg. (30d)</div>
+            <div style="font-size:1rem;font-weight:700;color:#4f46e5;">{{ fc.avg_daily_gen_30|default:"–" }} <small style="font-size:.65rem;color:#94a3b8;">kWh</small></div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;">Daily Consumption</div>
+            <div style="font-size:1rem;font-weight:700;color:#f59e0b;">{{ fc.avg_daily_cons_30|default:"–" }} <small style="font-size:.65rem;color:#94a3b8;">kWh</small></div>
+          </div>
+        </div>
+        {% if not fc.avg_daily_gen_30 %}
+        <div class="mt-2 text-muted" style="font-size:.75rem;">Log energy readings to enable forecasting</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3.5rem;opacity:.2">📈</div>
+    <h5 class="mt-3 text-muted">No active sites to forecast</h5>
+    <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill mt-2">Add First Site</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -233,11 +233,6 @@ class PharmacyBatch(CompatKwargsMixin, models.Model):
         return f"{self.merch_product.name} - Batch {self.batch_number} (Exp: {self.expiry_date})"
 
     @property
-    def is_expired(self) -> bool:
-        """Check if batch has expired."""
-        return self.expiry_date < timezone.now().date()
-
-    @property
     def days_to_expiry(self) -> int | None:
         """
         Days until expiry (negative if already expired).

@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Energy Dashboard – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .kpi-card{background:#fff;border-radius:16px;padding:1.2rem 1rem;border:1.5px solid #e2e8f0;height:100%;}
+  .kpi-val{font-size:1.7rem;font-weight:800;color:#0f172a;line-height:1.1;}
+  .kpi-label{font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.2rem;}
+  .kpi-sub{font-size:.73rem;color:#94a3b8;}
+  .section-card{background:#fff;border-radius:16px;padding:1.3rem;border:1.5px solid #e2e8f0;}
+  .section-head{font-size:.82rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .alert-row{display:flex;align-items:flex-start;gap:.7rem;padding:.6rem .7rem;border-radius:10px;border:1.5px solid #e2e8f0;background:#fff;}
+  .sev-critical{border-color:#fca5a5;background:#fff1f2;}
+  .sev-high{border-color:#fed7aa;background:#fff7ed;}
+  .sev-medium{border-color:#fde68a;background:#fffbeb;}
+  .sev-low{border-color:#bbf7d0;background:#f0fdf4;}
+  .asset-risk-bar{height:6px;border-radius:3px;background:#e2e8f0;overflow:hidden;}
+  .risk-fill{height:100%;border-radius:3px;}
+  .insight-pill{padding:.55rem .85rem;border-radius:10px;margin-bottom:.4rem;font-size:.83rem;display:flex;align-items:center;gap:.5rem;}
+  .insight-warning{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+  .insight-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;}
+  .insight-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;}
+  .qa-card{display:flex;align-items:center;gap:.7rem;padding:.85rem;border-radius:12px;text-decoration:none;color:inherit;border:1.5px solid #e2e8f0;background:#fff;transition:all .15s;height:100%;}
+  .qa-card:hover{border-color:#10b981;box-shadow:0 4px 16px rgba(0,0,0,.06);}
+  .qa-icon{font-size:1.6rem;flex-shrink:0;}
+  .chart-container{position:relative;height:220px;}
+</style>
+
+<div class="container-fluid py-4">
+
+  {# === HEADER === #}
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0" style="color:#0f172a;"><span style="font-size:1.4rem;">⚡</span> Renewable Energy Command Center</h4>
+      <div class="text-muted small">{{ business.name }} — Executive Overview</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'verticals:energy_monitoring' %}" class="btn btn-outline-primary btn-sm rounded-pill"><i class="bi bi-display me-1"></i>Monitoring</a>
+      <a href="{% url 'verticals:energy_alerts' %}" class="btn btn-outline-danger btn-sm rounded-pill">
+        <i class="bi bi-bell me-1"></i>Alerts{% if stats.critical_alerts %}<span class="badge bg-danger rounded-pill ms-1">{{ stats.critical_alerts }}</span>{% endif %}
+      </a>
+      <a href="{% url 'verticals:energy_sizing_create' %}" class="btn btn-success btn-sm rounded-pill"><i class="bi bi-calculator me-1"></i>New Sizing</a>
+      <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-primary btn-sm rounded-pill"><i class="bi bi-plus-lg me-1"></i>Add Site</a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# === INTELLIGENT INSIGHTS === #}
+  {% if intelligent_insights %}
+  <div class="mb-4">
+    {% for ins in intelligent_insights %}
+      <div class="insight-pill insight-{{ ins.type }}">
+        {% if ins.type == "warning" %}⚠{% elif ins.type == "success" %}✅{% else %}💡{% endif %}
+        {{ ins.text }}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# === PRIMARY KPIs === #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#10b981;">
+        <div class="kpi-val" style="color:#059669;">{{ stats.active_sites|default:0 }}</div>
+        <div class="kpi-label">Active Sites</div>
+        <div class="kpi-sub">of {{ stats.total_sites|default:0 }} total</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#6366f1;">
+        <div class="kpi-val" style="color:#4f46e5;">{{ stats.operational_assets|default:0 }}</div>
+        <div class="kpi-label">Live Assets</div>
+        <div class="kpi-sub">{{ stats.degraded_assets|default:0 }} degraded · {{ stats.faulty_assets|default:0 }} faulty</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#22d3ee;">
+        <div class="kpi-val" style="color:#0891b2;font-size:1.3rem;">{{ stats.installed_capacity|default:0|floatformat:1 }} <small style="font-size:.65rem;">kW</small></div>
+        <div class="kpi-label">Installed Capacity</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#f59e0b;">
+        <div class="kpi-val" style="color:#d97706;">{{ stats.maintenance_overdue|default:0 }}</div>
+        <div class="kpi-label">Maintenance Due</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#ef4444;">
+        <div class="kpi-val" style="color:#dc2626;">{{ stats.critical_alerts|default:0 }}</div>
+        <div class="kpi-label">Critical Alerts</div>
+        <div class="kpi-sub">{{ stats.high_alerts|default:0 }} high</div>
+      </div>
+    </div>
+    <div class="col-6 col-sm-4 col-xl-2">
+      <div class="kpi-card text-center" style="border-color:#84cc16;">
+        <div class="kpi-val" style="color:#4d7c0f;font-size:1.2rem;">{{ business.currency }} {{ stats.cumulative_savings|default:0|floatformat:0 }}</div>
+        <div class="kpi-label">Total Savings</div>
+        <div class="kpi-sub">{{ business.currency }} {{ stats.savings_this_month|default:0|floatformat:0 }} this month</div>
+      </div>
+    </div>
+  </div>
+
+  {# === SECONDARY KPIs === #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val" style="font-size:1.3rem;color:#059669;">{{ stats.generation_this_month|default:0|floatformat:1 }} <small style="font-size:.65rem;">kWh</small></div>
+        <div class="kpi-label">Generation (Month)</div>
+        <div class="kpi-sub">{{ stats.gen_this_week|default:0|floatformat:1 }} kWh this week</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val" style="font-size:1.3rem;color:#6366f1;">{{ stats.consumption_this_month|default:0|floatformat:1 }} <small style="font-size:.65rem;">kWh</small></div>
+        <div class="kpi-label">Consumption (Month)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val" style="font-size:1.3rem;color:{% if stats.avg_battery_health >= 60 %}#10b981{% elif stats.avg_battery_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_battery_health|default:0 }}%</div>
+        <div class="kpi-label">Avg Battery Health</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card text-center">
+        <div class="kpi-val" style="font-size:1.3rem;color:{% if stats.avg_asset_health >= 60 %}#10b981{% elif stats.avg_asset_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_asset_health|default:0 }}%</div>
+        <div class="kpi-label">Avg Asset Health</div>
+      </div>
+    </div>
+  </div>
+
+  {# === QUICK ACTIONS === #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3 col-lg">
+      <a href="{% url 'verticals:energy_site_create' %}" class="qa-card">
+        <span class="qa-icon">🏡</span>
+        <div><div class="fw-bold" style="color:#15803d;font-size:.85rem;">Add Site</div><div class="text-muted" style="font-size:.7rem;">New installation</div></div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+      <a href="{% url 'verticals:energy_asset_create' %}" class="qa-card">
+        <span class="qa-icon">🔋</span>
+        <div><div class="fw-bold" style="color:#4338ca;font-size:.85rem;">Register Asset</div><div class="text-muted" style="font-size:.7rem;">Panel, battery, inverter</div></div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+      <a href="{% url 'verticals:energy_sizing_create' %}" class="qa-card">
+        <span class="qa-icon">📐</span>
+        <div><div class="fw-bold" style="color:#059669;font-size:.85rem;">System Sizing</div><div class="text-muted" style="font-size:.7rem;">Design a system</div></div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+      <a href="{% url 'verticals:energy_maintenance_create' %}" class="qa-card">
+        <span class="qa-icon">🔧</span>
+        <div><div class="fw-bold" style="color:#c2410c;font-size:.85rem;">Log Maintenance</div><div class="text-muted" style="font-size:.7rem;">Service record</div></div>
+      </a>
+    </div>
+    <div class="col-6 col-md-3 col-lg">
+      <a href="{% url 'verticals:energy_load_management' %}" class="qa-card">
+        <span class="qa-icon">📊</span>
+        <div><div class="fw-bold" style="color:#334155;font-size:.85rem;">Load Analysis</div><div class="text-muted" style="font-size:.7rem;">Consumption patterns</div></div>
+      </a>
+    </div>
+  </div>
+
+  {# === ENERGY TREND CHART === #}
+  {% if recent_readings %}
+  <div class="row g-4 mb-4">
+    <div class="col-12">
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="section-head mb-0">📈 Energy Trend (Last 30 Days)</div>
+          <a href="{% url 'verticals:energy_forecasting' %}" style="font-size:.78rem;color:#6366f1;" class="text-decoration-none">Forecasting →</a>
+        </div>
+        <div class="chart-container">
+          <canvas id="energyTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-4">
+    {# === ACTIVE ALERTS === #}
+    <div class="col-12 col-lg-6">
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="section-head mb-0">Active Alerts</div>
+          <div class="d-flex align-items-center gap-2">
+            <form method="post" action="{% url 'verticals:energy_trigger_alerts' %}" style="display:inline;">{% csrf_token %}<button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill" style="font-size:.72rem;"><i class="bi bi-arrow-clockwise me-1"></i>Scan</button></form>
+            <a href="{% url 'verticals:energy_alerts' %}" style="font-size:.78rem;color:#6366f1;" class="text-decoration-none">View all →</a>
+          </div>
+        </div>
+        {% if recent_alerts %}
+          <div class="d-flex flex-column gap-2">
+          {% for alert in recent_alerts %}
+            <div class="alert-row sev-{{ alert.severity }}">
+              <div style="font-size:1.1rem;flex-shrink:0;">
+                {% if alert.severity == "critical" %}🔴{% elif alert.severity == "high" %}🟠{% elif alert.severity == "medium" %}🟡{% else %}🟢{% endif %}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div class="fw-semibold text-truncate" style="font-size:.83rem;">{{ alert.title }}</div>
+                {% if alert.site %}<div class="text-muted" style="font-size:.7rem;">{{ alert.site.name }}</div>{% endif %}
+              </div>
+              <div class="text-muted" style="font-size:.68rem;white-space:nowrap;">{{ alert.created_at|timesince }} ago</div>
+            </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-4">
+            <div style="font-size:2.5rem;opacity:.2">✅</div>
+            <div class="text-muted small mt-1">No active alerts — all systems healthy</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# === HIGH RISK ASSETS === #}
+    <div class="col-12 col-lg-6">
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="section-head mb-0">Assets at Risk</div>
+          <a href="{% url 'verticals:energy_assets' %}" style="font-size:.78rem;color:#6366f1;" class="text-decoration-none">All assets →</a>
+        </div>
+        {% if high_risk_assets %}
+          <div class="d-flex flex-column gap-2">
+          {% for asset in high_risk_assets %}
+            <div class="d-flex align-items-center gap-2">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fef2f2;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
+                {% if asset.asset_type == "solar_panel" %}☀️{% elif asset.asset_type == "battery" %}🔋{% elif asset.asset_type == "inverter" %}⚡{% elif asset.asset_type == "charge_controller" %}🔌{% elif asset.asset_type == "generator" %}⛽{% else %}🔩{% endif %}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div class="fw-semibold text-truncate" style="font-size:.82rem;">{{ asset }}</div>
+                <div class="asset-risk-bar mt-1">
+                  <div class="risk-fill" style="width:{{ asset.risk_score }}%;background:{% if asset.risk_score >= 75 %}#ef4444{% elif asset.risk_score >= 50 %}#f97316{% else %}#f59e0b{% endif %};"></div>
+                </div>
+              </div>
+              <span class="badge rounded-pill" style="font-size:.68rem;background:{% if asset.priority_label == 'critical' %}#ef4444{% elif asset.priority_label == 'high' %}#f97316{% else %}#f59e0b{% endif %};color:#fff;">{{ asset.risk_score }}%</span>
+            </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-4">
+            <div style="font-size:2.5rem;opacity:.2">✅</div>
+            <div class="text-muted small mt-1">All assets healthy</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# === FORECAST + SITES ATTENTION === #}
+  <div class="row g-4 mt-2">
+    <div class="col-12 col-lg-6">
+      <div class="section-card">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="section-head mb-0">📈 Demand Forecast</div>
+          <a href="{% url 'verticals:energy_forecasting' %}" style="font-size:.78rem;color:#6366f1;" class="text-decoration-none">Detailed →</a>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Next 7 Days</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#0f172a;">{{ forecast_summary.next_7_day_demand_kwh|default:"–" }} <small style="font-size:.65rem;color:#64748b;">kWh</small></div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Next 30 Days</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#0f172a;">{{ forecast_summary.next_30_day_demand_kwh|default:"–" }} <small style="font-size:.65rem;color:#64748b;">kWh</small></div>
+          </div>
+          <div class="col-12">
+            <div style="font-size:.8rem;color:#475569;">{{ forecast_summary.explanation }}</div>
+          </div>
+        </div>
+        <div class="mt-2 pt-2 border-top" style="font-size:.73rem;color:#94a3b8;">
+          🤖 AI/IoT ready — connect sensors and ML engine for precision forecasting.
+        </div>
+      </div>
+    </div>
+
+    {% if sites_needing_attention %}
+    <div class="col-12 col-lg-6">
+      <div class="section-card">
+        <div class="section-head">🏚️ Sites Needing Attention</div>
+        <div class="row g-2">
+        {% for site in sites_needing_attention %}
+          <div class="col-12 col-md-6">
+            <a href="{% url 'verticals:energy_site_detail' site.id %}" class="d-flex align-items-center gap-2 p-2 rounded-2 text-decoration-none" style="background:#fff7ed;border:1.5px solid #fed7aa;">
+              <span style="font-size:1.1rem">🏚️</span>
+              <div style="flex:1;min-width:0;">
+                <div class="fw-semibold text-truncate" style="font-size:.83rem;color:#0f172a;">{{ site.name }}</div>
+                <div style="font-size:.7rem;color:#ef4444;">{{ site.alert_count }} alert{{ site.alert_count|pluralize }}</div>
+              </div>
+            </a>
+          </div>
+        {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+{% if recent_readings %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  const ctx = document.getElementById('energyTrendChart');
+  if (!ctx) return;
+  const labels = {{ reading_dates_json|safe }};
+  const genData = {{ gen_data_json|safe }};
+  const consData = {{ cons_data_json|safe }};
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {label:'Generation (kWh)', data:genData, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.1)', fill:true, tension:.3, borderWidth:2, pointRadius:1},
+        {label:'Consumption (kWh)', data:consData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.08)', fill:true, tension:.3, borderWidth:2, pointRadius:1}
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top', labels:{font:{size:11}, usePointStyle:true, pointStyle:'circle'}}},
+      scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}, ticks:{font:{size:10}}}, x:{grid:{display:false}, ticks:{font:{size:9}, maxRotation:45}}}
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

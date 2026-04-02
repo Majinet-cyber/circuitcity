@@ -28,6 +28,13 @@ from inventory.verticals import (
 )
 
 try:
+    from inventory.verticals import energy as _energy_module
+    _HAS_ENERGY = True
+except ImportError:
+    _energy_module = None  # type: ignore
+    _HAS_ENERGY = False
+
+try:
     from inventory.verticals import car_dealer as _car_dealer_module
     _HAS_CAR_DEALER = True
 except ImportError:
@@ -124,6 +131,10 @@ urlpatterns = [
     path("groceries/sell/", groceries.sell, name="groceries_sell"),
     path("groceries/analytics/", groceries.analytics, name="groceries_analytics"),
     path("groceries/sales/<int:sale_id>/rollback/", groceries.rollback_sale, name="groceries_rollback_sale"),
+    # Phase 2: Groceries intelligence views
+    path("groceries/intelligence/", groceries.inventory_intelligence, name="groceries_intelligence"),
+    path("groceries/sales-analytics/", groceries.sales_analytics, name="groceries_sales_analytics"),
+    path("groceries/restocking/", groceries.smart_restocking, name="groceries_restocking"),
     # Groceries V2 (NEW - Stupid Simple Retail + Wholesale Flow)
     path("groceries/v2/dashboard/", groceries_v2.dashboard_v2, name="groceries_dashboard_v2"),
     path("groceries/v2/products/", groceries_v2.product_list_v2, name="groceries_products_v2"),
@@ -297,6 +308,9 @@ urlpatterns = [
     path("welding/reports/", welding.reports, name="welding_reports"),
     path("welding/simulator/", welding.job_simulator, name="welding_job_simulator"),
     path("welding/simulator/to-quote/", welding.simulator_to_quote, name="welding_simulator_to_quote"),
+    # Phase 2: Welding intelligence
+    path("welding/intelligence/", welding.workshop_intelligence, name="welding_intelligence"),
+    path("welding/clients/", welding.client_management, name="welding_clients"),
     
     # ==================== CAR HIRE VERTICAL ====================
     path("car_hire/dashboard/", car_hire.dashboard, name="car_hire_dashboard"),
@@ -333,4 +347,46 @@ urlpatterns = [
 if _HAS_CAR_DEALER and _car_dealer_module:
     urlpatterns += [
         path("car_dealer/dashboard/", _car_dealer_module.car_dealer_dashboard, name="car_dealer_dashboard"),
+    ]
+
+# Renewable Energy vertical (flagship)
+if _HAS_ENERGY and _energy_module:
+    urlpatterns += [
+        path("energy/dashboard/",       _energy_module.dashboard,          name="energy_dashboard"),
+        path("energy/sites/",            _energy_module.sites_list,          name="energy_sites"),
+        path("energy/sites/new/",        _energy_module.site_create,         name="energy_site_create"),
+        path("energy/sites/<int:site_id>/", _energy_module.site_detail,      name="energy_site_detail"),
+        path("energy/sites/<int:site_id>/report/pdf/", _energy_module.site_report_pdf, name="energy_site_report_pdf"),
+        path("energy/assets/",           _energy_module.assets_list,         name="energy_assets"),
+        path("energy/assets/new/",       _energy_module.asset_create,        name="energy_asset_create"),
+        path("energy/monitoring/",       _energy_module.monitoring,          name="energy_monitoring"),
+        path("energy/maintenance/",      _energy_module.maintenance_list,    name="energy_maintenance"),
+        path("energy/maintenance/log/",  _energy_module.maintenance_create,  name="energy_maintenance_create"),
+        path("energy/forecasting/",      _energy_module.forecasting,         name="energy_forecasting"),
+        path("energy/load-management/",  _energy_module.load_management,     name="energy_load_management"),
+        path("energy/sizing/",           _energy_module.system_sizing_list,  name="energy_sizing_list"),
+        path("energy/sizing/new/",       _energy_module.system_sizing_create, name="energy_sizing_create"),
+        path("energy/sizing/<int:run_id>/", _energy_module.system_sizing_detail, name="energy_sizing_detail"),
+        path("energy/sizing/<int:run_id>/pdf/", _energy_module.system_sizing_pdf, name="energy_sizing_pdf"),
+        path("energy/sizing/<int:run_id>/clone/", _energy_module.system_sizing_clone, name="energy_sizing_clone"),
+        path("energy/sizing/<int:run_id>/recalculate/", _energy_module.system_sizing_recalculate, name="energy_sizing_recalculate"),
+        path("energy/economics/",        _energy_module.economics,           name="energy_economics"),
+        path("energy/alerts/",           _energy_module.alerts_list,         name="energy_alerts"),
+        path("energy/alerts/<int:alert_id>/resolve/", _energy_module.alert_resolve, name="energy_alert_resolve"),
+        path("energy/alerts/scan/",      _energy_module.trigger_alert_scan,  name="energy_trigger_alerts"),
+        path("energy/technicians/",      _energy_module.technicians,         name="energy_technicians"),
+        path("energy/technicians/new/",  _energy_module.technician_visit_create, name="energy_technician_create"),
+        path("energy/reports/",          _energy_module.reports,             name="energy_reports"),
+        path("energy/api/reading/",      _energy_module.api_add_reading,     name="energy_api_reading"),
+        # Phase 2: Scenario comparison
+        path("energy/sizing/<int:run_id>/scenarios/", _energy_module.scenario_compare, name="energy_scenario_compare"),
+        path("energy/scenarios/<str:group_id>/", _energy_module.scenario_view, name="energy_scenario_view"),
+        # Phase 2: Proposal lifecycle
+        path("energy/sizing/<int:run_id>/proposal/", _energy_module.proposal_update_status, name="energy_proposal_update"),
+        # Phase 2: Portfolio command center
+        path("energy/portfolio/", _energy_module.portfolio, name="energy_portfolio"),
+        # Phase 2: Energy copilot
+        path("energy/copilot/", _energy_module.copilot, name="energy_copilot"),
+        # Phase 2: Data upload / ingestion
+        path("energy/data-upload/", _energy_module.data_upload, name="energy_data_upload"),
     ]

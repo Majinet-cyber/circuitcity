@@ -1,4 +1,4 @@
-﻿# circuitcity/accounts/urls.py
+# circuitcity/accounts/urls.py
 from django.conf import settings
 from django.contrib.auth.views import LogoutView
 from django.urls import path, reverse_lazy
@@ -16,11 +16,13 @@ urlpatterns = [
     # Authentication
     # -------------------------------
     path("login/", views.login_view, name="login"),
-    # New multi-step wizard (primary signup flow)
-    path("signup/", views.signup_wizard, {"step": 0}, name="signup"),
+    # Canonical signup entry point — routes to signup_manager with source tracking
+    # Both home page and marketplace now converge here
+    path("signup/", views.signup_entry, name="signup"),
+    # Legacy wizard (kept for backward compat, but no longer the canonical entry)
     path("signup/wizard/<int:step>/", views.signup_wizard, name="signup_wizard_step"),
     path("signup/verify-email/", views.signup_verify_email, name="signup_verify_email"),
-    # Legacy single-page signup (kept for backwards compatibility)
+    # Canonical manager signup wizard (3-step: Account → Store → Review)
     path("signup/manager/", views.signup_manager, name="signup_manager"),
     # Logout (supports GET or POST), plus a vanilla CBV option
     path("logout/", views.logout_get_or_post, name="logout"),

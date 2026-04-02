@@ -591,6 +591,7 @@ def notify_sale_completion(sale):
                 profit = None
                 quantity = 1
                 location_name = ""
+                revenue_amount = Decimal("0")
 
                 if hasattr(sale, "item") and sale.item:
                     item = sale.item
@@ -646,7 +647,35 @@ def notify_sale_completion(sale):
                     except (ValueError, TypeError):
                         quantity = 1
 
-                # Handle groceries/pharmacy/other verticals (MerchProduct sales)
+                # Handle pharmacy sales (PharmacySale uses batch → merch_product)
+                elif hasattr(sale, "batch") and sale.batch:
+                    merch_product = getattr(sale.batch, "merch_product", None)
+                    if merch_product and hasattr(merch_product, "name"):
+                        product_name = merch_product.name
+                        full_product_display = merch_product.name
+                        sku_imei = getattr(merch_product, "barcode", "") or ""
+
+                    # PharmacySale uses unit_cost / unit_price / total_amount
+                    try:
+                        qty = getattr(sale, "quantity", 1) or 1
+                        unit_cost_val = getattr(sale, "unit_cost", None)
+                        if unit_cost_val:
+                            cost = Decimal(str(unit_cost_val)) * Decimal(str(qty))
+                        total_val = getattr(sale, "total_amount", None)
+                        if total_val:
+                            revenue_amount = Decimal(str(total_val))
+                            profit = revenue_amount - cost if cost is not None else None
+                    except (ValueError, TypeError, AttributeError):
+                        cost = None
+                        profit = None
+
+                    quantity = getattr(sale, "quantity", 1) or 1
+                    try:
+                        quantity = int(quantity)
+                    except (ValueError, TypeError):
+                        quantity = 1
+
+                # Handle groceries/other verticals (MerchProduct sales via sale.product)
                 elif hasattr(sale, "product") and sale.product:
                     product = sale.product
                     if hasattr(product, "name"):
@@ -660,33 +689,16 @@ def notify_sale_completion(sale):
                     # SKU
                     sku_imei = getattr(product, "sku", "") or getattr(product, "barcode", "") or ""
 
-                    # Cost and profit - check for total_cost/total_price first (vertical sales)
-                    if hasattr(sale, "total_cost") and hasattr(sale, "total_price"):
-                        # Vertical sales (GrocerySale, PharmacySale, etc.) use total_cost/total_price
+                    # Cost and profit
+                    cost_price = getattr(sale, "unit_cost", None) or getattr(product, "cost_price", None)
+                    if cost_price:
                         try:
-                            cost = Decimal(str(sale.total_cost)) if sale.total_cost else None
-                            revenue_amount = Decimal(str(sale.total_price)) if sale.total_price else sale.price
-                            profit = revenue_amount - cost if cost is not None else None
+                            cost = Decimal(str(cost_price))
+                            if hasattr(sale, "unit_cost") and hasattr(sale, "quantity"):
+                                qty = getattr(sale, "quantity", 1) or 1
+                                cost = cost * Decimal(str(qty))
                         except (ValueError, TypeError):
                             cost = None
-                            profit = None
-                    else:
-                        # Fallback: use product cost_price or sale cost
-                        cost_price = getattr(sale, "unit_cost", None) or getattr(product, "cost_price", None)
-                        if cost_price:
-                            try:
-                                cost = Decimal(str(cost_price))
-                                # For unit_cost, multiply by quantity
-                                if hasattr(sale, "unit_cost") and hasattr(sale, "quantity"):
-                                    qty = getattr(sale, "quantity", 1) or 1
-                                    cost = cost * Decimal(str(qty))
-                                profit = sale.price - cost
-                            except (ValueError, TypeError):
-                                cost = None
-                                profit = None
-                        else:
-                            cost = None
-                            profit = None
 
                     # Quantity
                     quantity = getattr(sale, "quantity", 1) or 1
@@ -722,18 +734,18 @@ def notify_sale_completion(sale):
                 else:
                     final_product_display = "Product"
 
-                # Get revenue amount (use total_price for vertical sales, price for regular sales)
-                revenue_amount = sale.price
-                if hasattr(sale, "total_price") and sale.total_price:
-                    try:
-                        revenue_amount = Decimal(str(sale.total_price))
-                    except (ValueError, TypeError):
-                        revenue_amount = sale.price
-                else:
-                    # For regular sales, use price field
-                    try:
-                        revenue_amount = Decimal(str(sale.price)) if sale.price else Decimal("0")
-                    except (ValueError, TypeError):
+                # Get revenue amount - handle all sale types robustly
+                # PharmacySale → total_amount; vertical sales → total_price; regular → price
+                if not revenue_amount or revenue_amount == Decimal("0"):
+                    for _rev_attr in ("total_amount", "total_price", "price"):
+                        _rev_val = getattr(sale, _rev_attr, None)
+                        if _rev_val:
+                            try:
+                                revenue_amount = Decimal(str(_rev_val))
+                                break
+                            except (ValueError, TypeError):
+                                continue
+                    if not revenue_amount:
                         revenue_amount = Decimal("0")
 
                 # Calculate profit margin (guard divide-by-zero)

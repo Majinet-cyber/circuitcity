@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Energy Reports – {{ business.name }}{% endblock %}
+{% block content %}
+<style>
+  .report-card{display:flex;align-items:center;gap:1rem;padding:1.1rem;border-radius:14px;text-decoration:none;color:inherit;border:1.5px solid #e2e8f0;background:#fff;transition:all .15s;height:100%;}
+  .report-card:hover{border-color:#10b981;box-shadow:0 6px 20px rgba(0,0,0,.06);transform:translateY(-1px);}
+  .report-icon{font-size:2rem;flex-shrink:0;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+</style>
+
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+      <h4 class="fw-bold mb-0"><i class="bi bi-file-earmark-bar-graph me-2" style="color:#6366f1;"></i>Energy Reports & Exports</h4>
+      <div class="text-muted small">Generate, view, and download reports — {{ business.name }}</div>
+    </div>
+    <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
+  </div>
+
+  {# === PDF REPORTS === #}
+  <div class="section-head mt-3"><i class="bi bi-file-earmark-pdf me-1"></i> Downloadable Reports</div>
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_sizing_list' %}" class="report-card" style="border-color:#10b981;">
+        <span class="report-icon">📐</span>
+        <div>
+          <div class="fw-bold" style="color:#059669;">System Sizing Proposals</div>
+          <div class="text-muted" style="font-size:.78rem;">Generate PDF proposals with engineering specs, costs, and ROI analysis</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_sites' %}" class="report-card" style="border-color:#6366f1;">
+        <span class="report-icon">🏡</span>
+        <div>
+          <div class="fw-bold" style="color:#4f46e5;">Site Performance Reports</div>
+          <div class="text-muted" style="font-size:.78rem;">PDF reports with asset health, readings, and savings per site</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_economics' %}" class="report-card" style="border-color:#f59e0b;">
+        <span class="report-icon">💰</span>
+        <div>
+          <div class="fw-bold" style="color:#d97706;">Savings & ROI Report</div>
+          <div class="text-muted" style="font-size:.78rem;">Cumulative savings, payback period, and site-by-site ROI</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  {# === ANALYTICS VIEWS === #}
+  <div class="section-head"><i class="bi bi-bar-chart me-1"></i> Analytics & Intelligence</div>
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_maintenance' %}" class="report-card">
+        <span class="report-icon">🔧</span>
+        <div>
+          <div class="fw-bold" style="color:#c2410c;">Maintenance History</div>
+          <div class="text-muted" style="font-size:.78rem;">Service records, parts used, costs, and overdue tracking</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_assets' %}" class="report-card">
+        <span class="report-icon">🔋</span>
+        <div>
+          <div class="fw-bold" style="color:#4338ca;">Asset Health Report</div>
+          <div class="text-muted" style="font-size:.78rem;">Health scores, risk levels, warranty status, and degradation trends</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_forecasting' %}" class="report-card">
+        <span class="report-icon">📈</span>
+        <div>
+          <div class="fw-bold" style="color:#334155;">Demand Forecast</div>
+          <div class="text-muted" style="font-size:.78rem;">7-day and 30-day projections with trend analysis</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_load_management' %}" class="report-card">
+        <span class="report-icon">📊</span>
+        <div>
+          <div class="fw-bold" style="color:#6366f1;">Load Analysis</div>
+          <div class="text-muted" style="font-size:.78rem;">Peak windows, utilization, and optimization recommendations</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_alerts' %}?resolved=1" class="report-card">
+        <span class="report-icon">🔔</span>
+        <div>
+          <div class="fw-bold" style="color:#b45309;">Alert & Incident History</div>
+          <div class="text-muted" style="font-size:.78rem;">All resolved and active alerts with resolutions</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-12 col-md-6 col-lg-4">
+      <a href="{% url 'verticals:energy_technicians' %}" class="report-card">
+        <span class="report-icon">👷</span>
+        <div>
+          <div class="fw-bold" style="color:#059669;">Technician Activity</div>
+          <div class="text-muted" style="font-size:.78rem;">Visits, service records, and field operations log</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <div class="p-3 rounded-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
+    <div style="font-size:.8rem;color:#059669;">
+      <i class="bi bi-file-earmark-pdf me-1"></i> <strong>PDF Export:</strong> System sizing proposals include full PDF download. Site report PDFs are available from each site's detail page.
+    </div>
+  </div>
+</div>
+{% endblock %}

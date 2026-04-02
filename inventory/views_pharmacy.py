@@ -1941,22 +1941,32 @@ def batch_create(request: HttpRequest) -> HttpResponse:
             messages.error(request, "A batch with this number and expiry date already exists.")
             return redirect(request.path)
 
+        # Parse numeric fields safely
+        try:
+            qty_int = int(quantity)
+            reorder_int = int(reorder_level)
+            cost_dec = Decimal(str(cost_price))
+            sell_dec = Decimal(str(selling_price))
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid numeric values for quantity, reorder level, or prices.")
+            return redirect(request.path)
+
         # Create batch
         batch = PharmacyBatch.objects.create(
             business=business,
             merch_product=product,
             batch_number=batch_number,
             expiry_date=expiry_date,
-            quantity=int(quantity),
-            reorder_level=int(reorder_level),
-            cost_price=Decimal(cost_price),
-            selling_price=Decimal(selling_price),
+            quantity=qty_int,
+            reorder_level=reorder_int,
+            cost_price=cost_dec,
+            selling_price=sell_dec,
             supplier=supplier,
             received_date=received_date,
         )
 
         messages.success(request, f"Batch {batch.batch_number} created successfully.")
-        return redirect("inventory:pharmacy_batch_list")
+        return redirect("pharmacy:batch_list")
 
     # GET: show form
     products = MerchProduct.objects.filter(business=business, kind="pharmacy", is_active=True).order_by("name")
@@ -2005,7 +2015,7 @@ def batch_edit(request: HttpRequest, batch_id: int) -> HttpResponse:
 
         batch.save()
         messages.success(request, f"Batch {batch.batch_number} updated.")
-        return redirect("inventory:pharmacy_batch_list")
+        return redirect("pharmacy:batch_list")
 
     # GET: show form
     return render(
@@ -2299,12 +2309,17 @@ def sale_create(request: HttpRequest) -> HttpResponse:
 
     if request.method == "POST":
         batch_id = request.POST.get("batch")
-        quantity = int(request.POST.get("quantity", 1))
         payment_method = request.POST.get("payment_method", "CASH")
         customer_name = request.POST.get("customer_name", "").strip()
         customer_phone = request.POST.get("customer_phone", "").strip()
         prescription_number = request.POST.get("prescription_number", "").strip()
         notes = request.POST.get("notes", "").strip()
+
+        try:
+            quantity = int(request.POST.get("quantity", 1))
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid quantity.")
+            return redirect(request.path)
 
         # Validation
         if not batch_id:
@@ -2358,7 +2373,7 @@ def sale_create(request: HttpRequest) -> HttpResponse:
             f"Stock updated · Revenue added · Well done!\n"
             f"{batch.merch_product.name} x{quantity} | Total: MWK {sale.total_amount:,.2f}",
         )
-        return redirect("inventory:pharmacy_dashboard")
+        return redirect("verticals:pharmacy_dashboard")
 
     # GET: show form
     # Only show batches with stock, not expired

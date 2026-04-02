@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Sales Analytics · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:1400px;margin:0 auto;padding:16px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0}
+.filter-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.filter-btn{padding:8px 16px;border-radius:8px;font-size:.85rem;font-weight:600;text-decoration:none;border:1px solid #e2e8f0;background:#fff;color:#475569}
+.filter-btn.active{background:#2563eb;color:#fff;border-color:#2563eb}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.kpi-card{background:#fff;border-radius:14px;padding:18px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.kpi-card .num{font-size:1.5rem;font-weight:800;color:#1e293b}
+.kpi-card .lbl{color:#64748b;font-size:.75rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.kpi-card.highlight .num{color:#2563eb}
+.section-card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}
+.section-card h3{font-size:1.05rem;font-weight:700;margin:0 0 14px;color:#1e293b}
+.product-table{width:100%;border-collapse:collapse}
+.product-table th{background:#f8fafc;padding:10px 12px;text-align:left;font-size:.78rem;text-transform:uppercase;color:#64748b}
+.product-table td{padding:10px 12px;border-top:1px solid #f1f5f9;font-size:.88rem;color:#1e293b}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:768px){.two-col{grid-template-columns:1fr}}
+.mix-item{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:.9rem}
+.mix-item:last-child{border:none}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-graph-up"></i> Sales Analytics</h2>
+  </div>
+
+  <div class="filter-bar">
+    <a href="?days=7" class="filter-btn {% if days == 7 %}active{% endif %}">7 Days</a>
+    <a href="?days=14" class="filter-btn {% if days == 14 %}active{% endif %}">14 Days</a>
+    <a href="?days=30" class="filter-btn {% if days == 30 %}active{% endif %}">30 Days</a>
+    <a href="?days=90" class="filter-btn {% if days == 90 %}active{% endif %}">90 Days</a>
+  </div>
+
+  {% with a=analytics %}
+  <div class="kpi-grid">
+    <div class="kpi-card highlight"><div class="num">MWK {{ a.total_revenue|default:0|floatformat:0|intcomma }}</div><div class="lbl">Revenue</div></div>
+    <div class="kpi-card"><div class="num">MWK {{ a.total_profit|default:0|floatformat:0|intcomma }}</div><div class="lbl">Profit</div></div>
+    <div class="kpi-card"><div class="num">{{ a.total_transactions|default:0|intcomma }}</div><div class="lbl">Transactions</div></div>
+    <div class="kpi-card"><div class="num">{{ a.total_units|default:0|intcomma }}</div><div class="lbl">Units Sold</div></div>
+    <div class="kpi-card"><div class="num">MWK {{ a.avg_basket_value|default:0|floatformat:0|intcomma }}</div><div class="lbl">Avg Basket</div></div>
+  </div>
+
+  <div class="two-col">
+    {% if a.top_products %}
+    <div class="section-card">
+      <h3><i class="bi bi-trophy text-warning"></i> Top Products by Revenue</h3>
+      <table class="product-table">
+        <thead><tr><th>Product</th><th>Revenue</th><th>Units</th></tr></thead>
+        <tbody>
+        {% for p in a.top_products %}
+        <tr>
+          <td>{{ p.product__name }}</td>
+          <td>MWK {{ p.revenue|default:0|floatformat:0|intcomma }}</td>
+          <td>{{ p.units }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <div>
+      {% if a.payment_mix %}
+      <div class="section-card">
+        <h3><i class="bi bi-credit-card"></i> Payment Methods</h3>
+        {% for p in a.payment_mix %}
+        <div class="mix-item">
+          <span>{{ p.payment_method|default:"Other" }}</span>
+          <span><strong>{{ p.count }}</strong> txns · MWK {{ p.total|default:0|floatformat:0|intcomma }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if a.mode_mix %}
+      <div class="section-card">
+        <h3><i class="bi bi-shop"></i> Sale Modes</h3>
+        {% for m in a.mode_mix %}
+        <div class="mix-item">
+          <span>{{ m.sale_mode|title }}</span>
+          <span><strong>{{ m.count }}</strong> · MWK {{ m.total|default:0|floatformat:0|intcomma }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endwith %}
+</div>
+{% endblock %}

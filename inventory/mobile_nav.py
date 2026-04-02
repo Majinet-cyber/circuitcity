@@ -10,7 +10,10 @@ from typing import Any, Dict, List, Optional
 from django.http import HttpRequest
 from django.urls import NoReverseMatch, reverse
 
-from .helpers_core import CAR_HIRE, CEMENT, CLOTHING, FARM, GYM, LIQUOR, PHARMACY, PHONES, WELDING, business_vertical
+from .helpers_core import (
+    CAR_DEALER, CAR_HIRE, CEMENT, CLOTHING, ENERGY, FARM, GYM,
+    LIQUOR, PHARMACY, PHONES, WELDING, business_vertical,
+)
 
 
 def _safe_reverse(url_name: str, fallback: str = "#") -> str:
@@ -484,6 +487,94 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
             {
                 "key": "menu",
                 "label": "More",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == CAR_DEALER:
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["car_dealer:dashboard", "verticals:car_dealer_dashboard"], "/car-dealer/"),
+                "active_prefix": "/car-dealer/",
+                "is_menu": False,
+            },
+            {
+                "key": "vehicles",
+                "label": "Vehicles",
+                "icon_class": "bi-car-front",
+                "url": _safe_reverse_any(["car_dealer:vehicle_list"], "/car-dealer/vehicles/"),
+                "active_prefix": "/car-dealer/vehicles",
+                "is_menu": False,
+            },
+            {
+                "key": "stock_in",
+                "label": "Stock In",
+                "icon_class": "bi-box-arrow-in-down",
+                "url": _safe_reverse_any(["car_dealer:stock_in"], "/car-dealer/stock-in/"),
+                "active_prefix": "/car-dealer/stock-in",
+                "is_menu": False,
+            },
+            {
+                "key": "marketplace",
+                "label": "Marketplace",
+                "icon_class": "bi-shop",
+                "url": _safe_reverse_any(["inventory:manage_listings"], "/inventory/marketplace/listings/"),
+                "active_prefix": "/inventory/marketplace",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "Menu",
+                "icon_class": "bi-list",
+                "url": "#",
+                "active_prefix": None,
+                "is_menu": True,
+            },
+        ]
+
+    elif vertical == ENERGY:
+        return [
+            {
+                "key": "home",
+                "label": "Home",
+                "icon_class": "bi-speedometer2",
+                "url": _safe_reverse_any(["verticals:energy_dashboard"], "/verticals/energy/dashboard/"),
+                "active_prefix": "/verticals/energy/dashboard",
+                "is_menu": False,
+            },
+            {
+                "key": "sites",
+                "label": "Sites",
+                "icon_class": "bi-geo-alt",
+                "url": _safe_reverse_any(["verticals:energy_sites"], "/verticals/energy/sites/"),
+                "active_prefix": "/verticals/energy/sites",
+                "is_menu": False,
+            },
+            {
+                "key": "sizing",
+                "label": "Sizing",
+                "icon_class": "bi-calculator",
+                "url": _safe_reverse_any(["verticals:energy_sizing_list"], "/verticals/energy/sizing/"),
+                "active_prefix": "/verticals/energy/sizing",
+                "is_menu": False,
+            },
+            {
+                "key": "alerts",
+                "label": "Alerts",
+                "icon_class": "bi-bell",
+                "url": _safe_reverse_any(["verticals:energy_alerts"], "/verticals/energy/alerts/"),
+                "active_prefix": "/verticals/energy/alerts",
+                "is_menu": False,
+            },
+            {
+                "key": "menu",
+                "label": "Menu",
                 "icon_class": "bi-list",
                 "url": "#",
                 "active_prefix": None,

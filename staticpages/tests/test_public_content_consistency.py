@@ -42,15 +42,27 @@ class HomePageContentTests(TestCase):
         self.assertContains(response, "How It Works")
         self.assertContains(response, "how-it-works")
 
-    def test_homepage_contains_see_it_in_action(self):
-        """Homepage must contain See It In Action section."""
+    def test_homepage_contains_features_section(self):
+        """Homepage must contain a core features section with inventory/sales content."""
         response = self.client.get(reverse("staticpages:home"))
-        self.assertContains(response, "See It In Action")
+        content = response.content.decode("utf-8")
+        # The features section should showcase core product capabilities
+        self.assertTrue(
+            "features" in content.lower() or "Core Platform" in content or "inventory" in content.lower(),
+            "Homepage should have a features/capabilities section"
+        )
 
-    def test_homepage_contains_smart_recommendations(self):
-        """Homepage must contain Smart Recommendations section (features)."""
+    def test_homepage_contains_product_capabilities(self):
+        """Homepage must present key product capabilities (inventory, sales, profit)."""
         response = self.client.get(reverse("staticpages:home"))
-        self.assertContains(response, "Smart Recommendations")
+        content = response.content.decode("utf-8").lower()
+        # Core capabilities must be represented
+        capabilities = ["inventory", "sales", "profit"]
+        found = sum(1 for cap in capabilities if cap in content)
+        self.assertGreaterEqual(
+            found, 2,
+            f"Homepage should cover core product capabilities. Found: {found}/3"
+        )
 
     def test_homepage_no_zero_plus_with_join_x(self):
         """

@@ -808,3 +808,75 @@ def rollback_sale(request, sale_id):
         "active_tab": "stock",
     }
     return render(request, "verticals/groceries/rollback_confirm.html", context)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Inventory Intelligence
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GROCERY)
+def inventory_intelligence(request):
+    """Advanced inventory analytics: turnover, fast/slow movers, category performance."""
+    business = get_active_business(request)
+
+    try:
+        from inventory.services.groceries_intelligence import get_inventory_intelligence
+        intel = get_inventory_intelligence(business)
+    except Exception:
+        intel = {}
+
+    context = {
+        "business": business,
+        "active_tab": "intelligence",
+        "intel": intel,
+    }
+    return render(request, "verticals/groceries/inventory_intelligence.html", context)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GROCERY)
+def sales_analytics(request):
+    """Sales analytics: daily trends, product performance, payment mix."""
+    business = get_active_business(request)
+    days = int(request.GET.get("days", 30))
+
+    try:
+        from inventory.services.groceries_intelligence import get_sales_analytics
+        analytics = get_sales_analytics(business, days=days)
+    except Exception:
+        analytics = {}
+
+    context = {
+        "business": business,
+        "active_tab": "sales_analytics",
+        "analytics": analytics,
+        "days": days,
+    }
+    return render(request, "verticals/groceries/sales_analytics.html", context)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.GROCERY)
+def smart_restocking(request):
+    """Smart restocking recommendations based on sales velocity."""
+    business = get_active_business(request)
+
+    try:
+        from inventory.services.groceries_intelligence import get_restock_recommendations
+        recommendations = get_restock_recommendations(business)
+    except Exception:
+        recommendations = []
+
+    total_cost = sum(r.get("estimated_cost", 0) for r in recommendations)
+
+    context = {
+        "business": business,
+        "active_tab": "restocking",
+        "recommendations": recommendations,
+        "total_restock_cost": total_cost,
+    }
+    return render(request, "verticals/groceries/smart_restocking.html", context)

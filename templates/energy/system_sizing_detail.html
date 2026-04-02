@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ run.title }} – System Sizing{% endblock %}
+
+{% block content %}
+<style>
+  .result-card{background:#fff;border-radius:16px;padding:1.3rem;border:1.5px solid #e2e8f0;height:100%;}
+  .result-val{font-size:1.8rem;font-weight:800;color:#0f172a;line-height:1.1;}
+  .result-label{font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem;}
+  .result-sub{font-size:.75rem;color:#94a3b8;}
+  .section-head{font-size:.85rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.75rem;}
+  .rec-item{padding:.5rem .75rem;border-radius:10px;margin-bottom:.4rem;font-size:.85rem;}
+  .rec-ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;}
+  .rec-warn{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;}
+  .load-row{display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid #f1f5f9;font-size:.85rem;}
+  .load-row:last-child{border-bottom:none;}
+  .badge-objective{font-size:.7rem;padding:.2rem .55rem;border-radius:6px;background:#eef2ff;color:#4338ca;font-weight:600;}
+  .badge-arch{font-size:.7rem;padding:.2rem .55rem;border-radius:6px;background:#f0fdf4;color:#059669;font-weight:600;}
+</style>
+
+<div class="container-fluid py-4">
+  {# Header #}
+  <div class="d-flex align-items-start justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-1"><i class="bi bi-calculator me-2" style="color:#10b981;"></i>{{ run.title }}</h4>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="text-muted small">v{{ run.version }} · {{ run.created_at|date:"M j, Y" }}</span>
+        <span class="badge-objective">{{ run.get_design_objective_display }}</span>
+        <span class="badge-arch">{{ run.get_system_architecture_display }}</span>
+        {% if run.customer_name %}<span class="text-muted small">· {{ run.customer_name }}</span>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>All Sizings</a>
+      <a href="{% url 'verticals:energy_sizing_recalculate' run.id %}" class="btn btn-outline-primary btn-sm rounded-pill"><i class="bi bi-arrow-clockwise me-1"></i>Recalculate</a>
+      <a href="{% url 'verticals:energy_sizing_clone' run.id %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-copy me-1"></i>Clone</a>
+      <a href="{% url 'verticals:energy_sizing_pdf' run.id %}" class="btn btn-success btn-sm rounded-pill"><i class="bi bi-file-earmark-pdf me-1"></i>Download PDF</a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  {# === PRIMARY RESULTS === #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#10b981;">
+        <div class="result-val" style="color:#059669;">{{ run.total_daily_demand_kwh|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Daily Demand (kWh)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#f59e0b;">
+        <div class="result-val" style="color:#d97706;">{{ run.peak_load_w|default:"–"|floatformat:0 }}</div>
+        <div class="result-label">Peak Load (W)</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#6366f1;">
+        <div class="result-val" style="color:#4f46e5;">{{ run.recommended_array_kw|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Solar Array (kW)</div>
+        <div class="result-sub">{{ run.recommended_panel_count|default:"0" }} panels</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#8b5cf6;">
+        <div class="result-val" style="color:#7c3aed;">{{ run.recommended_battery_kwh|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Battery (kWh)</div>
+        <div class="result-sub">{{ run.usable_storage_kwh|default:"0"|floatformat:1 }} usable</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#ef4444;">
+        <div class="result-val" style="color:#dc2626;">{{ run.recommended_inverter_kw|default:"–"|floatformat:0 }}</div>
+        <div class="result-label">Inverter (kW)</div>
+        <div class="result-sub">{{ run.inverter_loading_pct|default:"0"|floatformat:0 }}% loading</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3 col-lg-2">
+      <div class="result-card text-center" style="border-color:#22d3ee;">
+        <div class="result-val" style="color:#0891b2;">{{ run.estimated_runtime_hours|default:"–"|floatformat:1 }}</div>
+        <div class="result-label">Runtime (Hours)</div>
+        <div class="result-sub">at full load</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {# === ECONOMICS === #}
+    <div class="col-12 col-lg-6">
+      <div class="result-card">
+        <div class="section-head"><i class="bi bi-cash-coin me-2" style="color:#10b981;"></i>Cost & ROI</div>
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Equipment CapEx</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ run.estimated_capex|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Installation</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ run.estimated_installation_cost|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Monthly Savings</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#059669;">{{ business.currency }} {{ run.projected_monthly_savings|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Annual Savings</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#059669;">{{ business.currency }} {{ run.projected_annual_savings|default:"0"|floatformat:0 }}</div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Payback</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#4f46e5;">{{ run.payback_years|default:"–"|floatformat:1 }}<small style="font-size:.7rem;"> yrs</small></div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">ROI</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#059669;">{{ run.roi_pct|default:"–"|floatformat:0 }}%</div>
+          </div>
+          <div class="col-4">
+            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;">Cost/kWh</div>
+            <div style="font-size:1.4rem;font-weight:800;">{{ business.currency }} {{ run.cost_per_kwh|default:"–"|floatformat:0 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# === RECOMMENDATIONS === #}
+    <div class="col-12 col-lg-6">
+      <div class="result-card">
+        <div class="section-head"><i class="bi bi-lightbulb me-2" style="color:#f59e0b;"></i>Recommendations & Warnings</div>
+        {% if run.warnings %}
+          {% for w in run.warnings %}
+            <div class="rec-item rec-warn">⚠ {{ w }}</div>
+          {% endfor %}
+        {% endif %}
+        {% if run.recommendations %}
+          {% for r in run.recommendations %}
+            <div class="rec-item rec-ok">✓ {{ r }}</div>
+          {% endfor %}
+        {% endif %}
+        {% if not run.recommendations and not run.warnings %}
+          <div class="text-muted small text-center py-3">Add appliances and compute to see recommendations.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# === LOAD SCHEDULE === #}
+  <div class="result-card mt-4">
+    <div class="section-head"><i class="bi bi-lightning-charge me-2" style="color:#f59e0b;"></i>Load Schedule ({{ appliances|length }} appliances)</div>
+    {% if appliances %}
+      <div class="table-responsive">
+        <table class="table table-sm mb-0" style="font-size:.85rem;">
+          <thead style="background:#f8fafc;">
+            <tr>
+              <th>Appliance</th>
+              <th class="text-center">Qty</th>
+              <th class="text-end">Wattage</th>
+              <th class="text-end">Hrs/Day</th>
+              <th class="text-end">Daily Wh</th>
+              <th class="text-center">Priority</th>
+              <th class="text-center">Period</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in appliances %}
+              <tr>
+                <td class="fw-semibold">{{ a.name }}</td>
+                <td class="text-center">{{ a.quantity }}</td>
+                <td class="text-end">{{ a.wattage|floatformat:0 }} W</td>
+                <td class="text-end">{{ a.hours_per_day|floatformat:1 }}</td>
+                <td class="text-end fw-semibold">{{ a.adjusted_daily_wh|floatformat:0 }} Wh</td>
+                <td class="text-center"><span class="badge {% if a.priority == 'critical' %}bg-danger{% elif a.priority == 'high' %}bg-warning text-dark{% elif a.priority == 'medium' %}bg-info text-dark{% else %}bg-secondary{% endif %}" style="font-size:.68rem;">{{ a.get_priority_display }}</span></td>
+                <td class="text-center" style="font-size:.75rem;">{{ a.get_usage_period_display }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot style="border-top:2px solid #10b981;">
+            <tr class="fw-bold">
+              <td>Total</td>
+              <td></td>
+              <td class="text-end">{{ run.peak_load_w|default:"0"|floatformat:0 }} W</td>
+              <td></td>
+              <td class="text-end">{{ run.total_daily_demand_wh|default:"0"|floatformat:0 }} Wh</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-muted text-center py-3">No appliances in this sizing run.</div>
+    {% endif %}
+  </div>
+
+  {% if run.notes or run.assumptions %}
+  <div class="result-card mt-4">
+    <div class="section-head">Notes & Assumptions</div>
+    {% if run.assumptions %}<p style="font-size:.88rem;"><strong>Assumptions:</strong> {{ run.assumptions }}</p>{% endif %}
+    {% if run.notes %}<p style="font-size:.88rem;">{{ run.notes }}</p>{% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

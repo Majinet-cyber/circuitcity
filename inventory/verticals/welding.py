@@ -1724,3 +1724,58 @@ def costs_add(request: HttpRequest) -> HttpResponse:
         "active_tab": "costs",
     })
     return render(request, "verticals/welding/costs_add.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: Workshop Intelligence Dashboard
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def workshop_intelligence(request):
+    """Enhanced workshop analytics with production intelligence."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    if not business:
+        return redirect("verticals:no_business")
+
+    try:
+        from inventory.services.welding_intelligence import (
+            get_workshop_intelligence, get_production_insights,
+        )
+        workshop_data = get_workshop_intelligence(business)
+        production_insights = get_production_insights(business)
+    except Exception:
+        workshop_data = {}
+        production_insights = []
+
+    ctx.update({
+        "active_tab": "intelligence",
+        "workshop": workshop_data,
+        "insights": production_insights,
+    })
+    return render(request, "verticals/welding/workshop_intelligence.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def client_management(request):
+    """Client analytics and management for welding workshop."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    if not business:
+        return redirect("verticals:no_business")
+
+    try:
+        from inventory.services.welding_intelligence import get_client_analytics
+        client_data = get_client_analytics(business)
+    except Exception:
+        client_data = {}
+
+    ctx.update({
+        "active_tab": "clients",
+        "clients": client_data,
+    })
+    return render(request, "verticals/welding/client_management.html", ctx)

@@ -13,4 +13,8 @@ urlpatterns = [
     path("sell/", groceries.sell, name="sell"),
     path("analytics/", groceries.analytics, name="analytics"),
     path("sales/<int:sale_id>/rollback/", groceries.rollback_sale, name="rollback_sale"),
+    # Phase 2: Intelligence views
+    path("intelligence/", groceries.inventory_intelligence, name="inventory_intelligence"),
+    path("sales-analytics/", groceries.sales_analytics, name="sales_analytics"),
+    path("restocking/", groceries.smart_restocking, name="smart_restocking"),
 ]

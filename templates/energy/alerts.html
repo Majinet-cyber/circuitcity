@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Energy Alerts – {{ business.name }}{% endblock %}
+{% block content %}
+<style>
+  .alert-card{border-radius:12px;padding:.9rem 1rem;border:1.5px solid #e2e8f0;background:#fff;margin-bottom:.6rem;}
+  .sev-critical{border-color:#fca5a5;background:#fff1f2;}
+  .sev-high{border-color:#fed7aa;background:#fff7ed;}
+  .sev-medium{border-color:#fde68a;background:#fffbeb;}
+  .sev-low{border-color:#bbf7d0;background:#f0fdf4;}
+</style>
+<div class="container-fluid py-4">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div>
+      <h4 class="fw-bold mb-0">🔔 Energy Alerts</h4>
+      <div class="text-muted small">{{ business.name }}</div>
+    </div>
+    <div class="d-flex gap-2">
+      {% if show_resolved %}
+        <a href="{% url 'verticals:energy_alerts' %}" class="btn btn-outline-secondary btn-sm rounded-pill">Hide Resolved</a>
+      {% else %}
+        <a href="?resolved=1" class="btn btn-outline-secondary btn-sm rounded-pill">Show Resolved</a>
+      {% endif %}
+    </div>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  {% if alerts %}
+    {% for alert in alerts %}
+    <div class="alert-card sev-{{ alert.severity }}">
+      <div class="d-flex align-items-start gap-3">
+        <div style="font-size:1.3rem;flex-shrink:0;">
+          {% if alert.severity == "critical" %}🔴{% elif alert.severity == "high" %}🟠{% elif alert.severity == "medium" %}🟡{% else %}🟢{% endif %}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-bold" style="font-size:.92rem;">{{ alert.title }}</span>
+            <span class="badge rounded-pill" style="font-size:.65rem;background:#6366f1;color:#fff;">{{ alert.get_alert_type_display }}</span>
+            {% if alert.is_resolved %}<span class="badge bg-success rounded-pill" style="font-size:.65rem;">Resolved</span>{% endif %}
+          </div>
+          {% if alert.site %}<div class="text-muted" style="font-size:.78rem;"><i class="bi bi-geo-alt me-1"></i>{{ alert.site.name }}</div>{% endif %}
+          {% if alert.description %}<div style="font-size:.82rem;color:#475569;margin-top:.25rem;">{{ alert.description }}</div>{% endif %}
+          {% if alert.suggested_action %}<div class="mt-1 p-2 rounded-2" style="background:rgba(255,255,255,.6);font-size:.78rem;color:#0f172a;"><strong>Action:</strong> {{ alert.suggested_action }}</div>{% endif %}
+        </div>
+        <div class="text-end" style="flex-shrink:0;">
+          <div class="text-muted" style="font-size:.72rem;">{{ alert.created_at|timesince }} ago</div>
+          {% if not alert.is_resolved %}
+          <form method="post" action="{% url 'verticals:energy_alert_resolve' alert.id %}" class="mt-1">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-success rounded-pill" style="font-size:.72rem;">Resolve</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="text-center py-5">
+    <div style="font-size:3.5rem;opacity:.2">✅</div>
+    <h5 class="mt-3 text-muted">No active alerts</h5>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

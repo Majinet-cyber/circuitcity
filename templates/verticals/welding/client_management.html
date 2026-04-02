@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Client Management · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-wrapper{max-width:1200px;margin:0 auto;padding:16px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-header h2{font-size:1.5rem;font-weight:700;color:#1e293b;margin:0}
+.stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:#fff;border-radius:14px;padding:20px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+.stat-card .num{font-size:1.8rem;font-weight:800;color:#1e293b}
+.stat-card .lbl{color:#64748b;font-size:.8rem;text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.section-card{background:#fff;border-radius:14px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:20px}
+.section-card h3{font-size:1.1rem;font-weight:700;margin:0 0 16px;color:#1e293b;display:flex;align-items:center;gap:8px}
+.client-table{width:100%;border-collapse:collapse}
+.client-table th{background:#f8fafc;padding:10px 14px;text-align:left;font-size:.8rem;text-transform:uppercase;color:#64748b}
+.client-table td{padding:10px 14px;border-top:1px solid #f1f5f9;font-size:.9rem;color:#1e293b}
+.client-table tr:hover{background:#f8fafc}
+.badge-repeat{background:#d1fae5;color:#065f46;padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="page-header">
+    <h2><i class="bi bi-people"></i> Client Management</h2>
+    <a href="{% url 'verticals:welding_dashboard' %}" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Dashboard</a>
+  </div>
+
+  {% with c=clients %}
+  <div class="stats-bar">
+    <div class="stat-card"><div class="num">{{ c.total_unique_clients|default:0 }}</div><div class="lbl">Total Clients</div></div>
+    <div class="stat-card"><div class="num">{{ c.repeat_clients|default:0 }}</div><div class="lbl">Repeat Clients</div></div>
+    <div class="stat-card"><div class="num">{{ c.repeat_rate|default:0 }}%</div><div class="lbl">Repeat Rate</div></div>
+  </div>
+
+  {% if c.top_clients_by_jobs %}
+  <div class="section-card">
+    <h3><i class="bi bi-trophy text-warning"></i> Top Clients by Jobs</h3>
+    <table class="client-table">
+      <thead><tr><th>Customer</th><th>Phone</th><th>Jobs</th><th>Total Quoted</th></tr></thead>
+      <tbody>
+      {% for cl in c.top_clients_by_jobs %}
+      <tr>
+        <td>{{ cl.customer_name }} {% if cl.job_count > 1 %}<span class="badge-repeat">Repeat</span>{% endif %}</td>
+        <td>{{ cl.customer_phone|default:"—" }}</td>
+        <td>{{ cl.job_count }}</td>
+        <td>MWK {{ cl.total_quoted|default:0|floatformat:0|intcomma }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if c.top_clients_by_value %}
+  <div class="section-card">
+    <h3><i class="bi bi-currency-dollar text-success"></i> Top Clients by Value</h3>
+    <table class="client-table">
+      <thead><tr><th>Customer</th><th>Accepted Quotes</th><th>Total Value</th></tr></thead>
+      <tbody>
+      {% for cl in c.top_clients_by_value %}
+      <tr>
+        <td>{{ cl.customer_name }}</td>
+        <td>{{ cl.quote_count }}</td>
+        <td>MWK {{ cl.total_value|default:0|floatformat:0|intcomma }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endwith %}
+</div>
+{% endblock %}

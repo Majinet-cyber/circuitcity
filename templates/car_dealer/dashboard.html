@@ -5,28 +5,37 @@
 
 {% block content %}
 <style>
-  .stat-card{background:#fff;border-radius:16px;padding:1.5rem;border:1.5px solid #e2e8f0;}
-  .stat-val{font-size:2rem;font-weight:800;color:#0f172a;}
-  .stat-label{font-size:.8rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;}
+  .kpi-card{background:#fff;border-radius:16px;padding:1.4rem 1.2rem;border:1.5px solid #e2e8f0;height:100%;}
+  .kpi-val{font-size:1.9rem;font-weight:800;color:#0f172a;line-height:1.1;}
+  .kpi-label{font-size:.75rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem;}
+  .kpi-sub{font-size:.78rem;color:#94a3b8;margin-top:.2rem;}
   .vehicle-card{background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;transition:all .15s;text-decoration:none;color:inherit;display:block;}
   .vehicle-card:hover{border-color:#6366f1;box-shadow:0 8px 24px rgba(0,0,0,.08);}
-  .vehicle-img-placeholder{width:100%;height:160px;background:linear-gradient(135deg,#fdf2f8,#f1f5f9);display:flex;align-items:center;justify-content:center;font-size:3.5rem;}
-  .vehicle-body{padding:.9rem;}
-  .vehicle-name{font-size:.95rem;font-weight:700;color:#0f172a;}
-  .vehicle-price{font-size:1rem;font-weight:800;color:#4f46e5;}
-  .vehicle-meta{font-size:.75rem;color:#64748b;}
+  .vehicle-img{width:100%;height:140px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;font-size:3rem;}
+  .vehicle-body{padding:.85rem;}
+  .vehicle-name{font-size:.9rem;font-weight:700;color:#0f172a;}
+  .vehicle-price{font-size:.95rem;font-weight:800;color:#4f46e5;}
+  .vehicle-meta{font-size:.72rem;color:#64748b;margin-top:.2rem;}
+  .aging-bar{height:6px;border-radius:3px;}
+  .section-title{font-size:.9rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;}
+  .make-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid #f1f5f9;}
+  .make-row:last-child{border-bottom:none;}
+  .make-bar{height:8px;border-radius:4px;background:#6366f1;transition:width .4s;}
 </style>
 
 <div class="container-fluid py-4">
   {# Header #}
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
-      <h4 class="fw-bold mb-0"><span style="font-size:1.5rem">🏎️</span> Car Dealer Dashboard</h4>
+      <h4 class="fw-bold mb-0"><span style="font-size:1.4rem">🏎️</span> Car Dealer Dashboard</h4>
       <div class="text-muted small">{{ business.name }}</div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
       <a href="{% url 'car_dealer:vehicle_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
         <i class="bi bi-list-ul me-1"></i>All Vehicles
+      </a>
+      <a href="{% url 'inventory:manage_listings' %}" class="btn btn-outline-warning btn-sm rounded-pill">
+        <i class="bi bi-shop me-1"></i>Marketplace
       </a>
       <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary btn-sm rounded-pill">
         <i class="bi bi-plus-lg me-1"></i>Add Vehicle
@@ -36,84 +45,228 @@
 
   {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
 
-  {# Stats #}
+  {# === PRIMARY KPIs === #}
   <div class="row g-3 mb-4">
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center">
-        <div class="stat-val">{{ stats.total }}</div>
-        <div class="stat-label">Total</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center">
+        <div class="kpi-val">{{ stats.total }}</div>
+        <div class="kpi-label">Total Units</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center" style="border-color:#10b981;">
-        <div class="stat-val" style="color:#059669;">{{ stats.in_stock }}</div>
-        <div class="stat-label">In Stock</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center" style="border-color:#10b981;">
+        <div class="kpi-val" style="color:#059669;">{{ stats.in_stock }}</div>
+        <div class="kpi-label">Available</div>
+        <div class="kpi-sub">In stock now</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center" style="border-color:#f59e0b;">
-        <div class="stat-val" style="color:#d97706;">{{ stats.reserved }}</div>
-        <div class="stat-label">Reserved</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center" style="border-color:#f59e0b;">
+        <div class="kpi-val" style="color:#d97706;">{{ stats.reserved }}</div>
+        <div class="kpi-label">Reserved</div>
+        <div class="kpi-sub">Pending sale</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center" style="border-color:#ef4444;">
-        <div class="stat-val" style="color:#dc2626;">{{ stats.sold_this_month }}</div>
-        <div class="stat-label">Sold This Month</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center" style="border-color:#ef4444;">
+        <div class="kpi-val" style="color:#dc2626;">{{ stats.sold_this_month }}</div>
+        <div class="kpi-label">Sold (Month)</div>
+        <div class="kpi-sub">This calendar month</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center" style="border-color:#6366f1;">
-        <div class="stat-val" style="color:#4f46e5;font-size:1.4rem;">{{ business.currency }} {{ stats.revenue_this_month|floatformat:0 }}</div>
-        <div class="stat-label">Revenue (month)</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center" style="border-color:#6366f1;">
+        <div class="kpi-val" style="color:#4f46e5;font-size:1.3rem;">{{ business.currency }} {{ stats.revenue_this_month|floatformat:0 }}</div>
+        <div class="kpi-label">Revenue (Month)</div>
       </div>
     </div>
-    <div class="col-6 col-md-2">
-      <div class="stat-card text-center">
-        <div class="stat-val" style="font-size:1.3rem;">{{ business.currency }} {{ stats.avg_selling_price|floatformat:0 }}</div>
-        <div class="stat-label">Avg Price</div>
+    <div class="col-6 col-sm-4 col-md-2">
+      <div class="kpi-card text-center" style="border-color:#8b5cf6;">
+        <div class="kpi-val" style="color:#7c3aed;font-size:1.3rem;">{{ business.currency }} {{ stats.inventory_value|floatformat:0 }}</div>
+        <div class="kpi-label">Stock Value</div>
+        <div class="kpi-sub">Current inventory</div>
       </div>
     </div>
   </div>
 
-  {# Quick actions #}
+  {# === SECOND ROW: Avg Price + Aging + Quick Actions === #}
+  <div class="row g-3 mb-4">
+    {# Avg Selling Price #}
+    <div class="col-12 col-md-3">
+      <div class="kpi-card">
+        <div class="kpi-label mb-2">Avg Asking Price</div>
+        <div style="font-size:1.6rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ stats.avg_selling_price|floatformat:0 }}</div>
+        <div class="kpi-sub">Across current stock</div>
+      </div>
+    </div>
+
+    {# Stock Aging #}
+    <div class="col-12 col-md-4">
+      <div class="kpi-card">
+        <div class="kpi-label mb-2">Stock Aging ⚠️</div>
+        {% with total_aged=stats.aging_30|add:stats.aging_60|add:stats.aging_90_plus %}
+        {% if total_aged > 0 %}
+          <div class="d-flex flex-column gap-2">
+            <div>
+              <div class="d-flex justify-content-between" style="font-size:.8rem;">
+                <span style="color:#d97706;">30–60 days</span>
+                <span class="fw-bold">{{ stats.aging_30 }} units</span>
+              </div>
+              {% if stats.in_stock > 0 %}
+              <div class="aging-bar mt-1" style="background:#fef3c7;">
+                <div class="aging-bar" style="background:#f59e0b;width:{% widthratio stats.aging_30 stats.in_stock 100 %}%;"></div>
+              </div>
+              {% endif %}
+            </div>
+            <div>
+              <div class="d-flex justify-content-between" style="font-size:.8rem;">
+                <span style="color:#ef4444;">60–90 days</span>
+                <span class="fw-bold">{{ stats.aging_60 }} units</span>
+              </div>
+              {% if stats.in_stock > 0 %}
+              <div class="aging-bar mt-1" style="background:#fee2e2;">
+                <div class="aging-bar" style="background:#ef4444;width:{% widthratio stats.aging_60 stats.in_stock 100 %}%;"></div>
+              </div>
+              {% endif %}
+            </div>
+            <div>
+              <div class="d-flex justify-content-between" style="font-size:.8rem;">
+                <span style="color:#dc2626;font-weight:700;">90+ days</span>
+                <span class="fw-bold" style="color:#dc2626;">{{ stats.aging_90_plus }} units</span>
+              </div>
+              {% if stats.in_stock > 0 %}
+              <div class="aging-bar mt-1" style="background:#fecaca;">
+                <div class="aging-bar" style="background:#dc2626;width:{% widthratio stats.aging_90_plus stats.in_stock 100 %}%;"></div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        {% else %}
+          <div class="text-muted small py-2">No aged stock — all vehicles are fresh 🎉</div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    {# Stock by Make #}
+    <div class="col-12 col-md-5">
+      <div class="kpi-card">
+        <div class="kpi-label mb-2">Stock by Make</div>
+        {% if vehicles_by_make %}
+          {% for row in vehicles_by_make %}
+          <div class="make-row">
+            <span style="font-size:.85rem;font-weight:600;color:#374151;">{{ row.model__make__name|default:row.make_text|default:"Unknown" }}</span>
+            <div class="d-flex align-items-center gap-2">
+              {% if stats.in_stock > 0 %}
+              <div style="width:80px;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
+                <div class="make-bar" style="width:{% widthratio row.count stats.in_stock 100 %}%;"></div>
+              </div>
+              {% endif %}
+              <span class="fw-bold" style="font-size:.8rem;color:#4f46e5;min-width:2.5rem;text-align:right;">{{ row.count }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small py-2">No vehicle data yet</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# === QUICK ACTIONS === #}
   <div class="row g-3 mb-4">
     <div class="col-12 col-md-4">
       <a href="{% url 'car_dealer:stock_in' %}" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#eef2ff;border:1.5px solid #c7d2fe;">
         <span style="font-size:2rem">📥</span>
-        <div><div class="fw-bold" style="color:#4f46e5;">Stock In</div><div class="text-muted small">Add a vehicle to inventory</div></div>
+        <div><div class="fw-bold" style="color:#4f46e5;">Stock In Vehicle</div><div class="text-muted small">Add a new unit to inventory</div></div>
       </a>
     </div>
     <div class="col-12 col-md-4">
       <a href="{% url 'car_dealer:vehicle_list' %}?status=in_stock" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
         <span style="font-size:2rem">🚘</span>
-        <div><div class="fw-bold" style="color:#059669;">Vehicle Inventory</div><div class="text-muted small">Browse and manage your stock</div></div>
+        <div><div class="fw-bold" style="color:#059669;">Vehicle Inventory</div><div class="text-muted small">Browse and manage stock</div></div>
       </a>
     </div>
     <div class="col-12 col-md-4">
       <a href="{% url 'inventory:manage_listings' %}" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#fef3c7;border:1.5px solid #fcd34d;">
         <span style="font-size:2rem">🛒</span>
-        <div><div class="fw-bold" style="color:#d97706;">Marketplace</div><div class="text-muted small">Manage public listings</div></div>
+        <div><div class="fw-bold" style="color:#d97706;">Marketplace Listings</div><div class="text-muted small">Manage public visibility</div></div>
       </a>
     </div>
   </div>
 
-  {# Recent stock #}
+  {# === RECENT SALES + FUEL MIX === #}
+  <div class="row g-3 mb-4">
+    {# Recent Sales #}
+    <div class="col-12 col-md-7">
+      <div class="kpi-card">
+        <div class="section-title mb-3">Recent Sales</div>
+        {% if recent_sold %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" style="font-size:.85rem;">
+            <thead><tr style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;">
+              <th>Vehicle</th><th>Price</th><th>Date</th>
+            </tr></thead>
+            <tbody>
+              {% for v in recent_sold %}
+              <tr>
+                <td><span class="fw-semibold">{{ v.display_name }}</span></td>
+                <td>{{ business.currency }} {{ v.sale_price|default:v.selling_price|floatformat:0 }}</td>
+                <td class="text-muted">{{ v.sold_at|date:"M d" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-muted small py-3 text-center">No sales recorded yet</div>
+        {% endif %}
+        <div class="mt-2">
+          <a href="{% url 'car_dealer:vehicle_list' %}?status=sold" class="text-decoration-none" style="font-size:.8rem;color:#6366f1;">View all sold vehicles →</a>
+        </div>
+      </div>
+    </div>
+
+    {# Fuel Type Mix #}
+    <div class="col-12 col-md-5">
+      <div class="kpi-card">
+        <div class="section-title mb-3">Stock by Fuel Type</div>
+        {% if vehicles_by_fuel %}
+          {% for row in vehicles_by_fuel %}
+          <div class="make-row">
+            <span style="font-size:.85rem;font-weight:600;color:#374151;">
+              {% if row.fuel_type == "petrol" %}⛽ Petrol
+              {% elif row.fuel_type == "diesel" %}🛢️ Diesel
+              {% elif row.fuel_type == "hybrid" %}🔋 Hybrid
+              {% elif row.fuel_type == "electric" %}⚡ Electric
+              {% else %}{{ row.fuel_type|capfirst }}{% endif %}
+            </span>
+            <span class="fw-bold" style="font-size:.85rem;color:#4f46e5;">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted small py-3 text-center">Add vehicles to see fuel mix</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# === AVAILABLE VEHICLES === #}
   {% if recent_vehicles %}
-  <h5 class="fw-bold mb-3">Available Vehicles</h5>
+  <h5 class="fw-bold mb-3">Available Vehicles <span class="badge bg-success rounded-pill" style="font-size:.75rem;">{{ stats.in_stock }}</span></h5>
   <div class="row g-3">
     {% for vehicle in recent_vehicles %}
     <div class="col-6 col-sm-4 col-md-3 col-lg-2">
       <a href="{% url 'car_dealer:vehicle_detail' vehicle.pk %}" class="vehicle-card">
-        <div class="vehicle-img-placeholder">🚗</div>
+        <div class="vehicle-img">🚗</div>
         <div class="vehicle-body">
           <div class="vehicle-name text-truncate">{{ vehicle.display_name }}</div>
           {% if vehicle.selling_price %}
             <div class="vehicle-price">{{ business.currency }} {{ vehicle.selling_price|floatformat:0 }}</div>
           {% endif %}
           <div class="vehicle-meta">
-            {% if vehicle.mileage %}{{ vehicle.mileage|floatformat:0 }} km{% endif %}
-            {% if vehicle.transmission %} · {{ vehicle.get_transmission_display }}{% endif %}
+            {% if vehicle.mileage %}{{ vehicle.mileage|floatformat:0 }} km · {% endif %}
+            {% if vehicle.year %}{{ vehicle.year }}{% endif %}
           </div>
         </div>
       </a>
@@ -122,12 +275,14 @@
   </div>
   {% else %}
   <div class="text-center py-5">
-    <div style="font-size:4rem;opacity:.25">🚗</div>
-    <h5 class="mt-3 text-muted">No vehicles yet</h5>
-    <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary rounded-pill mt-2">
+    <div style="font-size:4rem;opacity:.2">🚗</div>
+    <h5 class="mt-3 text-muted">No vehicles in stock</h5>
+    <p class="text-muted small">Stock in your first vehicle to get started.</p>
+    <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary rounded-pill mt-1">
       <i class="bi bi-plus-lg me-1"></i>Add First Vehicle
     </a>
   </div>
   {% endif %}
+
 </div>
 {% endblock %}
