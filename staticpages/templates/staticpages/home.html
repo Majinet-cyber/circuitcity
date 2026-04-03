@@ -2363,6 +2363,500 @@
     @media (max-width: 768px) {
       .smart-recs-grid { grid-template-columns: 1fr; }
     }
+
+    /* ============================================================
+       IMPACT / REAL STORIES — CAROUSEL
+    ============================================================ */
+    .impact-stories-section {
+      background: var(--bg-subtle);
+    }
+    /* --- Story badge --- */
+    .story-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 0.3rem 0.875rem;
+      border-radius: 2rem;
+      margin-bottom: 0.875rem;
+    }
+    .story-badge--gym {
+      background: rgba(79,70,229,0.08);
+      color: var(--brand);
+      border: 1px solid rgba(79,70,229,0.18);
+    }
+    .story-badge--pharmacy {
+      background: rgba(16,185,129,0.08);
+      color: var(--green-dark);
+      border: 1px solid rgba(16,185,129,0.2);
+    }
+
+    /* --- Proof pills --- */
+    .story-proof-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding-top: 1.5rem;
+      margin-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .story-proof-pill {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      padding: 0.3rem 0.8rem;
+      border-radius: 2rem;
+      background: var(--green-light);
+      color: var(--green-dark);
+      border: 1px solid rgba(16,185,129,0.2);
+    }
+
+    /* --- Story points --- */
+    .story-points {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .story-point {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.625rem;
+      font-size: 0.875rem;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    .story-point svg { flex-shrink: 0; margin-top: 2px; }
+    .story-point--pain { color: #92400e; }
+    .story-point--win  { color: #065f46; }
+
+    /* --- Phase labels --- */
+    .sc-phase-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6rem;
+    }
+    .sc-phase-label--before { color: #b45309; }
+    .sc-phase-label--during { color: var(--brand); }
+    .sc-phase-label--after  { color: var(--green-dark); }
+    .phase-pip {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .phase-pip--before { background: #f59e0b; }
+    .phase-pip--during { background: var(--brand); }
+    .phase-pip--after  { background: var(--green); }
+
+    /* ============================================================
+       STORY CAROUSEL WRAPPER
+    ============================================================ */
+    .sc-wrap {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+
+    /* Tab selector */
+    .sc-tabs {
+      display: flex;
+      border-bottom: 1.5px solid var(--border);
+      background: var(--bg-subtle);
+    }
+    .sc-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1rem 1.25rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: color var(--transition-base), background var(--transition-base);
+      position: relative;
+    }
+    .sc-tab::after {
+      content: '';
+      position: absolute;
+      bottom: -1.5px; left: 0; right: 0;
+      height: 2.5px;
+      background: var(--brand);
+      transform: scaleX(0);
+      transition: transform 0.25s ease;
+    }
+    .sc-tab--active {
+      color: var(--brand);
+      background: var(--bg);
+    }
+    .sc-tab--active::after {
+      transform: scaleX(1);
+    }
+    .sc-tab:hover:not(.sc-tab--active) {
+      color: var(--text);
+      background: rgba(0,0,0,0.02);
+    }
+    .sc-tab-icon { font-size: 1.1rem; }
+
+    /* Progress track */
+    .sc-progress-track {
+      height: 3px;
+      background: var(--border);
+      overflow: hidden;
+    }
+    .sc-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--brand) 0%, #7c3aed 100%);
+      transition: width 10s linear;
+    }
+
+    /* Slides container */
+    .sc-slides {
+      position: relative;
+    }
+    .sc-slide {
+      display: none;
+    }
+    .sc-slide--active {
+      display: block;
+      animation: scFadeUp 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes scFadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Slide inner layout */
+    .sc-slide-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2.5rem;
+      align-items: start;
+      padding: 2.5rem;
+    }
+    .sc-slide-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .sc-slide-title {
+      font-size: clamp(1.15rem, 2.5vw, 1.5rem);
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+    }
+    .sc-slide-lead {
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.75;
+      margin-bottom: 1.5rem;
+    }
+    .sc-phases {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-bottom: 0;
+    }
+    .sc-phase { }
+
+    /* Image grid inside slides */
+    .sc-slide-gallery { }
+    .sc-gallery-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto;
+      gap: 0.625rem;
+    }
+    .sc-gallery-grid--pharmacy {
+      grid-template-columns: 1fr 1fr;
+    }
+    .sc-img-card {
+      position: relative;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--bg-section);
+      border: 1px solid var(--border);
+      cursor: zoom-in;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+    }
+    .sc-img-card:hover {
+      transform: translateY(-2px) scale(1.01);
+      box-shadow: var(--shadow);
+    }
+    .sc-img-card img {
+      width: 100%;
+      height: 148px;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.35s ease;
+    }
+    .sc-img-card:hover img { transform: scale(1.04); }
+    .sc-img-card--tall img { height: 200px; }
+    .sc-img-card--wide {
+      grid-column: span 2;
+    }
+    .sc-img-card--wide img { height: 136px; object-fit: contain; background: var(--bg-section); }
+    /* zoom hint on hover */
+    .sc-img-card::after {
+      content: '⊕';
+      position: absolute;
+      bottom: 7px; right: 8px;
+      font-size: 1rem;
+      color: #fff;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .sc-img-card:hover::after { opacity: 1; }
+
+    /* Data-label badge overlay */
+    .sc-img-card::before {
+      content: attr(data-label);
+      position: absolute;
+      top: 6px; left: 6px;
+      font-size: 0.6rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.18rem 0.45rem;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .sc-img-card[data-label-type="before"]::before {
+      background: rgba(180,83,9,0.88);
+      color: #fff;
+    }
+    .sc-img-card[data-label-type="qr"]::before {
+      background: rgba(79,70,229,0.9);
+      color: #fff;
+    }
+    .sc-img-card[data-label-type="now"]::before {
+      background: rgba(5,150,105,0.88);
+      color: #fff;
+    }
+
+    /* Missing image placeholder */
+    .sc-img-card.sc-img--missing {
+      border-style: dashed;
+      border-color: var(--border);
+    }
+    .sc-img-card.sc-img--missing img {
+      opacity: 0;
+    }
+    .sc-img-card.sc-img--missing::after {
+      content: 'Image coming soon';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: var(--text-light);
+      text-align: center;
+      padding: 0.5rem;
+    }
+
+    /* Dot navigation */
+    .sc-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1.25rem 0 1.5rem;
+    }
+    .sc-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      border: none;
+      background: var(--border);
+      cursor: pointer;
+      transition: background 0.25s, transform 0.25s;
+      padding: 0;
+    }
+    .sc-dot--active {
+      background: var(--brand);
+      transform: scale(1.35);
+    }
+    .sc-dot:hover:not(.sc-dot--active) {
+      background: var(--text-muted);
+    }
+
+    /* Mobile */
+    @media (max-width: 900px) {
+      .sc-slide-inner {
+        grid-template-columns: 1fr;
+        gap: 1.75rem;
+        padding: 1.75rem 1.5rem;
+      }
+      .sc-gallery-grid,
+      .sc-gallery-grid--pharmacy {
+        grid-template-columns: 1fr 1fr;
+      }
+      .sc-img-card--wide { grid-column: span 2; }
+    }
+    @media (max-width: 640px) {
+      .sc-tabs { flex-direction: row; }
+      .sc-tab { padding: 0.875rem 0.75rem; font-size: 0.82rem; }
+      .sc-tab-icon { display: none; }
+    }
+    @media (max-width: 480px) {
+      .sc-slide-inner { padding: 1.25rem 1rem; gap: 1.25rem; }
+      .sc-gallery-grid,
+      .sc-gallery-grid--pharmacy { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+      .sc-img-card img { height: 108px; }
+      .sc-img-card--tall img { height: 132px; }
+      .sc-img-card--wide img { height: 110px; }
+    }
+
+    /* ============================================================
+       TESTIMONIALS — premium 2-person layout
+    ============================================================ */
+    .testimonials-grid--2col {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.75rem;
+    }
+    .testimonial-card--featured {
+      border-color: rgba(79,70,229,0.15);
+      background: linear-gradient(160deg, #fafbff 0%, #fff 80%);
+    }
+    .testimonial-card--featured:hover {
+      transform: translateY(-6px);
+      box-shadow: var(--shadow-lg);
+      border-color: rgba(79,70,229,0.22);
+    }
+    .testimonial-photo-wrap {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      overflow: hidden;
+      flex-shrink: 0;
+      border: 2.5px solid rgba(79,70,229,0.15);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+      cursor: zoom-in;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .testimonial-photo-wrap:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+    }
+    .testimonial-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+      display: block;
+    }
+    .testimonial-quote {
+      font-size: 1.0625rem;
+      color: var(--text);
+      line-height: 1.85;
+      font-style: italic;
+    }
+    .testimonial-quote::before {
+      content: '\201C';
+      font-size: 2.5rem;
+      line-height: 0;
+      vertical-align: -0.55rem;
+      margin-right: 0.1em;
+      color: var(--brand);
+      font-style: normal;
+      opacity: 0.4;
+    }
+    @media (max-width: 760px) {
+      .testimonials-grid--2col { grid-template-columns: 1fr; }
+    }
+
+    /* ============================================================
+       PREMIUM LIGHTBOX
+    ============================================================ */
+    .lb-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(9, 9, 20, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.28s ease, visibility 0.28s;
+      cursor: zoom-out;
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+    }
+    .lb-overlay.lb--open {
+      opacity: 1;
+      visibility: visible;
+    }
+    .lb-close {
+      position: fixed;
+      top: 1rem; right: 1rem;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      border: 1.5px solid rgba(255,255,255,0.22);
+      color: #fff;
+      font-size: 1.5rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      z-index: 9001;
+    }
+    .lb-close:hover { background: rgba(255,255,255,0.26); transform: scale(1.08); }
+    .lb-frame {
+      position: relative;
+      max-width: min(88vw, 980px);
+      cursor: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.875rem;
+    }
+    .lb-img {
+      max-width: 100%;
+      max-height: 82vh;
+      width: auto;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 28px 72px rgba(0,0,0,0.55), 0 4px 16px rgba(0,0,0,0.35);
+      object-fit: contain;
+      display: block;
+      animation: lbReveal 0.28s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    @keyframes lbReveal {
+      from { transform: scale(0.88); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+    .lb-caption {
+      color: rgba(255,255,255,0.68);
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      text-align: center;
+      max-width: 520px;
+      line-height: 1.55;
+    }
+    @media (max-width: 640px) {
+      .lb-close { top: 0.75rem; right: 0.75rem; width: 38px; height: 38px; font-size: 1.3rem; }
+      .lb-img { border-radius: 8px; max-height: 75vh; }
+    }
   </style>
 </head>
 <body>
@@ -3267,35 +3761,482 @@
   </section>
 
   <!-- ============================================================
-       TESTIMONIALS
+       IMPACT / REAL STORIES — ROTATING CAROUSEL
+  ============================================================ -->
+  <section class="section impact-stories-section" id="impact-stories">
+    <div class="container">
+
+      <div class="section-header section-header--center animate-in">
+        <span class="eyebrow">Real businesses. Real proof.</span>
+        <h2 class="section-title">From notebook to operating system.</h2>
+        <p class="section-subtitle">See how real businesses in Malawi are moving from paper records to QR-powered operations and real-time dashboards.</p>
+      </div>
+
+      <!-- CAROUSEL WRAPPER -->
+      <div class="sc-wrap animate-in" id="storyCarousel">
+
+        <!-- Tab selector -->
+        <div class="sc-tabs">
+          <button class="sc-tab sc-tab--active" data-story="0">
+            <span class="sc-tab-icon">🏋️</span>
+            <span class="sc-tab-label">Fitness &amp; Gym</span>
+          </button>
+          <button class="sc-tab" data-story="1">
+            <span class="sc-tab-icon">💊</span>
+            <span class="sc-tab-label">Pharmacy &amp; Retail</span>
+          </button>
+        </div>
+
+        <!-- Progress bar -->
+        <div class="sc-progress-track" aria-hidden="true">
+          <div class="sc-progress-fill" id="scProgressBar"></div>
+        </div>
+
+        <!-- Slides -->
+        <div class="sc-slides">
+
+          <!-- ── SLIDE 0: GYM ── -->
+          <div class="sc-slide sc-slide--active" data-index="0">
+            <div class="sc-slide-inner">
+
+              <!-- Left: text -->
+              <div class="sc-slide-text">
+                <span class="story-badge story-badge--gym">Fitness &amp; Gym</span>
+                <h3 class="sc-slide-title">Promise Fitness &amp; Gym moved from paper records to real-time member visibility.</h3>
+                <p class="sc-slide-lead">Member records that once lived in notebooks are now digital, searchable, and visible in real time. Payments, arrears, QR identity, and member status tracked instantly.</p>
+
+                <div class="sc-phases">
+                  <div class="sc-phase">
+                    <div class="sc-phase-label sc-phase-label--before">
+                      <span class="phase-pip phase-pip--before"></span>
+                      Before Emajinet
+                    </div>
+                    <div class="story-points">
+                      <div class="story-point story-point--pain">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
+                        Member records in notebooks — hard to search, easy to lose
+                      </div>
+                      <div class="story-point story-point--pain">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
+                        No clear view of who owed payments or was overdue
+                      </div>
+                    </div>
+                  </div>
+                  <div class="sc-phase">
+                    <div class="sc-phase-label sc-phase-label--after">
+                      <span class="phase-pip phase-pip--after"></span>
+                      Now — visible in real time
+                    </div>
+                    <div class="story-points">
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        QR identity for every member — digital, no disputes
+                      </div>
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Payment status visible immediately — active, overdue, arrears
+                      </div>
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Full gym dashboard — members, revenue, operations
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="story-proof-strip">
+                  <span class="story-proof-pill">QR member tracking</span>
+                  <span class="story-proof-pill">Real-time payment status</span>
+                  <span class="story-proof-pill">Digital member profiles</span>
+                  <span class="story-proof-pill">Mobile-first ops</span>
+                </div>
+              </div>
+
+              <!-- Right: image grid -->
+              <div class="sc-slide-gallery">
+                <div class="sc-gallery-grid">
+                  <div class="sc-img-card" data-label="Before" data-label-type="before"
+                       data-lb-src="{% static 'landing/stories/manual-gym-entry.jpg' %}"
+                       data-lb-alt="Manual gym entry" data-lb-cap="Before Emajinet — manual entry in a notebook">
+                    <img src="{% static 'landing/stories/manual-gym-entry.jpg' %}" alt="Manual gym entry" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card" data-label="Before" data-label-type="before"
+                       data-lb-src="{% static 'landing/stories/manual-gym-records.jpg' %}"
+                       data-lb-alt="Paper gym records" data-lb-cap="Before Emajinet — paper-based member records">
+                    <img src="{% static 'landing/stories/manual-gym-records.jpg' %}" alt="Paper gym records" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card" data-label="QR" data-label-type="qr"
+                       data-lb-src="{% static 'landing/stories/gym-qr-code.jpg' %}"
+                       data-lb-alt="Gym QR code sticker" data-lb-cap="Each gym now has a unique QR code for member identity">
+                    <img src="{% static 'landing/stories/gym-qr-code.jpg' %}" alt="Gym QR code" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card" data-label="Member QR" data-label-type="qr"
+                       data-lb-src="{% static 'landing/stories/gym-member-qr-code.png' %}"
+                       data-lb-alt="Member QR code" data-lb-cap="Every member gets their own scannable QR identity">
+                    <img src="{% static 'landing/stories/gym-member-qr-code.png' %}" alt="Member QR code" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card sc-img-card--wide" data-label="Live dashboard" data-label-type="now"
+                       data-lb-src="{% static 'landing/stories/gym-dashboard.png' %}"
+                       data-lb-alt="Gym management dashboard" data-lb-cap="Full gym dashboard — members, payments, and operations in real time">
+                    <img src="{% static 'landing/stories/gym-dashboard.png' %}" alt="Gym dashboard" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card sc-img-card--wide" data-label="Payment status" data-label-type="now"
+                       data-lb-src="{% static 'landing/stories/members-payment-status.png' %}"
+                       data-lb-alt="Members payment status" data-lb-cap="See who's paid, who's active, and who's overdue — instantly">
+                    <img src="{% static 'landing/stories/members-payment-status.png' %}" alt="Members payment status" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div><!-- /slide 0 -->
+
+          <!-- ── SLIDE 1: PHARMACY ── -->
+          <div class="sc-slide" data-index="1">
+            <div class="sc-slide-inner">
+
+              <!-- Left: text -->
+              <div class="sc-slide-text">
+                <span class="story-badge story-badge--pharmacy">Pharmacy &amp; Retail</span>
+                <h3 class="sc-slide-title">Pharmacy teams can now track sales and stock from the phone.</h3>
+                <p class="sc-slide-lead">From shelves to sales desk to live mobile insights — see what's selling, what needs restocking, and what's happening on the ground. In real time.</p>
+
+                <div class="sc-phases">
+                  <div class="sc-phase">
+                    <div class="sc-phase-label sc-phase-label--after">
+                      <span class="phase-pip phase-pip--after"></span>
+                      What changed
+                    </div>
+                    <div class="story-points">
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Sales visible on mobile — every transaction tracked
+                      </div>
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Stock levels visible — know what to reorder before it runs out
+                      </div>
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Staff accountability — who sold what, and how much
+                      </div>
+                      <div class="story-point story-point--win">
+                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                        Faster decisions — the information is already there
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="story-proof-strip">
+                  <span class="story-proof-pill">Mobile sales visibility</span>
+                  <span class="story-proof-pill">Live stock tracking</span>
+                  <span class="story-proof-pill">Staff accountability</span>
+                  <span class="story-proof-pill">Faster decisions</span>
+                </div>
+              </div>
+
+              <!-- Right: pharmacy images -->
+              <div class="sc-slide-gallery">
+                <div class="sc-gallery-grid sc-gallery-grid--pharmacy">
+                  <div class="sc-img-card sc-img-card--tall" data-label="Stock" data-label-type="now"
+                       data-lb-src="{% static 'landing/stories/pharmacy-stock.jpg' %}"
+                       data-lb-alt="Pharmacy stock management" data-lb-cap="Stock levels tracked — know what to reorder before it runs out">
+                    <img src="{% static 'landing/stories/pharmacy-stock.jpg' %}" alt="Pharmacy stock" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card sc-img-card--tall" data-label="In use" data-label-type="now"
+                       data-lb-src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}"
+                       data-lb-alt="Pharmacy sales agent using Emajinet" data-lb-cap="Sales agent tracking transactions on the ground">
+                    <img src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}" alt="Pharmacy sales agent" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                  <div class="sc-img-card sc-img-card--wide" data-label="Mobile sales" data-label-type="now"
+                       data-lb-src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}"
+                       data-lb-alt="Pharmacy mobile sales view" data-lb-cap="Live mobile sales view — every transaction visible in real time">
+                    <img src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}" alt="Pharmacy mobile sales" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div><!-- /slide 1 -->
+
+        </div><!-- /sc-slides -->
+
+        <!-- Dot navigation -->
+        <div class="sc-dots">
+          <button class="sc-dot sc-dot--active" data-story="0" aria-label="Gym story" title="Fitness &amp; Gym"></button>
+          <button class="sc-dot" data-story="1" aria-label="Pharmacy story" title="Pharmacy &amp; Retail"></button>
+        </div>
+
+      </div><!-- /sc-wrap -->
+
+    </div>
+  </section>
+
+  <!-- OLD STACKED STORIES REMOVED — replaced by rotating carousel above -->
+  <section style="display:none">
+    <!-- placeholder so old stacked section text starts below -->
+    <div class="story-module animate-in">
+        <div class="story-module-header">
+          <span class="story-badge story-badge--gym">Fitness &amp; Gym</span>
+          <h3 class="story-module-title">Promise Fitness &amp; Gym moved from paper records to real-time member visibility.</h3>
+          <p class="story-module-lead">Member records that once lived in notebooks are now digital, searchable, and visible in real time. Payments, arrears, QR identity, and member status are tracked instantly — giving the gym owner more control and less guesswork.</p>
+        </div>
+
+        <div class="story-body-split">
+
+          <!-- Left: narrative -->
+          <div class="story-narrative">
+
+            <div class="story-phase-block">
+              <div class="story-phase-tag story-phase-tag--before">
+                <span class="phase-pip phase-pip--before"></span>
+                Before Emajinet
+              </div>
+              <div class="story-points">
+                <div class="story-point story-point--pain">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
+                  Member records tracked in notebooks — hard to search, easy to lose
+                </div>
+                <div class="story-point story-point--pain">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
+                  Payments missed — no clear view of who was overdue
+                </div>
+                <div class="story-point story-point--pain">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
+                  Arguments with members over records — no proof, no system
+                </div>
+              </div>
+            </div>
+
+            <div class="story-phase-block">
+              <div class="story-phase-tag story-phase-tag--during">
+                <span class="phase-pip phase-pip--during"></span>
+                Digitised with Emajinet
+              </div>
+              <div class="story-points">
+                <div class="story-point">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 5L7 11 4.5 8.5l.7-.7L7 9.6l4-4 .7.7z"/></svg>
+                  Every member issued a personal QR code for digital identity
+                </div>
+                <div class="story-point">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 5L7 11 4.5 8.5l.7-.7L7 9.6l4-4 .7.7z"/></svg>
+                  Member can view their own profile and status — no disputes
+                </div>
+              </div>
+            </div>
+
+            <div class="story-phase-block">
+              <div class="story-phase-tag story-phase-tag--after">
+                <span class="phase-pip phase-pip--after"></span>
+                Now — visible in real time
+              </div>
+              <div class="story-points">
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Full gym dashboard — members, payments, activity
+                </div>
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Payment status visible immediately — who's active, who's overdue
+                </div>
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Trainer workflow, check-in, and operations all digital
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right: image mosaic -->
+          <div class="story-gallery">
+
+            <!-- Row 1: Before images -->
+            <div class="story-gallery-row story-gallery-row--2col">
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/manual-gym-entry.jpg' %}" alt="Manual gym entry book" loading="lazy">
+                <span class="story-img-label story-img-label--before">Before</span>
+                <div class="story-img-caption-bar">Manual entry</div>
+              </div>
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/manual-gym-records.jpg' %}" alt="Paper gym records" loading="lazy">
+                <span class="story-img-label story-img-label--before">Before</span>
+                <div class="story-img-caption-bar">Paper records</div>
+              </div>
+            </div>
+
+            <!-- Row 2: QR / digitised -->
+            <div class="story-gallery-row story-gallery-row--2col">
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/gym-qr-code.jpg' %}" alt="GYM QR code sticker" loading="lazy">
+                <span class="story-img-label story-img-label--qr">QR identity</span>
+                <div class="story-img-caption-bar">Gym QR sticker</div>
+              </div>
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/gym-member-qr-code.png' %}" alt="Member QR code" loading="lazy">
+                <span class="story-img-label story-img-label--qr">Member QR</span>
+                <div class="story-img-caption-bar">Member identity</div>
+              </div>
+            </div>
+
+            <!-- Row 3: After — dashboard + member + payment -->
+            <div class="story-gallery-row story-gallery-row--2col">
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/gym-dashboard.png' %}" alt="Gym management dashboard" loading="lazy">
+                <span class="story-img-label story-img-label--now">Live dashboard</span>
+                <div class="story-img-caption-bar">Gym dashboard</div>
+              </div>
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/members-payment-status.png' %}" alt="Members payment status" loading="lazy">
+                <span class="story-img-label story-img-label--now">Payment status</span>
+                <div class="story-img-caption-bar">Who's paid &amp; who's due</div>
+              </div>
+            </div>
+
+            <!-- Row 4: Member public view + training -->
+            <div class="story-gallery-row story-gallery-row--2col">
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/gym-member-public-view.png' %}" alt="Member public profile" loading="lazy">
+                <span class="story-img-label story-img-label--now">Member profile</span>
+                <div class="story-img-caption-bar">Public member view</div>
+              </div>
+              <div class="story-img-wrap">
+                <img src="{% static 'landing/stories/gym-training.jpg' %}" alt="Gym training in session" loading="lazy">
+                <span class="story-img-label story-img-label--now">Operations</span>
+                <div class="story-img-caption-bar">Professional ops</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Proof pills -->
+        <div class="story-proof-strip">
+          <span class="story-proof-pill">QR-based member tracking</span>
+          <span class="story-proof-pill">Real-time payment status</span>
+          <span class="story-proof-pill">Overdue members visible instantly</span>
+          <span class="story-proof-pill">Digital member profiles</span>
+          <span class="story-proof-pill">Mobile-first operations</span>
+        </div>
+      </div>
+
+      <!-- ── STORY 2: PHARMACY ── -->
+      <div class="story-module animate-in">
+        <div class="story-module-header">
+          <span class="story-badge story-badge--pharmacy">Pharmacy &amp; Retail</span>
+          <h3 class="story-module-title">Pharmacy teams can now track sales and stock from the phone.</h3>
+          <p class="story-module-lead">From shelves to sales desk to live mobile insights, Emajinet helps pharmacy teams see what is selling, what needs restocking, and what is happening on the ground — in real time.</p>
+        </div>
+
+        <div class="story-pharmacy-body">
+
+          <!-- Left: narrative -->
+          <div class="story-pharmacy-text">
+            <div class="story-phase-block">
+              <div class="story-phase-tag story-phase-tag--after">
+                <span class="phase-pip phase-pip--after"></span>
+                What changed
+              </div>
+              <div class="story-points">
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Sales visible on mobile — every transaction tracked
+                </div>
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Stock levels visible — know what to reorder before it runs out
+                </div>
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Staff accountability — who sold what, when, and how much
+                </div>
+                <div class="story-point story-point--win">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
+                  Faster decisions — information is already there when you need it
+                </div>
+              </div>
+            </div>
+            <div class="story-proof-strip" style="margin-top: 0.5rem;">
+              <span class="story-proof-pill">Sales visibility on mobile</span>
+              <span class="story-proof-pill">Stock visibility</span>
+              <span class="story-proof-pill">Faster decisions</span>
+              <span class="story-proof-pill">Daily accountability</span>
+            </div>
+          </div>
+
+          <!-- Right: pharmacy images -->
+          <div class="story-pharmacy-images">
+            <div class="story-img-wrap">
+              <img src="{% static 'landing/stories/pharmacy-stock.jpg' %}" alt="Pharmacy stock management" loading="lazy">
+              <span class="story-img-label story-img-label--now">Stock</span>
+              <div class="story-img-caption-bar">Stock tracked digitally</div>
+            </div>
+            <div class="story-img-wrap">
+              <img src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}" alt="Pharmacy sales agent using Emajinet" loading="lazy">
+              <span class="story-img-label story-img-label--now">In use</span>
+              <div class="story-img-caption-bar">Sales agent on the floor</div>
+            </div>
+            <div class="story-img-wrap">
+              <img src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}" alt="Pharmacy app sales view" loading="lazy">
+              <span class="story-img-label story-img-label--now">Live</span>
+              <div class="story-img-caption-bar">Mobile sales view</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================
+       TESTIMONIALS — real people, real words
   ============================================================ -->
   <section class="section section--alt" id="testimonials">
     <div class="container">
       <div class="section-header section-header--center animate-in">
         <span class="eyebrow">From the field</span>
-        <h2 class="section-title">Merchants who stopped running blind.</h2>
+        <h2 class="section-title">Real people. Real operations. Real results.</h2>
       </div>
-      <div class="testimonials-grid">
-        <div class="testimonial-card">
-          <p class="testimonial-quote">"Before Emajinet, I had no idea how much stock I was losing each week. Now I can see every movement, every sale, and exactly where my margins sit. Shrinkage is down and I finally feel in control."</p>
+      <div class="testimonials-grid testimonials-grid--2col">
+
+        <!-- Yohane Kajanga — gym owner -->
+        <div class="testimonial-card testimonial-card--featured animate-in">
+          <p class="testimonial-quote">Before Emajinet, everything ran on memory and notebooks — and too much fell through the cracks. Now my members can check their own dates themselves, I get real-time notifications, and the system tracks what matters without the confusion. It has brought real order to how I run the gym.</p>
           <div class="testimonial-author">
-            <div class="testimonial-avatar">TM</div>
+            <div class="testimonial-photo-wrap"
+                 data-lb-src="{% static 'landing/stories/yohane-kajanga.jpg' %}"
+                 data-lb-alt="Yohane Kajanga"
+                 data-lb-cap="Yohane Kajanga — Gym Owner, Lilongwe, Malawi">
+              <img src="{% static 'landing/stories/yohane-kajanga.jpg' %}" alt="Yohane Kajanga" class="testimonial-photo" loading="lazy"
+                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>YK</span>'">
+            </div>
             <div>
-              <div class="testimonial-name">Tavita Mkandawire</div>
-              <div class="testimonial-role">Electronics Shop Owner &mdash; Blantyre</div>
+              <div class="testimonial-name">Yohane Kajanga</div>
+              <div class="testimonial-role">Gym Owner &mdash; Lilongwe, Malawi</div>
             </div>
           </div>
         </div>
-        <div class="testimonial-card">
-          <p class="testimonial-quote">"I run two shops and used to spend hours reconciling sales manually. Emajinet shows me the numbers for both locations in real time. I know which branch is performing and which one needs attention."</p>
+
+        <!-- Zaina — business operator -->
+        <div class="testimonial-card testimonial-card--featured animate-in">
+          <p class="testimonial-quote">Because I am often moving, I need to know fast what is selling and what needs restocking. Emajinet gives me stock alerts and shows me the fast-moving products quickly so I can make supply decisions without waiting. The marketplace is also promising — marketing only through WhatsApp was limiting us.</p>
           <div class="testimonial-author">
-            <div class="testimonial-avatar">CS</div>
+            <div class="testimonial-photo-wrap"
+                 data-lb-src="{% static 'landing/stories/zaina.jpg' %}"
+                 data-lb-alt="Zaina"
+                 data-lb-cap="Zaina — Business Operator, Lilongwe, Malawi">
+              <img src="{% static 'landing/stories/zaina.jpg' %}" alt="Zaina" class="testimonial-photo" loading="lazy"
+                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>Z</span>'">
+            </div>
             <div>
-              <div class="testimonial-name">Chifundo Simwaka</div>
-              <div class="testimonial-role">Clothing Retailer &mdash; Lilongwe</div>
+              <div class="testimonial-name">Zaina</div>
+              <div class="testimonial-role">Business Operator &mdash; Lilongwe, Malawi</div>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   </section>
@@ -4177,6 +5118,87 @@
     })();
 
     // ============================================================
+    // ============================================================
+    // STORY CAROUSEL — 10-second auto-rotate
+    // ============================================================
+    (function() {
+      var carousel = document.getElementById('storyCarousel');
+      if (!carousel) return;
+
+      var slides   = carousel.querySelectorAll('.sc-slide');
+      var dots     = carousel.querySelectorAll('.sc-dot');
+      var tabs     = carousel.querySelectorAll('.sc-tab');
+      var progress = document.getElementById('scProgressBar');
+      var current  = 0;
+      var total    = slides.length;
+      var timer    = null;
+      var DELAY    = 10000;
+
+      function show(idx) {
+        slides[current].classList.remove('sc-slide--active');
+        dots[current].classList.remove('sc-dot--active');
+        tabs[current].classList.remove('sc-tab--active');
+        tabs[current].setAttribute('aria-selected', 'false');
+
+        current = ((idx % total) + total) % total;
+
+        slides[current].classList.add('sc-slide--active');
+        dots[current].classList.add('sc-dot--active');
+        tabs[current].classList.add('sc-tab--active');
+        tabs[current].setAttribute('aria-selected', 'true');
+
+        resetProgress();
+      }
+
+      function resetProgress() {
+        if (!progress) return;
+        progress.style.transition = 'none';
+        progress.style.width = '0%';
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            progress.style.transition = 'width ' + DELAY + 'ms linear';
+            progress.style.width = '100%';
+          });
+        });
+      }
+
+      function startTimer()  { timer = setInterval(function() { show(current + 1); }, DELAY); }
+      function stopTimer()   { clearInterval(timer); timer = null; }
+      function restartTimer(){ stopTimer(); startTimer(); }
+
+      /* Click handlers — dots */
+      dots.forEach(function(dot) {
+        dot.addEventListener('click', function() {
+          show(parseInt(this.dataset.story, 10));
+          restartTimer();
+        });
+      });
+
+      /* Click handlers — tabs */
+      tabs.forEach(function(tab) {
+        tab.addEventListener('click', function() {
+          show(parseInt(this.dataset.story, 10));
+          restartTimer();
+        });
+      });
+
+      /* Pause on hover */
+      carousel.addEventListener('mouseenter', stopTimer);
+      carousel.addEventListener('mouseleave', function() {
+        restartTimer();
+        resetProgress();
+      });
+
+      /* Pause on touch (mobile) */
+      carousel.addEventListener('touchstart', stopTimer, { passive: true });
+      carousel.addEventListener('touchend',   function() { restartTimer(); resetProgress(); }, { passive: true });
+
+      /* Init */
+      resetProgress();
+      startTimer();
+    })();
+
+    // ============================================================
     // SCROLL-TRIGGERED FADE-IN
     // ============================================================
     (function() {
@@ -4194,6 +5216,66 @@
 
       items.forEach(function(el) { observer.observe(el); });
     })();
+
+    // ============================================================
+    // PREMIUM LIGHTBOX
+    // ============================================================
+    (function() {
+      var overlay = document.getElementById('imgLightbox');
+      var lbImg   = document.getElementById('lbImg');
+      var lbCap   = document.getElementById('lbCaption');
+      var lbClose = document.getElementById('lbClose');
+      if (!overlay || !lbImg) return;
+
+      function openLb(src, alt, cap) {
+        lbImg.src  = src;
+        lbImg.alt  = alt || '';
+        if (lbCap) lbCap.textContent = cap || '';
+        overlay.classList.add('lb--open');
+        document.body.style.overflow = 'hidden';
+        if (lbClose) lbClose.focus();
+      }
+
+      function closeLb() {
+        overlay.classList.remove('lb--open');
+        document.body.style.overflow = '';
+        /* delay clearing src so fade-out is smooth */
+        setTimeout(function() { lbImg.src = ''; }, 300);
+      }
+
+      /* Backdrop click */
+      overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeLb();
+      });
+      /* Close button */
+      if (lbClose) lbClose.addEventListener('click', closeLb);
+      /* Escape key */
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.classList.contains('lb--open')) closeLb();
+      });
+
+      /* Delegate: any element with data-lb-src triggers lightbox */
+      document.addEventListener('click', function(e) {
+        var trigger = e.target.closest('[data-lb-src]');
+        if (!trigger) return;
+        var src = trigger.getAttribute('data-lb-src');
+        var alt = trigger.getAttribute('data-lb-alt') || '';
+        var cap = trigger.getAttribute('data-lb-cap') || '';
+        if (src) openLb(src, alt, cap);
+      });
+    })();
   </script>
+
+  <!-- ============================================================
+       LIGHTBOX MODAL
+  ============================================================ -->
+  <div id="imgLightbox" class="lb-overlay" role="dialog" aria-modal="true" aria-label="Image viewer">
+    <button class="lb-close" id="lbClose" aria-label="Close image viewer">&times;</button>
+    <div class="lb-frame" id="lbFrame">
+      <img id="lbImg" src="" alt="" class="lb-img">
+      <p class="lb-caption" id="lbCaption"></p>
+    </div>
+  </div>
+
 </body>
 </html>
