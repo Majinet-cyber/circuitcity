@@ -582,7 +582,19 @@ class LandingPageQualityTests(TestCase):
 
 
 class RenewableEnergyFlagshipTests(TestCase):
-    """Ensure the Renewable Energy flagship section is correctly restored on the landing page."""
+    """
+    Renewable Energy flagship section tests.
+
+    Rules enforced:
+    - Light mode (no dark gradient background)
+    - No extra 'Get Started Free' button inside the section
+    - Has a subtle 'Explore Renewable Energy' link only
+    - All 4 capabilities present
+    - Correct document order (after How It Works, before Simulator)
+    - Flagship label + engineering headline present
+    - Portfolio proof strip present
+    - Page renders HTTP 200
+    """
 
     def setUp(self):
         self.client = Client()
@@ -590,7 +602,6 @@ class RenewableEnergyFlagshipTests(TestCase):
         self.content = self.response.content.decode("utf-8")
 
     def test_energy_section_present(self):
-        """Dedicated renewable energy section must exist on the landing page."""
         self.assertIn(
             'id="renewable-energy"',
             self.content,
@@ -598,7 +609,6 @@ class RenewableEnergyFlagshipTests(TestCase):
         )
 
     def test_energy_flagship_label(self):
-        """'Flagship Vertical' eyebrow label must be present inside the energy section."""
         self.assertIn(
             "Flagship Vertical",
             self.content,
@@ -606,105 +616,202 @@ class RenewableEnergyFlagshipTests(TestCase):
         )
 
     def test_energy_headline_present(self):
-        """Engineering-grade headline must be present."""
         self.assertIn(
             "Engineering-grade intelligence",
             self.content,
-            "Energy section headline 'Engineering-grade intelligence' must be present",
+            "Energy section headline must be present",
         )
 
     def test_system_sizing_capability_present(self):
-        """System Sizing Engine capability card must be present."""
         self.assertIn(
             "System Sizing Engine",
             self.content,
-            "System Sizing Engine capability must be highlighted in energy section",
+            "System Sizing Engine capability must be in energy section",
         )
 
     def test_predictive_maintenance_present(self):
-        """Predictive Maintenance capability card must be present."""
         self.assertIn(
             "Predictive Maintenance",
             self.content,
-            "Predictive Maintenance capability must be highlighted in energy section",
+            "Predictive Maintenance capability must be in energy section",
         )
 
     def test_load_forecasting_present(self):
-        """Demand & Load Forecasting capability card must be present."""
         self.assertIn(
             "Demand",
             self.content,
-            "Demand & Load Forecasting must be highlighted in energy section",
+            "Demand & Load Forecasting must be in energy section",
         )
 
     def test_energy_economics_present(self):
-        """Energy Economics & ROI capability must be present."""
         self.assertIn(
             "Energy Economics",
             self.content,
-            "Energy Economics & ROI capability must be highlighted in energy section",
+            "Energy Economics & ROI capability must be in energy section",
         )
 
-    def test_energy_cta_points_to_signup(self):
-        """Energy section CTA must link to the signup page (accounts:signup_manager)."""
-        from django.urls import reverse as dj_reverse
-        signup_url = dj_reverse("accounts:signup_manager")
-        # Energy section contains a "Get Started Free" link
-        # We check that both the signup URL and 'Get Started Free' co-exist in the energy section
+    def test_no_extra_cta_button_inside_energy_section(self):
+        """Energy section must NOT contain a standalone 'Get Started Free' button.
+        The page-level CTA is fine; the energy section should only have a subtle link."""
+        # Isolate the energy section HTML
+        energy_start = self.content.find('id="renewable-energy"')
+        energy_end = self.content.find('id="business-simulator"')
+        self.assertGreater(energy_start, -1, "#renewable-energy must exist")
+        self.assertGreater(energy_end, energy_start, "#business-simulator must come after energy")
+        energy_html = self.content[energy_start:energy_end]
+        # Must NOT have "Get Started Free" as a button inside the energy section
+        self.assertNotIn(
+            "Get Started Free",
+            energy_html,
+            "Energy section must NOT have an extra 'Get Started Free' button — use subtle link only",
+        )
+
+    def test_explore_link_present_in_energy_section(self):
+        """Energy section must contain the subtle 'Explore Renewable Energy' link."""
         self.assertIn(
-            signup_url,
+            "Explore Renewable Energy",
             self.content,
-            f"Energy CTA must link to signup at {signup_url}",
+            "Energy section must have 'Explore Renewable Energy' subtle link",
+        )
+
+    def test_energy_is_light_mode(self):
+        """Energy section must NOT use a dark gradient background (light mode required)."""
+        energy_start = self.content.find('id="renewable-energy"')
+        energy_end = self.content.find('id="business-simulator"')
+        energy_html = self.content[energy_start:energy_end]
+        self.assertNotIn(
+            "#0d1a2e",
+            energy_html,
+            "Energy section must be light mode — dark navy color #0d1a2e must not appear",
+        )
+        self.assertNotIn(
+            "#0f2613",
+            energy_html,
+            "Energy section must be light mode — dark green #0f2613 must not appear",
         )
 
     def test_energy_section_positioned_after_how_it_works(self):
-        """Energy section must appear AFTER the How It Works section in document order."""
         how_it_works_pos = self.content.find('id="how-it-works"')
         energy_pos = self.content.find('id="renewable-energy"')
+        self.assertGreater(how_it_works_pos, -1, "#how-it-works must exist")
+        self.assertGreater(energy_pos, -1, "#renewable-energy must exist")
         self.assertGreater(
-            how_it_works_pos,
-            -1,
-            "#how-it-works must exist on the landing page",
-        )
-        self.assertGreater(
-            energy_pos,
-            -1,
-            "#renewable-energy must exist on the landing page",
-        )
-        self.assertGreater(
-            energy_pos,
-            how_it_works_pos,
-            "Renewable Energy section must appear AFTER How It Works in document order",
+            energy_pos, how_it_works_pos,
+            "Renewable Energy section must appear AFTER How It Works",
         )
 
     def test_energy_section_before_simulator(self):
-        """Energy section must appear BEFORE the business simulator section."""
         energy_pos = self.content.find('id="renewable-energy"')
         simulator_pos = self.content.find('id="business-simulator"')
+        self.assertGreater(simulator_pos, -1, "#business-simulator must exist")
+        self.assertGreater(energy_pos, -1, "#renewable-energy must exist")
         self.assertGreater(
-            simulator_pos,
-            -1,
-            "#business-simulator must exist on the landing page",
-        )
-        self.assertGreater(
-            energy_pos,
-            -1,
-            "#renewable-energy must exist on the landing page",
-        )
-        self.assertGreater(
-            simulator_pos,
-            energy_pos,
+            simulator_pos, energy_pos,
             "Business simulator must appear AFTER the Renewable Energy section",
         )
 
     def test_portfolio_proof_strip_present(self):
-        """Bottom proof strip must mention 'Portfolio-level command center'."""
         self.assertIn(
             "Portfolio-level command center",
             self.content,
             "Energy proof strip must mention portfolio capabilities",
         )
 
-    def test_landing_page_still_renders_200(self):
-        """Landing page must still return HTTP 200 after energy section is added."""
+    def test_landing_page_renders_200(self):
         self.assertEqual(self.response.status_code, 200)
+
+
+class LiveMetricsNeverBlankTests(TestCase):
+    """
+    Ensure the landing page metrics block never shows blank / dash / zero.
+
+    The metrics container (#liveMetricsContainer) must always be present.
+    The template must not render literal '—' (em dash) as a metric value.
+    The JS live metrics endpoint must return the correct schema.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.response = self.client.get(reverse("staticpages:home"))
+        self.content = self.response.content.decode("utf-8")
+
+    def test_live_metrics_container_always_rendered(self):
+        """#liveMetricsContainer must ALWAYS be present regardless of has_data."""
+        self.assertIn(
+            'id="liveMetricsContainer"',
+            self.content,
+            "#liveMetricsContainer must always be in the DOM for JS to target",
+        )
+
+    def test_live_metrics_note_element_present(self):
+        """#liveMetricsNote must always be present."""
+        self.assertIn(
+            'id="liveMetricsNote"',
+            self.content,
+            "#liveMetricsNote must always be in the DOM",
+        )
+
+    def test_no_raw_dash_as_metric_value_in_container(self):
+        """The hero-counter-value divs must not contain a bare '—' as text content.
+        Skeleton spans are OK; em dashes as decorative text are OK; but NOT as a metric value."""
+        # Find liveMetricsContainer block
+        start = self.content.find('id="liveMetricsContainer"')
+        end = self.content.find('id="liveMetricsNote"')
+        if start == -1 or end == -1:
+            self.fail("Could not locate liveMetricsContainer or liveMetricsNote in page")
+        container_html = self.content[start:end]
+        # The old pattern: <div class="hero-counter-value" style="...">—</div>
+        # Check for that exact pattern (style attribute implies it was the fallback div)
+        import re
+        dash_fallback = re.search(
+            r'hero-counter-value[^>]*style[^>]*>[^<]*\u2014[^<]*</',
+            container_html,
+        )
+        self.assertIsNone(
+            dash_fallback,
+            "hero-counter-value must not contain a bare '—' em dash as the metric value",
+        )
+
+    def test_lm_skeleton_class_exists_in_page(self):
+        """lm-skeleton CSS class must be defined in the page (for shimmer loading state)."""
+        self.assertIn(
+            "lm-skeleton",
+            self.content,
+            ".lm-skeleton class must be defined for skeleton loading animation",
+        )
+
+    def test_metrics_api_has_correct_schema(self):
+        """landing_metrics_api must return JSON with all required fields."""
+        import json
+        resp = self.client.get(reverse("staticpages:landing_metrics_api"))
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        required_fields = [
+            "active_businesses", "team_members",
+            "avg_daily_revenue", "sales_recorded_per_day",
+            "avg_margin_visibility", "has_data", "as_of", "status",
+        ]
+        for field in required_fields:
+            self.assertIn(field, data, f"landing_metrics_api response missing field: {field}")
+
+    def test_metrics_api_status_success(self):
+        """landing_metrics_api must return status='success'."""
+        import json
+        resp = self.client.get(reverse("staticpages:landing_metrics_api"))
+        data = json.loads(resp.content)
+        self.assertEqual(data.get("status"), "success")
+
+    def test_metrics_api_active_businesses_non_negative(self):
+        """active_businesses must be a non-negative integer."""
+        import json
+        resp = self.client.get(reverse("staticpages:landing_metrics_api"))
+        data = json.loads(resp.content)
+        val = data.get("active_businesses", -1)
+        self.assertGreaterEqual(val, 0, "active_businesses must be >= 0")
+
+    def test_metrics_api_has_data_is_bool(self):
+        """has_data must be a boolean."""
+        import json
+        resp = self.client.get(reverse("staticpages:landing_metrics_api"))
+        data = json.loads(resp.content)
+        self.assertIsInstance(data.get("has_data"), bool, "has_data must be a boolean")

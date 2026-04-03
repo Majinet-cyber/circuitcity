@@ -2292,6 +2292,22 @@
       background: linear-gradient(145deg, #fff 0%, #f0fdf4 100%);
     }
     .smart-rec-card--energy:hover { border-color: rgba(16,185,129,0.38); }
+
+    /* ── Skeleton loader for live metrics ── */
+    .lm-skeleton {
+      display: inline-block;
+      width: 90px; height: 1.4em;
+      background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+      background-size: 200% 100%;
+      animation: lm-shimmer 1.4s ease-in-out infinite;
+      border-radius: 6px;
+      vertical-align: middle;
+    }
+    @keyframes lm-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
     .smart-rec-new-badge {
       position: absolute;
       top: 1.25rem;
@@ -3029,51 +3045,46 @@
         {% endif %}
 
         <div class="hero-stat-card">
-          {% if live_metrics.has_data %}
+          {# Always render #liveMetricsContainer — JS populates it; skeletons shown until first fetch #}
           <div class="hero-counters" id="liveMetricsContainer">
             <div class="hero-counter">
               <div class="hero-counter-value">
-                {# Render real value immediately to prevent zero flash #}
-                <span class="counter-animated" data-target="{{ live_metrics.avg_daily_revenue }}" data-prefix="MWK ">MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}</span>
+                <span id="lm-revenue"
+                  data-prefix="MWK "
+                  {% if live_metrics.has_data %}data-seeded="{{ live_metrics.avg_daily_revenue }}"{% endif %}
+                >
+                  {% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}<span class="lm-skeleton"></span>{% endif %}
+                </span>
               </div>
               <div class="hero-counter-label">Avg. daily revenue tracked</div>
             </div>
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span class="counter-animated" data-target="{{ live_metrics.avg_sales_per_day }}" data-suffix="+">{{ live_metrics.avg_sales_per_day }}+</span>
+                <span id="lm-sales"
+                  data-suffix="+"
+                  {% if live_metrics.has_data %}data-seeded="{{ live_metrics.avg_sales_per_day }}"{% endif %}
+                >
+                  {% if live_metrics.has_data %}{{ live_metrics.avg_sales_per_day }}+{% else %}<span class="lm-skeleton"></span>{% endif %}
+                </span>
               </div>
               <div class="hero-counter-label">Sales recorded per day</div>
             </div>
-            {% if live_metrics.avg_margin_visibility %}
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span class="counter-animated" data-target="{{ live_metrics.avg_margin_visibility }}" data-suffix="%">{{ live_metrics.avg_margin_visibility }}%</span>
+                <span id="lm-margin"
+                  data-suffix="%"
+                  {% if live_metrics.avg_margin_visibility %}data-seeded="{{ live_metrics.avg_margin_visibility }}"{% endif %}
+                >
+                  {% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}<span class="lm-skeleton"></span>{% endif %}
+                </span>
               </div>
               <div class="hero-counter-label">Avg. margin visibility</div>
             </div>
-            {% endif %}
           </div>
           <div class="hero-stat-note" id="liveMetricsNote">
-            <span style="display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite;margin-right:0.4rem;vertical-align:middle;"></span>
-            Live — 30-day rolling average from active businesses
+            <span style="display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite;margin-right:0.4rem;vertical-align:middle;" aria-hidden="true"></span>
+            <span id="liveMetricsNoteText">Live — 30-day rolling average from active businesses</span>
           </div>
-          {% else %}
-          <div class="hero-counters">
-            <div class="hero-counter">
-              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
-              <div class="hero-counter-label">Avg. daily revenue tracked</div>
-            </div>
-            <div class="hero-counter">
-              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
-              <div class="hero-counter-label">Sales recorded per day</div>
-            </div>
-            <div class="hero-counter">
-              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
-              <div class="hero-counter-label">Avg. margin visibility</div>
-            </div>
-          </div>
-          <div class="hero-stat-note">Metrics populate as businesses record data</div>
-          {% endif %}
         </div>
       </div>
 
@@ -3096,12 +3107,12 @@
             <div class="dash-kpis">
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Avg. Daily Revenue</div>
-                <div class="dash-kpi-value">{% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}—{% endif %}</div>
+                <div class="dash-kpi-value" id="dash-kpi-revenue">{% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}<span class="lm-skeleton" style="width:80px;height:1em;display:inline-block;"></span>{% endif %}</div>
                 <div class="dash-kpi-delta">30-day avg</div>
               </div>
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Gross Margin</div>
-                <div class="dash-kpi-value dash-kpi-value--green">{% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}—{% endif %}</div>
+                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">{% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}<span class="lm-skeleton" style="width:50px;height:1em;display:inline-block;"></span>{% endif %}</div>
                 <div class="dash-kpi-delta">avg margin</div>
               </div>
               <div class="dash-kpi">
@@ -3477,187 +3488,111 @@
        RENEWABLE ENERGY FLAGSHIP SECTION
        Positioned after How It Works — most advanced vertical
   ============================================================ -->
-  <section id="renewable-energy" style="
-    background: linear-gradient(135deg, #0d1a2e 0%, #0f2613 50%, #0d1a2e 100%);
-    padding: 5rem 0;
-    position: relative;
-    overflow: hidden;
-  ">
-    {# Subtle grid overlay #}
-    <div style="
-      position: absolute; inset: 0;
-      background-image: radial-gradient(rgba(16,185,129,0.06) 1px, transparent 1px);
-      background-size: 32px 32px;
-      pointer-events: none;
-    " aria-hidden="true"></div>
+  {# ============================================================
+     RENEWABLE ENERGY FLAGSHIP — Light mode, premium, clean
+     Positioned after How It Works. No extra CTA button.
+  ============================================================ #}
+  <section id="renewable-energy" class="section section--light" style="border-top: 1px solid #e5e7eb;">
+    <div class="container">
 
-    {# Glow orb #}
-    <div style="
-      position: absolute; top: -10%; right: -8%;
-      width: 480px; height: 480px;
-      background: radial-gradient(circle, rgba(16,185,129,0.10) 0%, transparent 70%);
-      pointer-events: none;
-    " aria-hidden="true"></div>
-
-    <div class="container" style="position: relative; z-index: 1;">
-
-      {# Header row #}
-      <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 2rem; margin-bottom: 3rem;">
-        <div style="max-width: 580px;">
+      {# Header #}
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 2.75rem;">
+        <div style="max-width: 620px;">
           <span style="
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
-            color: #34d399; font-size: 0.75rem; font-weight: 700;
-            letter-spacing: 0.1em; text-transform: uppercase;
-            padding: 0.35rem 0.875rem; border-radius: 20px;
-            margin-bottom: 1.25rem;
+            display: inline-flex; align-items: center; gap: 0.45rem;
+            background: #ecfdf5; border: 1px solid #6ee7b7;
+            color: #065f46; font-size: 0.7rem; font-weight: 700;
+            letter-spacing: 0.09em; text-transform: uppercase;
+            padding: 0.3rem 0.75rem; border-radius: 20px;
+            margin-bottom: 1rem;
           ">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             Flagship Vertical
           </span>
           <h2 style="
-            font-size: clamp(1.75rem, 3.5vw, 2.6rem); font-weight: 800;
-            color: #fff; line-height: 1.15; letter-spacing: -0.02em;
-            margin-bottom: 1rem;
+            font-size: clamp(1.6rem, 3vw, 2.4rem); font-weight: 800;
+            color: var(--text-primary); line-height: 1.18; letter-spacing: -0.02em;
+            margin-bottom: 0.875rem;
           ">
             Engineering-grade intelligence<br>for renewable energy businesses.
           </h2>
-          <p style="
-            font-size: 1.0625rem; color: rgba(255,255,255,0.65);
-            line-height: 1.7; max-width: 520px;
-          ">
-            System sizing, demand forecasting, predictive maintenance, and full energy economics — built specifically for solar installers, energy service companies, and off-grid operators.
+          <p style="font-size: 1rem; color: var(--text-secondary); line-height: 1.7; max-width: 540px; margin: 0;">
+            Built for solar installers, ESCOs, and off-grid operators — system sizing, predictive maintenance, demand forecasting, and full energy economics in one platform.
           </p>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem; flex-shrink: 0;">
-          <a href="{% url 'accounts:signup_manager' %}" style="
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: #10b981; color: #fff;
-            font-size: 0.9375rem; font-weight: 700;
-            padding: 0.75rem 1.5rem; border-radius: 8px;
-            text-decoration: none; white-space: nowrap;
-            box-shadow: 0 4px 16px rgba(16,185,129,0.35);
-            transition: background 0.15s, transform 0.1s;
-          " onmouseover="this.style.background='#059669';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#10b981';this.style.transform='translateY(0)'">
-            Get Started Free
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </a>
-          <a href="{% url 'staticpages:about' %}" style="
-            font-size: 0.8125rem; color: rgba(255,255,255,0.45);
-            text-decoration: none; text-align: center;
-            transition: color 0.15s;
-          " onmouseover="this.style.color='rgba(255,255,255,0.75)'" onmouseout="this.style.color='rgba(255,255,255,0.45)'">
-            Learn about our verticals →
-          </a>
-        </div>
+        {# Subtle explore link — NO extra CTA button #}
+        <a href="{% url 'staticpages:about' %}" style="
+          display: inline-flex; align-items: center; gap: 0.375rem;
+          font-size: 0.875rem; font-weight: 600; color: #059669;
+          text-decoration: none; white-space: nowrap; flex-shrink: 0;
+          transition: color 0.15s;
+        " class="energy-explore-link">
+          Explore Renewable Energy
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
       </div>
 
-      {# 4 capability cards #}
-      <div style="
+      {# 4 capability cards — light mode #}
+      <div id="energy-capability-grid" style="
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 1.25rem;
-        margin-bottom: 2.5rem;
-      " id="energy-capability-grid">
+        grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+        gap: 1.125rem;
+        margin-bottom: 2rem;
+      ">
 
-        {# Card 1: System Sizing #}
-        <div style="
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
-          border-radius: 14px; padding: 1.5rem;
-          transition: border-color 0.2s, background 0.2s;
-        " class="energy-cap-card">
-          <div style="
-            width: 40px; height: 40px; border-radius: 10px;
-            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
-            margin-bottom: 1rem;
-          " aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+        <div class="energy-cap-card">
+          <div class="energy-cap-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
           </div>
-          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">System Sizing Engine</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
-            Calculate optimal system size from customer load profiles. Generate bankable proposals with full cost-benefit analysis and payback period.
-          </p>
+          <h3 class="energy-cap-title">System Sizing Engine</h3>
+          <p class="energy-cap-desc">Calculate optimal system size from customer load profiles. Generate bankable proposals with cost-benefit analysis and payback period.</p>
         </div>
 
-        {# Card 2: Predictive Maintenance #}
-        <div style="
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
-          border-radius: 14px; padding: 1.5rem;
-          transition: border-color 0.2s, background 0.2s;
-        " class="energy-cap-card">
-          <div style="
-            width: 40px; height: 40px; border-radius: 10px;
-            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
-            margin-bottom: 1rem;
-          " aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <div class="energy-cap-card">
+          <div class="energy-cap-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
           </div>
-          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Predictive Maintenance</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
-            Schedule and track maintenance across your entire asset fleet. Automated alerts before failures occur — reduce downtime, extend asset life.
-          </p>
+          <h3 class="energy-cap-title">Predictive Maintenance</h3>
+          <p class="energy-cap-desc">Schedule and track maintenance across your entire asset fleet. Automated alerts before failures occur — reduce downtime, extend asset life.</p>
         </div>
 
-        {# Card 3: Load / Demand Forecasting #}
-        <div style="
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
-          border-radius: 14px; padding: 1.5rem;
-          transition: border-color 0.2s, background 0.2s;
-        " class="energy-cap-card">
-          <div style="
-            width: 40px; height: 40px; border-radius: 10px;
-            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
-            margin-bottom: 1rem;
-          " aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        <div class="energy-cap-card">
+          <div class="energy-cap-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </div>
-          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Demand &amp; Load Forecasting</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
-            Model customer load profiles, forecast seasonal demand, and identify capacity constraints before they become service failures.
-          </p>
+          <h3 class="energy-cap-title">Demand &amp; Load Forecasting</h3>
+          <p class="energy-cap-desc">Model customer load profiles, forecast seasonal demand, and identify capacity constraints before they become service failures.</p>
         </div>
 
-        {# Card 4: Energy Economics #}
-        <div style="
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
-          border-radius: 14px; padding: 1.5rem;
-          transition: border-color 0.2s, background 0.2s;
-        " class="energy-cap-card">
-          <div style="
-            width: 40px; height: 40px; border-radius: 10px;
-            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
-            margin-bottom: 1rem;
-          " aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <div class="energy-cap-card">
+          <div class="energy-cap-icon" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
-          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Energy Economics &amp; ROI</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
-            Track cost savings, payback periods, and ROI across your entire portfolio. Present investors and clients with data-backed performance reports.
-          </p>
+          <h3 class="energy-cap-title">Energy Economics &amp; ROI</h3>
+          <p class="energy-cap-desc">Track cost savings, payback periods, and ROI across your portfolio. Present investors and clients with data-backed performance reports.</p>
         </div>
 
       </div>
 
       {# Bottom proof strip #}
       <div style="
-        border-top: 1px solid rgba(16,185,129,0.12);
-        padding-top: 1.5rem;
-        display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; align-items: center;
+        border-top: 1px solid #e5e7eb; padding-top: 1.25rem;
+        display: flex; flex-wrap: wrap; gap: 1.25rem 2rem; align-items: center;
       ">
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="energy-proof-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           Portfolio-level command center
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="energy-proof-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           Scenario comparison &amp; PDF proposals
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="energy-proof-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           Site monitoring &amp; energy readings
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <div class="energy-proof-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
           AI-ready copilot integration
         </div>
       </div>
@@ -3666,12 +3601,42 @@
   </section>
 
   <style>
-    .energy-cap-card:hover {
-      border-color: rgba(16,185,129,0.35) !important;
-      background: rgba(255,255,255,0.07) !important;
+    /* Renewable Energy flagship — light mode card styles */
+    .energy-cap-card {
+      background: #fff;
+      border: 1px solid #d1fae5;
+      border-radius: 14px;
+      padding: 1.4rem;
+      transition: border-color 0.18s, box-shadow 0.18s;
     }
+    .energy-cap-card:hover {
+      border-color: #6ee7b7;
+      box-shadow: 0 4px 18px rgba(16,185,129,0.10);
+    }
+    .energy-cap-icon {
+      width: 38px; height: 38px; border-radius: 9px;
+      background: #ecfdf5;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 0.875rem;
+    }
+    .energy-cap-title {
+      font-size: 0.9375rem; font-weight: 700;
+      color: var(--text-primary); margin-bottom: 0.4rem;
+    }
+    .energy-cap-desc {
+      font-size: 0.85rem; color: var(--text-secondary);
+      line-height: 1.6; margin: 0;
+    }
+    .energy-proof-item {
+      display: flex; align-items: center; gap: 0.4rem;
+      font-size: 0.8125rem; color: var(--text-secondary);
+    }
+    .energy-explore-link:hover { color: #047857 !important; }
     @media (max-width: 640px) {
-      #renewable-energy { padding: 3.5rem 0; }
+      #energy-capability-grid { grid-template-columns: 1fr 1fr; }
+      .energy-explore-link { display: none; }
+    }
+    @media (max-width: 400px) {
       #energy-capability-grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -5192,70 +5157,99 @@
     // ============================================================
     // HERO LIVE METRICS — 60-second background refresh
     // Values are server-rendered on first load (no zero flash).
-    // JS only patches values when fresh API data arrives.
     // ============================================================
-    (function() {
-      var lastGoodValues = null;
+    // LIVE METRICS — never blank, never "—", skeleton → real value
+    // Strategy:
+    //   1. Server renders real value if has_data, else skeleton span
+    //   2. JS fetches immediately on load → patches all three metric spans
+    //   3. If API returns has_data=false → show growing fallback text
+    //   4. On fetch failure → keep last-known-good, never revert to blank
+    //   5. Refresh every 60 seconds silently
+    // ============================================================
+    (function () {
+      'use strict';
 
-      function fmtNum(n) {
+      var _lastGood = null;  // stores last successful API payload
+
+      function fmt(n) {
         return Math.round(n).toLocaleString('en-US');
       }
 
-      function patchMetric(elId, prefix, suffix, val) {
-        var el = document.getElementById(elId);
+      // Set a single metric span to a real text value
+      function setMetricSpan(id, text) {
+        var el = document.getElementById(id);
         if (!el) return;
-        el.textContent = (prefix || '') + fmtNum(val) + (suffix || '');
+        el.innerHTML = text;  // replaces skeleton span or previous text
+      }
+
+      // Apply a full payload to all metric elements
+      function applyPayload(data) {
+        _lastGood = data;
+
+        if (data.avg_daily_revenue != null) {
+          setMetricSpan('lm-revenue', 'MWK\u00a0' + fmt(data.avg_daily_revenue));
+          var dashRev = document.getElementById('dash-kpi-revenue');
+          if (dashRev) dashRev.innerHTML = 'MWK\u00a0' + fmt(data.avg_daily_revenue);
+        }
+
+        if (data.sales_recorded_per_day != null) {
+          setMetricSpan('lm-sales', fmt(data.sales_recorded_per_day) + '+');
+        }
+
+        if (data.avg_margin_visibility != null) {
+          setMetricSpan('lm-margin', data.avg_margin_visibility + '%');
+          var dashMargin = document.getElementById('dash-kpi-margin');
+          if (dashMargin) dashMargin.innerHTML = data.avg_margin_visibility + '%';
+        }
+
+        // Freshness note
+        var noteEl = document.getElementById('liveMetricsNoteText');
+        if (noteEl && data.as_of) {
+          var secsAgo = Math.round((Date.now() - new Date(data.as_of).getTime()) / 1000);
+          var freshText = secsAgo < 10 ? 'just now' : secsAgo + 's ago';
+          noteEl.textContent = 'Live \u2014 30-day rolling average \u00b7 Updated ' + freshText;
+        }
+      }
+
+      // Show graceful fallback when platform has no recorded data yet
+      function applyFallback() {
+        // Only apply fallback if we have never had good data (no server-seeded values)
+        var rev = document.getElementById('lm-revenue');
+        if (rev && rev.getAttribute('data-seeded')) return;  // server gave us data — keep it
+        setMetricSpan('lm-revenue', 'Growing\u2026');
+        setMetricSpan('lm-sales', 'Growing\u2026');
+        setMetricSpan('lm-margin', 'Growing\u2026');
+        var noteEl = document.getElementById('liveMetricsNoteText');
+        if (noteEl) noteEl.textContent = 'Live data from active Emajinet businesses';
       }
 
       function refreshLiveMetrics() {
         fetch('{% url "staticpages:landing_metrics_api" %}')
-          .then(function(r) { return r.json(); })
-          .then(function(data) {
-            if (!data.has_data) return;
-            lastGoodValues = data;
-            // Patch the hero stat card spans if present
-            var container = document.getElementById('liveMetricsContainer');
-            if (!container) return;
-            var spans = container.querySelectorAll('.counter-animated');
-            spans.forEach(function(sp) {
-              var target = parseInt(sp.dataset.target, 10);
-              var prefix = sp.dataset.prefix || '';
-              var suffix = sp.dataset.suffix || '';
-              // Only update if we have a meaningful new value
-              var newVal = null;
-              if (prefix.indexOf('MWK') !== -1 && data.avg_daily_revenue) newVal = data.avg_daily_revenue;
-              else if (suffix === '+' && data.sales_recorded_per_day) newVal = data.sales_recorded_per_day;
-              else if (suffix === '%' && data.avg_margin_visibility) newVal = data.avg_margin_visibility;
-              if (newVal !== null && newVal !== target) {
-                sp.dataset.target = newVal;
-                sp.textContent = prefix + fmtNum(newVal) + suffix;
-              }
-            });
-            // Update freshness note
-            var note = document.getElementById('liveMetricsNote');
-            if (note && data.as_of) {
-              var d = new Date(data.as_of);
-              var secsAgo = Math.round((Date.now() - d.getTime()) / 1000);
-              var freshText = secsAgo < 10 ? 'just now' : secsAgo + 's ago';
-              // Only update the text node, not the dot span
-              var textNodes = note.childNodes;
-              for (var i = 0; i < textNodes.length; i++) {
-                if (textNodes[i].nodeType === 3 && textNodes[i].textContent.trim()) {
-                  textNodes[i].textContent = ' Live — 30-day rolling average · Updated ' + freshText;
-                  break;
-                }
-              }
-            }
+          .then(function (r) {
+            if (!r.ok) throw new Error('non-2xx');
+            return r.json();
           })
-          .catch(function() {
-            // On failure keep last good values — no blank or zero shown
+          .then(function (data) {
+            if (data.has_data) {
+              applyPayload(data);
+            } else if (!_lastGood) {
+              // No historical data and no prior good data — show graceful fallback
+              applyFallback();
+            }
+            // If _lastGood exists but new data has no data, keep _lastGood values as-is
+          })
+          .catch(function () {
+            // Network failure: keep whatever is currently displayed
+            // This is intentional — never revert to blank or skeleton on failure
           });
       }
 
-      // Initial refresh after 5s (page already has server values), then every 60s
-      setTimeout(refreshLiveMetrics, 5000);
+      // Fetch immediately on load (no artificial 5s delay)
+      refreshLiveMetrics();
+
+      // Then refresh every 60 seconds
       setInterval(refreshLiveMetrics, 60000);
-    })();
+    }());
 
     // ============================================================
     // ============================================================
