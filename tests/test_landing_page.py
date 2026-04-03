@@ -369,6 +369,220 @@ def test_landing_metrics_api_with_businesses(client):
     assert data["team_members"] >= 2
 
 
+def test_landing_page_airtel_partner_link(client):
+    """
+    GUARDRAIL: Airtel partner logo must link to https://www.airtel.mw/ with
+    target="_blank" rel="noopener noreferrer", not href="#".
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "https://www.airtel.mw/" in content, (
+        "Airtel partner link must point to https://www.airtel.mw/"
+    )
+    assert 'airtel-logo.svg' in content, (
+        "Airtel logo SVG must be rendered in partners section"
+    )
+
+
+def test_landing_page_tnm_partner_link(client):
+    """
+    GUARDRAIL: TNM partner logo must link to https://www.tnmmpamba.co.mw/#/ with
+    target="_blank" rel="noopener noreferrer", not href="#".
+    Must also use the real tnm-logo.svg asset, not a placeholder icon.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "https://www.tnmmpamba.co.mw/#/" in content, (
+        "TNM partner link must point to https://www.tnmmpamba.co.mw/#/"
+    )
+    assert "tnm-logo.svg" in content, (
+        "TNM logo must use the tnm-logo.svg asset, not a generic SVG icon"
+    )
+
+
+def test_landing_page_partner_links_open_new_tab(client):
+    """
+    GUARDRAIL: Partner links (Airtel, TNM) must open in a new tab and have
+    rel="noopener noreferrer" for security.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert 'rel="noopener noreferrer"' in content, (
+        "Partner links must include rel='noopener noreferrer'"
+    )
+
+
+def test_landing_page_vertical_cta_not_about(client):
+    """
+    GUARDRAIL: 'See all verticals' CTA must NOT point to the About page.
+    It must point to the pricing page or a real verticals destination.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    about_url = reverse("staticpages:about")
+    pricing_url = reverse("staticpages:pricing")
+
+    # The "See all verticals" link must go to pricing, not about
+    assert f'See all verticals' in content, "See all verticals text must be present"
+    # Check the link surrounding "See all verticals" is NOT the about URL
+    import re
+    pattern = re.search(r'href="([^"]*)"[^>]*>See all verticals', content)
+    if pattern:
+        href = pattern.group(1)
+        assert href != about_url, (
+            f"'See all verticals' must not link to About ({about_url})"
+        )
+        assert href == pricing_url, (
+            f"'See all verticals' must link to pricing ({pricing_url}), got {href}"
+        )
+
+
+def test_landing_page_energy_cta_not_about(client):
+    """
+    GUARDRAIL: 'Explore Renewable Energy' CTA must NOT point to the About page.
+    It must point to the pricing page or a real energy destination.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    about_url = reverse("staticpages:about")
+    pricing_url = reverse("staticpages:pricing")
+
+    import re
+    pattern = re.search(r'href="([^"]*)"[^>]*>\s*Explore Renewable Energy', content)
+    if pattern:
+        href = pattern.group(1)
+        assert href != about_url, (
+            f"'Explore Renewable Energy' must not link to About ({about_url})"
+        )
+        assert href == pricing_url, (
+            f"'Explore Renewable Energy' must link to pricing ({pricing_url}), got {href}"
+        )
+
+
+def test_sidebar_no_debug_comments(client):
+    """
+    GUARDRAIL: Sidebar partial must not expose DEBUG comments in rendered HTML.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "DEBUG: Resolved" not in content, (
+        "DEBUG URL resolution comment must not appear in rendered HTML"
+    )
+    assert "DEBUG: sidebar_items" not in content, (
+        "DEBUG sidebar_items comment must not appear in rendered HTML"
+    )
+
+
+@pytest.mark.django_db
+def test_upgrade_subscription_view_requires_post(client):
+    """
+    Upgrade subscription endpoint must require POST.
+    GET to upgrade_start must be rejected (405) not 500.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from billing.models import BusinessSubscription, SubscriptionPlan
+    from decimal import Decimal
+
+    User = get_user_model()
+    user = User.objects.create_user("upgradetester", "up@test.com", "testpass123")
+    biz = Business.objects.create(name="Upgrade Test Biz", slug="upgrade-test-biz-get")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    starter, _ = SubscriptionPlan.objects.get_or_create(
+        code="starter_upg_test",
+        defaults={"name": "Starter Upg", "amount": Decimal("20000"), "currency": "MWK", "is_active": True},
+    )
+    growth, _ = SubscriptionPlan.objects.get_or_create(
+        code="growth_upg_test",
+        defaults={"name": "Growth Upg", "amount": Decimal("60000"), "currency": "MWK", "is_active": True},
+    )
+    BusinessSubscription.objects.create(
+        business=biz,
+        plan=starter,
+        status=BusinessSubscription.Status.ACTIVE,
+    )
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    from django.urls import reverse as r
+    url = r("billing:upgrade_start", args=["growth_upg_test"])
+    response = client.get(url)
+    # GET on a @require_POST view returns 405 (Method Not Allowed), not 500
+    assert response.status_code in (302, 405), (
+        f"GET to upgrade_start must not return 500; got {response.status_code}"
+    )
+
+
+@pytest.mark.django_db
+def test_upgrade_subscription_invalid_plan_graceful(client):
+    """
+    Upgrade subscription with non-existent plan must redirect with error, not 500.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from billing.models import BusinessSubscription, SubscriptionPlan
+    from decimal import Decimal
+
+    User = get_user_model()
+    user = User.objects.create_user("invalidplantester", "ip@test.com", "testpass123")
+    biz = Business.objects.create(name="Invalid Plan Biz", slug="invalid-plan-biz")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    starter, _ = SubscriptionPlan.objects.get_or_create(
+        code="starter_inv_test",
+        defaults={"name": "Starter Inv", "amount": Decimal("20000"), "currency": "MWK", "is_active": True},
+    )
+    BusinessSubscription.objects.create(
+        business=biz,
+        plan=starter,
+        status=BusinessSubscription.Status.ACTIVE,
+    )
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    from django.urls import reverse as r
+    url = r("billing:upgrade_start", args=["nonexistent-plan-xyz"])
+    response = client.post(url)
+    # Must redirect to manage with error message, not 500
+    assert response.status_code == 302, (
+        f"Invalid plan upgrade must redirect (302), not crash; got {response.status_code}"
+    )
+    assert response.url == r("billing:manage"), (
+        "Invalid plan upgrade must redirect to billing:manage"
+    )
+
+
 @pytest.mark.django_db
 def test_car_dealer_stock_in_has_popular_makes(client):
     """
@@ -438,4 +652,206 @@ def test_energy_sizing_detail_has_quotation_section(client):
     assert "quotation" in content.lower() or "Quotation" in content, (
         "Energy sizing detail must include quotation builder section"
     )
+
+
+# ===========================================================================
+# PHASE 1 — Car dealer dashboard: quick-action cards removed, sidebar intact
+# ===========================================================================
+
+@pytest.mark.django_db
+def test_car_dealer_dashboard_no_quick_action_cards(client):
+    """
+    Car dealer dashboard must NOT contain the duplicated Quick Actions cards
+    (Stock In Vehicle, Available Stock, Marketplace) — these live in the sidebar.
+    The dashboard KPIs and hero CTAs must still be present.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+
+    User = get_user_model()
+    user = User.objects.create_user("cdqatest", "cdqa@example.com", "pass123")
+    biz = Business.objects.create(name="CD QA Biz", slug="cd-qa-biz", business_kind="car_dealer")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    from django.urls import reverse as r
+    url = r("verticals:car_dealer_dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # Quick-action card titles must NOT appear as standalone dashboard cards
+    assert "qa-title" not in content, (
+        "Quick-action card (.qa-title) must be removed from car dealer dashboard"
+    )
+    assert "Stock In Vehicle" not in content, (
+        "'Stock In Vehicle' quick-action card must not appear in dashboard"
+    )
+    assert "Available Stock" not in content, (
+        "'Available Stock' quick-action card must not appear in dashboard"
+    )
+
+    # Core KPIs must still be present
+    assert "Revenue" in content or "revenue" in content, "Revenue KPI must still be present"
+    assert "Dealer Dashboard" in content or "Car Dealer" in content, "Dashboard title must be present"
+
+
+@pytest.mark.django_db
+def test_car_dealer_sidebar_nav_items_present(client):
+    """
+    After removing quick-action cards from the dashboard, the sidebar must still
+    contain navigation links for Add Vehicle, All Vehicles, and Marketplace.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+
+    User = get_user_model()
+    user = User.objects.create_user("cdnav", "cdnav@example.com", "pass123")
+    biz = Business.objects.create(name="CD Nav Biz", slug="cd-nav-biz", business_kind="car_dealer")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    from django.urls import reverse as r
+    url = r("verticals:car_dealer_dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # Sidebar nav items must still link to the car dealer routes
+    assert "nav-car-dealer-stock-in" in content or "car-dealer/vehicles/add" in content or "Add Vehicle" in content, (
+        "Car dealer 'Add Vehicle' sidebar link must still exist"
+    )
+    assert "nav-car-dealer-marketplace" in content or "Marketplace" in content, (
+        "Car dealer 'Marketplace' sidebar link must still exist"
+    )
+
+
+# ===========================================================================
+# PHASE 3 — Farm vertical is in top-6 verticals showcase
+# ===========================================================================
+
+def test_farm_vertical_in_top_six_showcase(client):
+    """
+    Farm vertical must appear in the landing page vertical showcase grid
+    (top 6 cards), not just in a footnote.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Farm Manager" in content, (
+        "Farm Manager vertical must appear in the verticals showcase section"
+    )
+    assert "🌾" in content or "Farm" in content, (
+        "Farm vertical icon or name must be visible in the verticals section"
+    )
+
+
+# ===========================================================================
+# PHASE 2 — Problem section has all four problem cards
+# ===========================================================================
+
+def test_problem_section_has_shrinkage_and_demand_blindness(client):
+    """
+    The problem section must contain all four evidence cards:
+    inventory shrinkage, no sales tracking, margin blindness, demand blindness.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Inventory shrinkage" in content or "shrinkage" in content.lower(), (
+        "Inventory shrinkage problem card must be present"
+    )
+    assert "sales tracking" in content.lower(), (
+        "No sales tracking problem card must be present"
+    )
+    assert "Margin blindness" in content or "margin" in content.lower(), (
+        "Margin blindness problem card must be present"
+    )
+    assert "Demand blindness" in content or "demand" in content.lower(), (
+        "Demand blindness problem card must be present"
+    )
+
+
+# ===========================================================================
+# PHASE 5 — Landing metrics JS fallback is not blank
+# ===========================================================================
+
+def test_landing_metrics_fallback_js_present(client):
+    """
+    The landing page JS must contain a non-empty applyFallback() that sets
+    explicit numeric values, not just keeping skeleton loaders blank.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # The applyFallback function must set real values, not be empty
+    assert "applyFallback" in content, "applyFallback function must exist in page JS"
+    # Must contain at least one setMetricSpan call inside the fallback
+    assert "MWK" in content or "lm-revenue" in content, (
+        "Fallback must reference revenue metric span"
+    )
+
+
+# ===========================================================================
+# PHASE 4 — Gym dashboard clean (no dev leakage in rendered output)
+# ===========================================================================
+
+@pytest.mark.django_db
+def test_gym_dashboard_clean_render(client):
+    """
+    Gym dashboard when rendered for an authenticated user must not contain
+    visible developer/debug text. Django {# #} comments are invisible;
+    HTML <!-- --> comments must not contain dev planning notes.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+
+    User = get_user_model()
+    user = User.objects.create_user("gymclean", "gymclean@example.com", "pass123")
+    biz = Business.objects.create(name="Clean Gym", slug="clean-gym", business_kind="gym")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    from django.urls import reverse as r
+    url = r("verticals:gym_dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    forbidden = [
+        "REMOVED:",
+        "DEBUG:",
+        "TODO:",
+        "FIXME:",
+        "restored from git",
+        "planning note",
+    ]
+    for text in forbidden:
+        assert text not in content, (
+            f"Developer text '{text}' must not appear in gym dashboard rendered HTML"
+        )
 

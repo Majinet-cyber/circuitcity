@@ -149,25 +149,6 @@
   .bar-fill { height: 100%; border-radius: 999px; background: var(--cd-blue-mid); }
   .bar-val { font-size: .78rem; font-weight: 700; color: var(--cd-blue); min-width: 2rem; text-align: right; }
 
-  /* ── QUICK ACTIONS ── */
-  .quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.75rem; }
-  @media (max-width: 640px) { .quick-actions { grid-template-columns: repeat(1, 1fr); } }
-
-  .qa-card {
-    display: flex; align-items: center; gap: .85rem; padding: .9rem 1rem;
-    border-radius: var(--cd-radius-sm); text-decoration: none; color: inherit;
-    border: 1.5px solid var(--cd-border);
-    transition: all .15s; background: #fff;
-  }
-  .qa-card:hover { border-color: var(--cd-blue-mid); box-shadow: var(--cd-shadow); transform: translateY(-1px); color: inherit; }
-  .qa-icon {
-    width: 40px; height: 40px; border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 1.15rem;
-  }
-  .qa-title { font-size: .85rem; font-weight: 700; color: var(--cd-slate); }
-  .qa-desc { font-size: .72rem; color: var(--cd-muted); }
-
   /* ── RECENT SALES TABLE ── */
   .sales-table { font-size: .84rem; }
   .sales-table th { color: #94a3b8; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; border: none; padding: .5rem .75rem; }
@@ -287,22 +268,6 @@
       <div class="kpi-val money" style="color:var(--cd-purple)">{{ business.currency }} {{ stats.inventory_value|floatformat:0 }}</div>
       <div class="kpi-sub">Current inventory</div>
     </div>
-  </div>
-
-  {# ── QUICK ACTIONS ── #}
-  <div class="quick-actions">
-    <a href="{% url 'car_dealer:stock_in' %}" class="qa-card">
-      <div class="qa-icon" style="background:#eef2ff; color:#4f46e5"><i class="bi bi-plus-circle-fill"></i></div>
-      <div><div class="qa-title">Stock In Vehicle</div><div class="qa-desc">Add new unit to inventory</div></div>
-    </a>
-    <a href="{% url 'car_dealer:vehicle_list' %}?status=in_stock" class="qa-card">
-      <div class="qa-icon" style="background:#f0fdf4; color:#16a34a"><i class="bi bi-car-front-fill"></i></div>
-      <div><div class="qa-title">Available Stock</div><div class="qa-desc">{{ stats.in_stock }} unit{{ stats.in_stock|pluralize }} ready</div></div>
-    </a>
-    <a href="{% url 'inventory:manage_listings' %}" class="qa-card">
-      <div class="qa-icon" style="background:#fefce8; color:#d97706"><i class="bi bi-shop-window"></i></div>
-      <div><div class="qa-title">Marketplace</div><div class="qa-desc">Manage public listings</div></div>
-    </a>
   </div>
 
   {# ── INSIGHTS ROW ── #}

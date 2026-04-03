@@ -62,6 +62,12 @@ def get_all_verticals():
             'icon': '💪',
         },
         {
+            'code': 'farm',
+            'name': 'Farm Manager',
+            'description': 'Crop & livestock tracking, season management, and farm profitability',
+            'icon': '🌾',
+        },
+        {
             'code': 'pharmacy',
             'name': 'Pharmacy & Cosmetics',
             'description': 'Inventory tracking for medicines and cosmetics',
@@ -72,6 +78,12 @@ def get_all_verticals():
             'name': 'Clothing Store',
             'description': 'Manage apparel inventory with sizes and colors',
             'icon': '👔',
+        },
+        {
+            'code': 'car_dealer',
+            'name': 'Car Dealer',
+            'description': 'Vehicle dealership, stock management, sales & marketplace',
+            'icon': '🏎️',
         },
         {
             'code': 'liquor',
@@ -98,12 +110,6 @@ def get_all_verticals():
             'icon': '🏗️',
         },
         {
-            'code': 'farm',
-            'name': 'Farm Manager',
-            'description': 'Track crops, livestock, and farm profitability',
-            'icon': '🌾',
-        },
-        {
             'code': 'welding',
             'name': 'Welding Workshop',
             'description': 'Job estimation and welding project invoicing',
@@ -114,12 +120,6 @@ def get_all_verticals():
             'name': 'Car Hire Service',
             'description': 'Fleet management and vehicle rental bookings',
             'icon': '🚗',
-        },
-        {
-            'code': 'car_dealer',
-            'name': 'Car Dealer',
-            'description': 'Vehicle dealership, stock management, sales & marketplace',
-            'icon': '🏎️',
         },
         {
             'code': 'energy',

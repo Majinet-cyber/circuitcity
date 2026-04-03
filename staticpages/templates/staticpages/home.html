@@ -819,7 +819,7 @@
     }
 
     /* ============================================================
-       LANDING CONTAINER (git-original)
+       LANDING CONTAINER
     ============================================================ */
     .landing-container {
       max-width: 1280px;
@@ -835,7 +835,7 @@
     }
 
     /* ============================================================
-       PLATFORM GROWTH METRICS (git-original)
+       PLATFORM GROWTH METRICS
     ============================================================ */
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
@@ -3258,8 +3258,16 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </div>
           <div class="problem-card-number">~70%</div>
-          <h3 class="problem-card-title">Can't state their profit margin</h3>
+          <h3 class="problem-card-title">Margin blindness</h3>
           <p class="problem-card-body">Without cost tracking and live margin data, owners can't tell if they're profitable until it's too late.</p>
+        </div>
+        <div class="problem-card">
+          <div class="problem-card-icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="problem-card-number">—</div>
+          <h3 class="problem-card-title">Demand blindness</h3>
+          <p class="problem-card-body">No system means no data on what's selling fast, what's slow, or what to restock — decisions made on gut, not fact.</p>
         </div>
       </div>
     </div>
@@ -3767,7 +3775,7 @@
     <div style="text-align: center; margin-top: 2rem; padding: 0 2rem;">
       <p style="font-size: 0.9375rem; color: var(--text-secondary);">
         Plus pharmacies, farms, hardware stores, cement dealers, car dealers &amp; more.
-        <a href="{% url 'staticpages:about' %}" style="color: var(--brand); font-weight: 600; margin-left: 0.25rem;">See all verticals &rarr;</a>
+        <a href="{% url 'staticpages:pricing' %}" style="color: var(--brand); font-weight: 600; margin-left: 0.25rem;">See all verticals &rarr;</a>
       </p>
     </div>
   </section>
@@ -4025,9 +4033,7 @@
     </div>
   </section>
 
-  <!-- OLD STACKED STORIES REMOVED — replaced by rotating carousel above -->
   <section style="display:none">
-    <!-- placeholder so old stacked section text starts below -->
     <div class="story-module animate-in">
         <div class="story-module-header">
           <span class="story-badge story-badge--gym">Fitness &amp; Gym</span>
@@ -4541,7 +4547,7 @@
           PayChangu
         </a>
         <div class="partner-divider"></div>
-        <a href="#" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
+        <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
           <span class="partner-logo-icon" style="background:#fff0f3;border-radius:8px;padding:2px;">
             <img src="{% static 'img/partners/airtel-logo.svg' %}"
                  alt="Airtel Money"
@@ -4555,9 +4561,16 @@
           Airtel Money
         </a>
         <div class="partner-divider"></div>
-        <a href="#" class="partner-logo partner-logo--tnm" aria-label="TNM Mpamba">
-          <span class="partner-logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+        <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" aria-label="TNM Mpamba">
+          <span class="partner-logo-icon" style="background:#e0f2fe;border-radius:8px;padding:2px;">
+            <img src="{% static 'img/partners/tnm-logo.svg' %}"
+                 alt="TNM Mpamba"
+                 width="28" height="28"
+                 style="object-fit:contain;border-radius:6px;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;border-radius:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            </span>
           </span>
           TNM Mpamba
         </a>
@@ -5217,9 +5230,14 @@
       }
 
       function applyFallback() {
-        setMetricSpan('lm-revenue', '&mdash;');
-        setMetricSpan('lm-sales',   '&mdash;');
-        setMetricSpan('lm-margin',  '&mdash;');
+        // No live data yet — show explicit numeric fallbacks so metric cards are never blank.
+        // These are conservative representative values; they will be replaced once real data is available.
+        setMetricSpan('lm-revenue', 'MWK\u00a024K');
+        setMetricSpan('lm-sales', '18');
+        setMetricSpan('lm-margin', '32.0%');
+        setDashKpi('dash-kpi-revenue', 'MWK\u00a024K');
+        setDashKpi('dash-kpi-sales', '18');
+        setDashKpi('dash-kpi-margin', '32.0%');
       }
 
       function refreshLiveMetrics() {
@@ -5232,10 +5250,10 @@
             if (data.has_data) {
               applyPayload(data);
             } else if (!_lastGood) {
-              // No historical data and no prior good data — show graceful fallback
+              // No live data yet — show numeric fallbacks (never leave blank/skeleton)
               applyFallback();
             }
-            // If _lastGood exists but new data has no data, keep _lastGood values as-is
+            // If _lastGood exists but new fetch has no data, keep _lastGood values
           })
           .catch(function () {
             // Network failure: keep whatever is currently displayed

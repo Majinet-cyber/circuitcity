@@ -1,4 +1,4 @@
-﻿# billing/models.py
+# billing/models.py
 from __future__ import annotations
 
 import uuid
@@ -1370,6 +1370,7 @@ class SubscriptionChangeIntent(models.Model):
 
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     paid_at = models.DateTimeField(null=True, blank=True)
     applied_at = models.DateTimeField(null=True, blank=True)
     canceled_at = models.DateTimeField(null=True, blank=True)

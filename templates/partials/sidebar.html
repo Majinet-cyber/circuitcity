@@ -272,7 +272,6 @@
               {% else %}
                 {# Try named URL resolution #}
                 {% url item.url as item_url %}
-                <!-- DEBUG: Resolved {{ item.key }} URL: {{ item_url|default:"FAILED" }} -->
                 {% if item_url %}
                   <li class="{% if item.active_pattern in request.path or item.active_prefix in request.path %}active{% endif %}">
                     <a class="navlink" href="{{ item_url }}" {% if item.key %}data-cy="nav-{{ item.key }}"{% endif %} {% if item.testid %}data-testid="{{ item.testid }}"{% endif %}>
