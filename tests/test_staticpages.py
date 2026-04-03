@@ -66,6 +66,7 @@ class TestStaticPages:
         response = client.get(reverse("staticpages:home"))
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        # Check for About link
-        assert 'href="/home/about/"' in content or "staticpages:about" in content
+        # About link is at /landing/about/ (the staticpages namespace URL)
+        assert '/landing/about/' in content, \
+            "About link must appear on the home page (in the footer)"
 
