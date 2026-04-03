@@ -660,7 +660,15 @@ def logout_get_or_post(request):
         logout(request)
     except Exception:
         pass
-    return redirect(next_url)
+    response = redirect(next_url)
+    # Prevent the browser (and any proxy/CDN) from caching the post-logout
+    # redirect.  Without this, the browser may restore the cached 302 and
+    # skip the network entirely — keeping the user's browser thinking they
+    # are still authenticated even after the session was destroyed.
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
 
 
 # ----------------------------

@@ -79,6 +79,65 @@ class PharmacyCategory:
     ]
 
 
+def normalize_pharmacy_category(category: str) -> str:
+    """
+    Normalise a category string to a valid PharmacyCategory value.
+
+    Some UI flows (api_add_product_suggestion, catalog) use human-friendly
+    keys like "medicine" that are NOT in PharmacyCategory.ALL.  This helper
+    maps them to valid service-layer categories so stock_in_pharmacy never
+    raises ValidationError due to a UI ↔ service category mismatch.
+
+    If the category is already valid, it is returned unchanged.
+    If no mapping is found, "other" is returned as a safe fallback.
+    """
+    # Already a valid service category → return as-is
+    if category in PharmacyCategory.ALL:
+        return category
+
+    _MAPPING: dict = {
+        # UI-only aliases → service category
+        "medicine": PharmacyCategory.TABLETS_CAPSULES,
+        "medicines": PharmacyCategory.TABLETS_CAPSULES,
+        "tablets": PharmacyCategory.TABLETS_CAPSULES,
+        "capsules": PharmacyCategory.TABLETS_CAPSULES,
+        "syrup": PharmacyCategory.SYRUP,
+        "syrups": PharmacyCategory.SYRUP,
+        "ointment": PharmacyCategory.OINTMENT,
+        "ointments": PharmacyCategory.OINTMENT,
+        "cream": PharmacyCategory.OINTMENT,
+        "creams": PharmacyCategory.OINTMENT,
+        "drops": PharmacyCategory.DROPS,
+        "supplement": PharmacyCategory.VITAMIN,
+        "supplements": PharmacyCategory.VITAMIN,
+        "vitamins": PharmacyCategory.VITAMIN,
+        "cosmetic": PharmacyCategory.COSMETICS,
+        "cosmetics": PharmacyCategory.COSMETICS,
+        "skin care": PharmacyCategory.SKIN_CARE,
+        "skincare": PharmacyCategory.SKIN_CARE,
+        "hair care": PharmacyCategory.HAIR_CARE,
+        "haircare": PharmacyCategory.HAIR_CARE,
+        "body care": PharmacyCategory.PERSONAL_CARE,
+        "bodycare": PharmacyCategory.PERSONAL_CARE,
+        "personal care": PharmacyCategory.PERSONAL_CARE,
+        "baby care": PharmacyCategory.BABY_CARE,
+        "oral care": PharmacyCategory.ORAL_CARE,
+        "makeup": PharmacyCategory.BEAUTY_MAKEUP,
+        "beauty": PharmacyCategory.BEAUTY_MAKEUP,
+        "beauty_makeup": PharmacyCategory.BEAUTY_MAKEUP,
+        "perfume": PharmacyCategory.PERSONAL_CARE,
+        "perfumes": PharmacyCategory.PERSONAL_CARE,
+        "deodorant": PharmacyCategory.PERSONAL_CARE,
+        "deodorants": PharmacyCategory.PERSONAL_CARE,
+        "soap": PharmacyCategory.PERSONAL_CARE,
+        "soap_hygiene": PharmacyCategory.PERSONAL_CARE,
+        "first aid": PharmacyCategory.OTHER,
+        "first_aid": PharmacyCategory.OTHER,
+        "general": PharmacyCategory.GENERAL,
+    }
+    return _MAPPING.get(category.lower().strip(), PharmacyCategory.OTHER)
+
+
 class PharmacyBaseUnit:
     """Base units for pharmacy products (what we track internally)"""
 

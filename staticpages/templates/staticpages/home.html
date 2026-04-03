@@ -2695,6 +2695,75 @@
       background: var(--text-muted);
     }
 
+    /* ── Story Metrics Panel ────────────────────────────────────── */
+    .sc-metrics-wrap {
+      padding: 0 2rem 1.75rem;
+      position: relative;
+    }
+    .sc-metrics {
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      animation: scMetricsFade 0.32s ease;
+    }
+    .sc-metrics--active {
+      display: grid;
+    }
+    @keyframes scMetricsFade {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .sc-metric-chip {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.875rem 1rem;
+      border-radius: 0.875rem;
+      background: var(--bg-subtle);
+      border: 1.5px solid var(--border);
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .sc-metric-chip:hover {
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+    .sc-metric-value {
+      font-size: 1.4rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .sc-metric-label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .sc-metric-sublabel {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      opacity: 0.8;
+    }
+    /* Vertical accent colours */
+    .sc-metrics--gym .sc-metric-chip {
+      border-color: rgba(139, 92, 246, 0.18);
+    }
+    .sc-metrics--gym .sc-metric-chip:first-child .sc-metric-value {
+      color: #7c3aed;
+    }
+    .sc-metrics--gym .sc-metric-chip.metric--positive .sc-metric-value { color: #16a34a; }
+    .sc-metrics--gym .sc-metric-chip.metric--warning  .sc-metric-value { color: #d97706; }
+
+    .sc-metrics--pharmacy .sc-metric-chip {
+      border-color: rgba(16, 185, 129, 0.18);
+    }
+    .sc-metrics--pharmacy .sc-metric-chip:first-child .sc-metric-value {
+      color: #059669;
+    }
+    .sc-metrics--pharmacy .sc-metric-chip.metric--positive .sc-metric-value { color: #059669; }
+    .sc-metrics--pharmacy .sc-metric-chip.metric--warning  .sc-metric-value { color: #d97706; }
+
     /* Mobile */
     @media (max-width: 900px) {
       .sc-slide-inner {
@@ -2712,6 +2781,12 @@
       .sc-tabs { flex-direction: row; }
       .sc-tab { padding: 0.875rem 0.75rem; font-size: 0.82rem; }
       .sc-tab-icon { display: none; }
+      .sc-metrics-wrap { padding: 0 1.25rem 1.5rem; }
+      .sc-metrics { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+      .sc-metric-chip { padding: 0.65rem 0.75rem; }
+      .sc-metric-value { font-size: 1.1rem; }
+      .sc-metric-label { font-size: 0.68rem; }
+      .sc-metric-sublabel { display: none; }
     }
     @media (max-width: 480px) {
       .sc-slide-inner { padding: 1.25rem 1rem; gap: 1.25rem; }
@@ -2720,6 +2795,9 @@
       .sc-img-card img { height: 108px; }
       .sc-img-card--tall img { height: 132px; }
       .sc-img-card--wide img { height: 110px; }
+      .sc-metrics { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+      .sc-metric-chip { padding: 0.55rem 0.6rem; border-radius: 0.65rem; }
+      .sc-metric-value { font-size: 0.95rem; }
     }
 
     /* ============================================================
@@ -3968,6 +4046,45 @@
           <button class="sc-dot" data-story="1" aria-label="Pharmacy story" title="Pharmacy &amp; Retail"></button>
         </div>
 
+        <!-- ── Story Metrics: live vertical proof data ─────────────── -->
+        <div class="sc-metrics-wrap" id="scMetricsWrap" aria-live="polite">
+
+          {% comment %}Story 0 — Gym{% endcomment %}
+          <div class="sc-metrics sc-metrics--gym sc-metrics--active" data-metrics-story="0">
+            {% with metrics=story_metrics.gym.metrics %}
+            {% for m in metrics %}
+            <div class="sc-metric-chip metric--{{ m.status }}">
+              <span class="sc-metric-value">{{ m.value }}</span>
+              <span class="sc-metric-label">{{ m.label }}</span>
+              {% if m.sublabel %}<span class="sc-metric-sublabel">{{ m.sublabel }}</span>{% endif %}
+            </div>
+            {% empty %}
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Members tracked</span></div>
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Paid &amp; active</span></div>
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">In arrears</span></div>
+            {% endfor %}
+            {% endwith %}
+          </div>
+
+          {% comment %}Story 1 — Pharmacy{% endcomment %}
+          <div class="sc-metrics sc-metrics--pharmacy" data-metrics-story="1">
+            {% with metrics=story_metrics.pharmacy.metrics %}
+            {% for m in metrics %}
+            <div class="sc-metric-chip metric--{{ m.status }}">
+              <span class="sc-metric-value">{{ m.value }}</span>
+              <span class="sc-metric-label">{{ m.label }}</span>
+              {% if m.sublabel %}<span class="sc-metric-sublabel">{{ m.sublabel }}</span>{% endif %}
+            </div>
+            {% empty %}
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Sales recorded</span></div>
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Stock value</span></div>
+            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Revenue tracked</span></div>
+            {% endfor %}
+            {% endwith %}
+          </div>
+
+        </div><!-- /sc-metrics-wrap -->
+
       </div><!-- /sc-wrap -->
 
     </div>
@@ -5125,20 +5242,23 @@
       var carousel = document.getElementById('storyCarousel');
       if (!carousel) return;
 
-      var slides   = carousel.querySelectorAll('.sc-slide');
-      var dots     = carousel.querySelectorAll('.sc-dot');
-      var tabs     = carousel.querySelectorAll('.sc-tab');
-      var progress = document.getElementById('scProgressBar');
-      var current  = 0;
-      var total    = slides.length;
-      var timer    = null;
-      var DELAY    = 10000;
+      var slides      = carousel.querySelectorAll('.sc-slide');
+      var dots        = carousel.querySelectorAll('.sc-dot');
+      var tabs        = carousel.querySelectorAll('.sc-tab');
+      var progress    = document.getElementById('scProgressBar');
+      var metricPanels = carousel.querySelectorAll('.sc-metrics[data-metrics-story]');
+      var current     = 0;
+      var total       = slides.length;
+      var timer       = null;
+      var DELAY       = 10000;
 
       function show(idx) {
         slides[current].classList.remove('sc-slide--active');
         dots[current].classList.remove('sc-dot--active');
         tabs[current].classList.remove('sc-tab--active');
         tabs[current].setAttribute('aria-selected', 'false');
+        // Hide current metrics panel
+        if (metricPanels[current]) metricPanels[current].classList.remove('sc-metrics--active');
 
         current = ((idx % total) + total) % total;
 
@@ -5146,6 +5266,8 @@
         dots[current].classList.add('sc-dot--active');
         tabs[current].classList.add('sc-tab--active');
         tabs[current].setAttribute('aria-selected', 'true');
+        // Show new metrics panel
+        if (metricPanels[current]) metricPanels[current].classList.add('sc-metrics--active');
 
         resetProgress();
       }

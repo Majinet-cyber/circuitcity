@@ -30,7 +30,10 @@
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  /* animation-fill-mode: both ensures the hero stays at opacity:0 before the
+     animation fires, preventing a white flash before the gradient renders.   */
+  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  will-change: opacity;
 }
 
 .vertical-hero::before {
@@ -120,14 +123,19 @@
   box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
   text-align: center;
   height: auto !important;
-  min-height: 90px;
+  /* Reserve a stable minimum size so the grid never shifts while cards animate in */
+  min-height: 120px;
   min-width: 0;
   overflow: visible;
   position: relative;
   border: 1px solid rgba(15, 23, 42, 0.04);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
-  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* animation-fill-mode: both keeps opacity:0 during the delay period so the card
+     never flickers to opacity:1 before its stagger delay fires.               */
+  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  will-change: opacity, transform;
 }
 
 /* Hover Effects */

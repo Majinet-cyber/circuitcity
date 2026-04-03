@@ -798,6 +798,10 @@ def pharmacy_stock_in_catalog_save(request: HttpRequest) -> JsonResponse:
         if cost_price < 0 or selling_price < 0:
             return JsonResponse({"ok": False, "error": "Prices cannot be negative"}, status=400)
         
+        # Normalise category to a valid service-layer code
+        from inventory.pharmacy_config import normalize_pharmacy_category
+        category = normalize_pharmacy_category(category)
+
         # Parse expiry date if provided
         expiry_date = None
         if expiry_date_str:
@@ -3047,11 +3051,16 @@ def api_stock_in(request: HttpRequest) -> JsonResponse:
         else:
             selling_price = Decimal(selling_price)
 
+        # Normalise category: UI-friendly names → valid service-layer codes
+        from inventory.pharmacy_config import normalize_pharmacy_category
+        raw_category = product.category or "other"
+        safe_category = normalize_pharmacy_category(raw_category)
+
         # Call service layer with correct signature
         result = stock_in_pharmacy(
             business=business,
             product_name=product.name,
-            category=product.category or "other",
+            category=safe_category,
             user=request.user,
             quantity=quantity,
             unit=unit,
@@ -3072,7 +3081,7 @@ def api_stock_in(request: HttpRequest) -> JsonResponse:
             {
                 "success": True,
                 "batch_id": result["batch_id"],
-                "new_stock": result["current_batch_stock_base_units"],
+                "new_stock": result["qty_base_units"],  # service returns qty_base_units
                 "message": result["message"],
             }
         )
@@ -3130,7 +3139,7 @@ def api_sell(request: HttpRequest) -> JsonResponse:
                     "product": product.name,
                     "quantity": quantity,
                     "unit": unit,
-                    "sold_from_batches": result["sold_from_batches"],
+                    "sale_id": result.get("sale_id"),
                 }
             )
 

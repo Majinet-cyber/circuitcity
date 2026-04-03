@@ -315,6 +315,10 @@ MIDDLEWARE = [
     # MUST be AFTER AuthenticationMiddleware so request.user exists
     # This fixes "need hard refresh after deploy" by ensuring browsers always fetch fresh HTML
     "cc.middleware_cache.AuthenticatedHTMLNoCacheMiddleware",
+    # ✅ CACHE CONTROL: Ensure /sw.js is never cached by the browser.
+    # A cached service worker file prevents updates from being picked up on
+    # subsequent page loads — causing stale CSS/JS to persist indefinitely.
+    "cc.middleware_cache.ServiceWorkerNoCacheMiddleware",
     # HQ admins stay in HQ
     "cc.middleware.PreventHQFromClientUI",
     # Tenant resolution + compat alias

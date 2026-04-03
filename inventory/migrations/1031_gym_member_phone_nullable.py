@@ -11,7 +11,7 @@ def convert_empty_strings_to_null(apps, schema_editor):
     GymMember = apps.get_model("inventory", "GymMember")
     # Update all members with empty string phone to NULL
     updated_count = GymMember.objects.filter(phone="").update(phone=None)
-    print(f"  → Converted {updated_count} empty phone strings to NULL")
+    print(f"  -> Converted {updated_count} empty phone strings to NULL")
 
 
 def reverse_null_to_empty_strings(apps, schema_editor):

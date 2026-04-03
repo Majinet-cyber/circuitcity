@@ -194,7 +194,13 @@ def home(request):
     
     # Get all supported verticals (SSOT)
     verticals = get_all_verticals()
-    
+
+    # ── Story metrics: live vertical-specific proof data for the carousel ──
+    import json as _json
+    from staticpages.story_metrics import get_all_story_metrics
+    story_metrics_data = get_all_story_metrics()
+    story_metrics_json = _json.dumps(story_metrics_data)
+
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,  # Don't show internal navigation
         'total_merchants': total_merchants,
@@ -202,6 +208,9 @@ def home(request):
         'show_metrics': show_metrics,
         'show_agents_counter': show_agents_counter,
         'verticals': verticals,
+        # Story carousel: live KPI data per vertical
+        'story_metrics': story_metrics_data,
+        'story_metrics_json': story_metrics_json,
     })
 
 

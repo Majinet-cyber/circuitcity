@@ -13,19 +13,22 @@ const STATIC_CACHE = `static-${VERSION}`;
 const CDN_CACHE = `cdn-${VERSION}`;
 const OFFLINE_PAGE = '/offline/';
 
+// PRECACHE STRATEGY:
+// - Only precache assets whose exact paths we *know* exist at runtime.
+// - In production, CSS/JS files are fingerprinted by ManifestStaticFilesStorage
+//   (e.g. app.abc123def456.css).  Their original non-hashed paths (app.css)
+//   no longer exist as separate files, so trying to precache them causes 404s
+//   that can partially break SW installation.
+// - We do NOT list CSS/JS here.  They are cached on-demand the first time the
+//   browser requests the hashed URL (cache-first strategy handles hashed assets;
+//   SWR handles non-hashed ones).
+// - We only keep paths that are definitely present and unhashed (icons, manifest).
 const PRECACHE_ASSETS = [
-  '/',                                          // app shell
-  '/home/',                                     // home/dashboard
-  '/inventory/dashboard/',                      // main dashboard
-  '/static/css/tokens.css',
-  '/static/css/app.css',
-  '/static/css/polish.css',
-  '/static/css/mobile.css',
-  '/static/js/app.js',
   '/static/manifest.webmanifest',
   '/static/favicon.ico',
   '/static/icons/icon-192.png',
-  '/static/img/majn.png'
+  '/static/img/majn.png',
+  '/offline/',                                  // offline fallback page
 ];
 
 // Simple helpers

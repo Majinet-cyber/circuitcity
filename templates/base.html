@@ -962,9 +962,12 @@
                   <i class="bi bi-chat-left-text me-2"></i> Feedback
                 </a>
                 {% if request.user.is_authenticated %}
-                  <a href="{{ url_logout|default:'/accounts/logout/' }}" class="dropdown-item text-danger" data-testid="avatar-logout">
-                    <i class="bi bi-box-arrow-right me-2"></i> Logout
-                  </a>
+                  <form method="post" action="{{ url_logout|default:'/accounts/logout/' }}" class="d-block m-0 p-0" id="logout-form">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger w-100 border-0 bg-transparent text-start px-3 py-2" data-testid="avatar-logout" style="cursor:pointer;">
+                      <i class="bi bi-box-arrow-right me-2"></i> Logout
+                    </button>
+                  </form>
                 {% endif %}
               </div>
             </div>
@@ -2100,6 +2103,43 @@
           console.warn('ServiceWorker registration failed: ', error);
         }
       });
+  });
+})();
+</script>
+{# ===== bfcache guard: force reload if page restored from back/forward cache while logged out ===== #}
+<script>
+(function () {
+  // When the browser restores a page from the Back/Forward Cache (bfcache),
+  // the pageshow event fires with event.persisted === true.
+  // In that case the DOM is a frozen snapshot — HTTP cache-control headers are
+  // irrelevant.  We must re-validate auth state ourselves.
+  //
+  // Strategy:
+  //  - If the page was restored from bfcache AND we know the user was previously
+  //    authenticated (data-auth="1" on <body>) → hit /accounts/api/check/ (or the
+  //    login URL) with cache:no-store to see whether the session is still valid.
+  //  - If the server returns 401 / redirects to login → hard-navigate to login.
+  //  - If the user is now logged in but the page shows a guest state → reload.
+  //
+  // The simpler approach (reload on every pageshow restore) is used here to be
+  // 100% safe: one extra network request on back-navigation is acceptable.
+
+  var isAuthenticated = {{ request.user.is_authenticated|yesno:"true,false" }};
+
+  window.addEventListener('pageshow', function (e) {
+    if (!e.persisted) return; // not a bfcache restore — nothing to do
+
+    if (isAuthenticated) {
+      // Page was rendered as authenticated and then restored from bfcache.
+      // Force a full reload so the server can re-render with fresh auth state.
+      // This is the fix for "avatar missing / still logged in after logout".
+      window.location.reload();
+    } else {
+      // Page was rendered as a guest (e.g. login page).
+      // If the user navigates back here while logged in they'll just see login,
+      // which is harmless; a reload would bounce them to the dashboard anyway.
+      window.location.reload();
+    }
   });
 })();
 </script>

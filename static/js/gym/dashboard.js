@@ -76,22 +76,39 @@
   }
 
   /**
-   * Initialize count-up animations for elements with data-count attribute
+   * Initialize count-up animations for elements with data-count attribute.
+   *
+   * CRITICAL FIX: Elements already visible in the initial viewport are left
+   * untouched (server-rendered value is correct and animating from 0 would
+   * cause a visible number flash).  Only elements below the fold animate —
+   * and they do so off-screen, so the first time the user sees them they are
+   * already displaying the final value.
    */
   function initCountUpAnimations() {
+    if (prefersReducedMotion) return; // server-rendered values are already correct
+
     const countElements = document.querySelectorAll('[data-count]');
-    
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+
     countElements.forEach((element, index) => {
       const targetValue = element.getAttribute('data-count');
-      
+
       // Don't animate empty or placeholder values
       if (!targetValue || targetValue === '0' || targetValue === '—' || targetValue === '-') {
         return;
       }
 
-      // Stagger the animations
-      const delay = prefersReducedMotion ? 0 : index * 100;
-      
+      // Check if element is already in the initial viewport.
+      // If yes → skip animation entirely; the server-rendered value is correct
+      // and starting from 0 would cause a jarring flash.
+      const rect = element.getBoundingClientRect();
+      const inInitialViewport = rect.top < vh && rect.bottom > 0;
+      if (inInitialViewport) {
+        return;
+      }
+
+      // Below-fold: animate immediately (runs off-screen, user never sees the 0 start)
+      const delay = index * 100;
       setTimeout(() => {
         animateCountUp(element, targetValue, 1200);
       }, delay);
@@ -155,37 +172,52 @@
   }
 
   /**
-   * Observe elements entering viewport for animation trigger
-   * (Optional enhancement for long pages)
+   * Observe elements entering viewport for scroll-in animation.
+   *
+   * CRITICAL FIX: We must NOT set opacity:0 on elements that are already
+   * visible in the initial viewport — doing so creates a Flash of Invisible
+   * Content (FOIC / CLS) because the element renders visible, JS then hides
+   * it, and the observer immediately un-hides it.
+   *
+   * Rule: only hide + observe elements that are genuinely below the fold at
+   * page-load time.
    */
   function initIntersectionObserver() {
-    if ('IntersectionObserver' in window && !prefersReducedMotion) {
-      const observerOptions = {
-        threshold: 0.1,
-        rootMargin: '0px 0px -50px 0px'
-      };
+    if (!('IntersectionObserver' in window) || prefersReducedMotion) return;
 
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.style.opacity = '1';
-            entry.target.style.transform = 'translateY(0)';
-            observer.unobserve(entry.target);
-          }
-        });
-      }, observerOptions);
+    const vh = window.innerHeight || document.documentElement.clientHeight;
 
-      // Observe recent blocks that are far down the page
-      const recentBlocks = document.querySelectorAll('.recent-block');
-      recentBlocks.forEach((block, index) => {
-        if (index > 2) { // Only observe blocks after the first 2
-          block.style.opacity = '0';
-          block.style.transform = 'translateY(20px)';
-          block.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
-          observer.observe(block);
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+          observer.unobserve(entry.target);
         }
       });
-    }
+    }, observerOptions);
+
+    const recentBlocks = document.querySelectorAll('.recent-block');
+    recentBlocks.forEach((block, index) => {
+      if (index <= 2) return; // leave the first 3 blocks fully visible
+
+      // Only hide + animate blocks that start BELOW the viewport.
+      // Blocks partially in view are also left untouched (rect.top < vh).
+      const rect = block.getBoundingClientRect();
+      const belowFold = rect.top >= vh;
+
+      if (belowFold) {
+        block.style.opacity = '0';
+        block.style.transform = 'translateY(20px)';
+        block.style.transition = 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+        observer.observe(block);
+      }
+    });
   }
 
   /**

@@ -2,131 +2,250 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Member Status - {{ member.name }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ member.name }} — {{ member.business.name }}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(160deg, #1e1b4b 0%, #312e81 40%, #4c1d95 100%);
+            min-height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            padding: 1.25rem;
         }
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 500px;
+
+        .card {
+            background: #fff;
+            border-radius: 22px;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.1);
+            max-width: 420px;
             width: 100%;
-            padding: 40px;
+            overflow: hidden;
+        }
+
+        /* Header band */
+        .card-header {
+            padding: 1.75rem 1.75rem 1.25rem;
             text-align: center;
+            position: relative;
         }
-        h1 {
-            color: #1e293b;
-            font-size: 28px;
-            margin-bottom: 10px;
+        .card-header--active {
+            background: linear-gradient(135deg, #14532d 0%, #16a34a 100%);
+        }
+        .card-header--overdue {
+            background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 100%);
+        }
+        .card-header--pending {
+            background: linear-gradient(135deg, #78350f 0%, #d97706 100%);
+        }
+
+        .gym-brand {
+            font-size: 0.72rem;
             font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: rgba(255,255,255,0.7);
+            margin-bottom: 0.75rem;
         }
-        .gym-number {
-            color: #667eea;
-            font-size: 18px;
+        .member-name {
+            font-size: clamp(1.4rem, 6vw, 1.9rem);
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.35rem;
+            line-height: 1.15;
+        }
+        .member-number {
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.65);
+            font-weight: 500;
+            letter-spacing: 0.08em;
+        }
+
+        /* Status chip */
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.55rem 1.2rem;
+            border-radius: 999px;
+            font-size: 0.875rem;
+            font-weight: 700;
+            margin-top: 1rem;
+            letter-spacing: 0.02em;
+        }
+        .status-chip--active  { background: rgba(255,255,255,0.15); color: #fff; border: 1.5px solid rgba(255,255,255,0.3); }
+        .status-chip--overdue { background: rgba(255,255,255,0.15); color: #fff; border: 1.5px solid rgba(255,255,255,0.3); }
+
+        /* Body */
+        .card-body {
+            padding: 1.5rem 1.75rem;
+        }
+
+        /* Info rows */
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.875rem 0;
+            border-bottom: 1px solid #f1f5f9;
+            gap: 1rem;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-row-label {
+            font-size: 0.75rem;
             font-weight: 600;
-            margin-bottom: 30px;
-            letter-spacing: 0.05em;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 12px 24px;
-            border-radius: 50px;
-            font-weight: 600;
-            font-size: 16px;
-            margin-bottom: 20px;
-        }
-        .status-active {
-            background: #dcfce7;
-            color: #166534;
-        }
-        .status-overdue {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-        .info-item {
-            margin: 20px 0;
-            padding: 15px;
-            background: #f8fafc;
-            border-radius: 10px;
-        }
-        .info-label {
-            font-size: 12px;
             color: #64748b;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 5px;
+            letter-spacing: 0.06em;
+            padding-top: 0.1rem;
         }
-        .info-value {
-            font-size: 18px;
-            color: #1e293b;
-            font-weight: 600;
+        .info-row-value {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #0f172a;
+            text-align: right;
         }
-        .link-button {
-            display: inline-block;
-            margin-top: 30px;
-            padding: 14px 28px;
-            background: #667eea;
-            color: white;
+        .info-row-value--muted { color: #94a3b8; font-weight: 500; }
+
+        /* Days remaining pill */
+        .days-remaining {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+        .days-remaining--many { background: #dcfce7; color: #166534; }
+        .days-remaining--few  { background: #fef9c3; color: #854d0e; }
+        .days-remaining--zero { background: #fee2e2; color: #991b1b; }
+
+        /* CTA */
+        .card-footer {
+            padding: 0 1.75rem 1.75rem;
+        }
+        .cta-btn {
+            display: block;
+            text-align: center;
+            padding: 0.875rem;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
             text-decoration: none;
-            border-radius: 10px;
+            transition: opacity 0.15s, transform 0.15s;
+            background: #4f46e5;
+            color: #fff;
+        }
+        .cta-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+        .cta-btn--secondary {
+            background: #f1f5f9;
+            color: #475569;
+            margin-top: 0.5rem;
             font-weight: 600;
-            transition: background 0.2s;
         }
-        .link-button:hover {
-            background: #5568d3;
+
+        /* Branding watermark */
+        .powered-by {
+            text-align: center;
+            padding: 1rem 1.75rem 1.5rem;
+            font-size: 0.72rem;
+            color: #94a3b8;
+            letter-spacing: 0.04em;
         }
-        .reason {
-            color: #64748b;
-            font-size: 14px;
-            margin-top: 10px;
-        }
+        .powered-by a { color: #7c3aed; text-decoration: none; font-weight: 600; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{{ member.name }}</h1>
-        <div class="gym-number">{{ member.member_number|default:member.member_code|default:"N/A" }}</div>
+    <div class="card">
 
-        <div class="status-badge {% if status == 'ACTIVE' %}status-active{% else %}status-overdue{% endif %}">
-            {% if status == 'ACTIVE' %}
-                ✓ Active
+        <!-- Header: status-aware gradient -->
+        <div class="card-header {% if status == 'ACTIVE' %}card-header--active{% else %}card-header--overdue{% endif %}">
+            <div class="gym-brand">{{ member.business.name }}</div>
+            <div class="member-name">{{ member.name }}</div>
+            {% if member.member_number %}
+            <div class="member-number">Member #{{ member.member_number }}</div>
+            {% endif %}
+            <div>
+                <span class="status-chip {% if status == 'ACTIVE' %}status-chip--active{% else %}status-chip--overdue{% endif %}">
+                    {% if status == 'ACTIVE' %}
+                        ✓ Active Member
+                    {% else %}
+                        ⚠ Payment Overdue
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- Body: status detail -->
+        <div class="card-body">
+
+            {% if status == 'ACTIVE' and next_payment_date %}
+                {% now "Y-m-d" as today_str %}
+                <div class="info-row">
+                    <span class="info-row-label">Valid until</span>
+                    <span class="info-row-value">{{ next_payment_date|date:"N j, Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-row-label">Membership status</span>
+                    <span class="info-row-value">
+                        <span class="days-remaining days-remaining--many">✓ Paid &amp; Active</span>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-row-label">Verified</span>
+                    <span class="info-row-value">{% now "N j, Y" %}</span>
+                </div>
+
+            {% elif status == 'OVERDUE' %}
+                <div class="info-row">
+                    <span class="info-row-label">Status</span>
+                    <span class="info-row-value">
+                        <span class="days-remaining days-remaining--zero">Payment Required</span>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-row-label">Detail</span>
+                    <span class="info-row-value" style="color:#dc2626;">{{ reason }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-row-label">Checked</span>
+                    <span class="info-row-value">{% now "N j, Y" %}</span>
+                </div>
+
             {% else %}
-                ⚠ Overdue
+                <div class="info-row">
+                    <span class="info-row-label">Detail</span>
+                    <span class="info-row-value info-row-value--muted">{{ reason }}</span>
+                </div>
+            {% endif %}
+
+            <!-- Trainer info if available -->
+            {% if member.trainer %}
+            <div class="info-row">
+                <span class="info-row-label">Trainer</span>
+                <span class="info-row-value">{{ member.trainer.name }}</span>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <!-- CTA actions -->
+        <div class="card-footer">
+            {% if full_profile_url %}
+            <a href="{{ full_profile_url }}" class="cta-btn">
+                {% if is_authenticated %}View Full Profile{% else %}Log In for Full Profile{% endif %}
+            </a>
             {% endif %}
         </div>
 
-        {% if next_payment_date %}
-        <div class="info-item">
-            <div class="info-label">Next Payment Date</div>
-            <div class="info-value">{{ next_payment_date|date:"F d, Y" }}</div>
-        </div>
-        {% endif %}
+        <div class="powered-by">Verified by <a href="/">Emajinet</a></div>
 
-        <div class="reason">{{ reason }}</div>
-
-        {% if full_profile_url %}
-        <a href="{{ full_profile_url }}" class="link-button">
-            {% if is_authenticated %}
-                View Full Profile
-            {% else %}
-                Login to View Full Profile
-            {% endif %}
-        </a>
-        {% endif %}
     </div>
 </body>
 </html>
