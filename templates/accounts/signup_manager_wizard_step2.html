@@ -219,7 +219,7 @@
                       style="padding-left:42px; appearance:auto; cursor:pointer;"
                       data-auto-currency="true">
                 {% for val, label in form.country.field.choices %}
-                  <option value="{{ val }}" {% if form.country.value == val or (not form.country.value and val == 'MW') %}selected{% endif %}>{{ label }}</option>
+                  <option value="{{ val }}" {% if form.country.value == val or not form.country.value and val == 'MW' %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -235,7 +235,7 @@
                       name="currency" id="id_currency"
                       style="padding-left:42px; appearance:auto; cursor:pointer;">
                 {% for val, label in form.currency.field.choices %}
-                  <option value="{{ val }}" {% if form.currency.value == val or (not form.currency.value and val == 'MWK') %}selected{% endif %}>{{ label }}</option>
+                  <option value="{{ val }}" {% if form.currency.value == val or not form.currency.value and val == 'MWK' %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
             </div>
