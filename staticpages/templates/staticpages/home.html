@@ -3474,6 +3474,209 @@
   </section>
 
   <!-- ============================================================
+       RENEWABLE ENERGY FLAGSHIP SECTION
+       Positioned after How It Works — most advanced vertical
+  ============================================================ -->
+  <section id="renewable-energy" style="
+    background: linear-gradient(135deg, #0d1a2e 0%, #0f2613 50%, #0d1a2e 100%);
+    padding: 5rem 0;
+    position: relative;
+    overflow: hidden;
+  ">
+    {# Subtle grid overlay #}
+    <div style="
+      position: absolute; inset: 0;
+      background-image: radial-gradient(rgba(16,185,129,0.06) 1px, transparent 1px);
+      background-size: 32px 32px;
+      pointer-events: none;
+    " aria-hidden="true"></div>
+
+    {# Glow orb #}
+    <div style="
+      position: absolute; top: -10%; right: -8%;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(16,185,129,0.10) 0%, transparent 70%);
+      pointer-events: none;
+    " aria-hidden="true"></div>
+
+    <div class="container" style="position: relative; z-index: 1;">
+
+      {# Header row #}
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 2rem; margin-bottom: 3rem;">
+        <div style="max-width: 580px;">
+          <span style="
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
+            color: #34d399; font-size: 0.75rem; font-weight: 700;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            padding: 0.35rem 0.875rem; border-radius: 20px;
+            margin-bottom: 1.25rem;
+          ">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            Flagship Vertical
+          </span>
+          <h2 style="
+            font-size: clamp(1.75rem, 3.5vw, 2.6rem); font-weight: 800;
+            color: #fff; line-height: 1.15; letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+          ">
+            Engineering-grade intelligence<br>for renewable energy businesses.
+          </h2>
+          <p style="
+            font-size: 1.0625rem; color: rgba(255,255,255,0.65);
+            line-height: 1.7; max-width: 520px;
+          ">
+            System sizing, demand forecasting, predictive maintenance, and full energy economics — built specifically for solar installers, energy service companies, and off-grid operators.
+          </p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; flex-shrink: 0;">
+          <a href="{% url 'accounts:signup_manager' %}" style="
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: #10b981; color: #fff;
+            font-size: 0.9375rem; font-weight: 700;
+            padding: 0.75rem 1.5rem; border-radius: 8px;
+            text-decoration: none; white-space: nowrap;
+            box-shadow: 0 4px 16px rgba(16,185,129,0.35);
+            transition: background 0.15s, transform 0.1s;
+          " onmouseover="this.style.background='#059669';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#10b981';this.style.transform='translateY(0)'">
+            Get Started Free
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+          <a href="{% url 'staticpages:about' %}" style="
+            font-size: 0.8125rem; color: rgba(255,255,255,0.45);
+            text-decoration: none; text-align: center;
+            transition: color 0.15s;
+          " onmouseover="this.style.color='rgba(255,255,255,0.75)'" onmouseout="this.style.color='rgba(255,255,255,0.45)'">
+            Learn about our verticals →
+          </a>
+        </div>
+      </div>
+
+      {# 4 capability cards #}
+      <div style="
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1.25rem;
+        margin-bottom: 2.5rem;
+      " id="energy-capability-grid">
+
+        {# Card 1: System Sizing #}
+        <div style="
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
+          border-radius: 14px; padding: 1.5rem;
+          transition: border-color 0.2s, background 0.2s;
+        " class="energy-cap-card">
+          <div style="
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1rem;
+          " aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+          </div>
+          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">System Sizing Engine</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
+            Calculate optimal system size from customer load profiles. Generate bankable proposals with full cost-benefit analysis and payback period.
+          </p>
+        </div>
+
+        {# Card 2: Predictive Maintenance #}
+        <div style="
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
+          border-radius: 14px; padding: 1.5rem;
+          transition: border-color 0.2s, background 0.2s;
+        " class="energy-cap-card">
+          <div style="
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1rem;
+          " aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          </div>
+          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Predictive Maintenance</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
+            Schedule and track maintenance across your entire asset fleet. Automated alerts before failures occur — reduce downtime, extend asset life.
+          </p>
+        </div>
+
+        {# Card 3: Load / Demand Forecasting #}
+        <div style="
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
+          border-radius: 14px; padding: 1.5rem;
+          transition: border-color 0.2s, background 0.2s;
+        " class="energy-cap-card">
+          <div style="
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1rem;
+          " aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          </div>
+          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Demand &amp; Load Forecasting</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
+            Model customer load profiles, forecast seasonal demand, and identify capacity constraints before they become service failures.
+          </p>
+        </div>
+
+        {# Card 4: Energy Economics #}
+        <div style="
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(16,185,129,0.15);
+          border-radius: 14px; padding: 1.5rem;
+          transition: border-color 0.2s, background 0.2s;
+        " class="energy-cap-card">
+          <div style="
+            width: 40px; height: 40px; border-radius: 10px;
+            background: rgba(16,185,129,0.12); display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1rem;
+          " aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <h3 style="font-size: 0.9375rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Energy Economics &amp; ROI</h3>
+          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.5); line-height: 1.6; margin: 0;">
+            Track cost savings, payback periods, and ROI across your entire portfolio. Present investors and clients with data-backed performance reports.
+          </p>
+        </div>
+
+      </div>
+
+      {# Bottom proof strip #}
+      <div style="
+        border-top: 1px solid rgba(16,185,129,0.12);
+        padding-top: 1.5rem;
+        display: flex; flex-wrap: wrap; gap: 1.5rem 2.5rem; align-items: center;
+      ">
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Portfolio-level command center
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Scenario comparison &amp; PDF proposals
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          Site monitoring &amp; energy readings
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: rgba(255,255,255,0.45);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          AI-ready copilot integration
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <style>
+    .energy-cap-card:hover {
+      border-color: rgba(16,185,129,0.35) !important;
+      background: rgba(255,255,255,0.07) !important;
+    }
+    @media (max-width: 640px) {
+      #renewable-energy { padding: 3.5rem 0; }
+      #energy-capability-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+
+  <!-- ============================================================
        BUSINESS SIMULATOR
   ============================================================ -->
   <section class="simulator-section" id="business-simulator">

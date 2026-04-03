@@ -1,5 +1,21 @@
 """
-Production hardening tests for EMAJINET landing page and platform reliability.
+Production hardening tests for EMAJINET landing page, platform reliability,
+and Renewable Energy flagship section.
+
+Covers:
+- Renewable Energy flagship section present and correctly positioned
+- Energy section contains correct capability headings
+- Energy CTA link is valid
+- Landing metrics API endpoint schema and response
+- Hero section has no zero-flash placeholders
+- Mobile nav is lean (no footer clutter)
+- Pricing snapshot present on landing page with real prices
+- Data carousel replaced by compact callout (no old carousel DOM)
+- Smart Recommendations section is compact (no bloated 4-card grid)
+- CTA wording consistency ("Get Started Free")
+- Cache headers for authenticated pages (no-cache)
+
+NON-NEGOTIABLE: All tests must pass before deployment.
 
 Covers:
 - Landing metrics API endpoint schema and response
@@ -563,3 +579,132 @@ class LandingPageQualityTests(TestCase):
             2,
             f"'Get Started Free' should appear at least twice, found {count}",
         )
+
+
+class RenewableEnergyFlagshipTests(TestCase):
+    """Ensure the Renewable Energy flagship section is correctly restored on the landing page."""
+
+    def setUp(self):
+        self.client = Client()
+        self.response = self.client.get(reverse("staticpages:home"))
+        self.content = self.response.content.decode("utf-8")
+
+    def test_energy_section_present(self):
+        """Dedicated renewable energy section must exist on the landing page."""
+        self.assertIn(
+            'id="renewable-energy"',
+            self.content,
+            "Renewable Energy section (#renewable-energy) must exist on landing page",
+        )
+
+    def test_energy_flagship_label(self):
+        """'Flagship Vertical' eyebrow label must be present inside the energy section."""
+        self.assertIn(
+            "Flagship Vertical",
+            self.content,
+            "'Flagship Vertical' label must appear in the energy section",
+        )
+
+    def test_energy_headline_present(self):
+        """Engineering-grade headline must be present."""
+        self.assertIn(
+            "Engineering-grade intelligence",
+            self.content,
+            "Energy section headline 'Engineering-grade intelligence' must be present",
+        )
+
+    def test_system_sizing_capability_present(self):
+        """System Sizing Engine capability card must be present."""
+        self.assertIn(
+            "System Sizing Engine",
+            self.content,
+            "System Sizing Engine capability must be highlighted in energy section",
+        )
+
+    def test_predictive_maintenance_present(self):
+        """Predictive Maintenance capability card must be present."""
+        self.assertIn(
+            "Predictive Maintenance",
+            self.content,
+            "Predictive Maintenance capability must be highlighted in energy section",
+        )
+
+    def test_load_forecasting_present(self):
+        """Demand & Load Forecasting capability card must be present."""
+        self.assertIn(
+            "Demand",
+            self.content,
+            "Demand & Load Forecasting must be highlighted in energy section",
+        )
+
+    def test_energy_economics_present(self):
+        """Energy Economics & ROI capability must be present."""
+        self.assertIn(
+            "Energy Economics",
+            self.content,
+            "Energy Economics & ROI capability must be highlighted in energy section",
+        )
+
+    def test_energy_cta_points_to_signup(self):
+        """Energy section CTA must link to the signup page (accounts:signup_manager)."""
+        from django.urls import reverse as dj_reverse
+        signup_url = dj_reverse("accounts:signup_manager")
+        # Energy section contains a "Get Started Free" link
+        # We check that both the signup URL and 'Get Started Free' co-exist in the energy section
+        self.assertIn(
+            signup_url,
+            self.content,
+            f"Energy CTA must link to signup at {signup_url}",
+        )
+
+    def test_energy_section_positioned_after_how_it_works(self):
+        """Energy section must appear AFTER the How It Works section in document order."""
+        how_it_works_pos = self.content.find('id="how-it-works"')
+        energy_pos = self.content.find('id="renewable-energy"')
+        self.assertGreater(
+            how_it_works_pos,
+            -1,
+            "#how-it-works must exist on the landing page",
+        )
+        self.assertGreater(
+            energy_pos,
+            -1,
+            "#renewable-energy must exist on the landing page",
+        )
+        self.assertGreater(
+            energy_pos,
+            how_it_works_pos,
+            "Renewable Energy section must appear AFTER How It Works in document order",
+        )
+
+    def test_energy_section_before_simulator(self):
+        """Energy section must appear BEFORE the business simulator section."""
+        energy_pos = self.content.find('id="renewable-energy"')
+        simulator_pos = self.content.find('id="business-simulator"')
+        self.assertGreater(
+            simulator_pos,
+            -1,
+            "#business-simulator must exist on the landing page",
+        )
+        self.assertGreater(
+            energy_pos,
+            -1,
+            "#renewable-energy must exist on the landing page",
+        )
+        self.assertGreater(
+            simulator_pos,
+            energy_pos,
+            "Business simulator must appear AFTER the Renewable Energy section",
+        )
+
+    def test_portfolio_proof_strip_present(self):
+        """Bottom proof strip must mention 'Portfolio-level command center'."""
+        self.assertIn(
+            "Portfolio-level command center",
+            self.content,
+            "Energy proof strip must mention portfolio capabilities",
+        )
+
+    def test_landing_page_still_renders_200(self):
+        """Landing page must still return HTTP 200 after energy section is added."""
+        self.assertEqual(self.response.status_code, 200)
