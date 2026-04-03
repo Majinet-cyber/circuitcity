@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from typing import Optional, List, Iterable, Any, Dict, Callable
 import inspect
@@ -68,6 +68,9 @@ def _set_active_on_request_and_session(request: HttpRequest, biz: Business) -> N
         request.active_business_id = bid
         request.session["active_business_id"] = bid
         request.session["biz_id"] = bid  # legacy
+        # Clear cached product_mode so the middleware re-derives it from the new
+        # business on the very next request (prevents stale vertical sidebar).
+        request.session.pop("product_mode", None)
         request.session.modified = True
     except Exception:
         pass

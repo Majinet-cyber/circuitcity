@@ -98,6 +98,12 @@ CANONICAL_BUSINESS_KINDS = {
         "description": "Vehicle dealership, inventory management, sales & marketplace",
         "dashboard_route": "car_dealer:dashboard",  # Car Dealer has its own dashboard
     },
+    "energy": {
+        "display_name": "Renewable Energy",
+        "icon": "☀️",
+        "description": "Solar energy, battery systems, inverters & renewable power solutions",
+        "dashboard_route": "energy:dashboard",  # Energy vertical dashboard
+    },
 }
 
 
@@ -234,6 +240,17 @@ def normalize_business_kind(value: str | None) -> str | None:
         "auto dealer": "car_dealer",
         "used cars": "car_dealer",
         "second hand cars": "car_dealer",
+        # Renewable Energy (NEW)
+        "energy": "energy",
+        "renewable energy": "energy",
+        "solar": "energy",
+        "solar energy": "energy",
+        "solar power": "energy",
+        "solar systems": "energy",
+        "battery systems": "energy",
+        "inverter": "energy",
+        "green energy": "energy",
+        "clean energy": "energy",
     }
 
     # Return canonical code if mapped, otherwise return normalized input

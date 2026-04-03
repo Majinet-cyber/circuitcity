@@ -43,13 +43,14 @@ class TestSuccessPageHonesty:
         )
 
         # Create PENDING transaction (user just redirected back)
+        # NOTE: provider must be lowercase "paychangu" — matches production checkout behaviour
         transaction = PaymentTransaction.objects.create(
             business=business,
-            provider="PAYCHANGU",
+            provider="paychangu",
             tx_ref="test-tx-ref-123",
             amount=Decimal("10000.00"),
             currency="MWK",
-            payment_method="MOBILE_MONEY",
+            payment_method="card",
             status=PaymentTransaction.Status.PENDING,
         )
 
@@ -212,7 +213,7 @@ class TestSuccessPageMessaging:
 
         transaction = PaymentTransaction.objects.create(
             business=setup_data["business"],
-            provider="PAYCHANGU",
+            provider="paychangu",
             tx_ref="test-pending",
             amount=Decimal("10000.00"),
             currency="MWK",
@@ -236,7 +237,7 @@ class TestSuccessPageMessaging:
         # Create transaction
         transaction = PaymentTransaction.objects.create(
             business=setup_data["business"],
-            provider="PAYCHANGU",
+            provider="paychangu",
             tx_ref="test-processing",
             amount=Decimal("10000.00"),
             currency="MWK",
@@ -272,7 +273,7 @@ class TestSuccessPageMessaging:
 
         transaction = PaymentTransaction.objects.create(
             business=setup_data["business"],
-            provider="PAYCHANGU",
+            provider="paychangu",
             tx_ref="test-failed",
             amount=Decimal("10000.00"),
             currency="MWK",

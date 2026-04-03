@@ -207,6 +207,42 @@
           {% if form.business_kind.errors %}<div class="err">{{ form.business_kind.errors|striptags }}</div>{% endif %}
         </div>
 
+        <!-- Country & Currency (2-column on wider screens) -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+          <!-- Country -->
+          <div class="field">
+            <div class="label">Country</div>
+            <div style="position:relative">
+              <span class="addon" style="top:50%;translate:0 -50%">🌍</span>
+              <select class="input{% if form.country.errors %} is-error{% endif %}"
+                      name="country" id="id_country"
+                      style="padding-left:42px; appearance:auto; cursor:pointer;"
+                      data-auto-currency="true">
+                {% for val, label in form.country.field.choices %}
+                  <option value="{{ val }}" {% if form.country.value == val or (not form.country.value and val == 'MW') %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% if form.country.errors %}<div class="err">{{ form.country.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <!-- Currency -->
+          <div class="field">
+            <div class="label">Currency</div>
+            <div style="position:relative">
+              <span class="addon" style="top:50%;translate:0 -50%">💱</span>
+              <select class="input{% if form.currency.errors %} is-error{% endif %}"
+                      name="currency" id="id_currency"
+                      style="padding-left:42px; appearance:auto; cursor:pointer;">
+                {% for val, label in form.currency.field.choices %}
+                  <option value="{{ val }}" {% if form.currency.value == val or (not form.currency.value and val == 'MWK') %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% if form.currency.errors %}<div class="err">{{ form.currency.errors|striptags }}</div>{% endif %}
+          </div>
+        </div>
+
         <!-- Subdomain -->
         <div class="field">
           <div class="label">Subdomain <span style="color:#7c8aa3">(optional)</span></div>
@@ -235,6 +271,35 @@
 </div>
 
 <script>
+  // Country → auto-select currency mapping
+  (function(){
+    const COUNTRY_CURRENCY = {
+      "DZ":"DZD","AO":"AOA","BJ":"XOF","BW":"BWP","BF":"XOF","BI":"BIF","CV":"CVE",
+      "CM":"XAF","CF":"XAF","TD":"XAF","KM":"KMF","CG":"XAF","CD":"CDF","CI":"XOF",
+      "DJ":"DJF","EG":"EGP","GQ":"XAF","ER":"ERN","SZ":"SZL","ET":"ETB","GA":"XAF",
+      "GM":"GMD","GH":"GHS","GN":"GNF","GW":"XOF","KE":"KES","LS":"LSL","LR":"LRD",
+      "LY":"LYD","MG":"MGA","MW":"MWK","ML":"XOF","MR":"MRU","MU":"MUR","MA":"MAD",
+      "MZ":"MZN","NA":"NAD","NE":"XOF","NG":"NGN","RW":"RWF","ST":"STN","SN":"XOF",
+      "SC":"SCR","SL":"SLE","SO":"SOS","ZA":"ZAR","SS":"SSP","SD":"SDG","TZ":"TZS",
+      "TG":"XOF","TN":"TND","UG":"UGX","ZM":"ZMW","ZW":"ZWL"
+    };
+    const cSelect = document.getElementById('id_country');
+    const curSelect = document.getElementById('id_currency');
+    if(cSelect && curSelect){
+      cSelect.addEventListener('change', function(){
+        const cur = COUNTRY_CURRENCY[this.value];
+        if(cur){
+          for(let i=0; i<curSelect.options.length; i++){
+            if(curSelect.options[i].value === cur){
+              curSelect.selectedIndex = i;
+              break;
+            }
+          }
+        }
+      });
+    }
+  })();
+
   // Icon dropdown wiring - SSOT-driven (reads from data attributes)
   (function(){
     const host=document.getElementById('ccBizSelect');

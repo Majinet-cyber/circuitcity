@@ -825,7 +825,7 @@ class ManagerWizardStep1Form(forms.Form):
 
 
 class ManagerWizardStep2Form(forms.Form):
-    """Manager Signup Step 2: Store basics"""
+    """Manager Signup Step 2: Store basics (name, vertical, country, currency, subdomain)"""
 
     business_name = forms.CharField(
         max_length=200,
@@ -841,6 +841,24 @@ class ManagerWizardStep2Form(forms.Form):
         choices=BusinessKind.choices,
         widget=forms.Select(attrs={"autocomplete": "off"}),
     )
+    country = forms.ChoiceField(
+        label="Country",
+        required=False,
+        choices=[],  # populated in __init__ from country_currency module
+        initial="MW",
+        widget=forms.Select(
+            attrs={
+                "id": "id_country",
+                "data-auto-currency": "true",
+            }
+        ),
+    )
+    currency = forms.ChoiceField(
+        label="Currency",
+        choices=[],  # populated in __init__ from country_currency module
+        initial="MWK",
+        widget=forms.Select(attrs={"id": "id_currency"}),
+    )
     subdomain = forms.CharField(
         max_length=40,
         required=False,
@@ -853,6 +871,16 @@ class ManagerWizardStep2Form(forms.Form):
         ),
         help_text="yourstore.emajinet.africa",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            from core.country_currency import get_country_choices, get_currency_choices
+            self.fields["country"].choices = [("", "— Select country —")] + get_country_choices()
+            self.fields["currency"].choices = get_currency_choices()
+        except Exception:
+            self.fields["country"].choices = [("MW", "Malawi"), ("ZM", "Zambia"), ("ZW", "Zimbabwe"), ("MZ", "Mozambique"), ("TZ", "Tanzania")]
+            self.fields["currency"].choices = [("MWK", "MWK – Malawian Kwacha"), ("USD", "USD – US Dollar"), ("ZMW", "ZMW – Zambian Kwacha")]
 
     def clean_business_name(self):
         name = (self.cleaned_data.get("business_name") or "").strip()

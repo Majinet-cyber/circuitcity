@@ -63,21 +63,31 @@ def get_vertical_dashboard_url(vertical_kind: str) -> Optional[str]:
     Returns:
         str: URL name to redirect to, or None if default dashboard should be used
     """
+    # -----------------------------------------------------------------------
+    # CANONICAL business_kind → dashboard URL name mapping.
+    #
+    # Rules:
+    #  - Every supported vertical must have an entry here.
+    #  - "phones" is intentionally absent: dashboard/views.py:home renders the
+    #    generic shell for phones users (no redirect needed); post-login the
+    #    post_auth_redirect module adds the phones-specific URL itself.
+    #  - "hardware" uses the cement/bulk-goods dashboard (same stock/sell flow).
+    #  - "generic" is the explicit fallback for unknown/legacy kinds.
+    # -----------------------------------------------------------------------
     vertical_dashboard_map = {
         "gym": "verticals:gym_dashboard",
         "pharmacy": "verticals:pharmacy_hub",
         "clothing": "verticals:clothing_dashboard",
         "liquor": "verticals:liquor_dashboard",
         "grocery": "groceries:dashboard",
-        "hardware": "inventory:generic_dashboard",  # Hardware uses generic retail dashboard
-        "cement": "verticals:cement_dashboard",  # Cement has its own dashboard
-        "farm": "verticals:farm_dashboard",  # Farm vertical
-        "welding": "verticals:welding_dashboard",  # Welding vertical
-        "car_hire": "verticals:car_hire_dashboard",  # Car Hire Service vertical
-        "car_dealer": "car_dealer:dashboard",  # Car Dealer vertical
-        "energy": "verticals:energy_dashboard",  # Renewable Energy vertical
-        "generic": "inventory:generic_dashboard",  # Fallback for unrecognized verticals
-        # "phones" uses the default dashboard at /inventory/dashboard/
+        "hardware": "cement:dashboard",      # bulk-goods flow (same as cement)
+        "cement": "verticals:cement_dashboard",
+        "farm": "verticals:farm_dashboard",
+        "welding": "verticals:welding_dashboard",
+        "car_hire": "verticals:car_hire_dashboard",
+        "car_dealer": "car_dealer:dashboard",
+        "energy": "verticals:energy_dashboard",
+        "generic": "inventory:generic_dashboard",
     }
     return vertical_dashboard_map.get(vertical_kind)
 
@@ -2437,10 +2447,10 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "section": "MAIN",
                 "key": "stock_in",
                 "url": "car_dealer:stock_in",
-                "label": "Stock In Vehicle",
-                "icon": "bi-box-arrow-in-down",
-                "active_prefix": "/car-dealer/stock-in",
-                "active_pattern": "/car-dealer/stock-in",
+                "label": "Add Vehicle",
+                "icon": "bi-plus-square",
+                "active_prefix": "/car-dealer/vehicles/add",
+                "active_pattern": "/car-dealer/vehicles/add",
                 "require_manager": False,
                 "is_menu": False,
                 "is_header": False,

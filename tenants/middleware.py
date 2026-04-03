@@ -103,6 +103,63 @@ VERTICAL_ALIASES = {
     "supermarket": "grocery",
     "supermarket & groceries": "grocery",
     "retail": "grocery",
+    # Gym / Fitness
+    "gym": "gym",
+    "fitness": "gym",
+    "fitness center": "gym",
+    "health club": "gym",
+    "sports club": "gym",
+    # Clothing / Fashion
+    "clothing": "clothing",
+    "fashion": "clothing",
+    "apparel": "clothing",
+    "boutique": "clothing",
+    "garments": "clothing",
+    # Hardware & General Dealers
+    "hardware": "hardware",
+    "hardware & general dealers": "hardware",
+    "general dealers": "hardware",
+    "building supplies": "hardware",
+    "home improvement": "hardware",
+    # Cement / Building Materials
+    "cement": "cement",
+    "building materials": "cement",
+    # Farm Manager
+    "farm": "farm",
+    "agriculture": "farm",
+    "farming": "farm",
+    # Welding Workshop
+    "welding": "welding",
+    "welder": "welding",
+    "fabrication": "welding",
+    # Car Hire Service
+    "car_hire": "car_hire",
+    "car hire": "car_hire",
+    "car hire service": "car_hire",
+    "vehicle rental": "car_hire",
+    "car rental": "car_hire",
+    "fleet": "car_hire",
+    # Car Dealer
+    "car_dealer": "car_dealer",
+    "car dealer": "car_dealer",
+    "dealership": "car_dealer",
+    "car dealership": "car_dealer",
+    "vehicle dealer": "car_dealer",
+    "vehicle dealership": "car_dealer",
+    "auto dealer": "car_dealer",
+    "used cars": "car_dealer",
+    "second hand cars": "car_dealer",
+    # Renewable Energy
+    "energy": "energy",
+    "renewable energy": "energy",
+    "solar": "energy",
+    "solar energy": "energy",
+    "solar power": "energy",
+    "solar systems": "energy",
+    "battery systems": "energy",
+    "inverter": "energy",
+    "green energy": "energy",
+    "clean energy": "energy",
 }
 
 

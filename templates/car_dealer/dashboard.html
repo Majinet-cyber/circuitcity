@@ -5,280 +5,484 @@
 
 {% block content %}
 <style>
-  .kpi-card{background:#fff;border-radius:16px;padding:1.4rem 1.2rem;border:1.5px solid #e2e8f0;height:100%;}
-  .kpi-val{font-size:1.9rem;font-weight:800;color:#0f172a;line-height:1.1;}
-  .kpi-label{font-size:.75rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-top:.25rem;}
-  .kpi-sub{font-size:.78rem;color:#94a3b8;margin-top:.2rem;}
-  .vehicle-card{background:#fff;border-radius:14px;border:1.5px solid #e2e8f0;overflow:hidden;transition:all .15s;text-decoration:none;color:inherit;display:block;}
-  .vehicle-card:hover{border-color:#6366f1;box-shadow:0 8px 24px rgba(0,0,0,.08);}
-  .vehicle-img{width:100%;height:140px;background:linear-gradient(135deg,#f1f5f9,#e2e8f0);display:flex;align-items:center;justify-content:center;font-size:3rem;}
-  .vehicle-body{padding:.85rem;}
-  .vehicle-name{font-size:.9rem;font-weight:700;color:#0f172a;}
-  .vehicle-price{font-size:.95rem;font-weight:800;color:#4f46e5;}
-  .vehicle-meta{font-size:.72rem;color:#64748b;margin-top:.2rem;}
-  .aging-bar{height:6px;border-radius:3px;}
-  .section-title{font-size:.9rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.04em;}
-  .make-row{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid #f1f5f9;}
-  .make-row:last-child{border-bottom:none;}
-  .make-bar{height:8px;border-radius:4px;background:#6366f1;transition:width .4s;}
+  /* ── DESIGN TOKENS ── */
+  :root {
+    --cd-blue:       #1d4ed8;
+    --cd-blue-deep:  #1e3a8a;
+    --cd-blue-mid:   #2563eb;
+    --cd-blue-light: #dbeafe;
+    --cd-green:      #16a34a;
+    --cd-amber:      #d97706;
+    --cd-red:        #dc2626;
+    --cd-purple:     #7c3aed;
+    --cd-slate:      #0f172a;
+    --cd-muted:      #64748b;
+    --cd-border:     #e2e8f0;
+    --cd-radius:     18px;
+    --cd-radius-sm:  12px;
+    --cd-shadow:     0 4px 24px rgba(30,58,138,.09), 0 1px 4px rgba(0,0,0,.04);
+    --cd-shadow-lg:  0 16px 48px rgba(30,58,138,.14), 0 4px 12px rgba(0,0,0,.06);
+  }
+
+  /* ── HERO HEADER ── */
+  .cd-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 45%, #1d4ed8 100%);
+    border-radius: var(--cd-radius);
+    padding: 2rem 2rem 1.6rem;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.75rem;
+    color: #fff;
+  }
+  .cd-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -80px;
+    width: 280px; height: 280px;
+    background: radial-gradient(circle, rgba(99,102,241,.35) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cd-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -40px; left: -40px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(56,189,248,.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cd-hero-inner { position: relative; z-index: 1; }
+  .cd-hero-eyebrow {
+    font-size: .7rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: rgba(255,255,255,.55); margin-bottom: .35rem;
+  }
+  .cd-hero-title {
+    font-size: 1.6rem; font-weight: 800; color: #fff; line-height: 1.15; margin-bottom: .25rem;
+  }
+  .cd-hero-sub { font-size: .85rem; color: rgba(255,255,255,.65); }
+  .cd-hero-icon {
+    width: 80px; height: 44px; flex-shrink: 0; opacity: .92;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.3));
+  }
+  .cd-hero-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: 1.25rem; }
+  .cd-hero-btn-primary {
+    background: rgba(255,255,255,.95); color: var(--cd-blue-deep);
+    border: none; border-radius: 999px; padding: .45rem 1.1rem;
+    font-size: .82rem; font-weight: 700; text-decoration: none;
+    display: inline-flex; align-items: center; gap: .35rem;
+    transition: all .15s; box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+  .cd-hero-btn-primary:hover { background: #fff; color: var(--cd-blue); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0,0,0,.2); }
+  .cd-hero-btn-ghost {
+    background: rgba(255,255,255,.12); color: rgba(255,255,255,.9);
+    border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: .45rem 1.1rem;
+    font-size: .82rem; font-weight: 600; text-decoration: none;
+    display: inline-flex; align-items: center; gap: .35rem;
+    transition: all .15s;
+  }
+  .cd-hero-btn-ghost:hover { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* ── GLASS KPI CARDS ── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; margin-bottom: 1.75rem; }
+  @media (max-width: 768px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .kpi-card {
+    background: #fff;
+    border-radius: var(--cd-radius-sm);
+    border: 1.5px solid var(--cd-border);
+    padding: 1.15rem 1rem;
+    box-shadow: var(--cd-shadow);
+    position: relative; overflow: hidden;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--cd-shadow-lg); }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    border-radius: var(--cd-radius-sm) var(--cd-radius-sm) 0 0;
+  }
+  .kpi-card.accent-blue::before   { background: linear-gradient(90deg, var(--cd-blue-mid), #60a5fa); }
+  .kpi-card.accent-green::before  { background: linear-gradient(90deg, var(--cd-green), #4ade80); }
+  .kpi-card.accent-amber::before  { background: linear-gradient(90deg, var(--cd-amber), #fbbf24); }
+  .kpi-card.accent-red::before    { background: linear-gradient(90deg, var(--cd-red), #f87171); }
+  .kpi-card.accent-purple::before { background: linear-gradient(90deg, var(--cd-purple), #a78bfa); }
+  .kpi-card.accent-navy::before   { background: linear-gradient(90deg, #0f172a, #334155); }
+
+  .kpi-val {
+    font-size: 1.85rem; font-weight: 800; color: var(--cd-slate);
+    line-height: 1.1; margin-top: .2rem;
+  }
+  .kpi-val.money { font-size: 1.3rem; }
+  .kpi-label {
+    font-size: .68rem; font-weight: 700; color: var(--cd-muted);
+    text-transform: uppercase; letter-spacing: .07em;
+  }
+  .kpi-sub { font-size: .73rem; color: #94a3b8; margin-top: .2rem; }
+  .kpi-icon {
+    position: absolute; top: 1rem; right: .9rem;
+    font-size: 1.5rem; opacity: .08;
+  }
+
+  /* ── INSIGHT CARDS ── */
+  .insight-card {
+    background: #fff;
+    border-radius: var(--cd-radius-sm);
+    border: 1.5px solid var(--cd-border);
+    padding: 1.25rem;
+    box-shadow: var(--cd-shadow);
+    height: 100%;
+  }
+  .insight-title {
+    font-size: .7rem; font-weight: 700; color: var(--cd-muted);
+    text-transform: uppercase; letter-spacing: .07em; margin-bottom: .85rem;
+  }
+  .bar-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: .38rem 0; border-bottom: 1px solid #f8fafc;
+  }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-label { font-size: .82rem; font-weight: 600; color: #374151; }
+  .bar-track {
+    flex: 1; height: 7px; background: #f1f5f9;
+    border-radius: 999px; margin: 0 .6rem;
+    overflow: hidden;
+  }
+  .bar-fill { height: 100%; border-radius: 999px; background: var(--cd-blue-mid); }
+  .bar-val { font-size: .78rem; font-weight: 700; color: var(--cd-blue); min-width: 2rem; text-align: right; }
+
+  /* ── QUICK ACTIONS ── */
+  .quick-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.75rem; }
+  @media (max-width: 640px) { .quick-actions { grid-template-columns: repeat(1, 1fr); } }
+
+  .qa-card {
+    display: flex; align-items: center; gap: .85rem; padding: .9rem 1rem;
+    border-radius: var(--cd-radius-sm); text-decoration: none; color: inherit;
+    border: 1.5px solid var(--cd-border);
+    transition: all .15s; background: #fff;
+  }
+  .qa-card:hover { border-color: var(--cd-blue-mid); box-shadow: var(--cd-shadow); transform: translateY(-1px); color: inherit; }
+  .qa-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 1.15rem;
+  }
+  .qa-title { font-size: .85rem; font-weight: 700; color: var(--cd-slate); }
+  .qa-desc { font-size: .72rem; color: var(--cd-muted); }
+
+  /* ── RECENT SALES TABLE ── */
+  .sales-table { font-size: .84rem; }
+  .sales-table th { color: #94a3b8; font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; border: none; padding: .5rem .75rem; }
+  .sales-table td { border-color: #f1f5f9; padding: .6rem .75rem; vertical-align: middle; }
+  .sales-table tr:last-child td { border: none; }
+
+  /* ── VEHICLE CARDS ── */
+  .veh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+  .veh-card {
+    background: #fff; border-radius: var(--cd-radius-sm);
+    border: 1.5px solid var(--cd-border); overflow: hidden;
+    text-decoration: none; color: inherit; display: block;
+    transition: all .15s;
+  }
+  .veh-card:hover { border-color: var(--cd-blue-mid); box-shadow: var(--cd-shadow); transform: translateY(-2px); color: inherit; }
+  .veh-thumb {
+    width: 100%; height: 100px;
+    background: linear-gradient(135deg, #eff6ff, #dbeafe);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .veh-thumb img { width: 90%; height: auto; object-fit: contain; }
+  .veh-body { padding: .65rem .7rem; }
+  .veh-name { font-size: .82rem; font-weight: 700; color: var(--cd-slate); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .veh-price { font-size: .88rem; font-weight: 800; color: var(--cd-blue); }
+  .veh-meta { font-size: .68rem; color: var(--cd-muted); margin-top: .15rem; }
+
+  /* ── AGING INDICATORS ── */
+  .aging-row { margin-bottom: .6rem; }
+  .aging-label { display: flex; justify-content: space-between; font-size: .8rem; margin-bottom: .25rem; }
+  .aging-track { height: 7px; background: #f1f5f9; border-radius: 999px; overflow: hidden; }
+
+  /* ── SECTION HEADER ── */
+  .cd-section-hdr {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .cd-section-title {
+    font-size: .78rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--cd-muted);
+  }
+  .cd-section-link { font-size: .78rem; color: var(--cd-blue); text-decoration: none; }
+  .cd-section-link:hover { text-decoration: underline; }
 </style>
 
 <div class="container-fluid py-4">
-  {# Header #}
-  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-    <div>
-      <h4 class="fw-bold mb-0"><span style="font-size:1.4rem">🏎️</span> Car Dealer Dashboard</h4>
-      <div class="text-muted small">{{ business.name }}</div>
-    </div>
-    <div class="d-flex gap-2 flex-wrap">
-      <a href="{% url 'car_dealer:vehicle_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
-        <i class="bi bi-list-ul me-1"></i>All Vehicles
-      </a>
-      <a href="{% url 'inventory:manage_listings' %}" class="btn btn-outline-warning btn-sm rounded-pill">
-        <i class="bi bi-shop me-1"></i>Marketplace
-      </a>
-      <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary btn-sm rounded-pill">
-        <i class="bi bi-plus-lg me-1"></i>Add Vehicle
-      </a>
+
+  {# ── HERO HEADER ── #}
+  <div class="cd-hero">
+    <div class="cd-hero-inner d-flex align-items-start justify-content-between gap-3 flex-wrap">
+      <div class="flex-grow-1">
+        <div class="cd-hero-eyebrow">
+          <i class="bi bi-car-front-fill me-1" style="opacity:.7"></i>
+          Car Dealer &nbsp;·&nbsp; {{ business.name }}
+        </div>
+        <h1 class="cd-hero-title">Dealer Dashboard</h1>
+        <div class="cd-hero-sub">
+          {{ stats.in_stock }} vehicle{{ stats.in_stock|pluralize }} in stock
+          {% if stats.sold_this_month %} · {{ stats.sold_this_month }} sold this month{% endif %}
+        </div>
+        <div class="cd-hero-actions">
+          <a href="{% url 'car_dealer:stock_in' %}" class="cd-hero-btn-primary">
+            <i class="bi bi-plus-lg"></i> Add Vehicle
+          </a>
+          <a href="{% url 'car_dealer:vehicle_list' %}" class="cd-hero-btn-ghost">
+            <i class="bi bi-list-ul"></i> All Vehicles
+          </a>
+          <a href="{% url 'inventory:manage_listings' %}" class="cd-hero-btn-ghost">
+            <i class="bi bi-shop-window"></i> Marketplace
+          </a>
+        </div>
+      </div>
+      <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="Car" class="cd-hero-icon d-none d-sm-block">
     </div>
   </div>
 
-  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
 
-  {# === PRIMARY KPIs === #}
-  <div class="row g-3 mb-4">
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center">
-        <div class="kpi-val">{{ stats.total }}</div>
-        <div class="kpi-label">Total Units</div>
-      </div>
+  {# ── PRIMARY KPIs ── #}
+  <div class="kpi-grid">
+    <div class="kpi-card accent-blue">
+      <div class="kpi-icon"><i class="bi bi-car-front-fill"></i></div>
+      <div class="kpi-label">Total Units</div>
+      <div class="kpi-val">{{ stats.total }}</div>
+      <div class="kpi-sub">All inventory</div>
     </div>
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center" style="border-color:#10b981;">
-        <div class="kpi-val" style="color:#059669;">{{ stats.in_stock }}</div>
-        <div class="kpi-label">Available</div>
-        <div class="kpi-sub">In stock now</div>
-      </div>
+    <div class="kpi-card accent-green">
+      <div class="kpi-icon"><i class="bi bi-check-circle-fill"></i></div>
+      <div class="kpi-label">Available</div>
+      <div class="kpi-val" style="color:var(--cd-green)">{{ stats.in_stock }}</div>
+      <div class="kpi-sub">Ready to sell</div>
     </div>
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center" style="border-color:#f59e0b;">
-        <div class="kpi-val" style="color:#d97706;">{{ stats.reserved }}</div>
-        <div class="kpi-label">Reserved</div>
-        <div class="kpi-sub">Pending sale</div>
-      </div>
+    <div class="kpi-card accent-amber">
+      <div class="kpi-icon"><i class="bi bi-hourglass-split"></i></div>
+      <div class="kpi-label">Reserved</div>
+      <div class="kpi-val" style="color:var(--cd-amber)">{{ stats.reserved }}</div>
+      <div class="kpi-sub">Pending sale</div>
     </div>
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center" style="border-color:#ef4444;">
-        <div class="kpi-val" style="color:#dc2626;">{{ stats.sold_this_month }}</div>
-        <div class="kpi-label">Sold (Month)</div>
-        <div class="kpi-sub">This calendar month</div>
-      </div>
+    <div class="kpi-card accent-red">
+      <div class="kpi-icon"><i class="bi bi-bag-check-fill"></i></div>
+      <div class="kpi-label">Sold (Month)</div>
+      <div class="kpi-val" style="color:var(--cd-red)">{{ stats.sold_this_month }}</div>
+      <div class="kpi-sub">This calendar month</div>
     </div>
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center" style="border-color:#6366f1;">
-        <div class="kpi-val" style="color:#4f46e5;font-size:1.3rem;">{{ business.currency }} {{ stats.revenue_this_month|floatformat:0 }}</div>
-        <div class="kpi-label">Revenue (Month)</div>
-      </div>
+    <div class="kpi-card accent-navy">
+      <div class="kpi-icon"><i class="bi bi-currency-dollar"></i></div>
+      <div class="kpi-label">Revenue (Month)</div>
+      <div class="kpi-val money">{{ business.currency }} {{ stats.revenue_this_month|floatformat:0 }}</div>
     </div>
-    <div class="col-6 col-sm-4 col-md-2">
-      <div class="kpi-card text-center" style="border-color:#8b5cf6;">
-        <div class="kpi-val" style="color:#7c3aed;font-size:1.3rem;">{{ business.currency }} {{ stats.inventory_value|floatformat:0 }}</div>
-        <div class="kpi-label">Stock Value</div>
-        <div class="kpi-sub">Current inventory</div>
-      </div>
+    <div class="kpi-card accent-purple">
+      <div class="kpi-icon"><i class="bi bi-boxes"></i></div>
+      <div class="kpi-label">Stock Value</div>
+      <div class="kpi-val money" style="color:var(--cd-purple)">{{ business.currency }} {{ stats.inventory_value|floatformat:0 }}</div>
+      <div class="kpi-sub">Current inventory</div>
     </div>
   </div>
 
-  {# === SECOND ROW: Avg Price + Aging + Quick Actions === #}
-  <div class="row g-3 mb-4">
-    {# Avg Selling Price #}
-    <div class="col-12 col-md-3">
-      <div class="kpi-card">
-        <div class="kpi-label mb-2">Avg Asking Price</div>
-        <div style="font-size:1.6rem;font-weight:800;color:#0f172a;">{{ business.currency }} {{ stats.avg_selling_price|floatformat:0 }}</div>
-        <div class="kpi-sub">Across current stock</div>
-      </div>
-    </div>
+  {# ── QUICK ACTIONS ── #}
+  <div class="quick-actions">
+    <a href="{% url 'car_dealer:stock_in' %}" class="qa-card">
+      <div class="qa-icon" style="background:#eef2ff; color:#4f46e5"><i class="bi bi-plus-circle-fill"></i></div>
+      <div><div class="qa-title">Stock In Vehicle</div><div class="qa-desc">Add new unit to inventory</div></div>
+    </a>
+    <a href="{% url 'car_dealer:vehicle_list' %}?status=in_stock" class="qa-card">
+      <div class="qa-icon" style="background:#f0fdf4; color:#16a34a"><i class="bi bi-car-front-fill"></i></div>
+      <div><div class="qa-title">Available Stock</div><div class="qa-desc">{{ stats.in_stock }} unit{{ stats.in_stock|pluralize }} ready</div></div>
+    </a>
+    <a href="{% url 'inventory:manage_listings' %}" class="qa-card">
+      <div class="qa-icon" style="background:#fefce8; color:#d97706"><i class="bi bi-shop-window"></i></div>
+      <div><div class="qa-title">Marketplace</div><div class="qa-desc">Manage public listings</div></div>
+    </a>
+  </div>
 
-    {# Stock Aging #}
+  {# ── INSIGHTS ROW ── #}
+  <div class="row g-3 mb-4">
+
+    {# Average Price + Aging #}
     <div class="col-12 col-md-4">
-      <div class="kpi-card">
-        <div class="kpi-label mb-2">Stock Aging ⚠️</div>
+      <div class="insight-card">
+        <div class="insight-title">Avg Asking Price</div>
+        <div style="font-size:1.65rem;font-weight:800;color:var(--cd-slate);margin-bottom:.2rem;">
+          {{ business.currency }} {{ stats.avg_selling_price|floatformat:0 }}
+        </div>
+        <div class="kpi-sub mb-4">Across {{ stats.in_stock }} stocked vehicle{{ stats.in_stock|pluralize }}</div>
+
+        <div class="insight-title">Stock Aging</div>
         {% with total_aged=stats.aging_30|add:stats.aging_60|add:stats.aging_90_plus %}
         {% if total_aged > 0 %}
-          <div class="d-flex flex-column gap-2">
-            <div>
-              <div class="d-flex justify-content-between" style="font-size:.8rem;">
-                <span style="color:#d97706;">30–60 days</span>
-                <span class="fw-bold">{{ stats.aging_30 }} units</span>
-              </div>
-              {% if stats.in_stock > 0 %}
-              <div class="aging-bar mt-1" style="background:#fef3c7;">
-                <div class="aging-bar" style="background:#f59e0b;width:{% widthratio stats.aging_30 stats.in_stock 100 %}%;"></div>
-              </div>
-              {% endif %}
+          <div class="aging-row">
+            <div class="aging-label">
+              <span style="color:var(--cd-amber)">30–60 days</span>
+              <strong>{{ stats.aging_30 }}</strong>
             </div>
-            <div>
-              <div class="d-flex justify-content-between" style="font-size:.8rem;">
-                <span style="color:#ef4444;">60–90 days</span>
-                <span class="fw-bold">{{ stats.aging_60 }} units</span>
-              </div>
-              {% if stats.in_stock > 0 %}
-              <div class="aging-bar mt-1" style="background:#fee2e2;">
-                <div class="aging-bar" style="background:#ef4444;width:{% widthratio stats.aging_60 stats.in_stock 100 %}%;"></div>
-              </div>
-              {% endif %}
+            <div class="aging-track">
+              {% if stats.in_stock > 0 %}<div class="aging-fill" style="height:100%;border-radius:999px;background:var(--cd-amber);width:{% widthratio stats.aging_30 stats.in_stock 100 %}%;"></div>{% endif %}
             </div>
-            <div>
-              <div class="d-flex justify-content-between" style="font-size:.8rem;">
-                <span style="color:#dc2626;font-weight:700;">90+ days</span>
-                <span class="fw-bold" style="color:#dc2626;">{{ stats.aging_90_plus }} units</span>
-              </div>
-              {% if stats.in_stock > 0 %}
-              <div class="aging-bar mt-1" style="background:#fecaca;">
-                <div class="aging-bar" style="background:#dc2626;width:{% widthratio stats.aging_90_plus stats.in_stock 100 %}%;"></div>
-              </div>
-              {% endif %}
+          </div>
+          <div class="aging-row">
+            <div class="aging-label">
+              <span style="color:var(--cd-red)">60–90 days</span>
+              <strong>{{ stats.aging_60 }}</strong>
+            </div>
+            <div class="aging-track">
+              {% if stats.in_stock > 0 %}<div style="height:100%;border-radius:999px;background:var(--cd-red);width:{% widthratio stats.aging_60 stats.in_stock 100 %}%;"></div>{% endif %}
+            </div>
+          </div>
+          <div class="aging-row">
+            <div class="aging-label">
+              <span style="color:#dc2626;font-weight:700;">90+ days</span>
+              <strong style="color:#dc2626;">{{ stats.aging_90_plus }}</strong>
+            </div>
+            <div class="aging-track">
+              {% if stats.in_stock > 0 %}<div style="height:100%;border-radius:999px;background:#dc2626;width:{% widthratio stats.aging_90_plus stats.in_stock 100 %}%;"></div>{% endif %}
             </div>
           </div>
         {% else %}
-          <div class="text-muted small py-2">No aged stock — all vehicles are fresh 🎉</div>
+          <div class="text-muted" style="font-size:.8rem;padding:.5rem 0;">No aged stock — inventory is fresh</div>
         {% endif %}
         {% endwith %}
       </div>
     </div>
 
     {# Stock by Make #}
-    <div class="col-12 col-md-5">
-      <div class="kpi-card">
-        <div class="kpi-label mb-2">Stock by Make</div>
+    <div class="col-12 col-md-4">
+      <div class="insight-card">
+        <div class="insight-title">Stock by Make</div>
         {% if vehicles_by_make %}
           {% for row in vehicles_by_make %}
-          <div class="make-row">
-            <span style="font-size:.85rem;font-weight:600;color:#374151;">{{ row.model__make__name|default:row.make_text|default:"Unknown" }}</span>
-            <div class="d-flex align-items-center gap-2">
-              {% if stats.in_stock > 0 %}
-              <div style="width:80px;height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">
-                <div class="make-bar" style="width:{% widthratio row.count stats.in_stock 100 %}%;"></div>
-              </div>
-              {% endif %}
-              <span class="fw-bold" style="font-size:.8rem;color:#4f46e5;min-width:2.5rem;text-align:right;">{{ row.count }}</span>
+          <div class="bar-row">
+            <span class="bar-label">{{ row.model__make__name|default:row.make_text|default:"Unknown" }}</span>
+            <div class="bar-track">
+              {% if stats.in_stock > 0 %}<div class="bar-fill" style="width:{% widthratio row.count stats.in_stock 100 %}%;"></div>{% endif %}
             </div>
+            <span class="bar-val">{{ row.count }}</span>
           </div>
           {% endfor %}
         {% else %}
-          <div class="text-muted small py-2">No vehicle data yet</div>
+          <div class="text-muted" style="font-size:.8rem;padding:.5rem 0;">Add vehicles to see breakdown</div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Fuel Type Mix #}
+    <div class="col-12 col-md-4">
+      <div class="insight-card">
+        <div class="insight-title">Stock by Fuel Type</div>
+        {% if vehicles_by_fuel %}
+          {% for row in vehicles_by_fuel %}
+          <div class="bar-row">
+            <span class="bar-label">
+              {% if row.fuel_type == "petrol" %}⛽ Petrol
+              {% elif row.fuel_type == "diesel" %}🛢 Diesel
+              {% elif row.fuel_type == "hybrid" %}🔋 Hybrid
+              {% elif row.fuel_type == "electric" %}⚡ Electric
+              {% else %}{{ row.fuel_type|capfirst }}{% endif %}
+            </span>
+            <div class="bar-track">
+              {% if stats.in_stock > 0 %}<div class="bar-fill" style="width:{% widthratio row.count stats.in_stock 100 %}%;background:linear-gradient(90deg,#16a34a,#4ade80);"></div>{% endif %}
+            </div>
+            <span class="bar-val" style="color:var(--cd-green)">{{ row.count }}</span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="text-muted" style="font-size:.8rem;padding:.5rem 0;">No vehicles yet</div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  {# === QUICK ACTIONS === #}
+  {# ── RECENT SALES ── #}
   <div class="row g-3 mb-4">
-    <div class="col-12 col-md-4">
-      <a href="{% url 'car_dealer:stock_in' %}" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#eef2ff;border:1.5px solid #c7d2fe;">
-        <span style="font-size:2rem">📥</span>
-        <div><div class="fw-bold" style="color:#4f46e5;">Stock In Vehicle</div><div class="text-muted small">Add a new unit to inventory</div></div>
-      </a>
-    </div>
-    <div class="col-12 col-md-4">
-      <a href="{% url 'car_dealer:vehicle_list' %}?status=in_stock" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
-        <span style="font-size:2rem">🚘</span>
-        <div><div class="fw-bold" style="color:#059669;">Vehicle Inventory</div><div class="text-muted small">Browse and manage stock</div></div>
-      </a>
-    </div>
-    <div class="col-12 col-md-4">
-      <a href="{% url 'inventory:manage_listings' %}" class="d-flex align-items-center gap-3 p-3 rounded-3 text-decoration-none" style="background:#fef3c7;border:1.5px solid #fcd34d;">
-        <span style="font-size:2rem">🛒</span>
-        <div><div class="fw-bold" style="color:#d97706;">Marketplace Listings</div><div class="text-muted small">Manage public visibility</div></div>
-      </a>
-    </div>
-  </div>
-
-  {# === RECENT SALES + FUEL MIX === #}
-  <div class="row g-3 mb-4">
-    {# Recent Sales #}
-    <div class="col-12 col-md-7">
-      <div class="kpi-card">
-        <div class="section-title mb-3">Recent Sales</div>
+    <div class="col-12">
+      <div class="insight-card">
+        <div class="cd-section-hdr">
+          <div class="cd-section-title">Recent Sales</div>
+          <a href="{% url 'car_dealer:vehicle_list' %}?status=sold" class="cd-section-link">View all →</a>
+        </div>
         {% if recent_sold %}
         <div class="table-responsive">
-          <table class="table table-sm mb-0" style="font-size:.85rem;">
-            <thead><tr style="color:#94a3b8;font-size:.75rem;text-transform:uppercase;">
-              <th>Vehicle</th><th>Price</th><th>Date</th>
-            </tr></thead>
+          <table class="table sales-table mb-0">
+            <thead>
+              <tr>
+                <th>Vehicle</th>
+                <th>Sale Price</th>
+                <th>Date</th>
+                <th class="d-none d-md-table-cell">Buyer</th>
+              </tr>
+            </thead>
             <tbody>
               {% for v in recent_sold %}
               <tr>
-                <td><span class="fw-semibold">{{ v.display_name }}</span></td>
-                <td>{{ business.currency }} {{ v.sale_price|default:v.selling_price|floatformat:0 }}</td>
-                <td class="text-muted">{{ v.sold_at|date:"M d" }}</td>
+                <td>
+                  <a href="{% url 'car_dealer:vehicle_detail' v.pk %}" class="fw-semibold text-decoration-none" style="color:var(--cd-slate);">
+                    {{ v.display_name }}
+                  </a>
+                </td>
+                <td class="fw-bold" style="color:var(--cd-blue)">{{ business.currency }} {{ v.sale_price|default:v.selling_price|floatformat:0 }}</td>
+                <td class="text-muted">{{ v.sold_at|date:"d M" }}</td>
+                <td class="text-muted d-none d-md-table-cell">{{ v.buyer_name|default:"—" }}</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
         {% else %}
-        <div class="text-muted small py-3 text-center">No sales recorded yet</div>
-        {% endif %}
-        <div class="mt-2">
-          <a href="{% url 'car_dealer:vehicle_list' %}?status=sold" class="text-decoration-none" style="font-size:.8rem;color:#6366f1;">View all sold vehicles →</a>
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-receipt" style="font-size:2rem;opacity:.25;display:block;margin-bottom:.5rem;"></i>
+          No sales recorded yet
         </div>
-      </div>
-    </div>
-
-    {# Fuel Type Mix #}
-    <div class="col-12 col-md-5">
-      <div class="kpi-card">
-        <div class="section-title mb-3">Stock by Fuel Type</div>
-        {% if vehicles_by_fuel %}
-          {% for row in vehicles_by_fuel %}
-          <div class="make-row">
-            <span style="font-size:.85rem;font-weight:600;color:#374151;">
-              {% if row.fuel_type == "petrol" %}⛽ Petrol
-              {% elif row.fuel_type == "diesel" %}🛢️ Diesel
-              {% elif row.fuel_type == "hybrid" %}🔋 Hybrid
-              {% elif row.fuel_type == "electric" %}⚡ Electric
-              {% else %}{{ row.fuel_type|capfirst }}{% endif %}
-            </span>
-            <span class="fw-bold" style="font-size:.85rem;color:#4f46e5;">{{ row.count }}</span>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="text-muted small py-3 text-center">Add vehicles to see fuel mix</div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  {# === AVAILABLE VEHICLES === #}
-  {% if recent_vehicles %}
-  <h5 class="fw-bold mb-3">Available Vehicles <span class="badge bg-success rounded-pill" style="font-size:.75rem;">{{ stats.in_stock }}</span></h5>
-  <div class="row g-3">
-    {% for vehicle in recent_vehicles %}
-    <div class="col-6 col-sm-4 col-md-3 col-lg-2">
-      <a href="{% url 'car_dealer:vehicle_detail' vehicle.pk %}" class="vehicle-card">
-        <div class="vehicle-img">🚗</div>
-        <div class="vehicle-body">
-          <div class="vehicle-name text-truncate">{{ vehicle.display_name }}</div>
-          {% if vehicle.selling_price %}
-            <div class="vehicle-price">{{ business.currency }} {{ vehicle.selling_price|floatformat:0 }}</div>
-          {% endif %}
-          <div class="vehicle-meta">
-            {% if vehicle.mileage %}{{ vehicle.mileage|floatformat:0 }} km · {% endif %}
-            {% if vehicle.year %}{{ vehicle.year }}{% endif %}
-          </div>
-        </div>
-      </a>
+  {# ── AVAILABLE VEHICLES ── #}
+  <div class="cd-section-hdr">
+    <div class="cd-section-title">
+      Available Vehicles
+      <span class="badge rounded-pill ms-1" style="background:var(--cd-blue-light);color:var(--cd-blue);font-size:.7rem;">{{ stats.in_stock }}</span>
     </div>
+    {% if stats.in_stock > 6 %}
+    <a href="{% url 'car_dealer:vehicle_list' %}?status=in_stock" class="cd-section-link">See all →</a>
+    {% endif %}
+  </div>
+
+  {% if recent_vehicles %}
+  <div class="veh-grid">
+    {% for vehicle in recent_vehicles %}
+    <a href="{% url 'car_dealer:vehicle_detail' vehicle.pk %}" class="veh-card">
+      <div class="veh-thumb">
+        <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="{{ vehicle.display_name }}">
+      </div>
+      <div class="veh-body">
+        <div class="veh-name">{{ vehicle.display_name }}</div>
+        {% if vehicle.selling_price %}
+          <div class="veh-price">{{ business.currency }} {{ vehicle.selling_price|floatformat:0 }}</div>
+        {% endif %}
+        <div class="veh-meta">
+          {% if vehicle.mileage %}{{ vehicle.mileage|floatformat:0 }} km{% endif %}
+          {% if vehicle.year %} · {{ vehicle.year }}{% endif %}
+        </div>
+      </div>
+    </a>
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-5">
-    <div style="font-size:4rem;opacity:.2">🚗</div>
-    <h5 class="mt-3 text-muted">No vehicles in stock</h5>
+  <div class="text-center py-5" style="background:#f8fafc;border-radius:var(--cd-radius);border:2px dashed #e2e8f0;">
+    <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="No vehicles" style="width:80px;opacity:.25;margin-bottom:1rem;">
+    <h5 class="text-muted">No vehicles in stock</h5>
     <p class="text-muted small">Stock in your first vehicle to get started.</p>
-    <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary rounded-pill mt-1">
+    <a href="{% url 'car_dealer:stock_in' %}" class="btn btn-primary rounded-pill mt-1" style="font-size:.85rem;">
       <i class="bi bi-plus-lg me-1"></i>Add First Vehicle
     </a>
   </div>

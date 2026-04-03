@@ -372,11 +372,17 @@ def paychangu_payment_status(request: HttpRequest) -> JsonResponse:
     if not tx_ref:
         return JsonResponse({"status": "error", "message": "Missing tx_ref parameter"}, status=400)
 
+    logger.info(f"paychangu_payment_status: polling tx_ref={tx_ref}, business={business.id}")
+
     # Find transaction - scoped to current business (multi-tenant safe)
+    # NOTE: provider is stored lowercase "paychangu" — NEVER use uppercase "PAYCHANGU" here
     try:
-        transaction = PaymentTransaction.objects.get(tx_ref=tx_ref, business=business, provider="PAYCHANGU")
+        transaction = PaymentTransaction.objects.get(tx_ref=tx_ref, business=business, provider="paychangu")
     except PaymentTransaction.DoesNotExist:
-        logger.warning(f"Payment status check: tx_ref {tx_ref} not found for business {business.id}")
+        logger.warning(
+            f"paychangu_payment_status: tx_ref={tx_ref} not found for business={business.id}. "
+            f"Check provider casing and that checkout() created the transaction."
+        )
         return JsonResponse({"status": "error", "message": "Payment not found"}, status=404)
 
     # Get related invoice and subscription
@@ -402,6 +408,11 @@ def paychangu_payment_status(request: HttpRequest) -> JsonResponse:
         pass
 
     # Build response based on transaction status
+    logger.info(
+        f"paychangu_payment_status: tx_ref={tx_ref}, db_status={transaction.status}, "
+        f"payment_method={transaction.payment_method}"
+    )
+
     if transaction.status == PaymentTransaction.Status.SUCCESS:
         return JsonResponse(
             {
@@ -409,7 +420,7 @@ def paychangu_payment_status(request: HttpRequest) -> JsonResponse:
                 "transaction_status": transaction.status,
                 "invoice_status": invoice.status if invoice else None,
                 "subscription_status": subscription.status if subscription else None,
-                "next_url": "/inventory/dashboard/",  # or wherever you want to redirect
+                "next_url": "/billing/success/",
                 "message": "Payment confirmed! Your subscription is now active.",
             }
         )

@@ -115,12 +115,12 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         )
 
         # Recent 12 in-stock vehicles
-        recent_vehicles = in_stock_qs.select_related("car_model__make").order_by("-created_at")[:12]
+        recent_vehicles = in_stock_qs.select_related("model__make", "make").order_by("-created_at")[:12]
 
         # 5 most recent sales
         recent_sold = (
             qs.filter(status="sold")
-            .select_related("car_model__make")
+            .select_related("model__make", "make")
             .order_by("-sold_at")[:5]
         )
 

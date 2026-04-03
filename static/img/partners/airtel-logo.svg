@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 40" fill="none">
+  <rect x="2" y="2" width="36" height="36" rx="8" fill="#e11d48"/>
+  <!-- Stylized A / signal waves -->
+  <path d="M20 10 L12 28 H16 L18 23 H22 L24 28 H28 Z" fill="white"/>
+  <path d="M18 20 L20 15 L22 20 Z" fill="#e11d48"/>
+  <text x="44" y="27" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="700" fill="#1e293b">Airtel Money</text>
+</svg>

@@ -226,23 +226,16 @@ class NotificationPreference(models.Model):
     def get_or_create_default(cls, user):
         """
         Get or create default preferences for a user.
-        Sets sale_emails_enabled based on role: True for managers, False for agents.
+        All preferences default to True (opt-out model): every user starts subscribed
+        and can explicitly turn off channels they don't want.
         """
         try:
             return cls.objects.get(user=user)
         except cls.DoesNotExist:
-            # Determine if user is a manager/owner or agent
-            from tenants.models import Membership
-            is_manager = Membership.objects.filter(
-                user=user,
-                role__in=["MANAGER", "OWNER", "ADMIN"],
-                status="ACTIVE"
-            ).exists()
-            
-            return cls.objects.create(
-                user=user,
-                sale_emails_enabled=is_manager,  # Managers=True, Agents=False
-            )
+            # Use model field defaults (all True) — opt-out model.
+            # Role-based filtering happens at notification dispatch time,
+            # not at preference creation time.
+            return cls.objects.create(user=user)
 
 
 # ==============================================================================

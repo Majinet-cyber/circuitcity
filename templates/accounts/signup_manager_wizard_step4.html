@@ -196,6 +196,20 @@
         <span class="summary-value">{{ summary.business_kind_display|default:"—" }}</span>
       </div>
       
+      {% if summary.country %}
+      <div class="summary-row">
+        <span class="summary-label"><span class="summary-icon">🌍</span> Country</span>
+        <span class="summary-value">{{ summary.country }}</span>
+      </div>
+      {% endif %}
+
+      {% if summary.currency %}
+      <div class="summary-row">
+        <span class="summary-label"><span class="summary-icon">💱</span> Currency</span>
+        <span class="summary-value">{{ summary.currency }}</span>
+      </div>
+      {% endif %}
+
       {% if summary.subdomain %}
       <div class="summary-row">
         <span class="summary-label"><span class="summary-icon">🔗</span> Subdomain</span>

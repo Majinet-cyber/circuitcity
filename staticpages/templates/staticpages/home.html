@@ -160,13 +160,18 @@
     }
     .animate-in {
       opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
+      transform: translateY(24px);
+      transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1), transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .animate-in.visible {
       opacity: 1;
       transform: translateY(0);
     }
+    /* Stagger for step cards */
+    .steps-grid .step-card:nth-child(1) { transition-delay: 0.05s; }
+    .steps-grid .step-card:nth-child(2) { transition-delay: 0.12s; }
+    .steps-grid .step-card:nth-child(3) { transition-delay: 0.19s; }
+    .steps-grid .step-card:nth-child(4) { transition-delay: 0.26s; }
 
     /* ============================================================
        LAYOUT
@@ -189,26 +194,26 @@
     ============================================================ */
     .eyebrow {
       display: inline-block;
-      font-size: 0.6875rem;
+      font-size: 0.75rem;
       font-weight: 700;
-      letter-spacing: 0.12em;
+      letter-spacing: 0.11em;
       text-transform: uppercase;
       color: var(--brand);
-      margin-bottom: 0.625rem;
+      margin-bottom: 0.75rem;
     }
     .section-title {
-      font-size: clamp(1.75rem, 3vw, 2.25rem);
+      font-size: clamp(2rem, 3.5vw, 2.75rem);
       font-weight: 800;
-      line-height: 1.2;
+      line-height: 1.18;
       color: var(--text);
       margin-bottom: 0.875rem;
-      letter-spacing: -0.015em;
+      letter-spacing: -0.02em;
     }
     .section-subtitle {
-      font-size: 1rem;
+      font-size: 1.0625rem;
       color: var(--text-muted);
-      max-width: 540px;
-      line-height: 1.65;
+      max-width: 560px;
+      line-height: 1.7;
     }
     .section-header        { margin-bottom: 3rem; }
     .section-header--center { text-align: center; }
@@ -449,11 +454,12 @@
       background: var(--brand-light);
       color: var(--brand);
       font-size: 0.8125rem;
-      font-weight: 600;
-      padding: 0.3125rem 0.75rem;
+      font-weight: 700;
+      padding: 0.375rem 0.875rem;
       border-radius: 2rem;
       margin-bottom: 1.5rem;
-      border: 1px solid rgba(79,70,229,0.15);
+      border: 1px solid rgba(79,70,229,0.2);
+      letter-spacing: 0.01em;
     }
     .hero-tag::before {
       content: '';
@@ -461,6 +467,7 @@
       width: 6px; height: 6px;
       background: var(--brand);
       border-radius: 50%;
+      animation: pulse-dot 2.5s ease-in-out infinite;
     }
 
     .hero-title {
@@ -782,8 +789,8 @@
       .hero-image { order: -1; }
     }
     @media (max-width: 768px) {
-      .hero-title { font-size: 2.5rem; }
-      .hero-subtitle { font-size: 1.125rem; }
+      .hero-title { font-size: 2.75rem; line-height: 1.08; }
+      .hero-subtitle { font-size: 1.125rem; line-height: 1.65; }
       .hero-buttons {
         justify-content: center;
         align-items: center;
@@ -793,13 +800,14 @@
         width: 100%;
         max-width: 300px;
         text-align: center;
-        font-size: 1.25rem;
+        font-size: 1.125rem;
       }
     }
     @media (max-width: 480px) {
       .hero { padding: 5.5rem 0 3.5rem; }
-      .hero-title { font-size: 2rem; line-height: 1.2; word-wrap: break-word; }
-      .hero-subtitle { font-size: 1rem; line-height: 1.5; }
+      .hero-title { font-size: 2.25rem; line-height: 1.12; word-wrap: break-word; }
+      .hero-subtitle { font-size: 1rem; line-height: 1.6; }
+      .section-title { font-size: 1.875rem; }
       .dash-kpis { grid-template-columns: repeat(2,1fr); }
       .dash-kpis .dash-kpi:last-child { grid-column: 1 / -1; }
     }
@@ -898,17 +906,17 @@
       gap: 1.5rem;
     }
     .problem-card {
-      background: var(--gradient-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 2.25rem 2rem;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;
       box-shadow: var(--shadow-sm);
     }
     .problem-card:hover {
-      transform: translateY(-4px);
+      transform: translateY(-5px);
       box-shadow: var(--shadow-md);
-      border-color: var(--border-rich);
+      border-color: rgba(79,70,229,0.18);
     }
     .problem-card-icon {
       width: 44px; height: 44px;
@@ -928,15 +936,16 @@
       margin-bottom: 0.75rem;
     }
     .problem-card-title {
-      font-size: 1.0625rem;
-      font-weight: 700;
+      font-size: 1.125rem;
+      font-weight: 800;
       color: var(--text);
       margin-bottom: 0.625rem;
+      line-height: 1.3;
     }
     .problem-card-body {
       font-size: 0.9375rem;
       color: var(--text-muted);
-      line-height: 1.65;
+      line-height: 1.7;
     }
     @media (max-width: 768px) {
       .problem-grid { grid-template-columns: 1fr; }
@@ -948,21 +957,21 @@
     .features-grid {
       display: grid;
       grid-template-columns: repeat(3,1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-      box-shadow: var(--shadow-sm);
+      gap: 1.25rem;
     }
     .feature-item {
       background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-xl);
       padding: 2rem;
-      transition: background var(--transition-base), box-shadow var(--transition-base);
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;
     }
     .feature-item:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+      border-color: rgba(79,70,229,0.15);
       background: var(--bg-subtle);
-      box-shadow: inset 0 0 0 1px var(--border-rich);
     }
     .feature-icon {
       width: 44px; height: 44px;
@@ -980,15 +989,16 @@
       box-shadow: 0 4px 12px rgba(79,70,229,0.15);
     }
     .feature-title {
-      font-size: 1rem;
+      font-size: 1.0625rem;
       font-weight: 700;
       color: var(--text);
       margin-bottom: 0.5rem;
+      line-height: 1.3;
     }
     .feature-description {
-      font-size: 0.9rem;
+      font-size: 0.9375rem;
       color: var(--text-muted);
-      line-height: 1.65;
+      line-height: 1.7;
     }
     @media (max-width: 900px) { .features-grid { grid-template-columns: repeat(2,1fr); } }
     @media (max-width: 540px) { .features-grid { grid-template-columns: 1fr; } }
@@ -996,43 +1006,46 @@
     /* ============================================================
        HOW IT WORKS
     ============================================================ */
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(3,1fr);
-      gap: 2rem;
-      position: relative;
+    /* How It Works — restored 4-card premium layout from git history (5bd2cceb) */
+    .how-it-works-section {
+      padding: 5.5rem 0;
+      background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
     }
-    .steps-grid::before {
-      content: '';
-      position: absolute;
-      top: 28px;
-      left: calc(16.67% + 28px);
-      right: calc(16.67% + 28px);
-      height: 1px;
-      background: var(--border);
+    .steps-grid {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 2rem;
     }
     .step-card {
-      text-align: center;
+      background: var(--bg);
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.2s;
+      border: 2px solid rgba(79, 70, 229, 0.1);
+      text-align: left;
       position: relative;
-      background: transparent;
-      border: none;
-      padding: 0;
-      box-shadow: none;
     }
+    .step-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(79,70,229,0.22);
+    }
+    .step-card:active { transform: translateY(-2px) scale(0.98); }
     .step-number {
-      width: 56px; height: 56px;
-      border-radius: 50%;
-      background: var(--gradient-brand);
-      color: #fff;
-      font-size: 1.25rem;
-      font-weight: 700;
-      display: flex;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
-      margin: 0 auto 1.25rem;
-      position: relative;
-      z-index: 1;
-      box-shadow: 0 4px 14px rgba(79,70,229,0.3);
+      width: 50px; height: 50px;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--green) 100%);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 1.375rem;
+      font-weight: 700;
+      margin-bottom: 1.125rem;
+      box-shadow: 0 4px 14px rgba(79,70,229,0.28);
       transition: transform var(--transition-spring), box-shadow var(--transition-base);
     }
     .step-card:hover .step-number {
@@ -1040,21 +1053,27 @@
       box-shadow: 0 6px 20px rgba(79,70,229,0.4);
     }
     .step-title {
-      font-size: 1.0625rem;
+      font-size: 1.125rem;
       font-weight: 700;
       color: var(--text);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.625rem;
+      line-height: 1.3;
     }
     .step-description {
       font-size: 0.9375rem;
       color: var(--text-muted);
       line-height: 1.65;
     }
+    .how-it-works-note {
+      text-align: center;
+      margin-top: 2.5rem;
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+    }
+    .how-it-works-note strong { color: var(--text); font-weight: 700; }
     @media (max-width: 768px) {
-      .steps-grid { grid-template-columns: 1fr; gap: 2.5rem; }
-      .steps-grid::before { display: none; }
-      .step-card { text-align: left; display: flex; align-items: flex-start; gap: 1rem; }
-      .step-number { margin: 0; flex-shrink: 0; width: 44px; height: 44px; font-size: 1rem; }
+      .steps-grid { grid-template-columns: 1fr; gap: 1.25rem; }
+      .step-card { padding: 1.5rem; }
     }
 
     /* ============================================================
@@ -1105,25 +1124,25 @@
       gap: 1.5rem;
     }
     .testimonial-card {
-      background: var(--gradient-card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 2.25rem 2rem;
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
-      box-shadow: var(--shadow-sm);
-      transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+      box-shadow: var(--shadow);
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;
     }
     .testimonial-card:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow);
-      border-color: var(--border-rich);
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(79,70,229,0.16);
     }
     .testimonial-quote {
-      font-size: 1rem;
+      font-size: 1.0625rem;
       color: var(--text);
-      line-height: 1.75;
+      line-height: 1.8;
       font-style: italic;
     }
     .testimonial-author {
@@ -1267,16 +1286,17 @@
       pointer-events: none;
     }
     .cta-title {
-      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+      font-size: clamp(2rem, 4vw, 2.875rem);
       font-weight: 800;
       color: #fff;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.025em;
       margin-bottom: 1rem;
+      line-height: 1.15;
     }
     .cta-subtitle {
-      font-size: 1.0625rem;
-      color: rgba(255,255,255,0.8);
-      max-width: 480px;
+      font-size: 1.125rem;
+      color: rgba(255,255,255,0.85);
+      max-width: 500px;
       margin: 0 auto 2rem;
       line-height: 1.7;
     }
@@ -1289,63 +1309,74 @@
     /* ============================================================
        FOOTER
     ============================================================ */
+    /* ============================================================
+       FOOTER — DARK PREMIUM THEME (Stripe / Paystack quality)
+    ============================================================ */
     .footer {
-      background: var(--bg-section);
-      border-top: 1px solid var(--border);
-      padding: 3rem 0 2rem;
+      background: #0b1628;
+      border-top: none;
+      padding: 4.5rem 0 2.5rem;
+      position: relative;
+    }
+    .footer::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(79,70,229,0.5) 30%, rgba(124,58,237,0.5) 70%, transparent);
     }
     .footer-grid {
       display: grid;
       grid-template-columns: 2fr 1fr 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 2.5rem;
+      gap: 2.5rem;
+      margin-bottom: 3rem;
     }
     .footer-brand-logo {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      margin-bottom: 0.75rem;
+      margin-bottom: 1rem;
     }
-    .footer-brand-logo img { height: 28px; width: auto; }
-    .footer-brand-logo span { font-size: 1rem; font-weight: 700; color: var(--brand); }
+    .footer-brand-logo img { height: 28px; width: auto; filter: brightness(0) invert(1) opacity(0.9); }
+    .footer-brand-logo span { font-size: 1.0625rem; font-weight: 700; color: #fff; }
     .footer-tagline {
       font-size: 0.875rem;
-      color: var(--text-muted);
-      line-height: 1.6;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.7;
       max-width: 260px;
     }
     .footer-col-title {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--text);
-      margin-bottom: 1rem;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 1.25rem;
     }
     .footer-col-links {
       display: flex;
       flex-direction: column;
-      gap: 0.625rem;
+      gap: 0.75rem;
     }
     .footer-col-links a {
       font-size: 0.875rem;
-      color: var(--text-muted);
+      color: rgba(255,255,255,0.6);
       transition: color 0.15s;
     }
-    .footer-col-links a:hover { color: var(--brand); }
+    .footer-col-links a:hover { color: #fff; }
     .footer-bottom {
-      border-top: 1px solid var(--border);
-      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 1.75rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 1rem;
       flex-wrap: wrap;
     }
-    .footer-copy { font-size: 0.8125rem; color: var(--text-light); }
+    .footer-copy { font-size: 0.8125rem; color: rgba(255,255,255,0.3); }
     .footer-legal { display: flex; gap: 1.5rem; }
-    .footer-legal a { font-size: 0.8125rem; color: var(--text-light); transition: color 0.15s; }
-    .footer-legal a:hover { color: var(--text-muted); }
+    .footer-legal a { font-size: 0.8125rem; color: rgba(255,255,255,0.35); transition: color 0.15s; }
+    .footer-legal a:hover { color: rgba(255,255,255,0.7); }
     @media (max-width: 900px) {
       .footer-grid { grid-template-columns: 1fr 1fr; }
     }
@@ -1366,19 +1397,19 @@
     .product-depth-text {}
     .product-depth-text .eyebrow { margin-bottom: 0.875rem; }
     .product-depth-title {
-      font-size: clamp(1.625rem, 2.8vw, 2.125rem);
+      font-size: clamp(1.75rem, 3vw, 2.375rem);
       font-weight: 800;
-      line-height: 1.2;
-      letter-spacing: -0.02em;
+      line-height: 1.18;
+      letter-spacing: -0.022em;
       color: var(--text);
       margin-bottom: 1rem;
     }
     .product-depth-subtitle {
       font-size: 1.0625rem;
       color: var(--text-muted);
-      line-height: 1.7;
+      line-height: 1.75;
       margin-bottom: 1.75rem;
-      max-width: 440px;
+      max-width: 460px;
     }
     .product-depth-checks {
       display: flex;
@@ -1533,11 +1564,11 @@
       margin-bottom: 3rem;
     }
     .reality-stats-title {
-      font-size: clamp(1.75rem, 3vw, 2.25rem);
+      font-size: clamp(2rem, 3.5vw, 2.75rem);
       font-weight: 800;
       color: var(--text);
       margin-bottom: 0.75rem;
-      letter-spacing: -0.015em;
+      letter-spacing: -0.02em;
     }
     .reality-stats-subtitle {
       font-size: 1.0625rem;
@@ -1763,8 +1794,8 @@
        BUSINESS SIMULATOR
     ============================================================ */
     .simulator-section {
-      padding: 5rem 0;
-      background: var(--bg);
+      padding: 5.5rem 0;
+      background: var(--bg-subtle);
     }
     .simulator-container {
       max-width: 900px;
@@ -1772,11 +1803,20 @@
       padding: 0 2rem;
     }
     .simulator-card {
-      background: var(--gradient-card);
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-xl);
-      padding: 2.5rem;
+      padding: 3rem;
       box-shadow: var(--shadow-md);
+      position: relative;
+      overflow: hidden;
+    }
+    .simulator-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--gradient-brand);
     }
     .simulator-inputs {
       display: grid;
@@ -1868,18 +1908,25 @@
        MISSION & QUOTE
     ============================================================ */
     .mission-section {
-      padding: 4rem 0;
-      background: var(--bg);
+      padding: 6rem 0;
+      background: linear-gradient(160deg, #eef2ff 0%, #f8fafc 50%, #f0fdf4 100%);
       text-align: center;
+      border-top: 1px solid rgba(79,70,229,0.08);
+      border-bottom: 1px solid rgba(79,70,229,0.08);
     }
     .mission-text {
-      font-size: 1.25rem;
-      line-height: 1.8;
-      color: var(--text-muted);
-      max-width: 720px;
-      margin: 0 auto;
+      font-size: clamp(1.25rem, 2.5vw, 1.625rem);
+      font-weight: 400;
+      line-height: 1.85;
+      color: var(--text);
+      max-width: 760px;
+      margin: 1rem auto 0;
     }
-    .mission-text strong { color: var(--text); }
+    .mission-text strong {
+      color: var(--brand);
+      font-weight: 800;
+      font-size: 1.1em;
+    }
     .quote-section {
       padding: 4rem 0;
       background: var(--bg-subtle);
@@ -1918,7 +1965,7 @@
     /* ============================================================
        TEAM - EXPANDED WITH QUALIFICATIONS
     ============================================================ */
-    .team-section { padding: 5rem 0; background: var(--bg); }
+    .team-section { padding: 5rem 0; background: var(--bg-subtle); }
     .team-section-header { text-align: center; margin-bottom: 3rem; }
     .team-cards {
       display: grid;
@@ -1928,17 +1975,29 @@
       margin: 0 auto 2.5rem;
     }
     .team-member-card {
-      background: var(--gradient-card);
+      background: var(--bg);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 2rem;
-      box-shadow: var(--shadow-sm);
-      transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
-    }
-    .team-member-card:hover {
-      transform: translateY(-3px);
       box-shadow: var(--shadow);
-      border-color: var(--border-rich);
+      transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+      position: relative;
+      overflow: hidden;
+    }
+    .team-member-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: var(--gradient-brand);
+      opacity: 0;
+      transition: opacity var(--transition-base);
+    }
+    .team-member-card:hover::before { opacity: 1; }
+    .team-member-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(79,70,229,0.15);
     }
     .team-member-head {
       display: flex;
@@ -1954,7 +2013,8 @@
     }
     .team-member-role {
       font-size: 0.875rem;
-      color: var(--text-muted);
+      color: var(--brand);
+      font-weight: 600;
       margin-top: 0.125rem;
     }
     .education-list {
@@ -2197,6 +2257,112 @@
       align-items: center;
       justify-content: center;
     }
+
+
+    /* ============================================================
+       SMART RECOMMENDATIONS SECTION
+    ============================================================ */
+    .smart-recs-section {
+      padding: 5.5rem 0;
+      background: var(--bg-subtle);
+    }
+    .smart-recs-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.75rem;
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .smart-rec-card {
+      background: var(--bg);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 2.25rem;
+      box-shadow: var(--shadow);
+      position: relative;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;
+    }
+    .smart-rec-card:hover {
+      transform: translateY(-5px);
+      box-shadow: var(--shadow-md);
+      border-color: rgba(79,70,229,0.18);
+    }
+    .smart-rec-card--energy {
+      border-color: rgba(16,185,129,0.2);
+      background: linear-gradient(145deg, #fff 0%, #f0fdf4 100%);
+    }
+    .smart-rec-card--energy:hover { border-color: rgba(16,185,129,0.38); }
+    .smart-rec-new-badge {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      background: var(--green);
+      color: #fff;
+      font-size: 0.625rem;
+      font-weight: 700;
+      padding: 0.2rem 0.7rem;
+      border-radius: 2rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .smart-rec-icon {
+      width: 56px; height: 56px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 14px;
+      margin-bottom: 1.25rem;
+      flex-shrink: 0;
+    }
+    .smart-rec-icon--amber {
+      background: linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.08) 100%);
+      color: var(--amber);
+      box-shadow: 0 4px 12px rgba(245,158,11,0.15);
+    }
+    .smart-rec-icon--red {
+      background: linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.06) 100%);
+      color: var(--red);
+      box-shadow: 0 4px 12px rgba(239,68,68,0.12);
+    }
+    .smart-rec-icon--brand {
+      background: linear-gradient(135deg, rgba(79,70,229,0.12) 0%, rgba(79,70,229,0.06) 100%);
+      color: var(--brand);
+      box-shadow: 0 4px 12px rgba(79,70,229,0.12);
+    }
+    .smart-rec-icon--green {
+      background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(16,185,129,0.06) 100%);
+      color: var(--green);
+      box-shadow: 0 4px 12px rgba(16,185,129,0.12);
+    }
+    .smart-rec-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+      line-height: 1.3;
+    }
+    .smart-rec-desc {
+      font-size: 0.9375rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      margin-bottom: 1.25rem;
+    }
+    .smart-rec-prompts {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .smart-rec-prompt {
+      font-size: 0.8125rem;
+      padding: 0.5625rem 0.875rem;
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+    .smart-rec-prompt--amber { background: rgba(245,158,11,0.07); color: #92400e; border-left: 3px solid var(--amber); }
+    .smart-rec-prompt--red { background: rgba(239,68,68,0.06); color: #991b1b; border-left: 3px solid var(--red); }
+    .smart-rec-prompt--brand { background: var(--brand-light); color: var(--brand-dark); border-left: 3px solid var(--brand); }
+    .smart-rec-prompt--green { background: rgba(16,185,129,0.07); color: #065f46; border-left: 3px solid var(--green); }
+    @media (max-width: 768px) {
+      .smart-recs-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -2249,12 +2415,12 @@
   <section class="hero" id="hero">
     <div class="hero-content">
       <div class="hero-text">
-        <div class="hero-tag">Built for retail merchants</div>
+        <div class="hero-tag">Africa's Business Operating System</div>
         <h1 class="hero-title">
-          Run your business<br>with <span class="highlight">total visibility</span>.
+          Your business <span class="highlight">operating system</span> — and marketplace.
         </h1>
         <p class="hero-subtitle">
-          Track stock, monitor sales, hold staff accountable, and know your exact profit — from one system built for inventory-driven merchants.
+          Run your shop, pharmacy, gym, farm, or car dealership from one intelligent platform. Track stock, manage sales, publish to the marketplace, and get smart insights — mobile-first, built for Africa.
         </p>
 
         <!-- hero-buttons class retained for test compatibility -->
@@ -2388,6 +2554,7 @@
         <div class="laptop-base"></div>
         <div class="laptop-hinge"></div>
         </div><!-- /.laptop-frame -->
+
         </div><!-- /.laptop-wrapper -->
       </div>
     </div>
@@ -2419,6 +2586,43 @@
       </div>
     </div>
   </div>
+
+  <!-- ============================================================
+       VIDEO SECTION — credibility anchor near top
+  ============================================================ -->
+  <section class="video-section" id="product-demo">
+    <div class="video-section-inner">
+      <div class="video-wrap" id="product-demo-video-wrap">
+        <video
+          id="product-demo-video"
+          {% if VIDEO_BASE_URL %}
+          src="{{ VIDEO_BASE_URL }}/emajinet-farm.mp4"
+          {% else %}
+          src="{% static 'videos/emajinet-farm.mp4' %}"
+          {% endif %}
+          poster="{% static 'img/majn.png' %}"
+          preload="none"
+          controls
+          playsinline
+          muted
+          aria-label="Emajinet product demo: fast account setup, Farm Manager, data entry, smart prompts, and dashboards"
+        >
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      <div class="video-content">
+        <span class="eyebrow">See it live</span>
+        <h2>Watch Emajinet in action</h2>
+        <p class="video-subtitle">A quick walkthrough showing account setup, data entry, smart prompts, and real-time dashboards.</p>
+        <ul class="video-features-list">
+          <li>Create an account in seconds</li>
+          <li>Fast data entry for daily operations</li>
+          <li>Smart prompts and recommendations</li>
+          <li>Dashboards that show real performance</li>
+        </ul>
+      </div>
+    </div>
+  </section>
 
   <!-- ============================================================
        PROBLEM SECTION
@@ -2732,75 +2936,38 @@
   </section>
 
   <!-- ============================================================
-       HOW IT WORKS
+       HOW IT WORKS — restored from git history (5bd2cceb) — 4-step premium card layout
   ============================================================ -->
-  <section class="section" id="how-it-works">
+  <section class="section how-it-works-section" id="how-it-works">
     <div class="container">
       <div class="section-header section-header--center animate-in">
         <span class="eyebrow">Getting Started</span>
         <h2 class="section-title">How It Works</h2>
-        <p class="section-subtitle">Up and running in under 10 minutes. No training required. No expensive setup.</p>
+        <p class="section-subtitle">Get started in minutes with our simple, powerful workflow.</p>
       </div>
       <div class="steps-grid">
-        <div class="step-card">
+        <div class="step-card animate-in">
           <div class="step-number">1</div>
-          <div>
-            <h3 class="step-title">Create your account</h3>
-            <p class="step-description">Sign up as a business owner, add your store name, and set up your team members. Takes under 2 minutes.</p>
-          </div>
+          <h3 class="step-title">Sign Up &amp; Set Up</h3>
+          <p class="step-description">Create your business in seconds. Add your locations and team members — works for any business type.</p>
         </div>
-        <div class="step-card">
+        <div class="step-card animate-in">
           <div class="step-number">2</div>
-          <div>
-            <h3 class="step-title">Add your inventory</h3>
-            <p class="step-description">Import or manually add products with costs and selling prices. Set reorder levels and stock-in your current quantities.</p>
-          </div>
+          <h3 class="step-title">Add Your Records</h3>
+          <p class="step-description">Track inventory, seasons, or members depending on your business. Shops add products, farms add crops, gyms add members.</p>
         </div>
-        <div class="step-card">
+        <div class="step-card animate-in">
           <div class="step-number">3</div>
-          <div>
-            <h3 class="step-title">Run daily operations</h3>
-            <p class="step-description">Record sales, track stock movements, monitor margins, and receive alerts — from your phone or desktop in real time.</p>
-          </div>
+          <h3 class="step-title">Run Daily Operations</h3>
+          <p class="step-description">Record sales, expenses, and payments. Track team performance with built-in wallet and layby features.</p>
+        </div>
+        <div class="step-card animate-in">
+          <div class="step-number">4</div>
+          <h3 class="step-title">Get Recommendations</h3>
+          <p class="step-description">Receive smart prompts: restock alerts, margin warnings, renewal reminders, and season timing — so you always know what to do next.</p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       VIDEO SECTION
-  ============================================================ -->
-  <section class="video-section" id="product-demo">
-    <div class="video-section-inner">
-      <div class="video-wrap" id="product-demo-video-wrap">
-        <video
-          id="product-demo-video"
-          {% if VIDEO_BASE_URL %}
-          src="{{ VIDEO_BASE_URL }}/emajinet-farm.mp4"
-          {% else %}
-          src="{% static 'videos/emajinet-farm.mp4' %}"
-          {% endif %}
-          poster="{% static 'img/majn.png' %}"
-          preload="none"
-          controls
-          playsinline
-          muted
-          aria-label="Emajinet product demo: fast account setup, Farm Manager, data entry, smart prompts, and dashboards"
-        >
-          Your browser does not support the video tag.
-        </video>
-      </div>
-      <div class="video-content">
-        <span class="eyebrow">See it live</span>
-        <h2>Watch Emajinet in action</h2>
-        <p class="video-subtitle">A quick walkthrough showing account setup, data entry, smart prompts, and real-time dashboards.</p>
-        <ul class="video-features-list">
-          <li>Create an account in seconds</li>
-          <li>Fast data entry for daily operations</li>
-          <li>Smart prompts and recommendations</li>
-          <li>Dashboards that show real performance</li>
-        </ul>
-      </div>
+      <p class="how-it-works-note"><strong>Emajinet adapts to your business type</strong> — shop, farm, gym, pharmacy, car dealer, and more.</p>
     </div>
   </section>
 
@@ -2860,27 +3027,119 @@
     </div>
   </section>
 
+  <!-- ============================================================
+       SMART RECOMMENDATIONS
+  ============================================================ -->
+  <section class="smart-recs-section" id="smart-recommendations">
+    <div class="container">
+      <div class="section-header section-header--center animate-in">
+        <span class="eyebrow">Built-in Intelligence</span>
+        <h2 class="section-title">Smart Recommendations</h2>
+        <p class="section-subtitle">Emajinet reads your business data and surfaces the right insights at the right time — automatically.</p>
+      </div>
+      <div class="smart-recs-grid">
+
+        <!-- Restock Prompts -->
+        <div class="smart-rec-card">
+          <div class="smart-rec-icon smart-rec-icon--amber">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+              <line x1="12" y1="22.08" x2="12" y2="12"/>
+            </svg>
+          </div>
+          <h3 class="smart-rec-title">Restock Prompts</h3>
+          <p class="smart-rec-desc">Get prompted to reorder before you run out — based on sales velocity, lead time, and your configured minimum stock levels.</p>
+          <div class="smart-rec-prompts">
+            <div class="smart-rec-prompt smart-rec-prompt--amber">⚠ Samsung A05 — 3 units left. Reorder now at current pace.</div>
+            <div class="smart-rec-prompt smart-rec-prompt--amber">⚠ USB-C Charger — stock depletes in ~2 days. Stock up before the weekend.</div>
+          </div>
+        </div>
+
+        <!-- Margin Warnings -->
+        <div class="smart-rec-card">
+          <div class="smart-rec-icon smart-rec-icon--red">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <h3 class="smart-rec-title">Margin Warnings</h3>
+          <p class="smart-rec-desc">Automatic flags on below-cost sales, thin margins, and pricing drift — before they erode your profit without you noticing.</p>
+          <div class="smart-rec-prompts">
+            <div class="smart-rec-prompt smart-rec-prompt--red">🚨 Airpods Pro sold at 8% margin — check your cost price entry.</div>
+            <div class="smart-rec-prompt smart-rec-prompt--red">🚨 Sale below cost detected on USB-C Charger — review immediately.</div>
+          </div>
+        </div>
+
+        <!-- Season Prompts -->
+        <div class="smart-rec-card">
+          <div class="smart-rec-icon smart-rec-icon--brand">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+          </div>
+          <h3 class="smart-rec-title">Season Prompts</h3>
+          <p class="smart-rec-desc">Stay ahead of seasonal demand — back-to-school, harvest season, festive periods, and category-specific spikes that affect your stock needs.</p>
+          <div class="smart-rec-prompts">
+            <div class="smart-rec-prompt smart-rec-prompt--brand">📅 Back-to-school starts in 3 weeks — increase stationery stock by ~34%.</div>
+            <div class="smart-rec-prompt smart-rec-prompt--brand">📅 December electronics surge — review pricing and margins now.</div>
+          </div>
+        </div>
+
+        <!-- Renewable Energy Vertical -->
+        <div class="smart-rec-card smart-rec-card--energy">
+          <div class="smart-rec-new-badge">New</div>
+          <div class="smart-rec-icon smart-rec-icon--green">
+            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"/>
+              <line x1="12" y1="1" x2="12" y2="3"/>
+              <line x1="12" y1="21" x2="12" y2="23"/>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+              <line x1="1" y1="12" x2="3" y2="12"/>
+              <line x1="21" y1="12" x2="23" y2="12"/>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            </svg>
+          </div>
+          <h3 class="smart-rec-title">Renewable Energy Vertical</h3>
+          <p class="smart-rec-desc">Purpose-built insights for solar and energy businesses — system sizing, load optimisation, and preventive maintenance alerts.</p>
+          <div class="smart-rec-prompts">
+            <div class="smart-rec-prompt smart-rec-prompt--green">☀ Customer usage at 8h/day — 3kW system optimal. Recommend an upgrade path.</div>
+            <div class="smart-rec-prompt smart-rec-prompt--green">🔋 Battery maintenance overdue — last service 182 days ago. Schedule now.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- Available Verticals Section -->
   <section class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
     <div style="text-align: center; margin-bottom: 3rem;">
-      <h2 style="font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 700; color: var(--text-primary); margin-bottom: 1rem;">
-        One Platform, Every Business Type
+      <h2 style="font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: -0.02em;">
+        One Platform, Built for Real Operations
       </h2>
       <p style="font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-secondary); max-width: 700px; margin: 0 auto;">
-        Emajinet is purpose-built for each industry — not a generic tool. From car dealerships to pharmacies, get features tailored to how <em>you</em> operate.
+        Emajinet ships with purpose-built workflows for each industry — not generic forms. From car dealerships to pharmacies, the system is shaped around how your business actually runs.
       </p>
     </div>
 
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto;">
       {% for vertical in verticals %}
-      <div style="background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06); transition: transform 0.3s ease, box-shadow 0.3s ease;"
-           onmouseover="this.style.transform='translateY(-4px)'; this.style.boxShadow='0 4px 20px rgba(0, 0, 0, 0.1)';"
-           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(0, 0, 0, 0.06)';">
-        <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">{{ vertical.icon }}</div>
-        <h3 style="font-size: 1.125rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+      <div style="background: white; border-radius: 18px; padding: 1.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04); border: 1.5px solid #e2e8f0; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;"
+           onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 32px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.05)'; this.style.borderColor='rgba(79,70,229,0.18)';"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04)'; this.style.borderColor='#e2e8f0';">
+        <div style="font-size: 2.25rem; margin-bottom: 0.875rem;">{{ vertical.icon }}</div>
+        <h3 style="font-size: 1.125rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem; line-height: 1.3;">
           {{ vertical.name }}
         </h3>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin: 0;">
+        <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">
           {{ vertical.description }}
         </p>
       </div>
@@ -2889,7 +3148,7 @@
 
     <div style="text-align: center; margin-top: 2.5rem;">
       <p style="font-size: 1rem; color: var(--text-secondary); font-style: italic;">
-        🚀 <strong>More coming soon</strong> – We're constantly expanding to serve more industries
+        🚀 <strong>More verticals coming</strong> — each one purpose-built, not adapted
       </p>
     </div>
   </section>
@@ -2899,7 +3158,7 @@
     <div style="max-width: 1200px; margin: 0 auto;">
       <div style="text-align: center; margin-bottom: 3.5rem;">
         <div style="display: inline-block; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.35rem 1rem; border-radius: 2rem; margin-bottom: 1rem;">Built-in Marketplace</div>
-        <h2 style="font-size: clamp(1.75rem, 4vw, 2.75rem); font-weight: 800; color: #0f172a; margin-bottom: 1rem; line-height: 1.2;">
+        <h2 style="font-size: clamp(2rem, 4vw, 2.875rem); font-weight: 800; color: #0f172a; margin-bottom: 1rem; line-height: 1.18; letter-spacing: -0.02em;">
           Sell Online Without a Separate App
         </h2>
         <p style="font-size: clamp(1rem, 2vw, 1.2rem); color: #64748b; max-width: 660px; margin: 0 auto; line-height: 1.7;">
@@ -3183,9 +3442,10 @@
     <div class="container">
       <div class="section-header section-header--center">
         <span class="eyebrow">Our Mission</span>
+        <h2 class="section-title" style="font-size: clamp(2.25rem, 4vw, 3rem); font-weight: 800; margin-top: 0.5rem; letter-spacing: -0.025em;">Emajinet is the operating system of small business.</h2>
       </div>
       <p class="mission-text">
-        The <strong>operating system of small businesses</strong>. We give every shop, farm, and workshop a digital backoffice that handles inventory, sales, and insights &mdash; so owners can focus on what they do best.
+        We give every shop, farm, and workshop a <strong>digital backoffice</strong> that handles inventory, sales, and insights &mdash; so owners can stop running blind and start running smart.
       </p>
     </div>
   </section>
@@ -3234,15 +3494,29 @@
       <div class="partners-strip-label">Partners</div>
       <div class="partners-logos">
         <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" aria-label="PayChangu">
-          <span class="partner-logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span class="partner-logo-icon" style="background:#eff6ff;border-radius:8px;padding:2px;">
+            <img src="{% static 'img/partners/paychangu.png' %}"
+                 alt="PayChangu"
+                 width="28" height="28"
+                 style="object-fit:contain;border-radius:6px;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;border-radius:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </span>
           </span>
           PayChangu
         </a>
         <div class="partner-divider"></div>
         <a href="#" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
-          <span class="partner-logo-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span class="partner-logo-icon" style="background:#fff0f3;border-radius:8px;padding:2px;">
+            <img src="{% static 'img/partners/airtel.png' %}"
+                 alt="Airtel Money"
+                 width="28" height="28"
+                 style="object-fit:contain;border-radius:6px;"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#e11d48;border-radius:6px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
           </span>
           Airtel Money
         </a>

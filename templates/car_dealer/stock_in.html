@@ -4,204 +4,305 @@
 {% block title %}Add Vehicle – {{ business.name }}{% endblock %}
 
 {% block content %}
-<div class="container py-4" style="max-width:800px;">
+<style>
+  /* ── PILL SELECTORS ── */
+  .pill-group { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .pill-btn {
+    padding: .32rem .85rem; border-radius: 999px; font-size: .8rem; font-weight: 600;
+    border: 1.5px solid #e2e8f0; background: #f8fafc; color: #475569;
+    cursor: pointer; transition: all .12s; user-select: none;
+    outline: none;
+  }
+  .pill-btn:hover { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+  .pill-btn.active {
+    background: #1d4ed8; border-color: #1d4ed8; color: #fff;
+    box-shadow: 0 2px 8px rgba(29,78,216,.35);
+  }
+
+  /* ── DEAL HEALTH CARD ── */
+  .deal-health {
+    border-radius: 14px; padding: 1.1rem 1.25rem;
+    border: 1.5px solid #e2e8f0; background: #f8fafc;
+    transition: all .25s;
+  }
+  .deal-health.healthy { border-color: #86efac; background: linear-gradient(135deg, #f0fdf4, #dcfce7); }
+  .deal-health.thin    { border-color: #fde68a; background: linear-gradient(135deg, #fffbeb, #fef3c7); }
+  .deal-health.risky   { border-color: #fca5a5; background: linear-gradient(135deg, #fff1f2, #fee2e2); }
+  .deal-health.empty   { border-color: #e2e8f0; background: #f8fafc; }
+
+  .dh-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: .6rem; }
+  .dh-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; margin-bottom: .3rem; }
+  .dh-label { color: #64748b; }
+  .dh-val { font-weight: 700; color: #0f172a; }
+  .dh-status {
+    display: inline-flex; align-items: center; gap: .3rem;
+    font-size: .75rem; font-weight: 700; padding: .25rem .7rem;
+    border-radius: 999px; margin-top: .5rem;
+  }
+  .dh-status.healthy { background: #dcfce7; color: #16a34a; }
+  .dh-status.thin    { background: #fef3c7; color: #b45309; }
+  .dh-status.risky   { background: #fee2e2; color: #dc2626; }
+
+  /* ── SECTION CARD ── */
+  .form-section {
+    background: #fff; border: 1.5px solid #e2e8f0;
+    border-radius: 16px; padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .form-section-title {
+    font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #64748b; margin-bottom: 1.1rem;
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .form-section-title i { font-size: .85rem; }
+
+  .form-label { font-size: .8rem; font-weight: 600; margin-bottom: .35rem; }
+  .form-control, .form-select { font-size: .85rem; border-radius: 10px; }
+</style>
+
+<div class="container py-4" style="max-width: 860px;">
+
+  {# ── PAGE HEADER ── #}
   <div class="d-flex align-items-center gap-3 mb-4">
     <a href="{% url 'car_dealer:dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
       <i class="bi bi-arrow-left me-1"></i>Back
     </a>
     <div>
-      <h4 class="fw-bold mb-0">🏎️ Add Vehicle to Inventory</h4>
+      <h4 class="fw-bold mb-0" style="color:#0f172a;">
+        <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="" style="height:1.4em;vertical-align:middle;margin-right:.4rem;">
+        Add Vehicle to Inventory
+      </h4>
       <div class="text-muted small">{{ business.name }}</div>
     </div>
   </div>
 
-  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
 
-  <form method="post">
+  <form method="post" id="vehicleForm">
     {% csrf_token %}
 
-    <div class="row g-4">
-      {# Make & Model #}
-      <div class="col-12">
-        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
-          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Make &amp; Model</h6>
-          <div class="row g-3">
-            <div class="col-md-5">
-              <label class="form-label fw-semibold small">Make</label>
-              <select name="make_id" class="form-select" id="makeSelect">
-                <option value="">Select make...</option>
-                {% for make in makes %}
-                  <option value="{{ make.pk }}" {% if make.is_popular %}data-popular="1"{% endif %}>{{ make.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-5">
-              <label class="form-label fw-semibold small">Model</label>
-              <select name="model_id" class="form-select" id="modelSelect">
-                <option value="">Select model...</option>
-              </select>
-            </div>
-            <div class="col-md-2">
-              <label class="form-label fw-semibold small">Year</label>
-              <input type="number" name="year" class="form-control" min="1990" max="{{ current_year }}" placeholder="{{ current_year|add:'-1' }}">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Make (if not in list)</label>
-              <input type="text" name="make_text" class="form-control" placeholder="e.g., BYD">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Model (if not in list)</label>
-              <input type="text" name="model_text" class="form-control" placeholder="e.g., Atto 3">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Trim / Grade</label>
-              <input type="text" name="trim" class="form-control" placeholder="e.g., GL, SE, Touring">
-            </div>
-          </div>
+    {# ── MAKE & MODEL ── #}
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-search"></i>Make &amp; Model</div>
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Make</label>
+          <select name="make_id" class="form-select" id="makeSelect">
+            <option value="">Select make…</option>
+            {% for make in makes %}
+              <option value="{{ make.pk }}">{{ make.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Model</label>
+          <select name="model_id" class="form-select" id="modelSelect">
+            <option value="">Select model…</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Year</label>
+          <input type="number" name="year" class="form-control" min="1990" max="{{ current_year }}" placeholder="{{ current_year|add:'-1' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted">Make <span style="font-weight:400">(if not listed)</span></label>
+          <input type="text" name="make_text" class="form-control" placeholder="e.g. BYD">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label text-muted">Model <span style="font-weight:400">(if not listed)</span></label>
+          <input type="text" name="model_text" class="form-control" placeholder="e.g. Atto 3">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Trim / Grade</label>
+          <input type="text" name="trim" class="form-control" placeholder="e.g. GL, SE, Touring">
         </div>
       </div>
+    </div>
 
-      {# Specs #}
-      <div class="col-12">
-        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
-          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Specifications</h6>
-          <div class="row g-3">
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Body Type</label>
-              <select name="body_type" class="form-select">
-                <option value="">Select...</option>
-                <option value="sedan">Sedan</option>
-                <option value="hatchback">Hatchback</option>
-                <option value="suv">SUV / Crossover</option>
-                <option value="pickup">Pickup / Truck</option>
-                <option value="minivan">Minivan / MPV</option>
-                <option value="wagon">Station Wagon</option>
-                <option value="van">Van</option>
-                <option value="bus">Bus / Minibus</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Transmission</label>
-              <select name="transmission" class="form-select">
-                <option value="">Select...</option>
-                <option value="auto">Automatic</option>
-                <option value="manual">Manual</option>
-                <option value="cvt">CVT</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Fuel Type</label>
-              <select name="fuel_type" class="form-select">
-                <option value="">Select...</option>
-                <option value="petrol">Petrol</option>
-                <option value="diesel">Diesel</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="electric">Electric</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Drivetrain</label>
-              <select name="drivetrain" class="form-select">
-                <option value="">Select...</option>
-                <option value="fwd">FWD</option>
-                <option value="rwd">RWD</option>
-                <option value="awd">AWD</option>
-                <option value="4wd">4WD</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Engine Size</label>
-              <input type="text" name="engine_size" class="form-control" placeholder="e.g., 1500cc">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Mileage (km)</label>
-              <input type="number" name="mileage" class="form-control" min="0" placeholder="e.g., 45000">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Colour</label>
-              <input type="text" name="color" class="form-control" placeholder="e.g., White Pearl">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label fw-semibold small">Condition</label>
-              <select name="condition" class="form-select">
-                <option value="used" selected>Used</option>
-                <option value="new">New</option>
-                <option value="certified">Certified Pre-Owned</option>
-              </select>
-            </div>
+    {# ── SPECIFICATIONS ── #}
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-sliders"></i>Specifications</div>
+      <div class="row g-4">
+
+        {# Body Type pills #}
+        <div class="col-12">
+          <label class="form-label">Body Type</label>
+          <input type="hidden" name="body_type" id="body_type_val">
+          <div class="pill-group" data-target="body_type_val">
+            <button type="button" class="pill-btn" data-value="sedan">Sedan</button>
+            <button type="button" class="pill-btn" data-value="hatchback">Hatchback</button>
+            <button type="button" class="pill-btn" data-value="suv">SUV / Crossover</button>
+            <button type="button" class="pill-btn" data-value="pickup">Pickup / Truck</button>
+            <button type="button" class="pill-btn" data-value="minivan">Minivan / MPV</button>
+            <button type="button" class="pill-btn" data-value="wagon">Station Wagon</button>
+            <button type="button" class="pill-btn" data-value="van">Van</button>
+            <button type="button" class="pill-btn" data-value="bus">Bus / Minibus</button>
+            <button type="button" class="pill-btn" data-value="other">Other</button>
           </div>
         </div>
-      </div>
 
-      {# Pricing #}
-      <div class="col-12">
-        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
-          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Pricing</h6>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Buying Price (cost)</label>
-              <div class="input-group">
-                <span class="input-group-text">{{ business.currency }}</span>
-                <input type="number" name="buying_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+        {# Fuel Type pills #}
+        <div class="col-12">
+          <label class="form-label">Fuel Type</label>
+          <input type="hidden" name="fuel_type" id="fuel_type_val">
+          <div class="pill-group" data-target="fuel_type_val">
+            <button type="button" class="pill-btn" data-value="petrol">⛽ Petrol</button>
+            <button type="button" class="pill-btn" data-value="diesel">🛢 Diesel</button>
+            <button type="button" class="pill-btn" data-value="hybrid">🔋 Hybrid</button>
+            <button type="button" class="pill-btn" data-value="electric">⚡ Electric</button>
+          </div>
+        </div>
+
+        {# Transmission pills #}
+        <div class="col-12">
+          <label class="form-label">Transmission</label>
+          <input type="hidden" name="transmission" id="transmission_val">
+          <div class="pill-group" data-target="transmission_val">
+            <button type="button" class="pill-btn" data-value="auto">Automatic</button>
+            <button type="button" class="pill-btn" data-value="manual">Manual</button>
+            <button type="button" class="pill-btn" data-value="cvt">CVT</button>
+          </div>
+        </div>
+
+        {# Drivetrain pills #}
+        <div class="col-12">
+          <label class="form-label">Drivetrain</label>
+          <input type="hidden" name="drivetrain" id="drivetrain_val">
+          <div class="pill-group" data-target="drivetrain_val">
+            <button type="button" class="pill-btn" data-value="fwd">FWD</button>
+            <button type="button" class="pill-btn" data-value="rwd">RWD</button>
+            <button type="button" class="pill-btn" data-value="awd">AWD</button>
+            <button type="button" class="pill-btn" data-value="4wd">4WD</button>
+          </div>
+        </div>
+
+        {# Condition pills #}
+        <div class="col-12">
+          <label class="form-label">Condition</label>
+          <input type="hidden" name="condition" id="condition_val" value="used">
+          <div class="pill-group" data-target="condition_val">
+            <button type="button" class="pill-btn active" data-value="used">Used</button>
+            <button type="button" class="pill-btn" data-value="new">New</button>
+            <button type="button" class="pill-btn" data-value="certified">Certified Pre-Owned</button>
+          </div>
+        </div>
+
+        {# Engine, Mileage, Colour #}
+        <div class="col-md-4">
+          <label class="form-label">Engine Size</label>
+          <input type="text" name="engine_size" class="form-control" placeholder="e.g. 1500cc">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Mileage (km)</label>
+          <input type="number" name="mileage" class="form-control" min="0" placeholder="e.g. 45000">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Colour</label>
+          <input type="text" name="color" class="form-control" placeholder="e.g. White Pearl">
+        </div>
+      </div>
+    </div>
+
+    {# ── PRICING + LIVE MARGIN ── #}
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-cash-coin"></i>Pricing</div>
+      <div class="row g-3 align-items-start">
+        <div class="col-md-4">
+          <label class="form-label">Buying Price <span class="text-muted fw-normal">(cost)</span></label>
+          <div class="input-group">
+            <span class="input-group-text">{{ business.currency }}</span>
+            <input type="number" name="buying_price" id="buying_price_input"
+                   class="form-control" step="0.01" min="0" placeholder="0.00"
+                   autocomplete="off">
+          </div>
+          <div class="form-text">Internal only — not shown publicly</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Asking Price <span class="text-muted fw-normal">(selling)</span></label>
+          <div class="input-group">
+            <span class="input-group-text">{{ business.currency }}</span>
+            <input type="number" name="selling_price" id="selling_price_input"
+                   class="form-control" step="0.01" min="0" placeholder="0.00"
+                   autocomplete="off">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Stock Reference</label>
+          <input type="text" name="stock_ref" class="form-control" placeholder="e.g. CD-001">
+        </div>
+
+        {# ── DEAL HEALTH CARD ── #}
+        <div class="col-12">
+          <div class="deal-health empty" id="dealHealthCard">
+            <div class="dh-title">
+              <i class="bi bi-graph-up-arrow me-1"></i>Deal Health — Live Preview
+            </div>
+            <div class="row g-3">
+              <div class="col-6 col-md-3">
+                <div class="dh-label" style="font-size:.72rem;">Cost</div>
+                <div class="dh-val" id="dh_cost" style="font-size:1rem;">—</div>
               </div>
-              <div class="form-text">Internal use only</div>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Selling Price (asking)</label>
-              <div class="input-group">
-                <span class="input-group-text">{{ business.currency }}</span>
-                <input type="number" name="selling_price" class="form-control" step="0.01" min="0" placeholder="0.00">
+              <div class="col-6 col-md-3">
+                <div class="dh-label" style="font-size:.72rem;">Asking Price</div>
+                <div class="dh-val" id="dh_sell" style="font-size:1rem;">—</div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="dh-label" style="font-size:.72rem;">Gross Profit</div>
+                <div class="dh-val" id="dh_profit" style="font-size:1.15rem;">—</div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="dh-label" style="font-size:.72rem;">Margin</div>
+                <div class="dh-val" id="dh_margin" style="font-size:1.15rem;">—</div>
               </div>
             </div>
-            <div class="col-md-4">
-              <label class="form-label fw-semibold small">Stock Reference</label>
-              <input type="text" name="stock_ref" class="form-control" placeholder="e.g., CD-001">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {# IDs & location #}
-      <div class="col-12">
-        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
-          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Identity &amp; Location</h6>
-          <div class="row g-3">
-            <div class="col-md-5">
-              <label class="form-label fw-semibold small">Chassis / VIN Number</label>
-              <input type="text" name="chassis_no" class="form-control" placeholder="e.g., JTNB11HK0J3...">
-            </div>
-            <div class="col-md-7">
-              <label class="form-label fw-semibold small">Location</label>
-              <input type="text" name="location_text" class="form-control" placeholder="e.g., Showroom – Area 25">
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold small">Import Source Notes</label>
-              <input type="text" name="import_source_notes" class="form-control" placeholder="e.g., Japan direct, Be Forward, 2023">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {# Description #}
-      <div class="col-12">
-        <div class="p-4 rounded-3" style="background:#fff;border:1.5px solid #e2e8f0;">
-          <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;letter-spacing:.06em;">Description &amp; Features</h6>
-          <div class="mb-3">
-            <label class="form-label fw-semibold small">Description</label>
-            <textarea name="description" class="form-control" rows="3" placeholder="Brief overview..."></textarea>
-          </div>
-          <div>
-            <label class="form-label fw-semibold small">Key Features / Notes</label>
-            <textarea name="features_notes" class="form-control" rows="2" placeholder="e.g., Push-start, reverse camera, alloy wheels, sunroof..."></textarea>
+            <div id="dh_badge"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-4 d-flex gap-2">
+    {# ── IDENTITY & LOCATION ── #}
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-geo-alt"></i>Identity &amp; Location</div>
+      <div class="row g-3">
+        <div class="col-md-5">
+          <label class="form-label">Chassis / VIN Number</label>
+          <input type="text" name="chassis_no" class="form-control" placeholder="e.g. JTNB11HK0J3…">
+        </div>
+        <div class="col-md-7">
+          <label class="form-label">Location</label>
+          <input type="text" name="location_text" class="form-control" placeholder="e.g. Showroom – Area 25">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Import Source Notes</label>
+          <input type="text" name="import_source_notes" class="form-control" placeholder="e.g. Japan direct, Be Forward, 2023">
+        </div>
+      </div>
+    </div>
+
+    {# ── DESCRIPTION & FEATURES ── #}
+    <div class="form-section">
+      <div class="form-section-title"><i class="bi bi-card-text"></i>Description &amp; Features</div>
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Brief overview of the vehicle…"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Key Features / Notes</label>
+          <textarea name="features_notes" class="form-control" rows="2" placeholder="e.g. Push-start, reverse camera, alloy wheels, sunroof…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    {# ── SUBMIT ── #}
+    <div class="d-flex gap-2 mt-2">
       <button type="submit" class="btn btn-primary px-4 rounded-pill fw-bold">
-        <i class="bi bi-plus-lg me-1"></i>Add Vehicle
+        <i class="bi bi-plus-lg me-1"></i>Add to Inventory
       </button>
       <a href="{% url 'car_dealer:dashboard' %}" class="btn btn-outline-secondary rounded-pill">Cancel</a>
     </div>
@@ -209,21 +310,93 @@
 </div>
 
 <script>
-var carModelsData = {{ car_models_json|safe }};
-var makeSelect = document.getElementById('makeSelect');
-var modelSelect = document.getElementById('modelSelect');
-if (makeSelect) {
-  makeSelect.addEventListener('change', function() {
-    var makeId = this.value;
-    modelSelect.innerHTML = '<option value="">Select model...</option>';
-    var models = carModelsData[makeId] || [];
-    models.forEach(function(m) {
-      var opt = document.createElement('option');
-      opt.value = m.id;
-      opt.textContent = m.name;
-      modelSelect.appendChild(opt);
+(function () {
+  /* ── PILL SELECTORS ── */
+  document.querySelectorAll('.pill-group').forEach(function (group) {
+    var targetId = group.dataset.target;
+    var hidden   = targetId ? document.getElementById(targetId) : null;
+    group.querySelectorAll('.pill-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        group.querySelectorAll('.pill-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        if (hidden) hidden.value = btn.dataset.value;
+      });
     });
   });
-}
+
+  /* ── MAKE / MODEL CASCADE ── */
+  var carModelsData = {{ car_models_json|safe }};
+  var makeSelect    = document.getElementById('makeSelect');
+  var modelSelect   = document.getElementById('modelSelect');
+  if (makeSelect) {
+    makeSelect.addEventListener('change', function () {
+      var makeId = this.value;
+      modelSelect.innerHTML = '<option value="">Select model…</option>';
+      (carModelsData[makeId] || []).forEach(function (m) {
+        var opt     = document.createElement('option');
+        opt.value   = m.id;
+        opt.textContent = m.name;
+        modelSelect.appendChild(opt);
+      });
+    });
+  }
+
+  /* ── LIVE DEAL HEALTH ── */
+  var buyingInput  = document.getElementById('buying_price_input');
+  var sellingInput = document.getElementById('selling_price_input');
+  var card         = document.getElementById('dealHealthCard');
+  var dhCost       = document.getElementById('dh_cost');
+  var dhSell       = document.getElementById('dh_sell');
+  var dhProfit     = document.getElementById('dh_profit');
+  var dhMargin     = document.getElementById('dh_margin');
+  var dhBadge      = document.getElementById('dh_badge');
+  var currency     = '{{ business.currency }}';
+
+  function fmt(n) {
+    return currency + ' ' + Math.round(n).toLocaleString();
+  }
+
+  function updateMargin() {
+    var cost  = parseFloat(buyingInput.value)  || 0;
+    var sell  = parseFloat(sellingInput.value) || 0;
+
+    if (!cost && !sell) {
+      card.className = 'deal-health empty';
+      dhCost.textContent   = '—';
+      dhSell.textContent   = '—';
+      dhProfit.textContent = '—';
+      dhMargin.textContent = '—';
+      dhBadge.innerHTML    = '';
+      return;
+    }
+
+    var profit = sell - cost;
+    var margin = sell > 0 ? (profit / sell * 100) : 0;
+
+    dhCost.textContent   = fmt(cost);
+    dhSell.textContent   = fmt(sell);
+    dhProfit.textContent = fmt(profit);
+    dhMargin.textContent = margin.toFixed(1) + '%';
+
+    var status, label, icon;
+    if (profit <= 0) {
+      status = 'risky';  label = 'Loss — price below cost';   icon = '⚠️';
+    } else if (margin < 8) {
+      status = 'risky';  label = 'Risky — very thin margin';  icon = '⚠️';
+    } else if (margin < 15) {
+      status = 'thin';   label = 'Thin — acceptable margin';  icon = '⚡';
+    } else {
+      status = 'healthy'; label = 'Healthy margin';           icon = '✓';
+    }
+
+    card.className = 'deal-health ' + status;
+    dhProfit.style.color = profit > 0 ? '#16a34a' : '#dc2626';
+    dhBadge.innerHTML =
+      '<span class="dh-status ' + status + '">' + icon + ' ' + label + '</span>';
+  }
+
+  if (buyingInput)  buyingInput.addEventListener('input',  updateMargin);
+  if (sellingInput) sellingInput.addEventListener('input', updateMargin);
+})();
 </script>
 {% endblock %}

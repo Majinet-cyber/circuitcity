@@ -216,6 +216,61 @@
   </ul>
   {% endif %}
 
+  {# ================= CAR DEALER ================= #}
+  {% if business_kind == "car_dealer" %}
+  {% url 'car_dealer:dashboard'     as url_car_dealer_dash %}
+  {% url 'car_dealer:vehicle_list'  as url_car_dealer_list %}
+  {% url 'car_dealer:stock_in'      as url_car_dealer_add %}
+  {% url 'inventory:manage_listings' as url_car_dealer_marketplace %}
+  <div class="menu-group">INVENTORY</div>
+  <ul class="navlist">
+    <li><a class="navlink{% if request.path == url_car_dealer_dash %} active{% endif %}" href="{{ url_car_dealer_dash|default:'/car-dealer/' }}" data-cy="nav-dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li><a class="navlink{% if request.path == url_car_dealer_list %} active{% endif %}" href="{{ url_car_dealer_list|default:'/car-dealer/vehicles/' }}" data-cy="nav-car-dealer-vehicles"><i class="bi bi-car-front-fill"></i> Vehicles</a></li>
+    <li><a class="navlink{% if request.path == url_car_dealer_add %} active{% endif %}" href="{{ url_car_dealer_add|default:'/car-dealer/vehicles/add/' }}" data-cy="nav-car-dealer-add"><i class="bi bi-plus-circle"></i> Add Vehicle</a></li>
+  </ul>
+  <div class="menu-group">SALES</div>
+  <ul class="navlist">
+    {% if url_car_dealer_marketplace %}
+    <li><a class="navlink" href="{{ url_car_dealer_marketplace }}" data-cy="nav-car-dealer-marketplace"><i class="bi bi-shop-window"></i> Marketplace</a></li>
+    {% endif %}
+    <li><a class="navlink" href="{{ url_car_dealer_list|default:'/car-dealer/vehicles/' }}?status=sold" data-cy="nav-car-dealer-sold"><i class="bi bi-cash-coin"></i> Sales History</a></li>
+    <li><a class="navlink" href="{{ url_car_dealer_list|default:'/car-dealer/vehicles/' }}?status=reserved" data-cy="nav-car-dealer-reserved"><i class="bi bi-clock-history"></i> Reserved</a></li>
+  </ul>
+  <div class="menu-group">INSIGHTS</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{% url 'reports:home' %}" data-cy="nav-car-dealer-reports"><i class="bi bi-graph-up-arrow"></i> Reports</a></li>
+  </ul>
+  <div class="menu-group">ACCOUNT</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-car-dealer-billing"><i class="bi bi-credit-card-2-front"></i> Billing</a></li>
+    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-car-dealer-settings"><i class="bi bi-gear"></i> Settings</a></li>
+  </ul>
+  {% endif %}
+
+  {# ================= RENEWABLE ENERGY ================= #}
+  {% if business_kind == "energy" %}
+  {% url 'verticals:energy_dashboard'  as url_energy_dash %}
+  {% url 'verticals:energy_sites'      as url_energy_sites %}
+  {% url 'verticals:energy_assets'     as url_energy_assets %}
+  {% url 'verticals:energy_monitoring' as url_energy_monitoring %}
+  {% url 'verticals:energy_maintenance' as url_energy_maintenance %}
+  {% url 'verticals:energy_reports'    as url_energy_reports %}
+  <div class="menu-group">RENEWABLE ENERGY</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{{ url_energy_dash|default:'/verticals/energy/dashboard/' }}" data-cy="nav-dashboard"><i class="bi bi-lightning-charge"></i> Dashboard</a></li>
+    <li><a class="navlink" href="{{ url_energy_sites|default:'/verticals/energy/sites/' }}" data-cy="nav-energy-sites"><i class="bi bi-geo-alt"></i> Sites</a></li>
+    <li><a class="navlink" href="{{ url_energy_assets|default:'/verticals/energy/assets/' }}" data-cy="nav-energy-assets"><i class="bi bi-battery-charging"></i> Assets</a></li>
+    <li><a class="navlink" href="{{ url_energy_monitoring|default:'/verticals/energy/monitoring/' }}" data-cy="nav-energy-monitoring"><i class="bi bi-graph-up"></i> Monitoring</a></li>
+    <li><a class="navlink" href="{{ url_energy_maintenance|default:'/verticals/energy/maintenance/' }}" data-cy="nav-energy-maintenance"><i class="bi bi-wrench-adjustable"></i> Maintenance</a></li>
+    <li><a class="navlink" href="{{ url_energy_reports|default:'/verticals/energy/reports/' }}" data-cy="nav-energy-reports"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
+  </ul>
+  <div class="menu-group">SUBSCRIPTION</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-energy-billing"><i class="bi bi-credit-card-2-front"></i> Billing</a></li>
+    <li><a class="navlink" href="{% url 'settings_root' %}" data-cy="nav-energy-settings"><i class="bi bi-gear"></i> Settings</a></li>
+  </ul>
+  {% endif %}
+
   {# ================= SHARED: FINANCE ================= #}
   <div class="menu-group">FINANCE</div>
   <ul class="navlist">

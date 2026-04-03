@@ -1754,6 +1754,8 @@ def signup_manager(request):
             "business_kind": business_kind_key,
             "business_kind_display": business_kind_display,
             "subdomain": wizard_data.get("step2", {}).get("subdomain"),
+            "country": wizard_data.get("step2", {}).get("country", "MW"),
+            "currency": wizard_data.get("step2", {}).get("currency", "MWK"),
             "has_logo": False,  # Logo step removed
         }
 
@@ -1951,6 +1953,12 @@ def _complete_manager_wizard_signup(request, wizard_data, request_id=None):
                 subdomain or "NONE",
             )
 
+            # Persist country/currency from step 2 onto the new business
+            chosen_currency = step2.get("currency", "").strip() or "MWK"
+            if hasattr(biz, "currency") and chosen_currency:
+                biz.currency = chosen_currency
+                biz.save(update_fields=["currency"])
+
             # Membership
             if Membership is not None:
                 Membership.objects.update_or_create(
@@ -2005,6 +2013,23 @@ def _complete_manager_wizard_signup(request, wizard_data, request_id=None):
             if hasattr(profile, "is_manager"):
                 profile.is_manager = True
                 profile.save(update_fields=["is_manager"])
+
+            # Save country and currency preferences from signup step 2
+            chosen_country = step2.get("country", "").strip() or "MW"
+            chosen_currency = step2.get("currency", "").strip() or "MWK"
+            update_profile_fields = []
+            if hasattr(profile, "country") and chosen_country:
+                profile.country = chosen_country
+                update_profile_fields.append("country")
+            if hasattr(profile, "display_currency") and chosen_currency:
+                profile.display_currency = chosen_currency
+                update_profile_fields.append("display_currency")
+            if update_profile_fields:
+                profile.save(update_fields=update_profile_fields)
+                log.info(
+                    "Set country=%s currency=%s on profile | RequestID: %s | UserID: %s",
+                    chosen_country, chosen_currency, request_id, user.id,
+                )
                 
             # Defensive: ensure city is never NULL (production safety)
             if not profile.city:

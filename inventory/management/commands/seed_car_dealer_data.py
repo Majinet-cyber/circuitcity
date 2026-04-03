@@ -203,8 +203,140 @@ CAR_DATA: list[dict] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Demo vehicle seed data — realistic starter stock for car dealer businesses
+# ---------------------------------------------------------------------------
+
+DEMO_VEHICLES = [
+    # Popular affordable hatchbacks / city cars
+    {
+        "make": "Toyota", "model": "Vitz",
+        "year": 2015, "body_type": "hatchback", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.0L", "mileage": 68000,
+        "color": "White", "condition": "used", "status": "in_stock",
+        "buying_price": "2800000", "selling_price": "3200000",
+        "description": "Well maintained Toyota Vitz. Japan import. Service history available.",
+    },
+    {
+        "make": "Honda", "model": "Fit",
+        "year": 2017, "body_type": "hatchback", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.3L", "mileage": 52000,
+        "color": "Silver", "condition": "used", "status": "in_stock",
+        "buying_price": "3500000", "selling_price": "4200000",
+        "description": "Clean Honda Fit in excellent condition. Low mileage.",
+    },
+    {
+        "make": "Mazda", "model": "Demio",
+        "year": 2016, "body_type": "hatchback", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.3L", "mileage": 74000,
+        "color": "Red", "condition": "used", "status": "in_stock",
+        "buying_price": "3000000", "selling_price": "3600000",
+        "description": "Sporty Mazda Demio. Economical fuel consumption. Great city car.",
+    },
+    {
+        "make": "Nissan", "model": "March",
+        "year": 2014, "body_type": "hatchback", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.2L", "mileage": 82000,
+        "color": "Blue", "condition": "used", "status": "in_stock",
+        "buying_price": "2200000", "selling_price": "2700000",
+        "description": "Compact Nissan March. Ideal for students and city commuters.",
+    },
+    # Sedans
+    {
+        "make": "Toyota", "model": "Corolla",
+        "year": 2018, "body_type": "sedan", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.8L", "mileage": 45000,
+        "color": "White", "condition": "used", "status": "in_stock",
+        "buying_price": "5500000", "selling_price": "6500000",
+        "description": "Toyota Corolla 2018. Full option. Locally registered.",
+    },
+    {
+        "make": "Toyota", "model": "Premio",
+        "year": 2016, "body_type": "sedan", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.8L", "mileage": 61000,
+        "color": "Silver", "condition": "used", "status": "in_stock",
+        "buying_price": "4800000", "selling_price": "5800000",
+        "description": "Toyota Premio F package. Elegant family sedan. Clean interior.",
+    },
+    {
+        "make": "Mercedes-Benz", "model": "C-Class",
+        "year": 2015, "body_type": "sedan", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "2.0L", "mileage": 88000,
+        "color": "Black", "condition": "used", "status": "in_stock",
+        "buying_price": "8500000", "selling_price": "10500000",
+        "description": "Mercedes-Benz C200. Executive saloon. Well maintained, full service history.",
+    },
+    {
+        "make": "BMW", "model": "3 Series",
+        "year": 2014, "body_type": "sedan", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "2.0L", "mileage": 96000,
+        "color": "White", "condition": "used", "status": "in_stock",
+        "buying_price": "7800000", "selling_price": "9500000",
+        "description": "BMW 320i F30. Sports luxury sedan. Excellent driving dynamics.",
+    },
+    # SUVs and crossovers
+    {
+        "make": "Nissan", "model": "X-Trail",
+        "year": 2016, "body_type": "suv", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "2.0L", "mileage": 72000,
+        "color": "Grey", "condition": "used", "status": "in_stock",
+        "buying_price": "7000000", "selling_price": "8500000",
+        "description": "Nissan X-Trail T32. 7-seater family SUV. Panoramic roof.",
+    },
+    {
+        "make": "Honda", "model": "CR-V",
+        "year": 2017, "body_type": "suv", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "1.5L", "mileage": 58000,
+        "color": "White", "condition": "used", "status": "in_stock",
+        "buying_price": "8000000", "selling_price": "9800000",
+        "description": "Honda CR-V 1.5 Turbo. Spacious and fuel efficient SUV.",
+    },
+    {
+        "make": "Toyota", "model": "RAV4",
+        "year": 2018, "body_type": "suv", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "2.5L", "mileage": 42000,
+        "color": "Pearl White", "condition": "used", "status": "in_stock",
+        "buying_price": "11000000", "selling_price": "13500000",
+        "description": "Toyota RAV4 2018 Adventure edition. Low mileage. Full option.",
+    },
+    {
+        "make": "Subaru", "model": "Forester",
+        "year": 2016, "body_type": "suv", "transmission": "auto",
+        "fuel_type": "petrol", "engine_size": "2.0L", "mileage": 79000,
+        "color": "Black", "condition": "used", "status": "in_stock",
+        "buying_price": "7500000", "selling_price": "9000000",
+        "description": "Subaru Forester XT. Turbocharged AWD. Excellent for rough terrain.",
+    },
+    # Pickups / Workhorses
+    {
+        "make": "Toyota", "model": "Hilux",
+        "year": 2019, "body_type": "pickup", "transmission": "manual",
+        "fuel_type": "diesel", "engine_size": "2.8L", "mileage": 55000,
+        "color": "White", "condition": "used", "status": "in_stock",
+        "buying_price": "16000000", "selling_price": "19500000",
+        "description": "Toyota Hilux Revo DC 4x4. Workhorse and family pick-up. Very good condition.",
+    },
+    {
+        "make": "Isuzu", "model": "D-Max",
+        "year": 2018, "body_type": "pickup", "transmission": "manual",
+        "fuel_type": "diesel", "engine_size": "3.0L", "mileage": 67000,
+        "color": "Silver", "condition": "used", "status": "in_stock",
+        "buying_price": "14000000", "selling_price": "17000000",
+        "description": "Isuzu D-Max 4x4. Heavy duty double cab. Excellent towing capacity.",
+    },
+    {
+        "make": "Mazda", "model": "BT-50",
+        "year": 2017, "body_type": "pickup", "transmission": "manual",
+        "fuel_type": "diesel", "engine_size": "3.2L", "mileage": 88000,
+        "color": "Grey", "condition": "used", "status": "in_stock",
+        "buying_price": "12000000", "selling_price": "14500000",
+        "description": "Mazda BT-50 3.2 4x4. Reliable workhorse. Full service records.",
+    },
+]
+
+
 class Command(BaseCommand):
-    help = "Seed CarMake and CarModel reference data for Car Dealer vertical"
+    help = "Seed CarMake, CarModel reference data and optionally seed demo vehicles"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -212,18 +344,34 @@ class Command(BaseCommand):
             action="store_true",
             help="Re-seed data even if makes/models already exist",
         )
+        parser.add_argument(
+            "--demo",
+            action="store_true",
+            help="Also seed demo vehicles into all car_dealer businesses",
+        )
+        parser.add_argument(
+            "--business",
+            type=int,
+            default=None,
+            help="Limit demo vehicle seeding to a specific business ID",
+        )
 
     def handle(self, *args, **options):
         force = options.get("force", False)
+        seed_demo = options.get("demo", False)
+        business_id = options.get("business")
 
         try:
-            from inventory.models_car_dealer import CarMake, CarModel
+            from inventory.models_car_dealer import CarMake, CarModel, CarDealerVehicle
         except ImportError:
             self.stderr.write(
                 self.style.ERROR("Car dealer models not available. Run migrations first.")
             )
             return
 
+        # ----------------------------------------------------------------
+        # 1. Seed reference data (makes & models)
+        # ----------------------------------------------------------------
         created_makes = 0
         created_models = 0
         updated_makes = 0
@@ -273,7 +421,87 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Done. Created {created_makes} makes, {created_models} models. "
+                f"Reference data: Created {created_makes} makes, {created_models} models. "
                 f"Updated {updated_makes} makes, {updated_models} models."
             )
+        )
+
+        if not seed_demo:
+            return
+
+        # ----------------------------------------------------------------
+        # 2. Seed demo vehicles into car_dealer businesses
+        # ----------------------------------------------------------------
+        try:
+            from tenants.models import Business
+        except ImportError:
+            self.stderr.write(self.style.ERROR("tenants.models not available."))
+            return
+
+        qs = Business.objects.filter(business_kind="car_dealer")
+        if business_id:
+            qs = qs.filter(pk=business_id)
+
+        if not qs.exists():
+            self.stdout.write(
+                self.style.WARNING(
+                    "No car_dealer businesses found. Signup as a Car Dealer business first, "
+                    "then re-run with --demo to seed vehicles."
+                )
+            )
+            return
+
+        from decimal import Decimal
+
+        total_seeded = 0
+        for biz in qs:
+            existing = CarDealerVehicle.objects.filter(business=biz).count()
+            if existing >= 5 and not force:
+                self.stdout.write(
+                    f"  Skipping {biz.name} — already has {existing} vehicles (use --force to override)"
+                )
+                continue
+
+            seeded = 0
+            for vdata in DEMO_VEHICLES:
+                make_name = vdata["make"]
+                model_name = vdata["model"]
+
+                try:
+                    make_obj = CarMake.objects.get(name=make_name)
+                    model_obj = CarModel.objects.get(make=make_obj, name=model_name)
+                except (CarMake.DoesNotExist, CarModel.DoesNotExist):
+                    # Fallback to free-text if reference data not yet seeded
+                    make_obj = None
+                    model_obj = None
+
+                CarDealerVehicle.objects.create(
+                    business=biz,
+                    make=make_obj,
+                    model=model_obj,
+                    make_text=make_name if not make_obj else "",
+                    model_text=model_name if not model_obj else "",
+                    year=vdata.get("year"),
+                    body_type=vdata.get("body_type", ""),
+                    transmission=vdata.get("transmission", ""),
+                    fuel_type=vdata.get("fuel_type", ""),
+                    engine_size=vdata.get("engine_size", ""),
+                    mileage=vdata.get("mileage"),
+                    color=vdata.get("color", ""),
+                    condition=vdata.get("condition", "used"),
+                    status=vdata.get("status", "in_stock"),
+                    buying_price=Decimal(vdata["buying_price"]) if vdata.get("buying_price") else None,
+                    selling_price=Decimal(vdata["selling_price"]) if vdata.get("selling_price") else None,
+                    description=vdata.get("description", ""),
+                    features_notes="Demo vehicle — starter data",
+                )
+                seeded += 1
+
+            total_seeded += seeded
+            self.stdout.write(
+                self.style.SUCCESS(f"  Seeded {seeded} demo vehicles into '{biz.name}'")
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS(f"Demo seed complete. Total vehicles added: {total_seeded}")
         )

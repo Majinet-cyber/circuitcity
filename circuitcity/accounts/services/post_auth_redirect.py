@@ -36,47 +36,49 @@ logger = logging.getLogger(__name__)
 
 def _get_vertical_dashboard_url(business_kind: str) -> str:
     """
-    Map business_kind to its vertical-specific dashboard URL.
-    
-    This is the SINGLE SOURCE OF TRUTH for vertical dashboard routing.
-    
+    Resolve the vertical-specific dashboard URL for a given business_kind.
+
+    Delegates to inventory.utils_verticals.get_vertical_dashboard_url so
+    there is ONE canonical mapping kept in that module.  The phones vertical
+    is the only special case: it lands on the phones inventory dashboard
+    rather than the generic /dashboard/ shell.
+
     Args:
-        business_kind: The business vertical (e.g., 'phones', 'clothing', 'gym')
-        
+        business_kind: The business vertical code (e.g. 'car_dealer', 'energy')
+
     Returns:
-        str: The URL name for the vertical's dashboard
+        str: An absolute URL path to redirect to.
     """
-    # Vertical dashboard URL mapping
-    VERTICAL_DASHBOARDS = {
-        'phones': 'inventory_verticals:phones_dashboard',  # /inventory/verticals/phones/
-        'clothing': 'verticals:clothing_dashboard',
-        'gym': 'gym:dashboard',
-        'cement': 'cement:dashboard',
-        'hardware': 'cement:dashboard',  # Hardware uses cement dashboard
-        'general_dealers': 'cement:dashboard',
-        'liquor': 'liquor:dashboard',
-        'farm': 'verticals:farm_dashboard',  # Farm Manager vertical
-        'welding': 'verticals:welding_dashboard',  # Welding Workshop vertical
-        'car_hire': 'verticals:car_hire_dashboard',  # Car Hire Service vertical
-    }
-    
-    dashboard_url_name = VERTICAL_DASHBOARDS.get(
-        business_kind,
-        'inventory:inventory_dashboard'  # Safe fallback
-    )
-    
+    # 1. Try the canonical mapping in inventory.utils_verticals
+    url_name: Optional[str] = None
     try:
-        return reverse(dashboard_url_name)
+        from inventory.utils_verticals import get_vertical_dashboard_url as _canonical
+        url_name = _canonical(business_kind)
     except Exception as e:
-        logger.warning(
-            f"Could not reverse dashboard URL for {business_kind}: {e}. "
-            f"Falling back to default dashboard."
-        )
-        # Ultimate fallback
+        logger.warning("Could not import canonical vertical resolver: %s", e)
+
+    # 2. Special-case: phones vertical maps to its own inventory dashboard
+    #    (utils_verticals intentionally omits phones so dashboard:home renders
+    #     the generic shell for phone users; post-login we want a direct URL)
+    if not url_name and business_kind == "phones":
+        url_name = "inventory_verticals:phones_dashboard"
+
+    # 3. Reverse the URL name if we have one
+    if url_name:
         try:
-            return reverse('inventory:inventory_dashboard')
-        except Exception:
-            return '/dashboard/'
+            return reverse(url_name)
+        except Exception as e:
+            logger.warning(
+                "Could not reverse dashboard URL '%s' for kind '%s': %s. "
+                "Falling back to dashboard:home.",
+                url_name, business_kind, e,
+            )
+
+    # 4. Ultimate fallback – the generic dashboard shell handles further routing
+    try:
+        return reverse("dashboard:home")
+    except Exception:
+        return "/dashboard/"
 
 
 def get_post_login_redirect(user, request: Optional[HttpRequest] = None) -> str:

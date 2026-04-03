@@ -552,6 +552,14 @@ def notify_sale_completion(sale):
                     event_type="SALE_BATCH",
                 )
 
+                if not recipients:
+                    logger.warning(
+                        "[SALE_EMAIL] notify_sale_completion (batch): no manager recipients "
+                        "for business '%s' (id=%s). Check MANAGER/OWNER memberships have emails.",
+                        getattr(business, "name", "?"),
+                        getattr(business, "id", "?"),
+                    )
+
                 if recipients:
                     emit_event(
                         event_type="SALE_BATCH",
@@ -572,6 +580,16 @@ def notify_sale_completion(sale):
                 include_owner=True,
                 event_type="SALE_INSTANT",
             )
+
+            if not recipients:
+                logger.warning(
+                    "[SALE_EMAIL] notify_sale_completion: no manager recipients found "
+                    "for business '%s' (id=%s) and sale id=%s. "
+                    "Check that MANAGER/OWNER memberships have email addresses.",
+                    getattr(business, "name", "?"),
+                    getattr(business, "id", "?"),
+                    getattr(sale, "id", "?"),
+                )
 
             if recipients:
                 # Get sale details with enhanced information
@@ -636,7 +654,7 @@ def notify_sale_completion(sale):
                         try:
                             cost = Decimal(str(cost_price))
                             profit = sale.price - cost
-                        except (ValueError, TypeError):
+                        except Exception:
                             cost = None
                             profit = None
 
@@ -644,7 +662,7 @@ def notify_sale_completion(sale):
                     quantity = getattr(item, "quantity", 1) or 1
                     try:
                         quantity = int(quantity)
-                    except (ValueError, TypeError):
+                    except Exception:
                         quantity = 1
 
                 # Handle pharmacy sales (PharmacySale uses batch → merch_product)
@@ -665,14 +683,14 @@ def notify_sale_completion(sale):
                         if total_val:
                             revenue_amount = Decimal(str(total_val))
                             profit = revenue_amount - cost if cost is not None else None
-                    except (ValueError, TypeError, AttributeError):
+                    except Exception:
                         cost = None
                         profit = None
 
                     quantity = getattr(sale, "quantity", 1) or 1
                     try:
                         quantity = int(quantity)
-                    except (ValueError, TypeError):
+                    except Exception:
                         quantity = 1
 
                 # Handle groceries/other verticals (MerchProduct sales via sale.product)
@@ -697,14 +715,14 @@ def notify_sale_completion(sale):
                             if hasattr(sale, "unit_cost") and hasattr(sale, "quantity"):
                                 qty = getattr(sale, "quantity", 1) or 1
                                 cost = cost * Decimal(str(qty))
-                        except (ValueError, TypeError):
+                        except Exception:
                             cost = None
 
                     # Quantity
                     quantity = getattr(sale, "quantity", 1) or 1
                     try:
                         quantity = int(quantity)
-                    except (ValueError, TypeError):
+                    except Exception:
                         quantity = 1
 
                 # Location
@@ -743,7 +761,8 @@ def notify_sale_completion(sale):
                             try:
                                 revenue_amount = Decimal(str(_rev_val))
                                 break
-                            except (ValueError, TypeError):
+                            except Exception:
+                                # Catches ValueError, TypeError, decimal.InvalidOperation
                                 continue
                     if not revenue_amount:
                         revenue_amount = Decimal("0")

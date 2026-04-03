@@ -77,6 +77,27 @@ _VERTICAL_ALIASES = {
     "vehicle rental": "car_hire",
     "car rental": "car_hire",
     "fleet": "car_hire",
+    # Car Dealer
+    "car_dealer": "car_dealer",
+    "car dealer": "car_dealer",
+    "dealership": "car_dealer",
+    "car dealership": "car_dealer",
+    "vehicle dealer": "car_dealer",
+    "vehicle dealership": "car_dealer",
+    "auto dealer": "car_dealer",
+    "used cars": "car_dealer",
+    "second hand cars": "car_dealer",
+    # Renewable Energy
+    "energy": "energy",
+    "renewable energy": "energy",
+    "solar": "energy",
+    "solar energy": "energy",
+    "solar power": "energy",
+    "solar systems": "energy",
+    "battery systems": "energy",
+    "inverter": "energy",
+    "green energy": "energy",
+    "clean energy": "energy",
 }
 
 PRODUCT_MODE_SESSION_KEY = "product_mode"
