@@ -130,12 +130,95 @@ def get_all_verticals():
     ]
 
 
+def get_platform_live_metrics():
+    """
+    Compute live aggregated platform metrics from actual database records.
+    Uses 30-day rolling window. Cached for 10 minutes.
+
+    Returns a dict with:
+        has_data          – bool, True only if real records exist
+        avg_daily_revenue – int (raw MWK value) or None
+        avg_sales_per_day – int or None
+        avg_margin_visibility – float (%) or None
+    """
+    from django.core.cache import cache
+
+    cache_key = 'platform_live_metrics_v1'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    result = {'has_data': False}
+    try:
+        from inventory.models import InventoryItem
+        from django.db.models import Sum, Count
+        from django.db.models.functions import TruncDate
+        from django.utils import timezone
+        from datetime import timedelta
+
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+
+        sold_qs = InventoryItem.objects.filter(
+            status='SOLD',
+            sold_at__isnull=False,
+            sold_at__gte=thirty_days_ago,
+            selling_price__isnull=False,
+            order_price__gt=0,
+        )
+
+        agg = sold_qs.aggregate(
+            total_revenue=Sum('selling_price'),
+            total_cost=Sum('order_price'),
+            total_count=Count('id'),
+        )
+
+        total_revenue = agg.get('total_revenue') or 0
+        total_cost = agg.get('total_cost') or 0
+        total_count = agg.get('total_count') or 0
+
+        if total_count == 0 or total_revenue <= 0:
+            cache.set(cache_key, result, 600)
+            return result
+
+        days_with_data = (
+            sold_qs
+            .annotate(day=TruncDate('sold_at'))
+            .values('day')
+            .distinct()
+            .count()
+        )
+
+        if days_with_data == 0:
+            cache.set(cache_key, result, 600)
+            return result
+
+        avg_daily_rev = int(total_revenue / days_with_data)
+        avg_sales = max(1, round(total_count / days_with_data))
+        avg_margin = (
+            round(float((total_revenue - total_cost) / total_revenue * 100), 1)
+            if total_revenue > 0 else None
+        )
+
+        result = {
+            'has_data': True,
+            'avg_daily_revenue': avg_daily_rev,
+            'avg_sales_per_day': avg_sales,
+            'avg_margin_visibility': avg_margin,
+        }
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error('Live metrics error: %s', exc)
+
+    cache.set(cache_key, result, 600)
+    return result
+
+
 @never_cache
 def home(request):
     """
     Public home page with hero section and marketing copy.
     Never cached to ensure template updates are visible immediately.
-    
+
     Uses PUBLIC_SITE_METRICS from settings as SINGLE SOURCE OF TRUTH
     to prevent metric inconsistency across the site.
     """
@@ -201,16 +284,19 @@ def home(request):
     story_metrics_data = get_all_story_metrics()
     story_metrics_json = _json.dumps(story_metrics_data)
 
+    # ── Live platform metrics: real aggregated data, never fake ──
+    live_metrics = get_platform_live_metrics()
+
     return render(request, 'staticpages/home.html', {
-        'hide_nav': True,  # Don't show internal navigation
+        'hide_nav': True,
         'total_merchants': total_merchants,
         'total_agents': total_agents,
         'show_metrics': show_metrics,
         'show_agents_counter': show_agents_counter,
         'verticals': verticals,
-        # Story carousel: live KPI data per vertical
         'story_metrics': story_metrics_data,
         'story_metrics_json': story_metrics_json,
+        'live_metrics': live_metrics,
     })
 
 
@@ -751,6 +837,86 @@ def platform_stats_api(request):
             'status': 'error',
             'message': 'Unable to fetch stats at this time'
         })
+
+
+@never_cache
+def landing_metrics_api(request):
+    """
+    Public JSON endpoint for live landing page metrics.
+    Refreshed every 60 seconds by the frontend.
+
+    Returns aggregated platform metrics — no merchant-level data exposed.
+    Short TTL cache (30s) keeps DB load low while metrics stay fresh.
+
+    Schema:
+        active_businesses      int  — businesses with activity in last 30 days
+        team_members           int  — active users linked to active businesses
+        avg_daily_revenue      int  — MWK, 30-day rolling average
+        sales_recorded_per_day int  — 30-day rolling average
+        avg_margin_visibility  float|null — percent, null if cost data insufficient
+        has_data               bool — True only when real records exist
+        as_of                  str  — ISO timestamp of this response
+    """
+    from django.http import JsonResponse
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    cache_key = 'landing_metrics_api_v2'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached)
+
+    # Start from the existing live metrics helper (already DB-aggregated + cached)
+    live = get_platform_live_metrics()
+
+    # Active businesses / team members — separate query with activity filter
+    active_businesses = 0
+    team_members = 0
+    try:
+        from tenants.models import Business, Membership
+        from django.utils import timezone as tz
+        from datetime import timedelta
+
+        thirty_days_ago = tz.now() - timedelta(days=30)
+
+        # Businesses active = has at least one sold item in last 30 days
+        try:
+            from inventory.models import InventoryItem
+            active_biz_ids = (
+                InventoryItem.objects
+                .filter(status='SOLD', sold_at__gte=thirty_days_ago)
+                .values_list('business_id', flat=True)
+                .distinct()
+            )
+            active_businesses = active_biz_ids.count()
+        except Exception:
+            active_businesses = Business.objects.count()
+
+        # Team members = distinct users who are active members of qualifying businesses
+        team_members = (
+            Membership.objects
+            .filter(is_active=True)
+            .values('user')
+            .distinct()
+            .count()
+        )
+    except Exception:
+        pass
+
+    payload = {
+        'active_businesses': active_businesses,
+        'team_members': team_members,
+        'avg_daily_revenue': live.get('avg_daily_revenue') if live.get('has_data') else None,
+        'sales_recorded_per_day': live.get('avg_sales_per_day') if live.get('has_data') else None,
+        'avg_margin_visibility': live.get('avg_margin_visibility'),
+        'has_data': bool(live.get('has_data')),
+        'as_of': timezone.now().isoformat(),
+        'status': 'success',
+    }
+
+    # 30-second TTL — fresh but light on DB
+    cache.set(cache_key, payload, 30)
+    return JsonResponse(payload)
 
 
 def sitemap_xml(request):

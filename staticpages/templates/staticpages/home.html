@@ -4,8 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Emajinet — Business Management Software for Retail Merchants</title>
-  <meta name="description" content="Emajinet gives retail merchants in Malawi total visibility over stock, sales, and profit. Track inventory, hold staff accountable, and understand your margins — from one system.">
+  <title>Emajinet — The Operating System for African Business</title>
+  <meta name="description" content="African businesses don't fail for lack of effort. They operate blind. Emajinet gives you real-time visibility over inventory, sales, and profit — so every decision is informed.">
 
   <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
   <meta name="theme-color" content="#4f46e5">
@@ -18,8 +18,8 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.emajinet.africa{{ request.path }}">
-  <meta property="og:title" content="Emajinet — Business Management Software for Retail Merchants">
-  <meta property="og:description" content="Track inventory, monitor sales, manage staff, and understand profit clearly from one system.">
+  <meta property="og:title" content="Emajinet — The Operating System for African Business">
+  <meta property="og:description" content="African businesses don't fail for lack of effort. They operate blind. Emajinet gives you real-time visibility over inventory, sales, and profit.">
   <meta property="og:site_name" content="Emajinet">
   <meta property="og:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
   <meta property="og:image:width" content="1200">
@@ -29,8 +29,8 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://www.emajinet.africa{{ request.path }}">
-  <meta name="twitter:title" content="Emajinet — Business Management Software for Retail Merchants">
-  <meta name="twitter:description" content="Track inventory, monitor sales, manage staff, and understand profit clearly from one system.">
+  <meta name="twitter:title" content="Emajinet — The Operating System for African Business">
+  <meta name="twitter:description" content="African businesses don't fail for lack of effort. They operate blind. Emajinet gives you real-time visibility over inventory, sales, and profit.">
   <meta name="twitter:image" content="https://www.emajinet.africa{% static 'img/majn.png' %}">
 
   <!-- Structured Data -->
@@ -41,7 +41,7 @@
     "name": "Emajinet",
     "url": "https://www.emajinet.africa/",
     "logo": "https://www.emajinet.africa{% static 'img/majn.png' %}",
-    "description": "Business management software for retail merchants and inventory-driven businesses in Malawi.",
+    "description": "The operating system for African businesses. Real-time visibility over inventory, sales, and profit.",
     "foundingLocation": {
       "@type": "Place",
       "address": { "@type": "PostalAddress", "addressCountry": "MW" }
@@ -63,7 +63,7 @@
     "applicationCategory": "BusinessApplication",
     "operatingSystem": "Web",
     "url": "https://www.emajinet.africa/",
-    "description": "Business management software for retail merchants and inventory-driven businesses.",
+    "description": "The operating system for African businesses. Predictive insight, real-time visibility, data-driven operations.",
     "offers": {
       "@type": "Offer",
       "price": "0",
@@ -2959,7 +2959,7 @@
 
       <div class="nav-actions">
         <a href="{% url 'login' %}" class="btn btn-text">Sign in</a>
-        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started</a>
+        <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started Free</a>
         <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
           <div class="hamburger">
             <span></span><span></span><span></span>
@@ -2971,11 +2971,10 @@
     <div class="mobile-menu" id="mobileMenu" role="menu">
       <div class="mobile-menu-items">
         <a href="#features">Features</a>
-        <a href="#how-it-works">See How It Works</a>
-        <a href="{% url 'marketplace:home' %}">Marketplace</a>
+        <a href="#how-it-works">How It Works</a>
         <a href="{% url 'staticpages:pricing' %}">Pricing</a>
-        <a href="{% url 'staticpages:about' %}">About</a>
-        <a href="{% url 'login' %}" class="btn btn-secondary">Sign in</a>
+        <a href="{% url 'staticpages:contact' %}">Contact</a>
+        <a href="{% url 'login' %}" class="btn btn-secondary">Sign In</a>
         <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started Free</a>
       </div>
     </div>
@@ -2989,35 +2988,36 @@
       <div class="hero-text">
         <div class="hero-tag">Africa's Business Operating System</div>
         <h1 class="hero-title">
-          Your business <span class="highlight">operating system</span> — and marketplace.
+          African businesses don't fail for lack of effort.<br>They <span class="highlight">operate blind.</span>
         </h1>
         <p class="hero-subtitle">
-          Run your shop, pharmacy, gym, farm, or car dealership from one intelligent platform. Track stock, manage sales, publish to the marketplace, and get smart insights — mobile-first, built for Africa.
+          Emajinet gives you real-time visibility over inventory, sales, and profit. Know demand before it costs you. Run your business with clarity — not guesswork.
         </p>
 
         <!-- hero-buttons class retained for test compatibility -->
         <div class="hero-buttons" style="margin-top: 2rem;">
-          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started Free</a>
-          <a href="#how-it-works" class="btn btn-secondary">See How It Works</a>
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary btn-lg">Get Started Free</a>
+          <a href="#how-it-works" class="btn btn-secondary btn-lg">See How It Works</a>
         </div>
 
         <!-- Active Businesses / Team Members — git-original trust card -->
-        {% if show_metrics %}
+            {% if show_metrics %}
         <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
           <div style="display: flex; gap: 2rem; justify-content: flex-start; flex-wrap: wrap;">
             <div class="growth-metric" style="text-align: center;">
-              <div class="growth-metric-value" style="font-size: 2rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants|default:0 }}">0<span class="metric-plus">+</span></div>
+              {# Render real value immediately — no zero flash #}
+              <div class="growth-metric-value" style="font-size: 2rem; font-weight: 800; color: var(--primary);" id="totalMerchants" data-target="{{ total_merchants }}">{{ total_merchants }}<span class="metric-plus">+</span></div>
               <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;">Active Businesses</div>
             </div>
             {% if show_agents_counter %}
             <div class="growth-metric" style="text-align: center;">
-              <div class="growth-metric-value" style="font-size: 2rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents|default:0 }}">0<span class="metric-plus">+</span></div>
+              <div class="growth-metric-value" style="font-size: 2rem; font-weight: 800; color: var(--secondary);" id="totalAgents" data-target="{{ total_agents }}">{{ total_agents }}<span class="metric-plus">+</span></div>
               <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem;">Team Members</div>
             </div>
             {% endif %}
           </div>
           <div style="margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem;">
-            <span style="display: inline-block; width: 7px; height: 7px; background: var(--secondary); border-radius: 50%; animation: pulse 2s infinite; flex-shrink: 0;"></span>
+            <span style="display: inline-block; width: 7px; height: 7px; background: var(--secondary); border-radius: 50%; animation: pulse-dot 2s infinite; flex-shrink: 0;"></span>
             Live &mdash; shops, gyms, pharmacies, car dealers &amp; more
           </div>
         </div>
@@ -3029,21 +3029,51 @@
         {% endif %}
 
         <div class="hero-stat-card">
-          <div class="hero-counters">
+          {% if live_metrics.has_data %}
+          <div class="hero-counters" id="liveMetricsContainer">
             <div class="hero-counter">
-              <div class="hero-counter-value"><span class="counter-animated" data-target="84500" data-prefix="MWK ">MWK 0</span></div>
+              <div class="hero-counter-value">
+                {# Render real value immediately to prevent zero flash #}
+                <span class="counter-animated" data-target="{{ live_metrics.avg_daily_revenue }}" data-prefix="MWK ">MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}</span>
+              </div>
               <div class="hero-counter-label">Avg. daily revenue tracked</div>
             </div>
             <div class="hero-counter">
-              <div class="hero-counter-value"><span class="counter-animated" data-target="47" data-suffix="+">0</span></div>
+              <div class="hero-counter-value">
+                <span class="counter-animated" data-target="{{ live_metrics.avg_sales_per_day }}" data-suffix="+">{{ live_metrics.avg_sales_per_day }}+</span>
+              </div>
+              <div class="hero-counter-label">Sales recorded per day</div>
+            </div>
+            {% if live_metrics.avg_margin_visibility %}
+            <div class="hero-counter">
+              <div class="hero-counter-value">
+                <span class="counter-animated" data-target="{{ live_metrics.avg_margin_visibility }}" data-suffix="%">{{ live_metrics.avg_margin_visibility }}%</span>
+              </div>
+              <div class="hero-counter-label">Avg. margin visibility</div>
+            </div>
+            {% endif %}
+          </div>
+          <div class="hero-stat-note" id="liveMetricsNote">
+            <span style="display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite;margin-right:0.4rem;vertical-align:middle;"></span>
+            Live — 30-day rolling average from active businesses
+          </div>
+          {% else %}
+          <div class="hero-counters">
+            <div class="hero-counter">
+              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
+              <div class="hero-counter-label">Avg. daily revenue tracked</div>
+            </div>
+            <div class="hero-counter">
+              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
               <div class="hero-counter-label">Sales recorded per day</div>
             </div>
             <div class="hero-counter">
-              <div class="hero-counter-value"><span class="counter-animated" data-target="37" data-suffix="%">0</span></div>
+              <div class="hero-counter-value" style="font-size:1.5rem;color:var(--text-muted);font-weight:700;">—</div>
               <div class="hero-counter-label">Avg. margin visibility</div>
             </div>
           </div>
-          <div class="hero-stat-note">Live metrics from active Emajinet businesses</div>
+          <div class="hero-stat-note">Metrics populate as businesses record data</div>
+          {% endif %}
         </div>
       </div>
 
@@ -3065,19 +3095,19 @@
             <div class="dash-mock-greeting">Dashboard &middot; April 2026</div>
             <div class="dash-kpis">
               <div class="dash-kpi">
-                <div class="dash-kpi-label">Revenue Today</div>
-                <div class="dash-kpi-value">MWK 84,500</div>
-                <div class="dash-kpi-delta">+12% vs yesterday</div>
+                <div class="dash-kpi-label">Avg. Daily Revenue</div>
+                <div class="dash-kpi-value">{% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}—{% endif %}</div>
+                <div class="dash-kpi-delta">30-day avg</div>
               </div>
               <div class="dash-kpi">
-                <div class="dash-kpi-label">Gross Profit</div>
-                <div class="dash-kpi-value dash-kpi-value--green">MWK 31,200</div>
-                <div class="dash-kpi-delta">37% margin</div>
+                <div class="dash-kpi-label">Gross Margin</div>
+                <div class="dash-kpi-value dash-kpi-value--green">{% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}—{% endif %}</div>
+                <div class="dash-kpi-delta">avg margin</div>
               </div>
               <div class="dash-kpi">
-                <div class="dash-kpi-label">Items Sold</div>
-                <div class="dash-kpi-value">47 units</div>
-                <div class="dash-kpi-delta">9 transactions</div>
+                <div class="dash-kpi-label">Sales / Day</div>
+                <div class="dash-kpi-value">{% if live_metrics.has_data %}{{ live_metrics.avg_sales_per_day }}+{% else %}—{% endif %}</div>
+                <div class="dash-kpi-delta">avg transactions</div>
               </div>
             </div>
             <div class="dash-row">
@@ -3203,8 +3233,8 @@
     <div class="container">
       <div class="section-header animate-in">
         <span class="eyebrow">The Problem</span>
-        <h2 class="section-title">Most merchants run blind.</h2>
-        <p class="section-subtitle">If you carry inventory — whether in a phone shop, clothing store, liquor outlet, or hardware business — money is leaking from places you cannot see without the right system.</p>
+        <h2 class="section-title">Most businesses operate blind.</h2>
+        <p class="section-subtitle">They don't know real demand. They don't know their fastest-moving products. They can't state their actual margin. And money leaks from places they cannot see without the right system.</p>
       </div>
       <div class="problem-grid">
         <div class="problem-card">
@@ -3236,118 +3266,18 @@
   </section>
 
   <!-- ============================================================
-       REALITY STATS CAROUSEL
+       REALITY STAT — single compelling callout (condensed from carousel)
   ============================================================ -->
-  <section class="reality-stats-section" id="reality-stats">
-    <div class="reality-stats-container">
-      <div class="reality-stats-header">
-        <span class="eyebrow">The Data</span>
-        <h2 class="reality-stats-title">The reality for small businesses in Malawi</h2>
-        <p class="reality-stats-subtitle">Real data from national surveys and global retail benchmarks. See why Emajinet exists.</p>
-      </div>
-
-      <div class="stats-carousel" id="statsCarousel" aria-label="Business statistics carousel" role="region" tabindex="0">
-        <div class="stats-slides-wrapper" id="statsSlides">
-          <!-- Slide A: Digital Gap -->
-          <div class="stats-slide" data-slide="0">
-            <div class="stats-slide-content">
-              <h3 class="stats-problem-headline">Most MSMEs lack digital tools</h3>
-              <ul class="stats-pain-bullets">
-                <li>Only 2% of MSMEs in Malawi use the internet for business</li>
-                <li>Among medium enterprises, just 9% use computerized record keeping</li>
-                <li>Without digital systems, owners lose track of inventory, sales, and profits</li>
-              </ul>
-              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this &rarr;</a>
-            </div>
-            <div class="stats-slide-visual">
-              <div class="stats-chart-container">
-                <canvas id="chartDigitalGap" class="stats-chart-canvas" role="img" aria-label="Chart showing digital adoption rates"></canvas>
-              </div>
-              <div class="stats-citation">
-                <strong>Source:</strong> <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener">FinScope MSME Malawi 2019 Survey</a>
-              </div>
-              <div class="stats-solution-panel">
-                <div class="stats-solution-header">Emajinet solves this:</div>
-                <div class="stats-solution-features">
-                  <div class="stats-solution-feature">Live sales dashboards</div>
-                  <div class="stats-solution-feature">Real-time stock alerts</div>
-                  <div class="stats-solution-feature">Digital record keeping</div>
-                  <div class="stats-solution-feature">Mobile-first design</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Slide B: Informality -->
-          <div class="stats-slide" data-slide="1">
-            <div class="stats-slide-content">
-              <h3 class="stats-problem-headline">89% operate informally &mdash; but they matter</h3>
-              <ul class="stats-pain-bullets">
-                <li>Only 11% of MSMEs are officially registered</li>
-                <li>Yet MSMEs contribute 24% of total labour force employment</li>
-                <li>Informal businesses struggle with trust, compliance, and growth</li>
-              </ul>
-              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this &rarr;</a>
-            </div>
-            <div class="stats-slide-visual">
-              <div class="stats-chart-container">
-                <canvas id="chartInformality" class="stats-chart-canvas" role="img" aria-label="Chart showing business registration rates"></canvas>
-              </div>
-              <div class="stats-citation">
-                <strong>Source:</strong> <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener">FinScope MSME Malawi 2019 Survey</a>
-              </div>
-              <div class="stats-solution-panel">
-                <div class="stats-solution-header">Emajinet solves this:</div>
-                <div class="stats-solution-features">
-                  <div class="stats-solution-feature">Professional records</div>
-                  <div class="stats-solution-feature">Audit logs</div>
-                  <div class="stats-solution-feature">Role-based permissions</div>
-                  <div class="stats-solution-feature">Investor-ready reports</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Slide C: Shrinkage -->
-          <div class="stats-slide" data-slide="2">
-            <div class="stats-slide-content">
-              <h3 class="stats-problem-headline">Retail loses 1.6% to shrinkage &mdash; mostly theft</h3>
-              <ul class="stats-pain-bullets">
-                <li>Average retail shrink rate: 1.6% of sales (global benchmark)</li>
-                <li>Nearly two-thirds of shrink is due to theft (internal &amp; external)</li>
-                <li>Without tracking, theft and errors go undetected for months</li>
-              </ul>
-              <a href="#how-it-works" class="stats-cta-btn">See how Emajinet fixes this &rarr;</a>
-            </div>
-            <div class="stats-slide-visual">
-              <div class="stats-chart-container">
-                <canvas id="chartShrinkage" class="stats-chart-canvas" role="img" aria-label="Chart showing retail shrinkage breakdown"></canvas>
-              </div>
-              <div class="stats-citation">
-                <strong>Source:</strong> <a href="https://nrf.com/research/national-retail-security-survey-2023" target="_blank" rel="noopener">NRF National Retail Security Survey 2023</a>
-              </div>
-              <div class="stats-solution-panel">
-                <div class="stats-solution-header">Emajinet solves this:</div>
-                <div class="stats-solution-features">
-                  <div class="stats-solution-feature">Stock movement tracking</div>
-                  <div class="stats-solution-feature">Audit trail logs</div>
-                  <div class="stats-solution-feature">Agent accountability</div>
-                  <div class="stats-solution-feature">Automated alerts</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="stats-carousel-controls">
-        <button class="stats-carousel-arrow" id="statsPrevBtn" aria-label="Previous slide">&lsaquo;</button>
-        <div class="stats-carousel-dots" id="statsDots" role="tablist">
-          <button class="stats-carousel-dot active" data-slide="0" aria-label="Slide 1" role="tab" aria-selected="true"></button>
-          <button class="stats-carousel-dot" data-slide="1" aria-label="Slide 2" role="tab" aria-selected="false"></button>
-          <button class="stats-carousel-dot" data-slide="2" aria-label="Slide 3" role="tab" aria-selected="false"></button>
-        </div>
-        <button class="stats-carousel-arrow" id="statsNextBtn" aria-label="Next slide">&rsaquo;</button>
+  <section id="reality-stats" style="background: var(--bg-section); padding: 3.5rem 0;">
+    <div class="container">
+      <div style="max-width: 760px; margin: 0 auto; text-align: center;">
+        <span class="eyebrow">The Reality</span>
+        <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Only 2% of MSMEs in Malawi use the internet for business.</h2>
+        <p style="font-size: 1.0625rem; color: var(--text-muted); margin: 1rem auto 1.75rem; max-width: 600px; line-height: 1.7;">
+          Among medium enterprises, just 9% use computerised record keeping. Without a system, owners lose track of inventory, sales, and profits — often for months before noticing.
+          <br><span style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem; display: inline-block;">Source: <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener" style="color: var(--text-light);">FinScope MSME Malawi 2019</a></span>
+        </p>
+        <a href="#how-it-works" class="btn btn-primary">See how Emajinet fixes this &rarr;</a>
       </div>
     </div>
   </section>
@@ -3359,8 +3289,8 @@
     <div class="container">
       <div class="section-header section-header--center animate-in">
         <span class="eyebrow">Core Platform</span>
-        <h2 class="section-title">Operational control, end to end.</h2>
-        <p class="section-subtitle">Six tightly integrated capabilities built for inventory-driven retail businesses.</p>
+        <h2 class="section-title">Visibility. Intelligence. Control.</h2>
+        <p class="section-subtitle">Six tightly integrated capabilities that eliminate blind spots across your entire operation.</p>
       </div>
       <div class="features-grid">
         <div class="feature-item">
@@ -3419,7 +3349,7 @@
           <span class="eyebrow">Daily Reporting</span>
           <h2 class="product-depth-title">Know your exact position at the end of every day.</h2>
           <p class="product-depth-subtitle">
-            Emajinet generates a clean daily summary of revenue, cost of goods, gross profit, and margin — per product, per agent, and across all locations.
+            Prediction beats reaction. Emajinet generates a clean daily summary of revenue, cost, gross profit, and margin — per product, per agent, and across every location.
           </p>
           <div class="product-depth-checks">
             <div class="product-depth-check">
@@ -3515,7 +3445,7 @@
       <div class="section-header section-header--center animate-in">
         <span class="eyebrow">Getting Started</span>
         <h2 class="section-title">How It Works</h2>
-        <p class="section-subtitle">Get started in minutes with our simple, powerful workflow.</p>
+        <p class="section-subtitle">From signup to full operational visibility — in minutes, not months.</p>
       </div>
       <div class="steps-grid">
         <div class="step-card animate-in">
@@ -3600,243 +3530,73 @@
   </section>
 
   <!-- ============================================================
-       SMART RECOMMENDATIONS
+       SMART RECOMMENDATIONS — compact summary
   ============================================================ -->
-  <section class="smart-recs-section" id="smart-recommendations">
+  <section id="smart-recommendations" style="background: var(--bg-subtle); padding: 4rem 0;">
     <div class="container">
-      <div class="section-header section-header--center animate-in">
-        <span class="eyebrow">Built-in Intelligence</span>
-        <h2 class="section-title">Smart Recommendations</h2>
-        <p class="section-subtitle">Emajinet reads your business data and surfaces the right insights at the right time — automatically.</p>
-      </div>
-      <div class="smart-recs-grid">
-
-        <!-- Restock Prompts -->
-        <div class="smart-rec-card">
-          <div class="smart-rec-icon smart-rec-icon--amber">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-              <line x1="12" y1="22.08" x2="12" y2="12"/>
-            </svg>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; max-width: 960px; margin: 0 auto;">
+        <div>
+          <span class="eyebrow">Built-in Intelligence</span>
+          <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Smart recommendations, automatically.</h2>
+          <p style="font-size: 1rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 1.5rem;">
+            Emajinet reads your data and surfaces the right insight at the right time — restock prompts before you run out, margin warnings before profit erodes, and seasonal alerts before demand spikes.
+          </p>
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Try it free</a>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #92400e;">
+            ⚠ Samsung A05 — 3 units left. Reorder now at current velocity.
           </div>
-          <h3 class="smart-rec-title">Restock Prompts</h3>
-          <p class="smart-rec-desc">Get prompted to reorder before you run out — based on sales velocity, lead time, and your configured minimum stock levels.</p>
-          <div class="smart-rec-prompts">
-            <div class="smart-rec-prompt smart-rec-prompt--amber">⚠ Samsung A05 — 3 units left. Reorder now at current pace.</div>
-            <div class="smart-rec-prompt smart-rec-prompt--amber">⚠ USB-C Charger — stock depletes in ~2 days. Stock up before the weekend.</div>
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #991b1b;">
+            🚨 Sale below cost detected on USB-C Charger — review immediately.
+          </div>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #1e40af;">
+            📅 Back-to-school in 3 weeks — increase stationery stock ~34%.
           </div>
         </div>
-
-        <!-- Margin Warnings -->
-        <div class="smart-rec-card">
-          <div class="smart-rec-icon smart-rec-icon--red">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <h3 class="smart-rec-title">Margin Warnings</h3>
-          <p class="smart-rec-desc">Automatic flags on below-cost sales, thin margins, and pricing drift — before they erode your profit without you noticing.</p>
-          <div class="smart-rec-prompts">
-            <div class="smart-rec-prompt smart-rec-prompt--red">🚨 Airpods Pro sold at 8% margin — check your cost price entry.</div>
-            <div class="smart-rec-prompt smart-rec-prompt--red">🚨 Sale below cost detected on USB-C Charger — review immediately.</div>
-          </div>
-        </div>
-
-        <!-- Season Prompts -->
-        <div class="smart-rec-card">
-          <div class="smart-rec-icon smart-rec-icon--brand">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <h3 class="smart-rec-title">Season Prompts</h3>
-          <p class="smart-rec-desc">Stay ahead of seasonal demand — back-to-school, harvest season, festive periods, and category-specific spikes that affect your stock needs.</p>
-          <div class="smart-rec-prompts">
-            <div class="smart-rec-prompt smart-rec-prompt--brand">📅 Back-to-school starts in 3 weeks — increase stationery stock by ~34%.</div>
-            <div class="smart-rec-prompt smart-rec-prompt--brand">📅 December electronics surge — review pricing and margins now.</div>
-          </div>
-        </div>
-
-        <!-- Renewable Energy Vertical -->
-        <div class="smart-rec-card smart-rec-card--energy">
-          <div class="smart-rec-new-badge">New</div>
-          <div class="smart-rec-icon smart-rec-icon--green">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5"/>
-              <line x1="12" y1="1" x2="12" y2="3"/>
-              <line x1="12" y1="21" x2="12" y2="23"/>
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-              <line x1="1" y1="12" x2="3" y2="12"/>
-              <line x1="21" y1="12" x2="23" y2="12"/>
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-            </svg>
-          </div>
-          <h3 class="smart-rec-title">Renewable Energy Vertical</h3>
-          <p class="smart-rec-desc">Purpose-built insights for solar and energy businesses — system sizing, load optimisation, and preventive maintenance alerts.</p>
-          <div class="smart-rec-prompts">
-            <div class="smart-rec-prompt smart-rec-prompt--green">☀ Customer usage at 8h/day — 3kW system optimal. Recommend an upgrade path.</div>
-            <div class="smart-rec-prompt smart-rec-prompt--green">🔋 Battery maintenance overdue — last service 182 days ago. Schedule now.</div>
-          </div>
-        </div>
-
       </div>
     </div>
+    <style>
+      @media (max-width: 640px) {
+        #smart-recommendations .container > div { grid-template-columns: 1fr; }
+      }
+    </style>
   </section>
 
-  <!-- Available Verticals Section -->
-  <section class="landing-container" style="padding: 5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
-    <div style="text-align: center; margin-bottom: 3rem;">
-      <h2 style="font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: -0.02em;">
-        One Platform, Built for Real Operations
+  <!-- Available Verticals Section — top 6 shown, rest on features page -->
+  <section class="landing-container" style="padding: 4.5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
+    <div style="text-align: center; margin-bottom: 2.5rem; max-width: 1200px; margin-left: auto; margin-right: auto; padding: 0 2rem;">
+      <span class="eyebrow">Built for your industry</span>
+      <h2 style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: -0.02em;">
+        Purpose-built for every type of African business.
       </h2>
-      <p style="font-size: clamp(1rem, 2vw, 1.25rem); color: var(--text-secondary); max-width: 700px; margin: 0 auto;">
-        Emajinet ships with purpose-built workflows for each industry — not generic forms. From car dealerships to pharmacies, the system is shaped around how your business actually runs.
+      <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 620px; margin: 0 auto;">
+        Not generic forms — purpose-built workflows shaped around how your specific business operates.
       </p>
     </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; max-width: 1200px; margin: 0 auto;">
-      {% for vertical in verticals %}
-      <div style="background: white; border-radius: 18px; padding: 1.75rem; box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04); border: 1.5px solid #e2e8f0; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.2s;"
-           onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 12px 32px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.05)'; this.style.borderColor='rgba(79,70,229,0.18)';"
-           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04)'; this.style.borderColor='#e2e8f0';">
-        <div style="font-size: 2.25rem; margin-bottom: 0.875rem;">{{ vertical.icon }}</div>
-        <h3 style="font-size: 1.125rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem; line-height: 1.3;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
+      {% for vertical in verticals|slice:":6" %}
+      <div style="background: white; border-radius: 14px; padding: 1.5rem; box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04); border: 1.5px solid #e2e8f0;">
+        <div style="font-size: 2rem; margin-bottom: 0.75rem;">{{ vertical.icon }}</div>
+        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.375rem; line-height: 1.3;">
           {{ vertical.name }}
         </h3>
-        <p style="font-size: 0.9375rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">
+        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">
           {{ vertical.description }}
         </p>
       </div>
       {% endfor %}
     </div>
 
-    <div style="text-align: center; margin-top: 2.5rem;">
-      <p style="font-size: 1rem; color: var(--text-secondary); font-style: italic;">
-        🚀 <strong>More verticals coming</strong> — each one purpose-built, not adapted
+    <div style="text-align: center; margin-top: 2rem; padding: 0 2rem;">
+      <p style="font-size: 0.9375rem; color: var(--text-secondary);">
+        Plus pharmacies, farms, hardware stores, cement dealers, car dealers &amp; more.
+        <a href="{% url 'staticpages:about' %}" style="color: var(--brand); font-weight: 600; margin-left: 0.25rem;">See all verticals &rarr;</a>
       </p>
     </div>
   </section>
 
-  <!-- Marketplace Showcase Section -->
-  <section id="marketplace-showcase" style="padding: 5rem 1rem; background: #fff;">
-    <div style="max-width: 1200px; margin: 0 auto;">
-      <div style="text-align: center; margin-bottom: 3.5rem;">
-        <div style="display: inline-block; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: #fff; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; padding: 0.35rem 1rem; border-radius: 2rem; margin-bottom: 1rem;">Built-in Marketplace</div>
-        <h2 style="font-size: clamp(2rem, 4vw, 2.875rem); font-weight: 800; color: #0f172a; margin-bottom: 1rem; line-height: 1.18; letter-spacing: -0.02em;">
-          Sell Online Without a Separate App
-        </h2>
-        <p style="font-size: clamp(1rem, 2vw, 1.2rem); color: #64748b; max-width: 660px; margin: 0 auto; line-height: 1.7;">
-          Every Emajinet business gets a free public storefront. List products, vehicles, or services—customers browse, enquire, and buy. No extra subscription required.
-        </p>
-      </div>
-
-      <!-- Vertical showcase cards -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
-
-        <!-- Car Dealer Card -->
-        <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
-          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">🏎️</div>
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🏎️</div>
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #a78bfa; margin-bottom: 0.5rem;">Car Dealer</div>
-          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Full showroom on the web</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
-            Stock vehicles, track mileage &amp; specs, publish to the public marketplace, capture enquiries, and record sales — all in one dashboard.
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Vehicle Inventory</span>
-            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Public Listings</span>
-            <span style="background: rgba(167,139,250,0.2); color: #a78bfa; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(167,139,250,0.3);">Buyer Enquiries</span>
-          </div>
-        </div>
-
-        <!-- Pharmacy Card -->
-        <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
-          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">💊</div>
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💊</div>
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #6ee7b7; margin-bottom: 0.5rem;">Pharmacy</div>
-          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Smart stock with expiry tracking</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
-            Track medicines, cosmetics, expiry dates, and restock levels. List over-the-counter products on the marketplace.
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Expiry Alerts</span>
-            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Restock Levels</span>
-            <span style="background: rgba(110,231,183,0.2); color: #6ee7b7; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(110,231,183,0.3);">Marketplace</span>
-          </div>
-        </div>
-
-        <!-- Phones & Electronics Card -->
-        <div style="background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
-          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">📱</div>
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">📱</div>
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #93c5fd; margin-bottom: 0.5rem;">Phones &amp; Electronics</div>
-          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Scan, stock, and sell smarter</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
-            Barcode scanning, IMEI tracking, accessory bundles, and a public marketplace listing for each device.
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">Barcode Scan</span>
-            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">IMEI Tracking</span>
-            <span style="background: rgba(147,197,253,0.2); color: #93c5fd; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(147,197,253,0.3);">Live Listings</span>
-          </div>
-        </div>
-
-        <!-- Gym Card -->
-        <div style="background: linear-gradient(135deg, #9d174d 0%, #be185d 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;">
-          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">💪</div>
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">💪</div>
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #f9a8d4; margin-bottom: 0.5rem;">Gym &amp; Fitness</div>
-          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Members, check-ins &amp; trainers</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
-            Manage memberships, track daily check-ins, assign trainers, and post class or membership packages to the marketplace.
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Memberships</span>
-            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Check-ins</span>
-            <span style="background: rgba(249,168,212,0.2); color: #f9a8d4; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(249,168,212,0.3);">Packages</span>
-          </div>
-        </div>
-
-        <!-- Farm Card -->
-        <div style="background: linear-gradient(135deg, #14532d 0%, #166534 100%); border-radius: 20px; padding: 2rem; color: #fff; position: relative; overflow: hidden;" data-testid="marketplace-farm-card">
-          <div style="position: absolute; top: -20px; right: -20px; font-size: 6rem; opacity: 0.08;">🌾</div>
-          <div style="font-size: 2.5rem; margin-bottom: 1rem;">🌾</div>
-          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #86efac; margin-bottom: 0.5rem;">Farm &amp; Agriculture</div>
-          <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; line-height: 1.3;">Sell crops &amp; livestock online</h3>
-          <p style="font-size: 0.875rem; color: rgba(255,255,255,0.75); line-height: 1.6; margin-bottom: 1.5rem;">
-            Record harvest yields, track livestock batches, and publish fresh produce &amp; farm products directly to the marketplace for buyers to discover.
-          </p>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-            <span style="background: rgba(134,239,172,0.2); color: #86efac; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(134,239,172,0.3);">Crop Records</span>
-            <span style="background: rgba(134,239,172,0.2); color: #86efac; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(134,239,172,0.3);">Livestock Batches</span>
-            <span style="background: rgba(134,239,172,0.2); color: #86efac; font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 2rem; border: 1px solid rgba(134,239,172,0.3);">Marketplace</span>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Marketplace CTA banner -->
-      <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 20px; padding: 2.5rem 2rem; text-align: center; color: #fff;">
-        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🛍️</div>
-        <h3 style="font-size: clamp(1.25rem, 3vw, 1.75rem); font-weight: 800; margin-bottom: 0.75rem;">Browse the Emajinet Marketplace</h3>
-        <p style="font-size: 1rem; color: rgba(255,255,255,0.85); max-width: 540px; margin: 0 auto 1.5rem; line-height: 1.6;">
-          Discover vehicles, electronics, farm produce, groceries, and more from verified African businesses — all in one place.
-        </p>
-        <a href="/marketplace/" style="display: inline-block; background: #fff; color: #4f46e5; font-weight: 700; font-size: 1rem; padding: 0.8rem 2.2rem; border-radius: 2rem; text-decoration: none; transition: transform 0.2s;"
-           onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
-          Explore Listings →
-        </a>
-      </div>
-    </div>
-  </section>
 
   <!-- ============================================================
        IMPACT / REAL STORIES — ROTATING CAROUSEL
@@ -3846,8 +3606,8 @@
 
       <div class="section-header section-header--center animate-in">
         <span class="eyebrow">Real businesses. Real proof.</span>
-        <h2 class="section-title">From notebook to operating system.</h2>
-        <p class="section-subtitle">See how real businesses in Malawi are moving from paper records to QR-powered operations and real-time dashboards.</p>
+        <h2 class="section-title">From operating blind to operating smart.</h2>
+        <p class="section-subtitle">See how businesses across Malawi are moving from paper records and guesswork to real-time dashboards and data-driven decisions.</p>
       </div>
 
       <!-- CAROUSEL WRAPPER -->
@@ -4500,10 +4260,10 @@
     <div class="container">
       <div class="section-header section-header--center">
         <span class="eyebrow">Our Mission</span>
-        <h2 class="section-title" style="font-size: clamp(2.25rem, 4vw, 3rem); font-weight: 800; margin-top: 0.5rem; letter-spacing: -0.025em;">Emajinet is the operating system of small business.</h2>
+        <h2 class="section-title" style="font-size: clamp(2.25rem, 4vw, 3rem); font-weight: 800; margin-top: 0.5rem; letter-spacing: -0.025em;">Emajinet is the operating system for African business.</h2>
       </div>
       <p class="mission-text">
-        We give every shop, farm, and workshop a <strong>digital backoffice</strong> that handles inventory, sales, and insights &mdash; so owners can stop running blind and start running smart.
+        We give every shop, farm, and workshop a <strong>digital intelligence layer</strong> — real-time inventory, sales visibility, and predictive insight — so owners stop operating blind and start making informed decisions.
       </p>
     </div>
   </section>
@@ -4531,15 +4291,56 @@
   </section>
 
   <!-- ============================================================
+       PRICING SNAPSHOT — real prices from billing/pricing.py via context
+  ============================================================ -->
+  <section id="pricing-snapshot" style="padding: 4.5rem 0; background: var(--bg-subtle);">
+    <div class="container">
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <span class="eyebrow">Simple, transparent pricing</span>
+        <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Try Emajinet free for {{ PRICING_TRIAL_DAYS|default:30 }} days.</h2>
+        <p style="font-size: 1rem; color: var(--text-muted); margin: 0 auto;">No credit card required. Cancel anytime.</p>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; max-width: 900px; margin: 0 auto 2rem;">
+        {% for plan in PRICING_PLANS %}
+        <div style="background: {% if plan.code == 'growth' %}var(--brand){% else %}#fff{% endif %}; border-radius: 14px; padding: 1.75rem; border: {% if plan.code == 'growth' %}none{% else %}1.5px solid var(--border){% endif %}; box-shadow: {% if plan.code == 'growth' %}var(--shadow-brand){% else %}var(--shadow-sm){% endif %}; position: relative;">
+          {% if plan.code == 'growth' %}
+          <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;">MOST POPULAR</span>
+          {% endif %}
+          <div style="font-size: 1rem; font-weight: 700; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.9){% else %}var(--text){% endif %}; margin-bottom: 0.25rem;">{{ plan.name }}</div>
+          <div style="font-size: 1.75rem; font-weight: 800; color: {% if plan.code == 'growth' %}#fff{% else %}var(--brand){% endif %}; margin-bottom: 0.125rem;">{{ plan.currency }} {{ plan.amount|floatformat:0 }}</div>
+          <div style="font-size: 0.75rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.65){% else %}var(--text-muted){% endif %}; margin-bottom: 1rem;">/month</div>
+          <ul style="list-style: none; padding: 0; margin: 0 0 1.25rem; font-size: 0.875rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.85){% else %}var(--text-muted){% endif %}; display: flex; flex-direction: column; gap: 0.4rem;">
+            {% for feature in plan.features|slice:":4" %}
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <span style="color: {% if plan.code == 'growth' %}#a7f3d0{% else %}var(--green){% endif %}; flex-shrink: 0; margin-top: 1px;">✓</span>
+              {{ feature }}
+            </li>
+            {% endfor %}
+          </ul>
+          <a href="{% url 'accounts:signup_manager' %}" style="display: block; text-align: center; padding: 0.625rem 1rem; border-radius: var(--radius); font-size: 0.875rem; font-weight: 600; text-decoration: none; background: {% if plan.code == 'growth' %}#fff{% else %}var(--brand-light){% endif %}; color: var(--brand); border: 1.5px solid {% if plan.code == 'growth' %}#fff{% else %}transparent{% endif %};">
+            Start free trial
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div style="text-align: center;">
+        <a href="{% url 'staticpages:pricing' %}" class="btn btn-secondary" style="display: inline-flex;">See full pricing &rarr;</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================
        FINAL CTA
   ============================================================ -->
   <section class="cta-section" id="cta">
     <div class="container">
-      <h2 class="cta-title">Stop guessing. Start knowing.</h2>
-      <p class="cta-subtitle">Get full visibility over your stock, sales, and profit. 30-day free trial — no credit card required.</p>
-      <a href="{% url 'accounts:signup_manager' %}" class="btn btn-white btn-lg">Start Free Trial</a>
+      <h2 class="cta-title">Stop operating blind. Start running with visibility.</h2>
+      <p class="cta-subtitle">Know demand before it costs you. Track margins in real time. Make every decision from data. 30-day free trial — no credit card required.</p>
+      <a href="{% url 'accounts:signup_manager' %}" class="btn btn-white btn-lg">Get Started Free</a>
       <p class="cta-note">
-        {% if show_metrics %}Trusted by {{ total_merchants }}+ merchants{% else %}Trusted by merchants{% endif %} across Malawi &nbsp;&middot;&nbsp; Cancel anytime
+        {% if show_metrics %}Trusted by {{ total_merchants }}+ businesses{% else %}Trusted by businesses{% endif %} across Malawi &nbsp;&middot;&nbsp; Cancel anytime
       </p>
     </div>
   </section>
@@ -4805,7 +4606,7 @@
     })();
 
     // ============================================================
-    // REALITY STATS CAROUSEL
+    // REALITY STATS CAROUSEL — removed; section replaced with static callout
     // ============================================================
     (function() {
       var currentSlide = 0;
@@ -4814,7 +4615,7 @@
 
       function initCarousel() {
         var carousel = document.getElementById('statsCarousel');
-        if (!carousel) return;
+        if (!carousel) return; // graceful no-op when carousel HTML is absent
         var wrapper = document.getElementById('statsSlides');
         var prevBtn = document.getElementById('statsPrevBtn');
         var nextBtn = document.getElementById('statsNextBtn');
@@ -5129,109 +4930,128 @@
     })();
 
     // ============================================================
-    // LIVE PLATFORM GROWTH METRICS (git-original)
+    // LIVE PLATFORM GROWTH METRICS
+    // Values are server-rendered (no zero flash). JS only refreshes
+    // metrics in the background every 60 seconds.
     // ============================================================
-    function initPlatformMetrics() {
-      const merchantsEl = document.getElementById('totalMerchants');
-      const agentsEl = document.getElementById('totalAgents');
-
+    (function() {
+      var merchantsEl = document.getElementById('totalMerchants');
+      var agentsEl    = document.getElementById('totalAgents');
       if (!merchantsEl) return;
 
-      let merchantsTarget = parseInt(merchantsEl.dataset.target) || 0;
-      let agentsTarget = agentsEl ? (parseInt(agentsEl.dataset.target) || 0) : 0;
+      var merchantsTarget = parseInt(merchantsEl.dataset.target) || 0;
+      var agentsTarget    = agentsEl ? (parseInt(agentsEl.dataset.target) || 0) : 0;
 
-      function formatNumberWithPlus(num) {
-        const formatted = Math.round(num).toLocaleString('en-US');
+      function formatWithPlus(num) {
+        var formatted = Math.round(num).toLocaleString('en-US');
         return formatted + '<span class="metric-plus">+</span>';
       }
 
-      function animateValue(element, start, end, duration) {
-        if (start === end) {
-          element.innerHTML = formatNumberWithPlus(end);
-          return;
-        }
-        const range = end - start;
-        const increment = range / (duration / 16);
-        let current = start;
-        const timer = setInterval(() => {
-          current += increment;
-          if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-            element.innerHTML = formatNumberWithPlus(end);
-            clearInterval(timer);
+      function animateTo(el, fromVal, toVal, ms) {
+        if (fromVal === toVal) { el.innerHTML = formatWithPlus(toVal); return; }
+        var range = toVal - fromVal;
+        var step  = range / (ms / 16);
+        var cur   = fromVal;
+        var t = setInterval(function() {
+          cur += step;
+          if ((step > 0 && cur >= toVal) || (step < 0 && cur <= toVal)) {
+            el.innerHTML = formatWithPlus(toVal);
+            clearInterval(t);
           } else {
-            element.innerHTML = formatNumberWithPlus(current);
+            el.innerHTML = formatWithPlus(cur);
           }
         }, 16);
       }
 
-      animateValue(merchantsEl, 0, merchantsTarget, 2000);
-      if (agentsEl) animateValue(agentsEl, 0, agentsTarget, 2000);
-
-      function fetchLiveMetrics() {
+      function refreshMetrics() {
         fetch('{% url "staticpages:platform_stats_api" %}')
-          .then(response => response.json())
-          .then(data => {
-            if (data.status === 'success' && data.show_metrics) {
-              const newMerchants = data.total_merchants || 0;
-              const newAgents = data.total_agents || 0;
-              if (newMerchants !== merchantsTarget) {
-                animateValue(merchantsEl, merchantsTarget, newMerchants, 1000);
-                merchantsTarget = newMerchants;
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.status !== 'success' || !data.show_metrics) return;
+            var nm = data.total_merchants || 0;
+            var na = data.total_agents   || 0;
+            if (nm !== merchantsTarget) {
+              animateTo(merchantsEl, merchantsTarget, nm, 800);
+              merchantsTarget = nm;
+            }
+            if (agentsEl && na !== agentsTarget) {
+              animateTo(agentsEl, agentsTarget, na, 800);
+              agentsTarget = na;
+            }
+          })
+          .catch(function() {}); // silent — keep current values on failure
+      }
+
+      // Refresh every 60 seconds in background
+      setInterval(refreshMetrics, 60000);
+    })();
+
+    // ============================================================
+    // HERO LIVE METRICS — 60-second background refresh
+    // Values are server-rendered on first load (no zero flash).
+    // JS only patches values when fresh API data arrives.
+    // ============================================================
+    (function() {
+      var lastGoodValues = null;
+
+      function fmtNum(n) {
+        return Math.round(n).toLocaleString('en-US');
+      }
+
+      function patchMetric(elId, prefix, suffix, val) {
+        var el = document.getElementById(elId);
+        if (!el) return;
+        el.textContent = (prefix || '') + fmtNum(val) + (suffix || '');
+      }
+
+      function refreshLiveMetrics() {
+        fetch('{% url "staticpages:landing_metrics_api" %}')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (!data.has_data) return;
+            lastGoodValues = data;
+            // Patch the hero stat card spans if present
+            var container = document.getElementById('liveMetricsContainer');
+            if (!container) return;
+            var spans = container.querySelectorAll('.counter-animated');
+            spans.forEach(function(sp) {
+              var target = parseInt(sp.dataset.target, 10);
+              var prefix = sp.dataset.prefix || '';
+              var suffix = sp.dataset.suffix || '';
+              // Only update if we have a meaningful new value
+              var newVal = null;
+              if (prefix.indexOf('MWK') !== -1 && data.avg_daily_revenue) newVal = data.avg_daily_revenue;
+              else if (suffix === '+' && data.sales_recorded_per_day) newVal = data.sales_recorded_per_day;
+              else if (suffix === '%' && data.avg_margin_visibility) newVal = data.avg_margin_visibility;
+              if (newVal !== null && newVal !== target) {
+                sp.dataset.target = newVal;
+                sp.textContent = prefix + fmtNum(newVal) + suffix;
               }
-              if (agentsEl && newAgents !== agentsTarget) {
-                animateValue(agentsEl, agentsTarget, newAgents, 1000);
-                agentsTarget = newAgents;
+            });
+            // Update freshness note
+            var note = document.getElementById('liveMetricsNote');
+            if (note && data.as_of) {
+              var d = new Date(data.as_of);
+              var secsAgo = Math.round((Date.now() - d.getTime()) / 1000);
+              var freshText = secsAgo < 10 ? 'just now' : secsAgo + 's ago';
+              // Only update the text node, not the dot span
+              var textNodes = note.childNodes;
+              for (var i = 0; i < textNodes.length; i++) {
+                if (textNodes[i].nodeType === 3 && textNodes[i].textContent.trim()) {
+                  textNodes[i].textContent = ' Live — 30-day rolling average · Updated ' + freshText;
+                  break;
+                }
               }
             }
           })
-          .catch(error => { console.log('Failed to fetch live metrics:', error); });
+          .catch(function() {
+            // On failure keep last good values — no blank or zero shown
+          });
       }
 
-      setInterval(fetchLiveMetrics, 300000);
-    }
-
-    initPlatformMetrics();
-
-    // ============================================================
-    // HERO REVENUE / SALES / MARGIN ANIMATED COUNTERS
-    // ============================================================
-    (function() {
-      var counters = document.querySelectorAll('.counter-animated');
-      if (!counters.length) return;
-
-      function fmt(n) {
-        return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-      }
-
-      function animateCounter(el) {
-        var target = parseInt(el.dataset.target, 10) || 0;
-        var prefix = el.dataset.prefix || '';
-        var suffix = el.dataset.suffix || '';
-        var duration = 2000;
-        var start = null;
-
-        function step(ts) {
-          if (!start) start = ts;
-          var prog = Math.min((ts - start) / duration, 1);
-          var ease = 1 - Math.pow(1 - prog, 3);
-          var val = Math.round(ease * target);
-          el.textContent = prefix + fmt(val) + suffix;
-          if (prog < 1) requestAnimationFrame(step);
-          else el.textContent = prefix + fmt(target) + suffix;
-        }
-        requestAnimationFrame(step);
-      }
-
-      var observer = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-          if (entry.isIntersecting) {
-            animateCounter(entry.target);
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.3 });
-
-      counters.forEach(function(c) { observer.observe(c); });
+      // Initial refresh after 5s (page already has server values), then every 60s
+      setTimeout(refreshLiveMetrics, 5000);
+      setInterval(refreshLiveMetrics, 60000);
     })();
 
     // ============================================================
