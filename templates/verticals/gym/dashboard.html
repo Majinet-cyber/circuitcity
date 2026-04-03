@@ -14,16 +14,6 @@
 {% url 'gym:add_payment' as add_payment_url %}
 {% url 'inventory:time_logs' as checkin_url %}
 
-{#
-  REMOVED: dashboard_brand_header  — was a js-auto-hide element that collapsed after 30 s
-           with display:none, causing a large CLS.  The hero below already shows the
-           business name and greeting.
-
-  REMOVED: dashboard_quotes        — same js-auto-hide / display:none CLS issue.
-           One quote is embedded directly inside the hero where space is already reserved.
-
-  KEPT:    dashboard_yesterday_summary — purely server-rendered, no auto-hide, useful data.
-#}
 {% include "partials/dashboard_yesterday_summary.html" %}
 
 <div class="vertical-page">

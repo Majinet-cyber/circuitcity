@@ -200,5 +200,151 @@
   </div>
   {% endif %}
 
+  {# ===== QUOTATION BUILDER ===== #}
+  {% if run.recommended_array_kw %}
+  <div class="result-card mt-4" id="quotation-builder" style="border-color:#4f46e5;">
+    <div class="section-head" style="color:#4f46e5;"><i class="bi bi-file-earmark-text me-2"></i>Quotation Builder</div>
+    <p style="font-size:.85rem;color:#64748b;margin-bottom:1.25rem;">Derived from sizing run results. Adjust panel wattage to see component counts and estimated BOS items.</p>
+
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">System Size</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#4f46e5;">{{ run.recommended_array_kw|floatformat:1 }} kW</div>
+        <div style="font-size:.72rem;color:#94a3b8;">Solar array</div>
+      </div>
+      {% if run.recommended_inverter_kw %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Inverter</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#dc2626;">{{ run.recommended_inverter_kw|floatformat:0 }} kW</div>
+        <div style="font-size:.72rem;color:#94a3b8;">Recommended size</div>
+      </div>
+      {% endif %}
+      {% if run.recommended_battery_kwh %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Battery Bank</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#7c3aed;">{{ run.recommended_battery_kwh|floatformat:1 }} kWh</div>
+        <div style="font-size:.72rem;color:#94a3b8;">{{ run.usable_storage_kwh|default:"–"|floatformat:1 }} kWh usable</div>
+      </div>
+      {% endif %}
+      <div class="col-6 col-md-3">
+        <label style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.04em;">Panel Config</label>
+        <div style="font-size:1.5rem;font-weight:800;color:#059669;" id="qt-panel-count">{{ run.recommended_panel_count|default:"–" }}</div>
+        <div style="font-size:.72rem;color:#94a3b8;" id="qt-panel-note">panels ({{ run.panel_wattage|default:550 }}Wp each)</div>
+      </div>
+    </div>
+
+    <div class="row g-3 align-items-end mb-4">
+      <div class="col-sm-4">
+        <label style="font-size:.78rem;font-weight:600;color:#374151;">Panel wattage (Wp)</label>
+        <select id="qt-panel-wattage" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="250" {% if run.panel_wattage == 250 %}selected{% endif %}>250 Wp</option>
+          <option value="300" {% if run.panel_wattage == 300 %}selected{% endif %}>300 Wp</option>
+          <option value="350" {% if run.panel_wattage == 350 %}selected{% endif %}>350 Wp</option>
+          <option value="400" {% if run.panel_wattage == 400 %}selected{% endif %}>400 Wp</option>
+          <option value="450" {% if run.panel_wattage == 450 %}selected{% endif %}>450 Wp</option>
+          <option value="500" {% if run.panel_wattage == 500 %}selected{% endif %}>500 Wp</option>
+          <option value="550" {% if run.panel_wattage == 550 %}selected{% endif %}>550 Wp (common)</option>
+          <option value="600" {% if run.panel_wattage == 600 %}selected{% endif %}>600 Wp</option>
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <label style="font-size:.78rem;font-weight:600;color:#374151;">Design margin</label>
+        <select id="qt-design-margin" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="1.0">No margin (exact sizing)</option>
+          <option value="1.1" selected>+10% (recommended)</option>
+          <option value="1.15">+15%</option>
+          <option value="1.2">+20%</option>
+          <option value="1.25">+25% (commercial)</option>
+        </select>
+      </div>
+      <div class="col-sm-4">
+        <button id="qt-recalc" class="btn btn-primary btn-sm w-100" style="border-radius:8px;">Recalculate</button>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;border-radius:12px;padding:1rem 1.25rem;" id="qt-line-items">
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:.75rem;letter-spacing:.04em;">Quotation Line Items</div>
+      <table style="width:100%;font-size:.85rem;border-collapse:collapse;" id="qt-table">
+        <thead>
+          <tr style="border-bottom:1.5px solid #e2e8f0;">
+            <th style="text-align:left;padding:.35rem 0;color:#374151;">Item</th>
+            <th style="text-align:center;padding:.35rem 0;color:#374151;width:80px;">Qty</th>
+            <th style="text-align:left;padding:.35rem 0;color:#374151;">Specification</th>
+          </tr>
+        </thead>
+        <tbody id="qt-tbody">
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:1rem;font-size:.75rem;color:#94a3b8;">
+      <i class="bi bi-info-circle me-1"></i>
+      Panel count and component quantities are estimates based on system sizing outputs. Actual BOS (Balance of System) items depend on site survey and installation design. Verify with your installation team before issuing a formal quotation.
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var arrayKw   = parseFloat('{{ run.recommended_array_kw|default:"0"|floatformat:3 }}') || 0;
+    var invKw     = parseFloat('{{ run.recommended_inverter_kw|default:"0"|floatformat:2 }}') || 0;
+    var batKwh    = parseFloat('{{ run.recommended_battery_kwh|default:"0"|floatformat:2 }}') || 0;
+    var batUsable = parseFloat('{{ run.usable_storage_kwh|default:"0"|floatformat:2 }}') || 0;
+
+    var panelWattageEl  = document.getElementById('qt-panel-wattage');
+    var marginEl        = document.getElementById('qt-design-margin');
+    var recalcBtn       = document.getElementById('qt-recalc');
+    var panelCountEl    = document.getElementById('qt-panel-count');
+    var panelNoteEl     = document.getElementById('qt-panel-note');
+    var tbody           = document.getElementById('qt-tbody');
+
+    function calcAndRender() {
+      var wp     = parseInt(panelWattageEl.value) || 400;
+      var margin = parseFloat(marginEl.value) || 1.1;
+      var adjKw  = arrayKw * margin;
+      var panelCount = adjKw > 0 ? Math.ceil((adjKw * 1000) / wp) : 0;
+
+      panelCountEl.textContent = panelCount;
+      panelNoteEl.textContent  = 'panels (' + wp + ' Wp each, ' + Math.round((margin - 1) * 100) + '% margin)';
+
+      var rows = [];
+      if (panelCount > 0) {
+        rows.push({ item: 'Solar Panels', qty: panelCount, spec: wp + ' Wp monocrystalline' });
+      }
+      if (invKw > 0) {
+        rows.push({ item: 'Inverter / Hybrid Inverter', qty: 1, spec: invKw.toFixed(0) + ' kW' });
+      }
+      if (batKwh > 0) {
+        var batUnits = Math.ceil(batKwh / 2.4);
+        rows.push({ item: 'Battery Bank', qty: batUnits, spec: batKwh.toFixed(1) + ' kWh total (' + batUsable.toFixed(1) + ' kWh usable)' });
+      }
+      if (panelCount > 0) {
+        var strings = Math.max(1, Math.ceil(panelCount / 10));
+        rows.push({ item: 'DC Isolator / Combiner Box', qty: strings, spec: 'per string' });
+        rows.push({ item: 'MC4 Connectors (pairs)', qty: panelCount * 2, spec: 'pair' });
+        rows.push({ item: 'DC Cable (m)', qty: Math.round(panelCount * 3.5), spec: '4mm² PV cable (estimate)' });
+        rows.push({ item: 'Mounting Structure', qty: panelCount, spec: 'panel mounts (roof / ground)' });
+      }
+      if (invKw > 0) {
+        rows.push({ item: 'AC Protection / MCB', qty: 1, spec: 'per inverter output' });
+      }
+      rows.push({ item: 'AC Cable (m)', qty: 20, spec: '6mm² (installation estimate)' });
+      rows.push({ item: 'Earthing Kit', qty: 1, spec: 'site-wide' });
+      rows.push({ item: 'Monitoring / Data Logger', qty: 1, spec: 'optional — per site requirements' });
+
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr style="border-bottom:1px solid #f1f5f9;">' +
+          '<td style="padding:.4rem 0;font-weight:600;">' + r.item + '</td>' +
+          '<td style="padding:.4rem 0;text-align:center;">' + r.qty + '</td>' +
+          '<td style="padding:.4rem 0;color:#64748b;">' + r.spec + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+
+    recalcBtn.addEventListener('click', calcAndRender);
+    calcAndRender();
+  }());
+  </script>
+  {% endif %}
+
 </div>
 {% endblock %}

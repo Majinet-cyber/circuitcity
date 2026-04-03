@@ -43,6 +43,18 @@
   .dh-status.thin    { background: #fef3c7; color: #b45309; }
   .dh-status.risky   { background: #fee2e2; color: #dc2626; }
 
+  /* ── POPULAR MAKE CARDS ── */
+  .make-cards { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  .make-card {
+    padding: .45rem 1rem; border-radius: 10px; font-size: .82rem; font-weight: 600;
+    border: 1.5px solid #e2e8f0; background: #f8fafc; color: #374151;
+    cursor: pointer; transition: all .12s; user-select: none;
+    display: inline-flex; align-items: center; gap: .3rem;
+  }
+  .make-card:hover { border-color: #3b82f6; color: #1d4ed8; background: #eff6ff; }
+  .make-card.active { background: #1d4ed8; border-color: #1d4ed8; color: #fff; box-shadow: 0 2px 8px rgba(29,78,216,.25); }
+  .make-cards-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #64748b; margin-bottom: .45rem; }
+
   /* ── SECTION CARD ── */
   .form-section {
     background: #fff; border: 1.5px solid #e2e8f0;
@@ -88,6 +100,21 @@
     {# ── MAKE & MODEL ── #}
     <div class="form-section">
       <div class="form-section-title"><i class="bi bi-search"></i>Make &amp; Model</div>
+
+      {% if popular_makes %}
+      <div class="mb-3">
+        <div class="make-cards-label">Popular makes — tap to select</div>
+        <div class="make-cards" id="makeCardsGroup">
+          {% for make in popular_makes %}
+          <button type="button" class="make-card" data-make-id="{{ make.pk }}" data-make-name="{{ make.name }}">
+            {{ make.name }}
+          </button>
+          {% endfor %}
+          <button type="button" class="make-card" data-make-id="" data-make-name="">Other…</button>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="row g-3">
         <div class="col-md-5">
           <label class="form-label">Make</label>
@@ -324,20 +351,56 @@
     });
   });
 
-  /* ── MAKE / MODEL CASCADE ── */
-  var carModelsData = {{ car_models_json|safe }};
-  var makeSelect    = document.getElementById('makeSelect');
-  var modelSelect   = document.getElementById('modelSelect');
+  /* ── POPULAR MAKE CARDS ── */
+  var makeCardsGroup = document.getElementById('makeCardsGroup');
+  var carModelsData  = {{ car_models_json|safe }};
+  var makeSelect     = document.getElementById('makeSelect');
+  var modelSelect    = document.getElementById('modelSelect');
+
+  function populateModels(makeId) {
+    modelSelect.innerHTML = '<option value="">Select model…</option>';
+    (carModelsData[makeId] || []).forEach(function (m) {
+      var opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      modelSelect.appendChild(opt);
+    });
+  }
+
+  if (makeCardsGroup) {
+    makeCardsGroup.querySelectorAll('.make-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        makeCardsGroup.querySelectorAll('.make-card').forEach(function (c) { c.classList.remove('active'); });
+        card.classList.add('active');
+        var makeId   = card.dataset.makeId;
+        var makeName = card.dataset.makeName;
+        if (makeId) {
+          makeSelect.value = makeId;
+          populateModels(makeId);
+          // Scroll smoothly to model row
+          modelSelect.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          // "Other…" — clear selection and focus freeform field
+          makeSelect.value = '';
+          modelSelect.innerHTML = '<option value="">Select model…</option>';
+          var makeText = document.querySelector('input[name="make_text"]');
+          if (makeText) { makeText.focus(); }
+        }
+      });
+    });
+  }
+
+  /* ── MAKE / MODEL CASCADE (dropdown) ── */
   if (makeSelect) {
     makeSelect.addEventListener('change', function () {
       var makeId = this.value;
-      modelSelect.innerHTML = '<option value="">Select model…</option>';
-      (carModelsData[makeId] || []).forEach(function (m) {
-        var opt     = document.createElement('option');
-        opt.value   = m.id;
-        opt.textContent = m.name;
-        modelSelect.appendChild(opt);
-      });
+      // Sync card highlight
+      if (makeCardsGroup) {
+        makeCardsGroup.querySelectorAll('.make-card').forEach(function (c) {
+          c.classList.toggle('active', c.dataset.makeId === makeId);
+        });
+      }
+      populateModels(makeId);
     });
   }
 

@@ -222,12 +222,10 @@ def test_landing_page_no_leaked_developer_text(client):
         )
 
 
-def test_landing_page_metrics_show_neutral_labels(client):
+def test_landing_page_metrics_container_present(client):
     """
-    GUARDRAIL: Landing page metrics card must NOT display hardcoded numeric values.
-
-    Numeric aggregation is not yet live. The card must show neutral status labels
-    ('Real-time', 'Live', 'Tracking') rather than numbers like 'MWK 84,500' or '47+'.
+    Landing page metrics card must be present with correct labels.
+    Initial values render as skeleton loaders; JS patches in real values.
     """
     url = reverse("staticpages:home")
     response = client.get(url)
@@ -235,32 +233,88 @@ def test_landing_page_metrics_show_neutral_labels(client):
     assert response.status_code == 200
     content = response.content.decode()
 
-    # Metric labels must still be present
+    # Metric labels must be present
     assert "Avg. daily revenue tracked" in content
     assert "Sales recorded per day" in content
     assert "Avg. margin visibility" in content
 
-    # Neutral status labels must appear
-    assert "Real-time" in content
-    assert "Live" in content
-    assert "Tracking" in content
+    # Skeleton loader markup should be present (not placeholder text)
+    assert "lm-skeleton" in content, "lm-skeleton class should be used for skeleton loading"
 
-    # No hardcoded numeric values should appear in the metrics spans
+    # Placeholder text values must NOT appear (they were replaced with skeletons)
+    # "Real-time", "Live", "Tracking" as metric values are gone — JS drives real values
     import re
-    # Check that the lm-revenue span does not contain a MWK numeric value
-    lm_revenue_pattern = re.search(
-        r'id="lm-revenue"[^>]*>([^<]*)<', content
-    )
-    if lm_revenue_pattern:
-        span_text = lm_revenue_pattern.group(1).strip()
-        assert not re.match(r'^MWK[\s\u00a0]\d', span_text), (
-            f"lm-revenue span must not show a numeric MWK value, got: {span_text!r}"
+    # lm-revenue span should contain skeleton span, not plain text "Real-time"
+    lm_pattern = re.search(r'id="lm-revenue">(.*?)</span>', content, re.DOTALL)
+    if lm_pattern:
+        inner = lm_pattern.group(1)
+        assert "Real-time" not in inner, (
+            "lm-revenue must not show 'Real-time' — use skeleton loader instead"
         )
 
-    # Growing… must not appear (was a previous fallback that the task forbids)
-    assert "Growing" not in content or "Growing businesses" in content, (
-        "The text 'Growing\u2026' must not be used as a metric placeholder"
-    )
+
+def test_landing_metrics_api_schema(client):
+    """Landing metrics API must return correct JSON schema."""
+    url = reverse("staticpages:landing_metrics_api")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("application/json")
+
+    import json
+    data = json.loads(response.content)
+
+    required_keys = {
+        "active_businesses", "team_members", "has_data", "as_of", "status"
+    }
+    for key in required_keys:
+        assert key in data, f"Landing metrics API missing key: {key}"
+
+    assert data["status"] == "success"
+    assert isinstance(data["active_businesses"], int)
+    assert isinstance(data["team_members"], int)
+    assert isinstance(data["has_data"], bool)
+
+
+def test_landing_metrics_api_no_data_graceful(client):
+    """Landing metrics API must respond gracefully with no sales data."""
+    url = reverse("staticpages:landing_metrics_api")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    import json
+    data = json.loads(response.content)
+
+    # With no test data, has_data should be False but response must still be valid
+    assert data["status"] == "success"
+    assert data["active_businesses"] >= 0
+    assert data["team_members"] >= 0
+
+
+def test_landing_page_no_placeholder_metric_text(client):
+    """
+    GUARDRAIL: Landing page must not show 'Real-time', 'Live', 'Tracking' as
+    visible metric values. These were replaced with skeleton loaders.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # These must not appear as metric span content
+    # Note: they may appear in JS comments/strings — only visible HTML is checked
+    import re
+    for span_id in ["lm-revenue", "lm-sales", "lm-margin"]:
+        pattern = re.search(
+            r'id="' + span_id + r'">(.*?)</span>', content, re.DOTALL
+        )
+        if pattern:
+            inner = pattern.group(1)
+            for bad in ["Real-time", "Live", "Tracking"]:
+                assert bad not in inner, (
+                    f"Metric span #{span_id} must not contain placeholder text '{bad}'"
+                )
 
 
 def test_gym_dashboard_no_leaked_debug_text(client):
@@ -277,4 +331,111 @@ def test_gym_dashboard_no_leaked_debug_text(client):
     response = client.get(url)
     # Unauthenticated → redirect to login; template debug leaks only occur on 200.
     assert response.status_code in (200, 302)
+    if response.status_code == 200:
+        content = response.content.decode()
+        # Dev planning notes must not appear in rendered HTML
+        for forbidden in ["REMOVED: dashboard_brand_header", "HERO — gradient"]:
+            assert forbidden not in content, (
+                f"Dev comment '{forbidden}' must not appear in gym dashboard HTML"
+            )
+
+
+@pytest.mark.django_db
+def test_landing_metrics_api_with_businesses(client):
+    """
+    Landing metrics API returns correct team_members count when memberships exist.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from django.core.cache import cache
+
+    User = get_user_model()
+    user1 = User.objects.create_user("metricsuser1", "mu1@example.com", "pass123")
+    user2 = User.objects.create_user("metricsuser2", "mu2@example.com", "pass123")
+    biz = Business.objects.create(name="Metrics Test Biz", slug="metrics-test-biz-api")
+    Membership.objects.create(user=user1, business=biz, role="manager", status="ACTIVE", is_active=True)
+    Membership.objects.create(user=user2, business=biz, role="agent", status="ACTIVE", is_active=True)
+
+    cache.delete("landing_metrics_api_v2")
+    cache.delete("platform_live_metrics_v1")
+
+    url = reverse("staticpages:landing_metrics_api")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    import json
+    data = json.loads(response.content)
+    assert data["status"] == "success"
+    assert data["team_members"] >= 2
+
+
+@pytest.mark.django_db
+def test_car_dealer_stock_in_has_popular_makes(client):
+    """
+    Car dealer stock-in form must include popular make cards for tap-first UX.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.models_car_dealer import CarMake
+
+    User = get_user_model()
+    user = User.objects.create_user("cduxtester", "cdux@example.com", "pass123")
+    biz = Business.objects.create(name="CD UX Biz", slug="cd-ux-biz", business_kind="car_dealer")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    # Create a popular make
+    CarMake.objects.get_or_create(name="Toyota", defaults={"is_popular": True, "sort_order": 1})
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("car_dealer:stock_in")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    # Popular makes card section must be rendered
+    assert "make-card" in content or "make-cards" in content, (
+        "Popular make cards must be rendered in car dealer stock-in form"
+    )
+    assert "Toyota" in content
+
+
+@pytest.mark.django_db
+def test_energy_sizing_detail_has_quotation_section(client):
+    """
+    Energy system sizing detail page must include quotation builder section
+    when a sizing result exists.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.models_energy import SystemSizingRun
+
+    User = get_user_model()
+    user = User.objects.create_user("energytester", "en@example.com", "pass123")
+    biz = Business.objects.create(name="Energy Biz", slug="energy-biz", business_kind="energy")
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    run = SystemSizingRun.objects.create(
+        business=biz,
+        title="Test 3kW System",
+        recommended_array_kw=3.0,
+        recommended_panel_count=8,
+    )
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("verticals:energy_sizing_detail", kwargs={"run_id": run.pk})
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "quotation" in content.lower() or "Quotation" in content, (
+        "Energy sizing detail must include quotation builder section"
+    )
 

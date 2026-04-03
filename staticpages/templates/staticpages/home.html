@@ -3053,19 +3053,19 @@
           <div class="hero-counters" id="liveMetricsContainer">
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-revenue" class="lm-status-label">Real-time</span>
+                <span id="lm-revenue"><span class="lm-skeleton"></span></span>
               </div>
               <div class="hero-counter-label">Avg. daily revenue tracked</div>
             </div>
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-sales" class="lm-status-label">Live</span>
+                <span id="lm-sales"><span class="lm-skeleton" style="width:50px;"></span></span>
               </div>
               <div class="hero-counter-label">Sales recorded per day</div>
             </div>
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-margin" class="lm-status-label">Tracking</span>
+                <span id="lm-margin"><span class="lm-skeleton" style="width:60px;"></span></span>
               </div>
               <div class="hero-counter-label">Avg. margin visibility</div>
             </div>
@@ -3096,17 +3096,17 @@
             <div class="dash-kpis">
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Avg. Daily Revenue</div>
-                <div class="dash-kpi-value" id="dash-kpi-revenue">Real-time</div>
+                <div class="dash-kpi-value" id="dash-kpi-revenue">—</div>
                 <div class="dash-kpi-delta">30-day avg</div>
               </div>
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Gross Margin</div>
-                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">Live</div>
+                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">—</div>
                 <div class="dash-kpi-delta">avg margin</div>
               </div>
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Sales / Day</div>
-                <div class="dash-kpi-value">Tracking</div>
+                <div class="dash-kpi-value" id="dash-kpi-sales">—</div>
                 <div class="dash-kpi-delta">avg transactions</div>
               </div>
             </div>
@@ -3243,23 +3243,23 @@
           </div>
           <div class="problem-card-number">1.6%</div>
           <h3 class="problem-card-title">Inventory shrinkage</h3>
-          <p class="problem-card-body">The average retail business loses 1.6% of revenue to shrinkage — mostly from untracked stock and internal theft that goes undetected for months.</p>
+          <p class="problem-card-body">Average retail loss from untracked stock and internal theft — invisible without a system.</p>
         </div>
         <div class="problem-card">
           <div class="problem-card-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           </div>
           <div class="problem-card-number">~60%</div>
-          <h3 class="problem-card-title">No system for sales tracking</h3>
-          <p class="problem-card-body">Most small merchants rely on physical notebooks or memory. There is no record of who sold what, at what margin, or whether prices were applied correctly.</p>
+          <h3 class="problem-card-title">No sales tracking system</h3>
+          <p class="problem-card-body">Notebooks and memory replace records. No visibility on who sold what, at what price, or at what margin.</p>
         </div>
         <div class="problem-card">
           <div class="problem-card-icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
           </div>
           <div class="problem-card-number">~70%</div>
-          <h3 class="problem-card-title">Cannot state their actual profit margin</h3>
-          <p class="problem-card-body">Without cost-of-goods tracking and live margin calculations, most owners do not know whether their business is truly profitable until it is too late to act.</p>
+          <h3 class="problem-card-title">Can't state their profit margin</h3>
+          <p class="problem-card-body">Without cost tracking and live margin data, owners can't tell if they're profitable until it's too late.</p>
         </div>
       </div>
     </div>
@@ -3498,7 +3498,7 @@
             Built for solar installers, ESCOs, and off-grid operators — system sizing, predictive maintenance, demand forecasting, and full energy economics in one platform.
           </p>
         </div>
-        <a href="{% url 'staticpages:about' %}" style="
+        <a href="{% url 'staticpages:pricing' %}" style="
           display: inline-flex; align-items: center; gap: 0.375rem;
           font-size: 0.875rem; font-weight: 600; color: #059669;
           text-decoration: none; white-space: nowrap; flex-shrink: 0;
@@ -3679,31 +3679,61 @@
   ============================================================ -->
   <section id="smart-recommendations" style="background: var(--bg-subtle); padding: 4rem 0;">
     <div class="container">
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; max-width: 960px; margin: 0 auto;">
-        <div>
+      <div class="sr-grid">
+        <div class="sr-copy">
           <span class="eyebrow">Built-in Intelligence</span>
-          <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Smart recommendations, automatically.</h2>
-          <p style="font-size: 1rem; color: var(--text-muted); line-height: 1.7; margin-bottom: 1.5rem;">
-            Emajinet reads your data and surfaces the right insight at the right time — restock prompts before you run out, margin warnings before profit erodes, and seasonal alerts before demand spikes.
+          <h2 class="section-title" style="font-size: clamp(1.5rem, 3vw, 2.1rem);">Smart recommendations, automatically.</h2>
+          <p style="font-size: 0.9375rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.25rem;">
+            Emajinet surfaces the right insight at the right time — restock before you run out, margin warnings before profit erodes, seasonal alerts before demand spikes.
           </p>
           <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Try it free</a>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #92400e;">
-            ⚠ Samsung A05 — 3 units left. Reorder now at current velocity.
+        <div class="sr-alerts">
+          <div class="sr-alert sr-alert--warn">
+            <span class="sr-alert-icon">⚠</span>
+            <span>Samsung A05 — 3 units left. Reorder at current velocity.</span>
           </div>
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #991b1b;">
-            🚨 Sale below cost detected on USB-C Charger — review immediately.
+          <div class="sr-alert sr-alert--danger">
+            <span class="sr-alert-icon">🚨</span>
+            <span>Sale below cost on USB-C Charger — review immediately.</span>
           </div>
-          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 0.875rem 1.125rem; font-size: 0.9rem; color: #1e40af;">
-            📅 Back-to-school in 3 weeks — increase stationery stock ~34%.
+          <div class="sr-alert sr-alert--info">
+            <span class="sr-alert-icon">📅</span>
+            <span>Back-to-school in 3 weeks — increase stationery stock ~34%.</span>
           </div>
         </div>
       </div>
     </div>
     <style>
+      .sr-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2.5rem;
+        align-items: center;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      .sr-alerts { display: flex; flex-direction: column; gap: 0.625rem; }
+      .sr-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.625rem;
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        line-height: 1.45;
+      }
+      .sr-alert-icon { flex-shrink: 0; margin-top: 0.05rem; }
+      .sr-alert--warn   { background: #fff7ed; border: 1px solid #fed7aa; color: #92400e; }
+      .sr-alert--danger { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+      .sr-alert--info   { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
       @media (max-width: 640px) {
-        #smart-recommendations .container > div { grid-template-columns: 1fr; }
+        .sr-grid { grid-template-columns: 1fr; gap: 1.75rem; }
+        .sr-copy { text-align: center; }
+        .sr-copy .btn { width: 100%; max-width: 280px; }
+      }
+      @media (max-width: 400px) {
+        .sr-alert { font-size: 0.8125rem; padding: 0.625rem 0.875rem; }
       }
     </style>
   </section>
@@ -5148,25 +5178,48 @@
 
       var _lastGood = null;  // stores last successful API payload
 
-      function fmt(n) {
-        return Math.round(n).toLocaleString('en-US');
+      function fmtMwk(n) {
+        n = Math.round(n);
+        if (n >= 1000000) return 'MWK\u00a0' + (n / 1000000).toFixed(1) + 'M';
+        if (n >= 1000)    return 'MWK\u00a0' + Math.round(n / 1000) + 'K';
+        return 'MWK\u00a0' + n.toLocaleString('en-US');
       }
 
-      // Set a single metric span to a real text value
       function setMetricSpan(id, text) {
         var el = document.getElementById(id);
         if (!el) return;
-        el.innerHTML = text;  // replaces skeleton span or previous text
+        el.innerHTML = text;
       }
 
-      // Metrics display uses neutral status labels — numeric aggregation handled in a future pass.
+      function setDashKpi(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
+
       function applyPayload(data) {
         _lastGood = data;
-        // Intentionally no numeric values injected here.
+        var revenue = data.avg_daily_revenue;
+        var sales   = data.sales_recorded_per_day;
+        var margin  = data.avg_margin_visibility;
+
+        if (revenue !== null && revenue !== undefined) {
+          setMetricSpan('lm-revenue', fmtMwk(revenue));
+          setDashKpi('dash-kpi-revenue', fmtMwk(revenue));
+        }
+        if (sales !== null && sales !== undefined) {
+          setMetricSpan('lm-sales', Math.round(sales).toLocaleString('en-US'));
+          setDashKpi('dash-kpi-sales', Math.round(sales).toLocaleString('en-US'));
+        }
+        if (margin !== null && margin !== undefined) {
+          setMetricSpan('lm-margin', parseFloat(margin).toFixed(1) + '%');
+          setDashKpi('dash-kpi-margin', parseFloat(margin).toFixed(1) + '%');
+        }
       }
 
       function applyFallback() {
-        // No-op: neutral labels are rendered server-side and remain stable.
+        setMetricSpan('lm-revenue', '&mdash;');
+        setMetricSpan('lm-sales',   '&mdash;');
+        setMetricSpan('lm-margin',  '&mdash;');
       }
 
       function refreshLiveMetrics() {

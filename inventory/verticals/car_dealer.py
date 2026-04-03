@@ -205,6 +205,7 @@ def stock_in_vehicle(request: HttpRequest) -> HttpResponse:
 
     CarMake, CarModel, CarDealerVehicle = _get_car_models()
     makes = CarMake.objects.order_by("sort_order", "name") if CarMake else []
+    popular_makes = CarMake.objects.filter(is_popular=True).order_by("sort_order", "name") if CarMake else []
     car_models = CarModel.objects.select_related("make").order_by("make__name", "name") if CarModel else []
 
     if request.method == "POST":
@@ -286,6 +287,7 @@ def stock_in_vehicle(request: HttpRequest) -> HttpResponse:
         "car_dealer/stock_in.html",
         {
             "makes": makes,
+            "popular_makes": popular_makes,
             "car_models_json": json.dumps(car_models_by_make),
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
