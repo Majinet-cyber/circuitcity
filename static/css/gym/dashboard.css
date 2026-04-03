@@ -1,232 +1,560 @@
 /**
- * Gym Dashboard Polish - Premium Styles
- * Subtle animations, clean spacing, improved micro-interactions
+ * Gym Dashboard – Premium v3
+ *
+ * Design goals:
+ *  - Zero layout shift on first load (server-rendered dimensions, stable min-heights)
+ *  - No content flash (animation-fill-mode: both on every animated element)
+ *  - No JS-dependent visibility on above-fold elements
+ *  - Progressive stagger for scroll-in sections
+ *  - Buttery 60 fps interactions
  */
 
 /* ============================================================================
-   LAYOUT & BASE STYLES
-   ========================================================================== */
+   PAGE WRAPPER
+   ============================================================================ */
 
 .vertical-page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
   padding: 18px;
 }
 
 /* ============================================================================
-   HERO SECTION
-   ========================================================================== */
+   HERO
+   Stable-height gradient card. All content is server-rendered.
+   animation-fill-mode: both → element stays at opacity:0 during delay (no flash).
+   ============================================================================ */
 
 .vertical-hero {
-  background: linear-gradient(135deg, #2563eb, #10b981);
-  padding: 24px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #059669 100%);
+  padding: 26px 28px;
   border-radius: 20px;
   color: #fff;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
   align-items: center;
-  justify-content: space-between;
   position: relative;
   overflow: hidden;
-  /* animation-fill-mode: both ensures the hero stays at opacity:0 before the
-     animation fires, preventing a white flash before the gradient renders.   */
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+  /* min-height stabilises the layout during the fade-in animation so no
+     content below the hero shifts when the hero becomes visible           */
+  min-height: 148px;
+  animation: gymFadeIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
   will-change: opacity;
 }
 
+/* Decorative radial glows – purely visual, pointer-events off */
 .vertical-hero::before {
   content: '';
   position: absolute;
-  top: -50%;
-  right: -10%;
+  top: -70px;
+  right: -50px;
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
-  animation: pulse 4s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(255,255,255,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+.vertical-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -50px;
+  left: 35%;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+  pointer-events: none;
 }
 
-.vertical-hero h1 {
-  margin: 0;
-  font-size: clamp(24px, 3vw, 32px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
+/* --- Hero text column --- */
+.gym-hero-content {
+  z-index: 1;
+  min-width: 0;
 }
 
-.vertical-hero p {
-  margin: 4px 0 0;
-}
-
-/* Hero Actions */
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.hero-actions a {
-  border-radius: 999px;
-  padding: 10px 16px;
+.gym-hero-eyebrow {
+  margin: 0 0 5px;
+  font-size: 0.72rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.75;
+}
+
+.gym-hero-title {
+  margin: 0 0 6px;
+  font-size: clamp(20px, 2.6vw, 28px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.gym-hero-blurb {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+  opacity: 0.82;
+  line-height: 1.4;
+}
+
+.gym-hero-quote {
+  margin: 0;
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.62;
+  max-width: 400px;
+  line-height: 1.4;
+}
+
+/* --- Hero action cards column --- */
+.gym-hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+/* CTA card – glassmorphic pill with icon + copy + badge */
+.gym-action-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  padding: 11px 15px;
   text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #fff;
+  min-width: 185px;
+  transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  cursor: pointer;
+  /* Reserve a fixed height so the hero never shifts between renders */
+  min-height: 52px;
 }
 
-.hero-actions a:hover {
+.gym-action-card:hover,
+.gym-action-card:focus-visible {
+  background: rgba(255, 255, 255, 0.24);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  color: #fff;
+  text-decoration: none;
+  outline: 2px solid rgba(255,255,255,0.5);
+  outline-offset: 2px;
 }
 
-.hero-actions a:active {
+.gym-action-card:active {
   transform: translateY(0);
+  box-shadow: none;
 }
 
-.hero-actions .primary {
+.gym-action-icon {
+  font-size: 1.45rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.gym-action-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.gym-action-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  line-height: 1.2;
+}
+
+.gym-action-sub {
+  font-size: 0.72rem;
+  opacity: 0.78;
+}
+
+.gym-action-badge {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gym-action-badge--warn {
+  background: rgba(239, 68, 68, 0.28);
+  color: #fecaca;
+}
+
+.gym-action-arrow {
+  opacity: 0.65;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+/* More-dropdown wrapper inside hero */
+.gym-hero-more {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ============================================================================
+   MEMBER STATUS BLOCK
+   Server-rendered widths and colours — zero JS dependency on initial paint.
+   ============================================================================ */
+
+/* Override .recent-block padding so the KPI row bleeds edge-to-edge */
+.gym-member-status {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+/* 3-column KPI row */
+.gym-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.gym-kpi-card {
+  padding: 16px 14px;
   background: #fff;
+  border-right: 1px solid #e2e8f0;
+  /* Fixed min-height guarantees the row never shifts as numbers load */
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.gym-kpi-card:last-child {
+  border-right: none;
+}
+
+.gym-kpi-card--green {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+.gym-kpi-card--red {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+.gym-kpi-label {
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: #64748b;
+  margin: 0 0 3px;
+  line-height: 1.3;
+}
+
+.gym-kpi-label--red {
+  color: #991b1b;
+}
+
+/* KPI numbers — server-rendered, no JS animation on above-fold cards */
+.gym-kpi-value {
+  font-size: 1.85rem;
+  font-weight: 900;
+  margin: 0;
+  color: #0f172a;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  /* Reserve minimum width so the number slot never collapses to 0 */
+  min-width: 1ch;
+}
+
+.gym-kpi-value--green {
+  color: #16a34a;
+}
+
+.gym-kpi-value--red {
+  color: #dc2626;
+}
+
+.gym-kpi-note {
+  display: block;
+  font-size: 0.68rem;
+  margin-top: 3px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.gym-kpi-note--green {
+  color: #166534;
+}
+
+.gym-kpi-note--red {
+  color: #991b1b;
+}
+
+/* --- Health bar --------------------------------------------------------- */
+
+.gym-health-bar-wrap {
+  padding: 13px 16px 14px;
+}
+
+.gym-health-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.gym-health-bar-label {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.gym-health-bar-pct {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.gym-health-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  overflow: hidden;
+}
+
+/* Width is injected server-side via inline style.
+   The CSS transition fires only on subsequent changes (not initial render),
+   so no 0→X flash on page load — the bar paints at the correct width. */
+.gym-health-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+  transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gym-health-bar-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.67rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.gym-health-empty {
+  padding: 12px 16px 14px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.83rem;
+}
+
+.gym-health-empty-link {
+  color: #7c3aed;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gym-health-empty-link:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   FILTER SECTION
+   ============================================================================ */
+
+.gym-filter-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.gym-filter-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.gym-filter-pill {
+  border-radius: 20px;
+  padding: 5px 13px;
+  font-size: 0.83rem;
+  text-decoration: none;
+}
+
+.gym-filter-month-wrap {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.gym-filter-month-input {
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 0.83rem;
+  max-width: 140px;
+}
+
+.gym-filter-showing {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 0.83rem;
+}
+
+/* ============================================================================
+   SHARED SECTION PATTERNS
+   ============================================================================ */
+
+.gym-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 13px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gym-section-range {
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.gym-section-total {
+  font-weight: 700;
+  font-size: 0.93rem;
   color: #0f172a;
 }
 
-.hero-actions .primary:hover {
-  background: #f8fafc;
+.gym-section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
-.hero-actions .ghost {
-  border: 1px solid rgba(255,255,255,.8);
-  color: #fff;
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(10px);
-}
-
-.hero-actions .ghost:hover {
-  background: rgba(255,255,255,0.2);
-  border-color: #fff;
+.gym-section-range-sub {
+  display: block;
+  color: #64748b;
+  font-size: 0.76rem;
+  margin-top: 1px;
 }
 
 /* ============================================================================
    METRICS GRID & CARDS
-   ========================================================================== */
+   ============================================================================ */
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 13px;
   min-width: 0;
-  overflow: visible;
 }
 
-/* Base Metric Card */
+/* Base metric card.
+   animation-fill-mode: both → the `from` keyframe (opacity:0, translateY:16px)
+   applies immediately during the stagger delay, so there is NO jump at the
+   moment the animation starts.                                               */
 .metric-card {
   background: #fff;
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .06);
   text-align: center;
-  height: auto !important;
-  /* Reserve a stable minimum size so the grid never shifts while cards animate in */
-  min-height: 120px;
+  min-height: 110px;
   min-width: 0;
-  overflow: visible;
   position: relative;
-  border: 1px solid rgba(15, 23, 42, 0.04);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  /* animation-fill-mode: both keeps opacity:0 during the delay period so the card
-     never flickers to opacity:1 before its stagger delay fires.               */
-  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  animation: gymFadeUp 0.42s cubic-bezier(0.4, 0, 0.2, 1) both;
   will-change: opacity, transform;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-/* Hover Effects */
 .metric-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(15, 23, 42, .12);
-  border-color: rgba(15, 23, 42, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px rgba(15, 23, 42, .1);
 }
 
 .metric-card:active {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
-/* Staggered Animation */
-.metric-card:nth-child(1) { animation-delay: 0s; }
-.metric-card:nth-child(2) { animation-delay: 0.08s; }
-.metric-card:nth-child(3) { animation-delay: 0.16s; }
-.metric-card:nth-child(4) { animation-delay: 0.24s; }
-.metric-card:nth-child(5) { animation-delay: 0.32s; }
-.metric-card:nth-child(6) { animation-delay: 0.40s; }
+/* Staggered delays — cards appear in a ripple */
+.metric-card:nth-child(1) { animation-delay: 0.00s; }
+.metric-card:nth-child(2) { animation-delay: 0.05s; }
+.metric-card:nth-child(3) { animation-delay: 0.10s; }
+.metric-card:nth-child(4) { animation-delay: 0.15s; }
+.metric-card:nth-child(5) { animation-delay: 0.20s; }
+.metric-card:nth-child(6) { animation-delay: 0.25s; }
 
-/* Card Typography */
 .metric-card h3 {
-  margin: 0;
-  font-size: .9rem;
+  margin: 0 0 3px;
+  font-size: 0.70rem;
   text-transform: uppercase;
   color: #64748b;
-  white-space: normal !important;
   line-height: 1.2;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  letter-spacing: 0.05em;
-  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 
 .metric-card p {
-  margin: 6px 0 0;
-  font-size: 2rem;
+  margin: 0;
+  font-size: 1.75rem;
   font-weight: 800;
   color: #0f172a;
-  min-width: 0;
-  letter-spacing: -0.02em;
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
 .metric-card small {
   display: block;
   margin-top: 4px;
-  font-size: .85rem;
+  font-size: 0.76rem;
   color: #64748b;
-  min-width: 0;
-  overflow-wrap: break-word;
 }
 
 /* ============================================================================
-   KPI CARD COLOR ACCENTS
-   ========================================================================== */
+   KPI COLOR ACCENTS
+   ============================================================================ */
 
 .kpi-revenue {
-  border-top: 4px solid #3b82f6;
-  background: linear-gradient(180deg, #eff6ff 0%, #fff 40px);
+  border-top: 3px solid #3b82f6;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 44px);
 }
-
 .kpi-revenue h3 { color: #1e40af; }
-.kpi-revenue p { color: #2563eb; }
+.kpi-revenue p  { color: #2563eb; }
 
 .kpi-costs {
-  border-top: 4px solid #ef4444;
-  background: linear-gradient(180deg, #fef2f2 0%, #fff 40px);
+  border-top: 3px solid #ef4444;
+  background: linear-gradient(180deg, #fef2f2 0%, #fff 44px);
 }
-
 .kpi-costs h3 { color: #991b1b; }
-.kpi-costs p { color: #dc2626; }
+.kpi-costs p  { color: #dc2626; }
 
 .kpi-profit {
-  border-top: 4px solid #16a34a;
-  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40px);
+  border-top: 3px solid #16a34a;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 44px);
 }
-
 .kpi-profit h3 { color: #166534; }
 
 .kpi-mrr {
-  border-top: 4px solid #8b5cf6;
-  background: linear-gradient(180deg, #faf5ff 0%, #fff 40px);
+  border-top: 3px solid #8b5cf6;
+  background: linear-gradient(180deg, #faf5ff 0%, #fff 44px);
 }
-
 .kpi-mrr h3 { color: #6b21a8; }
-.kpi-mrr p { color: #7c3aed; }
+.kpi-mrr p  { color: #7c3aed; }
 
 /* ============================================================================
    PAYMENT METHOD CARDS
-   ========================================================================== */
+   ============================================================================ */
 
 .payment-method-card {
   position: relative;
@@ -235,12 +563,12 @@
 
 .payment-percentage {
   position: absolute;
-  top: 18px;
-  right: 18px;
+  top: 13px;
+  right: 13px;
   font-weight: 800;
-  font-size: 1.25rem;
-  opacity: 0.85;
-  transition: opacity 0.2s ease;
+  font-size: 1.05rem;
+  opacity: 0.78;
+  transition: opacity 0.15s ease;
 }
 
 .payment-method-card:hover .payment-percentage {
@@ -249,17 +577,21 @@
 
 .payment-bar-container {
   width: 100%;
-  height: 8px;
+  height: 7px;
   background: #f1f5f9;
   border-radius: 4px;
-  margin-top: 10px;
+  margin-top: 9px;
   overflow: hidden;
 }
 
+/* Initial width is 0; JS sets the real width after DOMContentLoaded.
+   The CSS transition fires as a change (0→X), which the user sees as a
+   smooth grow animation only once the metric-card has faded into view.  */
 .payment-bar {
   height: 100%;
   border-radius: 4px;
-  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 0;
+  transition: width 0.55s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
@@ -267,237 +599,352 @@
 .payment-bar::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-  animation: shimmer 2s infinite;
+  top: 0; left: -100%;
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: gymShimmer 2s infinite;
 }
 
-/* Payment Method Colors */
+/* Payment method colour palettes */
 .payment-method-cash {
-  border-top: 4px solid #10b981;
-  background: linear-gradient(180deg, #f0fdf4 0%, #fff 40px);
+  border-top: 3px solid #10b981;
+  background: linear-gradient(180deg, #f0fdf4 0%, #fff 44px);
 }
-
-.payment-method-cash h3 { color: #166534; }
+.payment-method-cash h3              { color: #166534; }
 .payment-method-cash .payment-percentage { color: #059669; }
 .payment-bar-cash { background: linear-gradient(90deg, #10b981, #059669); }
 
 .payment-method-mobile-money {
-  border-top: 4px solid #f59e0b;
-  background: linear-gradient(180deg, #fffbeb 0%, #fff 40px);
+  border-top: 3px solid #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 44px);
 }
-
-.payment-method-mobile-money h3 { color: #92400e; }
+.payment-method-mobile-money h3              { color: #92400e; }
 .payment-method-mobile-money .payment-percentage { color: #d97706; }
 .payment-bar-mobile-money { background: linear-gradient(90deg, #f59e0b, #d97706); }
 
 .payment-method-bank {
-  border-top: 4px solid #3b82f6;
-  background: linear-gradient(180deg, #eff6ff 0%, #fff 40px);
+  border-top: 3px solid #3b82f6;
+  background: linear-gradient(180deg, #eff6ff 0%, #fff 44px);
 }
-
-.payment-method-bank h3 { color: #1e40af; }
+.payment-method-bank h3              { color: #1e40af; }
 .payment-method-bank .payment-percentage { color: #2563eb; }
 .payment-bar-bank { background: linear-gradient(90deg, #3b82f6, #2563eb); }
 
 /* ============================================================================
-   RECENT BLOCKS
-   ========================================================================== */
+   RECENT BLOCK — shared card container
+   animation-fill-mode: both fixes the translateY jump at animation start.
+   Progressive stagger delays create a smooth page-load ripple effect.
+   ============================================================================ */
 
 .recent-block {
   background: #fff;
-  border-radius: 20px;
+  border-radius: 18px;
   padding: 18px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, .08);
-  border: 1px solid rgba(15, 23, 42, 0.04);
-  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  animation: fadeUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-  opacity: 0;
-  animation-delay: 0.2s;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .06);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  /* "both" keeps the `from` keyframe applied during the stagger delay,
+     preventing a flash from translateY(0) → translateY(16px) at start  */
+  animation: gymFadeUp 0.42s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* Stagger per section — subtle progressive entrance */
+.recent-block:nth-child(1) { animation-delay: 0.04s; }
+.recent-block:nth-child(2) { animation-delay: 0.08s; }
+.recent-block:nth-child(3) { animation-delay: 0.12s; }
+.recent-block:nth-child(4) { animation-delay: 0.16s; }
+.recent-block:nth-child(5) { animation-delay: 0.20s; }
+.recent-block:nth-child(6) { animation-delay: 0.24s; }
+.recent-block:nth-child(7) { animation-delay: 0.28s; }
+.recent-block:nth-child(8) { animation-delay: 0.32s; }
+
 .recent-block:hover {
-  box-shadow: 0 15px 35px rgba(15, 23, 42, .1);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
 }
 
 .recent-block h2 {
-  margin: 0;
-  font-size: 1.1rem;
+  margin: 0 0 12px;
+  font-size: 1rem;
   font-weight: 700;
   color: #0f172a;
 }
 
-/* Recent List */
-.recent-list {
+/* ============================================================================
+   PAYMENT LIST
+   ============================================================================ */
+
+.gym-payment-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.recent-item {
+.gym-payment-item {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 12px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fff;
+  transition: background 0.13s ease;
 }
 
-.recent-item:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, .06);
-  transform: translateX(4px);
+.gym-payment-item:hover {
+  background: #f1f5f9;
+}
+
+.gym-payment-left {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.gym-payment-avatar {
+  width: 33px;
+  height: 33px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.gym-payment-info {
+  min-width: 0;
+}
+
+.gym-payment-name {
+  font-weight: 600;
+  font-size: 0.87rem;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.gym-payment-method {
+  font-size: 0.71rem;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.gym-payment-right {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.gym-payment-amount {
+  font-weight: 700;
+  font-size: 0.87rem;
+  color: #16a34a;
+}
+
+.gym-payment-date {
+  font-size: 0.68rem;
+  color: #94a3b8;
+  margin-top: 1px;
+}
+
+/* Empty-state */
+.gym-payment-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1.5px dashed #e2e8f0;
+}
+
+.gym-payment-empty-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.gym-payment-empty-title {
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+  font-size: 0.93rem;
+}
+
+.gym-payment-empty-sub {
+  color: #64748b;
+  font-size: 0.81rem;
+  margin-bottom: 1rem;
 }
 
 /* ============================================================================
-   BUTTONS & INTERACTIVE ELEMENTS
-   ========================================================================== */
+   BUTTON UTILITIES
+   ============================================================================ */
 
-.btn {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.gym-btn-primary {
+  background: #7c3aed;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.81rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  display: inline-block;
+  transition: background 0.14s ease, transform 0.14s ease;
 }
 
-.btn:hover {
+.gym-btn-primary:hover,
+.gym-btn-primary:focus-visible {
+  background: #6d28d9;
+  color: #fff;
+  text-decoration: none;
   transform: translateY(-1px);
-  filter: brightness(1.05);
 }
 
-.btn:active {
-  transform: translateY(1px);
-}
-
-/* ============================================================================
-   ANIMATIONS & KEYFRAMES
-   ========================================================================== */
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.5;
-    transform: scale(1.1);
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    left: -100%;
-  }
-  100% {
-    left: 200%;
-  }
-}
-
-/* Countup number animation */
-.metric-card p[data-count] {
-  transition: color 0.3s ease;
+.gym-btn-primary:active {
+  transform: translateY(0);
 }
 
 /* ============================================================================
-   RESPONSIVE DESIGN
-   ========================================================================== */
+   KEYFRAME ANIMATIONS
+   ============================================================================ */
+
+@keyframes gymFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes gymFadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes gymShimmer {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+
+/* ============================================================================
+   RESPONSIVE — TABLET  (≤ 900 px)
+   ============================================================================ */
+
+@media (max-width: 900px) {
+  .vertical-hero {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .gym-hero-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .gym-action-card {
+    flex: 1 1 150px;
+  }
+
+  .gym-hero-more {
+    width: 100%;
+  }
+}
+
+/* ============================================================================
+   RESPONSIVE — MOBILE (≤ 640 px)
+   ============================================================================ */
 
 @media (max-width: 640px) {
   .vertical-page {
     padding: 12px;
-    gap: 16px;
-  }
-
-  .metric-card p {
-    font-size: clamp(1.5rem, 5vw, 2rem);
-  }
-
-  .metrics-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .payment-percentage {
-    font-size: 1.1rem;
+    gap: 12px;
   }
 
   .vertical-hero {
-    padding: 18px;
+    padding: 18px 16px;
+    min-height: auto;
     border-radius: 16px;
   }
 
-  .hero-actions {
-    width: 100%;
+  /* Keep 3-column KPI row on mobile — numbers are compact enough */
+  .gym-kpi-card {
+    padding: 11px 9px;
+    min-height: 72px;
   }
 
-  .hero-actions a {
-    flex: 1;
-    text-align: center;
-    min-width: 100px;
+  .gym-kpi-value {
+    font-size: 1.55rem;
+  }
+
+  /* 2-column financial metrics grid on mobile */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .metric-card {
+    min-height: 90px;
+  }
+
+  .metric-card p {
+    font-size: 1.45rem;
+  }
+
+  .gym-filter-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .gym-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gym-payment-name {
+    max-width: 140px;
   }
 }
 
 /* ============================================================================
-   ACCESSIBILITY & REDUCED MOTION
-   ========================================================================== */
+   ACCESSIBILITY — REDUCED MOTION
+   All animations and transitions disabled; elements immediately visible.
+   ============================================================================ */
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-
   .metric-card,
   .recent-block,
-  .vertical-hero {
-    animation: none !important;
-    opacity: 1 !important;
-  }
-
+  .vertical-hero,
+  .gym-action-card,
+  .gym-health-bar-fill,
   .payment-bar {
+    animation: none !important;
     transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 
-  .payment-bar::after {
-    animation: none !important;
+  /* Ensure payment bar still renders at the correct final width */
+  .payment-bar {
+    width: var(--bar-width, 0%) !important;
   }
 }
 
 /* ============================================================================
-   PRINT STYLES
-   ========================================================================== */
+   PRINT
+   ============================================================================ */
 
 @media print {
   .vertical-hero {
-    background: #2563eb !important;
+    background: #1d4ed8 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    animation: none;
+    opacity: 1;
   }
 
   .metric-card,
@@ -505,25 +952,11 @@
     box-shadow: none !important;
     border: 1px solid #e2e8f0 !important;
     page-break-inside: avoid;
+    animation: none;
+    opacity: 1;
   }
 
-  .hero-actions {
-    display: none !important;
+  .gym-hero-actions {
+    display: none;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

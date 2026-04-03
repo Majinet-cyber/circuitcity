@@ -14,144 +14,189 @@
 {% url 'gym:add_payment' as add_payment_url %}
 {% url 'inventory:time_logs' as checkin_url %}
 
-{% comment %}Branded header with greeting{% endcomment %}
-{% include "partials/dashboard_brand_header.html" %}
+{#
+  REMOVED: dashboard_brand_header  — was a js-auto-hide element that collapsed after 30 s
+           with display:none, causing a large CLS.  The hero below already shows the
+           business name and greeting.
 
-{% comment %}Daily wisdom quotes{% endcomment %}
-{% include "partials/dashboard_quotes.html" %}
+  REMOVED: dashboard_quotes        — same js-auto-hide / display:none CLS issue.
+           One quote is embedded directly inside the hero where space is already reserved.
 
-{% comment %}Yesterday summary (shows once per day){% endcomment %}
+  KEPT:    dashboard_yesterday_summary — purely server-rendered, no auto-hide, useful data.
+#}
 {% include "partials/dashboard_yesterday_summary.html" %}
 
 <div class="vertical-page">
-  <header class="vertical-hero">
-    <div>
-      <p style="margin:0;opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem">{{ business.name }} · {{ location_label }}</p>
-      <h1>{{ hero_title }}</h1>
-      <p>{{ hero_blurb }}</p>
+
+  {# ======================================================================
+     HERO — gradient card; all content server-rendered, no JS dependency
+     ====================================================================== #}
+  <header class="vertical-hero" aria-label="Gym overview">
+
+    {# Left: title + blurb + optional quote #}
+    <div class="gym-hero-content">
+      <p class="gym-hero-eyebrow">{{ business.name|default:"Your Gym" }} · {{ location_label|default:"Dashboard" }}</p>
+      <h1 class="gym-hero-title">{{ hero_title|default:"Gym Dashboard" }}</h1>
+      <p class="gym-hero-blurb">{{ hero_blurb|default:"Track members, revenue, and growth" }}</p>
+      {% if dashboard_quotes.slot_1 %}
+      {# Quote lives inside the hero so it never causes an independent layout shift #}
+      <p class="gym-hero-quote">"{{ dashboard_quotes.slot_1.text|truncatechars:100 }}" — {{ dashboard_quotes.slot_1.author }}</p>
+      {% endif %}
     </div>
-    <div class="hero-actions">
-      <a class="primary" href="{{ members_url|default:'/gym/members/' }}">
-        Manage members
-        <span class="badge bg-light text-primary ms-1" style="font-size: 0.85rem; padding: 0.25rem 0.5rem;">{{ total_members|default:0 }}</span>
+
+    {# Right: two prominent action cards + more-dropdown #}
+    <div class="gym-hero-actions">
+      <a href="{{ members_url|default:'/gym/members/' }}" class="gym-action-card" data-testid="hero-members">
+        <span class="gym-action-icon" aria-hidden="true">👥</span>
+        <div class="gym-action-body">
+          <span class="gym-action-title">Members</span>
+          <span class="gym-action-sub">{{ total_members|default:0 }} total</span>
+        </div>
+        <span class="gym-action-badge{% if members_in_arrears > 0 %} gym-action-badge--warn{% endif %}" aria-label="{% if members_in_arrears > 0 %}{{ members_in_arrears }} in arrears{% else %}{{ members_active_count }} active{% endif %}">
+          {% if members_in_arrears > 0 %}{{ members_in_arrears }} ⚠{% else %}{{ members_active_count }} ✓{% endif %}
+        </span>
       </a>
-      <a class="ghost" href="{{ add_payment_url|default:'/gym/payment/add/' }}">Record payment</a>
-      {% include "partials/vertical_more_dropdown.html" %}
+
+      <a href="{{ add_payment_url|default:'/gym/payment/add/' }}" class="gym-action-card" data-testid="hero-payment">
+        <span class="gym-action-icon" aria-hidden="true">💳</span>
+        <div class="gym-action-body">
+          <span class="gym-action-title">Record Payment</span>
+          <span class="gym-action-sub">Log revenue now</span>
+        </div>
+        <i class="bi bi-arrow-right gym-action-arrow" aria-hidden="true"></i>
+      </a>
+
+      <div class="gym-hero-more">
+        {% include "partials/vertical_more_dropdown.html" %}
+      </div>
     </div>
   </header>
 
-  <!-- Member Status Summary -->
-  <section class="recent-block" style="padding: 0; overflow: hidden; border-radius: 14px; border: 1.5px solid #e2e8f0; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,0.04);">
+  {# ======================================================================
+     MEMBERSHIP STATUS — 3 KPI cards + health bar
+     Server-rendered widths/colors — zero JS needed, zero CLS
+     ====================================================================== #}
+  <section class="recent-block gym-member-status" aria-label="Membership overview">
 
-    <!-- Top: KPI row -->
-    <div class="metrics-grid" style="padding: 1.25rem 1.25rem 0.5rem; gap: 0.75rem;">
-      <article class="metric-card" style="padding: 1rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #f8fafc;">
-        <h3 style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; margin: 0 0 0.4rem;">Total Members</h3>
-        <p style="font-size: 2rem; font-weight: 800; margin: 0; color: #0f172a; line-height: 1;" data-count="{{ total_members|default:'0' }}">{{ total_members|default:"0" }}</p>
+    {# KPI row — always 3 equal columns, content is server-rendered #}
+    <div class="gym-kpi-row">
+
+      <article class="gym-kpi-card">
+        <h3 class="gym-kpi-label">Total Members</h3>
+        <p class="gym-kpi-value" data-count="{{ total_members|default:'0' }}">{{ total_members|default:"0" }}</p>
       </article>
-      <article class="metric-card" style="padding: 1rem; border-radius: 10px; border: 1.5px solid #bbf7d0; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);">
-        <h3 style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #166534; margin: 0 0 0.4rem;">✓ Active &amp; Paid</h3>
-        <p style="font-size: 2rem; font-weight: 800; margin: 0; color: #16a34a; line-height: 1;" data-count="{{ members_active_count|default:'0' }}">{{ members_active_count|default:"0" }}</p>
-        <small style="color: #166534; font-size: 0.75rem; font-weight: 500;">valid membership today</small>
+
+      <article class="gym-kpi-card gym-kpi-card--green">
+        <h3 class="gym-kpi-label">✓ Active &amp; Paid</h3>
+        <p class="gym-kpi-value gym-kpi-value--green" data-count="{{ members_active_count|default:'0' }}">{{ members_active_count|default:"0" }}</p>
+        <small class="gym-kpi-note gym-kpi-note--green">valid today</small>
       </article>
-      <article class="metric-card" style="padding: 1rem; border-radius: 10px; border: 1.5px solid {% if members_in_arrears > 0 %}#fecaca{% else %}#e2e8f0{% endif %}; background: {% if members_in_arrears > 0 %}linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%){% else %}#f8fafc{% endif %};">
-        <h3 style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: {% if members_in_arrears > 0 %}#991b1b{% else %}#64748b{% endif %}; margin: 0 0 0.4rem;">
+
+      <article class="gym-kpi-card{% if members_in_arrears > 0 %} gym-kpi-card--red{% endif %}">
+        <h3 class="gym-kpi-label{% if members_in_arrears > 0 %} gym-kpi-label--red{% endif %}">
           {% if members_in_arrears > 0 %}⚠ In Arrears{% else %}○ In Arrears{% endif %}
         </h3>
-        <p style="font-size: 2rem; font-weight: 800; margin: 0; color: {% if members_in_arrears > 0 %}#dc2626{% else %}#94a3b8{% endif %}; line-height: 1;" data-count="{{ members_in_arrears|default:'0' }}">{{ members_in_arrears|default:"0" }}</p>
-        <small style="color: {% if members_in_arrears > 0 %}#991b1b{% else %}#94a3b8{% endif %}; font-size: 0.75rem; font-weight: 500;">overdue or pending</small>
+        <p class="gym-kpi-value{% if members_in_arrears > 0 %} gym-kpi-value--red{% endif %}" data-count="{{ members_in_arrears|default:'0' }}">{{ members_in_arrears|default:"0" }}</p>
+        <small class="gym-kpi-note{% if members_in_arrears > 0 %} gym-kpi-note--red{% endif %}">overdue or pending</small>
       </article>
-    </div>
 
-    <!-- Bottom: health bar -->
+    </div>{# /gym-kpi-row #}
+
+    {# Health bar — width set by server via widthratio, no JS required #}
     {% if total_members > 0 %}
-    <div style="padding: 0.75rem 1.25rem 1rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-        <span style="font-size: 0.75rem; font-weight: 600; color: #64748b;">Membership health</span>
-        <span style="font-size: 0.75rem; font-weight: 700; color: #16a34a;">
-          {% widthratio members_active_count total_members 100 %}% active
-        </span>
+    <div class="gym-health-bar-wrap">
+      <div class="gym-health-bar-header">
+        <span class="gym-health-bar-label">Membership health</span>
+        <span class="gym-health-bar-pct">{% widthratio members_active_count total_members 100 %}% active</span>
       </div>
-      <div style="height: 7px; border-radius: 999px; background: #fee2e2; overflow: hidden;">
-        <div style="height: 100%; border-radius: 999px; background: linear-gradient(90deg, #16a34a, #22c55e); width: {% widthratio members_active_count total_members 100 %}%; transition: width 0.7s ease;"></div>
+      <div class="gym-health-bar-track" role="progressbar"
+           aria-valuenow="{% widthratio members_active_count total_members 100 %}"
+           aria-valuemin="0" aria-valuemax="100">
+        <div class="gym-health-bar-fill" style="width:{% widthratio members_active_count total_members 100 %}%"></div>
       </div>
-      <div style="display: flex; justify-content: space-between; margin-top: 0.3rem; font-size: 0.7rem; color: #94a3b8;">
+      <div class="gym-health-bar-footer">
         <span>{{ members_active_count }} paid</span>
         <span>{{ members_in_arrears }} need follow-up</span>
       </div>
     </div>
     {% else %}
-    <div style="padding: 0.75rem 1.25rem 1rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
-      No members yet. <a href="{% url 'gym:member_add' %}" style="color: #7c3aed; font-weight: 600;">Add your first member →</a>
+    <div class="gym-health-empty">
+      No members yet.
+      <a href="{% url 'gym:member_add' %}" class="gym-health-empty-link">Add your first member →</a>
     </div>
     {% endif %}
 
   </section>
 
-  <!-- Date Range Filter -->
-  <section class="recent-block" style="margin-bottom: 18px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-      <h2 style="margin:0;font-size:1.1rem">Filter</h2>
-      <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+  {# ======================================================================
+     DATE RANGE FILTER
+     ====================================================================== #}
+  <section class="recent-block" aria-label="Date range filter">
+    <div class="gym-filter-row">
+      <h2>Filter</h2>
+      <div class="gym-filter-pills">
         <a href="?range=today"
-           class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+           class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
           Today
         </a>
         <a href="?range=last7"
-           class="btn {% if range_key == 'last7' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+           class="btn {% if range_key == 'last7' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
           Last 7 Days
         </a>
         <a href="?range=mtd"
-           class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+           class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
           MTD
         </a>
-        <div style="display: flex; gap: 4px; align-items: center;">
-          <input type="month" 
-                 id="monthPicker" 
+        <div class="gym-filter-month-wrap">
+          <input type="month"
+                 id="monthPicker"
                  value="{{ selected_month }}"
-                 class="form-control form-control-sm"
-                 style="border-radius: 20px; padding: 6px 12px; font-size: 0.9rem; max-width: 150px;"
-                 onchange="window.location.href='?range=month&month='+this.value">
-          {% if range_key == 'month' %}
-          <span class="badge bg-primary" style="font-size: 0.75rem;">Active</span>
-          {% endif %}
+                 class="form-control form-control-sm gym-filter-month-input"
+                 onchange="window.location.href='?range=month&amp;month='+this.value"
+                 aria-label="Select month">
+          {% if range_key == 'month' %}<span class="badge bg-primary" style="font-size:0.75rem;">Active</span>{% endif %}
         </div>
         <a href="?range=all_time"
-           class="btn {% if range_key == 'all_time' %}btn-primary{% else %}btn-outline-secondary{% endif %}"
-           style="border-radius: 20px; padding: 8px 16px; font-size: 0.9rem; text-decoration: none;">
+           class="btn {% if range_key == 'all_time' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
           All Time
         </a>
       </div>
     </div>
-    <div style="margin-top: 8px; color: #64748b; font-size: 0.9rem;">
-      Showing: <strong>{{ range_label }}</strong>
-    </div>
+    <p class="gym-filter-showing">Showing: <strong>{{ range_label }}</strong></p>
   </section>
 
-  <!-- Financial KPIs -->
-  <!-- GYM_DASH_DEBUG revenue={{ revenue|default:'MISSING' }} costs={{ costs|default:'MISSING' }} profit={{ profit|default:'MISSING' }} mrr={{ mrr|default:'MISSING' }} payment_count={{ payment_count|default:'MISSING' }} payment_mix_count={{ payment_mix|length|default:'MISSING' }} range_label={{ range_label|default:'MISSING' }} -->
-  <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.1rem">Financial Performance ({{ range_label }})</h2>
+  {# ======================================================================
+     FINANCIAL KPIs
+     ====================================================================== #}
+  {# DEBUG: revenue={{ revenue|default:'MISSING' }} costs={{ costs|default:'MISSING' }} profit={{ profit|default:'MISSING' }} mrr={{ mrr|default:'MISSING' }} #}
+  <section class="recent-block" aria-label="Financial performance">
+    <h2>Financial Performance <span class="gym-section-range">({{ range_label }})</span></h2>
     <div class="metrics-grid">
-      <article class="metric-card kpi-revenue" data-bs-toggle="tooltip" data-bs-placement="top" title="Total membership payments recorded in selected range">
+      <article class="metric-card kpi-revenue"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="Total membership payments recorded in selected range">
         <h3>Revenue</h3>
         <p data-count="{{ revenue|default:0|money }}">{{ revenue|default:0|money }}</p>
-        <small><span data-count="{{ payment_count|default:'0'|intcomma }}">{{ payment_count|default:"0"|intcomma }}</span> payment{{ payment_count|pluralize }}</small>
+        <small><span>{{ payment_count|default:"0"|intcomma }}</span> payment{{ payment_count|pluralize }}</small>
       </article>
-      <article class="metric-card kpi-costs" data-bs-toggle="tooltip" data-bs-placement="top" title="Costs recorded in Admin Wallet for selected range">
+      <article class="metric-card kpi-costs"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="Costs recorded in Admin Wallet for selected range">
         <h3>Costs</h3>
         <p data-count="{{ costs|default:0|money }}">{{ costs|default:0|money }}</p>
         <small>From admin wallet</small>
       </article>
-      <article class="metric-card kpi-profit" data-bs-toggle="tooltip" data-bs-placement="top" title="Revenue minus Costs">
+      <article class="metric-card kpi-profit"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="Revenue minus Costs">
         <h3>Profit</h3>
-        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}" data-count="{{ profit|default:0|money }}">{{ profit|default:0|money }}</p>
+        <p style="{% if profit < 0 %}color:#dc2626{% else %}color:#16a34a{% endif %}"
+           data-count="{{ profit|default:0|money }}">{{ profit|default:0|money }}</p>
         <small>Revenue - Costs</small>
       </article>
-      <article class="metric-card kpi-mrr" data-bs-toggle="tooltip" data-bs-placement="top" title="Monthly recurring revenue estimate for selected range">
+      <article class="metric-card kpi-mrr"
+               data-bs-toggle="tooltip" data-bs-placement="top"
+               title="Monthly recurring revenue estimate for selected range">
         <h3>MRR</h3>
         <p data-count="{{ mrr|default:0|money }}">{{ mrr|default:0|money }}</p>
         <small>Monthly Recurring Revenue</small>
@@ -159,18 +204,18 @@
     </div>
   </section>
 
-  <!-- Payment Mix -->
-  <!-- GYM_DASH_DEBUG payment_mix_data={% for pm in payment_mix %}{{ pm.method }}:{{ pm.amount|default:'MISSING_AMOUNT' }}:{{ pm.count|default:'MISSING_COUNT' }}:{{ pm.percentage|default:'MISSING_PCT' }}% {% endfor %} -->
-  <section class="recent-block">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <h2 style="margin:0;font-size:1.1rem">Payment Mix ({{ range_label }})</h2>
-      <div style="font-weight:700;font-size:1rem;color:#0f172a">
-        Total: {{ total_revenue|default:revenue|default:0|money }}
-      </div>
+  {# ======================================================================
+     PAYMENT MIX
+     ====================================================================== #}
+  {% if payment_mix %}
+  <section class="recent-block" aria-label="Payment mix breakdown">
+    <div class="gym-section-header">
+      <h2>Payment Mix <span class="gym-section-range">({{ range_label }})</span></h2>
+      <span class="gym-section-total">Total: {{ total_revenue|default:revenue|default:0|money }}</span>
     </div>
     <div class="metrics-grid">
       {% for pm in payment_mix %}
-      <article class="metric-card payment-method-card payment-method-{{ pm.method_code }} payment-mix-animate">
+      <article class="metric-card payment-method-card payment-method-{{ pm.method_code }}">
         <h3>{{ pm.method }}</h3>
         <p>{{ pm.amount|money }}</p>
         <small>{{ pm.count|intcomma }} payment{{ pm.count|pluralize }}</small>
@@ -182,10 +227,13 @@
       {% endfor %}
     </div>
   </section>
+  {% endif %}
 
-  <!-- Session/Check-in Stats -->
-  <section class="recent-block">
-    <h2 style="margin:0 0 10px;font-size:1.1rem">Check-ins & Sessions</h2>
+  {# ======================================================================
+     CHECK-IN STATS
+     ====================================================================== #}
+  <section class="recent-block" aria-label="Check-ins and sessions">
+    <h2>Check-ins &amp; Sessions</h2>
     <div class="metrics-grid">
       <article class="metric-card">
         <h3>Today</h3>
@@ -200,11 +248,11 @@
       <article class="metric-card">
         <h3>Today's Check-ins</h3>
         <p style="color:#10b981" data-count="{{ checkins_today|default:'0'|intcomma }}">{{ checkins_today|default:"0"|intcomma }}</p>
-        <small>gym check-ins</small>
+        <small>gym entries</small>
       </article>
       {% if top_streak_name %}
       <article class="metric-card">
-        <h3>Top Streak</h3>
+        <h3>Top Streak 🔥</h3>
         <p style="color:#f59e0b" data-count="{{ top_streak_days|default:'0'|intcomma }}">{{ top_streak_days|default:"0"|intcomma }}</p>
         <small>{{ top_streak_name|truncatewords:3 }}</small>
       </article>
@@ -212,63 +260,60 @@
     </div>
   </section>
 
-  <!-- Recent Payments -->
-  <section class="recent-block">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+  {# ======================================================================
+     RECENT PAYMENTS
+     ====================================================================== #}
+  <section class="recent-block" aria-label="Recent payments">
+    <div class="gym-section-header">
       <div>
-        <h2 style="margin:0;font-size:1.05rem;font-weight:700">Recent Payments</h2>
-        <small style="color:#64748b;font-size:0.78rem">{{ range_label }}</small>
+        <h2>Recent Payments</h2>
+        <small class="gym-section-range-sub">{{ range_label }}</small>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;">
-        <a class="btn btn-sm" href="{{ add_payment_url|default:'/gym/payment/add/' }}"
-           style="background:#7c3aed;color:#fff;border-radius:8px;padding:6px 14px;font-size:0.82rem;font-weight:600;text-decoration:none;">
-          + Record payment
-        </a>
-        <a class="btn btn-sm btn-outline-secondary" href="{{ members_url|default:'/gym/members/' }}"
-           style="border-radius:8px;padding:6px 14px;font-size:0.82rem;text-decoration:none;">
-          All members
-        </a>
+      <div class="gym-section-actions">
+        <a href="{{ add_payment_url|default:'/gym/payment/add/' }}"
+           class="gym-btn-primary btn btn-sm">+ Record payment</a>
+        <a href="{{ members_url|default:'/gym/members/' }}"
+           class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">All members</a>
       </div>
     </div>
+
     {% if recent_payments %}
-      <ul class="recent-list" style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;">
-        {% for payment in recent_payments %}
-          <li style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0;">
-            <div style="display:flex;align-items:center;gap:10px;">
-              <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#a855f7);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:0.8rem;flex-shrink:0;">
-                {{ payment.member.name|first|upper }}
-              </div>
-              <div>
-                <div style="font-weight:600;font-size:0.9rem;color:#0f172a;">{{ payment.member.name }}</div>
-                <div style="font-size:0.75rem;color:#64748b;">{{ payment.payment_method|title }}</div>
-              </div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-weight:700;font-size:0.9rem;color:#16a34a;">{{ payment.total_amount|money }}</div>
-              <div style="font-size:0.72rem;color:#94a3b8;">{{ payment.paid_at|date:"M j" }}</div>
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <div style="text-align:center;padding:2rem 1rem;border-radius:12px;background:#f8fafc;border:1.5px dashed #e2e8f0;">
-        <div style="font-size:2rem;margin-bottom:0.5rem;">💳</div>
-        <div style="font-weight:600;color:#0f172a;margin-bottom:0.25rem;">No payments recorded yet</div>
-        <div style="color:#64748b;font-size:0.85rem;margin-bottom:1rem;">
-          {% if members_in_arrears > 0 %}
-          {{ members_in_arrears }} member{{ members_in_arrears|pluralize }} in arrears — collect payments to get started.
-          {% else %}
-          Record a payment when a member pays their membership fee.
-          {% endif %}
+    <ul class="gym-payment-list">
+      {% for payment in recent_payments %}
+      <li class="gym-payment-item">
+        <div class="gym-payment-left">
+          <div class="gym-payment-avatar" aria-hidden="true">{{ payment.member.name|first|upper }}</div>
+          <div class="gym-payment-info">
+            <div class="gym-payment-name">{{ payment.member.name }}</div>
+            <div class="gym-payment-method">{{ payment.payment_method|title }}</div>
+          </div>
         </div>
-        <a href="{{ add_payment_url|default:'/gym/payment/add/' }}"
-           style="display:inline-block;background:#7c3aed;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;font-size:0.85rem;">
-          Record first payment
-        </a>
-      </div>
+        <div class="gym-payment-right">
+          <div class="gym-payment-amount">{{ payment.total_amount|money }}</div>
+          <div class="gym-payment-date">{{ payment.paid_at|date:"M j" }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="gym-payment-empty">
+      <div class="gym-payment-empty-icon" aria-hidden="true">💳</div>
+      <div class="gym-payment-empty-title">No payments recorded yet</div>
+      <p class="gym-payment-empty-sub">
+        {% if members_in_arrears > 0 %}
+          {{ members_in_arrears }} member{{ members_in_arrears|pluralize }} in arrears — collect payments to get started.
+        {% else %}
+          Record a payment when a member pays their membership fee.
+        {% endif %}
+      </p>
+      <a href="{{ add_payment_url|default:'/gym/payment/add/' }}" class="gym-btn-primary btn">
+        Record first payment
+      </a>
+    </div>
     {% endif %}
   </section>
-</div>
+
+</div>{# /vertical-page #}
 {% endblock %}
 
 {% block extra_js %}
