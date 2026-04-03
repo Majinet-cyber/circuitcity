@@ -244,16 +244,12 @@ def data_deletion(request):
 def get_cfo_mood(total_profit, profit_margin):
     """
     Determine CFO mood based on profit and margin.
-    Returns 'happy', 'serious', or 'neutral'.
+    Returns 'happy' or 'neutral' — only values with a backing static GIF.
+    'serious' mapped to 'neutral' to avoid missing-file crash on collectstatic.
     """
-    if total_profit <= 0:
-        return "serious"
-    elif total_profit >= 2_000_000 and profit_margin > 25:
+    if total_profit >= 2_000_000 and profit_margin > 25:
         return "happy"
-    elif total_profit < 400_000 or profit_margin < 10:
-        return "serious"
-    else:
-        return "neutral"
+    return "neutral"
 
 
 def simulator(request):
