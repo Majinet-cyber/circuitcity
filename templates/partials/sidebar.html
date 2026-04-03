@@ -139,14 +139,12 @@
   {% endif %}
 
   <!-- ---------- Tenant Business Navigation (Vertical-Aware) ---------- -->
-  <!-- DEBUG: sidebar_items count = {{ sidebar_items|length }}, vertical = {{ BUSINESS_VERTICAL }} -->
   {% if request.business and sidebar_items %}
     {% with vertical=BUSINESS_VERTICAL|default:'phones' %}
     
     {# Group items by section #}
     {% regroup sidebar_items by section as sections %}
-    <!-- DEBUG: Found {{ sections|length }} sections -->
-    
+
     {% for section in sections %}
       {# Special handling for MORE section - make it collapsible #}
       {% if section.grouper == "MORE" %}
@@ -225,10 +223,8 @@
       {% else %}
       <div>
         <div class="cc-section">{{ section.grouper }}</div>
-        <!-- DEBUG: Section {{ section.grouper }} has {{ section.list|length }} items -->
         <ul class="cc-nav">
           {% for item in section.list %}
-            <!-- DEBUG: Item {{ item.key }} ({{ item.label }}) -->
             {# Check if item requires manager role #}
             {% if item.require_manager|default:False %}
               {% if request.user.is_superuser or request.user.is_staff or IS_MANAGER %}

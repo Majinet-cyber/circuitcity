@@ -659,6 +659,12 @@
     .hero-counter-value .counter-animated {
       display: inline-block;
     }
+    .lm-status-label {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--brand);
+      letter-spacing: 0.01em;
+    }
     .hero-stat-note {
       font-size: 0.6875rem;
       color: var(--text-light);
@@ -1006,7 +1012,7 @@
     /* ============================================================
        HOW IT WORKS
     ============================================================ */
-    /* How It Works — restored 4-card premium layout from git history (5bd2cceb) */
+    /* How It Works — 4-card premium layout */
     .how-it-works-section {
       padding: 5.5rem 0;
       background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
@@ -3016,7 +3022,6 @@
           <a href="#how-it-works" class="btn btn-secondary btn-lg">See How It Works</a>
         </div>
 
-        <!-- Active Businesses / Team Members — git-original trust card -->
             {% if show_metrics %}
         <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
           <div style="display: flex; gap: 2rem; justify-content: flex-start; flex-wrap: wrap;">
@@ -3045,45 +3050,29 @@
         {% endif %}
 
         <div class="hero-stat-card">
-          {# Always render #liveMetricsContainer — JS populates it; skeletons shown until first fetch #}
           <div class="hero-counters" id="liveMetricsContainer">
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-revenue"
-                  data-prefix="MWK "
-                  {% if live_metrics.has_data %}data-seeded="{{ live_metrics.avg_daily_revenue }}"{% endif %}
-                >
-                  {% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}<span class="lm-skeleton"></span>{% endif %}
-                </span>
+                <span id="lm-revenue" class="lm-status-label">Real-time</span>
               </div>
               <div class="hero-counter-label">Avg. daily revenue tracked</div>
             </div>
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-sales"
-                  data-suffix="+"
-                  {% if live_metrics.has_data %}data-seeded="{{ live_metrics.avg_sales_per_day }}"{% endif %}
-                >
-                  {% if live_metrics.has_data %}{{ live_metrics.avg_sales_per_day }}+{% else %}<span class="lm-skeleton"></span>{% endif %}
-                </span>
+                <span id="lm-sales" class="lm-status-label">Live</span>
               </div>
               <div class="hero-counter-label">Sales recorded per day</div>
             </div>
             <div class="hero-counter">
               <div class="hero-counter-value">
-                <span id="lm-margin"
-                  data-suffix="%"
-                  {% if live_metrics.avg_margin_visibility %}data-seeded="{{ live_metrics.avg_margin_visibility }}"{% endif %}
-                >
-                  {% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}<span class="lm-skeleton"></span>{% endif %}
-                </span>
+                <span id="lm-margin" class="lm-status-label">Tracking</span>
               </div>
               <div class="hero-counter-label">Avg. margin visibility</div>
             </div>
           </div>
           <div class="hero-stat-note" id="liveMetricsNote">
             <span style="display:inline-block;width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse-dot 2s infinite;margin-right:0.4rem;vertical-align:middle;" aria-hidden="true"></span>
-            <span id="liveMetricsNoteText">Live — 30-day rolling average from active businesses</span>
+            <span id="liveMetricsNoteText">Live metrics from active Emajinet businesses</span>
           </div>
         </div>
       </div>
@@ -3107,17 +3096,17 @@
             <div class="dash-kpis">
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Avg. Daily Revenue</div>
-                <div class="dash-kpi-value" id="dash-kpi-revenue">{% if live_metrics.has_data %}MWK {{ live_metrics.avg_daily_revenue|floatformat:"0" }}{% else %}<span class="lm-skeleton" style="width:80px;height:1em;display:inline-block;"></span>{% endif %}</div>
+                <div class="dash-kpi-value" id="dash-kpi-revenue">Real-time</div>
                 <div class="dash-kpi-delta">30-day avg</div>
               </div>
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Gross Margin</div>
-                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">{% if live_metrics.avg_margin_visibility %}{{ live_metrics.avg_margin_visibility }}%{% else %}<span class="lm-skeleton" style="width:50px;height:1em;display:inline-block;"></span>{% endif %}</div>
+                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">Live</div>
                 <div class="dash-kpi-delta">avg margin</div>
               </div>
               <div class="dash-kpi">
                 <div class="dash-kpi-label">Sales / Day</div>
-                <div class="dash-kpi-value">{% if live_metrics.has_data %}{{ live_metrics.avg_sales_per_day }}+{% else %}<span class="lm-skeleton" style="width:44px;height:1em;display:inline-block;"></span>{% endif %}</div>
+                <div class="dash-kpi-value">Tracking</div>
                 <div class="dash-kpi-delta">avg transactions</div>
               </div>
             </div>
@@ -3448,9 +3437,6 @@
     </div>
   </section>
 
-  <!-- ============================================================
-       HOW IT WORKS — restored from git history (5bd2cceb) — 4-step premium card layout
-  ============================================================ -->
   <section class="section how-it-works-section" id="how-it-works">
     <div class="container">
       <div class="section-header section-header--center animate-in">
@@ -3484,14 +3470,6 @@
     </div>
   </section>
 
-  <!-- ============================================================
-       RENEWABLE ENERGY FLAGSHIP SECTION
-       Positioned after How It Works — most advanced vertical
-  ============================================================ -->
-  {# ============================================================
-     RENEWABLE ENERGY FLAGSHIP — Light mode, premium, clean
-     Positioned after How It Works. No extra CTA button.
-  ============================================================ #}
   <section id="renewable-energy" class="section section--light" style="border-top: 1px solid #e5e7eb;">
     <div class="container">
 
@@ -3520,7 +3498,6 @@
             Built for solar installers, ESCOs, and off-grid operators — system sizing, predictive maintenance, demand forecasting, and full energy economics in one platform.
           </p>
         </div>
-        {# Subtle explore link — NO extra CTA button #}
         <a href="{% url 'staticpages:about' %}" style="
           display: inline-flex; align-items: center; gap: 0.375rem;
           font-size: 0.875rem; font-weight: 600; color: #059669;
@@ -5182,45 +5159,14 @@
         el.innerHTML = text;  // replaces skeleton span or previous text
       }
 
-      // Apply a full payload to all metric elements
+      // Metrics display uses neutral status labels — numeric aggregation handled in a future pass.
       function applyPayload(data) {
         _lastGood = data;
-
-        if (data.avg_daily_revenue != null) {
-          setMetricSpan('lm-revenue', 'MWK\u00a0' + fmt(data.avg_daily_revenue));
-          var dashRev = document.getElementById('dash-kpi-revenue');
-          if (dashRev) dashRev.innerHTML = 'MWK\u00a0' + fmt(data.avg_daily_revenue);
-        }
-
-        if (data.sales_recorded_per_day != null) {
-          setMetricSpan('lm-sales', fmt(data.sales_recorded_per_day) + '+');
-        }
-
-        if (data.avg_margin_visibility != null) {
-          setMetricSpan('lm-margin', data.avg_margin_visibility + '%');
-          var dashMargin = document.getElementById('dash-kpi-margin');
-          if (dashMargin) dashMargin.innerHTML = data.avg_margin_visibility + '%';
-        }
-
-        // Freshness note
-        var noteEl = document.getElementById('liveMetricsNoteText');
-        if (noteEl && data.as_of) {
-          var secsAgo = Math.round((Date.now() - new Date(data.as_of).getTime()) / 1000);
-          var freshText = secsAgo < 10 ? 'just now' : secsAgo + 's ago';
-          noteEl.textContent = 'Live \u2014 30-day rolling average \u00b7 Updated ' + freshText;
-        }
+        // Intentionally no numeric values injected here.
       }
 
-      // Show graceful fallback when platform has no recorded data yet
       function applyFallback() {
-        // Only apply fallback if we have never had good data (no server-seeded values)
-        var rev = document.getElementById('lm-revenue');
-        if (rev && rev.getAttribute('data-seeded')) return;  // server gave us data — keep it
-        setMetricSpan('lm-revenue', 'Growing\u2026');
-        setMetricSpan('lm-sales', 'Growing\u2026');
-        setMetricSpan('lm-margin', 'Growing\u2026');
-        var noteEl = document.getElementById('liveMetricsNoteText');
-        if (noteEl) noteEl.textContent = 'Live data from active Emajinet businesses';
+        // No-op: neutral labels are rendered server-side and remain stable.
       }
 
       function refreshLiveMetrics() {
