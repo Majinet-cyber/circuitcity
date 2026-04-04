@@ -252,7 +252,7 @@ def parse_date_range_from_request(request) -> Dict[str, Any]:
             - range_label: str (human-readable label)
     """
     now = timezone.now()
-    today = now.date()
+    today = timezone.localtime(now).date()  # Use local timezone date to avoid UTC cutoff at 22:00
 
     # ===== PRECEDENCE 1: LEGACY RANGE PARAMS (highest priority for backward compat) =====
     range_param = request.GET.get("range", "")

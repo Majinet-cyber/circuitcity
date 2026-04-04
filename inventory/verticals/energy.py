@@ -521,12 +521,14 @@ def asset_create(request: HttpRequest) -> HttpResponse:
         messages.success(request, f"Asset added to {site.name}.")
         return redirect("verticals:energy_assets")
 
+    prefill_type = request.GET.get("prefill_type", "")
     return render(request, "energy/asset_form.html", {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "sites": sites,
         "asset_types": AssetType.choices,
         "action": "Add",
+        "prefill_type": prefill_type,
     })
 
 

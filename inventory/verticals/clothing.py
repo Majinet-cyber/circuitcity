@@ -1899,6 +1899,9 @@ def sales_trend_json(request):
     for day_data in daily_sales:
         sale_date = day_data["sale_date"]
         if sale_date:
+            # Normalize to date for consistent key format across SQLite/Postgres
+            if hasattr(sale_date, "date"):
+                sale_date = sale_date.date()
             # Convert Decimal to float for JSON serialization
             revenue_value = float(day_data["revenue"] or Decimal("0.00"))
             sales_by_date[sale_date.isoformat()] = {"revenue": revenue_value, "count": day_data["count"] or 0}

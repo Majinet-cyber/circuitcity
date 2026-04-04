@@ -51,43 +51,24 @@
         localStorage.setItem("cc-theme", "light");
       } catch (_) {}
 
-      // PHASE 2: One-time cleanup of service workers on localhost (dev only)
-      // Prevents "warped until hard refresh" caused by stale cached assets
+      // One-time cleanup of service workers on localhost
       var hostname = window.location.hostname;
       if ((hostname === 'localhost' || hostname === '127.0.0.1') && 'serviceWorker' in navigator) {
         try {
           var cleanupKey = 'sw_cleanup_20260106';
           if (!localStorage.getItem(cleanupKey)) {
-            console.log('[DEV] Running one-time service worker cleanup...');
-
-            // Unregister all service workers
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
-              for (var registration of registrations) {
-                registration.unregister();
-                console.log('[DEV] Unregistered SW:', registration.scope);
-              }
+              for (var registration of registrations) { registration.unregister(); }
             });
-
-            // Clear all caches
             if ('caches' in window) {
               caches.keys().then(function(names) {
-                for (var name of names) {
-                  caches.delete(name);
-                  console.log('[DEV] Deleted cache:', name);
-                }
+                for (var name of names) { caches.delete(name); }
               });
             }
-
-            // Mark cleanup as done
             localStorage.setItem(cleanupKey, '1');
-            console.log('[DEV] Service worker cleanup complete. Reloading...');
-
-            // Reload once to get fresh assets
             setTimeout(function() { window.location.reload(true); }, 100);
           }
-        } catch (e) {
-          console.warn('[DEV] SW cleanup failed:', e);
-        }
+        } catch (e) {}
       }
 
       // Base.html loaded
@@ -1393,7 +1374,6 @@
       document.querySelectorAll(".offcanvas-backdrop").forEach(function(el) { el.remove(); });
     });
 
-    // Expose for debugging
     window.CC_UI_CLEANUP = resetTransientUIState;
     window.resetTransientUIState = resetTransientUIState;
   })();

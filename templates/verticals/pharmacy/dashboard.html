@@ -925,20 +925,42 @@
 </style>
 
 <div class="pharmacy-dashboard">
-  <!-- ========== HEADER WITH FILTER BUTTON ========== -->
+  <!-- ========== HEADER ========== -->
   <div class="dashboard-header">
     <div class="dashboard-header-left">
-      <h1>💊 Pharmacy & Cosmetics Dashboard</h1>
-      <p>{{ active_business.name }} · {{ active_location.name }}</p>
+      <h1>💊 Pharmacy &amp; Cosmetics</h1>
+      <p>{{ active_business.name }}{% if active_location %} · {{ active_location.name }}{% endif %}</p>
     </div>
-    <button class="filter-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
-      <i class="bi bi-funnel"></i>
-      <span>Filter</span>
-      {% if product_filter_name or range_param != '30d' %}
-        <span class="filter-badge">Active</span>
-      {% endif %}
-    </button>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <a href="{% url 'pharmacy:sell' %}" style="background:rgba(255,255,255,.95);color:#064e3b;border:none;border-radius:999px;padding:.45rem 1rem;font-size:.82rem;font-weight:700;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.12);">
+        <i class="bi bi-bag-check-fill"></i> Sell
+      </a>
+      <a href="{% url 'pharmacy:stock_in_choice' %}" style="background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:.45rem 1rem;font-size:.82rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;transition:all .15s;">
+        <i class="bi bi-box-arrow-in-down"></i> Stock In
+      </a>
+      <button class="filter-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#filterPanel">
+        <i class="bi bi-funnel"></i>
+        <span>Filter</span>
+        {% if product_filter_name or range_param != '30d' %}
+          <span class="filter-badge">Active</span>
+        {% endif %}
+      </button>
+    </div>
   </div>
+
+  <!-- ========== TODAY AT A GLANCE ========== -->
+  {% if today_sales_count_actual > 0 or today_sales_amount > 0 %}
+  <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:1.4rem;">📊</span>
+      <div>
+        <div style="font-size:.72rem;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:.05em;">Today So Far</div>
+        <div style="font-size:1rem;font-weight:800;color:#14532d;">MWK {{ today_sales_amount|floatformat:0|intcomma }} · {{ today_sales_count_actual }} sale{{ today_sales_count_actual|pluralize }}</div>
+      </div>
+    </div>
+    <a href="{% url 'pharmacy:sale_list' %}" style="font-size:.8rem;color:#059669;font-weight:600;text-decoration:none;">View sales →</a>
+  </div>
+  {% endif %}
   
   <!-- ========== FILTER OFFCANVAS PANEL ========== -->
   <div class="offcanvas offcanvas-end" tabindex="-1" id="filterPanel" aria-labelledby="filterPanelLabel">
@@ -1190,6 +1212,45 @@
     </div>
   </div>
   
+  <!-- ========== WHAT NEEDS ATTENTION ========== -->
+  {% if expired_count > 0 or near_expiry_count > 0 or out_of_stock_count > 0 or low_stock_count > 0 %}
+  <div class="risk-section" style="margin-bottom:28px;">
+    <h2 class="section-title">⚡ Needs Your Attention</h2>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      {% if expired_count > 0 %}
+      <a href="{% url 'pharmacy:expired' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">🚫</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#dc2626;">{{ expired_count }} Expired Batch{{ expired_count|pluralize:"es" }}</div>
+          <div style="font-size:.8rem;color:#b91c1c;">Remove from shelves immediately</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#dc2626;"></i>
+      </a>
+      {% endif %}
+      {% if out_of_stock_count > 0 %}
+      <a href="{% url 'pharmacy:low_stock' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fff7ed;border:1.5px solid #fed7aa;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">📭</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#d97706;">{{ out_of_stock_count }} Product{{ out_of_stock_count|pluralize }} Out of Stock</div>
+          <div style="font-size:.8rem;color:#b45309;">Restock to resume selling</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#d97706;"></i>
+      </a>
+      {% endif %}
+      {% if near_expiry_count > 0 %}
+      <a href="{% url 'pharmacy:near_expiry' %}" style="display:flex;align-items:center;gap:12px;padding:12px 18px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:12px;text-decoration:none;color:inherit;transition:all .2s;">
+        <span style="font-size:1.4rem;">⏳</span>
+        <div style="flex:1;">
+          <div style="font-weight:700;font-size:.9rem;color:#92400e;">{{ near_expiry_count }} Batch{{ near_expiry_count|pluralize:"es" }} Near Expiry</div>
+          <div style="font-size:.8rem;color:#78350f;">Expiring within 30 days — plan action</div>
+        </div>
+        <i class="bi bi-arrow-right" style="color:#92400e;"></i>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   <!-- ========== TOP SELLERS & CATEGORIES ========== -->
   <div class="analytics-section">
     <h2 class="section-title">🏆 Top Performers · {{ period_label }}</h2>

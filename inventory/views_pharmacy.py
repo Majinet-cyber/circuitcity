@@ -47,7 +47,7 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
     Main pharmacy dashboard showing key metrics and alerts with date filtering.
     """
     business: Business = request.business
-    today = timezone.now().date()
+    today = timezone.localtime(timezone.now()).date()  # Use local timezone date to avoid UTC cutoff
 
     # ===== DATE FILTERING (PREMIUM) =====
     # Parse date range from query params (Today, 7d, 30d, This Month, Last Month, This Year, Custom)
@@ -338,7 +338,6 @@ def pharmacy_dashboard(request: HttpRequest) -> HttpResponse:
         try:
             from datetime import date as dt_date
 
-            today = timezone.now().date()
             month_start = dt_date(today.year, today.month, 1)
             ensure_monthly_recurring_costs(business, month_start)
         except Exception as e:

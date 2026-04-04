@@ -561,7 +561,7 @@ def sales_trend_json(request):
     range_param = request.GET.get("range", "30d")
     from django.utils import timezone as django_tz
 
-    today = django_tz.now().date()
+    today = django_tz.localtime(django_tz.now()).date()  # Use local timezone date to avoid UTC cutoff
 
     if range_param == "today":
         start_date = end_date = today

@@ -27,7 +27,7 @@
             <select name="asset_type" class="form-select rounded-3" required>
               <option value="">Select type…</option>
               {% for val, label in asset_types %}
-                <option value="{{ val }}">{{ label }}</option>
+                <option value="{{ val }}"{% if val == prefill_type %} selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>

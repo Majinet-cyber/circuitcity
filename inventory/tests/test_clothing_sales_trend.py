@@ -95,6 +95,10 @@ class ClothingSalesTrendRegressionTests(TestCase):
 
         self.client = Client()
         self.client.force_login(self.user)
+        # Set active business in session so base_context resolves the correct tenant scope
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session.save()
 
     def test_sales_trend_not_empty_when_sales_exist_mtd(self):
         """

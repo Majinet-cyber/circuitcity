@@ -124,6 +124,58 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             .order_by("-sold_at")[:5]
         )
 
+        # Total profit (sold vehicles: sale_price - buying_price)
+        total_profit = Decimal("0")
+        for v in qs.filter(status="sold"):
+            sp = v.sale_price or v.selling_price or Decimal("0")
+            bp = v.buying_price or Decimal("0")
+            total_profit += (sp - bp)
+
+        # Month-over-month revenue (last 6 months) for chart
+        import json as _json
+        from datetime import timedelta
+        monthly_revenue = []
+        monthly_labels = []
+        for months_ago in range(5, -1, -1):
+            m_date = today.replace(day=1)
+            # step back months_ago months
+            for _ in range(months_ago):
+                m_date = (m_date - timedelta(days=1)).replace(day=1)
+            sold_in_month = qs.filter(
+                status="sold",
+                sold_at__year=m_date.year,
+                sold_at__month=m_date.month,
+            )
+            rev = sum((v.sale_price or v.selling_price or Decimal("0")) for v in sold_in_month)
+            monthly_revenue.append(float(rev))
+            monthly_labels.append(m_date.strftime("%b %Y"))
+
+        stats["total_profit"] = total_profit
+
+        # Vehicles by body type
+        vehicles_by_body = (
+            in_stock_qs
+            .exclude(body_type="")
+            .values("body_type")
+            .annotate(count=Count("id"))
+            .order_by("-count")[:6]
+        )
+
+        # Aged vehicles needing action (90+ days)
+        aged_vehicles = (
+            in_stock_qs.filter(created_at__date__lte=cutoff_90)
+            .select_related("model__make", "make")
+            .order_by("created_at")[:5]
+        )
+
+    else:
+        import json as _json
+        monthly_revenue = []
+        monthly_labels = []
+        vehicles_by_body = []
+        aged_vehicles = []
+        stats["total_profit"] = Decimal("0")
+
     return render(
         request,
         "car_dealer/dashboard.html",
@@ -133,6 +185,10 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             "recent_sold": recent_sold,
             "vehicles_by_make": vehicles_by_make,
             "vehicles_by_fuel": vehicles_by_fuel,
+            "vehicles_by_body": vehicles_by_body,
+            "aged_vehicles": aged_vehicles,
+            "monthly_revenue_json": _json.dumps(monthly_revenue),
+            "monthly_labels_json": _json.dumps(monthly_labels),
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
         },
