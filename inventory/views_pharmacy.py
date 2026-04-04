@@ -1843,6 +1843,23 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         {"value": "other", "label": "Other"},
     ]
 
+    # C4: Precompute safe primitive prefill values so the template never has to
+    # resolve .attribute on a potentially-None object inside a filter argument.
+    # When engine.debug=True (DEBUG=True), resolving None.cost_price as a
+    # |default: filter argument raises VariableDoesNotExist uncaught → 500.
+    _plb = prefill_last_batch
+    _pp = prefill_product
+    prefill_cost_price = (
+        _plb.cost_price if _plb
+        else (_pp.cost_price if _pp else "")
+    )
+    prefill_selling_price = (
+        _plb.selling_price if _plb
+        else (_pp.selling_price if _pp else "")
+    )
+    prefill_supplier = _plb.supplier if _plb else ""
+    prefill_reorder_level = _plb.reorder_level if _plb else 10
+
     ctx = {
         "success_data": success_data,
         "category_options": category_options,
@@ -1856,6 +1873,11 @@ def pharmacy_stock_in(request: HttpRequest) -> HttpResponse:
         "prefill_product": prefill_product,
         # C4: prefill last-batch data so user doesn't re-enter cost/reorder/supplier
         "prefill_last_batch": prefill_last_batch,
+        # Safe scalar prefill values (never None — template-safe regardless of debug mode)
+        "prefill_cost_price": prefill_cost_price,
+        "prefill_selling_price": prefill_selling_price,
+        "prefill_supplier": prefill_supplier,
+        "prefill_reorder_level": prefill_reorder_level,
     }
 
     return render(request, "verticals/pharmacy/stock_in.html", ctx)

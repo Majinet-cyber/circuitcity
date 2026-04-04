@@ -18,23 +18,17 @@
 
 <div class="vertical-page">
 
-  {# ======================================================================
-     HERO — gradient card; all content server-rendered, no JS dependency
-     ====================================================================== #}
   <header class="vertical-hero" aria-label="Gym overview">
 
-    {# Left: title + blurb + optional quote #}
     <div class="gym-hero-content">
       <p class="gym-hero-eyebrow">{{ business.name|default:"Your Gym" }} · {{ location_label|default:"Dashboard" }}</p>
       <h1 class="gym-hero-title">{{ hero_title|default:"Gym Dashboard" }}</h1>
       <p class="gym-hero-blurb">{{ hero_blurb|default:"Track members, revenue, and growth" }}</p>
       {% if dashboard_quotes.slot_1 %}
-      {# Quote lives inside the hero so it never causes an independent layout shift #}
       <p class="gym-hero-quote">"{{ dashboard_quotes.slot_1.text|truncatechars:100 }}" — {{ dashboard_quotes.slot_1.author }}</p>
       {% endif %}
     </div>
 
-    {# Right: two prominent action cards + more-dropdown #}
     <div class="gym-hero-actions">
       <a href="{{ members_url|default:'/gym/members/' }}" class="gym-action-card" data-testid="hero-members">
         <span class="gym-action-icon" aria-hidden="true">👥</span>
@@ -62,13 +56,8 @@
     </div>
   </header>
 
-  {# ======================================================================
-     MEMBERSHIP STATUS — 3 KPI cards + health bar
-     Server-rendered widths/colors — zero JS needed, zero CLS
-     ====================================================================== #}
   <section class="recent-block gym-member-status" aria-label="Membership overview">
 
-    {# KPI row — always 3 equal columns, content is server-rendered #}
     <div class="gym-kpi-row">
 
       <article class="gym-kpi-card">
@@ -92,7 +81,6 @@
 
     </div>{# /gym-kpi-row #}
 
-    {# Health bar — width set by server via widthratio, no JS required #}
     {% if total_members > 0 %}
     <div class="gym-health-bar-wrap">
       <div class="gym-health-bar-header">
@@ -118,9 +106,6 @@
 
   </section>
 
-  {# ======================================================================
-     DATE RANGE FILTER
-     ====================================================================== #}
   <section class="recent-block" aria-label="Date range filter">
     <div class="gym-filter-row">
       <h2>Filter</h2>
@@ -155,9 +140,6 @@
     <p class="gym-filter-showing">Showing: <strong>{{ range_label }}</strong></p>
   </section>
 
-  {# ======================================================================
-     FINANCIAL KPIs
-     ====================================================================== #}
   <section class="recent-block" aria-label="Financial performance">
     <h2>Financial Performance <span class="gym-section-range">({{ range_label }})</span></h2>
     <div class="metrics-grid">
@@ -193,9 +175,6 @@
     </div>
   </section>
 
-  {# ======================================================================
-     PAYMENT MIX
-     ====================================================================== #}
   {% if payment_mix %}
   <section class="recent-block" aria-label="Payment mix breakdown">
     <div class="gym-section-header">
@@ -218,9 +197,6 @@
   </section>
   {% endif %}
 
-  {# ======================================================================
-     CHECK-IN STATS
-     ====================================================================== #}
   <section class="recent-block" aria-label="Check-ins and sessions">
     <h2>Check-ins &amp; Sessions</h2>
     <div class="metrics-grid">
@@ -249,9 +225,6 @@
     </div>
   </section>
 
-  {# ======================================================================
-     RECENT PAYMENTS
-     ====================================================================== #}
   <section class="recent-block" aria-label="Recent payments">
     <div class="gym-section-header">
       <div>

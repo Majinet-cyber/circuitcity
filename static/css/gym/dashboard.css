@@ -911,6 +911,122 @@
 }
 
 /* ============================================================================
+   RESPONSIVE — SMALL MOBILE (≤ 430 px)
+   Targets modern small phones: 320 px, 375 px, 390 px, 430 px.
+   Action cards overflow at min-width:185 px in a row layout; stacking
+   eliminates horizontal overflow entirely.
+   ============================================================================ */
+
+@media (max-width: 430px) {
+  .vertical-page {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .vertical-hero {
+    padding: 14px 12px;
+    border-radius: 14px;
+    gap: 14px;
+  }
+
+  /* Stack action cards to a single column — avoids 185 px min-width overflow */
+  .gym-hero-actions {
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+  }
+
+  .gym-action-card {
+    min-width: 0;
+    width: 100%;
+    flex: none;
+    padding: 10px 13px;
+  }
+
+  /* KPI cards: tighter padding + smaller font on narrow screens */
+  .gym-kpi-card {
+    padding: 8px 6px;
+    min-height: 62px;
+  }
+
+  .gym-kpi-value {
+    font-size: 1.3rem;
+  }
+
+  .gym-kpi-label {
+    font-size: 0.60rem;
+  }
+
+  /* Financial + payment-mix cards: keep 2 columns but smaller text */
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .metric-card {
+    padding: 12px 10px;
+    min-height: 80px;
+  }
+
+  .metric-card p {
+    font-size: 1.25rem;
+  }
+
+  /* Filter pills: scroll horizontally instead of wrapping/overflowing */
+  .gym-filter-pills {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    /* Visually hide the scrollbar while keeping it functional */
+    scrollbar-width: none;
+  }
+
+  .gym-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gym-filter-month-input {
+    max-width: 120px;
+  }
+
+  /* Section action buttons: stack for full tap target */
+  .gym-section-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .gym-section-actions .btn,
+  .gym-section-actions .gym-btn-primary {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Payment list: tighter avatar + truncated name on narrow width */
+  .gym-payment-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.72rem;
+  }
+
+  .gym-payment-name {
+    max-width: 110px;
+  }
+
+  .gym-payment-left {
+    gap: 7px;
+  }
+
+  /* Recent-block card padding */
+  .recent-block {
+    padding: 14px 12px;
+    border-radius: 14px;
+  }
+}
+
+/* ============================================================================
    ACCESSIBILITY — REDUCED MOTION
    All animations and transitions disabled; elements immediately visible.
    ============================================================================ */

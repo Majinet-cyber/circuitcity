@@ -1211,7 +1211,7 @@
                 id="supplier"
                 placeholder="Supplier name"
                 autocomplete="off"
-                value="{{ prefill_last_batch.supplier|default:'' }}">
+                value="{{ prefill_supplier }}">
             </div>
           </div>
         </div>
@@ -1249,7 +1249,7 @@
                   type="number" 
                   name="reorder_level" 
                   id="reorder-level"
-                  value="{{ prefill_last_batch.reorder_level|default:10 }}" 
+                  value="{{ prefill_reorder_level }}"
                   min="0">
                 <small>Alert when stock is low</small>
               </div>
@@ -1264,7 +1264,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value="{{ prefill_last_batch.cost_price|default:prefill_product.cost_price|default:'' }}">
+                  value="{{ prefill_cost_price }}">
                 <small>Your purchase price</small>
               </div>
               
@@ -1294,7 +1294,7 @@
                   step="0.01"
                   min="0"
                   placeholder="0.00"
-                  value="{{ prefill_last_batch.selling_price|default:prefill_product.selling_price|default:'' }}">
+                  value="{{ prefill_selling_price }}">
                 <small>Customer price</small>
               </div>
             </div>
