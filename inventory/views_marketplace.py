@@ -312,42 +312,55 @@ def create_listing(request: HttpRequest) -> HttpResponse:
         messages.error(request, "No active business found. Please select a business first.")
         return redirect("/")
 
-
     try:
         from inventory.marketplace_vertical_config import get_vertical_config
-        vertical_config = get_vertical_config(business.business_kind)
+        vertical_config = get_vertical_config(business.business_kind) or {}
     except Exception:
         vertical_config = {}
 
+    # form_data is ALWAYS a plain dict so template access via form_data.key is safe.
+    # GET → empty dict; POST → copy of submitted data; never a raw QueryDict.
+    form_data: dict = {}
+
+    def _re_render(extra_form_data: dict | None = None):
+        """Helper: re-render the create form, merging any extra POST data."""
+        return render(
+            request,
+            "marketplace/manage/create_edit.html",
+            {
+                "form_data": extra_form_data or form_data,
+                "business": business,
+                "vertical_config": vertical_config,
+                "ListingStatus": ListingStatus,
+                "editing": False,
+            },
+        )
+
     if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        description = request.POST.get("description", "").strip()
-        price_raw = request.POST.get("price", "").strip()
-        vertical = request.POST.get("vertical", "").strip() or business.business_kind or ""
-        contact_phone = request.POST.get("contact_phone", "").strip()
-        contact_email = request.POST.get("contact_email", "").strip()
-        address = request.POST.get("address", "").strip()
-        location_text = request.POST.get("location_text", "").strip()
-        status = request.POST.get("status", ListingStatus.DRAFT)
+        form_data = request.POST.dict()  # plain dict — safe for template .key access
+
+        title = form_data.get("title", "").strip()
+        description = form_data.get("description", "").strip()
+        price_raw = form_data.get("price", "").strip()
+        vertical = form_data.get("vertical", "").strip() or getattr(business, "business_kind", "") or ""
+        contact_phone = form_data.get("contact_phone", "").strip()
+        contact_email = form_data.get("contact_email", "").strip()
+        address = form_data.get("address", "").strip()
+        location_text = form_data.get("location_text", "").strip()
+        status = form_data.get("status", ListingStatus.DRAFT)
         media_file = request.FILES.get("media_file")
 
         if not title:
             messages.error(request, "Title is required.")
-            return render(request, "marketplace/manage/create_edit.html", {
-                "form_data": request.POST, "business": business, "vertical_config": vertical_config,
-                "ListingStatus": ListingStatus,
-            })
+            return _re_render(form_data)
 
         price = None
         if price_raw:
             try:
                 price = Decimal(price_raw)
             except InvalidOperation:
-                messages.error(request, "Invalid price format.")
-                return render(request, "marketplace/manage/create_edit.html", {
-                    "form_data": request.POST, "business": business, "vertical_config": vertical_config,
-                    "ListingStatus": ListingStatus,
-                })
+                messages.error(request, "Invalid price — please enter a valid number.")
+                return _re_render(form_data)
 
         try:
             listing = MarketplaceListing.objects.create(
@@ -365,29 +378,21 @@ def create_listing(request: HttpRequest) -> HttpResponse:
                 created_by=request.user,
             )
 
-            # Upload additional images
             for img_file in request.FILES.getlist("images"):
                 try:
                     MarketplaceListingImage.objects.create(listing=listing, image=img_file)
-                except Exception:
-                    pass
+                except Exception as img_err:
+                    log.warning("Listing image upload failed for listing %s: %s", listing.pk, img_err)
 
-            messages.success(request, f"Listing '{title}' created.")
+            messages.success(request, f"Listing '{title}' created successfully.")
             return redirect("inventory:manage_listings")
         except Exception as e:
-            log.exception("Listing creation error: %s", e)
+            log.exception("Listing creation error for business %s: %s", business.pk, e)
             messages.error(request, f"Could not create listing: {e}")
+            return _re_render(form_data)
 
-    return render(
-        request,
-        "marketplace/manage/create_edit.html",
-        {
-            "business": business,
-            "vertical_config": vertical_config,
-            "ListingStatus": ListingStatus,
-            "editing": False,
-        },
-    )
+    # GET — always render with empty form_data so template never sees a missing variable.
+    return _re_render({})
 
 
 @login_required
@@ -400,38 +405,47 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
 
     try:
         from inventory.marketplace_vertical_config import get_vertical_config
-        vertical_config = get_vertical_config(business.business_kind)
+        vertical_config = get_vertical_config(business.business_kind) or {}
     except Exception:
         vertical_config = {}
 
+    def _re_render(fd: dict | None = None):
+        return render(
+            request,
+            "marketplace/manage/create_edit.html",
+            {
+                "listing": listing,
+                "form_data": fd or {},
+                "business": business,
+                "vertical_config": vertical_config,
+                "ListingStatus": ListingStatus,
+                "editing": True,
+            },
+        )
+
     if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        description = request.POST.get("description", "").strip()
-        price_raw = request.POST.get("price", "").strip()
-        contact_phone = request.POST.get("contact_phone", "").strip()
-        contact_email = request.POST.get("contact_email", "").strip()
-        address = request.POST.get("address", "").strip()
-        location_text = request.POST.get("location_text", "").strip()
-        status = request.POST.get("status", listing.status)
+        form_data = request.POST.dict()
+        title = form_data.get("title", "").strip()
+        description = form_data.get("description", "").strip()
+        price_raw = form_data.get("price", "").strip()
+        contact_phone = form_data.get("contact_phone", "").strip()
+        contact_email = form_data.get("contact_email", "").strip()
+        address = form_data.get("address", "").strip()
+        location_text = form_data.get("location_text", "").strip()
+        status = form_data.get("status", listing.status)
         media_file = request.FILES.get("media_file")
 
         if not title:
             messages.error(request, "Title is required.")
-            return render(request, "marketplace/manage/create_edit.html", {
-                "listing": listing, "business": business, "vertical_config": vertical_config,
-                "ListingStatus": ListingStatus, "editing": True,
-            })
+            return _re_render(form_data)
 
         price = listing.price
         if price_raw:
             try:
                 price = Decimal(price_raw)
             except InvalidOperation:
-                messages.error(request, "Invalid price format.")
-                return render(request, "marketplace/manage/create_edit.html", {
-                    "listing": listing, "business": business, "vertical_config": vertical_config,
-                    "ListingStatus": ListingStatus, "editing": True,
-                })
+                messages.error(request, "Invalid price — please enter a valid number.")
+                return _re_render(form_data)
 
         try:
             listing.title = title
@@ -445,7 +459,6 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
                 listing.status = status
             if media_file:
                 listing.media_file = media_file
-            # Reset slug so it gets regenerated from new title
             if title != listing.title:
                 listing.listing_slug = ""
             listing.save()
@@ -453,26 +466,17 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
             for img_file in request.FILES.getlist("images"):
                 try:
                     MarketplaceListingImage.objects.create(listing=listing, image=img_file)
-                except Exception:
-                    pass
+                except Exception as img_err:
+                    log.warning("Edit-listing image upload failed: %s", img_err)
 
-            messages.success(request, f"Listing '{title}' updated.")
+            messages.success(request, f"Listing '{title}' updated successfully.")
             return redirect("inventory:manage_listings")
         except Exception as e:
-            log.exception("Listing update error: %s", e)
+            log.exception("Listing update error for listing %s: %s", listing_id, e)
             messages.error(request, f"Could not update listing: {e}")
+            return _re_render(form_data)
 
-    return render(
-        request,
-        "marketplace/manage/create_edit.html",
-        {
-            "listing": listing,
-            "business": business,
-            "vertical_config": vertical_config,
-            "ListingStatus": ListingStatus,
-            "editing": True,
-        },
-    )
+    return _re_render({})
 
 
 @login_required

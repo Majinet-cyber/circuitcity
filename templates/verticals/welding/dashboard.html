@@ -604,6 +604,12 @@
         <div class="kpi-label">📄 Outstanding</div>
         <div class="kpi-value warning">MWK {{ total_outstanding|floatformat:0|intcomma }}</div>
       </div>
+      {% if delayed_jobs > 0 %}
+      <div class="kpi-card" style="border-left:4px solid #dc2626">
+        <div class="kpi-label" style="color:#dc2626">⏰ Delayed Jobs (>14 days)</div>
+        <div class="kpi-value" style="color:#dc2626">{{ delayed_jobs }}</div>
+      </div>
+      {% endif %}
     </div>
     
     <!-- Charts Row -->
@@ -748,6 +754,32 @@
       </div>
     </div>
     
+    <!-- Top Clients -->
+    {% if top_clients %}
+    <div class="section-card" style="margin-bottom:1.5rem">
+      <div class="section-header">
+        <div class="section-title">👥 Top Clients</div>
+        <a href="{% url 'verticals:welding_client_management' %}" class="section-link">View All</a>
+      </div>
+      <div class="section-body" style="padding:1rem 1.5rem">
+        {% for client in top_clients %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e2e8f0">
+          <div>
+            <div style="font-weight:700;color:#0f172a">{{ client.customer_name }}</div>
+            {% if client.customer_phone %}
+            <div style="font-size:.8rem;color:#64748b">{{ client.customer_phone }}</div>
+            {% endif %}
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;color:#16a34a">MWK {{ client.total_value|floatformat:0|intcomma }}</div>
+            <div style="font-size:.78rem;color:#64748b">{{ client.quote_count }} quote{{ client.quote_count|pluralize }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Ready for Pickup Banner -->
     {% if jobs_ready > 0 %}
     <div class="ready-banner">

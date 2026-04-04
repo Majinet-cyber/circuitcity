@@ -169,62 +169,63 @@ def build_cement_brand_choices(business, in_stock_only: bool = True) -> list[dic
 
 def get_filtered_stock_in_categories(business) -> list[dict]:
     """
-    Get stock-in categories filtered by what the business actually has in inventory.
-    
-    Rules:
-    - If the business has NO products OR only cement products, show ONLY 'construction-materials'
-    - If the business has products in multiple categories, show all categories that have products
-    - Categories are determined by the 'category' field on MerchProduct
-    
-    This ensures cement vendor demos show only cement by default, but the system
-    expands to show other categories once the business actually stocks them.
+    Return all enabled stock-in categories for the hardware/cement vertical.
+
+    All registered categories are shown so users can stock any hardware product type
+    without needing to have pre-existing products for that category.
+    Categories that have products already stocked are marked with a badge count.
     """
-    from inventory.catalog.construction_materials import CONSTRUCTION_PRODUCTS
-    
-    # Get all products for this cement business
+    from inventory.catalog.registry import get_all_stock_in_categories
+
+    all_cats = get_all_stock_in_categories()
+
+    # Compute a stock count per category key for the badge display
     products = MerchProduct.objects.filter(
         business=business,
         kind=BusinessKind.CEMENT,
-        is_active=True
-    )
-    
-    # Get unique categories from existing products
-    existing_categories = set()
-    for product in products:
-        cat = (product.category or "").strip().lower()
-        if cat:
-            existing_categories.add(cat)
-    
-    # Map product categories to registry category keys
-    # 'construction-materials' includes cement, paint, iron-sheets, etc.
-    category_mapping = {
-        "construction-materials": "construction-materials",
+        is_active=True,
+    ).values("category", "quantity_in_stock")
+
+    # Map DB categories → registry keys (many-to-one)
+    db_to_registry: dict[str, str] = {
         "cement": "construction-materials",
-        "paint": "construction-materials",
-        "iron-sheets": "construction-materials",
+        "construction-materials": "construction-materials",
+        "paint": "paint-and-finishing",
+        "paint-and-finishing": "paint-and-finishing",
+        "plumbing": "plumbing-supplies",
+        "plumbing-supplies": "plumbing-supplies",
+        "electrical": "electrical-supplies",
+        "electrical-supplies": "electrical-supplies",
+        "tools": "tools-and-hardware",
+        "tools-and-hardware": "tools-and-hardware",
+        "roofing": "roofing-materials",
+        "roofing-materials": "roofing-materials",
+        "iron-sheets": "roofing-materials",
         "angle-iron": "construction-materials",
+        "fasteners": "fasteners-and-fixings",
+        "fasteners-and-fixings": "fasteners-and-fixings",
         "welding-materials": "welding-materials",
         "welding": "welding-materials",
+        "adhesives": "adhesives-and-sealants",
+        "adhesives-and-sealants": "adhesives-and-sealants",
         "car-spares": "car-spares",
         "automotive": "car-spares",
     }
-    
-    # Determine which registry categories have products
-    active_category_keys = set()
-    for cat in existing_categories:
-        mapped_key = category_mapping.get(cat, None)
-        if mapped_key:
-            active_category_keys.add(mapped_key)
-    
-    # If no products or only construction-materials, show only construction-materials (cement)
-    if not active_category_keys or active_category_keys == {"construction-materials"}:
-        return [cat for cat in STOCK_IN_CATEGORIES if cat["key"] == "construction-materials" and cat.get("enabled", True)]
-    
-    # Otherwise, show all categories that have products
-    return [
-        cat for cat in STOCK_IN_CATEGORIES
-        if cat["key"] in active_category_keys and cat.get("enabled", True)
-    ]
+
+    stock_counts: dict[str, int] = {}
+    for row in products:
+        raw_cat = (row["category"] or "").strip().lower()
+        reg_key = db_to_registry.get(raw_cat, "construction-materials")
+        stock_counts[reg_key] = stock_counts.get(reg_key, 0) + (row["quantity_in_stock"] or 0)
+
+    # Annotate each category with a stock count badge
+    annotated = []
+    for cat in all_cats:
+        entry = dict(cat)
+        entry["stock_count"] = stock_counts.get(cat["key"], 0)
+        annotated.append(entry)
+
+    return annotated
 
 
 def is_cement_product(product_slug: str) -> bool:
@@ -586,35 +587,143 @@ def stock_list(request):
 @require_business_kind(BusinessKind.CEMENT)
 def stock_in(request):
     """
-    FAST Stock-In wizard for cement (2-step demo flow).
-    
-    Flow (CEMENT DEMO OPTIMIZED - Jan 2026):
-    Step 1: Select Cement Brand (Dangote, Akshar, etc.) - fast demo start
-    Step 2: Quantity & Pricing (order price + selling price + quantity) → Save
-    
-    NO category step, NO extra details step for cement.
-    Default: 50KG bag cement products.
-    
-    All product definitions come from SSOT: inventory/catalog/construction_materials.py
+    Hardware / Cement Stock-In wizard.
+
+    Flow:
+      Step "choose" (default) — category selection grid (all hardware categories)
+      For "construction-materials":
+        Step 1 — Select brand (seeded cement brands)
+        Step 2 — Quantity & pricing → save
+      For any other category:
+        Step "generic" — simple product-name + qty + price form → save
     """
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+
     business = get_active_business(request)
 
-    # Seed default cement brands if not already seeded (idempotent)
+    # Seed default cement brands (idempotent)
     seed_cement_defaults(business)
 
-    # Step tracking (fast 2-step flow: brand → quantity/price)
-    step = request.GET.get("step", "1")
+    category_key = request.GET.get("category", "").strip()
 
+    # ------------------------------------------------------------------ #
+    # GENERIC STOCK-IN: for non-construction categories                   #
+    # ------------------------------------------------------------------ #
+    if category_key and category_key != "construction-materials":
+        from inventory.catalog.registry import get_category_by_key
+
+        cat_def = get_category_by_key(category_key) or {}
+        category_label = cat_def.get("label", category_key.replace("-", " ").title())
+
+        if request.method == "POST":
+            try:
+                product_name = request.POST.get("product_name", "").strip()
+                unit = request.POST.get("unit", "unit").strip() or "unit"
+                quantity_raw = request.POST.get("quantity", "0").strip()
+                cost_raw = request.POST.get("cost_price", "0").strip()
+                selling_raw = request.POST.get("selling_price", "0").strip()
+                notes = request.POST.get("notes", "").strip()
+
+                if not product_name:
+                    messages.error(request, "Product name is required.")
+                    return redirect(f"{reverse('cement:stock_in')}?category={category_key}&step=generic")
+
+                quantity = int(quantity_raw) if quantity_raw else 0
+                cost_price = Decimal(cost_raw) if cost_raw else Decimal("0")
+                selling_price = Decimal(selling_raw) if selling_raw else Decimal("0")
+
+                if quantity <= 0:
+                    messages.error(request, "Quantity must be greater than 0.")
+                    return redirect(f"{reverse('cement:stock_in')}?category={category_key}&step=generic")
+
+                with transaction.atomic():
+                    product, created = MerchProduct.objects.get_or_create(
+                        business=business,
+                        kind=BusinessKind.CEMENT,
+                        name=product_name,
+                        category=category_key,
+                        defaults={
+                            "base_unit": unit,
+                            "cost_price": cost_price,
+                            "selling_price": selling_price,
+                            "quantity_in_stock": 0,
+                            "is_active": True,
+                        },
+                    )
+                    product.quantity_in_stock = (product.quantity_in_stock or 0) + quantity
+                    if cost_price > 0:
+                        product.cost_price = cost_price
+                    if selling_price > 0:
+                        product.selling_price = selling_price
+                    if notes and not product.description:
+                        product.description = notes
+                    product.save()
+
+                action = "created and stocked" if created else f"stocked (+{quantity})"
+                messages.success(request, f"✅ {product_name} — {action} successfully.")
+                return redirect(f"{reverse('cement:stock_in')}?category={category_key}&step=generic")
+
+            except (ValueError, TypeError) as e:
+                messages.error(request, f"Invalid input: {e}")
+                _log.warning("Hardware stock-in generic form error: %s", e)
+                return redirect(f"{reverse('cement:stock_in')}?category={category_key}&step=generic")
+            except Exception as e:
+                messages.error(request, f"Could not save stock: {e}")
+                _log.exception("Hardware stock-in generic save error: %s", e)
+                return redirect(f"{reverse('cement:stock_in')}?category={category_key}&step=generic")
+
+        # GET: existing products in this category for reference
+        existing_products = (
+            MerchProduct.objects.filter(
+                business=business,
+                kind=BusinessKind.CEMENT,
+                category=category_key,
+                is_active=True,
+            )
+            .order_by("name")[:30]
+        )
+
+        return render(request, "verticals/cement/stock_in_fast.html", {
+            "business": business,
+            "step": "generic",
+            "category_key": category_key,
+            "category_label": category_label,
+            "category_def": cat_def,
+            "existing_products": existing_products,
+            "active_tab": "stock_in",
+        })
+
+    # ------------------------------------------------------------------ #
+    # CATEGORY CHOOSER — no category selected yet                         #
+    # ------------------------------------------------------------------ #
+    step = request.GET.get("step", "choose" if not category_key else "1")
+    if not category_key and step not in ("1", "2"):
+        step = "choose"
+
+    if step == "choose":
+        all_categories = get_filtered_stock_in_categories(business)
+        return render(request, "verticals/cement/stock_in_fast.html", {
+            "business": business,
+            "step": "choose",
+            "all_categories": all_categories,
+            "active_tab": "stock_in",
+        })
+
+    # ------------------------------------------------------------------ #
+    # CONSTRUCTION MATERIALS FLOW (existing cement wizard)               #
+    # ------------------------------------------------------------------ #
     if request.method == "POST":
         try:
+            _con_prefix = f"{reverse('cement:stock_in')}?category=construction-materials"
+
             # Step 1: Brand selection (select existing cement product by ID)
             if step == "1":
                 product_id = request.POST.get("product_id", "").strip()
                 if not product_id:
                     messages.error(request, "Please select a cement brand")
-                    return redirect(f"{reverse('cement:stock_in')}?step=1")
-                
-                # Validate product exists
+                    return redirect(f"{_con_prefix}&step=1")
+
                 try:
                     selected_product = MerchProduct.objects.get(
                         id=int(product_id),
@@ -622,13 +731,12 @@ def stock_in(request):
                         kind=BusinessKind.CEMENT,
                         is_active=True
                     )
-                    # Store the product_id for step 2
                     request.session["cement_stock_in_product_id"] = selected_product.id
                     request.session["cement_stock_in_brand"] = get_brand_label_for_product(selected_product)
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
+                    return redirect(f"{_con_prefix}&step=2")
                 except (MerchProduct.DoesNotExist, ValueError):
                     messages.error(request, "Invalid cement brand selected")
-                    return redirect(f"{reverse('cement:stock_in')}?step=1")
+                    return redirect(f"{_con_prefix}&step=1")
 
             # Step 2: Quantity and pricing
             elif step == "2":
@@ -636,18 +744,18 @@ def stock_in(request):
                 if not product_id:
                     messages.error(request, "Please start from Step 1")
                     return redirect("cement:stock_in")
-                
+
                 quantity = int(request.POST.get("quantity", 0))
                 cost_price = Decimal(request.POST.get("cost_price", "0"))
                 selling_price = Decimal(request.POST.get("selling_price", "0"))
 
                 if quantity <= 0:
                     messages.error(request, "Quantity must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
+                    return redirect(f"{_con_prefix}&step=2")
 
                 if cost_price <= 0 or selling_price <= 0:
                     messages.error(request, "Cost and selling prices must be greater than 0")
-                    return redirect(f"{reverse('cement:stock_in')}?step=2")
+                    return redirect(f"{_con_prefix}&step=2")
 
                 with transaction.atomic():
                     try:
@@ -707,10 +815,10 @@ def stock_in(request):
 
         except (ValueError, TypeError) as e:
             messages.error(request, f"Invalid input: {e}")
-            return redirect(f"{reverse('cement:stock_in')}?step={step}")
+            return redirect(f"{reverse('cement:stock_in')}?category=construction-materials&step={step}")
         except Exception as e:
             messages.error(request, f"Error adding stock: {e}")
-            return redirect(f"{reverse('cement:stock_in')}?step={step}")
+            return redirect(f"{reverse('cement:stock_in')}?category=construction-materials&step={step}")
 
     # GET: Show appropriate step
     context = {

@@ -846,6 +846,9 @@ def dashboard(request):
             # NEW: Sales by phone model (respects date range filter)
             "sales_by_model": sales_by_model,
             "sales_by_model_source": sales_by_model_source,  # "sales" or "stock"
+            # Low stock alerts
+            "low_stock_phones": low_stock_phones,
+            "low_stock_electronics": low_stock_electronics,
             # Role-based visibility flags
             "IS_MANAGER": is_manager,
             "IS_AGENT": is_agent,

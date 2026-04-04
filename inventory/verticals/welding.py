@@ -321,7 +321,26 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     
     # Outstanding jobs (not delivered)
     outstanding_jobs = jobs.exclude(status=WeldingJobStatus.DELIVERED).count()
-    
+
+    # Top clients by total quote value (all time)
+    top_clients = (
+        WeldingQuote.objects.filter(business=business)
+        .exclude(customer_name="")
+        .values("customer_name", "customer_phone")
+        .annotate(
+            total_value=Coalesce(Sum("total"), Decimal("0")),
+            quote_count=Count("id"),
+        )
+        .order_by("-total_value")[:5]
+    )
+
+    # Overdue / delayed jobs: active jobs older than 14 days
+    cutoff = timezone.now() - timedelta(days=14)
+    delayed_jobs = jobs.filter(
+        status__in=[WeldingJobStatus.PENDING, WeldingJobStatus.IN_PROGRESS],
+        created_at__lt=cutoff,
+    ).count()
+
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Welding Manager",
@@ -361,7 +380,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "avg_job_value": avg_job_value,
         "top_job_category": top_job_category,
         "outstanding_jobs": outstanding_jobs,
-        
+        "delayed_jobs": delayed_jobs,
+        "top_clients": list(top_clients),
+
         # Quick action URLs
         "url_create_quote": "/verticals/welding/quotes/create/",
         "url_stock_in": "/verticals/welding/stock-in/",

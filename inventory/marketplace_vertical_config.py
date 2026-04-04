@@ -224,6 +224,41 @@ VERTICAL_MARKETPLACE_CONFIG: dict[str, dict] = {
             "chassis_no": "Chassis / VIN",
         },
     },
+    "energy": {
+        "listing_fields": ["category", "brand", "capacity", "unit", "quantity_available"],
+        "cta_label": "Inquire / Order",
+        "listing_type_label": "Product",
+        "status_label_sold": "Out of Stock",
+        "hero_tagline": "Solar, energy & power products",
+        "show_price": True,
+        "show_location": True,
+        "icon": "bi-lightning-charge",
+        "metadata_labels": {
+            "category": "Category",
+            "brand": "Brand",
+            "capacity": "Capacity / Spec",
+            "unit": "Unit",
+            "quantity_available": "Available",
+        },
+    },
+    "electronics": {
+        "listing_fields": ["brand", "model", "storage", "ram", "condition", "color"],
+        "cta_label": "Inquire / Buy",
+        "listing_type_label": "Device",
+        "status_label_sold": "Sold",
+        "hero_tagline": "Phones, laptops & electronics",
+        "show_price": True,
+        "show_location": True,
+        "icon": "bi-pc-display",
+        "metadata_labels": {
+            "brand": "Brand",
+            "model": "Model",
+            "storage": "Storage",
+            "ram": "RAM",
+            "condition": "Condition",
+            "color": "Colour",
+        },
+    },
 }
 
 # Fallback config for unknown verticals
