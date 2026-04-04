@@ -389,4 +389,9 @@ if _HAS_ENERGY and _energy_module:
         path("energy/copilot/", _energy_module.copilot, name="energy_copilot"),
         # Phase 2: Data upload / ingestion
         path("energy/data-upload/", _energy_module.data_upload, name="energy_data_upload"),
+        # Commerce: product catalog, stock-in, sales
+        path("energy/products/",   _energy_module.energy_catalog,      name="energy_catalog"),
+        path("energy/stock-in/",   _energy_module.energy_stock_in,     name="energy_stock_in"),
+        path("energy/sell/",       _energy_module.energy_sell,         name="energy_sell"),
+        path("energy/seed/",       _energy_module.energy_seed_catalog, name="energy_seed_catalog"),
     ]

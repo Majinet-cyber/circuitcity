@@ -276,55 +276,137 @@
     </div>
   </div>
 
-  {# ── STOCK-IN INVENTORY CARDS ── #}
+  {# ── COMMERCE KPIs ── #}
+  {% if commerce %}
+  <div class="en-kpi2-grid mb-4">
+    <div class="en-kpi" style="border-color:#10b981;">
+      <div class="en-kpi-val money" style="color:#059669;">
+        {% if commerce.revenue_this_month %}
+          {{ business.currency|default:"MWK" }} {{ commerce.revenue_this_month|floatformat:0 }}
+        {% else %}—{% endif %}
+      </div>
+      <div class="en-kpi-lbl">Revenue (This Month)</div>
+      <div class="en-kpi-sub">{{ commerce.sales_this_month }} sale{{ commerce.sales_this_month|pluralize }}</div>
+    </div>
+    <div class="en-kpi" style="border-color:#6366f1;">
+      <div class="en-kpi-val money" style="color:#4f46e5;">
+        {% if commerce.profit_this_month %}
+          {{ business.currency|default:"MWK" }} {{ commerce.profit_this_month|floatformat:0 }}
+        {% else %}—{% endif %}
+      </div>
+      <div class="en-kpi-lbl">Gross Profit (Month)</div>
+    </div>
+    <div class="en-kpi">
+      <div class="en-kpi-val" style="color:#0f172a;">{{ commerce.total_products|default:0 }}</div>
+      <div class="en-kpi-lbl">Products in Catalog</div>
+      <div class="en-kpi-sub">
+        {% if commerce.low_stock_products > 0 %}
+          <span style="color:#d97706;">{{ commerce.low_stock_products }} low stock</span>
+        {% else %}all healthy{% endif %}
+      </div>
+    </div>
+    <div class="en-kpi">
+      <div class="en-kpi-val money" style="font-size:1.1rem;color:#0891b2;">
+        {% if commerce.inventory_value %}
+          {{ business.currency|default:"MWK" }} {{ commerce.inventory_value|floatformat:0 }}
+        {% else %}—{% endif %}
+      </div>
+      <div class="en-kpi-lbl">Inventory Value</div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── COMMERCE QUICK ACTIONS ── #}
   <div class="en-card mb-4">
     <div class="en-section-hdr">
       <div>
-        <p class="en-section-title mb-0">📦 Equipment Stock-In</p>
-        <div style="font-size:.8rem;color:#64748b;margin-top:.2rem;">Register received equipment into your asset inventory</div>
+        <p class="en-section-title mb-0">🛒 Energy Commerce</p>
+        <div style="font-size:.8rem;color:#64748b;margin-top:.2rem;">Stock and sell energy products</div>
+      </div>
+      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Product catalog →</a>
+    </div>
+    <div class="stock-in-grid">
+      <a href="{% url 'verticals:energy_stock_in' %}" class="stock-card primary">
+        <span class="stock-card-icon">📦</span>
+        <span class="stock-card-label">Stock In</span>
+        <span class="stock-card-sub">Record received goods</span>
+      </a>
+      <a href="{% url 'verticals:energy_sell' %}" class="stock-card primary">
+        <span class="stock-card-icon">🛒</span>
+        <span class="stock-card-label">Sell Products</span>
+        <span class="stock-card-sub">Record a sale</span>
+      </a>
+      <a href="{% url 'verticals:energy_catalog' %}" class="stock-card">
+        <span class="stock-card-icon">📋</span>
+        <span class="stock-card-label">Product List</span>
+        <span class="stock-card-sub">View &amp; manage</span>
+      </a>
+      <a href="{% url 'verticals:energy_seed_catalog' %}" class="stock-card"
+         onclick="return confirm('Seed the default energy catalog?')">
+        <span class="stock-card-icon">🌱</span>
+        <span class="stock-card-label">Seed Catalog</span>
+        <span class="stock-card-sub">Add default products</span>
+      </a>
+    </div>
+  </div>
+
+  {# ── RECENT ENERGY SALES ── #}
+  {% if recent_energy_sales %}
+  <div class="en-card mb-4">
+    <div class="en-section-hdr">
+      <p class="en-section-title mb-0">🧾 Recent Sales</p>
+      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Products →</a>
+    </div>
+    <div class="d-flex flex-column gap-2">
+      {% for sale in recent_energy_sales %}
+      <div class="d-flex align-items-center gap-3 p-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+        <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">⚡</div>
+        <div style="flex:1;min-width:0;">
+          <div class="fw-semibold text-truncate" style="font-size:.85rem;">{{ sale.product.name }}</div>
+          <div class="text-muted" style="font-size:.72rem;">
+            ×{{ sale.quantity }} {{ sale.product.unit }} · {{ sale.payment_method }}
+            {% if sale.sold_by %} · {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="fw-bold" style="font-size:.88rem;color:#059669;">{{ business.currency|default:"MWK" }} {{ sale.total_amount|floatformat:0 }}</div>
+          <div class="text-muted" style="font-size:.7rem;">{{ sale.sold_at|timesince }} ago</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── EQUIPMENT ASSET STOCK-IN ── #}
+  <div class="en-card mb-4">
+    <div class="en-section-hdr">
+      <div>
+        <p class="en-section-title mb-0">🏗️ Equipment Registration</p>
+        <div style="font-size:.8rem;color:#64748b;margin-top:.2rem;">Register installed equipment at customer sites</div>
       </div>
       <a href="{% url 'verticals:energy_assets' %}" class="en-section-link">View all assets →</a>
     </div>
     <div class="stock-in-grid">
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=solar_panel" class="stock-card primary">
+      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=solar_panel" class="stock-card">
         <span class="stock-card-icon">☀️</span>
         <span class="stock-card-label">Solar Panels</span>
-        <span class="stock-card-sub">Stock in</span>
+        <span class="stock-card-sub">Register asset</span>
       </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=battery" class="stock-card primary">
+      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=battery" class="stock-card">
         <span class="stock-card-icon">🔋</span>
         <span class="stock-card-label">Battery Banks</span>
-        <span class="stock-card-sub">Stock in</span>
+        <span class="stock-card-sub">Register asset</span>
       </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=inverter" class="stock-card primary">
+      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=inverter" class="stock-card">
         <span class="stock-card-icon">⚡</span>
         <span class="stock-card-label">Inverters</span>
-        <span class="stock-card-sub">Stock in</span>
+        <span class="stock-card-sub">Register asset</span>
       </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=charge_controller" class="stock-card primary">
+      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=charge_controller" class="stock-card">
         <span class="stock-card-icon">🔌</span>
         <span class="stock-card-label">Charge Controllers</span>
-        <span class="stock-card-sub">Stock in</span>
-      </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=other" class="stock-card">
-        <span class="stock-card-icon">🔩</span>
-        <span class="stock-card-label">Cables &amp; Wiring</span>
-        <span class="stock-card-sub">Stock in</span>
-      </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=meter" class="stock-card">
-        <span class="stock-card-icon">📟</span>
-        <span class="stock-card-label">Meters</span>
-        <span class="stock-card-sub">Stock in</span>
-      </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=generator" class="stock-card">
-        <span class="stock-card-icon">⛽</span>
-        <span class="stock-card-label">Generators</span>
-        <span class="stock-card-sub">Stock in</span>
-      </a>
-      <a href="{% url 'verticals:energy_asset_create' %}?prefill_type=breaker" class="stock-card">
-        <span class="stock-card-icon">🔁</span>
-        <span class="stock-card-label">Breakers &amp; Switches</span>
-        <span class="stock-card-sub">Stock in</span>
+        <span class="stock-card-sub">Register asset</span>
       </a>
     </div>
   </div>

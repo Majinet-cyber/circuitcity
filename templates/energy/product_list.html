@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Energy Products · {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .en-page { max-width:1300px; margin:0 auto; padding:1.25rem; }
+  .en-hero-bar {
+    background:linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#059669 100%);
+    border-radius:16px; padding:1.5rem 2rem; color:#fff; margin-bottom:1.5rem;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+  }
+  .en-hero-bar h1 { font-size:1.5rem; font-weight:800; margin:0; }
+  .en-hero-bar .sub { font-size:.85rem; color:rgba(255,255,255,.65); margin-top:.2rem; }
+  .en-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+  .btn-en { display:inline-flex; align-items:center; gap:.4rem; padding:.5rem 1.1rem;
+    border-radius:999px; font-size:.82rem; font-weight:700; text-decoration:none;
+    transition:all .15s; }
+  .btn-en-primary { background:rgba(255,255,255,.95); color:#064e3b; }
+  .btn-en-primary:hover { background:#fff; color:#059669; }
+  .btn-en-ghost { background:rgba(255,255,255,.12); color:rgba(255,255,255,.9);
+    border:1px solid rgba(255,255,255,.2); }
+  .btn-en-ghost:hover { background:rgba(255,255,255,.2); color:#fff; }
+
+  .kpi-row { display:grid; grid-template-columns:repeat(4,1fr); gap:.9rem; margin-bottom:1.5rem; }
+  @media(max-width:768px) { .kpi-row { grid-template-columns:repeat(2,1fr); } }
+  .kpi-card { background:#fff; border-radius:14px; border:1.5px solid #e2e8f0;
+    padding:1rem; box-shadow:0 4px 16px rgba(15,23,42,.06); text-align:center; }
+  .kpi-val { font-size:1.7rem; font-weight:800; color:#0f172a; line-height:1.1; margin:.1rem 0; }
+  .kpi-lbl { font-size:.65rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.07em; }
+
+  .table-card { background:#fff; border-radius:14px; border:1.5px solid #e2e8f0;
+    overflow:hidden; box-shadow:0 4px 16px rgba(15,23,42,.06); }
+  .table-header { padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between;
+    border-bottom:1px solid #f1f5f9; }
+  .table-title { font-size:.75rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; color:#64748b; margin:0; }
+  .products-table { width:100%; border-collapse:collapse; }
+  .products-table th { background:#f8fafc; padding:.65rem 1rem; text-align:left;
+    font-size:.72rem; font-weight:700; color:#64748b; text-transform:uppercase;
+    letter-spacing:.05em; border-bottom:1px solid #e2e8f0; white-space:nowrap; }
+  .products-table td { padding:.75rem 1rem; font-size:.85rem; border-bottom:1px solid #f1f5f9;
+    vertical-align:middle; }
+  .products-table tr:last-child td { border-bottom:none; }
+  .badge-cat { display:inline-block; padding:.2rem .55rem; border-radius:6px;
+    font-size:.68rem; font-weight:600; background:#f1f5f9; color:#475569; }
+  .badge-low { background:#fff7ed; color:#c2410c; }
+  .badge-ok  { background:#f0fdf4; color:#15803d; }
+  .badge-zero { background:#fef2f2; color:#dc2626; }
+  .empty-state { text-align:center; padding:4rem 2rem; color:#94a3b8; }
+  .empty-icon { font-size:3.5rem; opacity:.2; margin-bottom:1rem; }
+  @media(max-width:640px) {
+    .products-table th:nth-child(n+4),
+    .products-table td:nth-child(n+4) { display:none; }
+  }
+</style>
+
+<div class="en-page">
+
+  <div class="en-hero-bar">
+    <div>
+      <h1>⚡ Energy Products</h1>
+      <div class="sub">{{ business.name }} · Retail catalog</div>
+    </div>
+    <div class="en-actions">
+      <a href="{% url 'verticals:energy_stock_in' %}" class="btn-en btn-en-primary">
+        📦 Stock In
+      </a>
+      <a href="{% url 'verticals:energy_sell' %}" class="btn-en btn-en-ghost">
+        🛒 Sell
+      </a>
+      <a href="{% url 'verticals:energy_seed_catalog' %}" class="btn-en btn-en-ghost"
+         onclick="return confirm('Seed the default energy catalog? Existing products are not overwritten.')">
+        🌱 Seed Catalog
+      </a>
+      <a href="{% url 'verticals:energy_dashboard' %}" class="btn-en btn-en-ghost">
+        ← Dashboard
+      </a>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-val">{{ products|length }}</div>
+      <div class="kpi-lbl">Products</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val" style="color:{% if low_stock_count > 0 %}#d97706{% else %}#10b981{% endif %};">{{ low_stock_count }}</div>
+      <div class="kpi-lbl">Low / Out of Stock</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val" style="font-size:1.2rem;">{{ business.currency|default:"MWK" }} {{ total_value|floatformat:0|intcomma }}</div>
+      <div class="kpi-lbl">Inventory Value</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">{{ category_choices|length }}</div>
+      <div class="kpi-lbl">Categories</div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <p class="table-title">All Products</p>
+    </div>
+
+    {% if products %}
+    <div style="overflow-x:auto;">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Category</th>
+            <th>In Stock</th>
+            <th>Cost Price</th>
+            <th>Sell Price</th>
+            <th>Margin</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          {% with margin=p.selling_price|add:"-"|add:p.cost_price %}
+          <tr>
+            <td>
+              <div style="font-weight:700;color:#0f172a;">{{ p.name }}</div>
+              {% if p.sku %}<div style="font-size:.72rem;color:#94a3b8;">SKU: {{ p.sku }}</div>{% endif %}
+            </td>
+            <td><span class="badge-cat">{{ p.get_category_display }}</span></td>
+            <td>
+              <span class="badge-{% if p.quantity_in_stock == 0 %}zero{% elif p.is_low_stock %}low{% else %}ok{% endif %}">
+                {{ p.quantity_in_stock }} {{ p.unit }}
+              </span>
+            </td>
+            <td>{{ business.currency|default:"MWK" }} {{ p.cost_price|floatformat:0|intcomma }}</td>
+            <td>{{ business.currency|default:"MWK" }} {{ p.selling_price|floatformat:0|intcomma }}</td>
+            <td>
+              {% if p.selling_price > 0 %}
+                {{ business.currency|default:"MWK" }} {{ p.selling_price|add:"-"|add:p.cost_price|floatformat:0|intcomma }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if p.quantity_in_stock == 0 %}
+                <span style="color:#dc2626;font-size:.75rem;font-weight:700;">Out of Stock</span>
+              {% elif p.is_low_stock %}
+                <span style="color:#d97706;font-size:.75rem;font-weight:700;">Low Stock</span>
+              {% else %}
+                <span style="color:#059669;font-size:.75rem;font-weight:700;">In Stock</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="{% url 'verticals:energy_stock_in' %}?product_id={{ p.id }}" style="font-size:.78rem;color:#4f46e5;text-decoration:none;font-weight:600;">📦 Stock</a>
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">📦</div>
+      <p style="font-size:1rem;font-weight:600;color:#475569;">No products yet</p>
+      <p style="font-size:.88rem;">Seed the default catalog or add products via Stock-In.</p>
+      <a href="{% url 'verticals:energy_seed_catalog' %}" class="btn btn-success rounded-pill mt-2"
+         onclick="return confirm('Seed the default energy catalog?')">
+        🌱 Seed Catalog
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

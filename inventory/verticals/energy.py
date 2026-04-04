@@ -286,6 +286,50 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     ctx["gen_data_json"] = json.dumps(gen_data)
     ctx["cons_data_json"] = json.dumps(cons_data)
 
+    # Commerce KPIs (energy retail)
+    try:
+        from inventory.models_energy import EnergyProduct, EnergyItemSale, EnergyStockIn
+        from django.db.models import Sum, Count
+
+        products_qs = EnergyProduct.objects.filter(business=biz, is_active=True)
+        total_products = products_qs.count()
+        low_stock_products = sum(1 for p in products_qs if p.is_low_stock)
+        from django.db import models as _djmodels
+        inventory_value = products_qs.aggregate(
+            val=Sum(_djmodels.ExpressionWrapper(
+                _djmodels.F("cost_price") * _djmodels.F("quantity_in_stock"),
+                output_field=_djmodels.DecimalField(max_digits=16, decimal_places=2)
+            ))
+        )["val"] or Decimal("0")
+
+        sales_this_month = EnergyItemSale.objects.filter(
+            business=biz, sold_at__date__gte=month_start, is_reversed=False
+        ).aggregate(
+            revenue=Sum("total_amount"),
+            profit=Sum("profit"),
+            count=Count("id"),
+        )
+        recent_energy_sales = (
+            EnergyItemSale.objects
+            .filter(business=biz, is_reversed=False)
+            .select_related("product", "sold_by")
+            .order_by("-sold_at")[:8]
+        )
+
+        ctx["commerce"] = {
+            "total_products": total_products,
+            "low_stock_products": low_stock_products,
+            "inventory_value": inventory_value,
+            "revenue_this_month": sales_this_month["revenue"] or Decimal("0"),
+            "profit_this_month": sales_this_month["profit"] or Decimal("0"),
+            "sales_this_month": sales_this_month["count"] or 0,
+        }
+        ctx["recent_energy_sales"] = recent_energy_sales
+    except Exception as _ce:
+        log.debug(f"Energy commerce KPIs unavailable: {_ce}")
+        ctx["commerce"] = {}
+        ctx["recent_energy_sales"] = []
+
     return render(request, "energy/dashboard.html", ctx)
 
 
@@ -1670,3 +1714,410 @@ def data_upload(request: HttpRequest) -> HttpResponse:
         "uploads": uploads,
     }
     return render(request, "energy/data_upload.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Energy Commerce — Product Catalog, Stock-In, Sales
+# ---------------------------------------------------------------------------
+
+def _commerce_models():
+    """Lazy-load energy commerce models; returns None tuple on import error."""
+    try:
+        from inventory.models_energy import EnergyProduct, EnergyStockIn, EnergyItemSale, EnergyProductCategory
+        return EnergyProduct, EnergyStockIn, EnergyItemSale, EnergyProductCategory
+    except Exception:
+        return None, None, None, None
+
+
+@login_required
+@require_business
+def energy_catalog(request: HttpRequest) -> HttpResponse:
+    """Product catalog: list active products with stock levels."""
+    biz = get_active_business(request)
+    EnergyProduct, _, _, EnergyProductCategory = _commerce_models()
+    if EnergyProduct is None:
+        messages.error(request, "Energy commerce module unavailable.")
+        return redirect("verticals:energy_dashboard")
+
+    products = EnergyProduct.objects.filter(business=biz, is_active=True).order_by("category", "name")
+    low_stock = [p for p in products if p.is_low_stock]
+
+    category_choices = EnergyProductCategory.choices
+
+    ctx = {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "products": products,
+        "low_stock_count": len(low_stock),
+        "total_value": sum(p.inventory_value for p in products),
+        "category_choices": category_choices,
+    }
+    return render(request, "energy/product_list.html", ctx)
+
+
+@login_required
+@require_business
+def energy_stock_in(request: HttpRequest) -> HttpResponse:
+    """Stock-in view: record received energy goods."""
+    from django.db import transaction as db_tx
+    biz = get_active_business(request)
+    EnergyProduct, EnergyStockIn, _, EnergyProductCategory = _commerce_models()
+    if EnergyProduct is None:
+        messages.error(request, "Energy commerce module unavailable.")
+        return redirect("verticals:energy_dashboard")
+
+    if request.method == "POST":
+        product_id = request.POST.get("product_id", "").strip()
+        new_product_name = request.POST.get("new_product_name", "").strip()
+        category = request.POST.get("category", "other").strip()
+        quantity_str = request.POST.get("quantity", "").strip()
+        cost_price_str = request.POST.get("cost_price", "0").strip()
+        selling_price_str = request.POST.get("selling_price", "0").strip()
+        supplier = request.POST.get("supplier", "").strip()
+        notes = request.POST.get("notes", "").strip()
+        received_date_str = request.POST.get("received_date", "").strip()
+
+        # Validate required fields
+        errors = []
+        try:
+            quantity = int(quantity_str)
+            if quantity <= 0:
+                errors.append("Quantity must be at least 1.")
+        except (ValueError, TypeError):
+            errors.append("Enter a valid quantity.")
+
+        try:
+            cost_price = Decimal(cost_price_str)
+        except (InvalidOperation, ValueError):
+            cost_price = Decimal("0.00")
+
+        try:
+            selling_price = Decimal(selling_price_str)
+        except (InvalidOperation, ValueError):
+            selling_price = Decimal("0.00")
+
+        from datetime import date as _date
+        try:
+            received_date = _date.fromisoformat(received_date_str) if received_date_str else _date.today()
+        except ValueError:
+            received_date = _date.today()
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            try:
+                with db_tx.atomic():
+                    if product_id:
+                        product = EnergyProduct.objects.get(id=product_id, business=biz)
+                    elif new_product_name:
+                        product, _ = EnergyProduct.objects.get_or_create(
+                            business=biz,
+                            name=new_product_name,
+                            category=category,
+                            defaults={
+                                "selling_price": selling_price,
+                                "unit": request.POST.get("unit", "unit").strip() or "unit",
+                            },
+                        )
+                    else:
+                        messages.error(request, "Select an existing product or enter a new product name.")
+                        return redirect(request.path)
+
+                    # Update product prices and stock
+                    product.cost_price = cost_price
+                    if selling_price > 0:
+                        product.selling_price = selling_price
+                    product.quantity_in_stock += quantity
+                    product.save()
+
+                    EnergyStockIn.objects.create(
+                        business=biz,
+                        product=product,
+                        quantity=quantity,
+                        cost_price=cost_price,
+                        supplier=supplier,
+                        notes=notes,
+                        received_date=received_date,
+                        recorded_by=request.user,
+                    )
+
+                messages.success(request, f"✅ Stock-in recorded: {product.name} ×{quantity}")
+                return redirect("verticals:energy_catalog")
+            except EnergyProduct.DoesNotExist:
+                messages.error(request, "Selected product not found.")
+            except Exception as exc:
+                log.error(f"Energy stock-in error: {exc}", exc_info=True)
+                messages.error(request, f"Stock-in failed: {exc}")
+
+    products = EnergyProduct.objects.filter(business=biz, is_active=True).order_by("category", "name")
+    category_choices = EnergyProductCategory.choices
+    ctx = {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "products": products,
+        "category_choices": category_choices,
+        "today": timezone.now().date().isoformat(),
+    }
+    return render(request, "energy/stock_in.html", ctx)
+
+
+@login_required
+@require_business
+def energy_sell(request: HttpRequest) -> HttpResponse:
+    """Sell view: record a sale of an energy product."""
+    from django.db import transaction as db_tx
+    biz = get_active_business(request)
+    EnergyProduct, _, EnergyItemSale, _ = _commerce_models()
+    if EnergyProduct is None:
+        messages.error(request, "Energy commerce module unavailable.")
+        return redirect("verticals:energy_dashboard")
+
+    if request.method == "POST":
+        product_id = request.POST.get("product_id", "").strip()
+        quantity_str = request.POST.get("quantity", "1").strip()
+        unit_price_str = request.POST.get("unit_price", "0").strip()
+        payment_method = request.POST.get("payment_method", "CASH").strip()
+        customer_name = request.POST.get("customer_name", "").strip()
+        notes = request.POST.get("notes", "").strip()
+
+        errors = []
+        try:
+            qty = int(quantity_str)
+            if qty <= 0:
+                errors.append("Quantity must be at least 1.")
+        except (ValueError, TypeError):
+            errors.append("Enter a valid quantity.")
+            qty = 1
+
+        try:
+            unit_price = Decimal(unit_price_str)
+        except (InvalidOperation, ValueError):
+            errors.append("Enter a valid unit price.")
+            unit_price = Decimal("0.00")
+
+        if not product_id:
+            errors.append("Please select a product.")
+
+        if errors:
+            for e in errors:
+                messages.error(request, e)
+        else:
+            try:
+                product = EnergyProduct.objects.get(id=product_id, business=biz, is_active=True)
+
+                if product.quantity_in_stock < qty:
+                    messages.error(
+                        request,
+                        f"Insufficient stock. Requested {qty}, available {product.quantity_in_stock}."
+                    )
+                else:
+                    with db_tx.atomic():
+                        sale = EnergyItemSale.objects.create(
+                            business=biz,
+                            product=product,
+                            quantity=qty,
+                            unit_price=unit_price,
+                            unit_cost=product.cost_price,
+                            payment_method=payment_method,
+                            customer_name=customer_name,
+                            notes=notes,
+                            sold_by=request.user,
+                        )
+                        product.quantity_in_stock -= qty
+                        product.save(update_fields=["quantity_in_stock", "updated_at"])
+
+                        # Email managers after commit
+                        _sale_id = sale.id
+                        _biz_id = biz.id
+                        db_tx.on_commit(
+                            lambda: _email_managers_on_energy_sale(_sale_id, _biz_id)
+                        )
+
+                    messages.success(
+                        request,
+                        f"✅ Sale recorded: {product.name} ×{qty} — {biz.currency if hasattr(biz, 'currency') else 'MWK'} {sale.total_amount:,.2f}"
+                    )
+                    return redirect("verticals:energy_sell")
+            except EnergyProduct.DoesNotExist:
+                messages.error(request, "Selected product not found.")
+            except Exception as exc:
+                log.error(f"Energy sell error: {exc}", exc_info=True)
+                messages.error(request, f"Sale failed: {exc}")
+
+    # GET: show form
+    products = (
+        EnergyProduct.objects.filter(business=biz, is_active=True, quantity_in_stock__gt=0)
+        .order_by("category", "name")
+    )
+    ctx = {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "products": products,
+        "payment_choices": EnergyItemSale.PAYMENT_CHOICES if EnergyItemSale else [],
+    }
+    return render(request, "energy/sell.html", ctx)
+
+
+def _email_managers_on_energy_sale(sale_id: int, business_id: int) -> None:
+    """Email all managers after a committed energy sale — never raises."""
+    from django.core.mail import send_mail
+    from django.conf import settings as dj_settings
+    from tenants.models import Business, Membership
+    from inventory.models_energy import EnergyItemSale as _Sale
+
+    try:
+        sale = _Sale.objects.select_related("business", "product", "sold_by").get(pk=sale_id)
+        biz = Business.objects.get(pk=business_id)
+        managers = Membership.objects.filter(
+            business=biz, role__in=["manager", "owner"], status="active"
+        ).select_related("user")
+        recipients = [m.user.email for m in managers if m.user.email]
+        if not recipients:
+            return
+
+        currency = getattr(biz, "currency", "MWK")
+        cashier = (
+            sale.sold_by.get_full_name() or sale.sold_by.username
+        ) if sale.sold_by else "System"
+        subject = f"New Energy Sale — {biz.name} — {currency} {sale.total_amount:,.2f}"
+        body = (
+            f"A new energy product sale was recorded at {biz.name}.\n\n"
+            f"Product       : {sale.product.name}\n"
+            f"Category      : {sale.product.get_category_display()}\n"
+            f"Quantity      : {sale.quantity} {sale.product.unit}\n"
+            f"Unit Price    : {currency} {sale.unit_price:,.2f}\n"
+            f"Total         : {currency} {sale.total_amount:,.2f}\n"
+            f"Profit        : {currency} {sale.profit:,.2f}\n"
+            f"Payment       : {sale.payment_method}\n"
+            f"Cashier       : {cashier}\n"
+            f"Date/Time     : {sale.sold_at.strftime('%Y-%m-%d %H:%M')}\n"
+        )
+        if sale.customer_name:
+            body += f"Customer      : {sale.customer_name}\n"
+
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=getattr(dj_settings, "DEFAULT_FROM_EMAIL", "noreply@emajinet.com"),
+            recipient_list=recipients,
+            fail_silently=True,
+        )
+    except Exception as exc:
+        log.error(f"_email_managers_on_energy_sale failed for sale #{sale_id}: {exc}", exc_info=True)
+
+
+@login_required
+@require_business
+def energy_seed_catalog(request: HttpRequest) -> HttpResponse:
+    """
+    Idempotent seed endpoint: creates the standard energy product catalog
+    for the active business. Only creates items that don't already exist.
+    """
+    from django.db import transaction as db_tx
+    biz = get_active_business(request)
+    EnergyProduct, _, _, EnergyProductCategory = _commerce_models()
+    if EnergyProduct is None:
+        messages.error(request, "Energy commerce module unavailable.")
+        return redirect("verticals:energy_dashboard")
+
+    CATALOG = [
+        # Solar Panels
+        {"name": "50W Mono Solar Panel",        "category": "solar_panel",       "unit": "unit"},
+        {"name": "100W Mono Solar Panel",       "category": "solar_panel",       "unit": "unit"},
+        {"name": "200W Mono Solar Panel",       "category": "solar_panel",       "unit": "unit"},
+        {"name": "300W Mono Solar Panel",       "category": "solar_panel",       "unit": "unit"},
+        {"name": "400W Mono Solar Panel",       "category": "solar_panel",       "unit": "unit"},
+        {"name": "550W Mono Solar Panel",       "category": "solar_panel",       "unit": "unit"},
+        # Batteries
+        {"name": "100Ah 12V AGM Battery",       "category": "battery",           "unit": "unit"},
+        {"name": "200Ah 12V AGM Battery",       "category": "battery",           "unit": "unit"},
+        {"name": "100Ah Lithium (LiFePO4)",     "category": "battery",           "unit": "unit"},
+        {"name": "200Ah Lithium (LiFePO4)",     "category": "battery",           "unit": "unit"},
+        {"name": "5kWh Lithium Battery Pack",   "category": "battery",           "unit": "unit"},
+        # Inverters
+        {"name": "300W Pure Sine Inverter",     "category": "inverter",          "unit": "unit"},
+        {"name": "500W Pure Sine Inverter",     "category": "inverter",          "unit": "unit"},
+        {"name": "1000W Pure Sine Inverter",    "category": "inverter",          "unit": "unit"},
+        {"name": "2000W Pure Sine Inverter",    "category": "inverter",          "unit": "unit"},
+        {"name": "3000W Pure Sine Inverter",    "category": "inverter",          "unit": "unit"},
+        {"name": "5000W Hybrid Inverter",       "category": "inverter",          "unit": "unit"},
+        # Charge Controllers
+        {"name": "10A MPPT Charge Controller",  "category": "charge_controller", "unit": "unit"},
+        {"name": "20A MPPT Charge Controller",  "category": "charge_controller", "unit": "unit"},
+        {"name": "30A MPPT Charge Controller",  "category": "charge_controller", "unit": "unit"},
+        {"name": "40A MPPT Charge Controller",  "category": "charge_controller", "unit": "unit"},
+        {"name": "60A MPPT Charge Controller",  "category": "charge_controller", "unit": "unit"},
+        # Solar Lights
+        {"name": "5W Solar Bulb",               "category": "solar_light",       "unit": "unit"},
+        {"name": "10W Solar Bulb",              "category": "solar_light",       "unit": "unit"},
+        {"name": "30W Solar Street Light",      "category": "solar_light",       "unit": "unit"},
+        {"name": "50W Solar Street Light",      "category": "solar_light",       "unit": "unit"},
+        {"name": "Solar Garden Light",          "category": "solar_light",       "unit": "unit"},
+        # Cables & Wiring
+        {"name": "Solar Cable 4mm² (metre)",    "category": "cable_wire",        "unit": "metre"},
+        {"name": "Solar Cable 6mm² (metre)",    "category": "cable_wire",        "unit": "metre"},
+        {"name": "Battery Cable 16mm² (metre)", "category": "cable_wire",        "unit": "metre"},
+        {"name": "Battery Cable 25mm² (metre)", "category": "cable_wire",        "unit": "metre"},
+        # Breakers & Protection
+        {"name": "10A DC Circuit Breaker",      "category": "breaker",           "unit": "unit"},
+        {"name": "20A DC Circuit Breaker",      "category": "breaker",           "unit": "unit"},
+        {"name": "40A DC Circuit Breaker",      "category": "breaker",           "unit": "unit"},
+        {"name": "60A DC Fuse Holder",          "category": "breaker",           "unit": "unit"},
+        {"name": "100A Battery Fuse",           "category": "breaker",           "unit": "unit"},
+        # Mounting
+        {"name": "Roof Mount Brackets (pair)",  "category": "mounting",          "unit": "pair"},
+        {"name": "Ground Mount Frame (1 panel)","category": "mounting",          "unit": "unit"},
+        {"name": "Mounting Rail (metre)",       "category": "mounting",          "unit": "metre"},
+        {"name": "Mid Clamp",                   "category": "mounting",          "unit": "unit"},
+        {"name": "End Clamp",                   "category": "mounting",          "unit": "unit"},
+        # Connectors
+        {"name": "MC4 Connector Pair",          "category": "connector",         "unit": "pair"},
+        {"name": "MC4 Branch Connector (Y)",    "category": "connector",         "unit": "unit"},
+        {"name": "MC4 Cable Crimping Tool",     "category": "connector",         "unit": "unit"},
+        # Gas Equipment
+        {"name": "2-Burner Gas Cooker",         "category": "gas_cooker",        "unit": "unit"},
+        {"name": "3-Burner Gas Cooker",         "category": "gas_cooker",        "unit": "unit"},
+        {"name": "Single Burner Gas Cooker",    "category": "gas_cooker",        "unit": "unit"},
+        {"name": "6kg Gas Cylinder (filled)",   "category": "gas_cylinder",      "unit": "unit"},
+        {"name": "14kg Gas Cylinder (filled)",  "category": "gas_cylinder",      "unit": "unit"},
+        {"name": "45kg Gas Cylinder (filled)",  "category": "gas_cylinder",      "unit": "unit"},
+        {"name": "Standard Gas Regulator",      "category": "gas_regulator",     "unit": "unit"},
+        {"name": "High-Pressure Gas Regulator", "category": "gas_regulator",     "unit": "unit"},
+        # Energy Meters
+        {"name": "Single-Phase Energy Meter",   "category": "energy_meter",      "unit": "unit"},
+        {"name": "Three-Phase Energy Meter",    "category": "energy_meter",      "unit": "unit"},
+        {"name": "Prepaid Smart Meter",         "category": "energy_meter",      "unit": "unit"},
+        # Pumps
+        {"name": "Solar Water Pump 12V",        "category": "pump",              "unit": "unit"},
+        {"name": "Solar Water Pump 24V",        "category": "pump",              "unit": "unit"},
+        {"name": "Submersible Solar Pump",      "category": "pump",              "unit": "unit"},
+        # Backup Kits
+        {"name": "100W Solar Home Kit",         "category": "backup_kit",        "unit": "kit"},
+        {"name": "200W Solar Home Kit",         "category": "backup_kit",        "unit": "kit"},
+        {"name": "500W Off-Grid Starter Kit",   "category": "backup_kit",        "unit": "kit"},
+        {"name": "1kW Mini Off-Grid System",    "category": "backup_kit",        "unit": "kit"},
+    ]
+
+    created_count = 0
+    with db_tx.atomic():
+        for item in CATALOG:
+            _, created = EnergyProduct.objects.get_or_create(
+                business=biz,
+                name=item["name"],
+                category=item["category"],
+                defaults={
+                    "unit": item.get("unit", "unit"),
+                    "is_seeded": True,
+                    "is_active": True,
+                },
+            )
+            if created:
+                created_count += 1
+
+    if created_count:
+        messages.success(request, f"✅ Seeded {created_count} energy products into your catalog.")
+    else:
+        messages.info(request, "Catalog already up to date — no new products added.")
+
+    return redirect("verticals:energy_catalog")

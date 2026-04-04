@@ -1222,6 +1222,130 @@ class CopilotInsight(models.Model):
         return f"[{self.category}] {self.title}"
 
 
+# ---------------------------------------------------------------------------
+# Energy Commerce — Retail Product Catalog, Stock-In & Sales
+# ---------------------------------------------------------------------------
+
+class EnergyProductCategory(models.TextChoices):
+    SOLAR_PANEL        = "solar_panel",        "Solar Panels"
+    BATTERY            = "battery",            "Batteries"
+    INVERTER           = "inverter",           "Inverters"
+    CHARGE_CONTROLLER  = "charge_controller",  "Charge Controllers"
+    SOLAR_LIGHT        = "solar_light",        "Solar Lights & Bulbs"
+    CABLE_WIRE         = "cable_wire",         "Cables & Wiring"
+    BREAKER            = "breaker",            "Breakers & Protection"
+    MOUNTING           = "mounting",           "Mounting Accessories"
+    CONNECTOR          = "connector",          "Connectors (MC4 etc.)"
+    GAS_COOKER         = "gas_cooker",         "Gas Cookers"
+    GAS_CYLINDER       = "gas_cylinder",       "Gas Cylinders"
+    GAS_REGULATOR      = "gas_regulator",      "Gas Regulators"
+    ENERGY_METER       = "energy_meter",       "Energy Meters"
+    PUMP               = "pump",               "Pumps"
+    BACKUP_KIT         = "backup_kit",         "Backup / Mini-Grid Kits"
+    OTHER              = "other",              "Other"
+
+
+class EnergyProduct(models.Model):
+    """Retail energy product available for sale."""
+
+    business         = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="energy_products")
+    name             = models.CharField(max_length=200)
+    category         = models.CharField(max_length=50, choices=EnergyProductCategory.choices, default=EnergyProductCategory.OTHER)
+    sku              = models.CharField(max_length=100, blank=True, default="")
+    unit             = models.CharField(max_length=30, default="unit", help_text="e.g. unit, metre, kg, set")
+    cost_price       = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    selling_price    = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    quantity_in_stock = models.PositiveIntegerField(default=0)
+    reorder_level    = models.PositiveIntegerField(default=2)
+    description      = models.TextField(blank=True, default="")
+    is_active        = models.BooleanField(default=True)
+    is_seeded        = models.BooleanField(default=False, help_text="Auto-seeded catalog item")
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "inventory"
+        ordering = ["category", "name"]
+        unique_together = [["business", "name", "category"]]
+        verbose_name = "Energy Product"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_category_display()})"
+
+    @property
+    def is_low_stock(self) -> bool:
+        return self.quantity_in_stock <= self.reorder_level
+
+    @property
+    def inventory_value(self) -> Decimal:
+        return self.cost_price * self.quantity_in_stock
+
+
+class EnergyStockIn(models.Model):
+    """A stock-in event (goods received) for an energy product."""
+
+    business      = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="energy_stock_ins")
+    product       = models.ForeignKey(EnergyProduct, on_delete=models.CASCADE, related_name="stock_ins")
+    quantity      = models.PositiveIntegerField()
+    cost_price    = models.DecimalField(max_digits=14, decimal_places=2)
+    supplier      = models.CharField(max_length=200, blank=True, default="")
+    notes         = models.TextField(blank=True, default="")
+    received_date = models.DateField()
+    recorded_by   = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "inventory"
+        ordering = ["-created_at"]
+        verbose_name = "Energy Stock-In"
+
+    def __str__(self) -> str:
+        return f"Stock-in: {self.product.name} ×{self.quantity} ({self.received_date})"
+
+    @property
+    def total_cost(self) -> Decimal:
+        return self.cost_price * self.quantity
+
+
+class EnergyItemSale(models.Model):
+    """A completed retail sale of an energy product."""
+
+    PAYMENT_CHOICES = [
+        ("CASH",         "Cash"),
+        ("MOBILE_MONEY", "Mobile Money"),
+        ("BANK",         "Bank Transfer"),
+        ("CREDIT",       "Credit"),
+        ("OTHER",        "Other"),
+    ]
+
+    business        = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="energy_item_sales")
+    product         = models.ForeignKey(EnergyProduct, on_delete=models.CASCADE, related_name="sales")
+    quantity        = models.PositiveIntegerField(default=1)
+    unit_price      = models.DecimalField(max_digits=14, decimal_places=2)
+    unit_cost       = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    total_amount    = models.DecimalField(max_digits=14, decimal_places=2, editable=False, default=Decimal("0.00"))
+    profit          = models.DecimalField(max_digits=14, decimal_places=2, editable=False, default=Decimal("0.00"))
+    payment_method  = models.CharField(max_length=20, choices=PAYMENT_CHOICES, default="CASH")
+    customer_name   = models.CharField(max_length=200, blank=True, default="")
+    notes           = models.TextField(blank=True, default="")
+    sold_by         = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    sold_at         = models.DateTimeField(auto_now_add=True)
+    is_reversed     = models.BooleanField(default=False)
+
+    class Meta:
+        app_label = "inventory"
+        ordering = ["-sold_at"]
+        verbose_name = "Energy Item Sale"
+
+    def save(self, *args, **kwargs):
+        self.total_amount = self.unit_price * self.quantity
+        self.profit = (self.unit_price - self.unit_cost) * self.quantity
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"Sale: {self.product.name} ×{self.quantity} @ {self.total_amount}"
+
+
 __all__ = [
     "SiteType", "SiteStatus", "AssetType", "AssetStatus",
     "MaintenanceType", "AlertSeverity", "AlertType",
@@ -1231,4 +1355,6 @@ __all__ = [
     "SystemSizingRun", "ApplianceCategory", "LoadPriority", "SizingAppliance",
     "DemandForecast", "TechnicianVisit", "LoadProfile",
     "EnergyDataUpload", "CopilotInsight",
+    # Commerce
+    "EnergyProductCategory", "EnergyProduct", "EnergyStockIn", "EnergyItemSale",
 ]

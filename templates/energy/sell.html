@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Energy Sell · {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .sell-page { max-width:860px; margin:0 auto; padding:1.25rem; }
+  .sell-hero {
+    background:linear-gradient(135deg,#0f172a 0%,#1e40af 50%,#3b82f6 100%);
+    border-radius:16px; padding:1.5rem 2rem; color:#fff; margin-bottom:1.75rem;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+  }
+  .sell-hero h1 { font-size:1.45rem; font-weight:800; margin:0; }
+  .sell-hero .sub { font-size:.85rem; color:rgba(255,255,255,.65); margin-top:.2rem; }
+  .btn-back { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem 1rem;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+    color:rgba(255,255,255,.9); border-radius:999px; font-size:.82rem; font-weight:600;
+    text-decoration:none; transition:all .15s; }
+  .btn-back:hover { background:rgba(255,255,255,.2); color:#fff; }
+  .form-card { background:#fff; border-radius:16px; border:1.5px solid #e2e8f0;
+    padding:1.75rem; box-shadow:0 4px 16px rgba(15,23,42,.06); }
+  .form-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:#64748b; margin:0 0 1rem; padding-bottom:.6rem;
+    border-bottom:1px solid #f1f5f9; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media(max-width:560px) { .form-grid { grid-template-columns:1fr; } }
+  .form-full { grid-column:1/-1; }
+  .form-group label { display:block; font-size:.8rem; font-weight:700; color:#374151; margin-bottom:.4rem; }
+  .form-control-en { width:100%; padding:.65rem .9rem; border:1.5px solid #e2e8f0;
+    border-radius:10px; font-size:.9rem; color:#0f172a; transition:border-color .15s; }
+  .form-control-en:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
+  select.form-control-en { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
+  .product-detail-card { background:#f8fafc; border:1.5px solid #e2e8f0;
+    border-radius:12px; padding:1rem; margin-top:.75rem; display:none; }
+  .product-detail-card.show { display:block; }
+  .prod-name { font-size:1rem; font-weight:700; color:#0f172a; }
+  .prod-meta { font-size:.8rem; color:#64748b; margin-top:.25rem; }
+  .price-summary { background:linear-gradient(135deg,#eff6ff,#fff);
+    border:1.5px solid #bfdbfe; border-radius:12px; padding:1rem;
+    margin-top:1rem; display:flex; gap:1.5rem; flex-wrap:wrap; }
+  .price-item { text-align:center; }
+  .price-label { font-size:.7rem; font-weight:700; color:#64748b; text-transform:uppercase; }
+  .price-val { font-size:1.25rem; font-weight:800; color:#1e40af; }
+  .btn-submit { width:100%; padding:.85rem;
+    background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700;
+    cursor:pointer; transition:all .2s; margin-top:1rem; }
+  .btn-submit:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,99,235,.3); }
+  .empty-state { text-align:center; padding:3rem; color:#94a3b8; }
+</style>
+
+<div class="sell-page">
+  <div class="sell-hero">
+    <div>
+      <h1>🛒 Energy Sale</h1>
+      <div class="sub">{{ business.name }} · Record a product sale</div>
+    </div>
+    <div style="display:flex;gap:.5rem;">
+      <a href="{% url 'verticals:energy_catalog' %}" class="btn-back">📦 Products</a>
+      <a href="{% url 'verticals:energy_dashboard' %}" class="btn-back">← Dashboard</a>
+    </div>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if products %}
+  <div class="form-card">
+    <form method="post" id="sellForm">
+      {% csrf_token %}
+
+      <p class="form-section-title">Select Product</p>
+
+      <div class="form-group">
+        <label>Product <span style="color:#ef4444;">*</span></label>
+        <select name="product_id" class="form-control-en" id="productSelect" required>
+          <option value="">— Choose product —</option>
+          {% for p in products %}
+            <option value="{{ p.id }}"
+                    data-price="{{ p.selling_price }}"
+                    data-cost="{{ p.cost_price }}"
+                    data-stock="{{ p.quantity_in_stock }}"
+                    data-unit="{{ p.unit }}"
+                    data-name="{{ p.name }}">
+              {{ p.name }} — {{ p.quantity_in_stock }} {{ p.unit }} available
+            </option>
+          {% endfor %}
+        </select>
+        <div class="product-detail-card" id="productDetail">
+          <div class="prod-name" id="detailName"></div>
+          <div class="prod-meta" id="detailStock"></div>
+        </div>
+      </div>
+
+      <p class="form-section-title" style="margin-top:1.5rem;">Sale Details</p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Quantity <span style="color:#ef4444;">*</span></label>
+          <input type="number" name="quantity" id="qtyInput" class="form-control-en"
+                 min="1" value="1" required>
+        </div>
+        <div class="form-group">
+          <label>Unit Price</label>
+          <input type="number" name="unit_price" id="unitPriceInput" class="form-control-en"
+                 min="0" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Payment Method</label>
+          <select name="payment_method" class="form-control-en">
+            {% for code, label in payment_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Customer Name</label>
+          <input type="text" name="customer_name" class="form-control-en" placeholder="Optional">
+        </div>
+        <div class="form-group form-full">
+          <label>Notes</label>
+          <input type="text" name="notes" class="form-control-en" placeholder="Optional">
+        </div>
+      </div>
+
+      <div class="price-summary" id="priceSummary" style="display:none;">
+        <div class="price-item">
+          <div class="price-label">Unit Price</div>
+          <div class="price-val" id="summaryUnit">—</div>
+        </div>
+        <div class="price-item">
+          <div class="price-label">Quantity</div>
+          <div class="price-val" id="summaryQty">—</div>
+        </div>
+        <div class="price-item">
+          <div class="price-label">Total</div>
+          <div class="price-val" id="summaryTotal" style="color:#059669;">—</div>
+        </div>
+        <div class="price-item">
+          <div class="price-label">Est. Profit</div>
+          <div class="price-val" id="summaryProfit" style="color:#059669;">—</div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">✅ Record Sale</button>
+    </form>
+  </div>
+
+  {% else %}
+  <div class="form-card">
+    <div class="empty-state">
+      <div style="font-size:3rem;opacity:.2;margin-bottom:1rem;">📭</div>
+      <p style="font-size:1rem;font-weight:600;color:#475569;">No products in stock</p>
+      <p style="font-size:.88rem;">Stock in products before recording a sale.</p>
+      <a href="{% url 'verticals:energy_stock_in' %}" class="btn btn-success rounded-pill mt-2">
+        📦 Go to Stock-In
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+const currency = '{{ business.currency|default:"MWK" }}';
+
+function fmt(n) {
+  return currency + ' ' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+}
+
+function updateSummary() {
+  const sel = document.getElementById('productSelect');
+  const opt = sel.options[sel.selectedIndex];
+  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
+  const unitPrice = parseFloat(document.getElementById('unitPriceInput').value) || 0;
+  const cost = parseFloat(opt.dataset.cost) || 0;
+  const total = qty * unitPrice;
+  const profit = qty * (unitPrice - cost);
+  const summary = document.getElementById('priceSummary');
+
+  if (qty > 0 && unitPrice > 0 && opt.value) {
+    summary.style.display = 'flex';
+    document.getElementById('summaryUnit').textContent = fmt(unitPrice);
+    document.getElementById('summaryQty').textContent = qty;
+    document.getElementById('summaryTotal').textContent = fmt(total);
+    document.getElementById('summaryProfit').textContent = fmt(profit);
+    document.getElementById('summaryProfit').style.color = profit >= 0 ? '#059669' : '#dc2626';
+  } else {
+    summary.style.display = 'none';
+  }
+}
+
+document.getElementById('productSelect').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  const detail = document.getElementById('productDetail');
+  if (opt.value) {
+    detail.classList.add('show');
+    document.getElementById('detailName').textContent = opt.dataset.name;
+    document.getElementById('detailStock').textContent = opt.dataset.stock + ' ' + opt.dataset.unit + ' available';
+    document.getElementById('unitPriceInput').value = opt.dataset.price;
+  } else {
+    detail.classList.remove('show');
+  }
+  updateSummary();
+});
+
+document.getElementById('qtyInput').addEventListener('input', updateSummary);
+document.getElementById('unitPriceInput').addEventListener('input', updateSummary);
+</script>
+{% endblock %}

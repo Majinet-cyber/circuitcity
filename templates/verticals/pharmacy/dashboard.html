@@ -1105,15 +1105,20 @@
         </div>
       </div>
       <div class="chart-wrap">
-        <canvas id="trendChart"></canvas>
+        <canvas id="trendChart" style="display:none;"></canvas>
+        <div id="trendChartLoading" style="display:flex;align-items:center;justify-content:center;height:100%;gap:10px;color:#94a3b8;font-size:.9rem;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin .9s linear infinite;"><circle cx="12" cy="12" r="10" opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+          Loading chart…
+        </div>
       </div>
       <div id="trendChartEmpty" class="chart-empty" style="display: none;">
         <div class="chart-empty-icon">📈</div>
-        <p class="chart-empty-text">No sales yet for the selected period<br>Your sales trend will appear here after your first transaction</p>
+        <p class="chart-empty-text">No sales recorded yet for this period.<br>Your trend chart will appear after your first sale.</p>
         <a href="{% url 'pharmacy:sell' %}" class="chart-empty-cta">
-          <span>💊</span> Make a Sale
+          <span>💊</span> Record a Sale
         </a>
       </div>
+      <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
     </div>
   </div>
   
@@ -1426,44 +1431,53 @@ document.addEventListener('DOMContentLoaded', function() {
   let trendChart = null;
   let trendData = null;
   let activeMetric = 'revenue';
-  
-  const trendCanvas = document.getElementById('trendChart');
-  const trendEmpty = document.getElementById('trendChartEmpty');
-  const toggleBtns = document.querySelectorAll('.trend-toggle-btn');
-  
+
+  const trendCanvas  = document.getElementById('trendChart');
+  const trendLoading = document.getElementById('trendChartLoading');
+  const trendEmpty   = document.getElementById('trendChartEmpty');
+  const toggleBtns   = document.querySelectorAll('.trend-toggle-btn');
+
+  function showTrendEmpty() {
+    if (trendCanvas)  trendCanvas.style.display  = 'none';
+    if (trendLoading) trendLoading.style.display  = 'none';
+    if (trendEmpty)   trendEmpty.style.display    = 'block';
+  }
+  function showTrendCanvas() {
+    if (trendCanvas)  trendCanvas.style.display  = 'block';
+    if (trendLoading) trendLoading.style.display  = 'none';
+    if (trendEmpty)   trendEmpty.style.display    = 'none';
+  }
+
   // Build API URL with current filter params
   const urlParams = new URLSearchParams(window.location.search);
   const apiUrl = '{% url "verticals:pharmacy_sales_trend_json" %}?' + urlParams.toString() + '&t=' + Date.now();
-  
+
   // Fetch trend data
   fetch(apiUrl, { credentials: 'same-origin' })
     .then(response => {
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
-        throw new Error('Invalid response');
+        throw new Error('Bad response ' + response.status);
       }
       return response.json();
     })
     .then(data => {
       trendData = data;
-      
-      // Check if there's data
       if (!data.has_data || !data.labels || data.labels.length === 0) {
-        trendCanvas.style.display = 'none';
-        trendEmpty.style.display = 'block';
+        showTrendEmpty();
         return;
       }
-      
-      // Show chart
-      trendCanvas.style.display = 'block';
-      trendEmpty.style.display = 'none';
-      
-      // Render initial chart (revenue)
+      // Guard: Chart.js must be loaded
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded — showing empty state');
+        showTrendEmpty();
+        return;
+      }
+      showTrendCanvas();
       renderTrendChart('revenue');
     })
     .catch(error => {
-      console.error('Error loading trend chart:', error);
-      trendCanvas.style.display = 'none';
-      trendEmpty.style.display = 'block';
+      console.error('Trend chart fetch error:', error);
+      showTrendEmpty();
     });
   
   // Toggle metric (Revenue / Units)

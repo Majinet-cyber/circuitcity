@@ -2058,6 +2058,64 @@ def batch_edit(request: HttpRequest, batch_id: int) -> HttpResponse:
 # ==============================================================================
 
 
+def _email_managers_on_pharmacy_sale(sale_id: int, business_id: int) -> None:
+    """
+    Send a sale-notification email to all manager/owner accounts for the business.
+    Called via transaction.on_commit so it never blocks or rolls back the sale.
+    """
+    from django.core.mail import send_mail
+    from django.conf import settings
+    from tenants.models import Business, Membership
+    from inventory.models_pharmacy import PharmacySale as _PharmacySale
+
+    try:
+        sale = _PharmacySale.objects.select_related(
+            "business", "batch__merch_product", "sold_by"
+        ).get(pk=sale_id)
+        biz = Business.objects.get(pk=business_id)
+
+        managers = Membership.objects.filter(
+            business=biz, role__in=["manager", "owner"], status="active"
+        ).select_related("user")
+
+        recipient_emails = [
+            m.user.email for m in managers if m.user.email
+        ]
+        if not recipient_emails:
+            logger.info(f"No manager emails for business {biz.id}; skipping sale email.")
+            return
+
+        product_name = sale.batch.merch_product.name if sale.batch else "Unknown product"
+        cashier = sale.sold_by.get_full_name() or sale.sold_by.username if sale.sold_by else "System"
+        currency = getattr(biz, "currency", "MWK")
+        amount_fmt = f"{currency} {sale.total_amount:,.2f}"
+
+        subject = f"New Sale — {biz.name} — {amount_fmt}"
+        body = (
+            f"A new sale has been recorded at {biz.name}.\n\n"
+            f"Product       : {product_name}\n"
+            f"Quantity      : {sale.quantity} unit(s)\n"
+            f"Total Amount  : {amount_fmt}\n"
+            f"Payment       : {sale.payment_method}\n"
+            f"Cashier       : {cashier}\n"
+            f"Date/Time     : {sale.sold_at.strftime('%Y-%m-%d %H:%M')}\n"
+        )
+        if sale.customer_name:
+            body += f"Customer      : {sale.customer_name}\n"
+
+        from_email = getattr(settings, "DEFAULT_FROM_EMAIL", "noreply@emajinet.com")
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=from_email,
+            recipient_list=recipient_emails,
+            fail_silently=True,
+        )
+        logger.info(f"Sale email sent for sale #{sale_id} to {len(recipient_emails)} manager(s).")
+    except Exception as exc:
+        logger.error(f"_email_managers_on_pharmacy_sale failed for sale #{sale_id}: {exc}", exc_info=True)
+
+
 def _send_sale_notifications(sale: PharmacySale, business: Business) -> None:
     """
     Send WhatsApp notifications for a pharmacy sale.
@@ -2257,6 +2315,13 @@ def pharmacy_sell(request: HttpRequest) -> HttpResponse:
 
             # Check and notify low stock
             _check_and_notify_low_stock(batch, business)
+
+            # Email managers after successful DB commit (never blocks the sale)
+            _sale_id = sale.id
+            _biz_id = business.id
+            transaction.on_commit(
+                lambda: _email_managers_on_pharmacy_sale(_sale_id, _biz_id)
+            )
 
         # Store success data in session
         request.session["sell_success"] = True
@@ -3240,30 +3305,35 @@ def api_add_product_suggestion(request: HttpRequest) -> JsonResponse:
                 "name": existing_product.name,
             })
         
+        # Map free-text unit hint to a valid BaseUnit value
+        _unit_map = {"ml": "ml", "g": "g", "gram": "g", "grams": "g", "shot": "shot"}
+        base_unit = _unit_map.get((unit or "").lower().strip(), "unit")
+
         # Create new product
-        with transaction.atomic():
-            product = MerchProduct.objects.create(
-                business=business,
-                name=name,
-                kind="pharmacy",
-                category=category,
-                is_active=True,
-                spec_label="",  # Required field
-                unit=unit if unit else "piece",
-            )
-            
-            # Optionally store brand info (if you have a brand field or want to use description)
-            # For now, we'll just create the basic product
-            
+        try:
+            with transaction.atomic():
+                product = MerchProduct.objects.create(
+                    business=business,
+                    name=name,
+                    kind="pharmacy",
+                    category=category,
+                    is_active=True,
+                    spec_label="",
+                    base_unit=base_unit,
+                )
+        except Exception as create_err:
+            logger.error(f"Product create failed: {create_err}", exc_info=True)
+            return JsonResponse({"ok": False, "error": str(create_err)}, status=400)
+
         return JsonResponse({
             "ok": True,
             "product_id": product.id,
             "created": True,
             "name": product.name,
         })
-        
+
     except json.JSONDecodeError:
-        return JsonResponse({"ok": False, "error": "Invalid JSON"}, status=400)
+        return JsonResponse({"ok": False, "error": "Invalid JSON body"}, status=400)
     except Exception as e:
         logger.error(f"Add product suggestion error: {e}", exc_info=True)
-        return JsonResponse({"ok": False, "error": "Failed to add product"}, status=500)
+        return JsonResponse({"ok": False, "error": f"Unexpected error: {e}"}, status=500)

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Energy Stock-In · {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .si-page { max-width:860px; margin:0 auto; padding:1.25rem; }
+  .si-hero {
+    background:linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#059669 100%);
+    border-radius:16px; padding:1.5rem 2rem; color:#fff; margin-bottom:1.75rem;
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:1rem;
+  }
+  .si-hero h1 { font-size:1.45rem; font-weight:800; margin:0; }
+  .si-hero .sub { font-size:.85rem; color:rgba(255,255,255,.65); margin-top:.2rem; }
+  .btn-back { display:inline-flex; align-items:center; gap:.35rem; padding:.45rem 1rem;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
+    color:rgba(255,255,255,.9); border-radius:999px; font-size:.82rem; font-weight:600;
+    text-decoration:none; transition:all .15s; }
+  .btn-back:hover { background:rgba(255,255,255,.2); color:#fff; }
+  .form-card { background:#fff; border-radius:16px; border:1.5px solid #e2e8f0;
+    padding:1.75rem; box-shadow:0 4px 16px rgba(15,23,42,.06); }
+  .form-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:#64748b; margin:0 0 1rem; padding-bottom:.6rem;
+    border-bottom:1px solid #f1f5f9; }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media(max-width:560px) { .form-grid { grid-template-columns:1fr; } }
+  .form-full { grid-column:1/-1; }
+  .form-group label { display:block; font-size:.8rem; font-weight:700; color:#374151;
+    margin-bottom:.4rem; }
+  .form-group .hint { font-size:.72rem; color:#94a3b8; margin-top:.2rem; }
+  .form-control-en { width:100%; padding:.65rem .9rem; border:1.5px solid #e2e8f0;
+    border-radius:10px; font-size:.9rem; color:#0f172a; transition:border-color .15s; }
+  .form-control-en:focus { outline:none; border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.1); }
+  select.form-control-en { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
+  .toggle-row { display:flex; gap:.75rem; margin-bottom:1rem; }
+  .toggle-btn { flex:1; padding:.6rem; border-radius:10px; border:1.5px solid #e2e8f0;
+    font-size:.83rem; font-weight:700; cursor:pointer; background:#fff; color:#475569;
+    transition:all .15s; text-align:center; }
+  .toggle-btn.active { border-color:#059669; background:#f0fdf4; color:#059669; }
+  .btn-submit { width:100%; padding:.85rem; background:linear-gradient(135deg,#059669,#047857);
+    color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700;
+    cursor:pointer; transition:all .2s; margin-top:1rem; }
+  .btn-submit:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(5,150,105,.3); }
+</style>
+
+<div class="si-page">
+  <div class="si-hero">
+    <div>
+      <h1>📦 Energy Stock-In</h1>
+      <div class="sub">{{ business.name }} · Record received goods</div>
+    </div>
+    <a href="{% url 'verticals:energy_catalog' %}" class="btn-back">← Products</a>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}
+      <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="form-card">
+    <form method="post">
+      {% csrf_token %}
+
+      <p class="form-section-title">Product</p>
+
+      <div class="toggle-row" id="productToggleRow">
+        <div class="toggle-btn active" id="toggleExisting" onclick="switchMode('existing')">
+          Select Existing
+        </div>
+        <div class="toggle-btn" id="toggleNew" onclick="switchMode('new')">
+          Add New Product
+        </div>
+      </div>
+
+      <div id="existingPanel" class="form-grid" style="margin-bottom:1rem;">
+        <div class="form-group form-full">
+          <label>Select Product</label>
+          <select name="product_id" class="form-control-en" id="productSelect">
+            <option value="">— Choose product —</option>
+            {% for cat_code, cat_name in category_choices %}
+              {% with cat_products=products %}
+                {% for p in products %}
+                  {% if p.category == cat_code %}
+                    <option value="{{ p.id }}" data-cost="{{ p.cost_price }}" data-price="{{ p.selling_price }}">
+                      [{{ cat_name }}] {{ p.name }} ({{ p.quantity_in_stock }} in stock)
+                    </option>
+                  {% endif %}
+                {% endfor %}
+              {% endwith %}
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div id="newPanel" style="display:none;margin-bottom:1rem;">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Product Name <span style="color:#ef4444;">*</span></label>
+            <input type="text" name="new_product_name" class="form-control-en" placeholder="e.g. 200W Solar Panel">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category" class="form-control-en">
+              {% for code, label in category_choices %}
+                <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Unit</label>
+            <input type="text" name="unit" class="form-control-en" placeholder="unit, metre, kg, set…" value="unit">
+          </div>
+        </div>
+      </div>
+
+      <p class="form-section-title" style="margin-top:1.5rem;">Stock Details</p>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Quantity Received <span style="color:#ef4444;">*</span></label>
+          <input type="number" name="quantity" class="form-control-en" min="1" value="1" required>
+        </div>
+        <div class="form-group">
+          <label>Received Date</label>
+          <input type="date" name="received_date" class="form-control-en" value="{{ today }}">
+        </div>
+        <div class="form-group">
+          <label>Cost Price (per unit)</label>
+          <input type="number" name="cost_price" id="costPriceInput" class="form-control-en"
+                 min="0" step="0.01" value="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Selling Price (per unit)</label>
+          <input type="number" name="selling_price" id="sellPriceInput" class="form-control-en"
+                 min="0" step="0.01" value="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Supplier</label>
+          <input type="text" name="supplier" class="form-control-en" placeholder="Supplier name (optional)">
+        </div>
+        <div class="form-group form-full">
+          <label>Notes</label>
+          <input type="text" name="notes" class="form-control-en" placeholder="Optional notes">
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">✅ Record Stock-In</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function switchMode(mode) {
+  const existingPanel = document.getElementById('existingPanel');
+  const newPanel = document.getElementById('newPanel');
+  const toggleExisting = document.getElementById('toggleExisting');
+  const toggleNew = document.getElementById('toggleNew');
+  const productSelect = document.getElementById('productSelect');
+
+  if (mode === 'existing') {
+    existingPanel.style.display = 'grid';
+    newPanel.style.display = 'none';
+    toggleExisting.classList.add('active');
+    toggleNew.classList.remove('active');
+    productSelect.required = true;
+  } else {
+    existingPanel.style.display = 'none';
+    newPanel.style.display = 'block';
+    toggleExisting.classList.remove('active');
+    toggleNew.classList.add('active');
+    productSelect.required = false;
+    productSelect.value = '';
+  }
+}
+
+// Pre-fill cost/sell price from selected product
+document.getElementById('productSelect').addEventListener('change', function() {
+  const opt = this.options[this.selectedIndex];
+  if (opt.dataset.cost) document.getElementById('costPriceInput').value = opt.dataset.cost;
+  if (opt.dataset.price) document.getElementById('sellPriceInput').value = opt.dataset.price;
+});
+
+// If product_id pre-selected via query param
+const urlParams = new URLSearchParams(window.location.search);
+const pid = urlParams.get('product_id');
+if (pid) {
+  const sel = document.getElementById('productSelect');
+  sel.value = pid;
+  sel.dispatchEvent(new Event('change'));
+}
+</script>
+{% endblock %}
