@@ -14,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q, Sum
 from django.db.models.functions import Coalesce
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -450,6 +450,10 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             else:
                 break
     
+    # BUG FIX: Ensure chart data arrays have at least one element for proper rendering
+    # If all values are zero, charts should still render (just with zero values)
+    has_chart_data = any(chart_bookings) or any(chart_revenue)
+    
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Car Hire Dashboard",
@@ -501,13 +505,14 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "fleet_health_score": fleet_health_score,
         "availability_streak": availability_streak if availability_streak > 0 else None,
         
-        # Chart data (JSON for JS)
+        # Chart data (JSON for JS) - BUG FIX: Use proper JSON encoding
         "chart_labels": json.dumps(chart_labels),
         "chart_bookings": json.dumps(chart_bookings),
         "chart_revenue": json.dumps(chart_revenue),
         "chart_costs": json.dumps(chart_costs),
         "fleet_status_data": json.dumps(fleet_status_data),
         "fleet_status_labels": json.dumps(fleet_status_labels),
+        "has_chart_data": has_chart_data,  # For conditional rendering
         
         # Status choices for badges
         "VehicleStatus": VehicleStatus,
@@ -637,13 +642,15 @@ QUICK_ADD_VEHICLES = [
 @require_business_kind(BusinessKind.CAR_HIRE)
 @require_http_methods(["GET", "POST"])
 def vehicle_add(request: HttpRequest) -> HttpResponse:
-    """Add a new vehicle to the fleet with gamified quick-add cards."""
+    """Add a new vehicle to the fleet with gamified quick-add cards and photo upload."""
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
     ctx = base.base_context(request)
     business = ctx.get("business")
     
     if request.method == "POST":
         try:
-            # Build name from make/model/year if not provided
             name = request.POST.get("name", "").strip()
             make = request.POST.get("make", VehicleMake.TOYOTA)
             model = request.POST.get("model", "")
@@ -671,16 +678,40 @@ def vehicle_add(request: HttpRequest) -> HttpResponse:
                 notes=request.POST.get("notes", ""),
                 created_by=request.user,
             )
-            
-            messages.success(request, f"Vehicle '{vehicle.name}' added successfully! 🚗")
-            return redirect("/verticals/car_hire/vehicles/")
+
+            # Handle photo uploads
+            try:
+                from inventory.models_car_hire import HireVehicleImage
+                images = request.FILES.getlist("gallery_images")
+                for i, img_file in enumerate(images[:20]):
+                    HireVehicleImage.objects.create(
+                        vehicle=vehicle,
+                        image=img_file,
+                        sort_order=i,
+                        is_cover=(i == 0),
+                        uploaded_by=request.user,
+                    )
+            except Exception as img_err:
+                _logger.warning("Hire vehicle image upload error: %s", img_err)
+
+            messages.success(request, f"Vehicle '{vehicle.name}' added successfully!")
+
+            # Auto-publish to marketplace if requested
+            if request.POST.get("publish_to_marketplace") == "1":
+                try:
+                    _create_or_update_hire_marketplace_listing(vehicle, request.user, business)
+                    messages.success(request, "Vehicle published to marketplace.")
+                except Exception as mp_err:
+                    _logger.warning("Hire marketplace auto-publish failed: %s", mp_err)
+
+            return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle.pk)
         except Exception as e:
             messages.error(request, f"Error adding vehicle: {e}")
     
     ctx.update({
         "active_tab": "vehicles",
         "VehicleMake": VehicleMake,
-        "quick_add_vehicles": QUICK_ADD_VEHICLES,  # For gamified cards
+        "quick_add_vehicles": QUICK_ADD_VEHICLES,
     })
     
     return render(request, "verticals/car_hire/vehicle_add.html", ctx)
@@ -690,12 +721,65 @@ def vehicle_add(request: HttpRequest) -> HttpResponse:
 @require_business
 @require_business_kind(BusinessKind.CAR_HIRE)
 def vehicle_detail(request: HttpRequest, vehicle_id: int) -> HttpResponse:
-    """View vehicle details and trip history."""
+    """View vehicle details, photo gallery, and marketplace status."""
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
     ctx = base.base_context(request)
     business = ctx.get("business")
     
     vehicle = get_object_or_404(Vehicle, id=vehicle_id, business=business)
+
+    if request.method == "POST":
+        action = request.POST.get("_action", "")
+
+        if action == "upload_images":
+            try:
+                from inventory.models_car_hire import HireVehicleImage
+                images = request.FILES.getlist("gallery_images")
+                existing_count = vehicle.gallery_images.count()
+                added = 0
+                for i, img_file in enumerate(images[:20]):
+                    is_cover = existing_count == 0 and i == 0
+                    HireVehicleImage.objects.create(
+                        vehicle=vehicle,
+                        image=img_file,
+                        sort_order=existing_count + i,
+                        is_cover=is_cover,
+                        uploaded_by=request.user,
+                    )
+                    added += 1
+                if added:
+                    messages.success(request, f"{added} photo(s) added.")
+                else:
+                    messages.warning(request, "No photos selected.")
+            except Exception as e:
+                messages.error(request, f"Photo upload failed: {e}")
+            return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle_id)
+
+        if action == "publish_marketplace":
+            try:
+                from tenants.utils_roles import is_manager
+                if not is_manager(request.user, business):
+                    messages.error(request, "Only managers can publish listings.")
+                else:
+                    mp_action = request.POST.get("mp_action", "publish")
+                    if mp_action == "unpublish" and vehicle.marketplace_listing_id:
+                        from inventory.models_marketplace import ListingStatus
+                        vehicle.marketplace_listing.status = ListingStatus.OFFLINE
+                        vehicle.marketplace_listing.save(update_fields=["status", "updated_at"])
+                        messages.success(request, "Listing taken offline.")
+                    else:
+                        listing = _create_or_update_hire_marketplace_listing(vehicle, request.user, business)
+                        messages.success(request, f"Vehicle published to marketplace as '{listing.title}'.")
+            except Exception as e:
+                _logger.exception("Hire marketplace publish error: %s", e)
+                messages.error(request, f"Could not publish: {e}")
+            return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle_id)
     
+    # Get gallery images
+    gallery_images = vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at") if hasattr(vehicle, "gallery_images") else []
+
     # Get trip history
     trips = Trip.objects.filter(vehicle=vehicle).order_by("-start_datetime")[:20]
     
@@ -711,6 +795,8 @@ def vehicle_detail(request: HttpRequest, vehicle_id: int) -> HttpResponse:
     ctx.update({
         "active_tab": "vehicles",
         "vehicle": vehicle,
+        "gallery_images": gallery_images,
+        "marketplace_listing": vehicle.marketplace_listing,
         "trips": trips,
         "maintenance": maintenance,
         "total_trips": total_trips,
@@ -720,6 +806,137 @@ def vehicle_detail(request: HttpRequest, vehicle_id: int) -> HttpResponse:
     })
     
     return render(request, "verticals/car_hire/vehicle_detail.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+def delete_hire_vehicle_image(request: HttpRequest, vehicle_id: int, image_pk: int) -> HttpResponse:
+    """Delete a hire vehicle gallery image."""
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["POST"])
+
+    from tenants.utils_roles import is_manager
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+
+    if not is_manager(request.user, business):
+        return JsonResponse({"error": "Permission denied."}, status=403)
+
+    from inventory.models_car_hire import HireVehicleImage
+    vehicle = get_object_or_404(Vehicle, id=vehicle_id, business=business)
+    img = get_object_or_404(HireVehicleImage, pk=image_pk, vehicle=vehicle)
+
+    was_cover = img.is_cover
+    img.image.delete(save=False)
+    img.delete()
+
+    if was_cover:
+        next_img = vehicle.gallery_images.order_by("sort_order", "uploaded_at").first()
+        if next_img:
+            next_img.is_cover = True
+            next_img.save(update_fields=["is_cover"])
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"success": True})
+    messages.success(request, "Photo deleted.")
+    return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle_id)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.CAR_HIRE)
+def set_hire_cover_image(request: HttpRequest, vehicle_id: int, image_pk: int) -> HttpResponse:
+    """Set a gallery image as the cover for a hire vehicle."""
+    if request.method != "POST":
+        from django.http import HttpResponseNotAllowed
+        return HttpResponseNotAllowed(["POST"])
+
+    from tenants.utils_roles import is_manager
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+
+    if not is_manager(request.user, business):
+        return JsonResponse({"error": "Permission denied."}, status=403)
+
+    from inventory.models_car_hire import HireVehicleImage
+    vehicle = get_object_or_404(Vehicle, id=vehicle_id, business=business)
+    img = get_object_or_404(HireVehicleImage, pk=image_pk, vehicle=vehicle)
+
+    vehicle.gallery_images.update(is_cover=False)
+    img.is_cover = True
+    img.save(update_fields=["is_cover"])
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"success": True})
+    messages.success(request, "Cover photo updated.")
+    return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle_id)
+
+
+def _create_or_update_hire_marketplace_listing(vehicle, user, biz):
+    """Create or update a MarketplaceListing for a Car Hire Vehicle."""
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
+    from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
+
+    title = vehicle.name or vehicle.display_name
+
+    metadata = {
+        "make": vehicle.get_make_display(),
+        "model": vehicle.model,
+        "year": str(vehicle.year) if vehicle.year else "",
+        "seats": str(vehicle.seats) if vehicle.seats else "",
+        "fuel_type": vehicle.get_fuel_type_display() if vehicle.fuel_type else "",
+        "color": vehicle.color,
+        "rate_per_day": str(vehicle.daily_rate),
+        "availability": vehicle.get_status_display(),
+        "plate_number": vehicle.plate_number,
+        "odometer": str(vehicle.current_odometer),
+    }
+
+    if vehicle.marketplace_listing_id:
+        listing = vehicle.marketplace_listing
+        listing.title = title
+        listing.price = vehicle.daily_rate
+        listing.description = vehicle.notes or ""
+        listing.vertical_metadata = metadata
+        listing.status = ListingStatus.LIVE
+        listing.save(update_fields=["title", "price", "description", "vertical_metadata", "status", "updated_at"])
+    else:
+        listing = MarketplaceListing.objects.create(
+            business=biz,
+            vertical="car_hire",
+            title=title,
+            price=vehicle.daily_rate,
+            description=vehicle.notes or "",
+            vertical_metadata=metadata,
+            status=ListingStatus.LIVE,
+            created_by=user,
+        )
+        vehicle.marketplace_listing = listing
+        vehicle.save(update_fields=["marketplace_listing"])
+
+    # Sync gallery images
+    gallery = list(vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at")[:10])
+    if gallery:
+        listing.images.all().delete()
+        for i, vimg in enumerate(gallery):
+            try:
+                MarketplaceListingImage.objects.create(
+                    listing=listing,
+                    image=vimg.image,
+                    caption=vimg.caption or "",
+                    sort_order=i,
+                )
+            except Exception as e:
+                _logger.warning("Could not sync hire vehicle image to listing: %s", e)
+
+    return listing
 
 
 # ==============================================================================

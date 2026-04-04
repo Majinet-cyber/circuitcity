@@ -469,9 +469,10 @@ try:
         Vehicle,
         Trip,
         MaintenanceRecord,
+        HireVehicleImage,
     )
 except ImportError:
-    Vehicle = Trip = MaintenanceRecord = None
+    Vehicle = Trip = MaintenanceRecord = HireVehicleImage = None
 
 
 if Vehicle:

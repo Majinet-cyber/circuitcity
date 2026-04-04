@@ -5,6 +5,7 @@
 
 {% block content %}
 <style>
+  /* ── HERO ── */
   .vd-hero {
     background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
     border-radius: 20px; padding: 2rem; margin-bottom: 1.5rem; color: #fff;
@@ -27,20 +28,92 @@
   .vd-back-btn:hover { color: #fff; background: rgba(255,255,255,.1); }
   .vd-name { font-size: 1.5rem; font-weight: 800; margin-bottom: .4rem; }
   .vd-price-tag { font-size: 1.9rem; font-weight: 800; color: #93c5fd; }
-  .vd-sell-btn {
-    background: #fff; color: #1e3a8a; border: none;
-    border-radius: 999px; padding: .55rem 1.4rem;
-    font-size: .85rem; font-weight: 700; text-decoration: none;
+  .vd-action-btn {
+    border: none; border-radius: 999px; padding: .5rem 1.2rem;
+    font-size: .83rem; font-weight: 700; text-decoration: none;
     display: inline-flex; align-items: center; gap: .4rem;
     transition: all .15s; box-shadow: 0 2px 10px rgba(0,0,0,.15);
+    cursor: pointer;
   }
-  .vd-sell-btn:hover { background: #f0f9ff; color: #1d4ed8; transform: translateY(-1px); }
+  .vd-action-btn.sell { background: #fff; color: #1e3a8a; }
+  .vd-action-btn.sell:hover { background: #f0f9ff; color: #1d4ed8; transform: translateY(-1px); }
+  .vd-action-btn.publish { background: #16a34a; color: #fff; }
+  .vd-action-btn.publish:hover { background: #15803d; transform: translateY(-1px); }
+  .vd-action-btn.unpublish { background: rgba(255,255,255,.15); color: #fff; border: 1px solid rgba(255,255,255,.3); }
+  .vd-action-btn.unpublish:hover { background: rgba(255,255,255,.25); }
 
   /* Status badges */
   .vd-status-in_stock  { background: rgba(16,185,129,.15); color: #34d399; border: 1px solid rgba(52,211,153,.3); }
   .vd-status-sold      { background: rgba(239,68,68,.15);  color: #f87171; border: 1px solid rgba(248,113,113,.3); }
   .vd-status-reserved  { background: rgba(245,158,11,.15); color: #fbbf24; border: 1px solid rgba(251,191,36,.3); }
+  .vd-status-offline   { background: rgba(148,163,184,.15); color: #94a3b8; border: 1px solid rgba(148,163,184,.3); }
   .vd-status           { padding: .25rem .75rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+  .mp-badge-live   { background: #dcfce7; color: #16a34a; }
+  .mp-badge-draft  { background: #fef3c7; color: #b45309; }
+  .mp-badge-sold   { background: #fee2e2; color: #dc2626; }
+  .mp-badge-offline { background: #f1f5f9; color: #64748b; }
+  .mp-badge { padding: .25rem .75rem; border-radius: 999px; font-size: .72rem; font-weight: 700; display: inline-flex; align-items: center; gap: .3rem; }
+
+  /* Gallery */
+  .gallery-hero {
+    position: relative; border-radius: 16px; overflow: hidden;
+    aspect-ratio: 16/10; background: linear-gradient(135deg,#eff6ff,#dbeafe);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: .65rem;
+  }
+  .gallery-hero img { width: 100%; height: 100%; object-fit: cover; }
+  .gallery-hero-placeholder { width: 65%; max-height: 160px; object-fit: contain; opacity: .55; }
+  .gallery-thumb-row { display: flex; gap: .4rem; flex-wrap: nowrap; overflow-x: auto; padding-bottom: .25rem; }
+  .gallery-thumb {
+    flex-shrink: 0; width: 68px; height: 52px; border-radius: 8px;
+    overflow: hidden; cursor: pointer; border: 2.5px solid transparent;
+    transition: all .12s; position: relative;
+  }
+  .gallery-thumb.active { border-color: #1d4ed8; }
+  .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .gallery-photo-count {
+    position: absolute; bottom: 6px; right: 8px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: .68rem; font-weight: 700; padding: .2rem .5rem;
+    border-radius: 999px;
+  }
+  .gallery-action-row {
+    display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed #cbd5e1; border-radius: 12px; padding: 1.5rem 1rem;
+    text-align: center; cursor: pointer; transition: all .15s;
+    background: #f8fafc;
+  }
+  .upload-zone:hover { border-color: #1d4ed8; background: #eff6ff; }
+  .upload-zone input { display: none; }
+
+  /* Photo card in gallery manager */
+  .photo-card {
+    position: relative; border-radius: 10px; overflow: hidden;
+    border: 2px solid #e2e8f0; aspect-ratio: 4/3;
+    transition: border-color .12s;
+  }
+  .photo-card.is-cover { border-color: #1d4ed8; }
+  .photo-card img { width: 100%; height: 100%; object-fit: cover; }
+  .photo-card-actions {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.45);
+    display: flex; align-items: center; justify-content: center;
+    gap: .4rem; opacity: 0; transition: opacity .15s;
+  }
+  .photo-card:hover .photo-card-actions { opacity: 1; }
+  .photo-card-actions button {
+    background: rgba(255,255,255,.9); border: none; border-radius: 999px;
+    padding: .25rem .6rem; font-size: .72rem; font-weight: 700; cursor: pointer;
+  }
+  .cover-badge {
+    position: absolute; top: 5px; left: 5px;
+    background: #1d4ed8; color: #fff; font-size: .6rem; font-weight: 800;
+    padding: 2px 8px; border-radius: 999px;
+  }
 
   /* Spec grid */
   .spec-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; }
@@ -57,14 +130,21 @@
   .detail-card-title {
     font-size: .7rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: .07em; color: #64748b; margin-bottom: .85rem;
+    display: flex; align-items: center; gap: .4rem;
   }
-
-  /* Quick update form */
   .form-label { font-size: .8rem; font-weight: 600; }
   .form-control, .form-select { font-size: .85rem; border-radius: 10px; }
+
+  /* Marketplace panel */
+  .mp-panel {
+    border-radius: 14px; padding: 1.1rem 1.25rem; border: 1.5px solid #e2e8f0;
+    background: #f8fafc;
+  }
+  .mp-panel.live { border-color: #86efac; background: linear-gradient(135deg,#f0fdf4,#dcfce7); }
+  .mp-panel.draft { border-color: #fde68a; background: linear-gradient(135deg,#fffbeb,#fef3c7); }
 </style>
 
-<div class="container py-4" style="max-width: 900px;">
+<div class="container py-4" style="max-width: 960px;">
 
   {# ── HERO ── #}
   <div class="vd-hero">
@@ -78,6 +158,9 @@
             <span class="vd-status vd-status-{{ vehicle.status }}">{{ vehicle.get_status_display }}</span>
             {% if vehicle.stock_ref %}<span style="font-size:.72rem;color:rgba(255,255,255,.5);">Ref: {{ vehicle.stock_ref }}</span>{% endif %}
             <span style="font-size:.72rem;color:rgba(255,255,255,.4);">Stocked {{ vehicle.date_stocked|date:"d M Y" }}</span>
+            {% if marketplace_listing %}
+            <span class="mp-badge mp-badge-{{ marketplace_listing.status }}"><i class="bi bi-shop"></i> {{ marketplace_listing.get_status_display }}</span>
+            {% endif %}
           </div>
           <div class="vd-name">{{ vehicle.display_name }}</div>
           {% if vehicle.selling_price %}
@@ -85,16 +168,36 @@
             {% if vehicle.buying_price and is_manager %}
               <div style="font-size:.78rem;color:rgba(255,255,255,.45);margin-top:.2rem;">
                 Cost: {{ business.currency }} {{ vehicle.buying_price|floatformat:0 }}
-                {# margin hint shown if both prices set #}
               </div>
             {% endif %}
           {% endif %}
         </div>
-        {% if is_manager and vehicle.status == "in_stock" %}
-        <a href="{% url 'car_dealer:sell_vehicle' vehicle.pk %}" class="vd-sell-btn">
-          <i class="bi bi-cash-coin"></i> Mark as Sold
-        </a>
-        {% endif %}
+        <div class="d-flex flex-wrap gap-2 align-items-start">
+          {% if is_manager and vehicle.status == "in_stock" %}
+          <a href="{% url 'car_dealer:sell_vehicle' vehicle.pk %}" class="vd-action-btn sell">
+            <i class="bi bi-cash-coin"></i> Mark as Sold
+          </a>
+          {% endif %}
+          {% if is_manager %}
+            {% if not marketplace_listing or marketplace_listing.status != "live" %}
+            <form method="post" action="{% url 'car_dealer:publish_to_marketplace' vehicle.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="mp_action" value="publish">
+              <button type="submit" class="vd-action-btn publish">
+                <i class="bi bi-shop"></i> Publish to Marketplace
+              </button>
+            </form>
+            {% else %}
+            <form method="post" action="{% url 'car_dealer:publish_to_marketplace' vehicle.pk %}" style="display:inline;">
+              {% csrf_token %}
+              <input type="hidden" name="mp_action" value="unpublish">
+              <button type="submit" class="vd-action-btn unpublish">
+                <i class="bi bi-eye-slash"></i> Take Offline
+              </button>
+            </form>
+            {% endif %}
+          {% endif %}
+        </div>
       </div>
     </div>
   </div>
@@ -114,19 +217,59 @@
 
   <div class="row g-3">
 
-    {# ── VEHICLE IMAGE PLACEHOLDER ── #}
+    {# ── PHOTO GALLERY ── #}
     <div class="col-12 col-md-5">
-      <div class="detail-card" style="padding:0;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);height:220px;display:flex;align-items:center;justify-content:center;border-radius:14px;">
-          <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="{{ vehicle.display_name }}" style="width:75%;max-height:160px;object-fit:contain;">
+      <div class="detail-card" style="padding: 1rem;">
+        <div class="detail-card-title"><i class="bi bi-images"></i> Photos ({{ gallery_images|length }})</div>
+
+        {% if gallery_images %}
+        <div class="gallery-hero" id="galleryHero">
+          <img id="galleryMainImg" src="{{ gallery_images.0.image.url }}" alt="{{ vehicle.display_name }}">
+          <span class="gallery-photo-count">{{ gallery_images|length }}</span>
         </div>
+        <div class="gallery-thumb-row">
+          {% for img in gallery_images %}
+          <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img.image.url }}" onclick="switchGalleryImage(this)">
+            <img src="{{ img.image.url }}" alt="">
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="gallery-hero">
+          <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="{{ vehicle.display_name }}" class="gallery-hero-placeholder">
+        </div>
+        <p class="text-center text-muted" style="font-size:.8rem;margin-top:.5rem;">No photos yet — add some below</p>
+        {% endif %}
+
+        {% if is_manager %}
+        <div class="gallery-action-row">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill"
+                  onclick="document.getElementById('detailPhotoInput').click()">
+            <i class="bi bi-plus-circle me-1"></i>Add Photos
+          </button>
+          {% if gallery_images %}
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill"
+                  data-bs-toggle="modal" data-bs-target="#managePhotosModal">
+            <i class="bi bi-grid-3x3-gap me-1"></i>Manage ({{ gallery_images|length }})
+          </button>
+          {% endif %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data" id="photoUploadForm" style="display:none;">
+          {% csrf_token %}
+          <input type="hidden" name="_action" value="upload_images">
+          <input type="file" name="gallery_images" id="detailPhotoInput"
+                 accept="image/jpeg,image/png,image/webp" multiple
+                 onchange="this.form.submit()">
+        </form>
+        {% endif %}
       </div>
     </div>
 
     {# ── SPECS ── #}
     <div class="col-12 col-md-7">
       <div class="detail-card">
-        <div class="detail-card-title">Specifications</div>
+        <div class="detail-card-title"><i class="bi bi-sliders"></i> Specifications</div>
         <div class="spec-grid">
           {% if vehicle.make %}<div class="spec-item"><div class="spec-label">Make</div><div class="spec-val">{{ vehicle.make.name }}</div></div>{% endif %}
           {% if vehicle.model %}<div class="spec-item"><div class="spec-label">Model</div><div class="spec-val">{{ vehicle.model.name }}</div></div>{% endif %}
@@ -138,17 +281,71 @@
           {% if vehicle.engine_size %}<div class="spec-item"><div class="spec-label">Engine</div><div class="spec-val">{{ vehicle.engine_size }}</div></div>{% endif %}
           {% if vehicle.mileage is not None %}<div class="spec-item"><div class="spec-label">Mileage</div><div class="spec-val">{{ vehicle.mileage|floatformat:0 }} km</div></div>{% endif %}
           {% if vehicle.color %}<div class="spec-item"><div class="spec-label">Colour</div><div class="spec-val">{{ vehicle.color }}</div></div>{% endif %}
+          {% if vehicle.interior_color %}<div class="spec-item"><div class="spec-label">Interior</div><div class="spec-val">{{ vehicle.interior_color }}</div></div>{% endif %}
           {% if vehicle.drivetrain %}<div class="spec-item"><div class="spec-label">Drivetrain</div><div class="spec-val">{{ vehicle.drivetrain|upper }}</div></div>{% endif %}
           {% if vehicle.condition %}<div class="spec-item"><div class="spec-label">Condition</div><div class="spec-val">{{ vehicle.get_condition_display }}</div></div>{% endif %}
+          {% if vehicle.chassis_no %}<div class="spec-item"><div class="spec-label">Chassis/VIN</div><div class="spec-val" style="font-size:.78rem;"><code>{{ vehicle.chassis_no }}</code></div></div>{% endif %}
         </div>
       </div>
+
+      {# ── MARKETPLACE STATUS ── #}
+      {% if is_manager %}
+      <div class="detail-card">
+        <div class="detail-card-title"><i class="bi bi-shop"></i> Marketplace</div>
+        {% if marketplace_listing %}
+        <div class="mp-panel {% if marketplace_listing.status == 'live' %}live{% elif marketplace_listing.status == 'draft' %}draft{% endif %}">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+              <span class="mp-badge mp-badge-{{ marketplace_listing.status }} mb-1">
+                <i class="bi bi-circle-fill" style="font-size:.4rem;"></i>
+                {{ marketplace_listing.get_status_display }}
+              </span>
+              <div style="font-size:.85rem;font-weight:600;color:#0f172a;margin-top:.35rem;">{{ marketplace_listing.title }}</div>
+              {% if marketplace_listing.price %}
+              <div style="font-size:.8rem;color:#64748b;">Listed price: {{ business.currency }} {{ marketplace_listing.price|floatformat:0 }}</div>
+              {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <form method="post" action="{% url 'car_dealer:publish_to_marketplace' vehicle.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="mp_action" value="publish">
+                <button type="submit" class="btn btn-success btn-sm rounded-pill px-3">
+                  <i class="bi bi-arrow-repeat me-1"></i>Sync &amp; Re-publish
+                </button>
+              </form>
+              <form method="post" action="{% url 'car_dealer:publish_to_marketplace' vehicle.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="mp_action" value="unpublish">
+                <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3">
+                  <i class="bi bi-eye-slash me-1"></i>Take Offline
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div class="mp-panel">
+          <p style="font-size:.84rem;color:#64748b;margin-bottom:.85rem;">
+            This vehicle is not yet published to the marketplace. Publishing creates a live public listing with photos and specs.
+          </p>
+          <form method="post" action="{% url 'car_dealer:publish_to_marketplace' vehicle.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="mp_action" value="publish">
+            <button type="submit" class="btn btn-success btn-sm rounded-pill px-3">
+              <i class="bi bi-shop me-1"></i>Publish to Marketplace
+            </button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
   </div>
 
   {# ── IDENTITY / LOCATION ── #}
   {% if vehicle.chassis_no or vehicle.location_text or vehicle.import_source_notes %}
   <div class="detail-card">
-    <div class="detail-card-title">Identity &amp; Location</div>
+    <div class="detail-card-title"><i class="bi bi-geo-alt"></i> Identity &amp; Location</div>
     <div class="row g-2" style="font-size:.85rem;">
       {% if vehicle.chassis_no %}
       <div class="col-12 col-md-6">
@@ -176,11 +373,11 @@
   {% if vehicle.description or vehicle.features_notes %}
   <div class="detail-card">
     {% if vehicle.description %}
-    <div class="detail-card-title">Description</div>
+    <div class="detail-card-title"><i class="bi bi-card-text"></i> Description</div>
     <p class="text-muted" style="font-size:.87rem;">{{ vehicle.description|linebreaksbr }}</p>
     {% endif %}
     {% if vehicle.features_notes %}
-    <div class="detail-card-title {% if vehicle.description %}mt-3{% endif %}">Features &amp; Notes</div>
+    <div class="detail-card-title {% if vehicle.description %}mt-3{% endif %}"><i class="bi bi-star"></i> Features &amp; Notes</div>
     <p class="text-muted" style="font-size:.87rem;">{{ vehicle.features_notes|linebreaksbr }}</p>
     {% endif %}
   </div>
@@ -189,7 +386,7 @@
   {# ── QUICK UPDATE (managers only, non-sold) ── #}
   {% if is_manager and vehicle.status != "sold" %}
   <div class="detail-card">
-    <div class="detail-card-title">Quick Update</div>
+    <div class="detail-card-title"><i class="bi bi-pencil-square"></i> Quick Update</div>
     <form method="post">
       {% csrf_token %}
       <div class="row g-3">
@@ -214,8 +411,16 @@
           <input type="text" name="location_text" class="form-control form-control-sm"
                  value="{{ vehicle.location_text }}">
         </div>
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control form-control-sm" rows="2">{{ vehicle.description }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Features / Notes</label>
+          <textarea name="features_notes" class="form-control form-control-sm" rows="2">{{ vehicle.features_notes }}</textarea>
+        </div>
       </div>
-      <div class="mt-3 d-flex gap-2">
+      <div class="mt-3 d-flex gap-2 flex-wrap">
         <button type="submit" class="btn btn-primary btn-sm rounded-pill px-3">
           <i class="bi bi-check-lg me-1"></i>Save Changes
         </button>
@@ -230,4 +435,55 @@
   {% endif %}
 
 </div>
+
+{# ── MANAGE PHOTOS MODAL ── #}
+{% if is_manager and gallery_images %}
+<div class="modal fade" id="managePhotosModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">Manage Photos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:.82rem;color:#64748b;margin-bottom:1rem;">
+          Click "Set as Cover" to change the primary photo. Delete photos you don't need.
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.65rem;">
+          {% for img in gallery_images %}
+          <div class="photo-card {% if img.is_cover %}is-cover{% endif %}">
+            <img src="{{ img.image.url }}" alt="">
+            {% if img.is_cover %}<span class="cover-badge">Cover</span>{% endif %}
+            <div class="photo-card-actions">
+              {% if not img.is_cover %}
+              <form method="post" action="{% url 'car_dealer:set_cover_image' vehicle.pk img.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" style="background:#1d4ed8;color:#fff;">Set Cover</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'car_dealer:delete_vehicle_image' vehicle.pk img.pk %}" style="display:inline;"
+                    onsubmit="return confirm('Delete this photo?')">
+                {% csrf_token %}
+                <button type="submit" style="background:#dc2626;color:#fff;">Delete</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function switchGalleryImage(thumb) {
+  var mainImg = document.getElementById('galleryMainImg');
+  if (mainImg && thumb.dataset.url) {
+    mainImg.src = thumb.dataset.url;
+  }
+  document.querySelectorAll('.gallery-thumb').forEach(function(t) { t.classList.remove('active'); });
+  thumb.classList.add('active');
+}
+</script>
 {% endblock %}

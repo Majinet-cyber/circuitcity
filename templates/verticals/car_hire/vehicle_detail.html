@@ -1,176 +1,312 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}{{ vehicle.name }} - Car Hire - {{ business.name }}{% endblock %}
+{% block title %}{{ vehicle.name }} – Car Hire – {{ business.name }}{% endblock %}
 
 {% block extra_css %}
 <style>
 .vehicle-detail-page {
     --hire-primary: #059669;
+    --hire-primary-rgb: 5, 150, 105;
+    max-width: 960px;
+    margin: 0 auto;
 }
-
 .back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 0.875rem;
-    margin-bottom: 1rem;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    color: var(--muted); text-decoration: none; font-size: 0.875rem; margin-bottom: 1rem;
 }
-.back-link:hover { color: var(--ink); }
+.back-link:hover { color: var(--hire-primary); }
 
-.vehicle-header {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-    padding: 1.5rem;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+/* Hero card */
+.vd-hero {
+    background: linear-gradient(135deg, #064e3b 0%, #059669 100%);
+    border-radius: 20px; padding: 1.75rem; margin-bottom: 1.5rem; color: #fff;
+    position: relative; overflow: hidden;
 }
-
-.vehicle-title {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--ink);
-    margin: 0 0 0.25rem 0;
+.vd-hero::after {
+    content: ''; position: absolute; right: -50px; top: -50px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, rgba(16,185,129,.3) 0%, transparent 70%);
+    pointer-events: none;
 }
+.vd-hero-inner { position: relative; z-index: 1; }
 
-.vehicle-plate {
-    font-family: var(--font-mono);
-    font-size: 1rem;
-    color: var(--muted);
+/* Gallery */
+.gallery-hero {
+    border-radius: 14px; overflow: hidden; aspect-ratio: 16/10;
+    background: linear-gradient(135deg,#ecfdf5,#d1fae5);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: .6rem; position: relative;
 }
-
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.875rem;
-    border-radius: 999px;
-    font-size: 0.875rem;
-    font-weight: 600;
+.gallery-hero img.thumb { width:100%;height:100%;object-fit:cover; }
+.gallery-hero img.placeholder { width:55%;max-height:120px;object-fit:contain;opacity:.4; }
+.gallery-thumb-row { display:flex;gap:.35rem;overflow-x:auto;padding-bottom:.2rem; }
+.gallery-thumb {
+    flex-shrink:0;width:62px;height:48px;border-radius:7px;overflow:hidden;
+    cursor:pointer;border:2.5px solid transparent;transition:all .12s;
 }
-.status-badge.available { background: #dcfce7; color: #16a34a; }
-.status-badge.on-trip { background: #dbeafe; color: #2563eb; }
-.status-badge.maintenance { background: #fef3c7; color: #d97706; }
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin-bottom: 1.5rem;
+.gallery-thumb.active { border-color:var(--hire-primary); }
+.gallery-thumb img { width:100%;height:100%;object-fit:cover; }
+.photo-count-badge {
+    position:absolute;bottom:6px;right:8px;background:rgba(0,0,0,.55);color:#fff;
+    font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:999px;
 }
 
+/* Photo card in manager */
+.photo-card {
+    position:relative;border-radius:9px;overflow:hidden;
+    border:2px solid var(--border);aspect-ratio:4/3;transition:border-color .12s;
+}
+.photo-card.is-cover { border-color:var(--hire-primary); }
+.photo-card img { width:100%;height:100%;object-fit:cover; }
+.photo-card-actions {
+    position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);
+    display:flex;align-items:center;justify-content:center;gap:.35rem;
+    opacity:0;transition:opacity .15s;
+}
+.photo-card:hover .photo-card-actions { opacity:1; }
+.photo-card-actions button {
+    background:rgba(255,255,255,.9);border:none;border-radius:999px;
+    padding:.22rem .55rem;font-size:.7rem;font-weight:700;cursor:pointer;
+}
+.cover-badge {
+    position:absolute;top:4px;left:4px;background:var(--hire-primary);color:#fff;
+    font-size:.58rem;font-weight:800;padding:1px 7px;border-radius:999px;
+}
+.upload-zone {
+    border:2px dashed var(--border);border-radius:11px;padding:1.25rem;
+    text-align:center;cursor:pointer;transition:all .15s;background:#f8fafc;margin-top:.65rem;
+}
+.upload-zone:hover { border-color:var(--hire-primary);background:#ecfdf5; }
+
+/* Stats */
+.stats-row { display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.5rem; }
 .stat-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1rem 1.25rem;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:1rem 1.25rem;
 }
-
-.stat-label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 0.25rem;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: var(--ink);
-}
+.stat-label { font-size:.72rem;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:.2rem; }
+.stat-value { font-size:1.4rem;font-weight:800;color:var(--ink); }
 
 .section-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-    margin-bottom: 1.5rem;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    overflow:hidden;margin-bottom:1.25rem;
 }
-
 .section-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    padding:.85rem 1.25rem;border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;
 }
+.section-title { font-size:.92rem;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:.4rem; }
+.section-title i { color:var(--hire-primary); }
+.section-body { padding:1rem 1.25rem; }
 
-.section-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--ink);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.section-title i { color: var(--hire-primary); }
-
-.section-body { padding: 1rem 1.25rem; }
-
-.info-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 1rem;
-}
-
-.info-item-label {
-    font-size: 0.75rem;
-    color: var(--muted);
-    margin-bottom: 0.125rem;
-}
-
-.info-item-value {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--ink);
-}
-
-.list-empty {
-    padding: 2rem;
-    text-align: center;
-    color: var(--muted);
-}
+.info-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem; }
+.info-item-label { font-size:.72rem;color:var(--muted);margin-bottom:.1rem; }
+.info-item-value { font-size:.9rem;font-weight:600;color:var(--ink); }
 
 .trip-item, .maintenance-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 0;
-    border-bottom: 1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;
+    padding:.7rem 0;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;
 }
-.trip-item:last-child, .maintenance-item:last-child { border-bottom: none; }
+.trip-item:last-child, .maintenance-item:last-child { border-bottom:none; }
+.trip-customer { font-weight:600;color:var(--ink); }
+.trip-details { font-size:.8rem;color:var(--muted); }
 
-.trip-info { flex: 1; }
-.trip-customer { font-weight: 600; color: var(--ink); }
-.trip-details { font-size: 0.8125rem; color: var(--muted); }
+.status-badge { display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .7rem;border-radius:999px;font-size:.78rem;font-weight:600; }
+.status-badge.available { background:#dcfce7;color:#16a34a; }
+.status-badge.on_trip { background:#dbeafe;color:#2563eb; }
+.status-badge.maintenance { background:#fef3c7;color:#d97706; }
+
+/* Marketplace panel */
+.mp-panel { border-radius:12px;padding:1rem 1.15rem;border:1.5px solid var(--border);background:#f8fafc; }
+.mp-panel.live { border-color:#86efac;background:linear-gradient(135deg,#f0fdf4,#dcfce7); }
+.mp-badge { padding:.22rem .65rem;border-radius:999px;font-size:.68rem;font-weight:700; }
+.mp-badge-live { background:#dcfce7;color:#16a34a; }
+.mp-badge-draft { background:#fef3c7;color:#b45309; }
+.mp-badge-offline { background:#f1f5f9;color:#64748b; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="vehicle-detail-page">
-    <a href="/verticals/car_hire/vehicles/" class="back-link">
+    <a href="{% url 'verticals:car_hire_vehicles' %}" class="back-link">
         <i class="fas fa-arrow-left"></i> Back to Fleet
     </a>
-    
-    <div class="vehicle-header">
-        <div>
-            <h1 class="vehicle-title">{{ vehicle.display_name }}</h1>
-            <div class="vehicle-plate">{{ vehicle.plate_number }}</div>
+
+    {# ── HERO ── #}
+    <div class="vd-hero">
+        <div class="vd-hero-inner">
+            <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                        <span class="status-badge {{ vehicle.status }}">{{ vehicle.get_status_display }}</span>
+                        {% if marketplace_listing %}
+                        <span class="mp-badge mp-badge-{{ marketplace_listing.status }}">
+                            <i class="bi bi-shop" style="font-size:.7rem;"></i> {{ marketplace_listing.get_status_display }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h1 style="font-size:1.45rem;font-weight:800;margin-bottom:.25rem;">{{ vehicle.display_name }}</h1>
+                    <div style="font-size:.85rem;opacity:.7;">{{ vehicle.plate_number }}</div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 align-items-start">
+                    <a href="{% url 'verticals:car_hire_trip_add' %}" class="btn btn-light btn-sm rounded-pill px-3 fw-bold" style="font-size:.8rem;">
+                        <i class="bi bi-plus-circle me-1"></i>New Booking
+                    </a>
+                </div>
+            </div>
         </div>
-        <span class="status-badge {% if vehicle.status == 'available' %}available{% elif vehicle.status == 'on_trip' %}on-trip{% else %}maintenance{% endif %}">
-            {{ vehicle.get_status_display }}
-        </span>
     </div>
-    
-    <div class="stats-grid">
+
+    {# ── MESSAGES ── #}
+    {% for m in messages %}
+    <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
+    {% endfor %}
+
+    <div class="row g-3 mb-3">
+        {# ── PHOTO GALLERY ── #}
+        <div class="col-12 col-md-5">
+            <div class="section-card" style="overflow:visible;">
+                <div class="section-header">
+                    <span class="section-title"><i class="bi bi-images"></i> Photos ({{ gallery_images|length }})</span>
+                    <div class="d-flex gap-2">
+                        {% if gallery_images %}
+                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill" style="font-size:.74rem;"
+                                data-bs-toggle="modal" data-bs-target="#managePhotosModal">
+                            Manage
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="section-body">
+                    {% if gallery_images %}
+                    <div class="gallery-hero" id="galleryHero">
+                        <img class="thumb" id="galleryMainImg" src="{{ gallery_images.0.image.url }}" alt="{{ vehicle.name }}">
+                        <span class="photo-count-badge"><i class="bi bi-images" style="font-size:.55rem;"></i> {{ gallery_images|length }}</span>
+                    </div>
+                    <div class="gallery-thumb-row">
+                        {% for img in gallery_images %}
+                        <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img.image.url }}" onclick="switchGallery(this)">
+                            <img src="{{ img.image.url }}" alt="">
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="gallery-hero">
+                        <img class="placeholder" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23059669' opacity='0.3'%3E%3Cpath d='M21 6.5l-4-4H7L3 6.5v11A1.5 1.5 0 004.5 19h15A1.5 1.5 0 0021 17.5V6.5zm-9 10a4 4 0 110-8 4 4 0 010 8z'/%3E%3C/svg%3E" alt="">
+                    </div>
+                    <p class="text-center text-muted" style="font-size:.78rem;margin:.5rem 0 0;">No photos yet</p>
+                    {% endif %}
+
+                    <div class="upload-zone" onclick="document.getElementById('detailHirePhotoInput').click()">
+                        <div style="font-size:.82rem;font-weight:600;color:#334155;">
+                            <i class="bi bi-plus-circle me-1" style="color:var(--hire-primary);"></i>Add Photos
+                        </div>
+                        <div style="font-size:.72rem;color:#94a3b8;">JPEG, PNG, WEBP</div>
+                    </div>
+                    <form method="post" enctype="multipart/form-data" id="hireDetailPhotoForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="_action" value="upload_images">
+                        <input type="file" name="gallery_images" id="detailHirePhotoInput"
+                               accept="image/jpeg,image/png,image/webp" multiple style="display:none;"
+                               onchange="this.form.submit()">
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# ── VEHICLE INFO + MARKETPLACE ── #}
+        <div class="col-12 col-md-7">
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title"><i class="bi bi-info-circle"></i> Vehicle Info</span>
+                </div>
+                <div class="section-body">
+                    <div class="info-grid">
+                        <div><div class="info-item-label">Make</div><div class="info-item-value">{{ vehicle.get_make_display }}</div></div>
+                        <div><div class="info-item-label">Model</div><div class="info-item-value">{{ vehicle.model }}</div></div>
+                        <div><div class="info-item-label">Year</div><div class="info-item-value">{{ vehicle.year|default:"—" }}</div></div>
+                        <div><div class="info-item-label">Color</div><div class="info-item-value">{{ vehicle.color|default:"—" }}</div></div>
+                        <div><div class="info-item-label">Seats</div><div class="info-item-value">{{ vehicle.seats|default:"—" }}</div></div>
+                        <div><div class="info-item-label">Fuel</div><div class="info-item-value">{{ vehicle.get_fuel_type_display }}</div></div>
+                        <div><div class="info-item-label">Plate</div><div class="info-item-value"><code>{{ vehicle.plate_number }}</code></div></div>
+                        <div>
+                            <div class="info-item-label">Next Service</div>
+                            <div class="info-item-value">
+                                {% if vehicle.next_maintenance_km %}
+                                    {% if vehicle.is_maintenance_due %}<span style="color:#dc2626;font-weight:700;">OVERDUE</span>
+                                    {% else %}{{ vehicle.km_until_maintenance|intcomma }} km to go{% endif %}
+                                {% else %}—{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% if vehicle.notes %}
+                    <div style="margin-top:.85rem;padding-top:.85rem;border-top:1px solid var(--border);">
+                        <div class="info-item-label">Notes</div>
+                        <div class="info-item-value" style="font-weight:400;">{{ vehicle.notes }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ── MARKETPLACE ── #}
+            <div class="section-card">
+                <div class="section-header">
+                    <span class="section-title"><i class="bi bi-shop"></i> Marketplace</span>
+                </div>
+                <div class="section-body">
+                    {% if marketplace_listing %}
+                    <div class="mp-panel {% if marketplace_listing.status == 'live' %}live{% endif %}">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                            <div>
+                                <span class="mp-badge mp-badge-{{ marketplace_listing.status }}">{{ marketplace_listing.get_status_display }}</span>
+                                <div style="font-size:.85rem;font-weight:600;margin-top:.35rem;">{{ marketplace_listing.title }}</div>
+                                {% if marketplace_listing.price %}
+                                <div style="font-size:.78rem;color:var(--muted);">MK {{ marketplace_listing.price|intcomma }}/day</div>
+                                {% endif %}
+                            </div>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="_action" value="publish_marketplace">
+                                    <input type="hidden" name="mp_action" value="publish">
+                                    <button type="submit" class="btn btn-success btn-sm rounded-pill px-3" style="font-size:.78rem;">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Sync &amp; Re-publish
+                                    </button>
+                                </form>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="_action" value="publish_marketplace">
+                                    <input type="hidden" name="mp_action" value="unpublish">
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill px-3" style="font-size:.78rem;">
+                                        <i class="bi bi-eye-slash me-1"></i>Take Offline
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mp-panel">
+                        <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">
+                            Not yet published. Publish to let customers find and book this vehicle online.
+                        </p>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="_action" value="publish_marketplace">
+                            <input type="hidden" name="mp_action" value="publish">
+                            <button type="submit" class="btn btn-success btn-sm rounded-pill px-3" style="font-size:.82rem;">
+                                <i class="bi bi-shop me-1"></i>Publish to Marketplace
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── STATS ROW ── #}
+    <div class="stats-row">
         <div class="stat-card">
             <div class="stat-label">Total Trips</div>
             <div class="stat-value">{{ total_trips|default:0 }}</div>
@@ -188,69 +324,19 @@
             <div class="stat-value">{{ vehicle.current_odometer|intcomma }} km</div>
         </div>
     </div>
-    
-    <div class="section-card">
-        <div class="section-header">
-            <h2 class="section-title"><i class="fas fa-info-circle"></i> Vehicle Details</h2>
-        </div>
-        <div class="section-body">
-            <div class="info-grid">
-                <div>
-                    <div class="info-item-label">Make</div>
-                    <div class="info-item-value">{{ vehicle.get_make_display }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Model</div>
-                    <div class="info-item-value">{{ vehicle.model }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Year</div>
-                    <div class="info-item-value">{{ vehicle.year|default:"—" }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Color</div>
-                    <div class="info-item-value">{{ vehicle.color|default:"—" }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Seats</div>
-                    <div class="info-item-value">{{ vehicle.seats|default:"—" }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Fuel Type</div>
-                    <div class="info-item-value">{{ vehicle.get_fuel_type_display }}</div>
-                </div>
-                <div>
-                    <div class="info-item-label">Next Service</div>
-                    <div class="info-item-value">
-                        {% if vehicle.next_maintenance_km %}
-                            {% if vehicle.is_maintenance_due %}
-                            <span style="color: #dc2626;">OVERDUE</span>
-                            {% else %}
-                            {{ vehicle.km_until_maintenance|intcomma }} km
-                            {% endif %}
-                        {% else %}
-                        —
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-            {% if vehicle.notes %}
-            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-                <div class="info-item-label">Notes</div>
-                <div class="info-item-value">{{ vehicle.notes }}</div>
-            </div>
-            {% endif %}
-        </div>
-    </div>
-    
+
+    {# ── RECENT TRIPS ── #}
     <div class="section-card">
         <div class="section-header">
             <h2 class="section-title"><i class="fas fa-route"></i> Recent Trips</h2>
+            <a href="{% url 'verticals:car_hire_trip_add' %}" class="btn btn-sm rounded-pill px-3" style="background:var(--hire-primary);color:#fff;font-size:.78rem;">
+                <i class="bi bi-plus me-1"></i>New Trip
+            </a>
         </div>
         <div class="section-body">
             {% if trips %}
             {% for trip in trips %}
-            <a href="/verticals/car_hire/trips/{{ trip.id }}/" class="trip-item" style="text-decoration: none;">
+            <a href="{% url 'verticals:car_hire_trip_detail' trip.id %}" class="trip-item">
                 <div class="trip-info">
                     <div class="trip-customer">{{ trip.customer_name }}</div>
                     <div class="trip-details">{{ trip.destination }} — {{ trip.start_datetime|date:"M j, Y" }}</div>
@@ -259,14 +345,18 @@
             </a>
             {% endfor %}
             {% else %}
-            <div class="list-empty">No trips recorded yet</div>
+            <div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem;">No trips recorded yet</div>
             {% endif %}
         </div>
     </div>
-    
+
+    {# ── MAINTENANCE ── #}
     <div class="section-card">
         <div class="section-header">
             <h2 class="section-title"><i class="fas fa-wrench"></i> Maintenance History</h2>
+            <a href="{% url 'verticals:car_hire_maintenance_add' %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3" style="font-size:.78rem;">
+                <i class="bi bi-plus me-1"></i>Add Record
+            </a>
         </div>
         <div class="section-body">
             {% if maintenance %}
@@ -274,16 +364,61 @@
             <div class="maintenance-item">
                 <div class="trip-info">
                     <div class="trip-customer">{{ record.get_maintenance_type_display }}</div>
-                    <div class="trip-details">{{ record.description|truncatechars:50 }} — {{ record.date|date:"M j, Y" }}</div>
+                    <div class="trip-details">{{ record.description|truncatechars:60 }} — {{ record.date|date:"M j, Y" }}</div>
                 </div>
-                <span style="font-weight: 600;">MK {{ record.cost|intcomma }}</span>
+                <span style="font-weight:700;color:var(--ink);font-size:.88rem;">MK {{ record.cost|intcomma }}</span>
             </div>
             {% endfor %}
             {% else %}
-            <div class="list-empty">No maintenance records yet</div>
+            <div style="text-align:center;padding:2rem;color:var(--muted);font-size:.85rem;">No maintenance records yet</div>
             {% endif %}
         </div>
     </div>
 </div>
-{% endblock %}
 
+{# ── MANAGE PHOTOS MODAL ── #}
+{% if gallery_images %}
+<div class="modal fade" id="managePhotosModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content" style="border-radius:16px;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold">Manage Photos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem;">
+          {% for img in gallery_images %}
+          <div class="photo-card {% if img.is_cover %}is-cover{% endif %}">
+            <img src="{{ img.image.url }}" alt="">
+            {% if img.is_cover %}<span class="cover-badge">Cover</span>{% endif %}
+            <div class="photo-card-actions">
+              {% if not img.is_cover %}
+              <form method="post" action="{% url 'verticals:car_hire_set_cover_image' vehicle.pk img.pk %}">
+                {% csrf_token %}
+                <button type="submit" style="background:#059669;color:#fff;">Cover</button>
+              </form>
+              {% endif %}
+              <form method="post" action="{% url 'verticals:car_hire_delete_vehicle_image' vehicle.pk img.pk %}"
+                    onsubmit="return confirm('Delete this photo?')">
+                {% csrf_token %}
+                <button type="submit" style="background:#dc2626;color:#fff;">Del</button>
+              </form>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function switchGallery(thumb) {
+    var mainImg = document.getElementById('galleryMainImg');
+    if (mainImg && thumb.dataset.url) mainImg.src = thumb.dataset.url;
+    document.querySelectorAll('.gallery-thumb').forEach(t => t.classList.remove('active'));
+    thumb.classList.add('active');
+}
+</script>
+{% endblock %}

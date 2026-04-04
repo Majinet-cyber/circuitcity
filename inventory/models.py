@@ -1892,6 +1892,18 @@ try:
         CarMake,
         CarModel,
         CarDealerVehicle,
+        CarDealerVehicleImage,
+    )
+except ImportError:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Car Hire vertical models (image gallery + marketplace link)
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_car_hire import (  # noqa: F401, E402
+        HireVehicleImage,
     )
 except ImportError:
     pass

@@ -15,5 +15,8 @@ urlpatterns = [
     path("vehicles/add/", views.stock_in_vehicle, name="stock_in"),
     path("vehicles/<int:pk>/", views.vehicle_detail, name="vehicle_detail"),
     path("vehicles/<int:pk>/sell/", views.sell_vehicle, name="sell_vehicle"),
+    path("vehicles/<int:pk>/images/<int:image_pk>/delete/", views.delete_vehicle_image, name="delete_vehicle_image"),
+    path("vehicles/<int:pk>/images/<int:image_pk>/set-cover/", views.set_cover_image, name="set_cover_image"),
+    path("vehicles/<int:pk>/publish/", views.publish_to_marketplace, name="publish_to_marketplace"),
     path("seed/", views.seed_car_data, name="seed_data"),
 ]

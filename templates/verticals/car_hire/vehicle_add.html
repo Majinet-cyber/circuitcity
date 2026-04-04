@@ -468,7 +468,7 @@
     </div>
     
     <!-- Form -->
-    <form method="post" class="form-card animate-in" style="animation-delay: 0.2s" id="vehicleForm">
+    <form method="post" enctype="multipart/form-data" class="form-card animate-in" style="animation-delay: 0.2s" id="vehicleForm">
         {% csrf_token %}
         
         <div class="form-section">
@@ -552,6 +552,43 @@
         <div class="form-group">
             <label class="form-label">Notes</label>
             <textarea name="notes" class="form-input" rows="3" placeholder="Any additional notes about this vehicle..."></textarea>
+        </div>
+
+        <!-- Photo Upload -->
+        <div class="form-section" style="margin-top: 1.5rem;">
+            <div class="form-section-title">Vehicle Photos</div>
+            <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">
+                Add photos of this vehicle. The first photo becomes the cover. Up to 20 photos.
+            </p>
+            <div id="hirePhotoDropZone" style="
+              border: 2px dashed var(--border); border-radius: 12px; padding: 2rem 1rem;
+              text-align: center; cursor: pointer; transition: all .15s; background: #f8fafc;"
+              onclick="document.getElementById('hirePhotoInput').click()">
+              <div style="font-size: 2rem; margin-bottom: .4rem;">📷</div>
+              <div style="font-weight: 700; color: #334155; font-size: .9rem;">Click to add photos</div>
+              <div style="font-size: .75rem; color: #94a3b8; margin-top: .25rem;">JPEG, PNG, WEBP · Max 10 MB each · Up to 20</div>
+            </div>
+            <input type="file" name="gallery_images" id="hirePhotoInput"
+                   accept="image/jpeg,image/png,image/webp" multiple
+                   style="display:none;" onchange="handleHirePhotoSelect(this.files)">
+            <div id="hirePhotoPreviewGrid" style="
+              display: none; grid-template-columns: repeat(auto-fill, minmax(100px,1fr));
+              gap: .5rem; margin-top: .75rem;"></div>
+            <div id="hirePhotoCount" style="font-size:.74rem;color:#64748b;margin-top:.35rem;"></div>
+        </div>
+
+        <!-- Marketplace Publish Toggle -->
+        <div class="form-section" style="margin-top: 1rem;">
+            <div class="form-section-title">Marketplace</div>
+            <div style="display:flex;align-items:center;gap:.75rem;">
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="hirePublishToggle" name="publish_to_marketplace" value="1">
+                <label class="form-check-label" for="hirePublishToggle" style="font-size:.85rem;font-weight:600;">
+                  Publish to Marketplace immediately
+                </label>
+              </div>
+            </div>
+            <div style="font-size:.73rem;color:#94a3b8;margin-top:.3rem;">Creates a live public hire listing. Manageable from vehicle detail.</div>
         </div>
         
         <button type="submit" class="btn-submit" data-testid="submit-vehicle">
@@ -656,5 +693,49 @@ document.getElementById('vehicleForm').addEventListener('submit', function(e) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
     btn.disabled = true;
 });
+
+// Hire vehicle photo preview
+let hireAllFiles = [];
+window.handleHirePhotoSelect = function(files) {
+    const grid = document.getElementById('hirePhotoPreviewGrid');
+    const counter = document.getElementById('hirePhotoCount');
+    const input = document.getElementById('hirePhotoInput');
+    const newFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    hireAllFiles = hireAllFiles.concat(newFiles).slice(0, 20);
+
+    if (window.DataTransfer) {
+        const dt = new DataTransfer();
+        hireAllFiles.forEach(f => dt.items.add(f));
+        input.files = dt.files;
+    }
+
+    grid.innerHTML = '';
+    grid.style.display = hireAllFiles.length ? 'grid' : 'none';
+    hireAllFiles.forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const item = document.createElement('div');
+            item.style.cssText = `position:relative;border-radius:8px;overflow:hidden;border:2px solid ${idx===0?'var(--hire-primary)':'var(--border)'};aspect-ratio:4/3;`;
+            item.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">
+              ${idx===0?'<div style="position:absolute;top:3px;left:3px;background:var(--hire-primary);color:#fff;font-size:.55rem;font-weight:800;padding:1px 6px;border-radius:999px;">COVER</div>':''}`;
+            grid.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    if (counter) counter.textContent = hireAllFiles.length + ' photo(s) selected';
+};
+
+// Drag and drop
+const hireDropZone = document.getElementById('hirePhotoDropZone');
+if (hireDropZone) {
+    hireDropZone.addEventListener('dragover', e => { e.preventDefault(); hireDropZone.style.borderColor = 'var(--hire-primary)'; });
+    hireDropZone.addEventListener('dragleave', () => { hireDropZone.style.borderColor = 'var(--border)'; });
+    hireDropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        hireDropZone.style.borderColor = 'var(--border)';
+        if (e.dataTransfer.files.length) handleHirePhotoSelect(e.dataTransfer.files);
+    });
+}
 </script>
 {% endblock %}

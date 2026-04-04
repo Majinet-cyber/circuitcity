@@ -2,9 +2,17 @@
 """
 Car Hire Service vertical models.
 Tracks vehicles (fleet), trips/bookings, and maintenance.
+Models:
+  - Vehicle           : a vehicle in the rental fleet
+  - HireVehicleImage  : gallery photos for a hire vehicle
+  - Trip              : a booking/rental record
+  - MaintenanceRecord : vehicle maintenance history
+  - CarHireRevenue    : additional revenue entries
+  - CarHireCost       : cost/expense entries
 """
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 
 from django.conf import settings
@@ -157,13 +165,16 @@ class Vehicle(models.Model):
         default="petrol",
     )
     
-    # Photo (optional)
-    photo = models.ImageField(
-        upload_to="car_hire/vehicles/",
+    # Marketplace link
+    marketplace_listing = models.ForeignKey(
+        "inventory.MarketplaceListing",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
+        related_name="car_hire_vehicles",
+        help_text="Linked marketplace listing (auto-managed)",
     )
-    
+
     # Status
     is_active = models.BooleanField(default=True, db_index=True)
     notes = models.TextField(blank=True, default="")
@@ -225,6 +236,19 @@ class Vehicle(models.Model):
             VehicleStatus.MAINTENANCE: "warning",
         }
         return colors.get(self.status, "secondary")
+
+    @property
+    def cover_image(self):
+        """Return the primary/cover gallery image, or None."""
+        return self.gallery_images.filter(is_cover=True).first() or self.gallery_images.order_by("sort_order", "uploaded_at").first()
+
+    @property
+    def has_photos(self) -> bool:
+        return self.gallery_images.exists()
+
+    @property
+    def photo_count(self) -> int:
+        return self.gallery_images.count()
 
 
 # ==============================================================================
@@ -741,3 +765,62 @@ class CarHireCost(models.Model):
     
     def __str__(self):
         return f"{self.get_category_display()} - MWK {self.amount:,.0f} ({self.incurred_on})"
+
+
+# ==============================================================================
+# VEHICLE GALLERY IMAGES
+# ==============================================================================
+
+
+def _hire_vehicle_image_path(instance, filename):
+    """car_hire/<business_id>/vehicles/<vehicle_id>/<filename>"""
+    filename = os.path.basename(filename)
+    business_id = instance.vehicle.business_id
+    vehicle_id = instance.vehicle_id
+    return f"car_hire/{business_id}/vehicles/{vehicle_id}/{filename}"
+
+
+class HireVehicleImage(models.Model):
+    """
+    One of (potentially many) photos for a hire fleet Vehicle.
+    Supports a primary/cover flag and sort ordering.
+    """
+
+    vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.CASCADE,
+        related_name="gallery_images",
+        db_index=True,
+    )
+    image = models.ImageField(
+        upload_to=_hire_vehicle_image_path,
+    )
+    caption = models.CharField(max_length=200, blank=True, default="")
+    is_cover = models.BooleanField(
+        default=False,
+        help_text="Mark as the primary/cover image",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, db_index=True)
+    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True)
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-is_cover", "sort_order", "uploaded_at"]
+        verbose_name = "Hire Vehicle Image"
+        verbose_name_plural = "Hire Vehicle Images"
+
+    def __str__(self):
+        return f"Photo for {self.vehicle.name} (#{self.sort_order})"
+
+    def save(self, *args, **kwargs):
+        if self.is_cover and self.vehicle_id:
+            HireVehicleImage.objects.filter(
+                vehicle_id=self.vehicle_id, is_cover=True
+            ).exclude(pk=self.pk or 0).update(is_cover=False)
+        super().save(*args, **kwargs)

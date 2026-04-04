@@ -1,9 +1,11 @@
 # inventory/verticals/car_dealer.py
 """
-Car Dealer vertical: views for dashboard, stock in, sell, inventory list, vehicle detail.
+Car Dealer vertical: views for dashboard, stock in, sell, inventory list,
+vehicle detail, photo management, and marketplace publishing.
 """
 from __future__ import annotations
 
+import json
 import logging
 from decimal import Decimal, InvalidOperation
 
@@ -26,6 +28,14 @@ def _get_car_models():
         return CarMake, CarModel, CarDealerVehicle
     except ImportError:
         return None, None, None
+
+
+def _get_image_model():
+    try:
+        from inventory.models_car_dealer import CarDealerVehicleImage
+        return CarDealerVehicleImage
+    except ImportError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +65,8 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         "aging_30": 0,
         "aging_60": 0,
         "aging_90_plus": 0,
+        "marketplace_live": 0,
+        "low_photo_vehicles": 0,
     }
     recent_vehicles = []
     vehicles_by_make = []
@@ -88,21 +100,18 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         if in_stock_prices:
             stats["avg_selling_price"] = sum(in_stock_prices) / len(in_stock_prices)
 
-        # Total inventory value (sum of selling prices in stock)
         stats["inventory_value"] = sum(in_stock_prices)
 
-        # Inventory cost basis (sum of buying prices in stock)
         in_stock_costs = [v.buying_price for v in in_stock_qs if v.buying_price]
         stats["inventory_cost_basis"] = sum(in_stock_costs) if in_stock_costs else Decimal("0")
 
-        # Profit this month (revenue - buying_price of sold units this month)
         cost_this_month = sum(
             (v.buying_price or Decimal("0")) for v in sold_this_month
         )
         stats["cost_this_month"] = cost_this_month
         stats["profit_this_month"] = stats["revenue_this_month"] - cost_this_month
 
-        # Stock aging (days since created_at)
+        # Stock aging
         from datetime import timedelta
         cutoff_30 = today - timedelta(days=30)
         cutoff_60 = today - timedelta(days=60)
@@ -111,7 +120,20 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         stats["aging_60"] = in_stock_qs.filter(created_at__date__lte=cutoff_60, created_at__date__gt=cutoff_90).count()
         stats["aging_90_plus"] = in_stock_qs.filter(created_at__date__lte=cutoff_90).count()
 
-        # Vehicles by make (top 6); include free-text fallback via make_text
+        # Marketplace live listings
+        stats["marketplace_live"] = qs.filter(marketplace_listing__status="live").count()
+
+        # Low-photo vehicles (no gallery images)
+        CarDealerVehicleImage = _get_image_model()
+        if CarDealerVehicleImage:
+            vehicles_with_photos = (
+                CarDealerVehicleImage.objects.filter(vehicle__business=biz)
+                .values_list("vehicle_id", flat=True)
+                .distinct()
+            )
+            stats["low_photo_vehicles"] = in_stock_qs.exclude(pk__in=vehicles_with_photos).count()
+
+        # Vehicles by make
         vehicles_by_make = (
             in_stock_qs
             .values("model__make__name", "make_text")
@@ -119,7 +141,6 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             .order_by("-count")[:6]
         )
 
-        # Vehicles by fuel type
         vehicles_by_fuel = (
             in_stock_qs
             .exclude(fuel_type="")
@@ -128,31 +149,24 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             .order_by("-count")[:5]
         )
 
-        # Recent 12 in-stock vehicles
-        recent_vehicles = in_stock_qs.select_related("model__make", "make").order_by("-created_at")[:12]
+        recent_vehicles = in_stock_qs.select_related("model__make", "make").prefetch_related("gallery_images").order_by("-created_at")[:12]
 
-        # 5 most recent sales
         recent_sold = (
             qs.filter(status="sold")
             .select_related("model__make", "make")
             .order_by("-sold_at")[:5]
         )
 
-        # Total profit (sold vehicles: sale_price - buying_price)
         total_profit = Decimal("0")
         for v in qs.filter(status="sold"):
             sp = v.sale_price or v.selling_price or Decimal("0")
             bp = v.buying_price or Decimal("0")
             total_profit += (sp - bp)
 
-        # Month-over-month revenue (last 6 months) for chart
-        import json as _json
-        from datetime import timedelta
         monthly_revenue = []
         monthly_labels = []
         for months_ago in range(5, -1, -1):
             m_date = today.replace(day=1)
-            # step back months_ago months
             for _ in range(months_ago):
                 m_date = (m_date - timedelta(days=1)).replace(day=1)
             sold_in_month = qs.filter(
@@ -166,7 +180,6 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
 
         stats["total_profit"] = total_profit
 
-        # Vehicles by body type
         vehicles_by_body = (
             in_stock_qs
             .exclude(body_type="")
@@ -175,7 +188,6 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             .order_by("-count")[:6]
         )
 
-        # Aged vehicles needing action (90+ days)
         aged_vehicles = (
             in_stock_qs.filter(created_at__date__lte=cutoff_90)
             .select_related("model__make", "make")
@@ -183,7 +195,6 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         )
 
     else:
-        import json as _json
         monthly_revenue = []
         monthly_labels = []
         vehicles_by_body = []
@@ -201,8 +212,8 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
             "vehicles_by_fuel": vehicles_by_fuel,
             "vehicles_by_body": vehicles_by_body,
             "aged_vehicles": aged_vehicles,
-            "monthly_revenue_json": _json.dumps(monthly_revenue),
-            "monthly_labels_json": _json.dumps(monthly_labels),
+            "monthly_revenue_json": json.dumps(monthly_revenue),
+            "monthly_labels_json": json.dumps(monthly_labels),
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
         },
@@ -221,11 +232,14 @@ def vehicle_list(request: HttpRequest) -> HttpResponse:
 
     status_filter = request.GET.get("status", "")
     search_q = request.GET.get("q", "").strip()
+    make_filter = request.GET.get("make", "").strip()
+    body_filter = request.GET.get("body_type", "").strip()
 
     vehicles = []
     counts = {}
+    makes_for_filter = []
     if CarDealerVehicle:
-        qs = CarDealerVehicle.objects.filter(business=biz).select_related("make", "model")
+        qs = CarDealerVehicle.objects.filter(business=biz).select_related("make", "model").prefetch_related("gallery_images")
         counts = {
             "all": qs.count(),
             "in_stock": qs.filter(status="in_stock").count(),
@@ -234,6 +248,11 @@ def vehicle_list(request: HttpRequest) -> HttpResponse:
         }
         if status_filter and status_filter != "all":
             qs = qs.filter(status=status_filter)
+        if make_filter:
+            from django.db.models import Q
+            qs = qs.filter(Q(make__name__icontains=make_filter) | Q(make_text__icontains=make_filter))
+        if body_filter:
+            qs = qs.filter(body_type=body_filter)
         if search_q:
             from django.db.models import Q
             qs = qs.filter(
@@ -246,6 +265,10 @@ def vehicle_list(request: HttpRequest) -> HttpResponse:
                 | Q(chassis_no__icontains=search_q)
             )
         vehicles = qs.order_by("-created_at")
+        # Makes for filter bar
+        CarMakeModel = CarMake
+        if CarMakeModel:
+            makes_for_filter = CarMakeModel.objects.order_by("name")
 
     return render(
         request,
@@ -255,6 +278,9 @@ def vehicle_list(request: HttpRequest) -> HttpResponse:
             "counts": counts,
             "status_filter": status_filter,
             "search_q": search_q,
+            "make_filter": make_filter,
+            "body_filter": body_filter,
+            "makes_for_filter": makes_for_filter,
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
         },
@@ -274,6 +300,7 @@ def stock_in_vehicle(request: HttpRequest) -> HttpResponse:
         return redirect("car_dealer:vehicle_list")
 
     CarMake, CarModel, CarDealerVehicle = _get_car_models()
+    CarDealerVehicleImage = _get_image_model()
     makes = CarMake.objects.order_by("sort_order", "name") if CarMake else []
     popular_makes = CarMake.objects.filter(is_popular=True).order_by("sort_order", "name") if CarMake else []
     car_models = CarModel.objects.select_related("make").order_by("make__name", "name") if CarModel else []
@@ -336,7 +363,35 @@ def stock_in_vehicle(request: HttpRequest) -> HttpResponse:
                 status="in_stock",
             )
 
+            # Handle photo uploads
+            if CarDealerVehicleImage:
+                images = request.FILES.getlist("gallery_images")
+                cover_set = False
+                for i, img_file in enumerate(images[:20]):  # max 20 images
+                    is_cover = (i == 0) and not cover_set
+                    try:
+                        CarDealerVehicleImage.objects.create(
+                            vehicle=vehicle,
+                            image=img_file,
+                            sort_order=i,
+                            is_cover=is_cover,
+                            uploaded_by=request.user,
+                        )
+                        if is_cover:
+                            cover_set = True
+                    except Exception as img_err:
+                        log.warning("Could not save vehicle image: %s", img_err)
+
             messages.success(request, f"Vehicle '{vehicle.display_name}' added to inventory.")
+
+            # Auto-publish to marketplace if requested
+            if data.get("publish_to_marketplace") == "1":
+                try:
+                    _create_or_update_marketplace_listing(vehicle, request.user, biz)
+                    messages.success(request, "Vehicle published to marketplace.")
+                except Exception as mp_err:
+                    log.warning("Marketplace auto-publish failed: %s", mp_err)
+
             return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
 
         except Exception as e:
@@ -344,7 +399,6 @@ def stock_in_vehicle(request: HttpRequest) -> HttpResponse:
             messages.error(request, f"Could not add vehicle: {e}")
 
     # Build car models JSON for JS
-    import json
     car_models_by_make: dict[str, list] = {}
     for cm in car_models:
         key = str(cm.make_id)
@@ -378,6 +432,11 @@ def vehicle_detail(request: HttpRequest, pk: int) -> HttpResponse:
     vehicle = get_object_or_404(CarDealerVehicle, pk=pk, business=biz)
 
     if request.method == "POST" and is_manager(request.user, biz):
+        action = request.POST.get("_action", "")
+
+        if action == "upload_images":
+            return _handle_vehicle_image_upload(request, vehicle)
+
         # Quick field updates
         for field in ["selling_price", "status", "location_text", "description", "features_notes"]:
             val = request.POST.get(field)
@@ -392,16 +451,244 @@ def vehicle_detail(request: HttpRequest, pk: int) -> HttpResponse:
         messages.success(request, "Vehicle updated.")
         return redirect("car_dealer:vehicle_detail", pk=pk)
 
+    gallery_images = vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at") if hasattr(vehicle, "gallery_images") else []
+    marketplace_listing = vehicle.marketplace_listing
+
     return render(
         request,
         "car_dealer/vehicle_detail.html",
         {
             "vehicle": vehicle,
+            "gallery_images": gallery_images,
+            "marketplace_listing": marketplace_listing,
             "business": biz,
             "BUSINESS_VERTICAL": "car_dealer",
             "is_manager": is_manager(request.user, biz),
         },
     )
+
+
+def _handle_vehicle_image_upload(request, vehicle):
+    """Handle photo upload POST from vehicle detail page."""
+    CarDealerVehicleImage = _get_image_model()
+    if not CarDealerVehicleImage:
+        messages.error(request, "Image model not available.")
+        return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
+
+    images = request.FILES.getlist("gallery_images")
+    if not images:
+        messages.warning(request, "No images selected.")
+        return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
+
+    existing_count = vehicle.gallery_images.count()
+    added = 0
+    for i, img_file in enumerate(images[:20]):
+        try:
+            is_cover = existing_count == 0 and i == 0
+            CarDealerVehicleImage.objects.create(
+                vehicle=vehicle,
+                image=img_file,
+                sort_order=existing_count + i,
+                is_cover=is_cover,
+                uploaded_by=request.user,
+            )
+            added += 1
+        except Exception as err:
+            log.warning("Image upload error: %s", err)
+
+    if added:
+        messages.success(request, f"{added} photo(s) added.")
+    else:
+        messages.error(request, "Could not save photos.")
+    return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
+
+
+# ---------------------------------------------------------------------------
+# Delete vehicle image (AJAX or regular POST)
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@require_POST
+def delete_vehicle_image(request: HttpRequest, pk: int, image_pk: int) -> HttpResponse:
+    biz = get_active_business(request)
+    if not is_manager(request.user, biz):
+        return JsonResponse({"error": "Permission denied."}, status=403)
+
+    CarMake, CarModel, CarDealerVehicle = _get_car_models()
+    CarDealerVehicleImage = _get_image_model()
+    vehicle = get_object_or_404(CarDealerVehicle, pk=pk, business=biz)
+    img = get_object_or_404(CarDealerVehicleImage, pk=image_pk, vehicle=vehicle)
+
+    was_cover = img.is_cover
+    img.image.delete(save=False)
+    img.delete()
+
+    # If we deleted the cover, promote the next image
+    if was_cover:
+        next_img = vehicle.gallery_images.order_by("sort_order", "uploaded_at").first()
+        if next_img:
+            next_img.is_cover = True
+            next_img.save(update_fields=["is_cover"])
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"success": True})
+    messages.success(request, "Photo deleted.")
+    return redirect("car_dealer:vehicle_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Set cover image
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@require_POST
+def set_cover_image(request: HttpRequest, pk: int, image_pk: int) -> HttpResponse:
+    biz = get_active_business(request)
+    if not is_manager(request.user, biz):
+        return JsonResponse({"error": "Permission denied."}, status=403)
+
+    CarMake, CarModel, CarDealerVehicle = _get_car_models()
+    CarDealerVehicleImage = _get_image_model()
+    vehicle = get_object_or_404(CarDealerVehicle, pk=pk, business=biz)
+    img = get_object_or_404(CarDealerVehicleImage, pk=image_pk, vehicle=vehicle)
+
+    # Clear all cover flags
+    vehicle.gallery_images.update(is_cover=False)
+    img.is_cover = True
+    img.save(update_fields=["is_cover"])
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return JsonResponse({"success": True})
+    messages.success(request, "Cover photo updated.")
+    return redirect("car_dealer:vehicle_detail", pk=pk)
+
+
+# ---------------------------------------------------------------------------
+# Publish / unpublish to Marketplace
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@require_POST
+def publish_to_marketplace(request: HttpRequest, pk: int) -> HttpResponse:
+    biz = get_active_business(request)
+    if not is_manager(request.user, biz):
+        messages.error(request, "Only managers can publish listings.")
+        return redirect("car_dealer:vehicle_detail", pk=pk)
+
+    CarMake, CarModel, CarDealerVehicle = _get_car_models()
+    vehicle = get_object_or_404(CarDealerVehicle, pk=pk, business=biz)
+    action = request.POST.get("mp_action", "publish")
+
+    try:
+        if action == "unpublish":
+            if vehicle.marketplace_listing_id:
+                from inventory.models_marketplace import ListingStatus
+                vehicle.marketplace_listing.status = ListingStatus.OFFLINE
+                vehicle.marketplace_listing.save(update_fields=["status", "updated_at"])
+                messages.success(request, "Listing taken offline.")
+        elif action == "mark_draft":
+            if vehicle.marketplace_listing_id:
+                from inventory.models_marketplace import ListingStatus
+                vehicle.marketplace_listing.status = ListingStatus.DRAFT
+                vehicle.marketplace_listing.save(update_fields=["status", "updated_at"])
+                messages.success(request, "Listing saved as draft.")
+        else:
+            listing = _create_or_update_marketplace_listing(vehicle, request.user, biz)
+            messages.success(request, f"Vehicle published to marketplace as '{listing.title}'.")
+    except Exception as e:
+        log.exception("Marketplace publish error: %s", e)
+        messages.error(request, f"Could not publish: {e}")
+
+    return redirect("car_dealer:vehicle_detail", pk=pk)
+
+
+def _create_or_update_marketplace_listing(vehicle, user, biz):
+    """
+    Create or update a MarketplaceListing for a CarDealerVehicle.
+    Syncs: title, price, description, images, and vertical_metadata.
+    """
+    from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
+
+    make_label = vehicle.make.name if vehicle.make else vehicle.make_text or "Vehicle"
+    model_label = vehicle.model.name if vehicle.model else vehicle.model_text or ""
+    year_label = str(vehicle.year) if vehicle.year else ""
+    title_parts = [p for p in [year_label, make_label, model_label, vehicle.trim] if p]
+    title = " ".join(title_parts) or vehicle.display_name
+
+    metadata = {
+        "make": make_label,
+        "model": model_label,
+        "year": str(vehicle.year) if vehicle.year else "",
+        "mileage": str(vehicle.mileage) if vehicle.mileage is not None else "",
+        "transmission": vehicle.get_transmission_display() if vehicle.transmission else "",
+        "fuel_type": vehicle.get_fuel_type_display() if vehicle.fuel_type else "",
+        "color": vehicle.color,
+        "condition": vehicle.get_condition_display() if vehicle.condition else "",
+        "chassis_no": vehicle.chassis_no,
+        "body_type": vehicle.get_body_type_display() if vehicle.body_type else "",
+        "engine_size": vehicle.engine_size,
+        "drivetrain": vehicle.get_drivetrain_display() if vehicle.drivetrain else "",
+        "stock_ref": vehicle.stock_ref,
+        "status": vehicle.get_status_display(),
+    }
+
+    if vehicle.marketplace_listing_id:
+        listing = vehicle.marketplace_listing
+        listing.title = title
+        listing.price = vehicle.selling_price
+        listing.description = vehicle.description or vehicle.features_notes or ""
+        listing.location_text = vehicle.location_text
+        listing.vertical_metadata = metadata
+        listing.status = ListingStatus.LIVE
+        listing.save(update_fields=["title", "price", "description", "location_text", "vertical_metadata", "status", "updated_at"])
+    else:
+        listing = MarketplaceListing.objects.create(
+            business=biz,
+            vertical="car_dealer",
+            title=title,
+            price=vehicle.selling_price,
+            description=vehicle.description or vehicle.features_notes or "",
+            location_text=vehicle.location_text,
+            contact_phone=getattr(biz, "phone", "") or "",
+            contact_email=getattr(biz, "email", "") or "",
+            address=vehicle.location_text,
+            vertical_metadata=metadata,
+            status=ListingStatus.LIVE,
+            created_by=user,
+        )
+        vehicle.marketplace_listing = listing
+        vehicle.save(update_fields=["marketplace_listing"])
+
+    # Sync gallery images → MarketplaceListingImage
+    _sync_vehicle_images_to_listing(vehicle, listing)
+
+    return listing
+
+
+def _sync_vehicle_images_to_listing(vehicle, listing):
+    """Copy vehicle gallery images to the marketplace listing."""
+    from inventory.models_marketplace import MarketplaceListingImage
+
+    gallery = list(vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at")[:10])
+    if not gallery:
+        return
+
+    # Remove old listing images and re-add from vehicle gallery
+    listing.images.all().delete()
+
+    for i, vimg in enumerate(gallery):
+        try:
+            MarketplaceListingImage.objects.create(
+                listing=listing,
+                image=vimg.image,
+                caption=vimg.caption or "",
+                sort_order=i,
+            )
+        except Exception as e:
+            log.warning("Could not sync vehicle image to listing: %s", e)
 
 
 # ---------------------------------------------------------------------------

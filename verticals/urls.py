@@ -319,6 +319,8 @@ urlpatterns = [
     path("car_hire/vehicles/", car_hire.vehicles_list, name="car_hire_vehicles"),
     path("car_hire/vehicles/new/", car_hire.vehicle_add, name="car_hire_vehicle_add"),
     path("car_hire/vehicles/<int:vehicle_id>/", car_hire.vehicle_detail, name="car_hire_vehicle_detail"),
+    path("car_hire/vehicles/<int:vehicle_id>/images/<int:image_pk>/delete/", car_hire.delete_hire_vehicle_image, name="car_hire_delete_vehicle_image"),
+    path("car_hire/vehicles/<int:vehicle_id>/images/<int:image_pk>/set-cover/", car_hire.set_hire_cover_image, name="car_hire_set_cover_image"),
     
     # Trips / Bookings
     path("car_hire/trips/", car_hire.trips_list, name="car_hire_trips"),

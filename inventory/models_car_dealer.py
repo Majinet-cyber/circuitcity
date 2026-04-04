@@ -4,9 +4,10 @@ Car Dealer vertical models.
 
 Provides a production-grade vehicle inventory system for car dealerships.
 Models:
-  - CarMake    : brand/manufacturer reference data (Toyota, Mazda, etc.)
-  - CarModel   : model reference data (Corolla, Axio, etc.)
-  - CarDealerVehicle : the actual vehicle in stock
+  - CarMake              : brand/manufacturer reference data (Toyota, Mazda, etc.)
+  - CarModel             : model reference data (Corolla, Axio, etc.)
+  - CarDealerVehicle     : the actual vehicle in stock
+  - CarDealerVehicleImage: one of many photos for a vehicle (gallery)
 """
 from __future__ import annotations
 
@@ -401,3 +402,75 @@ class CarDealerVehicle(models.Model):
                 self.marketplace_listing.save(update_fields=["status", "updated_at"])
             except Exception:
                 pass
+
+    @property
+    def cover_image(self):
+        """Return the primary/cover gallery image, or None."""
+        return self.gallery_images.filter(is_cover=True).first() or self.gallery_images.order_by("sort_order", "uploaded_at").first()
+
+    @property
+    def has_photos(self) -> bool:
+        return self.gallery_images.exists()
+
+    @property
+    def photo_count(self) -> int:
+        return self.gallery_images.count()
+
+
+# ---------------------------------------------------------------------------
+# Vehicle gallery images
+# ---------------------------------------------------------------------------
+
+def _car_dealer_vehicle_image_path(instance, filename):
+    """car_dealer/<business_id>/vehicles/<vehicle_id>/<filename>"""
+    filename = os.path.basename(filename)
+    business_id = instance.vehicle.business_id
+    vehicle_id = instance.vehicle_id
+    return f"car_dealer/{business_id}/vehicles/{vehicle_id}/{filename}"
+
+
+class CarDealerVehicleImage(models.Model):
+    """
+    One of (potentially many) photos for a CarDealerVehicle.
+    Supports a primary/cover flag and sort ordering.
+    """
+
+    vehicle = models.ForeignKey(
+        CarDealerVehicle,
+        on_delete=models.CASCADE,
+        related_name="gallery_images",
+        db_index=True,
+    )
+    image = models.ImageField(
+        upload_to=_car_dealer_vehicle_image_path,
+    )
+    caption = models.CharField(max_length=200, blank=True, default="")
+    is_cover = models.BooleanField(
+        default=False,
+        help_text="Mark as the primary/cover image shown on cards and marketplace",
+    )
+    sort_order = models.PositiveSmallIntegerField(default=0, db_index=True)
+    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True)
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-is_cover", "sort_order", "uploaded_at"]
+        verbose_name = "Vehicle Image"
+        verbose_name_plural = "Vehicle Images"
+
+    def __str__(self):
+        return f"Photo for {self.vehicle.display_name} (#{self.sort_order})"
+
+    def save(self, *args, **kwargs):
+        # Ensure only one cover per vehicle
+        if self.is_cover and self.vehicle_id:
+            CarDealerVehicleImage.objects.filter(
+                vehicle_id=self.vehicle_id, is_cover=True
+            ).exclude(pk=self.pk or 0).update(is_cover=False)
+        super().save(*args, **kwargs)
