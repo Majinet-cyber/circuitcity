@@ -185,6 +185,11 @@
           <a href="{% url 'inventory:manage_listings' %}" class="cd-hero-btn-ghost">
             <i class="bi bi-shop-window"></i> Marketplace
           </a>
+          {% if stats.total == 0 %}
+          <a href="{% url 'car_dealer:seed_data' %}" class="cd-hero-btn-ghost" style="border-color:rgba(251,191,36,.6);color:#fbbf24;">
+            <i class="bi bi-database-fill-add"></i> Seed Make/Model Data
+          </a>
+          {% endif %}
         </div>
       </div>
       <img src="{% static 'img/car-dealer/car-green.svg' %}" alt="Car" style="width:80px;height:44px;flex-shrink:0;opacity:.92;filter:drop-shadow(0 2px 8px rgba(0,0,0,.3));" class="d-none d-sm-block">
@@ -241,9 +246,19 @@
     <div class="col-6 col-md-3">
       <div class="kpi-card accent-teal">
         <div class="kpi-icon"><i class="bi bi-graph-up-arrow"></i></div>
-        <div class="kpi-label">Total Profit</div>
-        <div class="kpi-val money" style="color:#0891b2;">{{ business.currency }} {{ stats.total_profit|floatformat:0 }}</div>
-        <div class="kpi-sub">All-time realized</div>
+        <div class="kpi-label">Profit (Month)</div>
+        <div class="kpi-val money" style="color:{% if stats.profit_this_month >= 0 %}#0891b2{% else %}var(--cd-red){% endif %};">
+          {{ business.currency }} {{ stats.profit_this_month|floatformat:0 }}
+        </div>
+        <div class="kpi-sub">Revenue minus buying cost</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card accent-navy">
+        <div class="kpi-icon"><i class="bi bi-wallet2"></i></div>
+        <div class="kpi-label">Inventory Cost Basis</div>
+        <div class="kpi-val money" style="color:#334155;">{{ business.currency }} {{ stats.inventory_cost_basis|floatformat:0 }}</div>
+        <div class="kpi-sub">Total buying cost in stock</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
@@ -255,10 +270,22 @@
       </div>
     </div>
     <div class="col-6 col-md-3">
+      <div class="kpi-card accent-purple">
+        <div class="kpi-icon"><i class="bi bi-receipt-cutoff"></i></div>
+        <div class="kpi-label">Total Profit (All-time)</div>
+        <div class="kpi-val money" style="color:var(--cd-purple);">{{ business.currency }} {{ stats.total_profit|floatformat:0 }}</div>
+        <div class="kpi-sub">All realized profit</div>
+      </div>
+    </div>
+  </div>
+
+  {# ── AGING ROW ── #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
       <div class="kpi-card{% if stats.aging_90_plus > 0 %} accent-red{% else %} accent-green{% endif %}">
         <div class="kpi-icon"><i class="bi bi-clock-history"></i></div>
         <div class="kpi-label">Aged 90+ Days</div>
-        <div class="kpi-val{% if stats.aging_90_plus > 0 %}" style="color:var(--cd-red){% endif %}">{{ stats.aging_90_plus }}</div>
+        <div class="kpi-val {% if stats.aging_90_plus > 0 %}text-danger{% endif %}">{{ stats.aging_90_plus }}</div>
         <div class="kpi-sub">Need price review</div>
       </div>
     </div>
@@ -281,8 +308,13 @@
         <div class="cd-section-hdr mb-2">
           <div class="insight-title mb-0">📈 Monthly Revenue (6 months)</div>
         </div>
-        <div class="chart-wrap">
-          <canvas id="revChart"></canvas>
+        <div class="chart-wrap" style="position:relative;height:200px;">
+          <canvas id="revChart" style="display:none;"></canvas>
+          <div id="revChartEmpty" style="display:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#94a3b8;font-size:.85rem;gap:.4rem;">
+            <i class="bi bi-bar-chart" style="font-size:2rem;opacity:.3;"></i>
+            <span>No sales yet — revenue will appear here</span>
+            <a href="{% url 'car_dealer:vehicle_list' %}" style="font-size:.78rem;color:#1d4ed8;text-decoration:none;margin-top:.25rem;">View inventory →</a>
+          </div>
         </div>
       </div>
     </div>
@@ -502,11 +534,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (function(){
-  const ctx = document.getElementById('revChart');
-  if (!ctx) return;
+  const canvas   = document.getElementById('revChart');
+  const emptyEl  = document.getElementById('revChartEmpty');
+  if (!canvas) return;
+
   const labels = {{ monthly_labels_json|safe }};
   const data   = {{ monthly_revenue_json|safe }};
-  new Chart(ctx, {
+  const hasData = data && data.some(v => v > 0);
+
+  if (!hasData || typeof Chart === 'undefined') {
+    canvas.style.display = 'none';
+    if (emptyEl) { emptyEl.style.display = 'flex'; }
+    return;
+  }
+
+  canvas.style.display = 'block';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  new Chart(canvas, {
     type: 'bar',
     data: {
       labels,

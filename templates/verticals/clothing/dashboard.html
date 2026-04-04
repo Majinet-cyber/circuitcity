@@ -219,22 +219,58 @@
 
   <section class="cc-kpi-grid">
     <article class="metric-card">
-      <h3>Products</h3>
+      <h3>🧾 Sales Count{% if active_range == 'today' %} (Today){% elif active_range == '7d' %} (7D){% elif active_range == 'date' %} (Day){% else %} (MTD){% endif %}</h3>
+      <p>{{ total_sales_count|default:"0" }}</p>
+      <small>Transaction count</small>
+    </article>
+    <article class="metric-card">
+      <h3>👗 Products</h3>
       <p>{{ product_count }}</p>
+      <small>{{ active_product_count }} active style{{ active_product_count|pluralize }}</small>
     </article>
     <article class="metric-card">
-      <h3>Active styles</h3>
-      <p>{{ active_product_count }}</p>
-    </article>
-    <article class="metric-card">
-      <h3>Scan required</h3>
-      <p>{{ scan_required_count }}</p>
-    </article>
-    <article class="metric-card">
-      <h3>Tracking inventory</h3>
+      <h3>📦 Tracking Inventory</h3>
       <p>{{ inventory_tracked_count }}</p>
+      <small>Units with scan tracking</small>
     </article>
+    {% if low_stock_products %}
+    <article class="metric-card" style="border-color:#fca5a5;background:linear-gradient(135deg,#fff1f2,#fee2e2);">
+      <h3 style="color:#dc2626;">⚠️ Low Stock Items</h3>
+      <p style="color:#dc2626;">{{ low_stock_products|length }}</p>
+      <small style="color:#991b1b;">Items running low — restock soon</small>
+    </article>
+    {% else %}
+    <article class="metric-card">
+      <h3>✅ Stock Health</h3>
+      <p style="color:#16a34a;font-size:1.5rem;">Good</p>
+      <small>No low-stock alerts</small>
+    </article>
+    {% endif %}
   </section>
+
+  {# Low Stock Alert Panel #}
+  {% if low_stock_products %}
+  <section class="recent-block" style="border:1.5px solid #fca5a5;background:#fff5f5;">
+    <h2 style="margin:0 0 12px;font-size:1.05rem;color:#dc2626;">⚠️ Low Stock Alerts</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      {% for p in low_stock_products %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem .9rem;background:#fff;border-radius:10px;border:1px solid #fecaca;">
+        <div>
+          <strong style="font-size:.9rem;color:#0f172a;">{{ p.name }}</strong>
+          <small style="display:block;color:#64748b;font-size:.78rem;">{{ p.category_display|default:p.kind }}</small>
+        </div>
+        <div style="text-align:right;">
+          <span style="font-weight:700;color:#dc2626;font-size:.95rem;">{{ p.quantity|default:0 }} left</span>
+          <small style="display:block;color:#64748b;font-size:.72rem;">Min: {{ p.low_stock_threshold|default:5 }}</small>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <a href="{% url 'verticals:clothing_scan_in' %}" style="display:inline-flex;align-items:center;gap:.3rem;margin-top:.85rem;font-size:.82rem;font-weight:700;color:#dc2626;text-decoration:none;">
+      <i class="bi bi-plus-circle"></i> Restock now →
+    </a>
+  </section>
+  {% endif %}
 
 
   {% comment %}Recent Sales Transactions List{% endcomment %}

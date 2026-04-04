@@ -169,12 +169,34 @@
 
       {% if form.size %}
       <div class="form-row">
-        <div class="form-group">
-          <label for="{{ form.size.id_for_label }}">
-            Size
-            <span class="optional-badge">OPTIONAL</span>
-          </label>
+        <div class="form-group" style="flex:1;">
+          <label>Size <span class="optional-badge">OPTIONAL</span></label>
+          {# Clickable size pills when sizes are available; fall back to text input #}
+          {% if sizes %}
+          <div id="sizePillGroup" style="display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.5rem;">
+            {% for sz in sizes %}
+            <button type="button"
+                    onclick="selectSize('{{ sz }}')"
+                    id="size-pill-{{ sz }}"
+                    style="padding:.38rem .85rem;border-radius:999px;font-size:.82rem;font-weight:700;
+                           border:2px solid #e2e8f0;background:#f8fafc;color:#475569;cursor:pointer;
+                           transition:all .12s;user-select:none;"
+                    onmouseover="this.style.borderColor='#0ea5e9';this.style.color='#0369a1';"
+                    onmouseout="if(!this.classList.contains('sz-active')){this.style.borderColor='#e2e8f0';this.style.color='#475569';}">
+              {{ sz }}
+            </button>
+            {% endfor %}
+          </div>
+          {# Hidden input for the size value #}
+          <input type="hidden" name="{{ form.size.html_name }}" id="sizeHiddenInput">
+          {# Visible fallback text (also editable for custom sizes) #}
+          <input type="text" id="sizeTextDisplay" placeholder="Click size above or type custom"
+                 style="padding:8px 12px;border:2px solid #e2e8f0;border-radius:10px;font-size:.9rem;width:100%;margin-top:.35rem;"
+                 oninput="document.getElementById('sizeHiddenInput').value=this.value;">
+          {% else %}
+          {# No size list for this category (e.g. accessories) — plain input #}
           {{ form.size }}
+          {% endif %}
         </div>
         
         <div class="form-group">
@@ -232,5 +254,30 @@
   </div>
 </div>
 
+<script>
+function selectSize(sz) {
+  // Update hidden input
+  document.getElementById('sizeHiddenInput').value = sz;
+  // Update visible text
+  var disp = document.getElementById('sizeTextDisplay');
+  if (disp) disp.value = sz;
+  // Update pill styles
+  document.querySelectorAll('#sizePillGroup button').forEach(function(btn) {
+    var active = btn.id === 'size-pill-' + sz;
+    btn.classList.toggle('sz-active', active);
+    if (active) {
+      btn.style.background    = '#0ea5e9';
+      btn.style.borderColor   = '#0ea5e9';
+      btn.style.color         = '#fff';
+      btn.style.boxShadow     = '0 2px 8px rgba(14,165,233,.35)';
+    } else {
+      btn.style.background  = '#f8fafc';
+      btn.style.borderColor = '#e2e8f0';
+      btn.style.color       = '#475569';
+      btn.style.boxShadow   = '';
+    }
+  });
+}
+</script>
 {% endblock %}
 

@@ -39,6 +39,20 @@ from inventory.models_marketplace import (
 )
 from tenants.decorators import require_business
 from tenants.models import Business
+from tenants.utils import get_active_business as _get_active_business
+
+
+def _biz(request) -> "Business | None":
+    """
+    Resolve the active business from request — works regardless of which
+    middleware/decorator populated the attribute.
+    Order: request.business (middleware) → request.active_business (legacy) → util lookup.
+    """
+    return (
+        getattr(request, "business", None)
+        or getattr(request, "active_business", None)
+        or _get_active_business(request)
+    )
 
 log = logging.getLogger(__name__)
 
@@ -244,7 +258,7 @@ def manage_listings(request: HttpRequest) -> HttpResponse:
     """
     Manager marketplace dashboard — all listings with status tabs.
     """
-    business = request.active_business
+    business = _biz(request)
 
     status_filter = request.GET.get("status", "all")
 
@@ -293,7 +307,11 @@ def manage_listings(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def create_listing(request: HttpRequest) -> HttpResponse:
     """Create a new marketplace listing."""
-    business = request.active_business
+    business = _biz(request)
+    if not business:
+        messages.error(request, "No active business found. Please select a business first.")
+        return redirect("/")
+
 
     try:
         from inventory.marketplace_vertical_config import get_vertical_config
@@ -377,7 +395,7 @@ def create_listing(request: HttpRequest) -> HttpResponse:
 @require_http_methods(["GET", "POST"])
 def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
     """Edit an existing listing."""
-    business = request.active_business
+    business = _biz(request)
     listing = get_object_or_404(MarketplaceListing, pk=listing_id, business=business)
 
     try:
@@ -461,7 +479,7 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
 @require_business
 @require_POST
 def delete_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
-    business = request.active_business
+    business = _biz(request)
     listing = get_object_or_404(MarketplaceListing, pk=listing_id, business=business)
     title = listing.title
     listing.delete()
@@ -477,7 +495,7 @@ def toggle_listing_status(request: HttpRequest, listing_id: int) -> HttpResponse
     Quick status toggle. POST with ?status=live|offline|sold|out_of_stock|draft
     Returns JSON for AJAX callers; redirects for normal form callers.
     """
-    business = request.active_business
+    business = _biz(request)
     listing = get_object_or_404(MarketplaceListing, pk=listing_id, business=business)
 
     new_status = request.POST.get("status", "").strip()
@@ -504,7 +522,7 @@ def toggle_listing_status(request: HttpRequest, listing_id: int) -> HttpResponse
 @require_POST
 def upload_listing_image(request: HttpRequest, listing_id: int) -> HttpResponse:
     """AJAX endpoint to add images to a listing."""
-    business = request.active_business
+    business = _biz(request)
     listing = get_object_or_404(MarketplaceListing, pk=listing_id, business=business)
 
     uploaded = []
@@ -522,7 +540,7 @@ def upload_listing_image(request: HttpRequest, listing_id: int) -> HttpResponse:
 @require_business
 def view_enquiries(request: HttpRequest) -> HttpResponse:
     """View all enquiries for this business."""
-    business = request.active_business
+    business = _biz(request)
     enquiries_qs = (
         MarketplaceEnquiry.objects
         .filter(business=business)
@@ -538,7 +556,7 @@ def view_enquiries(request: HttpRequest) -> HttpResponse:
 @require_business
 @require_POST
 def mark_enquiry_read(request: HttpRequest, enquiry_id: int) -> HttpResponse:
-    business = request.active_business
+    business = _biz(request)
     enquiry = get_object_or_404(MarketplaceEnquiry, pk=enquiry_id, business=business)
     enquiry.mark_as_read()
     return JsonResponse({"ok": True})

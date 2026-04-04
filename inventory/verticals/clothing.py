@@ -18,6 +18,23 @@ from inventory.models_verticals import ClothingSale
 
 from . import base
 
+
+def _clothing_low_stock(business, threshold: int = 5):
+    """Return MerchProduct instances that are low on stock for the given business."""
+    try:
+        return list(
+            MerchProduct.objects.filter(
+                business=business,
+                kind="clothing",
+                is_active=True,
+                quantity__gt=0,
+                quantity__lte=threshold,
+            ).order_by("quantity")[:10]
+        )
+    except Exception:
+        return []
+
+
 # ============================================================================
 # COMPATIBILITY: Re-export CLOTHING_CATEGORIES from SSOT
 # ============================================================================
@@ -246,6 +263,10 @@ def dashboard(request):
             "recent_products": metrics["recent"],
             # Recent Sales List (Last 10 transactions)
             "recent_sales": recent_sales,
+            # Alias for template compatibility
+            "total_sales_count": total_sales_mtd,
+            # Low stock: products with quantity <= low_stock_threshold (or <= 5 default)
+            "low_stock_products": _clothing_low_stock(business),
             # KPI Panels (Sales Metrics)
             "revenue_mtd": revenue_mtd,
             "cost_mtd": cost_mtd,

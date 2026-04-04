@@ -47,8 +47,11 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
         "sold_this_month": 0,
         "reserved": 0,
         "revenue_this_month": Decimal("0"),
+        "cost_this_month": Decimal("0"),
+        "profit_this_month": Decimal("0"),
         "avg_selling_price": Decimal("0"),
         "inventory_value": Decimal("0"),
+        "inventory_cost_basis": Decimal("0"),
         "aging_30": 0,
         "aging_60": 0,
         "aging_90_plus": 0,
@@ -87,6 +90,17 @@ def car_dealer_dashboard(request: HttpRequest) -> HttpResponse:
 
         # Total inventory value (sum of selling prices in stock)
         stats["inventory_value"] = sum(in_stock_prices)
+
+        # Inventory cost basis (sum of buying prices in stock)
+        in_stock_costs = [v.buying_price for v in in_stock_qs if v.buying_price]
+        stats["inventory_cost_basis"] = sum(in_stock_costs) if in_stock_costs else Decimal("0")
+
+        # Profit this month (revenue - buying_price of sold units this month)
+        cost_this_month = sum(
+            (v.buying_price or Decimal("0")) for v in sold_this_month
+        )
+        stats["cost_this_month"] = cost_this_month
+        stats["profit_this_month"] = stats["revenue_this_month"] - cost_this_month
 
         # Stock aging (days since created_at)
         from datetime import timedelta
@@ -449,3 +463,68 @@ def sell_vehicle(request: HttpRequest, pk: int) -> HttpResponse:
             "BUSINESS_VERTICAL": "car_dealer",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Seed reference data
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def seed_car_data(request: HttpRequest) -> HttpResponse:
+    """
+    One-click seed of CarMake / CarModel reference catalog.
+    Safe to run multiple times (idempotent).  Manager-only.
+    """
+    from tenants.utils_roles import is_manager as _is_manager
+    biz = get_active_business(request)
+
+    if not _is_manager(request.user, biz):
+        messages.error(request, "Only managers can seed reference data.")
+        return redirect("car_dealer:dashboard")
+
+    try:
+        from inventory.management.commands.seed_car_dealer_data import CAR_DATA
+        from inventory.models_car_dealer import CarMake, CarModel
+
+        created_makes  = 0
+        created_models = 0
+
+        for entry in CAR_DATA:
+            make_obj, make_new = CarMake.objects.get_or_create(
+                name=entry["make"],
+                defaults={
+                    "slug": entry["make"].lower().replace(" ", "-").replace("-benz", "benz"),
+                    "sort_order": entry.get("sort_order", 99),
+                    "is_popular": entry.get("popular", False),
+                },
+            )
+            if make_new:
+                created_makes += 1
+
+            for m in entry.get("models", []):
+                _, model_new = CarModel.objects.get_or_create(
+                    make=make_obj,
+                    name=m["name"],
+                    defaults={
+                        "slug": (make_obj.slug + "-" + m["name"].lower().replace(" ", "-"))[:80],
+                        "body_type": m.get("body_type", ""),
+                        "common_years": m.get("common_years", ""),
+                    },
+                )
+                if model_new:
+                    created_models += 1
+
+        if created_makes or created_models:
+            messages.success(
+                request,
+                f"Seeded {created_makes} make(s) and {created_models} model(s). "
+                "Data is ready for use.",
+            )
+        else:
+            messages.info(request, "Reference catalog already up to date — nothing new to add.")
+    except Exception as e:
+        log.exception("Car data seeding failed: %s", e)
+        messages.error(request, f"Seeding failed: {e}")
+
+    return redirect("car_dealer:stock_in")

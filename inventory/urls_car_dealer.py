@@ -15,4 +15,5 @@ urlpatterns = [
     path("vehicles/add/", views.stock_in_vehicle, name="stock_in"),
     path("vehicles/<int:pk>/", views.vehicle_detail, name="vehicle_detail"),
     path("vehicles/<int:pk>/sell/", views.sell_vehicle, name="sell_vehicle"),
+    path("seed/", views.seed_car_data, name="seed_data"),
 ]
