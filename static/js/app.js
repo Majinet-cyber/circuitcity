@@ -584,19 +584,11 @@
   })();
 
   /* =========================
-     SERVICE WORKER (optional)
+     SERVICE WORKER — DISABLED
+     SW registration removed to eliminate hard-refresh rendering bugs.
+     The /sw.js endpoint now serves a cleanup-only no-op worker.
+     See templates/base.html for full explanation.
   ========================== */
-  (function sw() {
-    if ('serviceWorker' in navigator) {
-      // CRITICAL: Disable service worker on localhost to prevent cache poisoning
-      var hostname = window.location.hostname;
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        console.log('[DEV] Service worker disabled on localhost to prevent cache issues');
-        return;
-      }
-      navigator.serviceWorker.register('/static/sw.js').catch(() => { /* no-op */ });
-    }
-  })();
 
   /* =========================
      LEGACY BLOCKS (kept from your original file)

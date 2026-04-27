@@ -86,17 +86,25 @@ def test_base_template_has_pwa_meta_tags(client):
         assert 'viewport' in content.lower(), "Viewport meta tag not found"
 
 
-def test_service_worker_registration_in_base(client):
-    """Test that service worker registration script is present in base template."""
+def test_service_worker_cleanup_in_base(client):
+    """
+    Test that service worker cleanup (not registration) is present in base template.
+
+    SW registration is intentionally disabled (stability hotfix — hard-refresh bug).
+    The base template must instead contain cleanup code that unregisters any
+    previously installed service workers and clears all caches.
+    """
     response = client.get('/')
-    
+
     if response.status_code == 200:
         content = response.content.decode()
-        assert 'serviceWorker' in content, "Service worker registration not found"
-        assert 'navigator.serviceWorker.register' in content, "Service worker registration code not found"
-        # Verify it registers from /sw.js (not /static/sw.js)
-        assert '/sw.js' in content or 'sw.js' in content, \
-            "Service worker should be registered from /sw.js"
+        # Cleanup code must be present
+        assert 'serviceWorker' in content, "SW cleanup code missing from base template"
+        assert 'getRegistrations' in content or 'unregister' in content, \
+            "SW cleanup: must call getRegistrations() or unregister()"
+        # Registration must NOT be present (intentionally disabled)
+        assert 'navigator.serviceWorker.register(' not in content, \
+            "SW registration must be disabled (stability hotfix)"
 
 
 def test_offline_page_exists():
@@ -145,15 +153,19 @@ def test_pwa_icons_referenced(client):
                "PWA icons not referenced"
 
 
-def test_service_worker_skips_admin(client):
-    """Test that service worker registration skips Django admin."""
+def test_service_worker_registration_disabled(client):
+    """
+    Test that service worker registration is disabled (stability hotfix).
+
+    SW registration was causing hard-refresh rendering bugs.  It must be absent
+    from the base template.  The cleanup SW at /sw.js handles cache eviction.
+    """
     response = client.get('/')
-    
+
     if response.status_code == 200:
         content = response.content.decode()
-        # Check that SW registration has admin check
-        assert "'/admin/'" in content or "startsWith('/admin')" in content, \
-               "Service worker should skip admin pages"
+        assert 'navigator.serviceWorker.register(' not in content, \
+               "SW registration must be disabled — stability hotfix is active"
 
 
 def test_service_worker_fails_gracefully(client):
@@ -207,13 +219,17 @@ def test_pwa_install_js_included_in_base(client):
 def test_pwa_install_js_file_exists(client):
     """Test that PWA install JS file is accessible."""
     response = client.get('/static/js/pwa-install.js')
-    
+
     # Should be 200 after collectstatic, or 404 in dev (acceptable)
     assert response.status_code in [200, 404], \
            f"Unexpected status code for pwa-install.js: {response.status_code}"
-    
+
     if response.status_code == 200:
-        content = response.content.decode()
+        # WhiteNoise may return a StreamingHttpResponse; handle both cases.
+        if hasattr(response, 'streaming_content'):
+            content = b"".join(response.streaming_content).decode()
+        else:
+            content = response.content.decode()
         # Verify key functionality is present
         assert 'beforeinstallprompt' in content.lower(), \
                "PWA install JS should handle beforeinstallprompt event"

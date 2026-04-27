@@ -1,9 +1,17 @@
 # conftest.py — pytest config to make tests stable & fast
 
 import os
+import warnings
 import pytest
 from uuid import uuid4
 from django.utils.text import slugify
+
+# Suppress ResourceWarning for unclosed file descriptors opened by WhiteNoise.
+# WhiteNoise opens static files during middleware initialisation and does not
+# always close the low-level FileIO objects before Python's GC finalises them.
+# This is a known upstream behaviour and is not caused by application code.
+# See: https://github.com/evansd/whitenoise/issues (file-handle leak on init)
+warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed file")
 
 # Ensure Django settings are discoverable for pytest
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "cc.settings")

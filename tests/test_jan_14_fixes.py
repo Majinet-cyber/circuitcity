@@ -503,8 +503,14 @@ class TestPWAUpdateFlow(TestCase):
         
         assert "clients.claim()" in content
 
-    def test_base_template_has_reload_once_guard(self):
-        """Base template should have reload-once guard to prevent loops."""
+    def test_base_template_has_sw_cleanup_code(self):
+        """
+        Base template must contain SW cleanup code (not registration).
+
+        SW registration is intentionally disabled (stability hotfix).
+        The base template must run cleanup code that unregisters existing
+        service workers and clears all browser caches on every page load.
+        """
         from circuitcity.accounts.models import Profile
         from tenants.models import Business, Membership
         from inventory.business_kinds import BusinessKind
@@ -512,7 +518,7 @@ class TestPWAUpdateFlow(TestCase):
         client = Client()
         user = User.objects.create_user(username="swtest", password="test123")
         Profile.objects.get_or_create(user=user, defaults={"display_name": "Test"})
-        
+
         business = Business.objects.create(
             name="Test",
             kind=BusinessKind.PHONES,
@@ -525,21 +531,30 @@ class TestPWAUpdateFlow(TestCase):
             role="MANAGER",
             status="ACTIVE"
         )
-        
+
         client.login(username="swtest", password="test123")
         session = client.session
         session['active_business_id'] = business.id
         session.save()
-        
+
         response = client.get("/dashboard/")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        
-        assert "cc_sw_reloaded" in content, "Must have reload guard sessionStorage key"
-        assert "reloadOnce" in content, "Must have reloadOnce function"
 
-    def test_single_sw_registration(self):
-        """Base template should have exactly one service worker registration."""
+        assert "getRegistrations" in content, \
+            "Must have SW cleanup: getRegistrations()"
+        assert "unregister" in content, \
+            "Must have SW cleanup: unregister()"
+        assert "caches" in content, \
+            "Must have cache cleanup code"
+
+    def test_no_sw_registration(self):
+        """
+        Base template must have zero service worker registrations.
+
+        SW registration is intentionally disabled (stability hotfix — hard-refresh bug).
+        Any navigator.serviceWorker.register() call in the rendered page is a regression.
+        """
         from circuitcity.accounts.models import Profile
         from tenants.models import Business, Membership
         from inventory.business_kinds import BusinessKind
@@ -547,7 +562,7 @@ class TestPWAUpdateFlow(TestCase):
         client = Client()
         user = User.objects.create_user(username="swtest2", password="test123")
         Profile.objects.get_or_create(user=user, defaults={"display_name": "Test"})
-        
+
         business = Business.objects.create(
             name="Test2",
             kind=BusinessKind.PHONES,
@@ -560,18 +575,21 @@ class TestPWAUpdateFlow(TestCase):
             role="MANAGER",
             status="ACTIVE"
         )
-        
+
         client.login(username="swtest2", password="test123")
         session = client.session
         session['active_business_id'] = business.id
         session.save()
-        
+
         response = client.get("/dashboard/")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        
-        count = content.count("navigator.serviceWorker.register")
-        assert count == 1, f"Must have exactly 1 SW registration, found {count}"
+
+        count = content.count("navigator.serviceWorker.register(")
+        assert count == 0, (
+            f"SW registration must be disabled (stability hotfix). "
+            f"Found {count} registration(s) in the rendered page."
+        )
 
 
 @pytest.mark.django_db

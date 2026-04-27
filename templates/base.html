@@ -51,27 +51,65 @@
         localStorage.setItem("cc-theme", "light");
       } catch (_) {}
 
-      // One-time cleanup of service workers on localhost
-      var hostname = window.location.hostname;
-      if ((hostname === 'localhost' || hostname === '127.0.0.1') && 'serviceWorker' in navigator) {
-        try {
-          var cleanupKey = 'sw_cleanup_20260106';
-          if (!localStorage.getItem(cleanupKey)) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-              for (var registration of registrations) { registration.unregister(); }
-            });
-            if ('caches' in window) {
-              caches.keys().then(function(names) {
-                for (var name of names) { caches.delete(name); }
-              });
-            }
-            localStorage.setItem(cleanupKey, '1');
-            setTimeout(function() { window.location.reload(true); }, 100);
-          }
-        } catch (e) {}
-      }
+      // =====================================================================
+      // GLOBAL SERVICE WORKER + CACHE CLEANUP (all environments, all users)
+      // =====================================================================
+      // Root cause: previous SW versions cached static assets with a stale
+      // VERSION key (BUILD_ID_PLACEHOLDER was not always injected correctly),
+      // causing users to see distorted/stale layouts after deploys.
+      //
+      // Fix: unregister ALL service workers and clear ALL caches on every page
+      // load.  The active SW at /sw.js is now a no-op cleanup worker that
+      // intercepts nothing.  This script handles any user whose browser still
+      // has an old SW installed before the cleanup SW was deployed.
+      //
+      // This cleanup code runs every page load (async, non-blocking).
+      // It is safe to remove after 2–3 deploy cycles once all users have
+      // received the cleanup SW.
+      // =====================================================================
+      (function swCleanup() {
+        function log() {
+          try { console.log.apply(console, arguments); } catch (_) {}
+        }
 
-      // Base.html loaded
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations()
+            .then(function (registrations) {
+              return Promise.all(
+                registrations.map(function (reg) {
+                  log('[SW cleanup] Unregistering SW:', reg.scope);
+                  return reg.unregister().catch(function (err) {
+                    log('[SW cleanup] Failed to unregister SW:', err);
+                  });
+                })
+              );
+            })
+            .catch(function (err) {
+              log('[SW cleanup] Error fetching SW registrations:', err);
+            });
+        }
+
+        if ('caches' in window) {
+          caches.keys()
+            .then(function (keys) {
+              return Promise.all(
+                keys.map(function (key) {
+                  log('[SW cleanup] Deleting cache:', key);
+                  return caches.delete(key).catch(function (err) {
+                    log('[SW cleanup] Failed to delete cache', key, err);
+                  });
+                })
+              );
+            })
+            .catch(function (err) {
+              log('[SW cleanup] Error listing caches:', err);
+            });
+        }
+      })();
+      // =====================================================================
+      // END SW CLEANUP
+      // =====================================================================
+
     })();
   </script>
 
@@ -1984,106 +2022,29 @@
 {# ===== PWA Install Banner (2025-12-25) ===== #}
 <script src="{% static 'js/pwa-install.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 
-{# ===== PWA Service Worker Registration ===== #}
+{# ===== PWA Service Worker: REGISTRATION DISABLED (stability hotfix) ===== #}
+{#                                                                           #}
+{# ROOT CAUSE: The old caching SW caused hard-refresh rendering bugs         #}
+{# by mixing stale cached static assets (from a SW with a wrong VERSION      #}
+{# due to BUILD_ID_PLACEHOLDER not being injected on the static/sw.js path)  #}
+{# with fresh HTML responses after deploys.                                  #}
+{#                                                                           #}
+{# FIX: SW registration is permanently disabled here.  The /sw.js endpoint   #}
+{# now serves a cleanup-only no-op SW that clears all old caches and         #}
+{# intercepts no fetch requests.  The inline cleanup script above (in <head>) #}
+{# handles users who still have the old SW installed.                        #}
+{#                                                                           #}
+{# Re-enable SW registration here only after a careful audit of caching      #}
+{# strategy and after confirming stable deploys without hard-refresh issues. #}
 <script>
 (function() {
-  // Only register service worker if supported and not in Django admin
-  if (!('serviceWorker' in navigator)) return;
-  if (window.location.pathname.startsWith('/admin/')) return;
-
-  // CRITICAL: Disable service worker on local dev to prevent cache poisoning
-  // Service workers can cache bad responses (302 redirects, 500 errors) during development,
-  // causing "blank page" or "warped dashboard" issues that persist even after fixes.
-  var hostname = window.location.hostname;
-  // CRITICAL: Disable service worker on localhost AND in Cypress tests
-  // This prevents stale cache issues and flaky tests
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || window.Cypress) {
-    console.log('[DEV/E2E] Service worker disabled on localhost/Cypress to prevent cache issues');
-    
-    // If running in Cypress, also aggressively clear all caches on every load
-    if (window.Cypress && 'caches' in window) {
-      caches.keys().then(function(names) {
-        return Promise.all(
-          names.map(function(name) {
-            console.log('[E2E] Deleting cache:', name);
-            return caches.delete(name);
-          })
-        );
-      }).then(function() {
-        console.log('[E2E] All caches cleared for Cypress test');
-      }).catch(function(err) {
-        console.warn('[E2E] Cache cleanup failed:', err);
-      });
-    }
-    
-    return;
+  // Service worker registration is intentionally disabled.
+  // The global cleanup script in <head> already handles SW removal.
+  // Version marker: EMAJINET_SW_DISABLED_20260427
+  if (false) {
+    // Dead code — never runs. Kept as a reminder of the disabled registration.
+    navigator && navigator.serviceWorker;
   }
-
-  window.addEventListener('load', function() {
-    // Reload-once guard to prevent infinite reload loops
-    const SW_RELOAD_KEY = 'cc_sw_reloaded';
-    function reloadOnce() {
-      if (sessionStorage.getItem(SW_RELOAD_KEY) === '1') {
-        console.log('SW update: already reloaded this session, skipping');
-        return;
-      }
-      sessionStorage.setItem(SW_RELOAD_KEY, '1');
-      window.location.reload();
-    }
-
-    navigator.serviceWorker.register('/sw.js', { scope: '/' })
-      .then(function(registration) {
-        console.log('ServiceWorker registered: ', registration.scope);
-
-        // Force check for updates on every load (critical for deploys)
-        registration.update();
-
-        // Auto-activate waiting service worker and reload (once per session)
-        function activateWaitingSW() {
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-            // Reload once to get new SW (session-guarded)
-            reloadOnce();
-          }
-        }
-
-        // If SW is already waiting, activate it immediately
-        if (registration.waiting) {
-          activateWaitingSW();
-        }
-
-        // Watch for new SW installing
-        registration.addEventListener('updatefound', function() {
-          const newWorker = registration.installing;
-          if (!newWorker) return;
-
-          newWorker.addEventListener('statechange', function() {
-            if (newWorker.state === 'installed') {
-              if (navigator.serviceWorker.controller) {
-                // New SW available, activate it immediately
-                console.log('New content available; activating now.');
-                activateWaitingSW();
-              } else {
-                // First SW install
-                console.log('Content cached for offline use.');
-              }
-            }
-          });
-        });
-
-        // Listen for SW taking control (after skipWaiting)
-        navigator.serviceWorker.addEventListener('controllerchange', function() {
-          // New SW has taken control
-          console.log('New service worker activated');
-        });
-      })
-      .catch(function(error) {
-        // Fail silently in production, log in dev
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          console.warn('ServiceWorker registration failed: ', error);
-        }
-      });
-  });
 })();
 </script>
 {# ===== bfcache guard: force reload if page restored from back/forward cache while logged out ===== #}

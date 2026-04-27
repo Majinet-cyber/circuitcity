@@ -680,35 +680,44 @@ class TestPWACachingNoHardRefresh(TestCase):
         assert "SKIP_WAITING" in content, "Service worker must handle SKIP_WAITING message"
         assert "skipWaiting" in content, "Service worker must call skipWaiting()"
 
-    def test_sw_has_stale_while_revalidate_strategy(self):
+    def test_sw_is_cleanup_only_no_caching(self):
         """
-        SW must use stale-while-revalidate for non-hashed assets to prevent hard refresh.
+        SW must be a no-op cleanup worker — no caching strategies at all.
+
+        The previous caching SW caused hard-refresh rendering bugs.  The new SW
+        clears all caches and intercepts no fetch requests.  Stale-while-revalidate
+        and cache-first strategies are intentionally absent.
         """
         client = Client()
         response = client.get("/sw.js")
-        
+
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        
-        # Check for SWR implementation
-        assert "swr" in content.lower() or "stale" in content.lower(), \
-            "Service worker should implement stale-while-revalidate"
 
-    def test_base_template_has_auto_update_sw_registration(self):
+        # Must have cleanup behaviour
+        assert "caches.keys()" in content, "SW must clear all caches on activate"
+        assert "caches.delete" in content, "SW must delete old caches"
+        # Must NOT cache anything (no cache.put, no cache.add, no cache.addAll)
+        assert "cache.put" not in content, "Cleanup SW must NOT cache responses"
+        assert "cache.addAll" not in content, "Cleanup SW must NOT precache assets"
+
+    def test_base_template_has_sw_cleanup_not_registration(self):
         """
-        Base template must include SW registration with auto-update logic.
+        CRITICAL: Base template must have SW cleanup, NOT SW registration.
+
+        SW registration is intentionally disabled (stability hotfix — hard-refresh bug).
+        The cleanup code runs on every page load and unregisters any lingering SWs.
         """
-        # Create test user and business for authenticated page
         from django.contrib.auth import get_user_model
         from tenants.models import Business, Membership
         from circuitcity.accounts.models import Profile
         from inventory.business_kinds import BusinessKind
-        
+
         User = get_user_model()
         client = Client()
         user = User.objects.create_user(username="testuser", password="testpass123")
         Profile.objects.get_or_create(user=user, defaults={"display_name": "Test User"})
-        
+
         business = Business.objects.create(
             name="Test Business",
             kind=BusinessKind.PHONES,
@@ -721,56 +730,51 @@ class TestPWACachingNoHardRefresh(TestCase):
             role="MANAGER",
             status="ACTIVE"
         )
-        
+
         client.login(username="testuser", password="testpass123")
         session = client.session
         session['active_business_id'] = business.id
         session.save()
-        
+
         response = client.get("/dashboard/")
         assert response.status_code == 200
-        
+
         content = response.content.decode("utf-8")
-        
-        # Check for SW registration
-        assert "navigator.serviceWorker.register" in content, \
-            "Page must register service worker"
-        
-        # Check for auto-update logic
-        assert "registration.update()" in content, \
-            "SW registration must call update() to check for new SW"
-        
-        # Check for SKIP_WAITING message sending
-        assert "postMessage" in content and "SKIP_WAITING" in content, \
-            "SW registration must send SKIP_WAITING message to activate new SW"
-        
-        # Check for reload on update
-        assert "reload()" in content, \
-            "SW registration must reload page when new SW is available"        # POLISH: Check for reload-once guard (prevent loops)
-        assert "cc_sw_reloaded" in content, \
-            "Must have reload guard sessionStorage key to prevent loops"
-        assert "reloadOnce" in content, \
-            "Must have reloadOnce() function to prevent reload loops"
-        assert "sessionStorage.getItem" in content, \
-            "Must check sessionStorage before reloading"
+
+        # Cleanup must be present
+        assert "getRegistrations" in content, \
+            "Must have SW cleanup: getRegistrations()"
+        assert "unregister" in content, \
+            "Must have SW cleanup: unregister()"
+        # Registration must be absent
+        register_count = content.count("navigator.serviceWorker.register(")
+        assert register_count == 0, (
+            f"SW registration must be disabled (stability hotfix). "
+            f"Found {register_count} registration call(s)."
+        )
+        # Must NOT register /static/sw.js (was broken — bypassed BUILD_ID injection)
+        assert "static/sw.js" not in content, \
+            "Must NOT reference /static/sw.js (was bypassing BUILD_ID injection)"
 
     def test_base_template_has_single_sw_registration(self):
         """
-        CRITICAL: Must register service worker exactly once, no duplicates.
-        Must use /sw.js (dynamic endpoint), not static/sw.js.
+        LEGACY: Kept for reference. SW registration count must be zero.
+
+        This test previously checked for exactly 1 registration.  After the
+        stability hotfix, it verifies that zero registrations exist.
         """
         from django.contrib.auth import get_user_model
         from tenants.models import Business, Membership
         from circuitcity.accounts.models import Profile
         from inventory.business_kinds import BusinessKind
-        
+
         User = get_user_model()
         client = Client()
-        user = User.objects.create_user(username="testuser", password="testpass123")
+        user = User.objects.create_user(username="testuser2sw", password="testpass123")
         Profile.objects.get_or_create(user=user, defaults={"display_name": "Test User"})
-        
+
         business = Business.objects.create(
-            name="Test Business",
+            name="Test Business SW",
             kind=BusinessKind.PHONES,
             owner=user,
             status="ACTIVE"
@@ -781,29 +785,23 @@ class TestPWACachingNoHardRefresh(TestCase):
             role="MANAGER",
             status="ACTIVE"
         )
-        
-        client.login(username="testuser", password="testpass123")
+
+        client.login(username="testuser2sw", password="testpass123")
         session = client.session
         session['active_business_id'] = business.id
         session.save()
-        
+
         response = client.get("/dashboard/")
         assert response.status_code == 200
-        
+
         content = response.content.decode("utf-8")
-        
-        # Count serviceWorker.register calls (should be exactly 1)
-        register_count = content.count("navigator.serviceWorker.register")
-        assert register_count == 1, \
-            f"Must have exactly 1 SW registration, found {register_count}"
-        
-        # Must register /sw.js (dynamic endpoint)
-        assert "register('/sw.js'" in content or 'register("/sw.js"' in content, \
-            "Must register /sw.js (dynamic endpoint)"
-        
-        # Must NOT register static/sw.js
+
+        register_count = content.count("navigator.serviceWorker.register(")
+        assert register_count == 0, \
+            f"SW registration must be disabled (stability hotfix). Found {register_count}."
+
         assert "static/sw.js" not in content, \
-            "Must NOT register static/sw.js (use dynamic /sw.js instead)"
+            "Must NOT register static/sw.js"
 
     def test_sw_headers_complete(self):
         """

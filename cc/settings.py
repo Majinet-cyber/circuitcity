@@ -774,15 +774,21 @@ WHITENOISE_MANIFEST_STRICT = False
 
 def _whitenoise_video_headers(headers, path, url):
     """
-    Add immutable cache headers for video files so the browser caches them
-    aggressively and never re-fetches after the first successful load.
+    Set correct headers for specific static file types that WhiteNoise / the
+    OS MIME database may not handle correctly on all platforms.
 
-    WhiteNoise already sets Accept-Ranges: bytes and handles 206 partial-content
-    responses for range requests.  This function only tweaks Cache-Control.
+    - Video files: add immutable cache headers for aggressive browser caching.
+    - .webmanifest: force application/manifest+json Content-Type so browsers
+      accept the PWA manifest correctly.  On Windows the OS MIME registry may
+      return application/octet-stream for this extension.
     """
     if path and path.lower().endswith((".mp4", ".webm", ".ogg", ".mov")):
         # max-age=31536000 (1 year) + immutable = browser never revalidates
         headers["Cache-Control"] = "public, max-age=31536000, immutable"
+
+    if path and path.lower().endswith(".webmanifest"):
+        # Force correct Content-Type regardless of OS MIME registry
+        headers["Content-Type"] = "application/manifest+json; charset=utf-8"
 
 
 WHITENOISE_ADD_HEADERS_FUNCTION = _whitenoise_video_headers
