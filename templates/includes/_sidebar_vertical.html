@@ -256,20 +256,38 @@
 
   {# ================= RENEWABLE ENERGY ================= #}
   {% if business_kind == "energy" %}
-  {% url 'verticals:energy_dashboard'  as url_energy_dash %}
-  {% url 'verticals:energy_sites'      as url_energy_sites %}
-  {% url 'verticals:energy_assets'     as url_energy_assets %}
-  {% url 'verticals:energy_monitoring' as url_energy_monitoring %}
-  {% url 'verticals:energy_maintenance' as url_energy_maintenance %}
-  {% url 'verticals:energy_reports'    as url_energy_reports %}
+  {% url 'verticals:energy_dashboard'    as url_energy_dash %}
+  {% url 'verticals:energy_sites'        as url_energy_sites %}
+  {% url 'verticals:energy_assets'       as url_energy_assets %}
+  {% url 'verticals:energy_monitoring'   as url_energy_monitoring %}
+  {% url 'verticals:energy_maintenance'  as url_energy_maintenance %}
+  {% url 'verticals:energy_forecasting'  as url_energy_forecasting %}
+  {% url 'verticals:energy_load_management' as url_energy_load %}
+  {% url 'verticals:energy_sizing_list'  as url_energy_sizing %}
+  {% url 'verticals:energy_economics'    as url_energy_economics %}
+  {% url 'verticals:energy_alerts'       as url_energy_alerts %}
+  {% url 'verticals:energy_simulations'  as url_energy_simulations %}
+  {% url 'verticals:energy_reports'      as url_energy_reports %}
   <div class="menu-group">RENEWABLE ENERGY</div>
   <ul class="navlist">
-    <li><a class="navlink" href="{{ url_energy_dash|default:'/verticals/energy/dashboard/' }}" data-cy="nav-dashboard"><i class="bi bi-lightning-charge"></i> Dashboard</a></li>
-    <li><a class="navlink" href="{{ url_energy_sites|default:'/verticals/energy/sites/' }}" data-cy="nav-energy-sites"><i class="bi bi-geo-alt"></i> Sites</a></li>
-    <li><a class="navlink" href="{{ url_energy_assets|default:'/verticals/energy/assets/' }}" data-cy="nav-energy-assets"><i class="bi bi-battery-charging"></i> Assets</a></li>
-    <li><a class="navlink" href="{{ url_energy_monitoring|default:'/verticals/energy/monitoring/' }}" data-cy="nav-energy-monitoring"><i class="bi bi-graph-up"></i> Monitoring</a></li>
-    <li><a class="navlink" href="{{ url_energy_maintenance|default:'/verticals/energy/maintenance/' }}" data-cy="nav-energy-maintenance"><i class="bi bi-wrench-adjustable"></i> Maintenance</a></li>
-    <li><a class="navlink" href="{{ url_energy_reports|default:'/verticals/energy/reports/' }}" data-cy="nav-energy-reports"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
+    <li><a class="navlink{% if request.path == url_energy_dash %} active{% endif %}" href="{{ url_energy_dash|default:'/verticals/energy/dashboard/' }}" data-cy="nav-dashboard"><i class="bi bi-lightning-charge"></i> Overview</a></li>
+    <li><a class="navlink{% if request.path == url_energy_sites %} active{% endif %}" href="{{ url_energy_sites|default:'/verticals/energy/sites/' }}" data-cy="nav-energy-sites"><i class="bi bi-geo-alt"></i> Sites</a></li>
+    <li><a class="navlink{% if request.path == url_energy_assets %} active{% endif %}" href="{{ url_energy_assets|default:'/verticals/energy/assets/' }}" data-cy="nav-energy-assets"><i class="bi bi-battery-charging"></i> Assets</a></li>
+    <li><a class="navlink{% if request.path == url_energy_monitoring %} active{% endif %}" href="{{ url_energy_monitoring|default:'/verticals/energy/monitoring/' }}" data-cy="nav-energy-monitoring"><i class="bi bi-graph-up"></i> Monitoring</a></li>
+    <li><a class="navlink{% if request.path == url_energy_maintenance %} active{% endif %}" href="{{ url_energy_maintenance|default:'/verticals/energy/maintenance/' }}" data-cy="nav-energy-maintenance"><i class="bi bi-wrench-adjustable"></i> Predictive Maintenance</a></li>
+  </ul>
+  <div class="menu-group">INTELLIGENCE</div>
+  <ul class="navlist">
+    <li><a class="navlink{% if request.path == url_energy_forecasting %} active{% endif %}" href="{{ url_energy_forecasting|default:'/verticals/energy/forecasting/' }}" data-cy="nav-energy-forecasting"><i class="bi bi-graph-up-arrow"></i> Demand Forecasting</a></li>
+    <li><a class="navlink{% if request.path == url_energy_load %} active{% endif %}" href="{{ url_energy_load|default:'/verticals/energy/load-management/' }}" data-cy="nav-energy-load"><i class="bi bi-sliders"></i> Load Management</a></li>
+    <li><a class="navlink{% if request.path == url_energy_sizing %} active{% endif %}" href="{{ url_energy_sizing|default:'/verticals/energy/sizing/' }}" data-cy="nav-energy-sizing"><i class="bi bi-calculator"></i> System Sizing</a></li>
+    <li><a class="navlink{% if request.path == url_energy_simulations %} active{% endif %}" href="{{ url_energy_simulations|default:'/verticals/energy/simulations/' }}" data-cy="nav-energy-simulations" style="{% if request.path == url_energy_simulations %}color:#10b981;{% else %}color:#10b981;{% endif %}"><i class="bi bi-play-circle"></i> Simulations <span style="font-size:.65rem;background:linear-gradient(135deg,#10b981,#3b82f6);color:#fff;border-radius:10px;padding:.1rem .4rem;margin-left:.3rem;">LIVE</span></a></li>
+    <li><a class="navlink{% if request.path == url_energy_economics %} active{% endif %}" href="{{ url_energy_economics|default:'/verticals/energy/economics/' }}" data-cy="nav-energy-economics"><i class="bi bi-cash-coin"></i> Costs &amp; Savings</a></li>
+    <li><a class="navlink{% if request.path == url_energy_alerts %} active{% endif %}" href="{{ url_energy_alerts|default:'/verticals/energy/alerts/' }}" data-cy="nav-energy-alerts"><i class="bi bi-bell"></i> Alerts &amp; Incidents</a></li>
+  </ul>
+  <div class="menu-group">REPORTS</div>
+  <ul class="navlist">
+    <li><a class="navlink{% if request.path == url_energy_reports %} active{% endif %}" href="{{ url_energy_reports|default:'/verticals/energy/reports/' }}" data-cy="nav-energy-reports"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
   </ul>
   <div class="menu-group">SUBSCRIPTION</div>
   <ul class="navlist">

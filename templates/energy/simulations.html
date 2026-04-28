@@ -1,0 +1,2300 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Simulation Center – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+/* ============================================================
+   SIMULATION CENTER — Emajinet Energy Intelligence Platform
+   Grant-winning · Client-closing · Engineering Intelligence
+   ============================================================ */
+:root {
+  --energy-green: #10b981;
+  --energy-blue: #3b82f6;
+  --energy-amber: #f59e0b;
+  --energy-purple: #8b5cf6;
+  --energy-red: #ef4444;
+  --energy-dark: #0f172a;
+  --energy-teal: #06b6d4;
+}
+
+/* ---- HERO ---- */
+.sim-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #064e3b 100%);
+  color: #fff;
+  padding: 2.5rem 1.5rem 2rem;
+  border-radius: 20px;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+.sim-hero::before {
+  content: '';
+  position: absolute;
+  top: -40px; right: -40px;
+  width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.sim-hero::after {
+  content: '';
+  position: absolute;
+  bottom: -60px; left: 30%;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.sim-hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: .4rem; position: relative; z-index: 1; }
+.sim-hero .hero-sub { opacity: .8; font-size: .95rem; margin-bottom: 1.5rem; position: relative; z-index: 1; max-width: 600px; }
+
+/* ---- KPI CARDS in Hero ---- */
+.hero-kpi { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px; padding: 1rem 1.2rem; backdrop-filter: blur(10px); position: relative; z-index: 1; }
+.hero-kpi .kv { font-size: 1.7rem; font-weight: 800; color: #fff; }
+.hero-kpi .kl { font-size: .72rem; color: rgba(255,255,255,.65); text-transform: uppercase; letter-spacing: .04em; }
+.hero-kpi .ki { font-size: 1.3rem; margin-bottom: .3rem; }
+.hero-kpi.green .kv { color: #34d399; }
+.hero-kpi.blue .kv { color: #93c5fd; }
+.hero-kpi.amber .kv { color: #fde68a; }
+.hero-kpi.purple .kv { color: #c4b5fd; }
+
+/* ---- SIMULATION GALLERY CARDS ---- */
+.sim-gallery-card {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.2rem;
+  cursor: pointer;
+  transition: all .2s;
+  position: relative;
+  overflow: hidden;
+}
+.sim-gallery-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+}
+.sim-gallery-card.gc-green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+.sim-gallery-card.gc-blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+.sim-gallery-card.gc-amber::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.sim-gallery-card.gc-purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.sim-gallery-card.gc-red::before { background: linear-gradient(90deg, #ef4444, #f87171); }
+.sim-gallery-card.gc-teal::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+.sim-gallery-card:hover { border-color: var(--energy-green); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(16,185,129,.12); }
+.sim-gallery-card .gc-icon { font-size: 1.8rem; margin-bottom: .5rem; display: block; }
+.sim-gallery-card .gc-title { font-size: .88rem; font-weight: 700; color: #0f172a; margin-bottom: .3rem; }
+.sim-gallery-card .gc-desc { font-size: .73rem; color: #6b7280; line-height: 1.4; }
+.sim-gallery-card .gc-badge { position: absolute; top: .7rem; right: .7rem; font-size: .62rem; font-weight: 700;
+  padding: .15rem .45rem; border-radius: 20px; }
+.badge-live { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-pro { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd; }
+.badge-new { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+
+/* ---- TAB BAR ---- */
+.sim-tab-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: 1.5rem;
+}
+.sim-tab {
+  padding: .5rem 1rem;
+  border-radius: 30px;
+  border: 2px solid #e2e8f0;
+  background: #fff;
+  font-size: .78rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+}
+.sim-tab:hover { border-color: var(--energy-green); color: var(--energy-green); }
+.sim-tab.active { background: var(--energy-green); border-color: var(--energy-green); color: #fff; }
+
+.sim-panel { display: none; }
+.sim-panel.active { display: block; }
+
+.sim-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.sim-card h5 {
+  font-size: .9rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1rem;
+  padding-bottom: .5rem;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+/* ---- INPUT CONTROLS ---- */
+.sim-input-group { margin-bottom: 1rem; }
+.sim-input-group label { font-size: .78rem; font-weight: 600; color: #475569; margin-bottom: .3rem; display: block; }
+.sim-input-group input[type="range"] { width: 100%; accent-color: var(--energy-green); }
+.sim-input-group .range-val { font-size: .8rem; font-weight: 700; color: var(--energy-green); }
+.sim-input-group select, .sim-input-group input[type="number"] {
+  width: 100%; border-radius: 10px; border: 1.5px solid #e2e8f0;
+  font-size: .85rem; padding: .4rem .7rem;
+}
+.sim-input-group select:focus { border-color: var(--energy-green); outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,.12); }
+
+/* ---- SYSTEM TYPE SELECTOR ---- */
+.sys-type-btn {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: .6rem .8rem;
+  font-size: .75rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  background: #fff;
+  transition: all .15s;
+  text-align: center;
+  flex: 1;
+}
+.sys-type-btn:hover { border-color: var(--energy-green); }
+.sys-type-btn.active { background: var(--energy-green); border-color: var(--energy-green); color: #fff; }
+.sys-type-btn .stb-icon { font-size: 1.1rem; display: block; margin-bottom: .2rem; }
+
+/* ---- RESULT CARDS ---- */
+.result-card {
+  background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+  border: 1.5px solid #bbf7d0;
+  border-radius: 14px;
+  padding: 1.1rem;
+  text-align: center;
+  margin-bottom: .8rem;
+}
+.result-card .rv { font-size: 1.6rem; font-weight: 800; color: var(--energy-green); }
+.result-card .rl { font-size: .73rem; color: #065f46; }
+.result-card.amber { background: linear-gradient(135deg,#fffbeb,#fef3c7); border-color:#fde68a; }
+.result-card.amber .rv { color: #d97706; }
+.result-card.amber .rl { color: #92400e; }
+.result-card.blue { background: linear-gradient(135deg,#eff6ff,#dbeafe); border-color:#bfdbfe; }
+.result-card.blue .rv { color: #1d4ed8; }
+.result-card.blue .rl { color: #1e40af; }
+.result-card.purple { background: linear-gradient(135deg,#f5f3ff,#ede9fe); border-color:#c4b5fd; }
+.result-card.purple .rv { color: #7c3aed; }
+.result-card.purple .rl { color: #5b21b6; }
+.result-card.red { background: linear-gradient(135deg,#fef2f2,#fee2e2); border-color:#fca5a5; }
+.result-card.red .rv { color: #dc2626; }
+.result-card.red .rl { color: #991b1b; }
+
+/* ---- ANIMATION BOX ---- */
+.anim-box {
+  background: #0f172a;
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  min-height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.anim-box svg { width: 100%; height: 100%; }
+
+/* ---- FLOW ANIMATIONS ---- */
+@keyframes flow-pulse { 0%{stroke-dashoffset:40} 100%{stroke-dashoffset:0} }
+@keyframes flow-pulse-fast { 0%{stroke-dashoffset:20} 100%{stroke-dashoffset:0} }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+@keyframes glow { 0%,100%{filter:drop-shadow(0 0 4px #10b981)} 50%{filter:drop-shadow(0 0 12px #10b981)} }
+@keyframes sun-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+@keyframes flow-lr { 0%{stroke-dashoffset:30} 100%{stroke-dashoffset:0} }
+@keyframes water-flow { 0%{stroke-dashoffset:40} 100%{stroke-dashoffset:0} }
+@keyframes blade-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+@keyframes droplet-fall { 0%{transform:translateY(0);opacity:1} 100%{transform:translateY(18px);opacity:0} }
+@keyframes pulse-ring { 0%{transform:scale(1);opacity:.7} 100%{transform:scale(1.6);opacity:0} }
+@keyframes tank-fill { 0%{height:0} 100%{height:var(--fill-h,40px)} }
+@keyframes roi-grow { 0%{transform:scaleY(0)} 100%{transform:scaleY(1)} }
+
+.flow-line { stroke-dasharray: 8 4; animation: flow-pulse 1.5s linear infinite; }
+.flow-line-fast { stroke-dasharray: 6 3; animation: flow-pulse-fast .8s linear infinite; }
+.flow-line-slow { stroke-dasharray: 8 4; animation: flow-pulse 3s linear infinite; }
+.flow-line-water { stroke-dasharray: 10 5; animation: water-flow 1.2s linear infinite; }
+.spin-blades { transform-origin: 50% 50%; animation: blade-spin 2s linear infinite; }
+.pulse-glow { animation: glow 2s ease-in-out infinite; }
+
+/* ---- SCENARIO COMPARISON ---- */
+.scenario-bar { height: 22px; border-radius: 6px; background: var(--energy-green); transition: width .5s; }
+.scenario-row { display: flex; align-items: center; gap: .8rem; margin-bottom: .6rem; }
+.scenario-label { font-size: .78rem; font-weight: 600; color: #374151; min-width: 110px; }
+.scenario-pct { font-size: .78rem; color: #374151; min-width: 50px; text-align: right; }
+
+/* ---- CLIENT VIDEO MODAL ---- */
+.video-modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(15,23,42,.75);
+  z-index: 1050;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.video-modal-backdrop.open { display: flex; }
+.video-modal {
+  background: #fff;
+  border-radius: 20px;
+  width: min(700px, 95vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 2rem;
+  position: relative;
+}
+.video-modal-close {
+  position: absolute; top: 1rem; right: 1rem;
+  background: #f1f5f9; border: none; border-radius: 50%;
+  width: 36px; height: 36px; cursor: pointer; font-size: 1.1rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.storyboard-frame {
+  background: linear-gradient(135deg,#0f172a,#1e3a5f);
+  border-radius: 14px;
+  padding: 1.2rem;
+  color: #fff;
+  margin-bottom: .8rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.storyboard-frame .sf-num {
+  background: rgba(16,185,129,.2); border: 2px solid #10b981;
+  color: #34d399; font-weight: 800; border-radius: 50%;
+  width: 36px; height: 36px; min-width: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .85rem;
+}
+.storyboard-frame .sf-title { font-size: .88rem; font-weight: 700; margin-bottom: .2rem; }
+.storyboard-frame .sf-desc { font-size: .75rem; color: rgba(255,255,255,.65); }
+
+/* ---- ROI CHART ---- */
+.roi-bar-wrap { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.roi-bar { width: 100%; border-radius: 4px 4px 0 0; transform-origin: bottom;
+  animation: roi-grow .6s ease-out; transition: height .4s; }
+
+/* ---- DOWNLOAD BUTTONS ---- */
+.dl-btn { border-radius: 10px; font-size: .82rem; font-weight: 600; padding: .55rem 1.1rem; }
+.coming-soon-badge {
+  background: #fef3c7; color: #92400e; font-size: .68rem; font-weight: 700;
+  padding: .15rem .5rem; border-radius: 20px; border: 1px solid #fde68a;
+  vertical-align: middle; margin-left: .4rem;
+}
+.video-btn-premium {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: .7rem 1.3rem;
+  font-weight: 700;
+  font-size: .85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  transition: all .2s;
+}
+.video-btn-premium:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(124,58,237,.3); }
+
+/* ---- PIPELINE STATUS ---- */
+.pipeline-status {
+  background: linear-gradient(135deg,#ede9fe,#f5f3ff);
+  border: 1.5px solid #c4b5fd;
+  border-radius: 12px;
+  padding: 1rem;
+  font-size: .82rem;
+  color: #5b21b6;
+}
+
+/* ---- DISCLAIMER ---- */
+.disclaimer {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: .7rem 1rem;
+  font-size: .75rem;
+  color: #475569;
+  margin-top: 1.5rem;
+}
+
+/* ---- ADAPTIVE DIAGRAM HINT ---- */
+.arch-badge {
+  display: inline-block;
+  background: #ecfdf5;
+  border: 1px solid #6ee7b7;
+  color: #065f46;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .15rem .5rem;
+  border-radius: 20px;
+  margin-bottom: .5rem;
+}
+</style>
+
+{# ============================================================ #}
+{#   CLIENT VIDEO MODAL                                        #}
+{# ============================================================ #}
+<div class="video-modal-backdrop" id="videoModalBackdrop">
+  <div class="video-modal" id="videoModal">
+    <button class="video-modal-close" onclick="closeVideoModal()">✕</button>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);border-radius:10px;padding:.6rem;color:#fff;font-size:1.2rem;">🎬</div>
+      <div>
+        <h5 class="fw-bold mb-0" id="video_modal_title">Generate Client Video</h5>
+        <div class="text-muted small" id="video_modal_sub">Professional proposal animation for client presentation</div>
+      </div>
+    </div>
+
+    <div class="pipeline-status mb-3">
+      <i class="bi bi-camera-video me-2"></i>
+      <strong>MP4 Video Rendering Pipeline:</strong> Being prepared. Download the simulation storyboard meanwhile —
+      it presents your proposal professionally in any meeting or grant application.
+    </div>
+
+    <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:.8rem;">
+      <i class="bi bi-film me-1"></i>Proposal Storyboard — <span id="video_scenario_label">2 Acre Tomato Irrigation</span>
+    </div>
+    <div id="storyboard_frames"></div>
+
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button class="btn btn-success fw-bold" onclick="downloadStoryboard()">
+        <i class="bi bi-file-earmark-slides me-1"></i>Download Storyboard
+      </button>
+      <button class="btn btn-outline-primary fw-bold" onclick="downloadClientProposalPDF()">
+        <i class="bi bi-file-earmark-pdf me-1"></i>Client Proposal
+      </button>
+      <button class="btn btn-outline-secondary" disabled>
+        <i class="bi bi-camera-video me-1"></i>MP4 Export
+        <span class="coming-soon-badge">Pipeline Preparing</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="container-fluid py-4">
+
+  {# ===== HERO ===== #}
+  <div class="sim-hero">
+    <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+      <div style="position:relative;z-index:1;">
+        <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem;">
+          <i class="bi bi-play-circle me-1"></i>Emajinet · Energy Intelligence Platform
+        </div>
+        <h1><i class="bi bi-play-circle-fill me-2" style="color:#10b981;"></i>Simulation Center</h1>
+        <p class="hero-sub">
+          Visualize how energy systems perform before installation. Show clients how power flows,
+          water moves, savings grow, and failures are prevented — before a single cable is laid.
+        </p>
+      </div>
+      <div style="position:relative;z-index:1;display:flex;gap:.5rem;flex-wrap:wrap;align-self:flex-start;">
+        <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-light btn-sm rounded-pill">
+          <i class="bi bi-calculator me-1"></i>System Sizing
+        </a>
+        <a href="{% url 'verticals:energy_economics' %}" class="btn btn-outline-light btn-sm rounded-pill">
+          <i class="bi bi-cash-coin me-1"></i>Savings
+        </a>
+      </div>
+    </div>
+
+    {# KPI Cards — seeded demo data #}
+    <div class="row g-3" style="position:relative;z-index:1;">
+      <div class="col-6 col-md-3">
+        <div class="hero-kpi green">
+          <div class="ki">⚡</div>
+          <div class="kv">10</div>
+          <div class="kl">Active Simulations</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="hero-kpi amber">
+          <div class="ki">💰</div>
+          <div class="kv">MWK 4.8M</div>
+          <div class="kl">Est. Monthly Savings</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="hero-kpi blue">
+          <div class="ki">🛡️</div>
+          <div class="kv">14 hrs</div>
+          <div class="kl">Downtime Prevented</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="hero-kpi purple">
+          <div class="ki">📈</div>
+          <div class="kv">+23%</div>
+          <div class="kl">Efficiency Gain</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== SIMULATION GALLERY (10 cards) ===== #}
+  <div class="mb-2 d-flex align-items-center justify-content-between">
+    <div>
+      <span style="font-size:.8rem;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.05em;">
+        <i class="bi bi-grid-3x3-gap me-2" style="color:#10b981;"></i>Choose a Simulation
+      </span>
+    </div>
+    <span style="font-size:.72rem;color:#94a3b8;">Click any card to open the simulation workspace</span>
+  </div>
+  <div class="row g-2 mb-4" id="sim-gallery">
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-green" onclick="showSim('household')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">🏠</span>
+        <div class="gc-title">Household Energy Flow</div>
+        <div class="gc-desc">Solar + battery + grid flow for home backup</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-blue" onclick="showSim('irrigation')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">🌾</span>
+        <div class="gc-title">Irrigation Water Flow</div>
+        <div class="gc-desc">Water source → pump → field with solar power</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-amber" onclick="showSim('solar')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">☀️</span>
+        <div class="gc-title">Solar Plant Performance</div>
+        <div class="gc-desc">Generation curve, capacity factor, load coverage</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-teal" onclick="showSim('wind')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">💨</span>
+        <div class="gc-title">Wind Turbine Generation</div>
+        <div class="gc-desc">Power curve, capacity factor, annual yield</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-purple" onclick="showSim('hybrid')">
+        <span class="gc-badge badge-pro">PRO</span>
+        <span class="gc-icon">⚡</span>
+        <div class="gc-title">Hybrid Solar + Wind + Generator</div>
+        <div class="gc-desc">Multi-source energy balance and coverage</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-red" onclick="showSim('blackout')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">🔋</span>
+        <div class="gc-title">Battery + Blackout Prediction</div>
+        <div class="gc-desc">Autonomy hours, SOC timeline, survival analysis</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-amber" onclick="showSim('diesel')">
+        <span class="gc-badge badge-live">LIVE</span>
+        <span class="gc-icon">⛽</span>
+        <div class="gc-title">Diesel Replacement ROI</div>
+        <div class="gc-desc">Month-by-month savings vs diesel spend</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-green" onclick="showSim('minigrid')">
+        <span class="gc-badge badge-new">NEW</span>
+        <span class="gc-icon">🏘️</span>
+        <div class="gc-title">Mini-grid Community</div>
+        <div class="gc-desc">Village-scale shared solar + distribution network</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-blue" onclick="showSim('coldroom')">
+        <span class="gc-badge badge-new">NEW</span>
+        <span class="gc-icon">🧊</span>
+        <div class="gc-title">Cold Room / Refrigeration</div>
+        <div class="gc-desc">Cooling load, solar sizing, savings vs diesel</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <div class="sim-gallery-card gc-teal" onclick="showSim('borehole')">
+        <span class="gc-badge badge-new">NEW</span>
+        <span class="gc-icon">💧</span>
+        <div class="gc-title">Borehole Water + Solar Pump</div>
+        <div class="gc-desc">Deep borehole pumping, submersible pump sizing</div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB BAR ===== #}
+  <div class="sim-tab-bar" id="simTabBar">
+    <button class="sim-tab active" onclick="showSim('household')"><i class="bi bi-house-door"></i> Household</button>
+    <button class="sim-tab" onclick="showSim('irrigation')"><i class="bi bi-droplet-half"></i> Irrigation</button>
+    <button class="sim-tab" onclick="showSim('solar')"><i class="bi bi-sun"></i> Solar Plant</button>
+    <button class="sim-tab" onclick="showSim('wind')"><i class="bi bi-wind"></i> Wind</button>
+    <button class="sim-tab" onclick="showSim('hybrid')"><i class="bi bi-lightning-charge"></i> Hybrid</button>
+    <button class="sim-tab" onclick="showSim('blackout')"><i class="bi bi-battery-half"></i> Blackout</button>
+    <button class="sim-tab" onclick="showSim('diesel')"><i class="bi bi-fuel-pump"></i> Diesel ROI</button>
+    <button class="sim-tab" onclick="showSim('minigrid')"><i class="bi bi-people"></i> Mini-grid</button>
+    <button class="sim-tab" onclick="showSim('coldroom')"><i class="bi bi-thermometer-snow"></i> Cold Room</button>
+    <button class="sim-tab" onclick="showSim('borehole')"><i class="bi bi-droplet"></i> Borehole</button>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 1: HOUSEHOLD ENERGY FLOW                              #}
+  {# ============================================================ #}
+  <div class="sim-panel active" id="sim-household">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-sliders me-2" style="color:var(--energy-green);"></i>Household Inputs</h5>
+          <div class="sim-input-group">
+            <label>Solar Array (kW): <span class="range-val" id="hh_solar_val">3.5</span></label>
+            <input type="range" id="hh_solar" min="1" max="15" step="0.5" value="3.5" oninput="updateHH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Battery Bank (kWh): <span class="range-val" id="hh_batt_val">5</span></label>
+            <input type="range" id="hh_batt" min="1" max="30" step="1" value="5" oninput="updateHH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Daily Load (kWh): <span class="range-val" id="hh_load_val">8</span></label>
+            <input type="range" id="hh_load" min="1" max="40" step="0.5" value="8" oninput="updateHH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Peak Sun Hours: <span class="range-val" id="hh_psh_val">5.5</span></label>
+            <input type="range" id="hh_psh" min="3" max="8" step="0.1" value="5.5" oninput="updateHH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Grid availability (%): <span class="range-val" id="hh_grid_val">40</span></label>
+            <input type="range" id="hh_grid" min="0" max="100" step="5" value="40" oninput="updateHH()">
+          </div>
+        </div>
+        <div class="sim-card">
+          <h5><i class="bi bi-download me-2"></i>Export &amp; Present</h5>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-success dl-btn" onclick="downloadHHReport()"><i class="bi bi-file-earmark-text me-1"></i>Download Proposal</button>
+            <button class="btn btn-outline-secondary dl-btn" onclick="downloadHHJson()"><i class="bi bi-braces me-1"></i>Export JSON</button>
+          </div>
+          <div class="mt-2">
+            <button class="video-btn-premium w-100" onclick="openVideoModal('household')">
+              <i class="bi bi-camera-video-fill"></i>Generate Client Video
+            </button>
+          </div>
+          <div class="mt-2 small text-muted">
+            Creates a professional animation explaining your system to clients, funders &amp; grant reviewers.
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-lightning-charge me-2" style="color:var(--energy-green);"></i>Electricity Flow — Live Animation</h5>
+          <div class="row g-2 mb-3" id="hh_results"></div>
+
+          {# Animated SVG: household electricity flow #}
+          <div class="anim-box mb-3" style="min-height:270px;" id="hh_anim_box">
+            <svg viewBox="0 0 640 270" xmlns="http://www.w3.org/2000/svg" id="hh_svg">
+              {# Dark background gradient #}
+              <defs>
+                <linearGradient id="skyGradHH" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#0f172a"/>
+                  <stop offset="100%" stop-color="#1e3a5f"/>
+                </linearGradient>
+              </defs>
+              <rect width="640" height="270" fill="url(#skyGradHH)"/>
+
+              {# Sun #}
+              <g transform="translate(55,55)">
+                <circle cx="0" cy="0" r="20" fill="#fbbf24" opacity=".9" class="pulse-glow"/>
+                <g style="transform-origin:0px 0px;animation:sun-spin 10s linear infinite;">
+                  <line x1="0" y1="-28" x2="0" y2="-34" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="20" y1="-20" x2="24" y2="-24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="28" y1="0" x2="34" y2="0" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="20" y1="20" x2="24" y2="24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="0" y1="28" x2="0" y2="34" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="-20" y1="20" x2="-24" y2="24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="-28" y1="0" x2="-34" y2="0" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="-20" y1="-20" x2="-24" y2="-24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                </g>
+                <text y="38" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">SUN</text>
+              </g>
+
+              {# Solar Panel #}
+              <g transform="translate(150,38)">
+                <rect x="-35" y="0" width="70" height="46" rx="4" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5"/>
+                <line x1="-35" y1="15" x2="35" y2="15" stroke="#3b82f6" stroke-width=".8"/>
+                <line x1="-35" y1="31" x2="35" y2="31" stroke="#3b82f6" stroke-width=".8"/>
+                <line x1="-12" y1="0" x2="-12" y2="46" stroke="#3b82f6" stroke-width=".8"/>
+                <line x1="12" y1="0" x2="12" y2="46" stroke="#3b82f6" stroke-width=".8"/>
+                <text y="62" x="0" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                <text y="74" x="0" text-anchor="middle" fill="#93c5fd" font-size="8" id="hh_solar_label">3.5 kW</text>
+              </g>
+
+              {# Sun → Panel flow #}
+              <line x1="76" y1="55" x2="115" y2="55" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
+
+              {# MPPT Controller #}
+              <g transform="translate(280,55)">
+                <rect x="-28" y="-18" width="56" height="36" rx="6" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
+                <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="bold">MPPT</text>
+                <text x="0" y="8" text-anchor="middle" fill="#34d399" font-size="7">Controller</text>
+              </g>
+
+              {# Panel → MPPT flow #}
+              <line x1="185" y1="61" x2="252" y2="61" stroke="#3b82f6" stroke-width="2" class="flow-line"/>
+
+              {# Battery #}
+              <g transform="translate(150,195)">
+                <rect x="-28" y="-40" width="56" height="70" rx="6" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+                <rect x="-9" y="-46" width="18" height="8" rx="2" fill="#10b981"/>
+                <rect x="-20" y="-33" width="40" height="54" rx="4" fill="#10b981" id="hh_batt_fill" style="opacity:.6;"/>
+                <text y="42" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">BATTERY</text>
+                <text y="53" text-anchor="middle" fill="#34d399" font-size="8" id="hh_batt_label">5 kWh</text>
+                <text y="64" text-anchor="middle" fill="#6ee7b7" font-size="8" id="hh_batt_soc">SOC 80%</text>
+              </g>
+
+              {# MPPT → Battery #}
+              <path d="M 280 73 Q 280 150 150 155" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="6 3" class="flow-line-slow"/>
+
+              {# Inverter #}
+              <g transform="translate(420,135)">
+                <rect x="-35" y="-28" width="70" height="56" rx="8" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+                <text x="0" y="-10" text-anchor="middle" fill="#10b981" font-size="9" font-weight="bold">INVERTER</text>
+                <text x="0" y="5" text-anchor="middle" fill="#34d399" font-size="8" id="hh_inv_label">4.2 kVA</text>
+                <text x="0" y="18" text-anchor="middle" fill="#6ee7b7" font-size="7">DC → AC</text>
+              </g>
+
+              {# MPPT → Inverter #}
+              <path d="M 308 55 Q 390 55 385 107" stroke="#f59e0b" stroke-width="2" fill="none" stroke-dasharray="6 3" class="flow-line"/>
+
+              {# Battery → Inverter #}
+              <path d="M 178 180 Q 300 180 385 148" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="6 3" class="flow-line-slow"/>
+
+              {# House Loads #}
+              <g transform="translate(565,135)">
+                <polygon points="0,-48 48,-10 48,40 -48,40 -48,-10" fill="#1e3a5f" stroke="#60a5fa" stroke-width="2"/>
+                <polygon points="-14,40 -14,14 14,14 14,40" fill="#0f172a" stroke="#60a5fa" stroke-width="1.5"/>
+                <rect x="-30" y="-8" width="16" height="14" fill="#1d4ed8" opacity=".7"/>
+                <rect x="14" y="-8" width="16" height="14" fill="#1d4ed8" opacity=".7"/>
+                <circle cx="-22" cy="0" r="3" fill="#fbbf24" style="animation:blink 2s infinite;"/>
+                <circle cx="22" cy="0" r="3" fill="#fbbf24" style="animation:blink 2.4s infinite;"/>
+                <text y="58" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">HOUSE</text>
+                <text y="69" text-anchor="middle" fill="#93c5fd" font-size="8" id="hh_load_label">8 kWh/day</text>
+              </g>
+
+              {# Inverter → House #}
+              <line x1="455" y1="135" x2="517" y2="135" stroke="#10b981" stroke-width="2.5" class="flow-line-fast"/>
+
+              {# Blackout Zone warning (conditional, shown via JS) #}
+              <g id="hh_blackout_zone" style="display:none;">
+                <rect x="500" y="170" width="120" height="24" rx="6" fill="#7f1d1d" opacity=".8"/>
+                <text x="560" y="186" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold" style="animation:blink 1s infinite;">⚠ BLACKOUT RISK 22:30</text>
+              </g>
+
+              {# Grid backup #}
+              <g transform="translate(565,220)">
+                <rect x="-25" y="-18" width="50" height="36" rx="6" fill="#374151" stroke="#9ca3af" stroke-width="1.5"/>
+                <line x1="0" y1="-18" x2="0" y2="-30" stroke="#9ca3af" stroke-width="2"/>
+                <line x1="-10" y1="-30" x2="10" y2="-30" stroke="#9ca3af" stroke-width="3"/>
+                <text y="26" text-anchor="middle" fill="#9ca3af" font-size="9">GRID</text>
+                <text x="0" y="8" text-anchor="middle" fill="#d1d5db" font-size="8" id="hh_grid_label">40%</text>
+              </g>
+              <line x1="565" y1="175" x2="565" y2="202" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 3" class="flow-line-slow"/>
+
+              {# Legend #}
+              <text x="10" y="264" fill="#475569" font-size="8">⚡ DC flow &nbsp; — &nbsp; 🔋 Battery buffer &nbsp; — &nbsp; 🏠 AC loads &nbsp; — &nbsp; 🔌 Grid backup</text>
+            </svg>
+          </div>
+
+          {# Daily load chart #}
+          <div class="sim-card" style="padding:1rem;margin-bottom:0;">
+            <h5 style="font-size:.8rem;"><i class="bi bi-bar-chart me-1"></i>Daily Energy Profile</h5>
+            <div id="hh_chart" style="display:flex;align-items:flex-end;gap:2px;height:80px;"></div>
+            <div style="display:flex;gap:1rem;margin-top:.5rem;font-size:.72rem;color:#6b7280;">
+              <span><span style="width:10px;height:10px;background:#10b981;border-radius:2px;display:inline-block;margin-right:3px;"></span>Solar</span>
+              <span><span style="width:10px;height:10px;background:#3b82f6;border-radius:2px;display:inline-block;margin-right:3px;"></span>Battery</span>
+              <span><span style="width:10px;height:10px;background:#9ca3af;border-radius:2px;display:inline-block;margin-right:3px;"></span>Grid</span>
+            </div>
+          </div>
+        </div>
+        <div class="sim-card">
+          <h5><i class="bi bi-card-text me-2"></i>Scenario Summary &amp; Recommendation</h5>
+          <div id="hh_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 2: IRRIGATION WATER FLOW (ADAPTIVE)                   #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-irrigation">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-sliders me-2" style="color:var(--energy-amber);"></i>Irrigation Inputs</h5>
+
+          {# Power source selector #}
+          <div class="sim-input-group">
+            <label>Power Source / System Type</label>
+            <div class="d-flex gap-2 flex-wrap" id="irr_sys_selector">
+              <div class="sys-type-btn active" data-sys="solar_dc" onclick="selectIrrSys('solar_dc')"><span class="stb-icon">☀️</span>Solar DC Pump</div>
+              <div class="sys-type-btn" data-sys="solar_ac" onclick="selectIrrSys('solar_ac')"><span class="stb-icon">⚡</span>Solar AC VFD</div>
+              <div class="sys-type-btn" data-sys="generator" onclick="selectIrrSys('generator')"><span class="stb-icon">⛽</span>Generator</div>
+              <div class="sys-type-btn" data-sys="hybrid" onclick="selectIrrSys('hybrid')"><span class="stb-icon">🔋</span>Hybrid</div>
+            </div>
+            <div class="arch-badge mt-2" id="irr_arch_badge">☀️ Solar DC: Panels → Controller → DC Pump → Water (no inverter)</div>
+          </div>
+
+          <div class="sim-input-group">
+            <label>Land Size (acres): <span class="range-val" id="irr_land_val">2</span></label>
+            <input type="range" id="irr_land" min="0.5" max="20" step="0.5" value="2" oninput="updateIRR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Total Head (m): <span class="range-val" id="irr_head_val">18</span></label>
+            <input type="range" id="irr_head" min="2" max="80" step="1" value="18" oninput="updateIRR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Distance: Source→Field (m): <span class="range-val" id="irr_dist_val">120</span></label>
+            <input type="range" id="irr_dist" min="10" max="500" step="10" value="120" oninput="updateIRR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Irrigation Hours/Day: <span class="range-val" id="irr_hrs_val">6</span></label>
+            <input type="range" id="irr_hrs" min="1" max="12" step="1" value="6" oninput="updateIRR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Crop Type</label>
+            <select id="irr_crop_sim" onchange="updateIRR()">
+              <option value="6">Tomatoes (6mm/day)</option>
+              <option value="5">Maize (5mm/day)</option>
+              <option value="5">Onions (5mm/day)</option>
+              <option value="5">Vegetables (5mm/day)</option>
+              <option value="10">Rice (10mm/day)</option>
+              <option value="8">Sugarcane (8mm/day)</option>
+            </select>
+          </div>
+          <div class="sim-input-group">
+            <label>Water Source</label>
+            <select id="irr_src_sim" onchange="updateIRR()">
+              <option value="river">River / Open water</option>
+              <option value="borehole">Borehole</option>
+              <option value="dam">Dam</option>
+              <option value="well">Well</option>
+            </select>
+          </div>
+          <div class="sim-input-group">
+            <label>Irrigation Method</label>
+            <select id="irr_method_sim" onchange="updateIRR()">
+              <option value="drip">Drip Irrigation</option>
+              <option value="sprinkler">Sprinkler</option>
+              <option value="furrow">Furrow / Flood</option>
+            </select>
+          </div>
+        </div>
+        <div class="sim-card">
+          <h5><i class="bi bi-download me-2"></i>Export &amp; Present</h5>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-warning dl-btn text-dark" onclick="downloadIRRReport()"><i class="bi bi-file-earmark-text me-1"></i>Download Proposal</button>
+            <button class="btn btn-outline-secondary dl-btn" onclick="downloadIRRJson()"><i class="bi bi-braces me-1"></i>Export JSON</button>
+          </div>
+          <div class="mt-2">
+            <button class="video-btn-premium w-100" onclick="openVideoModal('irrigation')">
+              <i class="bi bi-camera-video-fill"></i>Generate Client Video
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-droplet-half me-2" style="color:var(--energy-amber);"></i>Water Flow — Adaptive Animation</h5>
+          <div class="row g-2 mb-3" id="irr_results"></div>
+
+          {# Adaptive Farm Irrigation SVG #}
+          <div class="anim-box mb-3" style="min-height:270px;" id="irr_anim_box">
+            <svg viewBox="0 0 640 270" xmlns="http://www.w3.org/2000/svg" id="irr_svg">
+              <rect width="640" height="270" fill="#0f172a"/>
+              <rect y="145" width="640" height="125" fill="#052e16"/>
+
+              {# Sun #}
+              <circle cx="595" cy="40" r="18" fill="#fbbf24" opacity=".9"/>
+              <g style="transform-origin:595px 40px;animation:sun-spin 10s linear infinite;">
+                <line x1="595" y1="15" x2="595" y2="10" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                <line x1="612" y1="23" x2="616" y2="19" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                <line x1="620" y1="40" x2="625" y2="40" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                <line x1="612" y1="57" x2="616" y2="61" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              </g>
+
+              {# === SOLAR DC PATH (default) === #}
+              <g id="irr_path_solar_dc">
+                {# Solar Panels #}
+                <g transform="translate(55,70)">
+                  <rect x="-42" y="-16" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
+                  <rect x="-42" y="20" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
+                  <text x="0" y="68" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                  <text x="0" y="80" text-anchor="middle" fill="#93c5fd" font-size="8" id="irr_solar_dc_label">2.2 kW</text>
+                </g>
+                {# MPPT Controller #}
+                <g transform="translate(175,80)">
+                  <rect x="-22" y="-16" width="44" height="32" rx="5" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
+                  <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7" font-weight="bold">MPPT</text>
+                  <text x="0" y="8" text-anchor="middle" fill="#34d399" font-size="6.5">Ctrl</text>
+                  <text x="0" y="35" text-anchor="middle" fill="#6ee7b7" font-size="8" id="irr_pump_label">1.5 kW DC</text>
+                </g>
+                {# Solar → MPPT #}
+                <line x1="97" y1="72" x2="153" y2="75" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
+                {# MPPT → Pump (electric) #}
+                <line x1="197" y1="80" x2="250" y2="112" stroke="#10b981" stroke-width="2" class="flow-line"/>
+              </g>
+
+              {# === SOLAR AC PATH === #}
+              <g id="irr_path_solar_ac" style="display:none;">
+                <g transform="translate(55,70)">
+                  <rect x="-42" y="-16" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
+                  <rect x="-42" y="20" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
+                  <text x="0" y="68" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                </g>
+                <g transform="translate(175,80)">
+                  <rect x="-26" y="-18" width="52" height="36" rx="5" fill="#1e3a5f" stroke="#8b5cf6" stroke-width="1.5"/>
+                  <text x="0" y="-5" text-anchor="middle" fill="#a78bfa" font-size="7" font-weight="bold">PUMP VFD</text>
+                  <text x="0" y="8" text-anchor="middle" fill="#c4b5fd" font-size="6.5">Solar AC</text>
+                </g>
+                <line x1="97" y1="72" x2="149" y2="75" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
+                <line x1="201" y1="80" x2="250" y2="112" stroke="#8b5cf6" stroke-width="2" class="flow-line"/>
+              </g>
+
+              {# === GENERATOR PATH === #}
+              <g id="irr_path_generator" style="display:none;">
+                <g transform="translate(75,75)">
+                  <rect x="-35" y="-25" width="70" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+                  <text x="0" y="-8" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold">GENERATOR</text>
+                  <text x="0" y="8" text-anchor="middle" fill="#fecaca" font-size="8" id="irr_gen_label">10 kW</text>
+                  <circle cx="-15" cy="-2" r="6" fill="#ef4444" style="animation:blink 1s infinite;"/>
+                </g>
+                <line x1="110" y1="75" x2="240" y2="112" stroke="#ef4444" stroke-width="2" class="flow-line"/>
+              </g>
+
+              {# === HYBRID PATH === #}
+              <g id="irr_path_hybrid" style="display:none;">
+                <g transform="translate(45,55)">
+                  <rect x="-35" y="-14" width="70" height="28" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.2" transform="rotate(-12)"/>
+                  <text x="0" y="30" text-anchor="middle" fill="#93c5fd" font-size="8">SOLAR</text>
+                </g>
+                <g transform="translate(120,75)">
+                  <rect x="-20" y="-12" width="40" height="24" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.2"/>
+                  <text x="0" y="4" text-anchor="middle" fill="#fca5a5" font-size="7">GEN</text>
+                  <text x="0" y="26" text-anchor="middle" fill="#fca5a5" font-size="7">Backup</text>
+                </g>
+                <g transform="translate(190,80)">
+                  <rect x="-20" y="-14" width="40" height="28" rx="5" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
+                  <text x="0" y="-2" text-anchor="middle" fill="#10b981" font-size="6.5" font-weight="bold">CTRL</text>
+                  <text x="0" y="10" text-anchor="middle" fill="#34d399" font-size="6">Hybrid</text>
+                </g>
+                <line x1="80" y1="55" x2="170" y2="78" stroke="#fbbf24" stroke-width="1.5" class="flow-line"/>
+                <line x1="140" y1="75" x2="170" y2="78" stroke="#ef4444" stroke-width="1.5" class="flow-line-slow"/>
+                <line x1="210" y1="80" x2="250" y2="112" stroke="#10b981" stroke-width="2" class="flow-line"/>
+              </g>
+
+              {# Pump (shared) #}
+              <g transform="translate(270,130)">
+                <rect x="-22" y="-22" width="44" height="44" rx="7" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+                <circle cx="0" cy="0" r="11" fill="#10b981" opacity=".7"/>
+                <text y="34" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">PUMP</text>
+              </g>
+
+              {# Water Source #}
+              <g transform="translate(100,218)">
+                <ellipse cx="0" cy="0" rx="55" ry="18" fill="#1e40af" opacity=".65"/>
+                <ellipse cx="12" cy="-6" rx="32" ry="10" fill="#3b82f6" opacity=".5"/>
+                <text y="30" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">WATER SOURCE</text>
+              </g>
+              {# Water source → Pump pipe #}
+              <path d="M 155 215 Q 200 185 248 152" stroke="#3b82f6" stroke-width="5" fill="none" class="flow-line-water"/>
+
+              {# Storage Tank (optional) #}
+              <g id="irr_tank_g" transform="translate(400,130)" style="display:none;">
+                <rect x="-18" y="-35" width="36" height="65" rx="4" fill="#1e3a5f" stroke="#06b6d4" stroke-width="2"/>
+                <rect x="-14" y="-15" width="28" height="40" rx="2" fill="#06b6d4" id="irr_tank_fill" style="opacity:.5;"/>
+                <text y="42" text-anchor="middle" fill="#22d3ee" font-size="8" font-weight="bold">TANK</text>
+              </g>
+
+              {# Pump → Field pipe #}
+              <path d="M 292 130 Q 380 115 430 165" stroke="#10b981" stroke-width="5" fill="none" class="flow-line-water"/>
+
+              {# Crop field #}
+              <g transform="translate(440,165)">
+                <rect x="0" y="0" width="185" height="75" rx="5" fill="#065f46"/>
+                {# Crop plants - varied heights suggesting growth #}
+                <g fill="#22c55e">
+                  <ellipse cx="18" cy="35" rx="9" ry="16"/>
+                  <ellipse cx="48" cy="28" rx="9" ry="20"/>
+                  <ellipse cx="78" cy="34" rx="9" ry="16"/>
+                  <ellipse cx="108" cy="24" rx="9" ry="22"/>
+                  <ellipse cx="138" cy="30" rx="9" ry="18"/>
+                  <ellipse cx="168" cy="33" rx="7" ry="15"/>
+                </g>
+                {# Animated water droplets (drip effect) #}
+                <circle cx="18" cy="18" r="3.5" fill="#60a5fa" id="irr_d1" style="animation:blink 1.3s infinite;"/>
+                <circle cx="78" cy="16" r="3.5" fill="#60a5fa" id="irr_d2" style="animation:blink 1.9s infinite;"/>
+                <circle cx="138" cy="14" r="3.5" fill="#60a5fa" id="irr_d3" style="animation:blink 1.5s infinite;"/>
+                <text x="92" y="88" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">IRRIGATED FIELD</text>
+              </g>
+
+              {# Pipe from field nozzles #}
+              <line x1="430" y1="165" x2="440" y2="180" stroke="#10b981" stroke-width="3" class="flow-line-water"/>
+
+              {# Label #}
+              <text x="10" y="264" fill="#475569" font-size="8">🌊 Water flows from source → pump → field. Power: <tspan id="irr_sys_label_svg">Solar DC (no inverter)</tspan></text>
+            </svg>
+          </div>
+
+          <div id="irr_summary" class="small mt-2"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 3: SOLAR PLANT                                        #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-solar">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-sun me-2" style="color:#fbbf24;"></i>Solar Plant Inputs</h5>
+          <div class="sim-input-group">
+            <label>Array Size (kWp): <span class="range-val" id="sol_kw_val">10</span></label>
+            <input type="range" id="sol_kw" min="1" max="200" step="1" value="10" oninput="updateSOL()">
+          </div>
+          <div class="sim-input-group">
+            <label>Peak Sun Hours: <span class="range-val" id="sol_psh_val">5.5</span></label>
+            <input type="range" id="sol_psh" min="3" max="8" step="0.1" value="5.5" oninput="updateSOL()">
+          </div>
+          <div class="sim-input-group">
+            <label>Panel Efficiency (%): <span class="range-val" id="sol_eff_val">85</span></label>
+            <input type="range" id="sol_eff" min="60" max="100" step="1" value="85" oninput="updateSOL()">
+          </div>
+          <div class="sim-input-group">
+            <label>Battery Storage (kWh): <span class="range-val" id="sol_batt_val">20</span></label>
+            <input type="range" id="sol_batt" min="0" max="200" step="5" value="20" oninput="updateSOL()">
+          </div>
+          <div class="sim-input-group">
+            <label>Load Demand (kWh/day): <span class="range-val" id="sol_load_val">40</span></label>
+            <input type="range" id="sol_load" min="5" max="500" step="5" value="40" oninput="updateSOL()">
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-sun me-2" style="color:#fbbf24;"></i>Solar Plant Results</h5>
+          <div class="row g-2 mb-3" id="sol_results"></div>
+          <div id="sol_generation_chart" class="mb-3"></div>
+          <div id="sol_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 4: WIND TURBINE                                       #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-wind">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-wind me-2" style="color:#60a5fa;"></i>Wind Turbine Inputs</h5>
+          <div class="sim-input-group">
+            <label>Turbine Rating (kW): <span class="range-val" id="wind_kw_val">2</span></label>
+            <input type="range" id="wind_kw" min="0.5" max="20" step="0.5" value="2" oninput="updateWIND()">
+          </div>
+          <div class="sim-input-group">
+            <label>Avg Wind Speed (m/s): <span class="range-val" id="wind_spd_val">5</span></label>
+            <input type="range" id="wind_spd" min="1" max="15" step="0.5" value="5" oninput="updateWIND()">
+          </div>
+          <div class="sim-input-group">
+            <label>Cut-in Speed (m/s): <span class="range-val" id="wind_cutin_val">2.5</span></label>
+            <input type="range" id="wind_cutin" min="1" max="5" step="0.5" value="2.5" oninput="updateWIND()">
+          </div>
+          <div class="sim-input-group">
+            <label>Hub Height (m): <span class="range-val" id="wind_hub_val">24</span></label>
+            <input type="range" id="wind_hub" min="10" max="50" step="2" value="24" oninput="updateWIND()">
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-wind me-2" style="color:#60a5fa;"></i>Wind Turbine Results</h5>
+          <div class="row g-2 mb-3" id="wind_results"></div>
+          <div class="anim-box mb-3" style="min-height:220px;">
+            <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg" id="wind_svg">
+              <defs>
+                <linearGradient id="skyGradWind" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#1e3a5f"/>
+                  <stop offset="100%" stop-color="#064e3b"/>
+                </linearGradient>
+              </defs>
+              <rect width="400" height="220" fill="url(#skyGradWind)"/>
+              <rect x="192" y="60" width="10" height="140" fill="#374151"/>
+              <g id="wind_rotor" transform="translate(197,80)" style="transform-origin:0 0;animation:blade-spin 2s linear infinite;">
+                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(0)"/>
+                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(120)"/>
+                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(240)"/>
+                <circle cx="0" cy="0" r="8" fill="#374151" stroke="#6b7280" stroke-width="2"/>
+              </g>
+              <rect y="200" width="400" height="20" fill="#065f46"/>
+              <line x1="10" y1="80" x2="80" y2="80" stroke="#60a5fa" stroke-width="2" class="flow-line"/>
+              <line x1="10" y1="100" x2="70" y2="100" stroke="#60a5fa" stroke-width="1.5" class="flow-line-slow"/>
+              <line x1="10" y1="60" x2="60" y2="60" stroke="#60a5fa" stroke-width="1.5" class="flow-line"/>
+              <text x="270" y="90" fill="#34d399" font-size="11" font-weight="bold">Output:</text>
+              <text x="270" y="108" fill="#fbbf24" font-size="14" font-weight="bold" id="wind_kw_label">2 kW</text>
+              <text x="270" y="126" fill="#93c5fd" font-size="10" id="wind_kwh_label">~12 kWh/day</text>
+              <text x="270" y="145" fill="#86efac" font-size="9" id="wind_cf_label">Capacity Factor: 35%</text>
+              <text x="197" y="216" text-anchor="middle" fill="#6b7280" font-size="9">Wind speed controls blade speed and output</text>
+            </svg>
+          </div>
+          <div id="wind_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 5: HYBRID SOLAR + WIND + GENERATOR                   #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-hybrid">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-lightning-charge me-2" style="color:var(--energy-green);"></i>Hybrid System Inputs</h5>
+          <div class="sim-input-group">
+            <label>Solar Array (kW): <span class="range-val" id="hyb_solar_val">5</span></label>
+            <input type="range" id="hyb_solar" min="1" max="50" step="0.5" value="5" oninput="updateHYB()">
+          </div>
+          <div class="sim-input-group">
+            <label>Wind Turbine (kW): <span class="range-val" id="hyb_wind_val">2</span></label>
+            <input type="range" id="hyb_wind" min="0" max="20" step="0.5" value="2" oninput="updateHYB()">
+          </div>
+          <div class="sim-input-group">
+            <label>Generator Backup (kW): <span class="range-val" id="hyb_gen_val">5</span></label>
+            <input type="range" id="hyb_gen" min="0" max="50" step="1" value="5" oninput="updateHYB()">
+          </div>
+          <div class="sim-input-group">
+            <label>Battery (kWh): <span class="range-val" id="hyb_batt_val">10</span></label>
+            <input type="range" id="hyb_batt" min="1" max="100" step="1" value="10" oninput="updateHYB()">
+          </div>
+          <div class="sim-input-group">
+            <label>Daily Demand (kWh): <span class="range-val" id="hyb_load_val">18</span></label>
+            <input type="range" id="hyb_load" min="1" max="200" step="1" value="18" oninput="updateHYB()">
+          </div>
+          <div class="sim-input-group">
+            <label>Wind Speed (m/s): <span class="range-val" id="hyb_wind_spd_val">5</span></label>
+            <input type="range" id="hyb_wind_spd" min="1" max="12" step="0.5" value="5" oninput="updateHYB()">
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-lightning-charge me-2" style="color:var(--energy-green);"></i>Hybrid System Results</h5>
+          <div class="row g-2 mb-3" id="hyb_results"></div>
+          <div id="hyb_energy_balance" class="mb-3"></div>
+          <div id="hyb_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 6: BLACKOUT / BATTERY AUTONOMY                       #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-blackout">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-battery-half me-2" style="color:var(--energy-green);"></i>Blackout Simulation Inputs</h5>
+          <div class="sim-input-group">
+            <label>Battery Capacity (kWh): <span class="range-val" id="bo_batt_val">5</span></label>
+            <input type="range" id="bo_batt" min="1" max="50" step="1" value="5" oninput="updateBO()">
+          </div>
+          <div class="sim-input-group">
+            <label>Essential Load (W): <span class="range-val" id="bo_load_val">400</span></label>
+            <input type="range" id="bo_load" min="50" max="5000" step="50" value="400" oninput="updateBO()">
+          </div>
+          <div class="sim-input-group">
+            <label>Battery DoD (%): <span class="range-val" id="bo_dod_val">80</span></label>
+            <input type="range" id="bo_dod" min="30" max="100" step="5" value="80" oninput="updateBO()">
+          </div>
+          <div class="sim-input-group">
+            <label>Solar Recharge (kW): <span class="range-val" id="bo_solar_val">2</span></label>
+            <input type="range" id="bo_solar" min="0" max="10" step="0.5" value="2" oninput="updateBO()">
+          </div>
+          <div class="sim-input-group">
+            <label>Typical blackout length (hrs): <span class="range-val" id="bo_cut_val">6</span></label>
+            <input type="range" id="bo_cut" min="1" max="24" step="1" value="6" oninput="updateBO()">
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-battery-half me-2" style="color:var(--energy-green);"></i>Battery Autonomy Results</h5>
+          <div class="row g-2 mb-3" id="bo_results"></div>
+          <div id="bo_timeline" class="mb-3"></div>
+          <div id="bo_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 7: DIESEL REPLACEMENT ROI                            #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-diesel">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-fuel-pump me-2" style="color:#ef4444;"></i>Diesel Replacement Inputs</h5>
+          <div class="sim-input-group">
+            <label>Diesel spend/month (MWK): <span class="range-val" id="die_spend_val">500,000</span></label>
+            <input type="range" id="die_spend" min="50000" max="5000000" step="50000" value="500000" oninput="updateDIE()">
+          </div>
+          <div class="sim-input-group">
+            <label>Generator rating (kW): <span class="range-val" id="die_gen_val">10</span></label>
+            <input type="range" id="die_gen" min="1" max="100" step="1" value="10" oninput="updateDIE()">
+          </div>
+          <div class="sim-input-group">
+            <label>Run hours/day: <span class="range-val" id="die_hrs_val">8</span></label>
+            <input type="range" id="die_hrs" min="1" max="24" step="1" value="8" oninput="updateDIE()">
+          </div>
+          <div class="sim-input-group">
+            <label>Solar offset target (%): <span class="range-val" id="die_offset_val">80</span></label>
+            <input type="range" id="die_offset" min="20" max="100" step="5" value="80" oninput="updateDIE()">
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-fuel-pump me-2" style="color:#ef4444;"></i>Diesel Replacement Analysis</h5>
+          <div class="row g-2 mb-3" id="die_results"></div>
+          <div id="die_comparison" class="mb-3"></div>
+          {# Month-by-month ROI chart #}
+          <div id="die_roi_chart" class="mb-3"></div>
+          <div id="die_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 8: MINI-GRID COMMUNITY                               #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-minigrid">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-people me-2" style="color:var(--energy-green);"></i>Mini-grid Inputs</h5>
+          <div class="sim-input-group">
+            <label>Households connected: <span class="range-val" id="mg_homes_val">25</span></label>
+            <input type="range" id="mg_homes" min="5" max="200" step="5" value="25" oninput="updateMG()">
+          </div>
+          <div class="sim-input-group">
+            <label>Avg load per household (kWh/day): <span class="range-val" id="mg_hload_val">2</span></label>
+            <input type="range" id="mg_hload" min="0.5" max="10" step="0.5" value="2" oninput="updateMG()">
+          </div>
+          <div class="sim-input-group">
+            <label>Solar array (kWp): <span class="range-val" id="mg_solar_val">15</span></label>
+            <input type="range" id="mg_solar" min="1" max="200" step="1" value="15" oninput="updateMG()">
+          </div>
+          <div class="sim-input-group">
+            <label>Community battery (kWh): <span class="range-val" id="mg_batt_val">30</span></label>
+            <input type="range" id="mg_batt" min="5" max="500" step="5" value="30" oninput="updateMG()">
+          </div>
+          <div class="sim-input-group">
+            <label>Tariff charged (MWK/kWh): <span class="range-val" id="mg_tariff_val">120</span></label>
+            <input type="range" id="mg_tariff" min="50" max="300" step="10" value="120" oninput="updateMG()">
+          </div>
+          <div class="sim-input-group">
+            <label>Community anchors</label>
+            <select id="mg_anchor" onchange="updateMG()">
+              <option value="basic">Residential only</option>
+              <option value="school">School + clinic</option>
+              <option value="market">Market + shops</option>
+              <option value="full">School + clinic + market</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-people me-2" style="color:var(--energy-green);"></i>Mini-grid Community Results</h5>
+          <div class="row g-2 mb-3" id="mg_results"></div>
+          <div id="mg_distribution" class="mb-3"></div>
+          <div id="mg_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 9: COLD ROOM / REFRIGERATION                         #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-coldroom">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-thermometer-snow me-2" style="color:#06b6d4;"></i>Cold Room Inputs</h5>
+          <div class="sim-input-group">
+            <label>Room volume (m³): <span class="range-val" id="cr_vol_val">20</span></label>
+            <input type="range" id="cr_vol" min="5" max="200" step="5" value="20" oninput="updateCR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Target temperature (°C): <span class="range-val" id="cr_temp_val">4</span></label>
+            <input type="range" id="cr_temp" min="-25" max="15" step="1" value="4" oninput="updateCR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Ambient temperature (°C): <span class="range-val" id="cr_ambient_val">32</span></label>
+            <input type="range" id="cr_ambient" min="20" max="45" step="1" value="32" oninput="updateCR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Diesel spend/month (MWK): <span class="range-val" id="cr_diesel_val">350,000</span></label>
+            <input type="range" id="cr_diesel" min="50000" max="2000000" step="50000" value="350000" oninput="updateCR()">
+          </div>
+          <div class="sim-input-group">
+            <label>Product type</label>
+            <select id="cr_product" onchange="updateCR()">
+              <option value="produce">Fresh produce / vegetables</option>
+              <option value="fish">Fish</option>
+              <option value="meat">Meat / poultry</option>
+              <option value="dairy">Dairy</option>
+              <option value="flowers">Flowers / horticulture</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-thermometer-snow me-2" style="color:#06b6d4;"></i>Cold Room Solar Sizing Results</h5>
+          <div class="row g-2 mb-3" id="cr_results"></div>
+          <div id="cr_comparison" class="mb-3"></div>
+          <div id="cr_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ============================================================ #}
+  {#   SIM 10: BOREHOLE WATER + SOLAR PUMP                      #}
+  {# ============================================================ #}
+  <div class="sim-panel" id="sim-borehole">
+    <div class="row g-3">
+      <div class="col-12 col-lg-4">
+        <div class="sim-card">
+          <h5><i class="bi bi-droplet me-2" style="color:#06b6d4;"></i>Borehole Pump Inputs</h5>
+          <div class="sim-input-group">
+            <label>Borehole depth (m): <span class="range-val" id="bh_depth_val">45</span></label>
+            <input type="range" id="bh_depth" min="10" max="150" step="5" value="45" oninput="updateBH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Static water level (m): <span class="range-val" id="bh_swl_val">30</span></label>
+            <input type="range" id="bh_swl" min="5" max="120" step="5" value="30" oninput="updateBH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Delivery head (m above ground): <span class="range-val" id="bh_del_val">15</span></label>
+            <input type="range" id="bh_del" min="0" max="60" step="5" value="15" oninput="updateBH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Required flow (m³/hr): <span class="range-val" id="bh_flow_val">3</span></label>
+            <input type="range" id="bh_flow" min="0.5" max="20" step="0.5" value="3" oninput="updateBH()">
+          </div>
+          <div class="sim-input-group">
+            <label>Pumping hours/day: <span class="range-val" id="bh_hrs_val">6</span></label>
+            <input type="range" id="bh_hrs" min="1" max="12" step="1" value="6" oninput="updateBH()">
+          </div>
+          <div class="sim-input-group">
+            <label>End use</label>
+            <select id="bh_use" onchange="updateBH()">
+              <option value="domestic">Domestic / drinking water</option>
+              <option value="irrigation">Irrigation</option>
+              <option value="livestock">Livestock watering</option>
+              <option value="school">School / institution</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-lg-8">
+        <div class="sim-card">
+          <h5><i class="bi bi-droplet me-2" style="color:#06b6d4;"></i>Borehole Solar Pump Sizing Results</h5>
+          <div class="row g-2 mb-3" id="bh_results"></div>
+          {# Borehole animated SVG #}
+          <div class="anim-box mb-3" style="min-height:240px;">
+            <svg viewBox="0 0 500 240" xmlns="http://www.w3.org/2000/svg" id="bh_svg">
+              <rect width="500" height="240" fill="#0f172a"/>
+              {# Ground surface #}
+              <rect x="0" y="110" width="500" height="10" fill="#4b5563"/>
+              {# Underground soil layers #}
+              <rect x="0" y="120" width="500" height="60" fill="#1c1307"/>
+              <rect x="0" y="180" width="500" height="60" fill="#0f0a04"/>
+              {# Sun #}
+              <circle cx="80" cy="50" r="18" fill="#fbbf24" opacity=".9"/>
+              {# Solar panels #}
+              <g transform="translate(200,55)">
+                <rect x="-55" y="-14" width="110" height="28" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5"/>
+                <line x1="-55" y1="-5" x2="55" y2="-5" stroke="#3b82f6" stroke-width=".7"/>
+                <line x1="-55" y1="5" x2="55" y2="5" stroke="#3b82f6" stroke-width=".7"/>
+                <line x1="-18" y1="-14" x2="-18" y2="14" stroke="#3b82f6" stroke-width=".7"/>
+                <line x1="18" y1="-14" x2="18" y2="14" stroke="#3b82f6" stroke-width=".7"/>
+                <text x="0" y="30" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                <text x="0" y="42" text-anchor="middle" fill="#93c5fd" font-size="8" id="bh_solar_label">3.5 kW</text>
+              </g>
+              {# Sun → Panel #}
+              <line x1="98" y1="50" x2="145" y2="50" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
+              {# MPPT Controller #}
+              <g transform="translate(340,55)">
+                <rect x="-22" y="-16" width="44" height="32" rx="5" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
+                <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7" font-weight="bold">MPPT</text>
+                <text x="0" y="8" text-anchor="middle" fill="#34d399" font-size="6.5">Ctrl</text>
+              </g>
+              {# Panel → MPPT #}
+              <line x1="255" y1="55" x2="318" y2="55" stroke="#3b82f6" stroke-width="2" class="flow-line"/>
+              {# Borehole casing #}
+              <rect x="230" y="110" width="40" height="130" rx="4" fill="#374151" stroke="#6b7280" stroke-width="1.5"/>
+              {# Water in borehole #}
+              <rect x="232" y="165" width="36" height="75" rx="3" fill="#1e40af" opacity=".6"/>
+              <text x="250" y="220" text-anchor="middle" fill="#93c5fd" font-size="8">WATER</text>
+              {# Submersible pump #}
+              <g transform="translate(250,195)">
+                <circle cx="0" cy="0" r="13" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+                <text x="0" y="4" text-anchor="middle" fill="#34d399" font-size="6" font-weight="bold">PUMP</text>
+              </g>
+              {# Electric cable from MPPT to pump #}
+              <path d="M 340 71 Q 340 100 270 100 Q 250 100 250 115" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
+              {# Water riser pipe #}
+              <line x1="250" y1="182" x2="250" y2="110" stroke="#3b82f6" stroke-width="5" class="flow-line-water"/>
+              {# Discharge to storage tank #}
+              <g transform="translate(420,90)">
+                <rect x="-22" y="-30" width="44" height="60" rx="4" fill="#1e3a5f" stroke="#06b6d4" stroke-width="2"/>
+                <rect x="-16" y="-5" width="32" height="30" rx="2" fill="#06b6d4" id="bh_tank_fill" style="opacity:.6;"/>
+                <text x="0" y="42" text-anchor="middle" fill="#22d3ee" font-size="9" font-weight="bold">STORAGE</text>
+                <text x="0" y="54" text-anchor="middle" fill="#22d3ee" font-size="8" id="bh_tank_label">Tank</text>
+              </g>
+              {# Pump → tank pipe (surface) #}
+              <path d="M 270 110 Q 320 75 398 90" stroke="#3b82f6" stroke-width="4" fill="none" class="flow-line-water"/>
+              {# Labels #}
+              <text x="10" y="235" fill="#475569" font-size="8">💧 Submersible pump · No inverter needed · Solar DC direct drive · <tspan id="bh_sys_note">45m depth</tspan></text>
+            </svg>
+          </div>
+          <div id="bh_summary" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== DISCLAIMER ===== #}
+  <div class="disclaimer">
+    <i class="bi bi-shield-check me-1"></i>
+    <strong>Disclaimer:</strong> All simulation results are estimates for planning, client-explanation, and grant proposal purposes only.
+    Values should be verified by a qualified energy engineer or technician before procurement or installation.
+    Solar irradiance data is based on Malawi regional averages (~5.0–5.8 PSH). Actual site conditions may vary.
+    This simulation engine is designed to support institutional, NGO, and donor-funded energy project proposals.
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SIMULATION ENGINE — Emajinet Energy Intelligence Platform
+   ============================================================ */
+
+// ---- Utility functions ----
+function fmt(n, dp=1) { return Number(n).toFixed(dp); }
+function fmtK(n) {
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K';
+  return Math.round(n).toString();
+}
+function resultCard(val, label, cls='') {
+  return `<div class="col-6 col-md-3"><div class="result-card ${cls}"><div class="rv">${val}</div><div class="rl">${label}</div></div></div>`;
+}
+
+// ---- Tab switching ----
+var _currentSim = 'household';
+function showSim(name) {
+  _currentSim = name;
+  document.querySelectorAll('.sim-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sim-tab').forEach(t => t.classList.remove('active'));
+  var panel = document.getElementById('sim-' + name);
+  if (panel) panel.classList.add('active');
+  var tabs = document.querySelectorAll('.sim-tab');
+  var simMap = {household:0,irrigation:1,solar:2,wind:3,hybrid:4,blackout:5,diesel:6,minigrid:7,coldroom:8,borehole:9};
+  if (simMap[name] !== undefined && tabs[simMap[name]]) tabs[simMap[name]].classList.add('active');
+  // Scroll to tab bar
+  document.getElementById('simTabBar').scrollIntoView({behavior:'smooth', block:'nearest'});
+  const updaters = {
+    household:updateHH, irrigation:updateIRR, solar:updateSOL,
+    wind:updateWIND, hybrid:updateHYB, blackout:updateBO, diesel:updateDIE,
+    minigrid:updateMG, coldroom:updateCR, borehole:updateBH
+  };
+  if (updaters[name]) updaters[name]();
+}
+
+// ============================================================
+// SIM 1: HOUSEHOLD ELECTRICITY FLOW
+// ============================================================
+function updateHH() {
+  const solar = parseFloat(document.getElementById('hh_solar').value);
+  const batt = parseFloat(document.getElementById('hh_batt').value);
+  const load = parseFloat(document.getElementById('hh_load').value);
+  const psh = parseFloat(document.getElementById('hh_psh').value);
+  const gridPct = parseFloat(document.getElementById('hh_grid').value);
+
+  document.getElementById('hh_solar_val').textContent = solar;
+  document.getElementById('hh_batt_val').textContent = batt;
+  document.getElementById('hh_load_val').textContent = load;
+  document.getElementById('hh_psh_val').textContent = psh;
+  document.getElementById('hh_grid_val').textContent = gridPct;
+
+  const solarGen = solar * psh * 0.85;
+  const surplus = Math.max(0, solarGen - load);
+  const deficit = Math.max(0, load - solarGen);
+  const battAutonomy = (batt * 0.8 * 1000) / (load * 1000 / 24);
+  const solarPct = Math.min(100, solarGen / load * 100).toFixed(0);
+  const battPct = Math.min(100, Math.min(surplus, batt) / load * 100).toFixed(0);
+  const blackoutRisk = Math.max(0, 100 - parseInt(solarPct) - parseInt(battPct) * 0.5 - gridPct * 0.3).toFixed(0);
+
+  if (document.getElementById('hh_solar_label')) document.getElementById('hh_solar_label').textContent = solar + ' kW';
+  if (document.getElementById('hh_batt_label')) document.getElementById('hh_batt_label').textContent = batt + ' kWh';
+  if (document.getElementById('hh_inv_label')) document.getElementById('hh_inv_label').textContent = fmt(solar * 1.2, 1) + ' kVA';
+  const soc = Math.min(100, Math.max(20, parseInt(solarPct)));
+  if (document.getElementById('hh_batt_soc')) document.getElementById('hh_batt_soc').textContent = 'SOC ' + soc + '%';
+  if (document.getElementById('hh_grid_label')) document.getElementById('hh_grid_label').textContent = gridPct + '%';
+  if (document.getElementById('hh_load_label')) document.getElementById('hh_load_label').textContent = load + ' kWh/day';
+
+  // Blackout zone warning
+  var bz = document.getElementById('hh_blackout_zone');
+  if (bz) bz.style.display = parseInt(blackoutRisk) > 35 ? '' : 'none';
+
+  document.getElementById('hh_results').innerHTML =
+    resultCard(fmt(solarGen) + ' kWh', 'Daily Solar Gen') +
+    resultCard(fmt(battAutonomy, 1) + ' hrs', 'Battery Autonomy') +
+    resultCard(solarPct + '%', 'Solar Coverage', 'blue') +
+    resultCard(blackoutRisk + '%', 'Blackout Risk', parseInt(blackoutRisk) > 30 ? 'amber' : '');
+
+  // Draw hourly chart
+  const hours = Array.from({length:24}, (_, h) => {
+    const sunFactor = h >= 6 && h <= 18 ? Math.sin((h-6)/12 * Math.PI) : 0;
+    const gen = solar * psh / 6 * sunFactor * 0.85;
+    const loadH = load / 24 * (h >= 18 || h < 6 ? 1.3 : 0.8);
+    return {gen, batt: Math.max(0, gen - loadH), grid: Math.max(0, loadH - gen) * gridPct/100};
+  });
+  const maxH = Math.max(...hours.map(h => Math.max(h.gen, h.batt + h.grid, 0.1)));
+  const chart = document.getElementById('hh_chart');
+  chart.innerHTML = hours.map((h, i) => {
+    const gH = (h.gen/maxH*70).toFixed(0);
+    const bH = (h.batt/maxH*70).toFixed(0);
+    const gridH = (h.grid/maxH*70).toFixed(0);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;">
+      <div style="height:${gH}px;width:100%;background:#10b981;border-radius:2px 2px 0 0;"></div>
+      <div style="height:${bH}px;width:100%;background:#3b82f6;"></div>
+      <div style="height:${gridH}px;width:100%;background:#9ca3af;"></div>
+      ${i%6===0 ? `<div style="font-size:7px;color:#94a3b8;">${i}h</div>` : ''}
+    </div>`;
+  }).join('');
+
+  const annualSavings = solarGen * 365 * 185;
+  const capex = solar * 1000 * 650 + batt * 450000 + solar * 1.2 * 180000;
+  const payback = capex / annualSavings;
+  document.getElementById('hh_summary').innerHTML = `
+    <div class="row g-2">
+      <div class="col-12 col-md-6">
+        <strong>Recommended System</strong><br>
+        Solar: ${solar} kW &nbsp;|&nbsp; Battery: ${batt} kWh &nbsp;|&nbsp; Inverter: ${fmt(solar*1.2,1)} kVA<br>
+        <strong>Architecture:</strong> Panels → MPPT → Battery → Inverter → House Loads → Grid backup<br>
+        Solar covers <strong>${solarPct}%</strong> of daily load. Battery gives <strong>${fmt(battAutonomy,1)} hours</strong> autonomy.
+      </div>
+      <div class="col-12 col-md-6">
+        <strong>Financial Case</strong><br>
+        Annual savings: <strong>MWK ${fmtK(annualSavings)}</strong> &nbsp;|&nbsp;
+        Est. CapEx: <strong>MWK ${fmtK(capex)}</strong><br>
+        Payback: ~<strong>${fmt(payback,1)} years</strong> &nbsp;|&nbsp; Blackout risk: ${blackoutRisk}%<br>
+        <em>Run kettle &amp; iron during solar peak 10am–2pm for best efficiency.</em>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// SIM 2: IRRIGATION — ADAPTIVE SYSTEM TYPE
+// ============================================================
+var _irrSys = 'solar_dc';
+
+function selectIrrSys(sys) {
+  _irrSys = sys;
+  document.querySelectorAll('#irr_sys_selector .sys-type-btn').forEach(b => b.classList.remove('active'));
+  var btn = document.querySelector('[data-sys="' + sys + '"]');
+  if (btn) btn.classList.add('active');
+
+  // Hide all paths
+  ['solar_dc','solar_ac','generator','hybrid'].forEach(p => {
+    var el = document.getElementById('irr_path_' + p);
+    if (el) el.style.display = 'none';
+  });
+  var active = document.getElementById('irr_path_' + sys);
+  if (active) active.style.display = '';
+
+  // Update architecture badge
+  var badges = {
+    solar_dc: '☀️ Solar DC: Panels → MPPT Controller → DC Pump → Water (no inverter)',
+    solar_ac: '⚡ Solar AC: Panels → Pump VFD → AC Motor Pump → Water',
+    generator: '⛽ Generator: Gen Set → AC Pump → Water (diesel powered)',
+    hybrid: '🔋 Hybrid: Solar + Generator + Controller → Pump → Water'
+  };
+  var badge = document.getElementById('irr_arch_badge');
+  if (badge) badge.textContent = badges[sys] || '';
+
+  var sysLabels = {solar_dc:'Solar DC (no inverter)', solar_ac:'Solar AC VFD', generator:'Generator', hybrid:'Solar + Generator Hybrid'};
+  var svgLabel = document.getElementById('irr_sys_label_svg');
+  if (svgLabel) svgLabel.textContent = sysLabels[sys] || '';
+
+  updateIRR();
+}
+
+function updateIRR() {
+  const land = parseFloat(document.getElementById('irr_land').value);
+  const head = parseFloat(document.getElementById('irr_head').value);
+  const dist = parseFloat(document.getElementById('irr_dist').value);
+  const hrs = parseFloat(document.getElementById('irr_hrs').value);
+  const mmDay = parseFloat(document.getElementById('irr_crop_sim').value);
+  const src = document.getElementById('irr_src_sim').value;
+  const method = document.getElementById('irr_method_sim').value;
+
+  document.getElementById('irr_land_val').textContent = land;
+  document.getElementById('irr_head_val').textContent = head;
+  document.getElementById('irr_dist_val').textContent = dist;
+  document.getElementById('irr_hrs_val').textContent = hrs;
+
+  const landHa = land * 0.4047;
+  // Irrigation efficiency factors
+  const effFactor = method === 'drip' ? 0.9 : method === 'sprinkler' ? 0.75 : 0.55;
+  const m3Day = (mmDay * landHa * 10) / effFactor;
+  const totalHead = head + (src === 'borehole' ? 12 : 0) + dist * 0.02;
+  const flowM3h = m3Day / hrs;
+  const pumpW = (flowM3h * totalHead * 2.72) / 0.65;
+  const pumpKw = Math.max(0.37, Math.ceil(pumpW / 100) / 10);
+  const pumpType = (src === 'borehole' || head > 25) ? 'Submersible' : 'Surface';
+
+  // System-specific solar sizing
+  var solarKw = 0;
+  var archNote = '';
+  if (_irrSys === 'solar_dc') {
+    solarKw = Math.ceil(pumpKw / 0.82 * 1.35 * 10) / 10;
+    archNote = 'DC pump — no inverter required. Simpler, more efficient.';
+  } else if (_irrSys === 'solar_ac') {
+    solarKw = Math.ceil(pumpKw / 0.78 * 1.4 * 10) / 10;
+    archNote = 'AC pump with VFD — variable speed control for optimised flow.';
+  } else if (_irrSys === 'generator') {
+    solarKw = 0;
+    archNote = 'Diesel generator — no solar panels. High running cost.';
+  } else if (_irrSys === 'hybrid') {
+    solarKw = Math.ceil(pumpKw / 0.82 * 0.85 * 10) / 10;
+    archNote = 'Hybrid — solar covers daytime, generator kicks in when needed.';
+  }
+
+  if (document.getElementById('irr_pump_label')) document.getElementById('irr_pump_label').textContent = pumpKw + ' kW';
+  if (document.getElementById('irr_solar_dc_label')) document.getElementById('irr_solar_dc_label').textContent = solarKw + ' kWp';
+
+  const dieselSavingYr = pumpKw * hrs * 365 * 3500 / 3;
+  const capex = _irrSys !== 'generator' ? (solarKw * 1000 * 650 + pumpKw * 1000 * 280000) : (pumpKw * 1000 * 80000);
+  const paybackMonths = _irrSys !== 'generator' ? (capex / (dieselSavingYr/12)) : 0;
+  const yieldImprovement = method === 'drip' ? 35 : method === 'sprinkler' ? 22 : 10;
+
+  var solarCardHtml = _irrSys !== 'generator'
+    ? resultCard(solarKw + ' kWp', 'Solar Array Required')
+    : resultCard('N/A', 'Solar Array');
+
+  document.getElementById('irr_results').innerHTML =
+    resultCard(m3Day.toFixed(0) + ' m³', 'Water/Day Required') +
+    resultCard(pumpKw + ' kW', 'Pump Power', 'amber') +
+    solarCardHtml +
+    resultCard(pumpType, 'Pump Type', 'blue');
+
+  document.getElementById('irr_summary').innerHTML = `
+    <div class="row g-2">
+      <div class="col-12 col-md-6">
+        <strong>System Architecture:</strong> ${archNote}<br>
+        <strong>Why ${pumpType}:</strong> ${src === 'borehole' ? 'Submersible pump required for borehole source.' : head < 15 ? 'Surface pump — low head, open water.' : 'Surface/VFD pump for moderate head.'}<br>
+        Total head: ${totalHead.toFixed(0)}m &nbsp;|&nbsp; Flow: ${flowM3h.toFixed(1)} m³/h<br>
+        Irrigation method: ${method} (efficiency: ${Math.round(effFactor*100)}%)<br>
+        Pipe: ${flowM3h < 5 ? '63mm HDPE' : flowM3h < 10 ? '90mm HDPE' : '110mm HDPE'}
+      </div>
+      <div class="col-12 col-md-6">
+        <strong>Schedule:</strong> 06:00–09:00 and 15:00–18:00 (lower evaporation)<br>
+        <strong>Expected yield improvement:</strong> +${yieldImprovement}% with ${method} irrigation<br>
+        ${_irrSys !== 'generator' ? `<strong>Payback vs diesel:</strong> ~${paybackMonths.toFixed(0)} months<br>` : ''}
+        <strong>Water daily:</strong> ${m3Day.toFixed(0)} m³ for ${land} acres<br>
+        <em>${land} acre farm demo — Tomato crop example: MWK ${fmtK(m3Day * 365 * 85)} annual water value</em>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// SIM 3: SOLAR PLANT
+// ============================================================
+function updateSOL() {
+  const kw = parseFloat(document.getElementById('sol_kw').value);
+  const psh = parseFloat(document.getElementById('sol_psh').value);
+  const eff = parseFloat(document.getElementById('sol_eff').value);
+  const batt = parseFloat(document.getElementById('sol_batt').value);
+  const load = parseFloat(document.getElementById('sol_load').value);
+
+  document.getElementById('sol_kw_val').textContent = kw;
+  document.getElementById('sol_psh_val').textContent = psh;
+  document.getElementById('sol_eff_val').textContent = eff;
+  document.getElementById('sol_batt_val').textContent = batt;
+  document.getElementById('sol_load_val').textContent = load;
+
+  const genDay = kw * psh * (eff/100);
+  const surplus = Math.max(0, genDay - load);
+  const coverage = Math.min(100, genDay/load*100).toFixed(0);
+  const capFactor = (genDay / (kw * 24) * 100).toFixed(0);
+  const annualGen = genDay * 365;
+  const annualSavings = genDay * 365 * 185;
+
+  document.getElementById('sol_results').innerHTML =
+    resultCard(fmt(genDay) + ' kWh', 'Daily Generation') +
+    resultCard(coverage + '%', 'Load Coverage') +
+    resultCard(capFactor + '%', 'Capacity Factor', 'blue') +
+    resultCard('MWK ' + fmtK(annualSavings), 'Annual Savings', 'amber');
+
+  const bars = Array.from({length:24}, (_, h) => {
+    const sf = h >= 6 && h <= 18 ? Math.sin((h-6)/12*Math.PI) : 0;
+    const gen = kw * psh/6 * sf * (eff/100);
+    return {gen};
+  });
+  const maxV = Math.max(...bars.map(b => b.gen), 0.1);
+  document.getElementById('sol_generation_chart').innerHTML = `
+    <div style="font-size:.75rem;font-weight:600;color:#475569;margin-bottom:.4rem;"><i class="bi bi-bar-chart me-1"></i>Hourly Generation Profile</div>
+    <div style="display:flex;align-items:flex-end;gap:2px;height:80px;">
+    ${bars.map((b,i)=>`<div style="flex:1;height:${(b.gen/maxV*70).toFixed(0)}px;background:${b.gen > kw*0.7 ? '#fbbf24' : '#10b981'};border-radius:2px 2px 0 0;" title="${i}:00 — ${fmt(b.gen)} kW"></div>`).join('')}
+    </div>
+    <div style="font-size:.7rem;color:#6b7280;margin-top:.3rem;">Yellow = peak generation (solar noon). Green = generation. Peak at 12h.</div>`;
+
+  document.getElementById('sol_summary').innerHTML = `
+    <strong>Recommended System:</strong> ${kw} kWp array &nbsp;|&nbsp; ${batt} kWh battery &nbsp;|&nbsp; ${psh} PSH (Malawi avg)<br>
+    Daily: ${fmt(genDay)} kWh &nbsp;|&nbsp; Annual: ${fmt(annualGen, 0)} kWh &nbsp;|&nbsp; Coverage: ${coverage}%<br>
+    Surplus: ${fmt(surplus)} kWh/day &nbsp;|&nbsp; Annual savings: MWK ${fmtK(annualSavings)}<br>
+    System CapEx: MWK ${fmtK(kw*1000*650 + batt*450000)}<br>
+    <em>Capacity factor ${capFactor}% is typical for Malawi (tropical, excellent solar resource year-round).</em>`;
+}
+
+// ============================================================
+// SIM 4: WIND TURBINE
+// ============================================================
+function updateWIND() {
+  const rating = parseFloat(document.getElementById('wind_kw').value);
+  const spd = parseFloat(document.getElementById('wind_spd').value);
+  const cutin = parseFloat(document.getElementById('wind_cutin').value);
+
+  document.getElementById('wind_kw_val').textContent = rating;
+  document.getElementById('wind_spd_val').textContent = spd;
+  document.getElementById('wind_cutin_val').textContent = cutin;
+  document.getElementById('wind_hub_val').textContent = document.getElementById('wind_hub').value;
+
+  const available = spd > cutin ? Math.min(1, Math.pow((spd - cutin) / (12 - cutin), 1.5)) : 0;
+  const output = rating * available;
+  const capFactor = (available * 100).toFixed(0);
+  const dailyKwh = output * 24;
+  const annualKwh = dailyKwh * 365;
+
+  const bladeSpeed = spd > cutin ? (spd / 8) * 2 : 0.05;
+  const rotor = document.getElementById('wind_rotor');
+  if (rotor) rotor.style.animationDuration = (2 / Math.max(0.05, bladeSpeed)).toFixed(1) + 's';
+
+  if (document.getElementById('wind_kw_label')) document.getElementById('wind_kw_label').textContent = fmt(output) + ' kW';
+  if (document.getElementById('wind_kwh_label')) document.getElementById('wind_kwh_label').textContent = '~' + fmt(dailyKwh) + ' kWh/day';
+  if (document.getElementById('wind_cf_label')) document.getElementById('wind_cf_label').textContent = 'Capacity Factor: ' + capFactor + '%';
+
+  document.getElementById('wind_results').innerHTML =
+    resultCard(fmt(output) + ' kW', 'Current Output', 'blue') +
+    resultCard(fmt(dailyKwh) + ' kWh', 'Daily Generation') +
+    resultCard(capFactor + '%', 'Capacity Factor') +
+    resultCard(fmt(annualKwh/1000, 0) + ' MWh', 'Annual Gen', 'amber');
+
+  document.getElementById('wind_summary').innerHTML = `
+    <strong>Wind at ${spd} m/s → ${rating} kW turbine:</strong> Output: ${fmt(output)} kW (${capFactor}% capacity factor)<br>
+    Daily: ${fmt(dailyKwh)} kWh &nbsp;|&nbsp; Annual: ${fmt(annualKwh, 0)} kWh<br>
+    ${spd < cutin ? '<strong class="text-danger">⚠ Wind below cut-in speed — turbine idle.</strong>' :
+      spd >= 12 ? '🌬 Turbine at rated output. Excellent wind resource.' :
+      '💨 Turbine generating at partial capacity.'}
+    <br><strong>Grant note:</strong> Wind data must be from a minimum 12-month met mast measurement. Statement of typical wind resource required for institutional finance.`;
+}
+
+// ============================================================
+// SIM 5: HYBRID (Solar + Wind + Generator)
+// ============================================================
+function updateHYB() {
+  const solar = parseFloat(document.getElementById('hyb_solar').value);
+  const wind = parseFloat(document.getElementById('hyb_wind').value);
+  const gen = parseFloat(document.getElementById('hyb_gen').value);
+  const batt = parseFloat(document.getElementById('hyb_batt').value);
+  const load = parseFloat(document.getElementById('hyb_load').value);
+  const windSpd = parseFloat(document.getElementById('hyb_wind_spd').value);
+
+  document.getElementById('hyb_solar_val').textContent = solar;
+  document.getElementById('hyb_wind_val').textContent = wind;
+  document.getElementById('hyb_gen_val').textContent = gen;
+  document.getElementById('hyb_batt_val').textContent = batt;
+  document.getElementById('hyb_load_val').textContent = load;
+  document.getElementById('hyb_wind_spd_val').textContent = windSpd;
+
+  const solarGen = solar * 5.5 * 0.85;
+  const windAvail = windSpd > 2.5 ? Math.min(1, Math.pow((windSpd-2.5)/9.5, 1.5)) : 0;
+  const windGen = wind * windAvail * 24;
+  const totalRenew = solarGen + windGen;
+  const genNeeded = Math.max(0, load - totalRenew);
+  const genKwh = Math.min(gen * 24, genNeeded);
+  const totalGen = totalRenew + genKwh;
+  const coverage = Math.min(100, totalGen/load*100).toFixed(0);
+  const renewPct = Math.min(100, totalRenew/load*100).toFixed(0);
+  const surplus = Math.max(0, totalGen - load);
+
+  document.getElementById('hyb_results').innerHTML =
+    resultCard(fmt(solarGen) + ' kWh', 'Solar Generation') +
+    resultCard(fmt(windGen) + ' kWh', 'Wind Generation', 'blue') +
+    resultCard(renewPct + '%', 'Renewable Share', 'purple') +
+    resultCard(coverage + '%', 'Total Coverage');
+
+  const totalH = Math.max(totalGen, load, 0.1);
+  document.getElementById('hyb_energy_balance').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:.5rem;">Energy Balance</div>
+    ${[
+      {l:'Solar', v:solarGen, c:'#10b981'},
+      {l:'Wind', v:windGen, c:'#3b82f6'},
+      {l:'Generator', v:genKwh, c:'#ef4444'},
+      {l:'Demand', v:load, c:'#9ca3af'},
+    ].map(row => `
+    <div class="scenario-row"><div class="scenario-label">${row.l}</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:${Math.min(100,row.v/totalH*100).toFixed(0)}%;height:100%;background:${row.c};border-radius:6px;"></div>
+      </div>
+      <div class="scenario-pct">${fmt(row.v)} kWh</div></div>`).join('')}`;
+
+  document.getElementById('hyb_summary').innerHTML = `
+    <strong>Hybrid: ${solar} kW Solar + ${wind} kW Wind + ${gen} kW Generator + ${batt} kWh Battery</strong><br>
+    Renewable generation: ${fmt(totalRenew)} kWh (${renewPct}%) &nbsp;|&nbsp; Generator fill-in: ${fmt(genKwh)} kWh<br>
+    Total coverage: ${coverage}% &nbsp;|&nbsp; Surplus: ${fmt(surplus)} kWh<br>
+    <strong>Grant appeal:</strong> ${renewPct}% renewable fraction exceeds most development finance thresholds (≥60% required).
+    Solar peaks midday; wind covers nights/cloudy periods; generator acts as safety net only.`;
+}
+
+// ============================================================
+// SIM 6: BLACKOUT / AUTONOMY
+// ============================================================
+function updateBO() {
+  const batt = parseFloat(document.getElementById('bo_batt').value);
+  const load = parseFloat(document.getElementById('bo_load').value);
+  const dod = parseFloat(document.getElementById('bo_dod').value);
+  const solar = parseFloat(document.getElementById('bo_solar').value);
+  const cutLen = parseFloat(document.getElementById('bo_cut').value);
+
+  document.getElementById('bo_batt_val').textContent = batt;
+  document.getElementById('bo_load_val').textContent = load;
+  document.getElementById('bo_dod_val').textContent = dod;
+  document.getElementById('bo_solar_val').textContent = solar;
+  document.getElementById('bo_cut_val').textContent = cutLen;
+
+  const usableKwh = batt * (dod/100);
+  const autonomyHrs = (usableKwh * 1000) / load;
+  const solarRechargeHrs = batt / (solar || 0.001) / 0.85;
+  const canSurvive = autonomyHrs >= cutLen;
+  const surplusHrs = Math.max(0, autonomyHrs - cutLen);
+
+  document.getElementById('bo_results').innerHTML =
+    resultCard(fmt(autonomyHrs, 1) + ' hrs', 'Battery Autonomy') +
+    resultCard(fmt(usableKwh, 1) + ' kWh', 'Usable Capacity') +
+    resultCard(canSurvive ? '✓ YES' : '✗ NO', canSurvive ? 'Survives Blackout' : 'Battery Insufficient', canSurvive ? '' : 'amber') +
+    resultCard(fmt(solarRechargeHrs, 1) + ' hrs', 'Solar Recharge', 'blue');
+
+  const ticks = Array.from({length: Math.min(50, Math.ceil(Math.max(autonomyHrs, cutLen)) + 2)}, (_, h) => {
+    const soc = Math.max(0, (usableKwh - (load/1000)*h) / batt * 100);
+    return soc;
+  });
+  document.getElementById('bo_timeline').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:.5rem;"><i class="bi bi-battery me-1"></i>Battery State During Blackout</div>
+    <div style="display:flex;align-items:flex-end;gap:3px;height:70px;background:#f8fafc;border-radius:8px;padding:.5rem;">
+    ${ticks.map((soc,h)=>`<div style="flex:1;height:${(soc/100*58).toFixed(0)}px;background:${soc>50?'#10b981':soc>20?'#f59e0b':'#ef4444'};border-radius:2px 2px 0 0;" title="${h}h: ${soc.toFixed(0)}% SOC"></div>`).join('')}
+    </div>
+    <div style="font-size:.7rem;color:#6b7280;margin-top:.3rem;">Hours into blackout → 🟢 Safe &nbsp; 🟡 Low &nbsp; 🔴 Critical</div>`;
+
+  document.getElementById('bo_summary').innerHTML = `
+    <strong>Analysis:</strong> ${canSurvive ?
+      `Battery survives a ${cutLen}h blackout with ${fmt(surplusHrs,1)} hours to spare. ✓` :
+      `⚠ Battery lasts only ${fmt(autonomyHrs,1)}h — insufficient for a typical ${cutLen}h outage. Increase capacity.`}
+    <br>Essential load: ${load}W &nbsp;|&nbsp; Battery: ${batt} kWh &nbsp;|&nbsp; DoD: ${dod}%
+    <br>Solar recharge: ${fmt(solarRechargeHrs,1)} hours at ${solar} kW after power returns.
+    <br><strong>Priority loads:</strong> Fridge, lights, phone charging, router.
+    <br><strong>Shed during outage:</strong> Kettle, iron, AC — extends autonomy significantly.`;
+}
+
+// ============================================================
+// SIM 7: DIESEL REPLACEMENT ROI (with month-by-month chart)
+// ============================================================
+function updateDIE() {
+  const spend = parseFloat(document.getElementById('die_spend').value);
+  const genKw = parseFloat(document.getElementById('die_gen').value);
+  const hrs = parseFloat(document.getElementById('die_hrs').value);
+  const offset = parseFloat(document.getElementById('die_offset').value);
+
+  document.getElementById('die_spend_val').textContent = (spend/1000).toFixed(0) + ',000';
+  document.getElementById('die_gen_val').textContent = genKw;
+  document.getElementById('die_hrs_val').textContent = hrs;
+  document.getElementById('die_offset_val').textContent = offset;
+
+  const solarNeeded = genKw * (offset/100) * 1.3;
+  const battNeeded = genKw * (offset/100) * hrs * 0.4;
+  const annualDieselSave = spend * 12 * (offset/100);
+  const capex = solarNeeded * 1000 * 650 + battNeeded * 450000 + genKw * (offset/100) * 1000 * 180000;
+  const paybackYrs = capex / annualDieselSave;
+  const co2SavedKg = hrs * 365 * genKw * (offset/100) * 0.7;
+
+  document.getElementById('die_results').innerHTML =
+    resultCard(fmt(solarNeeded) + ' kW', 'Solar Required') +
+    resultCard(fmt(battNeeded) + ' kWh', 'Battery Needed') +
+    resultCard('MWK ' + fmtK(annualDieselSave), 'Annual Diesel Saving', 'amber') +
+    resultCard(fmt(paybackYrs, 1) + ' yrs', 'Payback Period', 'blue');
+
+  document.getElementById('die_comparison').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:.5rem;">Annual Cost Comparison</div>
+    <div class="scenario-row"><div class="scenario-label" style="color:#ef4444;">Diesel now</div>
+      <div style="flex:1;background:#fee2e2;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:100%;height:100%;background:#ef4444;border-radius:6px;"></div>
+      </div>
+      <div class="scenario-pct" style="color:#ef4444;">MWK ${fmtK(spend*12)}</div></div>
+    <div class="scenario-row"><div class="scenario-label">After solar</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:${100-offset}%;height:100%;background:#10b981;border-radius:6px;"></div>
+      </div>
+      <div class="scenario-pct">MWK ${fmtK(spend*12*(1-offset/100))}</div></div>
+    <div style="font-size:.73rem;color:#065f46;margin-top:.5rem;">💚 Saving MWK ${fmtK(annualDieselSave)}/yr &nbsp;|&nbsp; CO₂ avoided: ${(co2SavedKg/1000).toFixed(1)} tonnes/yr</div>`;
+
+  // Month-by-month ROI (36 months)
+  const months = Array.from({length:36}, (_, i) => {
+    const cumSave = annualDieselSave/12 * (i+1);
+    const netPos = cumSave - capex;
+    return {month: i+1, cumSave, netPos, payback: netPos >= 0};
+  });
+  const maxSave = months[35].cumSave;
+  document.getElementById('die_roi_chart').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:.5rem;"><i class="bi bi-graph-up me-1"></i>Month-by-Month Savings vs Investment (36 months)</div>
+    <div style="display:flex;align-items:flex-end;gap:2px;height:90px;background:#f8fafc;border-radius:8px;padding:.5rem .5rem 0;">
+    ${months.map(m => {
+      const h = Math.max(2, (m.cumSave/maxSave*78)).toFixed(0);
+      const color = m.payback ? '#10b981' : (m.cumSave > capex*0.6 ? '#f59e0b' : '#3b82f6');
+      return `<div style="flex:1;height:${h}px;background:${color};border-radius:2px 2px 0 0;" title="Month ${m.month}: MWK ${fmtK(m.cumSave)} saved"></div>`;
+    }).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.68rem;color:#94a3b8;margin-top:.3rem;">
+      <span>Month 1</span><span>Month 12</span><span>Month 24</span><span>Month 36</span>
+    </div>
+    <div style="font-size:.7rem;margin-top:.3rem;">
+      🔵 Building savings &nbsp; 🟡 Approaching payback &nbsp; 🟢 Paid off — pure profit
+      &nbsp;|&nbsp; Payback at month ~${Math.ceil(paybackYrs*12)}
+    </div>`;
+
+  document.getElementById('die_summary').innerHTML = `
+    <strong>Diesel Replacement Plan (${offset}% offset):</strong><br>
+    Solar: ${fmt(solarNeeded)} kW &nbsp;|&nbsp; Battery: ${fmt(battNeeded)} kWh &nbsp;|&nbsp; CapEx: MWK ${fmtK(capex)}<br>
+    Annual saving: MWK ${fmtK(annualDieselSave)} &nbsp;|&nbsp; Payback: ${fmt(paybackYrs,1)} years<br>
+    CO₂ avoided: ${(co2SavedKg/1000).toFixed(1)} tonnes/year<br>
+    <strong>Generator role after solar:</strong> Emergency backup only — starts only when battery &lt; 20% SOC.
+    <br><em>Suitable for World Bank / AfDB / USAID project finance (energy access, emissions reduction).</em>`;
+}
+
+// ============================================================
+// SIM 8: MINI-GRID COMMUNITY
+// ============================================================
+function updateMG() {
+  const homes = parseFloat(document.getElementById('mg_homes').value);
+  const hload = parseFloat(document.getElementById('mg_hload').value);
+  const solar = parseFloat(document.getElementById('mg_solar').value);
+  const batt = parseFloat(document.getElementById('mg_batt').value);
+  const tariff = parseFloat(document.getElementById('mg_tariff').value);
+  const anchor = document.getElementById('mg_anchor').value;
+
+  document.getElementById('mg_homes_val').textContent = homes;
+  document.getElementById('mg_hload_val').textContent = hload;
+  document.getElementById('mg_solar_val').textContent = solar;
+  document.getElementById('mg_batt_val').textContent = batt;
+  document.getElementById('mg_tariff_val').textContent = tariff;
+
+  // Anchor load additions
+  const anchorLoads = {basic:0, school:5, market:8, full:12};
+  const anchorKwh = anchorLoads[anchor] || 0;
+  const totalDemand = homes * hload + anchorKwh;
+  const solarGen = solar * 5.5 * 0.85;
+  const coverage = Math.min(100, solarGen/totalDemand*100).toFixed(0);
+  const monthlyRevenue = totalDemand * 30 * tariff;
+  const capex = solar * 1000 * 650 + batt * 450000 + homes * 85000;
+  const paybackYrs = capex / (monthlyRevenue * 12);
+  const livelihoods = Math.round(homes * 0.6 + (anchor === 'market' || anchor === 'full' ? homes * 0.3 : 0));
+
+  document.getElementById('mg_results').innerHTML =
+    resultCard(homes + ' HH', 'Households Powered') +
+    resultCard(fmt(totalDemand) + ' kWh', 'Community Demand/Day') +
+    resultCard(coverage + '%', 'Solar Coverage', 'blue') +
+    resultCard('MWK ' + fmtK(monthlyRevenue), 'Monthly Revenue', 'amber');
+
+  // Load distribution bar
+  const homesKwh = homes * hload;
+  const totalK = Math.max(totalDemand, 0.1);
+  document.getElementById('mg_distribution').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;color:#374151;margin-bottom:.5rem;">Community Load Distribution</div>
+    <div class="scenario-row"><div class="scenario-label">Residential</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:${(homesKwh/totalK*100).toFixed(0)}%;height:100%;background:#10b981;border-radius:6px;"></div>
+      </div>
+      <div class="scenario-pct">${fmt(homesKwh)} kWh</div></div>
+    ${anchorKwh > 0 ? `<div class="scenario-row"><div class="scenario-label">Anchor loads</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:${(anchorKwh/totalK*100).toFixed(0)}%;height:100%;background:#8b5cf6;border-radius:6px;"></div>
+      </div>
+      <div class="scenario-pct">${anchorKwh} kWh</div></div>` : ''}`;
+
+  document.getElementById('mg_summary').innerHTML = `
+    <strong>Mini-grid for ${homes} households${anchor !== 'basic' ? ' + community anchors' : ''}:</strong><br>
+    Total demand: ${fmt(totalDemand)} kWh/day &nbsp;|&nbsp; Solar gen: ${fmt(solarGen)} kWh/day &nbsp;|&nbsp; Coverage: ${coverage}%<br>
+    CapEx estimate: MWK ${fmtK(capex)} &nbsp;|&nbsp; Payback: ${fmt(paybackYrs,1)} years at MWK ${tariff}/kWh<br>
+    <strong>Livelihoods supported:</strong> ~${livelihoods} people with productive use opportunities<br>
+    <em>Designed for World Bank/USAID rural electrification grant templates. Anchor loads (school, clinic, market) improve financial viability and bankability.</em>`;
+}
+
+// ============================================================
+// SIM 9: COLD ROOM / REFRIGERATION
+// ============================================================
+function updateCR() {
+  const vol = parseFloat(document.getElementById('cr_vol').value);
+  const temp = parseFloat(document.getElementById('cr_temp').value);
+  const ambient = parseFloat(document.getElementById('cr_ambient').value);
+  const diesel = parseFloat(document.getElementById('cr_diesel').value);
+  const product = document.getElementById('cr_product').value;
+
+  document.getElementById('cr_vol_val').textContent = vol;
+  document.getElementById('cr_temp_val').textContent = temp;
+  document.getElementById('cr_ambient_val').textContent = ambient;
+  document.getElementById('cr_diesel_val').textContent = (diesel/1000).toFixed(0) + ',000';
+
+  const deltaT = ambient - temp;
+  // Refrigeration load estimation (kW) — simplified heat load calculation
+  const wallLoad = vol * 0.05 * deltaT / 24;
+  const productLoad = product === 'fish' ? vol * 0.02 : product === 'meat' ? vol * 0.018 : vol * 0.01;
+  const infiltration = vol * 0.008 * deltaT / 24;
+  const refLoad = wallLoad + productLoad + infiltration;
+  const compressorKw = refLoad / 2.8; // COP ≈ 2.8
+  const dailyKwh = compressorKw * 16; // 16 hrs/day runtime
+  const solarKw = Math.ceil(dailyKwh / 5.5 / 0.82 * 1.3 * 10) / 10;
+  const battKwh = dailyKwh * 0.5; // 8hrs overnight buffer
+  const capex = solarKw * 1000 * 650 + battKwh * 450000 + 850000; // + refrigeration unit
+  const annualDieselSave = diesel * 12;
+  const paybackYrs = capex / annualDieselSave;
+
+  document.getElementById('cr_results').innerHTML =
+    resultCard(fmt(refLoad, 1) + ' kW', 'Cooling Load') +
+    resultCard(fmt(solarKw) + ' kW', 'Solar Required') +
+    resultCard(fmt(battKwh, 0) + ' kWh', 'Battery Buffer', 'blue') +
+    resultCard('MWK ' + fmtK(annualDieselSave), 'Annual Diesel Saving', 'amber');
+
+  const prodNames = {produce:'Vegetables/Produce',fish:'Fish',meat:'Meat/Poultry',dairy:'Dairy',flowers:'Flowers'};
+  document.getElementById('cr_comparison').innerHTML = `
+    <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;">Cost Comparison</div>
+    <div class="scenario-row"><div class="scenario-label" style="color:#ef4444;">Diesel cold room</div>
+      <div style="flex:1;background:#fee2e2;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:100%;height:100%;background:#ef4444;border-radius:6px;"></div>
+      </div><div class="scenario-pct">MWK ${fmtK(diesel*12)}/yr</div></div>
+    <div class="scenario-row"><div class="scenario-label">Solar cold room</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:20px;">
+        <div style="width:${Math.max(5,100-Math.min(95,annualDieselSave/annualDieselSave*85))}%;height:100%;background:#10b981;border-radius:6px;"></div>
+      </div><div class="scenario-pct">MWK ${fmtK(capex/15)}/yr</div></div>`;
+
+  document.getElementById('cr_summary').innerHTML = `
+    <strong>Cold Room: ${vol} m³ &nbsp;|&nbsp; ${deltaT}°C ΔT &nbsp;|&nbsp; ${prodNames[product]}</strong><br>
+    Cooling load: ${fmt(refLoad,1)} kW &nbsp;|&nbsp; Compressor: ${fmt(compressorKw,1)} kW<br>
+    Solar: ${solarKw} kW &nbsp;|&nbsp; Battery: ${fmt(battKwh,0)} kWh &nbsp;|&nbsp; Daily energy: ${fmt(dailyKwh)} kWh<br>
+    CapEx estimate: MWK ${fmtK(capex)} &nbsp;|&nbsp; Payback: ${fmt(paybackYrs,1)} years<br>
+    <strong>Post-harvest loss reduction:</strong> ${product === 'fish' ? '60–80%' : product === 'produce' ? '40–60%' : '30–50%'} loss prevented.
+    <em>Solar cold rooms are fundable under agri-value-chain programs (FAO, IFAD, GIZ).</em>`;
+}
+
+// ============================================================
+// SIM 10: BOREHOLE WATER + SOLAR PUMP
+// ============================================================
+function updateBH() {
+  const depth = parseFloat(document.getElementById('bh_depth').value);
+  const swl = parseFloat(document.getElementById('bh_swl').value);
+  const del = parseFloat(document.getElementById('bh_del').value);
+  const flow = parseFloat(document.getElementById('bh_flow').value);
+  const hrs = parseFloat(document.getElementById('bh_hrs').value);
+  const use = document.getElementById('bh_use').value;
+
+  document.getElementById('bh_depth_val').textContent = depth;
+  document.getElementById('bh_swl_val').textContent = swl;
+  document.getElementById('bh_del_val').textContent = del;
+  document.getElementById('bh_flow_val').textContent = flow;
+  document.getElementById('bh_hrs_val').textContent = hrs;
+
+  // Dynamic water level with drawdown
+  const dynamicLevel = swl * 1.1;
+  const totalHead = dynamicLevel + del + 5; // +5 friction losses
+  const pumpKw = (flow * totalHead * 2.72) / (3600 * 0.65);
+  const pumpKwRound = Math.max(0.37, Math.ceil(pumpKw * 10) / 10);
+  const solarKw = Math.ceil(pumpKwRound / 0.82 * 1.35 * 10) / 10;
+  const dailyM3 = flow * hrs;
+  const storageM3 = dailyM3 * 1.5; // 1.5 days storage recommended
+
+  // Population served (domestic)
+  const usersPerM3 = {domestic: 50, irrigation: 0, livestock: 20, school: 40};
+  const popServed = use !== 'irrigation' ? Math.round(dailyM3 * 1000 / 20) : 0; // 20L/person
+
+  if (document.getElementById('bh_solar_label')) document.getElementById('bh_solar_label').textContent = solarKw + ' kWp';
+  if (document.getElementById('bh_sys_note')) document.getElementById('bh_sys_note').textContent = depth + 'm borehole · submersible DC pump';
+
+  document.getElementById('bh_results').innerHTML =
+    resultCard(totalHead.toFixed(0) + 'm', 'Total Dynamic Head') +
+    resultCard(pumpKwRound + ' kW', 'Pump Power', 'amber') +
+    resultCard(solarKw + ' kWp', 'Solar Array', 'blue') +
+    resultCard(dailyM3.toFixed(0) + ' m³', 'Daily Water Yield');
+
+  document.getElementById('bh_summary').innerHTML = `
+    <strong>Borehole Solar Pump: ${depth}m depth &nbsp;|&nbsp; ${flow} m³/h flow</strong><br>
+    <strong>Architecture:</strong> Solar panels → MPPT controller → submersible DC pump (no inverter)<br>
+    Static water level: ${swl}m &nbsp;|&nbsp; Dynamic level: ${dynamicLevel.toFixed(0)}m &nbsp;|&nbsp; Total head: ${totalHead.toFixed(0)}m<br>
+    Solar: ${solarKw} kWp &nbsp;|&nbsp; Pump: ${pumpKwRound} kW &nbsp;|&nbsp; Recommended storage: ${storageM3.toFixed(0)} m³<br>
+    ${use === 'domestic' ? `<strong>Population served:</strong> ~${popServed} people at 20L/person/day<br>` : ''}
+    <strong>Solar DC advantage:</strong> No inverter → lower cost, fewer failure points, simpler maintenance.
+    <br><em>Suitable for WASH (Water, Sanitation &amp; Hygiene) grant proposals — UNICEF, IRC, WaterAid.</em>`;
+}
+
+// ============================================================
+// CLIENT VIDEO MODAL
+// ============================================================
+var _videoScenario = 'household';
+
+var _storyboards = {
+  household: {
+    title: 'Household Solar Energy System Proposal',
+    subtitle: 'Your customised home energy solution',
+    frames: [
+      {num:'01', title:'Your Energy Challenge', desc:'Current grid availability, typical blackout duration, and monthly electricity costs are reviewed.'},
+      {num:'02', title:'Solar Generation Flow', desc:'Solar panels capture sunlight → MPPT controller optimises power → charges battery bank during the day.'},
+      {num:'03', title:'Battery Storage', desc:'The battery stores solar energy for evening use. Autonomy calculated based on your specific loads.'},
+      {num:'04', title:'Inverter & House Loads', desc:'Battery powers inverter → inverter converts DC to AC → your appliances run on clean solar power.'},
+      {num:'05', title:'Grid Backup Logic', desc:'Grid is available as backup only. System switches seamlessly when battery is depleted.'},
+      {num:'06', title:'Financial Return', desc:'Payback period, annual savings (MWK), CO₂ avoided, and 25-year system return presented.'},
+    ]
+  },
+  irrigation: {
+    title: 'Solar Irrigation System Proposal',
+    subtitle: 'Water-efficient, fuel-free farming solution',
+    frames: [
+      {num:'01', title:'Farm Overview', desc:'Land size, crop type, water requirement per day, and current irrigation challenge reviewed.'},
+      {num:'02', title:'Water Source & Pump Logic', desc:'Water source identified → pump type selected → total head and flow rate calculated.'},
+      {num:'03', title:'Solar Generation Flow', desc:'Solar panels power pump directly (DC) or via VFD (AC) — no fuel cost during daylight.'},
+      {num:'04', title:'Irrigation Operation', desc:'Water flows through pipes → field rows → drip/sprinkler points → crop uptake visualised.'},
+      {num:'05', title:'Savings vs Diesel', desc:'Annual diesel fuel saving calculated. Month-by-month payback timeline shown.'},
+      {num:'06', title:'Recommendation', desc:'Complete equipment list, sizing, watering schedule, and expected yield improvement.'},
+    ]
+  }
+};
+
+function openVideoModal(scenario) {
+  _videoScenario = scenario;
+  var board = _storyboards[scenario] || _storyboards.household;
+  document.getElementById('video_modal_title').textContent = 'Generate Client Video — ' + board.title;
+  document.getElementById('video_modal_sub').textContent = board.subtitle;
+  document.getElementById('video_scenario_label').textContent = board.title;
+  document.getElementById('storyboard_frames').innerHTML = board.frames.map(f =>
+    `<div class="storyboard-frame">
+      <div class="sf-num">${f.num}</div>
+      <div>
+        <div class="sf-title">${f.title}</div>
+        <div class="sf-desc">${f.desc}</div>
+      </div>
+    </div>`
+  ).join('');
+  document.getElementById('videoModalBackdrop').classList.add('open');
+}
+
+function closeVideoModal() {
+  document.getElementById('videoModalBackdrop').classList.remove('open');
+}
+
+// Close on backdrop click
+document.getElementById('videoModalBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) closeVideoModal();
+});
+
+// ============================================================
+// DOWNLOAD FUNCTIONS
+// ============================================================
+function downloadHHReport() {
+  const solar = document.getElementById('hh_solar').value;
+  const batt = document.getElementById('hh_batt').value;
+  const load = document.getElementById('hh_load').value;
+  const psh = document.getElementById('hh_psh').value;
+  const solarGen = (parseFloat(solar) * parseFloat(psh) * 0.85).toFixed(1);
+  const capex = Math.round(parseFloat(solar)*1000*650 + parseFloat(batt)*450000 + parseFloat(solar)*1.2*180000);
+  const savings = Math.round(parseFloat(solarGen)*365*185);
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Household Energy Proposal</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:820px;margin:2rem auto;color:#1f2937;line-height:1.5;}
+  h1{color:#10b981;border-bottom:3px solid #10b981;padding-bottom:.5rem;}
+  h2{color:#374151;border-bottom:2px solid #e5e7eb;padding-bottom:.4rem;margin-top:2rem;}
+  .kpi-row{display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0;}
+  .kpi{border:2px solid #10b981;border-radius:10px;padding:1rem 1.5rem;text-align:center;min-width:120px;}
+  .kpi .v{font-size:1.8rem;font-weight:800;color:#10b981;} .kpi .l{font-size:.85rem;color:#6b7280;}
+  .arch{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:1rem;margin:1rem 0;font-family:monospace;font-size:.85rem;}
+  .disclaimer{background:#f9fafb;border:1px solid #d1d5db;border-radius:8px;padding:.8rem;font-size:.8rem;color:#6b7280;margin-top:2rem;}
+  @media print{body{margin:.5rem;}}</style></head><body>
+  <h1>⚡ Household Energy System Proposal</h1>
+  <p><strong>Generated by Emajinet Energy Intelligence Platform</strong> &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</p>
+  <h2>Recommended System</h2>
+  <div class="kpi-row">
+    <div class="kpi"><div class="v">${solar} kW</div><div class="l">Solar Array</div></div>
+    <div class="kpi"><div class="v">${batt} kWh</div><div class="l">Battery Bank</div></div>
+    <div class="kpi"><div class="v">${(parseFloat(solar)*1.2).toFixed(1)} kVA</div><div class="l">Inverter</div></div>
+    <div class="kpi"><div class="v">${solarGen} kWh</div><div class="l">Daily Solar Gen</div></div>
+  </div>
+  <h2>System Architecture</h2>
+  <div class="arch">Solar Panels (${solar} kW) → MPPT Controller → Battery (${batt} kWh) → Inverter (${(parseFloat(solar)*1.2).toFixed(1)} kVA) → House Loads (${load} kWh/day) → Grid Backup</div>
+  <h2>Financial Summary</h2>
+  <table style="width:100%;border-collapse:collapse;font-size:.9rem;">
+    <tr style="background:#f0fdf4;"><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;"><strong>Est. CapEx</strong></td><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;">MWK ${(capex/1000).toFixed(0)}K</td></tr>
+    <tr><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;"><strong>Annual Savings</strong></td><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;">MWK ${(savings/1000).toFixed(0)}K</td></tr>
+    <tr style="background:#f0fdf4;"><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;"><strong>Payback Period</strong></td><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;">${(capex/savings).toFixed(1)} years</td></tr>
+    <tr><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;"><strong>25-Year Return</strong></td><td style="padding:.5rem 1rem;border:1px solid #e5e7eb;">MWK ${((savings*25-capex)/1000).toFixed(0)}K</td></tr>
+  </table>
+  <h2>Assumptions</h2>
+  <ul><li>Location: Malawi (Southern Hemisphere, North-facing panels, ${psh} PSH)</li>
+  <li>Panel derating: 85%</li><li>Battery DoD: 80%</li><li>Grid tariff: MWK 185/kWh (ESCOM)</li></ul>
+  <div class="disclaimer">⚠ Estimates for planning purposes. Verify with a qualified energy engineer before installation.<br>Emajinet Energy Intelligence Platform</div>
+  <script>window.print();<\/script></body></html>`);
+}
+
+function downloadHHJson() {
+  const data = {
+    type: 'household_simulation', generated: new Date().toISOString(),
+    inputs: {solar_kw: document.getElementById('hh_solar').value, battery_kwh: document.getElementById('hh_batt').value,
+      daily_load_kwh: document.getElementById('hh_load').value, peak_sun_hours: document.getElementById('hh_psh').value,
+      grid_availability_pct: document.getElementById('hh_grid').value},
+    assumptions: {hemisphere:'southern', panel_orientation:'north', location:'Malawi', tariff_mwk_kwh:185},
+    architecture: 'Panels → MPPT → Battery → Inverter → Loads → Grid Backup',
+    disclaimer: 'Estimates for planning only.'
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'household_simulation.json'; a.click();
+}
+
+function downloadIRRReport() {
+  const land = document.getElementById('irr_land').value;
+  const head = document.getElementById('irr_head').value;
+  const crop = document.getElementById('irr_crop_sim').options[document.getElementById('irr_crop_sim').selectedIndex].text;
+  const sys = {solar_dc:'Solar DC Pump (no inverter)', solar_ac:'Solar AC with VFD', generator:'Diesel Generator', hybrid:'Hybrid Solar+Generator'};
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>Irrigation System Proposal</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:820px;margin:2rem auto;color:#1f2937;line-height:1.5;}
+  h1{color:#f59e0b;border-bottom:3px solid #f59e0b;padding-bottom:.5rem;}
+  h2{color:#374151;border-bottom:2px solid #e5e7eb;padding-bottom:.4rem;margin-top:2rem;}
+  .arch{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:1rem;margin:1rem 0;font-family:monospace;font-size:.85rem;}
+  .disclaimer{background:#f9fafb;border:1px solid #d1d5db;border-radius:8px;padding:.8rem;font-size:.8rem;color:#6b7280;margin-top:2rem;}
+  @media print{body{margin:.5rem;}}</style></head><body>
+  <h1>🌾 Solar Irrigation System Proposal</h1>
+  <p><strong>Generated by Emajinet Energy Intelligence Platform</strong> &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</p>
+  <h2>Farm Overview</h2>
+  <p>Land: ${land} acres &nbsp;|&nbsp; Crop: ${crop} &nbsp;|&nbsp; Head: ${head}m &nbsp;|&nbsp; System: ${sys[_irrSys]||'Solar DC'}</p>
+  <h2>System Architecture</h2>
+  <div class="arch">${_irrSys==='solar_dc'?'Solar Panels → MPPT Controller → DC Pump → Water (NO inverter)':
+    _irrSys==='solar_ac'?'Solar Panels → Pump VFD → AC Motor Pump → Water':
+    _irrSys==='generator'?'Generator → AC Pump → Water':
+    'Solar Panels + Generator → Controller → Pump → Water'}</div>
+  <h2>Irrigation Schedule</h2>
+  <p><strong>06:00–09:00</strong> — Morning irrigation (lower evaporation, crops actively growing)<br>
+  <strong>15:00–18:00</strong> — Afternoon irrigation (before temperature drops, avoid heat stress)</p>
+  <h2>Notes</h2>
+  <ul><li>Verify pump head, flow rate, and pipe sizing with a qualified irrigation engineer</li>
+  <li>DC pump does not require an inverter — reducing cost and maintenance</li>
+  <li>Schedule irrigation during solar peak hours for maximum efficiency</li></ul>
+  <div class="disclaimer">⚠ Estimates for planning purposes. Verify with qualified engineer before installation.<br>Emajinet Energy Intelligence Platform</div>
+  <script>window.print();<\/script></body></html>`);
+}
+
+function downloadIRRJson() {
+  const data = {
+    type: 'irrigation_simulation', generated: new Date().toISOString(),
+    inputs: {land_acres: document.getElementById('irr_land').value, head_m: document.getElementById('irr_head').value,
+      distance_m: document.getElementById('irr_dist').value, daily_hours: document.getElementById('irr_hrs').value,
+      source: document.getElementById('irr_src_sim').value, system_type: _irrSys,
+      irrigation_method: document.getElementById('irr_method_sim').value},
+    architecture: _irrSys === 'solar_dc' ? 'Panels → MPPT → DC Pump → Water (no inverter)' : 'varies by system type',
+    assumptions: {hemisphere:'southern', psh:5.5, location:'Malawi'},
+    disclaimer: 'Estimates for planning only.'
+  };
+  const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'irrigation_simulation.json'; a.click();
+}
+
+function downloadStoryboard() {
+  var board = _storyboards[_videoScenario] || _storyboards.household;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${board.title} — Storyboard</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:840px;margin:2rem auto;color:#1f2937;background:#f8fafc;}
+  h1{color:#10b981;} .frame{background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:14px;padding:1.2rem;margin-bottom:1rem;color:#fff;display:flex;align-items:flex-start;gap:1rem;}
+  .num{background:rgba(16,185,129,.2);border:2px solid #10b981;color:#34d399;font-weight:800;border-radius:50%;width:40px;height:40px;min-width:40px;display:flex;align-items:center;justify-content:center;font-size:.9rem;}
+  .ft{font-weight:700;margin-bottom:.3rem;} .fd{font-size:.8rem;color:rgba(255,255,255,.7);}
+  .footer{font-size:.75rem;color:#9ca3af;margin-top:2rem;text-align:center;}
+  @media print{body{background:#fff;margin:.5rem;}}</style></head><body>
+  <h1>🎬 ${board.title}</h1>
+  <p style="color:#6b7280;">${board.subtitle} &nbsp;|&nbsp; Generated by Emajinet · ${new Date().toLocaleDateString()}</p>
+  ${board.frames.map(f=>`<div class="frame"><div class="num">${f.num}</div><div><div class="ft">${f.title}</div><div class="fd">${f.desc}</div></div></div>`).join('')}
+  <div class="footer">Emajinet Energy Intelligence Platform &bull; Simulation Storyboard<br>This storyboard is for client presentation and grant proposal purposes. All values subject to site verification.</div>
+  <script>window.print();<\/script></body></html>`);
+}
+
+function downloadClientProposalPDF() {
+  var board = _storyboards[_videoScenario] || _storyboards.household;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${board.title} — Client Proposal</title>
+  <style>body{font-family:'Segoe UI',Arial,sans-serif;max-width:820px;margin:2rem auto;color:#1f2937;}
+  h1{color:#10b981;font-size:1.6rem;} h2{color:#374151;border-bottom:2px solid #e5e7eb;padding-bottom:.4rem;margin-top:1.5rem;}
+  .cover{background:linear-gradient(135deg,#0f172a,#064e3b);color:#fff;padding:2rem;border-radius:14px;margin-bottom:2rem;}
+  .cover h1{color:#34d399;border:none;} .cover p{opacity:.8;}
+  .disclaimer{background:#f9fafb;border:1px solid #d1d5db;border-radius:8px;padding:.8rem;font-size:.78rem;color:#6b7280;margin-top:2rem;}
+  @media print{body{margin:.5rem;}}</style></head><body>
+  <div class="cover">
+    <h1>${board.title}</h1>
+    <p>${board.subtitle}</p>
+    <p style="font-size:.85rem;margin-top:1rem;">Prepared by: Emajinet Energy Intelligence Platform &nbsp;|&nbsp; ${new Date().toLocaleDateString()}</p>
+  </div>
+  <h2>Scope of Work</h2>
+  <p>This proposal outlines a complete energy system designed to meet the client's specific requirements as simulated in the Emajinet Simulation Center.</p>
+  <h2>Proposed System Architecture</h2>
+  ${board.frames.map(f=>`<p><strong>${f.num}. ${f.title}:</strong> ${f.desc}</p>`).join('')}
+  <h2>Why Emajinet</h2>
+  <p>Emajinet provides engineering-grade energy simulations, sizing calculations, and client proposal support for solar, irrigation, hybrid, and off-grid projects across Africa.</p>
+  <div class="disclaimer">⚠ This proposal is based on simulation inputs and should be verified by a qualified energy engineer before procurement. Site assessment recommended.<br>Emajinet Energy Intelligence Platform</div>
+  <script>window.print();<\/script></body></html>`);
+}
+
+// ============================================================
+// INITIALISE
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  updateHH();
+  updateIRR();
+  updateSOL();
+  updateWIND();
+  updateHYB();
+  updateBO();
+  updateDIE();
+  updateMG();
+  updateCR();
+  updateBH();
+});
+</script>
+{% endblock %}
