@@ -369,30 +369,10 @@ def test_landing_metrics_api_with_businesses(client):
     assert data["team_members"] >= 2
 
 
-def test_landing_page_airtel_partner_link(client):
+def test_landing_page_trusted_infrastructure_section_present(client):
     """
-    GUARDRAIL: Airtel partner logo must link to https://www.airtel.mw/ with
-    target="_blank" rel="noopener noreferrer", not href="#".
-    """
-    url = reverse("staticpages:home")
-    response = client.get(url)
-
-    assert response.status_code == 200
-    content = response.content.decode()
-
-    assert "https://www.airtel.mw/" in content, (
-        "Airtel partner link must point to https://www.airtel.mw/"
-    )
-    assert 'airtel-logo.svg' in content, (
-        "Airtel logo SVG must be rendered in partners section"
-    )
-
-
-def test_landing_page_tnm_partner_link(client):
-    """
-    GUARDRAIL: TNM partner logo must link to https://www.tnmmpamba.co.mw/#/ with
-    target="_blank" rel="noopener noreferrer", not href="#".
-    Must also use the real tnm-logo.svg asset, not a placeholder icon.
+    GUARDRAIL: The Trusted Infrastructure section must be present on the landing page
+    after the features section, replacing the old marquee partners strip.
     """
     url = reverse("staticpages:home")
     response = client.get(url)
@@ -400,17 +380,111 @@ def test_landing_page_tnm_partner_link(client):
     assert response.status_code == 200
     content = response.content.decode()
 
-    assert "https://www.tnmmpamba.co.mw/#/" in content, (
-        "TNM partner link must point to https://www.tnmmpamba.co.mw/#/"
+    assert "Trusted Infrastructure" in content, (
+        "Landing page must contain 'Trusted Infrastructure' section heading"
     )
-    assert "tnm-logo.svg" in content, (
-        "TNM logo must use the tnm-logo.svg asset, not a generic SVG icon"
+    assert 'id="trusted-infrastructure"' in content, (
+        "Trusted Infrastructure section must have id='trusted-infrastructure'"
+    )
+
+
+def test_landing_page_trusted_infra_contains_paychangu(client):
+    """
+    GUARDRAIL: Trusted Infrastructure section must include PayChangu.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "PayChangu" in content, (
+        "Trusted Infrastructure section must include PayChangu"
+    )
+    assert "Seamless Local Payments" in content, (
+        "PayChangu card must have its headline 'Seamless Local Payments'"
+    )
+
+
+def test_landing_page_trusted_infra_contains_twilio(client):
+    """
+    GUARDRAIL: Trusted Infrastructure section must include Twilio.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Twilio" in content, (
+        "Trusted Infrastructure section must include Twilio"
+    )
+    assert "Secure OTP" in content, (
+        "Twilio card must have its headline 'Secure OTP &amp; Alerts'"
+    )
+
+
+def test_landing_page_trusted_infra_contains_sendgrid(client):
+    """
+    GUARDRAIL: Trusted Infrastructure section must include SendGrid.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "SendGrid" in content, (
+        "Trusted Infrastructure section must include SendGrid"
+    )
+    assert "Reliable Email Delivery" in content, (
+        "SendGrid card must have its headline 'Reliable Email Delivery'"
+    )
+
+
+def test_landing_page_trusted_infra_subtitle_and_microcopy(client):
+    """
+    Trusted Infrastructure section must contain the approved subtitle and microcopy.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Powered by global and African technology leaders" in content, (
+        "Trusted Infrastructure subtitle must be present"
+    )
+    assert "Trusted by modern businesses" in content, (
+        "Trusted Infrastructure microcopy must be present"
+    )
+    assert "Built on infrastructure trusted by millions" in content, (
+        "Trusted Infrastructure trust statement must be present"
+    )
+
+
+def test_landing_page_old_partners_strip_not_duplicated(client):
+    """
+    GUARDRAIL: The old marquee partners strip must not appear on the page.
+    The new Trusted Infrastructure section is the single integration showcase.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "partners-strip" not in content, (
+        "Old 'partners-strip' marquee element must not appear; use Trusted Infrastructure section instead"
+    )
+    assert "partners-marquee-track" not in content, (
+        "Old marquee track must be removed; use Trusted Infrastructure section instead"
     )
 
 
 def test_landing_page_partner_links_open_new_tab(client):
     """
-    GUARDRAIL: Partner links (Airtel, TNM) must open in a new tab and have
+    GUARDRAIL: External infrastructure links must open in a new tab and have
     rel="noopener noreferrer" for security.
     """
     url = reverse("staticpages:home")
@@ -985,9 +1059,9 @@ def test_landing_page_still_loads_with_simulation(client):
     # Pricing/CTA must still be present
     assert "pricing" in content.lower() or "Get Started" in content
 
-    # Partners must still be present
-    assert "airtel" in content.lower() or "partner" in content.lower(), (
-        "Partners section must still be present after adding energy simulation"
+    # Trusted Infrastructure section must still be present
+    assert "Trusted Infrastructure" in content or "trusted-infrastructure" in content, (
+        "Trusted Infrastructure section must still be present after adding energy simulation"
     )
 
 
@@ -1153,6 +1227,155 @@ def test_hero_preview_no_layout_jump(client):
 
     assert "dash-panels-host" in content, "Panels host wrapper must exist"
     assert "dashPanelsHost" in content, "dashPanelsHost id must exist for JS targeting"
+
+
+# ===========================================================================
+# GROCERIES DASHBOARD TESTS
+# ===========================================================================
+
+# ===========================================================================
+# CHART LEGEND WORDING — no raw "cursor" in user-facing labels
+# ===========================================================================
+
+def test_landing_page_chart_legend_no_raw_cursor(client):
+    """
+    GUARDRAIL: The energy simulation chart legend on the landing page must NOT
+    contain the raw word 'cursor' as a visible label.
+
+    'cursor' is developer jargon; the approved term is 'Current Time Marker'.
+    CSS property values (cursor:pointer) are not affected — only visible text.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    import re
+    # Extract the chart legend div text (the aria-hidden caption under demoSimChart)
+    legend_match = re.search(
+        r'id="demoSimChart"[^>]*>.*?<div[^>]*aria-hidden="true"[^>]*>(.*?)</div>',
+        content,
+        re.DOTALL,
+    )
+    if legend_match:
+        legend_text = legend_match.group(1)
+        assert "cursor" not in legend_text.lower(), (
+            "Chart legend must not contain the raw word 'cursor' — use 'Current Time Marker' instead"
+        )
+
+
+def test_landing_page_chart_legend_has_current_time_marker(client):
+    """
+    GUARDRAIL: The energy simulation chart legend must use 'Current Time Marker'
+    (not the old developer label 'cursor').
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Current Time Marker" in content, (
+        "Energy simulation chart legend must contain 'Current Time Marker'"
+    )
+
+
+@pytest.mark.django_db
+def test_energy_sizing_detail_chart_legend_no_raw_cursor(client):
+    """
+    GUARDRAIL: The energy system sizing detail chart legend must NOT contain
+    the raw phrase 'time cursor' or bare 'cursor' as a visible label.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.models_energy import SystemSizingRun
+
+    User = get_user_model()
+    user = User.objects.create_user("curtestleg", "curtestleg@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Cursor Legend Test Biz", slug="cursor-legend-test-biz", business_kind="energy"
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    run = SystemSizingRun.objects.create(
+        business=biz,
+        title="Legend Test System",
+        recommended_array_kw=3.0,
+        recommended_panel_count=8,
+    )
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("verticals:energy_sizing_detail", kwargs={"run_id": run.pk})
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    import re
+    # Extract only the visible caption below the simChart canvas (not JS code/comments)
+    caption_match = re.search(
+        r'id="simChart"[^>]*>.*?<div[^>]*>(.*?)</div>',
+        content,
+        re.DOTALL,
+    )
+    if caption_match:
+        caption_text = caption_match.group(1)
+        assert "time cursor" not in caption_text.lower(), (
+            "Energy sizing detail chart caption must not contain 'time cursor' — "
+            "use 'Current Time Marker' instead"
+        )
+    # Also verify the label is not present as visible HTML outside script/style blocks
+    html_without_scripts = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
+    html_without_scripts = re.sub(r'<style[^>]*>.*?</style>', '', html_without_scripts, flags=re.DOTALL)
+    assert "time cursor" not in html_without_scripts.lower(), (
+        "Energy sizing detail rendered HTML must not contain 'time cursor' — "
+        "use 'Current Time Marker' instead"
+    )
+
+
+@pytest.mark.django_db
+def test_energy_sizing_detail_chart_legend_has_current_time_marker(client):
+    """
+    GUARDRAIL: The energy system sizing detail chart legend must display
+    'Current Time Marker' instead of the old developer label.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.models_energy import SystemSizingRun
+
+    User = get_user_model()
+    user = User.objects.create_user("ctmtestleg", "ctmtestleg@example.com", "pass123")
+    biz = Business.objects.create(
+        name="CTM Legend Test Biz", slug="ctm-legend-test-biz", business_kind="energy"
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    run = SystemSizingRun.objects.create(
+        business=biz,
+        title="CTM Legend Test System",
+        recommended_array_kw=3.0,
+        recommended_panel_count=8,
+    )
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("verticals:energy_sizing_detail", kwargs={"run_id": run.pk})
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Current Time Marker" in content, (
+        "Energy sizing detail chart legend must contain 'Current Time Marker' (cyan)"
+    )
 
 
 # ===========================================================================
