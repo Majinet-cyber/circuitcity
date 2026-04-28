@@ -180,19 +180,9 @@ def _get_kpis(
             # Filter by business vertical
             inv_qs = inv_qs.filter(Q(business__business_kind__iexact=vertical) | Q(business__vertical__iexact=vertical))
 
-        # Stock value (cost basis)
+        # Stock value (cost basis, using cost_price field)
         stock_value_data = inv_qs.aggregate(
-            total=Coalesce(
-                Sum(
-                    Case(
-                        When(cost__isnull=False, then=F("cost")),
-                        When(purchase_price__isnull=False, then=F("purchase_price")),
-                        default=Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
-                        output_field=DecimalField(max_digits=12, decimal_places=2),
-                    )
-                ),
-                zero_dec,
-            )
+            total=Coalesce(Sum(Coalesce(F("cost_price"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)))), zero_dec)
         )
         stock_value = stock_value_data["total"] or Decimal("0.00")
 
@@ -257,12 +247,13 @@ def _get_chart_series(
     sales_count_trend = []
     profit_trend = []
 
-    # Build profit map
+    # Build profit map (using cost_price field)
     profit_map = {}
+    zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
     if connection.vendor == "sqlite":
         # Calculate profit in Python for SQLite
         sales_for_profit = sales_qs.select_related("item").values(
-            "sold_at", "price", "item__cost", "item__purchase_price"
+            "sold_at", "price", "item__cost_price"
         )
         daily_profit_data = defaultdict(Decimal)
 
@@ -270,18 +261,13 @@ def _get_chart_series(
             if sale["sold_at"]:
                 day = sale["sold_at"].date() if hasattr(sale["sold_at"], "date") else sale["sold_at"]
                 price = Decimal(str(sale["price"] or 0))
-                cost = Decimal(str(sale["item__cost"] or sale["item__purchase_price"] or 0))
+                cost = Decimal(str(sale["item__cost_price"] or 0))
                 daily_profit_data[day] += price - cost
 
         profit_map = {day: float(profit) for day, profit in daily_profit_data.items()}
     else:
         # PostgreSQL/MySQL: use DB-level aggregation
-        profit_annotation = Case(
-            When(item__cost__isnull=False, then=F("price") - F("item__cost")),
-            When(item__purchase_price__isnull=False, then=F("price") - F("item__purchase_price")),
-            default=F("price"),
-            output_field=DecimalField(max_digits=12, decimal_places=2),
-        )
+        profit_annotation = F("price") - Coalesce(F("item__cost_price"), zero_cost)
 
         daily_profit = (
             sales_qs.annotate(day=TruncDate("sold_at"), profit=profit_annotation)
