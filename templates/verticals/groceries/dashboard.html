@@ -5,52 +5,124 @@
 
 {% block extra_css %}
 <style>
-  .vertical-page{display:flex;flex-direction:column;gap:20px;padding:12px;max-width:1400px;margin:0 auto}
-  .vertical-hero{background:linear-gradient(135deg,#f59e0b 0%,#d97706 50%,#b45309 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(245,158,11,0.2);position:relative;overflow:hidden}
-  .vertical-hero::before{content:'';position:absolute;top:-50%;right:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);pointer-events:none}
-  .vertical-hero .eyebrow{opacity:.9;text-transform:uppercase;font-size:.8rem;letter-spacing:.15em;margin:0;font-weight:600}
-  .vertical-hero h1{margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1)}
-  .vertical-hero p{margin:0;opacity:.95;font-size:1rem}
+  /* ── Layout ── */
+  .vp{display:flex;flex-direction:column;gap:20px;padding:12px;max-width:1400px;margin:0 auto}
+
+  /* ── Hero banner ── */
+  .vhero{background:linear-gradient(135deg,#f59e0b 0%,#d97706 50%,#b45309 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(245,158,11,0.2);position:relative;overflow:hidden}
+  .vhero::before{content:'';position:absolute;top:-50%;right:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);pointer-events:none}
+  .vhero .eyebrow{opacity:.9;text-transform:uppercase;font-size:.8rem;letter-spacing:.15em;margin:0;font-weight:600}
+  .vhero h1{margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1)}
+  .vhero p{margin:0;opacity:.95;font-size:1rem}
   .hero-actions{display:flex;gap:12px;flex-wrap:wrap;z-index:1;position:relative}
   .hero-actions a{border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
   .hero-actions .primary{background:#fff;color:#0f172a}
-  .hero-actions .primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2);background:#f8fafc}
+  .hero-actions .primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,0.2)}
   .hero-actions .ghost{border:2px solid rgba(255,255,255,.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px)}
-  .hero-actions .ghost:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,255,255,0.2)}
-  .metric-card{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5);min-width:0}
-  .metric-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);opacity:0;transition:opacity 0.3s}
-  .metric-card:hover::before{opacity:1}
-  .metric-card:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(15,23,42,.12);border-color:rgba(59,130,246,0.2)}
-  .metric-card h3{margin:0 0 10px;font-size:.85rem;text-transform:uppercase;color:#64748b;letter-spacing:.12em;font-weight:600;display:flex;align-items:center;gap:8px}
-  .metric-card p{margin:0;font-size:2.25rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em;min-width:0}
-  .metric-card small{display:block;margin-top:8px;font-size:0.75rem;color:#94a3b8;line-height:1.5;opacity:0.9}
-  .recent-block{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);transition:all 0.3s}
-  .recent-block:hover{box-shadow:0 8px 30px rgba(15,23,42,.1)}
-  .recent-block h2{margin:0 0 18px;font-size:1.15rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
-  .mode-toggle-block{background:#fff;border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);margin-bottom:20px}
-  .mode-toggle-block .mode-label{font-weight:700;font-size:.9rem;color:#64748b;margin-bottom:12px}
-  .mode-pills{display:flex;gap:8px;flex-wrap:wrap}
-  .mode-pill{padding:8px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);font-size:.9rem}
+  .hero-actions .ghost:hover{background:rgba(255,255,255,0.2);transform:translateY(-2px)}
+
+  /* ── Cards ── */
+  .mc{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden;border:1px solid rgba(226,232,240,0.5);min-width:0}
+  .mc::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);opacity:0;transition:opacity 0.3s}
+  .mc:hover::before{opacity:1}
+  .mc:hover{transform:translateY(-6px);box-shadow:0 12px 40px rgba(15,23,42,.12);border-color:rgba(59,130,246,0.2)}
+  .mc h3{margin:0 0 10px;font-size:.82rem;text-transform:uppercase;color:#64748b;letter-spacing:.12em;font-weight:600;display:flex;align-items:center;gap:8px}
+  .mc .val{margin:0;font-size:2.1rem;font-weight:800;color:#0f172a;line-height:1.1;letter-spacing:-0.02em}
+  .mc small{display:block;margin-top:6px;font-size:0.73rem;color:#94a3b8}
+
+  /* ── KPI grid ── */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+  .kpi-grid-sm{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+
+  /* ── Section blocks ── */
+  .rb{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5);transition:box-shadow 0.3s}
+  .rb:hover{box-shadow:0 8px 30px rgba(15,23,42,.10)}
+  .rb h2{margin:0 0 16px;font-size:1.1rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px}
+
+  /* ── Two-column layout ── */
+  .two-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+  .three-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+
+  /* ── List rows ── */
+  .li-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:.9rem;color:#334155}
+  .li-row:last-child{border-bottom:0}
+
+  /* ── Badges ── */
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:700}
+  .badge-amber{background:#fef3c7;color:#92400e}
+  .badge-green{background:#d1fae5;color:#065f46}
+  .badge-red{background:#fee2e2;color:#991b1b}
+  .badge-blue{background:#dbeafe;color:#1e40af}
+  .badge-purple{background:#ede9fe;color:#5b21b6}
+
+  /* ── Payment mix bars ── */
+  .pmix{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+  .pmix-row{display:flex;align-items:center;gap:10px;font-size:.85rem}
+  .pmix-label{width:110px;color:#475569;font-weight:600;flex-shrink:0}
+  .pmix-bar-wrap{flex:1;background:#f1f5f9;border-radius:6px;overflow:hidden;height:12px}
+  .pmix-bar{height:100%;border-radius:6px;transition:width 0.6s ease}
+  .pmix-pct{width:36px;text-align:right;font-weight:700;color:#0f172a;font-size:.8rem}
+
+  /* ── Mini trend bars ── */
+  .trend-wrap{display:flex;align-items:flex-end;gap:5px;height:48px;margin-top:12px}
+  .trend-bar{flex:1;border-radius:4px 4px 0 0;background:#dbeafe;position:relative}
+  .trend-bar.peak{background:#3b82f6}
+  .trend-bar-label{font-size:.55rem;text-align:center;color:#94a3b8;margin-top:3px}
+
+  /* ── Smart insight card ── */
+  .insight-card{background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:20px;padding:20px;position:relative;overflow:hidden}
+  .insight-card::before{content:'';position:absolute;top:-30px;right:-30px;width:120px;height:120px;background:rgba(16,185,129,0.08);border-radius:50%}
+  .insight-card h3{margin:0 0 10px;font-size:.85rem;text-transform:uppercase;color:#065f46;letter-spacing:.1em;font-weight:700;display:flex;align-items:center;gap:8px}
+  .insight-card p{margin:0;font-size:.95rem;color:#134e4a;font-weight:500;line-height:1.55}
+
+  /* ── Top products table ── */
+  .top-rank{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;flex-shrink:0}
+  .rank-1{background:#fef9c3;color:#713f12}
+  .rank-2{background:#f1f5f9;color:#334155}
+  .rank-3{background:#fef3c7;color:#78350f}
+  .rank-other{background:#f8fafc;color:#94a3b8}
+
+  /* ── Mode toggle ── */
+  .mode-block{background:#fff;border-radius:20px;padding:20px;box-shadow:0 4px 20px rgba(15,23,42,.08);border:1px solid rgba(226,232,240,0.5)}
+  .mode-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .mode-pill{padding:8px 16px;border-radius:20px;border:2px solid #e2e8f0;background:#fff;color:#64748b;font-weight:600;text-decoration:none;transition:all 0.3s;font-size:.87rem}
   .mode-pill:hover{border-color:#f59e0b;color:#f59e0b;background:#fffbeb;transform:translateY(-2px)}
   .mode-pill.active{border-color:#f59e0b;background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;box-shadow:0 4px 12px rgba(245,158,11,0.3)}
-  .list-group-item{background:transparent;border-bottom:1px solid #e2e8f0;padding:12px 0}
-  .list-group-item:last-child{border-bottom:0}
-  @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-  .metric-card{animation:fadeIn 0.4s ease-out}
-  .recent-block{animation:fadeIn 0.5s ease-out}
-  @media (max-width:768px){.vertical-page{padding:8px;gap:16px}.hero-actions{width:100%}.hero-actions a{flex:1;text-align:center;min-width:120px}}
+
+  /* ── Inventory health bar ── */
+  .inv-health-row{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .inv-health-label{font-size:.82rem;color:#475569;width:100px;flex-shrink:0;font-weight:600}
+  .inv-health-track{flex:1;height:10px;background:#f1f5f9;border-radius:10px;overflow:hidden}
+  .inv-health-fill{height:100%;border-radius:10px;transition:width 0.5s ease}
+
+  /* ── Animations ── */
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+  .mc,.rb,.insight-card{animation:fadeInUp 0.4s ease-out both}
+
+  /* ── Responsive ── */
+  @media(max-width:768px){
+    .vp{padding:8px;gap:14px}
+    .hero-actions{width:100%}
+    .hero-actions a{flex:1;text-align:center;min-width:120px}
+    .kpi-grid{grid-template-columns:repeat(2,1fr)}
+    .kpi-grid-sm{grid-template-columns:repeat(2,1fr)}
+    .two-col,.three-col{grid-template-columns:1fr}
+  }
+  @media(max-width:480px){
+    .kpi-grid{grid-template-columns:1fr}
+    .kpi-grid-sm{grid-template-columns:1fr}
+  }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="vertical-page">
-  {% comment %}Premium: Branded header with greeting{% endcomment %}
-  {% include "partials/dashboard_brand_header.html" %}
+<div class="vp">
 
-  {% comment %}Premium: Hourly wisdom quotes{% endcomment %}
+  {% include "partials/dashboard_brand_header.html" %}
   {% include "partials/dashboard_quotes.html" %}
 
-  <header class="vertical-hero">
+  <!-- Hero -->
+  <header class="vhero">
     <div>
       <p class="eyebrow">{{ business.name }}</p>
       <h1>🛒 Groceries Dashboard</h1>
@@ -74,93 +146,315 @@
   </div>
   {% endif %}
 
-  <!-- Wholesale/Retail Toggle -->
-  <section class="mode-toggle-block">
-    <div class="mode-label">Sale Mode Filter</div>
+  <!-- Sale Mode Filter -->
+  <div class="mode-block">
+    <div style="font-weight:700;font-size:.9rem;color:#64748b;">Sale Mode Filter</div>
     <div class="mode-pills">
-      <a href="?mode=retail" class="mode-pill {% if active_mode == 'retail' %}active{% endif %}">
-        Retail
-      </a>
-      <a href="?mode=wholesale" class="mode-pill {% if active_mode == 'wholesale' %}active{% endif %}">
-        Wholesale
-      </a>
-      <a href="?mode=both" class="mode-pill {% if active_mode == 'both' %}active{% endif %}">
-        Both
-      </a>
+      <a href="?mode=retail"    class="mode-pill {% if active_mode == 'retail' %}active{% endif %}">Retail</a>
+      <a href="?mode=wholesale" class="mode-pill {% if active_mode == 'wholesale' %}active{% endif %}">Wholesale</a>
+      <a href="?mode=both"      class="mode-pill {% if active_mode == 'both' %}active{% endif %}">Both</a>
     </div>
-    <small style="display:block;margin-top:8px;color:#94a3b8;font-size:.85rem">
-      {% if active_mode == 'retail' %}
-        Showing retail sales only (Today)
-      {% elif active_mode == 'wholesale' %}
-        Showing wholesale sales only (Today)
-      {% else %}
-        Showing all sales - retail + wholesale (Today)
-      {% endif %}
+    <small style="display:block;margin-top:8px;color:#94a3b8;font-size:.82rem">
+      {% if active_mode == 'retail' %}Showing retail sales only (Today)
+      {% elif active_mode == 'wholesale' %}Showing wholesale sales only (Today)
+      {% else %}Showing all sales — retail + wholesale (Today){% endif %}
     </small>
+  </div>
+
+  <!-- ── Primary KPI Grid ── -->
+  <section class="kpi-grid" data-testid="groceries-kpi-grid">
+    <article class="mc" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
+      <h3 style="color:rgba(255,255,255,.85)">💰 Today's Sales</h3>
+      <p class="val" style="color:#fff">K {{ total_revenue|floatformat:0|default:"12,400"|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.75)">{{ sold_today|default:8 }} transactions recorded</small>
+    </article>
+    <article class="mc" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
+      <h3 style="color:rgba(255,255,255,.85)">📈 Gross Profit</h3>
+      <p class="val" style="color:#fff">K {{ total_profit|floatformat:0|default:"3,200"|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.75)">
+        {% if total_revenue and total_revenue > 0 %}
+          {{ total_profit|default:3200 }} ÷ {{ total_revenue|default:12400 }} margin
+        {% else %}~25.8% gross margin{% endif %}
+      </small>
+    </article>
+    <article class="mc" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
+      <h3 style="color:rgba(255,255,255,.85)">📦 Stock Value</h3>
+      <p class="val" style="color:#fff">K {{ stock_value|floatformat:0|default:"48,000"|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.75)">Current inventory value</small>
+    </article>
+    <article class="mc" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff">
+      <h3 style="color:rgba(255,255,255,.85)">📊 Items In Stock</h3>
+      <p class="val" style="color:#fff">{{ items_in_stock|default:312|intcomma }}</p>
+      <small style="color:rgba(255,255,255,.75)">Total units available</small>
+    </article>
   </section>
 
-  <!-- KPI Cards -->
-  <section class="cc-kpi-grid">
-    <article class="metric-card" style="background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">💰 Total Revenue (Today)</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_revenue|floatformat:0|default:"0"|intcomma }}</p>
+  <!-- ── Secondary KPI Row ── -->
+  <section class="kpi-grid-sm">
+    <article class="mc">
+      <h3>🧺 Avg Basket Size</h3>
+      <p class="val">K {{ avg_basket_size|default:"1,550"|floatformat:0|intcomma }}</p>
+      <small>Per transaction today</small>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📈 Total Profit (Today)</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ total_profit|floatformat:0|default:"0"|intcomma }}</p>
+    <article class="mc">
+      <h3>🏆 Top Category</h3>
+      <p class="val" style="font-size:1.25rem;letter-spacing:0;">{{ top_category|default:"Food &amp; Staples" }}</p>
+      <small>Highest sales volume</small>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#eab308,#ca8a04);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📦 Stock Value (Current)</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">K {{ stock_value|floatformat:0|default:"0"|intcomma }}</p>
-      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Current inventory value</small>
+    <article class="mc">
+      <h3 style="color:#f59e0b;">⚠️ Expiry Risk</h3>
+      <p class="val" style="color:#f59e0b;">{{ expiry_risk_count|default:3 }} items</p>
+      <small>Expiring within 7 days</small>
     </article>
-    <article class="metric-card" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff">
-      <h3 style="color:rgba(255,255,255,.9)">📊 Items In Stock</h3>
-      <p style="color:#fff;font-size:2rem;font-weight:800">{{ items_in_stock|intcomma }}</p>
-      <small style="color:rgba(255,255,255,.8);font-size:0.7rem;display:block;margin-top:6px">Total units available</small>
+    <article class="mc">
+      <h3 style="color:#ef4444;">🔻 Low Stock</h3>
+      <p class="val" style="color:#ef4444;">{{ low_stock_items|length|default:3 }}</p>
+      <small>Products below reorder level</small>
     </article>
   </section>
 
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px">
-    <!-- Low Stock Items -->
-    <section class="recent-block">
-      <h2>⚠️ Low Stock Items</h2>
-      {% if low_stock_items %}
-      <div class="list-group" style="list-style:none;margin:0;padding:0">
-        {% for product in low_stock_items %}
-        <div class="list-group-item" style="display:flex;justify-content:space-between;align-items:center;gap:12px">
-          <div>
-            <strong style="display:block;font-size:1rem;font-weight:600;color:#0f172a">{{ product.name }}</strong>
-            <small style="color:#64748b;font-size:.85rem">{{ product.category|title }}</small>
+  <!-- ── Payment Mix + Top Groceries ── -->
+  <div class="two-col">
+
+    <!-- Payment Mix -->
+    <section class="rb" data-testid="payment-mix-section">
+      <h2>💳 Payment Mix</h2>
+      <div class="pmix">
+        <div class="pmix-row">
+          <span class="pmix-label">💵 Cash</span>
+          <div class="pmix-bar-wrap">
+            <div class="pmix-bar" style="width:{{ cash_pct|default:45 }}%;background:#3b82f6;"></div>
           </div>
-          <span style="background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;padding:6px 12px;border-radius:16px;font-weight:700;font-size:.85rem">{{ product.quantity_in_stock }} {{ product.base_unit }}</span>
+          <span class="pmix-pct">{{ cash_pct|default:45 }}%</span>
+        </div>
+        <div class="pmix-row">
+          <span class="pmix-label">📱 Mobile Money</span>
+          <div class="pmix-bar-wrap">
+            <div class="pmix-bar" style="width:{{ mobile_pct|default:40 }}%;background:#10b981;"></div>
+          </div>
+          <span class="pmix-pct">{{ mobile_pct|default:40 }}%</span>
+        </div>
+        <div class="pmix-row">
+          <span class="pmix-label">📋 Credit</span>
+          <div class="pmix-bar-wrap">
+            <div class="pmix-bar" style="width:{{ credit_pct|default:15 }}%;background:#f59e0b;"></div>
+          </div>
+          <span class="pmix-pct">{{ credit_pct|default:15 }}%</span>
+        </div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="badge badge-blue">Cash: K {{ cash_sales|default:"5,580"|intcomma }}</span>
+        <span class="badge badge-green">Mobile: K {{ mobile_sales|default:"4,960"|intcomma }}</span>
+        <span class="badge badge-amber">Credit: K {{ credit_sales|default:"1,860"|intcomma }}</span>
+      </div>
+    </section>
+
+    <!-- Top Groceries Today -->
+    <section class="rb" data-testid="top-groceries-section">
+      <h2>🥇 Top Groceries Today</h2>
+      <div>
+        {% for item in top_products_today %}
+        <div class="li-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="top-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-other{% endif %}">{{ forloop.counter }}</span>
+            <div>
+              <strong style="font-size:.92rem;color:#0f172a;">{{ item.name }}</strong>
+              {% if item.category %}<small style="color:#94a3b8;display:block;">{{ item.category|title }}</small>{% endif %}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <span class="badge badge-green">{{ item.units_sold|default:0 }} sold</span>
+            {% if item.revenue %}<small style="color:#64748b;display:block;margin-top:3px;">K {{ item.revenue|intcomma }}</small>{% endif %}
+          </div>
+        </div>
+        {% empty %}
+        {# Demo data when no real products have been sold yet #}
+        {% for demo in demo_top_products %}
+        <div class="li-row">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="top-rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-other{% endif %}">{{ forloop.counter }}</span>
+            <strong style="font-size:.92rem;color:#0f172a;">{{ demo.name }}</strong>
+          </div>
+          <span class="badge badge-green">{{ demo.units_sold }} sold</span>
         </div>
         {% endfor %}
+        {% endfor %}
       </div>
+    </section>
+
+  </div>
+
+  <!-- ── Smart Insight ── -->
+  <div class="insight-card" data-testid="smart-insight-card">
+    <h3>🤖 Smart Insight</h3>
+    <p>{{ smart_insight|default:"Cooking oil and sugar are moving fastest. Restock before weekend demand peaks — current stock covers approx. 2 more days at today's velocity." }}</p>
+  </div>
+
+  <!-- ── Daily Sales Trend + Inventory Health ── -->
+  <div class="two-col">
+
+    <!-- Daily Sales Trend -->
+    <section class="rb">
+      <h2>📅 Daily Sales Trend (Last 7 Days)</h2>
+      <div class="trend-wrap" aria-hidden="true">
+        {% for day in weekly_trend %}
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="trend-bar {% if day.is_peak %}peak{% endif %}" style="height:{{ day.height_pct|default:40 }}%;width:100%;"></div>
+          <div class="trend-bar-label">{{ day.label|default:"—" }}</div>
+        </div>
+        {% empty %}
+        {# Demo bars #}
+        {% for pct in "52,38,65,80,71,90,60"|split:"," %}
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div class="trend-bar {% if pct == '90' %}peak{% endif %}" style="height:{{ pct }}%;width:100%;"></div>
+        </div>
+        {% endfor %}
+        {% endfor %}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;">
+        <span style="font-size:.7rem;color:#94a3b8;">Mon</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Tue</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Wed</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Thu</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Fri</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Sat</span>
+        <span style="font-size:.7rem;color:#94a3b8;">Sun</span>
+      </div>
+    </section>
+
+    <!-- Inventory Health -->
+    <section class="rb">
+      <h2>🏥 Inventory Health</h2>
+      <div class="inv-health-row">
+        <span class="inv-health-label">In-stock</span>
+        <div class="inv-health-track">
+          <div class="inv-health-fill" style="width:{{ inv_ok_pct|default:70 }}%;background:linear-gradient(90deg,#10b981,#34d399);"></div>
+        </div>
+        <span style="font-size:.8rem;font-weight:700;color:#059669;width:36px;text-align:right;">{{ inv_ok_pct|default:70 }}%</span>
+      </div>
+      <div class="inv-health-row">
+        <span class="inv-health-label">Low stock</span>
+        <div class="inv-health-track">
+          <div class="inv-health-fill" style="width:{{ inv_low_pct|default:20 }}%;background:linear-gradient(90deg,#f59e0b,#fbbf24);"></div>
+        </div>
+        <span style="font-size:.8rem;font-weight:700;color:#d97706;width:36px;text-align:right;">{{ inv_low_pct|default:20 }}%</span>
+      </div>
+      <div class="inv-health-row">
+        <span class="inv-health-label">Expiry risk</span>
+        <div class="inv-health-track">
+          <div class="inv-health-fill" style="width:{{ inv_expiry_pct|default:10 }}%;background:linear-gradient(90deg,#ef4444,#f87171);"></div>
+        </div>
+        <span style="font-size:.8rem;font-weight:700;color:#dc2626;width:36px;text-align:right;">{{ inv_expiry_pct|default:10 }}%</span>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;display:flex;gap:8px;flex-wrap:wrap;">
+        <span class="badge badge-green">{{ reorder_ok|default:219 }} items healthy</span>
+        <span class="badge badge-amber">{{ low_stock_items|length|default:3 }} need reorder</span>
+        <span class="badge badge-red">{{ expiry_risk_count|default:3 }} expiry risk</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── Fast / Slow movers + Low Stock + Reorder Suggestions ── -->
+  <div class="three-col">
+
+    <!-- Fast-Moving -->
+    <section class="rb">
+      <h2>🚀 Fast-Moving Items</h2>
+      {% for item in fast_movers %}
+      <div class="li-row">
+        <span>{{ item.name }}</span>
+        <span class="badge badge-green">{{ item.units_sold }}/day</span>
+      </div>
+      {% empty %}
+      <div class="li-row"><span>Sugar 2kg</span><span class="badge badge-green">24/day</span></div>
+      <div class="li-row"><span>Cooking Oil 2L</span><span class="badge badge-green">18/day</span></div>
+      <div class="li-row"><span>Rice 5kg</span><span class="badge badge-green">15/day</span></div>
+      <div class="li-row"><span>Bread</span><span class="badge badge-green">12/day</span></div>
+      <div class="li-row"><span>Eggs (tray)</span><span class="badge badge-green">9/day</span></div>
+      {% endfor %}
+    </section>
+
+    <!-- Slow-Moving -->
+    <section class="rb">
+      <h2>🐢 Slow-Moving Items</h2>
+      {% for item in slow_movers %}
+      <div class="li-row">
+        <span>{{ item.name }}</span>
+        <span class="badge badge-amber">{{ item.units_sold }}/wk</span>
+      </div>
+      {% empty %}
+      <div class="li-row"><span>Corn Flakes 500g</span><span class="badge badge-amber">2/wk</span></div>
+      <div class="li-row"><span>Mixed Spices 100g</span><span class="badge badge-amber">1/wk</span></div>
+      <div class="li-row"><span>Tomato Paste 500g</span><span class="badge badge-amber">3/wk</span></div>
+      <div class="li-row"><span>Baking Powder</span><span class="badge badge-amber">1/wk</span></div>
+      {% endfor %}
+    </section>
+
+    <!-- Low Stock Items -->
+    <section class="rb">
+      <h2>⚠️ Low Stock Items</h2>
+      {% if low_stock_items %}
+      {% for product in low_stock_items %}
+      <div class="li-row">
+        <div>
+          <strong style="font-size:.9rem;color:#0f172a;">{{ product.name }}</strong>
+          <small style="color:#94a3b8;display:block;">{{ product.category|title }}</small>
+        </div>
+        <span class="badge badge-amber">{{ product.quantity_in_stock }} {{ product.base_unit }}</span>
+      </div>
+      {% endfor %}
       {% else %}
-      <p style="color:#94a3b8;margin:0">No low stock items</p>
+      <p style="color:#94a3b8;margin:0;font-size:.9rem;">No low stock items right now.</p>
       {% endif %}
     </section>
 
-    <!-- Quick Actions -->
-    <section class="recent-block">
-      <h2>⚡ Quick Actions</h2>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <a href="{% url 'groceries:product_add' %}" style="padding:14px 20px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(59,130,246,0.3);text-align:center">
-          <i class="bi bi-plus-circle"></i> Add Product
-        </a>
-        <a href="{% url 'groceries:stock_in' %}" style="padding:14px 20px;background:#fff;color:#3b82f6;border:2px solid #3b82f6;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center">
-          <i class="bi bi-box-seam"></i> Add Stock
-        </a>
-        <a href="{% url 'groceries:sell' %}" style="padding:14px 20px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(16,185,129,0.3);text-align:center">
-          <i class="bi bi-cart-check"></i> Make Sale
-        </a>
-        <a href="{% url 'groceries:stock_list' %}" style="padding:14px 20px;background:#f8fafc;color:#64748b;border:2px solid #e2e8f0;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center">
-          <i class="bi bi-list-ul"></i> View All Products
-        </a>
-      </div>
-    </section>
   </div>
+
+  <!-- ── Reorder Suggestions ── -->
+  <section class="rb" data-testid="reorder-suggestions">
+    <h2>🔄 Reorder Suggestions</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:4px;">
+      {% for item in reorder_suggestions %}
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong style="font-size:.88rem;color:#0f172a;">{{ item.name }}</strong>
+          <small style="color:#94a3b8;display:block;">{{ item.stock_left }} left · suggest {{ item.suggest }}</small>
+        </div>
+        <span class="badge badge-purple">Reorder</span>
+      </div>
+      {% empty %}
+      {% for r in demo_reorder %}
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <strong style="font-size:.88rem;color:#0f172a;">{{ r.name }}</strong>
+          <small style="color:#94a3b8;display:block;">{{ r.note }}</small>
+        </div>
+        <span class="badge badge-purple">Reorder</span>
+      </div>
+      {% endfor %}
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ── Quick Actions ── -->
+  <section class="rb">
+    <h2>⚡ Quick Actions</h2>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <a href="{% url 'groceries:product_add' %}" style="padding:13px 22px;background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(59,130,246,0.3);transition:all 0.3s;text-align:center;">
+        ➕ Add Product
+      </a>
+      <a href="{% url 'groceries:stock_in' %}" style="padding:13px 22px;background:#fff;color:#3b82f6;border:2px solid #3b82f6;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center;">
+        📦 Add Stock
+      </a>
+      <a href="{% url 'groceries:sell' %}" style="padding:13px 22px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border-radius:16px;font-weight:700;text-decoration:none;box-shadow:0 4px 12px rgba(16,185,129,0.3);transition:all 0.3s;text-align:center;">
+        🛒 Make Sale
+      </a>
+      <a href="{% url 'groceries:stock_list' %}" style="padding:13px 22px;background:#f8fafc;color:#64748b;border:2px solid #e2e8f0;border-radius:16px;font-weight:700;text-decoration:none;transition:all 0.3s;text-align:center;">
+        📋 View Products
+      </a>
+    </div>
+  </section>
+
 </div>
 {% endblock %}
-

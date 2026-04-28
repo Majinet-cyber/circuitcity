@@ -547,7 +547,6 @@
       transform: perspective(1100px) rotateY(-10deg) rotateX(4deg);
       transform-style: preserve-3d;
       transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
-      /* Elevation shadow */
       filter: drop-shadow(0 32px 56px rgba(0,0,0,0.28))
               drop-shadow(0 12px 24px rgba(0,0,0,0.16))
               drop-shadow(0 0 40px rgba(79,70,229,0.08));
@@ -676,15 +675,15 @@
       .hero-counters { flex-direction: column; gap: 0.75rem; }
     }
 
-    /* Product dashboard mockup */
-    .dash-mock { background: #1e1b4b; }
+    /* Product dashboard mockup — light mode inside dark laptop */
+    .dash-mock { background: #ffffff; }
     .dash-mock-topbar {
-      background: #2d2a5e;
+      background: #f8fafc;
       padding: 0.75rem 1.25rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid rgba(255,255,255,0.07);
+      border-bottom: 1px solid #e2e8f0;
     }
     .dash-dots { display: flex; gap: 6px; }
     .dash-dot {
@@ -696,13 +695,13 @@
     .dash-dot--green  { background: #28c840; }
     .dash-mock-title {
       font-size: 0.7rem;
-      color: rgba(255,255,255,0.45);
+      color: #64748b;
       font-weight: 500;
     }
     .dash-mock-body { padding: 1.25rem; }
     .dash-mock-greeting {
       font-size: 0.7rem;
-      color: rgba(255,255,255,0.4);
+      color: #94a3b8;
       margin-bottom: 1rem;
     }
     .dash-kpis {
@@ -712,14 +711,14 @@
       margin-bottom: 1rem;
     }
     .dash-kpi {
-      background: rgba(255,255,255,0.06);
+      background: #f8fafc;
       border-radius: 8px;
       padding: 0.875rem;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid #e2e8f0;
     }
     .dash-kpi-label {
       font-size: 0.6rem;
-      color: rgba(255,255,255,0.4);
+      color: #94a3b8;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       margin-bottom: 0.25rem;
@@ -727,26 +726,26 @@
     .dash-kpi-value {
       font-size: 0.9375rem;
       font-weight: 700;
-      color: #fff;
+      color: #0f172a;
       line-height: 1.2;
     }
-    .dash-kpi-value--green { color: #34d399; }
-    .dash-kpi-delta { font-size: 0.6rem; color: #34d399; margin-top: 0.2rem; }
-    .dash-kpi-delta--down { color: #f87171; }
+    .dash-kpi-value--green { color: #059669; }
+    .dash-kpi-delta { font-size: 0.6rem; color: #059669; margin-top: 0.2rem; }
+    .dash-kpi-delta--down { color: #dc2626; }
     .dash-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.625rem;
     }
     .dash-card {
-      background: rgba(255,255,255,0.06);
+      background: #f8fafc;
       border-radius: 8px;
       padding: 0.875rem;
-      border: 1px solid rgba(255,255,255,0.05);
+      border: 1px solid #e2e8f0;
     }
     .dash-card-title {
       font-size: 0.6rem;
-      color: rgba(255,255,255,0.4);
+      color: #94a3b8;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       margin-bottom: 0.625rem;
@@ -756,9 +755,9 @@
       justify-content: space-between;
       align-items: center;
       padding: 0.3rem 0;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
+      border-bottom: 1px solid #f1f5f9;
       font-size: 0.6875rem;
-      color: rgba(255,255,255,0.7);
+      color: #334155;
     }
     .dash-stock-row:last-child { border-bottom: none; }
     .dash-badge {
@@ -767,15 +766,15 @@
       border-radius: 2rem;
       font-weight: 600;
     }
-    .dash-badge--low  { background: rgba(251,191,36,0.2);  color: #fbbf24; }
-    .dash-badge--ok   { background: rgba(52,211,153,0.15); color: #34d399; }
+    .dash-badge--low  { background: #fef3c7; color: #92400e; }
+    .dash-badge--ok   { background: #d1fae5; color: #065f46; }
     .dash-alert-row {
       display: flex;
       align-items: flex-start;
       gap: 0.5rem;
       padding: 0.3rem 0;
       font-size: 0.6875rem;
-      color: rgba(255,255,255,0.6);
+      color: #475569;
     }
     .dash-alert-dot {
       width: 5px; height: 5px;
@@ -783,9 +782,63 @@
       margin-top: 0.3rem;
       flex-shrink: 0;
     }
-    .dash-alert-dot--amber { background: #fbbf24; }
-    .dash-alert-dot--red   { background: #f87171; }
-    .dash-alert-dot--green { background: #34d399; }
+    .dash-alert-dot--amber { background: #f59e0b; }
+    .dash-alert-dot--red   { background: #ef4444; }
+    .dash-alert-dot--green { background: #10b981; }
+
+    /* ── Laptop preview rotation ── */
+    .dash-panel {
+      position: absolute;
+      inset: 0;
+      transition: opacity 0.8s ease, transform 0.8s ease;
+      will-change: opacity, transform;
+    }
+    .dash-panel--active {
+      opacity: 1;
+      transform: translateX(0);
+      z-index: 2;
+      pointer-events: auto;
+    }
+    .dash-panel--hidden {
+      opacity: 0;
+      transform: translateX(8px);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .dash-panels-host {
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Energy preview — light mode with green accents */
+    .energy-mock { background: #f0fdf4; }
+    .energy-mock .dash-mock-topbar { background: #dcfce7; border-bottom: 1px solid #bbf7d0; }
+    .energy-mock .dash-mock-title  { color: #065f46; }
+    .energy-mock .dash-mock-greeting { color: #6b7280; }
+    .energy-kpi { background: #ffffff; border: 1px solid #bbf7d0; }
+    .energy-kpi .dash-kpi-label { color: #64748b; }
+    .energy-kpi .dash-kpi-value { color: #047857; }
+    .energy-kpi .dash-kpi-delta { color: #059669; }
+    .energy-card { background: #ffffff; border: 1px solid #bbf7d0; }
+    .energy-card .dash-card-title { color: #64748b; }
+    .energy-alert-row { color: #374151; }
+    .energy-mini-bar-wrap {
+      display: flex; align-items: flex-end; gap: 3px;
+      height: 28px; margin-top: 8px;
+    }
+    .energy-mini-bar {
+      flex: 1; border-radius: 3px 3px 0 0;
+      background: rgba(16,185,129,0.3);
+      transition: height 0.3s;
+    }
+    .energy-status-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 0; font-size: 0.6rem;
+      color: #374151;
+      border-top: 1px solid #d1fae5;
+      margin-top: 6px; padding-top: 6px;
+    }
+    .energy-dot-healthy { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; margin-right: 4px; vertical-align: middle; }
 
     @media (max-width: 900px) {
       .hero-content {
@@ -3112,77 +3165,161 @@
         <div class="laptop-wrapper">
         <div class="laptop-frame">
         <div class="laptop-screen">
-        <div class="dash-mock">
-          <div class="dash-mock-topbar">
-            <div class="dash-dots">
-              <div class="dash-dot dash-dot--red"></div>
-              <div class="dash-dot dash-dot--yellow"></div>
-              <div class="dash-dot dash-dot--green"></div>
+        <!-- Rotating panels host — height set by tallest panel -->
+        <div class="dash-panels-host" id="dashPanelsHost" style="height:360px;">
+
+          <!-- Panel 1: Business Dashboard (default) -->
+          <div class="dash-panel dash-panel--active" id="dashPanel0" aria-label="Business dashboard preview">
+          <div class="dash-mock" style="height:100%;overflow:hidden;">
+            <div class="dash-mock-topbar">
+              <div class="dash-dots">
+                <div class="dash-dot dash-dot--red"></div>
+                <div class="dash-dot dash-dot--yellow"></div>
+                <div class="dash-dot dash-dot--green"></div>
+              </div>
+              <div class="dash-mock-title">Emajinet &mdash; Today's Overview</div>
+              <div></div>
             </div>
-            <div class="dash-mock-title">Emajinet &mdash; Today's Overview</div>
-            <div></div>
+            <div class="dash-mock-body">
+              <div class="dash-mock-greeting">Dashboard &middot; April 2026</div>
+              <div class="dash-kpis">
+                <div class="dash-kpi">
+                  <div class="dash-kpi-label">Avg. Daily Revenue</div>
+                  <div class="dash-kpi-value" id="dash-kpi-revenue">—</div>
+                  <div class="dash-kpi-delta">30-day avg</div>
+                </div>
+                <div class="dash-kpi">
+                  <div class="dash-kpi-label">Gross Margin</div>
+                  <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">—</div>
+                  <div class="dash-kpi-delta">avg margin</div>
+                </div>
+                <div class="dash-kpi">
+                  <div class="dash-kpi-label">Sales / Day</div>
+                  <div class="dash-kpi-value" id="dash-kpi-sales">—</div>
+                  <div class="dash-kpi-delta">avg transactions</div>
+                </div>
+              </div>
+              <div class="dash-row">
+                <div class="dash-card">
+                  <div class="dash-card-title">Stock Levels</div>
+                  <div class="dash-stock-row">
+                    <span>Samsung A05</span>
+                    <span class="dash-badge dash-badge--low">3 left</span>
+                  </div>
+                  <div class="dash-stock-row">
+                    <span>Airpods Pro</span>
+                    <span class="dash-badge dash-badge--ok">12 in stock</span>
+                  </div>
+                  <div class="dash-stock-row">
+                    <span>USB-C Charger</span>
+                    <span class="dash-badge dash-badge--low">5 left</span>
+                  </div>
+                  <div class="dash-stock-row">
+                    <span>iPhone 15</span>
+                    <span class="dash-badge dash-badge--ok">8 in stock</span>
+                  </div>
+                </div>
+                <div class="dash-card">
+                  <div class="dash-card-title">Alerts</div>
+                  <div class="dash-alert-row">
+                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
+                    <span>Samsung A05 — restock now</span>
+                  </div>
+                  <div class="dash-alert-row">
+                    <div class="dash-alert-dot dash-alert-dot--red"></div>
+                    <span>Sale below cost detected</span>
+                  </div>
+                  <div class="dash-alert-row">
+                    <div class="dash-alert-dot dash-alert-dot--green"></div>
+                    <span>Agent Mwale: 12 sales today</span>
+                  </div>
+                  <div class="dash-alert-row">
+                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
+                    <span>USB-C Charger — low stock</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="dash-mock-body">
-            <div class="dash-mock-greeting">Dashboard &middot; April 2026</div>
-            <div class="dash-kpis">
-              <div class="dash-kpi">
-                <div class="dash-kpi-label">Avg. Daily Revenue</div>
-                <div class="dash-kpi-value" id="dash-kpi-revenue">—</div>
-                <div class="dash-kpi-delta">30-day avg</div>
+          </div><!-- /Panel 1 -->
+
+          <!-- Panel 2: Renewable Energy Dashboard Preview -->
+          <div class="dash-panel dash-panel--hidden" id="dashPanel1" aria-label="Renewable Energy dashboard preview" data-testid="energy-preview-panel">
+          <div class="dash-mock energy-mock" style="height:100%;overflow:hidden;">
+            <div class="dash-mock-topbar">
+              <div class="dash-dots">
+                <div class="dash-dot dash-dot--red"></div>
+                <div class="dash-dot dash-dot--yellow"></div>
+                <div class="dash-dot dash-dot--green"></div>
               </div>
-              <div class="dash-kpi">
-                <div class="dash-kpi-label">Gross Margin</div>
-                <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">—</div>
-                <div class="dash-kpi-delta">avg margin</div>
-              </div>
-              <div class="dash-kpi">
-                <div class="dash-kpi-label">Sales / Day</div>
-                <div class="dash-kpi-value" id="dash-kpi-sales">—</div>
-                <div class="dash-kpi-delta">avg transactions</div>
-              </div>
+              <div class="dash-mock-title">Emajinet Energy &mdash; Site Overview</div>
+              <div></div>
             </div>
-            <div class="dash-row">
-              <div class="dash-card">
-                <div class="dash-card-title">Stock Levels</div>
-                <div class="dash-stock-row">
-                  <span>Samsung A05</span>
-                  <span class="dash-badge dash-badge--low">3 left</span>
+            <div class="dash-mock-body" style="padding:0.9rem 1rem;">
+              <div class="dash-mock-greeting">Renewable Energy &middot; April 2026</div>
+              <!-- KPI Row 1 -->
+              <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:0.75rem;">
+                <div class="dash-kpi energy-kpi">
+                  <div class="dash-kpi-label">Installed Capacity</div>
+                  <div class="dash-kpi-value">5.0 kW</div>
+                  <div class="dash-kpi-delta">3 active sites</div>
                 </div>
-                <div class="dash-stock-row">
-                  <span>Airpods Pro</span>
-                  <span class="dash-badge dash-badge--ok">12 in stock</span>
+                <div class="dash-kpi energy-kpi">
+                  <div class="dash-kpi-label">Generated Today</div>
+                  <div class="dash-kpi-value">12.4 kWh</div>
+                  <div class="dash-kpi-delta">↑ vs yesterday</div>
                 </div>
-                <div class="dash-stock-row">
-                  <span>USB-C Charger</span>
-                  <span class="dash-badge dash-badge--low">5 left</span>
-                </div>
-                <div class="dash-stock-row">
-                  <span>iPhone 15</span>
-                  <span class="dash-badge dash-badge--ok">8 in stock</span>
+                <div class="dash-kpi energy-kpi">
+                  <div class="dash-kpi-label">Battery Health</div>
+                  <div class="dash-kpi-value">91%</div>
+                  <div class="dash-kpi-delta">Optimal</div>
                 </div>
               </div>
-              <div class="dash-card">
-                <div class="dash-card-title">Alerts</div>
-                <div class="dash-alert-row">
-                  <div class="dash-alert-dot dash-alert-dot--amber"></div>
-                  <span>Samsung A05 — restock now</span>
+              <!-- 2-col row -->
+              <div class="dash-row" style="gap:0.5rem;">
+                <div class="dash-card energy-card" style="padding:0.75rem;">
+                  <div class="dash-card-title">Alerts &amp; Status</div>
+                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
+                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
+                    <span>2 maintenance alerts</span>
+                  </div>
+                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
+                    <div class="dash-alert-dot dash-alert-dot--red"></div>
+                    <span>Blackout risk: 18:30&ndash;21:00</span>
+                  </div>
+                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
+                    <div class="dash-alert-dot dash-alert-dot--green"></div>
+                    <span>System status: Healthy</span>
+                  </div>
+                  <div class="energy-status-row">
+                    <span><span class="energy-dot-healthy"></span>Est. savings</span>
+                    <span style="color:#047857;font-weight:700;">MWK 185,000/mo</span>
+                  </div>
                 </div>
-                <div class="dash-alert-row">
-                  <div class="dash-alert-dot dash-alert-dot--red"></div>
-                  <span>Sale below cost detected</span>
-                </div>
-                <div class="dash-alert-row">
-                  <div class="dash-alert-dot dash-alert-dot--green"></div>
-                  <span>Agent Mwale: 12 sales today</span>
-                </div>
-                <div class="dash-alert-row">
-                  <div class="dash-alert-dot dash-alert-dot--amber"></div>
-                  <span>USB-C Charger — low stock</span>
+                <div class="dash-card energy-card" style="padding:0.75rem;">
+                  <div class="dash-card-title">Generation Forecast</div>
+                  <div style="font-size:0.6rem;color:#94a3b8;margin-bottom:4px;">Hourly kWh output (today)</div>
+                  <div class="energy-mini-bar-wrap" aria-hidden="true">
+                    <div class="energy-mini-bar" style="height:35%;"></div>
+                    <div class="energy-mini-bar" style="height:55%;"></div>
+                    <div class="energy-mini-bar" style="height:80%;"></div>
+                    <div class="energy-mini-bar" style="height:100%;background:rgba(16,185,129,0.55);"></div>
+                    <div class="energy-mini-bar" style="height:90%;"></div>
+                    <div class="energy-mini-bar" style="height:70%;"></div>
+                    <div class="energy-mini-bar" style="height:50%;"></div>
+                    <div class="energy-mini-bar" style="height:30%;"></div>
+                  </div>
+                  <div class="energy-status-row">
+                    <span>Peak: 12:00–14:00</span>
+                    <span style="color:#047857;">3.8 kWh peak</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+          </div><!-- /Panel 2 -->
+
+        </div><!-- /.dash-panels-host -->
         </div><!-- /.laptop-screen -->
         <div class="laptop-base"></div>
         <div class="laptop-hinge"></div>
@@ -5980,6 +6117,24 @@
         if (src) openLb(src, alt, cap);
       });
     })();
+
+    /* ── Hero laptop preview rotation (5s per panel) ── */
+    (function () {
+      var panels = document.querySelectorAll('.dash-panel');
+      if (!panels || panels.length < 2) return;
+      var current = 0;
+      var DELAY = 5000;
+      function showPanel(idx) {
+        panels[current].classList.remove('dash-panel--active');
+        panels[current].classList.add('dash-panel--hidden');
+        current = idx % panels.length;
+        panels[current].classList.remove('dash-panel--hidden');
+        panels[current].classList.add('dash-panel--active');
+      }
+      setInterval(function () {
+        showPanel(current + 1);
+      }, DELAY);
+    }());
   </script>
 
   <!-- ============================================================

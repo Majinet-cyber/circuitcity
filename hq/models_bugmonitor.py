@@ -126,6 +126,18 @@ class SystemIssue(models.Model):
         ordering = ["-last_seen_at"]
         verbose_name = "System Issue"
         verbose_name_plural = "System Issues"
+        permissions = [
+            ("can_view_hq_admin",       "Can view HQ admin"),
+            ("can_view_bug_monitor",    "Can view Bug Monitor"),
+            ("can_view_stack_traces",   "Can view stack traces"),
+            ("can_manage_bug_status",   "Can manage bug status"),
+            ("can_assign_bugs",         "Can assign bugs"),
+            ("can_view_audit_logs",     "Can view audit logs"),
+            ("can_manage_admin_roles",  "Can manage admin roles"),
+            ("can_view_business_data",  "Can view business data"),
+            ("can_manage_integrations", "Can manage integrations"),
+            ("can_view_webhooks",       "Can view webhooks"),
+        ]
         indexes = [
             models.Index(fields=["fingerprint"]),
             models.Index(fields=["status", "severity"]),

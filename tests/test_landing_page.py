@@ -1031,3 +1031,349 @@ def test_gym_dashboard_clean_render(client):
             f"Developer text '{text}' must not appear in gym dashboard rendered HTML"
         )
 
+
+# ===========================================================================
+# HERO LAPTOP PREVIEW ROTATION — both panels must be present in HTML
+# ===========================================================================
+
+def test_hero_contains_business_dashboard_preview(client):
+    """
+    Hero laptop must contain the normal business dashboard preview panel.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "dashPanel0" in content, "Business dashboard panel (dashPanel0) must be in hero"
+    assert "dash-panel--active" in content, "One panel must start as active"
+    assert "Stock Levels" in content or "Samsung A05" in content, (
+        "Business dashboard preview content must be present"
+    )
+
+
+def test_hero_contains_energy_dashboard_preview(client):
+    """
+    Hero laptop must contain the Renewable Energy dashboard preview panel.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "dashPanel1" in content, "Energy dashboard panel (dashPanel1) must be in hero"
+    assert "energy-preview-panel" in content or "data-testid=\"energy-preview-panel\"" in content, (
+        "Energy preview panel must have its testid"
+    )
+
+
+def test_hero_energy_preview_has_installed_capacity(client):
+    """
+    The hero energy preview must show '5.0 kW' installed capacity text.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "5.0 kW" in content, (
+        "Energy preview must show '5.0 kW' installed capacity"
+    )
+    assert "Installed Capacity" in content or "installed capacity" in content.lower(), (
+        "Energy preview must label installed capacity"
+    )
+
+
+def test_hero_energy_preview_has_realistic_metrics(client):
+    """
+    The hero energy preview must show all required realistic demo metrics.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "12.4 kWh" in content, "Energy preview must show 12.4 kWh generated today"
+    assert "91%" in content, "Energy preview must show 91% battery health"
+    assert "185,000" in content or "MWK 185,000" in content, (
+        "Energy preview must show MWK 185,000 estimated savings"
+    )
+    assert "Blackout risk" in content, "Energy preview must show blackout risk text"
+    assert "System status" in content or "system status" in content.lower(), (
+        "Energy preview must show system status"
+    )
+
+
+def test_hero_energy_preview_has_forecast_chart(client):
+    """
+    The hero energy preview must contain a mini forecast/bar chart element.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "energy-mini-bar" in content or "Generation Forecast" in content, (
+        "Energy preview must contain a mini generation forecast chart"
+    )
+
+
+def test_hero_preview_rotation_js_present(client):
+    """
+    Hero laptop rotation JS must be present and reference panel IDs.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "dash-panel" in content, "Rotation panel class must exist"
+    assert "dashPanel0" in content and "dashPanel1" in content, (
+        "Both panel IDs must be in the page"
+    )
+    assert "dash-panel--hidden" in content, "Hidden panel class must be in HTML"
+    assert "dash-panel--active" in content, "Active panel class must be in HTML"
+
+
+def test_hero_preview_no_layout_jump(client):
+    """
+    Panels host must have a fixed height to prevent layout jump during rotation.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "dash-panels-host" in content, "Panels host wrapper must exist"
+    assert "dashPanelsHost" in content, "dashPanelsHost id must exist for JS targeting"
+
+
+# ===========================================================================
+# GROCERIES DASHBOARD TESTS
+# ===========================================================================
+
+@pytest.mark.django_db
+def test_groceries_dashboard_loads(client):
+    """
+    Groceries dashboard must return 200 for an authenticated grocery business user.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("groctest", "groctest@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Test Grocery Store",
+        slug="test-grocery-store-dash",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+    assert "Groceries Dashboard" in content
+
+
+@pytest.mark.django_db
+def test_groceries_dashboard_has_payment_mix(client):
+    """
+    Groceries dashboard must contain the payment mix section with Cash, Mobile Money, Credit.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("grocpmix", "grocpmix@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Grocery Payment Mix Test",
+        slug="grocery-pmix-test",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "payment-mix-section" in content or "Payment Mix" in content, (
+        "Groceries dashboard must contain a Payment Mix section"
+    )
+    assert "Cash" in content, "Payment Mix must show Cash"
+    assert "Mobile Money" in content, "Payment Mix must show Mobile Money"
+    assert "Credit" in content, "Payment Mix must show Credit"
+
+
+@pytest.mark.django_db
+def test_groceries_dashboard_demo_values_are_nonzero(client):
+    """
+    Groceries dashboard in demo mode must not show zero values for key KPIs.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("grocdemoval", "grocdemoval@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Grocery Demo Values Test",
+        slug="grocery-demo-values-test",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # Demo banner must be present (no real products)
+    assert "Demo Preview" in content or "groceries-demo-banner" in content, (
+        "Demo banner must be shown when no real data exists"
+    )
+
+    # KPI values must not be zero — demo fills in non-zero values
+    assert "12,400" in content or "K 0" not in content, (
+        "Demo revenue must be non-zero (12,400 expected)"
+    )
+    assert "3,200" in content or "K 0" not in content, (
+        "Demo profit must be non-zero (3,200 expected)"
+    )
+    assert "48,000" in content, (
+        "Demo stock value must be 48,000"
+    )
+
+
+@pytest.mark.django_db
+def test_groceries_dashboard_has_smart_insight(client):
+    """
+    Groceries dashboard must contain the Smart Insight card.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("grocinsight", "grocinsight@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Grocery Insight Test",
+        slug="grocery-insight-test",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Smart Insight" in content or "smart-insight-card" in content, (
+        "Groceries dashboard must contain Smart Insight card"
+    )
+    assert "Cooking oil" in content or "Restock" in content, (
+        "Smart Insight must contain actionable restock advice"
+    )
+
+
+@pytest.mark.django_db
+def test_groceries_dashboard_has_top_groceries_section(client):
+    """
+    Groceries dashboard must contain the 'Top Groceries Today' section.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("groctopg", "groctopg@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Grocery Top Section Test",
+        slug="grocery-top-section-test",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Top Groceries Today" in content or "top-groceries-section" in content, (
+        "Groceries dashboard must contain Top Groceries Today section"
+    )
+
+
+@pytest.mark.django_db
+def test_groceries_dashboard_has_reorder_suggestions(client):
+    """
+    Groceries dashboard must contain the Reorder Suggestions section.
+    """
+    from django.contrib.auth import get_user_model
+    from tenants.models import Business, Membership
+    from inventory.business_kinds import BusinessKind
+
+    User = get_user_model()
+    user = User.objects.create_user("grocreorder", "grocreorder@example.com", "pass123")
+    biz = Business.objects.create(
+        name="Grocery Reorder Test",
+        slug="grocery-reorder-test",
+        business_kind=BusinessKind.GROCERY,
+    )
+    Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
+
+    client.force_login(user)
+    session = client.session
+    session["active_business_id"] = biz.id
+    session.save()
+
+    url = reverse("groceries:dashboard")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "reorder-suggestions" in content or "Reorder Suggestions" in content, (
+        "Groceries dashboard must contain Reorder Suggestions section"
+    )
+

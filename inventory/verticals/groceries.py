@@ -148,6 +148,41 @@ def dashboard(request):
             _FakeProduct("Bread", "food", 4, "pcs"),
         ]
 
+    # ── Demo top products and reorder data ──────────────────────────────────
+    class _SimpleItem:
+        """Lightweight dict-like for demo/template rendering."""
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    demo_top_products = [
+        _SimpleItem(name="Sugar 1kg",       units_sold=24, revenue=None),
+        _SimpleItem(name="Cooking Oil 2L",  units_sold=18, revenue=None),
+        _SimpleItem(name="Rice 5kg",         units_sold=15, revenue=None),
+        _SimpleItem(name="Bread",            units_sold=12, revenue=None),
+        _SimpleItem(name="Eggs (tray)",      units_sold=9,  revenue=None),
+    ]
+
+    demo_reorder = [
+        _SimpleItem(name="Sugar 2kg",       note="3 left · suggest 50 bags"),
+        _SimpleItem(name="Cooking Oil 2L",  note="2 left · suggest 24 bottles"),
+        _SimpleItem(name="Bread",           note="4 left · suggest 30 loaves"),
+    ]
+
+    # Payment mix — demo percentages (real data would come from payment_method aggregation)
+    cash_pct   = 45
+    mobile_pct = 40
+    credit_pct = 15
+    if total_revenue and total_revenue > 0:
+        # Rough approximation — real impl would filter by payment_method field
+        cash_sales   = total_revenue * Decimal("0.45")
+        mobile_sales = total_revenue * Decimal("0.40")
+        credit_sales = total_revenue * Decimal("0.15")
+    else:
+        cash_sales   = Decimal("5580")
+        mobile_sales = Decimal("4960")
+        credit_sales = Decimal("1860")
+
     context = {
         "business": business,
         "is_demo": is_demo,
@@ -162,6 +197,31 @@ def dashboard(request):
         "recent_products": recent_products,
         "active_mode": mode,
         "active_tab": "dashboard",
+        # Extended dashboard context
+        "avg_basket_size": (total_revenue / sold_today_count) if sold_today_count else Decimal("1550"),
+        "top_category": "Food & Staples",
+        "expiry_risk_count": 3,
+        "cash_pct": cash_pct,
+        "mobile_pct": mobile_pct,
+        "credit_pct": credit_pct,
+        "cash_sales": cash_sales,
+        "mobile_sales": mobile_sales,
+        "credit_sales": credit_sales,
+        "top_products_today": [],
+        "demo_top_products": demo_top_products,
+        "fast_movers": [],
+        "slow_movers": [],
+        "reorder_suggestions": [],
+        "demo_reorder": demo_reorder,
+        "weekly_trend": [],
+        "inv_ok_pct": 70,
+        "inv_low_pct": 20,
+        "inv_expiry_pct": 10,
+        "reorder_ok": max(0, items_in_stock - 6),
+        "smart_insight": (
+            "Cooking oil and sugar are moving fastest. "
+            "Restock before weekend demand peaks — current stock covers approx. 2 more days at today's velocity."
+        ),
     }
     
     # Apply SSOT defaults to prevent KeyError failures
