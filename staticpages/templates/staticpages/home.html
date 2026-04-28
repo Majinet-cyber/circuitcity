@@ -8,7 +8,7 @@
   <meta name="description" content="African businesses don't fail for lack of effort. They operate blind. Emajinet gives you real-time visibility over inventory, sales, and profit — so every decision is informed.">
 
   <link rel="canonical" href="https://www.emajinet.africa{{ request.path }}">
-  <meta name="theme-color" content="#4f46e5">
+  <meta name="theme-color" content="#059669">
   <link rel="icon" href="{% static 'favicon.ico' %}">
   <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
 
@@ -78,10 +78,11 @@
        DESIGN TOKENS
     ============================================================ */
     :root {
-      --brand:        #4f46e5;
-      --brand-dark:   #3730a3;
-      --brand-light:  #eef2ff;
-      --brand-glow:   rgba(79,70,229,0.18);
+      /* ── Primary brand: Emajinet Green ── */
+      --brand:        #059669;
+      --brand-dark:   #047857;
+      --brand-light:  #ecfdf5;
+      --brand-glow:   rgba(5,150,105,0.18);
       --green:        #10b981;
       --green-dark:   #059669;
       --green-light:  #ecfdf5;
@@ -91,7 +92,7 @@
       --text-muted:   #64748b;
       --text-light:   #94a3b8;
       --border:       #e2e8f0;
-      --border-rich:  rgba(79,70,229,0.08);
+      --border-rich:  rgba(5,150,105,0.1);
       --bg:           #ffffff;
       --bg-subtle:    #f8fafc;
       --bg-section:   #f1f5f9;
@@ -99,18 +100,18 @@
       --shadow:       0 4px 16px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
       --shadow-md:    0 12px 32px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.05);
       --shadow-lg:    0 20px 48px rgba(0,0,0,0.12), 0 8px 16px rgba(0,0,0,0.06);
-      --shadow-brand: 0 8px 24px rgba(79,70,229,0.15), 0 2px 8px rgba(79,70,229,0.08);
+      --shadow-brand: 0 8px 24px rgba(5,150,105,0.18), 0 2px 8px rgba(5,150,105,0.10);
       --radius:       8px;
       --radius-lg:    14px;
       --radius-xl:    20px;
-      --gradient-brand: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-      --gradient-hero: linear-gradient(135deg, #eef2ff 0%, #faf5ff 50%, #f0fdf4 100%);
+      --gradient-brand: linear-gradient(135deg, #059669 0%, #0891b2 100%);
+      --gradient-hero: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 40%, #f8fafc 100%);
       --gradient-card: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       --transition-spring: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      /* Backward-compat aliases used by restored git sections */
-      --primary: #4f46e5;
-      --primary-dark: #4338ca;
+      /* Backward-compat aliases */
+      --primary: #059669;
+      --primary-dark: #047857;
       --secondary: #10b981;
       --text-primary: #0f172a;
       --text-secondary: #64748b;
@@ -411,7 +412,7 @@
     .hero {
       padding: 7rem 0 5rem;
       background: var(--gradient-hero);
-      background-image: radial-gradient(rgba(79,70,229,0.07) 1px, transparent 1px);
+      background-image: radial-gradient(rgba(5,150,105,0.08) 1px, transparent 1px);
       background-size: 28px 28px;
       background-position: 0 0;
       border-bottom: 1px solid var(--border);
@@ -432,7 +433,7 @@
       right: -20%;
       width: 600px;
       height: 600px;
-      background: radial-gradient(circle, rgba(79,70,229,0.06) 0%, transparent 70%);
+      background: radial-gradient(circle, rgba(5,150,105,0.07) 0%, transparent 70%);
       pointer-events: none;
     }
     .hero-content {
@@ -549,7 +550,7 @@
       transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
       filter: drop-shadow(0 32px 56px rgba(0,0,0,0.28))
               drop-shadow(0 12px 24px rgba(0,0,0,0.16))
-              drop-shadow(0 0 40px rgba(79,70,229,0.08));
+              drop-shadow(0 0 40px rgba(5,150,105,0.10));
     }
     .laptop-frame:hover {
       transform: perspective(1100px) rotateY(-4deg) rotateX(2deg);
@@ -563,7 +564,7 @@
       box-shadow:
         0 0 0 1px rgba(255,255,255,0.06) inset,
         0 1px 0 rgba(255,255,255,0.08) inset,
-        0 -1px 60px rgba(79,70,229,0.14);
+        0 -1px 60px rgba(5,150,105,0.12);
       position: relative;
     }
     /* Screen glass sheen */
@@ -587,7 +588,7 @@
       position: absolute;
       top: -1px; left: -1px; right: -1px;
       height: 3px;
-      background: linear-gradient(90deg, rgba(79,70,229,0.35), rgba(124,58,237,0.35), rgba(79,70,229,0.35));
+      background: linear-gradient(90deg, rgba(5,150,105,0.5), rgba(16,185,129,0.5), rgba(5,150,105,0.5));
       border-radius: 14px 14px 0 0;
       pointer-events: none;
       z-index: 11;
@@ -840,6 +841,253 @@
     }
     .energy-dot-healthy { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981; margin-right: 4px; vertical-align: middle; }
 
+    /* ── Command-center panel: sidebar + main ── */
+    .cmd-layout {
+      display: flex;
+      height: 100%;
+      overflow: hidden;
+    }
+    .cmd-sidenav {
+      width: 64px;
+      background: #0f172a;
+      padding: 0.6rem 0.35rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      flex-shrink: 0;
+    }
+    .cmd-nav-brand {
+      font-size: 0.52rem;
+      font-weight: 800;
+      color: #10b981;
+      text-align: center;
+      padding: 0.3rem 0 0.5rem;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 0.25rem;
+    }
+    .cmd-nav-item {
+      font-size: 0.5rem;
+      color: #64748b;
+      padding: 0.3rem 0.35rem;
+      border-radius: 4px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+    .cmd-nav-item svg { width: 10px; height: 10px; flex-shrink: 0; }
+    .cmd-nav-item.active { background: rgba(16,185,129,0.15); color: #10b981; font-weight: 700; }
+    .cmd-main {
+      flex: 1;
+      min-width: 0;
+      padding: 0.65rem 0.7rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+    /* Header row */
+    .cmd-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cmd-title { font-size: 0.68rem; font-weight: 800; color: #0f172a; }
+    .cmd-live-pill {
+      font-size: 0.5rem;
+      font-weight: 700;
+      color: #166534;
+      background: #dcfce7;
+      padding: 0.1rem 0.45rem;
+      border-radius: 99px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .cmd-live-dot {
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: #22c55e;
+      animation: pulse-dot 2s infinite;
+    }
+    /* 4-col KPI strip */
+    .cmd-kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.35rem;
+    }
+    .cmd-kpi-item {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 0.4rem 0.45rem;
+    }
+    .cmd-kpi-item.kpi-green { border-top: 2px solid #10b981; }
+    .cmd-kpi-item.kpi-blue  { border-top: 2px solid #3b82f6; }
+    .cmd-kpi-item.kpi-amber { border-top: 2px solid #f59e0b; }
+    .cmd-kpi-item.kpi-indigo{ border-top: 2px solid #6366f1; }
+    .cmd-kpi-val { font-size: 0.72rem; font-weight: 800; color: #0f172a; line-height: 1; }
+    .cmd-kpi-lbl { font-size: 0.48rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.15rem; }
+    .cmd-kpi-delta { font-size: 0.48rem; margin-top: 0.1rem; }
+    .cmd-kpi-delta.up   { color: #16a34a; }
+    .cmd-kpi-delta.warn { color: #d97706; }
+    /* Chart panel */
+    .cmd-chart-panel {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem 0.35rem;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .cmd-chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+      flex-shrink: 0;
+    }
+    .cmd-chart-title { font-size: 0.58rem; font-weight: 700; color: #334155; }
+    .cmd-chart-legend {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .cmd-legend-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    .cmd-legend-label { font-size: 0.46rem; color: #64748b; }
+    .cmd-chart-up-badge {
+      font-size: 0.48rem;
+      font-weight: 700;
+      color: #166534;
+      background: #dcfce7;
+      padding: 0.08rem 0.35rem;
+      border-radius: 4px;
+    }
+    .cmd-chart-svg {
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      display: block;
+      overflow: visible;
+    }
+    .cmd-xaxis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.44rem;
+      color: #94a3b8;
+      padding: 0 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    /* Bottom row: alerts + health */
+    .cmd-bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.4rem;
+      flex-shrink: 0;
+    }
+    .cmd-panel-mini {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 0.4rem 0.45rem;
+    }
+    .cmd-panel-title {
+      font-size: 0.5rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #94a3b8;
+      margin-bottom: 0.3rem;
+    }
+    .cmd-alert-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.56rem;
+      color: #475569;
+      padding: 0.18rem 0;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .cmd-alert-row:last-child { border-bottom: none; }
+    .cmd-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .cmd-dot.red   { background: #ef4444; }
+    .cmd-dot.amber { background: #f59e0b; }
+    .cmd-dot.green { background: #10b981; }
+    .cmd-health-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.55rem;
+      color: #475569;
+      padding: 0.18rem 0;
+      border-bottom: 1px solid #f8fafc;
+    }
+    .cmd-health-row:last-child { border-bottom: none; }
+    .cmd-status-ok   { color: #166534; font-weight: 700; font-size: 0.5rem; }
+    .cmd-status-warn { color: #92400e; font-weight: 700; font-size: 0.5rem; }
+
+    /* Energy panel enhanced */
+    .nrg-chart-panel {
+      background: #fff;
+      border: 1px solid #bbf7d0;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem 0.35rem;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .nrg-sim-panel {
+      background: #fff;
+      border: 1px solid #bbf7d0;
+      border-radius: 6px;
+      padding: 0.4rem 0.45rem;
+    }
+    .nrg-sim-title {
+      font-size: 0.5rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #047857;
+      margin-bottom: 0.3rem;
+    }
+    .nrg-sim-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.55rem;
+      color: #374151;
+      padding: 0.18rem 0;
+      border-bottom: 1px solid #d1fae5;
+    }
+    .nrg-sim-row:last-child { border-bottom: none; }
+    .nrg-sim-val { font-weight: 700; color: #047857; }
+    .nrg-sparkline-wrap {
+      height: 22px;
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      margin: 0.25rem 0;
+    }
+    .nrg-spark-bar {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      background: rgba(16,185,129,0.35);
+    }
+    .nrg-spark-bar.peak { background: #10b981; }
+
     @media (max-width: 900px) {
       .hero-content {
         grid-template-columns: 1fr;
@@ -975,7 +1223,7 @@
     .problem-card:hover {
       transform: translateY(-5px);
       box-shadow: var(--shadow-md);
-      border-color: rgba(79,70,229,0.18);
+      border-color: rgba(5,150,105,0.2);
     }
     .problem-card-icon {
       width: 44px; height: 44px;
@@ -1029,7 +1277,7 @@
     .feature-item:hover {
       transform: translateY(-4px);
       box-shadow: var(--shadow);
-      border-color: rgba(79,70,229,0.15);
+      border-color: rgba(5,150,105,0.18);
       background: var(--bg-subtle);
     }
     .feature-icon {
@@ -1037,7 +1285,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, var(--brand-light) 0%, #ede9fe 100%);
+      background: linear-gradient(135deg, var(--brand-light) 0%, #d1fae5 100%);
       border-radius: 10px;
       margin-bottom: 1rem;
       color: var(--brand);
@@ -1045,7 +1293,7 @@
     }
     .feature-item:hover .feature-icon {
       transform: scale(1.08);
-      box-shadow: 0 4px 12px rgba(79,70,229,0.15);
+      box-shadow: 0 4px 12px rgba(5,150,105,0.18);
     }
     .feature-title {
       font-size: 1.0625rem;
@@ -3092,22 +3340,30 @@
   <section class="hero" id="hero">
     <div class="hero-content">
       <div class="hero-text">
-        <div class="hero-tag">Africa's Business Operating System</div>
+        <div class="hero-tag">Africa's Business Intelligence Platform</div>
         <h1 class="hero-title">
-          African businesses don't fail for lack of effort.<br>They <span class="highlight">operate blind.</span>
+          African businesses don't fail for lack of effort—<br><span class="highlight">they operate blind.</span>
         </h1>
         <p class="hero-subtitle">
-          Emajinet gives you real-time visibility over inventory, sales, and profit. Know demand before it costs you. Run your business with clarity — not guesswork.
+          Businesses should not run on notebooks, guesswork, and Excel sheets that can disappear tomorrow.
+          <br><br>
+          Emajinet unifies energy, assets, finance, and operations in one platform—so from solar sites to shop floors, you can decide with confidence.
         </p>
 
         <!-- hero-buttons class retained for test compatibility -->
         <div class="hero-buttons" style="margin-top: 2rem;">
-          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary btn-lg">Get Started Free</a>
-          <a href="#how-it-works" class="btn btn-secondary btn-lg">See How It Works</a>
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary btn-lg">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Start Free
+          </a>
+          <a href="#how-it-works" class="btn btn-secondary btn-lg">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
+            Watch Demo
+          </a>
         </div>
 
             {% if show_metrics %}
-        <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
+        <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(5,150,105,0.05); border-radius: 16px; border: 1px solid rgba(5,150,105,0.12);">
           <div style="display: flex; gap: 2rem; justify-content: flex-start; flex-wrap: wrap;">
             <div class="growth-metric" style="text-align: center;">
               {# Render real value immediately — no zero flash #}
@@ -3122,12 +3378,12 @@
             {% endif %}
           </div>
           <div style="margin-top: 0.75rem; font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.4rem;">
-            <span style="display: inline-block; width: 7px; height: 7px; background: var(--secondary); border-radius: 50%; animation: pulse-dot 2s infinite; flex-shrink: 0;"></span>
+            <span style="display: inline-block; width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse-dot 2s infinite; flex-shrink: 0;"></span>
             Live &mdash; shops, gyms, pharmacies, car dealers &amp; more
           </div>
         </div>
         {% else %}
-        <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(79, 70, 229, 0.05); border-radius: 16px; border: 1px solid rgba(79, 70, 229, 0.1);">
+        <div class="platform-growth-metrics" style="margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(5,150,105,0.05); border-radius: 16px; border: 1px solid rgba(5,150,105,0.12);">
           <div style="font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Join businesses across Malawi</div>
           <div style="font-size: 0.8rem; color: var(--text-secondary);">30-day free trial &nbsp;&middot;&nbsp; No credit card required</div>
         </div>
@@ -3168,154 +3424,258 @@
         <!-- Rotating panels host — height set by tallest panel -->
         <div class="dash-panels-host" id="dashPanelsHost" style="height:360px;">
 
-          <!-- Panel 1: Business Dashboard (default) -->
+          <!-- Panel 1: Business Command Center (default) -->
           <div class="dash-panel dash-panel--active" id="dashPanel0" aria-label="Business dashboard preview">
-          <div class="dash-mock" style="height:100%;overflow:hidden;">
-            <div class="dash-mock-topbar">
+          <div class="dash-mock" style="height:100%;overflow:hidden;display:flex;flex-direction:column;">
+            <!-- Window chrome bar -->
+            <div class="dash-mock-topbar" style="flex-shrink:0;">
               <div class="dash-dots">
                 <div class="dash-dot dash-dot--red"></div>
                 <div class="dash-dot dash-dot--yellow"></div>
                 <div class="dash-dot dash-dot--green"></div>
               </div>
-              <div class="dash-mock-title">Emajinet &mdash; Today's Overview</div>
-              <div></div>
+              <div class="dash-mock-title">Emajinet &mdash; Command Center</div>
+              <div style="font-size:0.55rem;color:#10b981;font-weight:700;">● Live</div>
             </div>
-            <div class="dash-mock-body">
-              <div class="dash-mock-greeting">Dashboard &middot; April 2026</div>
-              <div class="dash-kpis">
-                <div class="dash-kpi">
-                  <div class="dash-kpi-label">Avg. Daily Revenue</div>
-                  <div class="dash-kpi-value" id="dash-kpi-revenue">—</div>
-                  <div class="dash-kpi-delta">30-day avg</div>
+            <!-- Command-center layout: mini sidenav + main -->
+            <div class="cmd-layout" style="flex:1;min-height:0;">
+              <!-- Mini sidebar -->
+              <div class="cmd-sidenav" aria-hidden="true">
+                <div class="cmd-nav-brand">EMJ</div>
+                <div class="cmd-nav-item active">
+                  <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+                  Dashboard
                 </div>
-                <div class="dash-kpi">
-                  <div class="dash-kpi-label">Gross Margin</div>
-                  <div class="dash-kpi-value dash-kpi-value--green" id="dash-kpi-margin">—</div>
-                  <div class="dash-kpi-delta">avg margin</div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,12 5,7 9,10 15,3"/></svg>
+                  Analytics
                 </div>
-                <div class="dash-kpi">
-                  <div class="dash-kpi-label">Sales / Day</div>
-                  <div class="dash-kpi-value" id="dash-kpi-sales">—</div>
-                  <div class="dash-kpi-delta">avg transactions</div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+                  Agents
+                </div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><line x1="5" y1="3" x2="5" y2="13"/></svg>
+                  Inventory
+                </div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l4 6-4 6-4-6z"/></svg>
+                  Simulate
                 </div>
               </div>
-              <div class="dash-row">
-                <div class="dash-card">
-                  <div class="dash-card-title">Stock Levels</div>
-                  <div class="dash-stock-row">
-                    <span>Samsung A05</span>
-                    <span class="dash-badge dash-badge--low">3 left</span>
-                  </div>
-                  <div class="dash-stock-row">
-                    <span>Airpods Pro</span>
-                    <span class="dash-badge dash-badge--ok">12 in stock</span>
-                  </div>
-                  <div class="dash-stock-row">
-                    <span>USB-C Charger</span>
-                    <span class="dash-badge dash-badge--low">5 left</span>
-                  </div>
-                  <div class="dash-stock-row">
-                    <span>iPhone 15</span>
-                    <span class="dash-badge dash-badge--ok">8 in stock</span>
+              <!-- Main content -->
+              <div class="cmd-main">
+                <!-- Header -->
+                <div class="cmd-header">
+                  <span class="cmd-title">HQ Overview &middot; April 2026</span>
+                  <div class="cmd-live-pill">
+                    <span class="cmd-live-dot"></span>Real-time
                   </div>
                 </div>
-                <div class="dash-card">
-                  <div class="dash-card-title">Alerts</div>
-                  <div class="dash-alert-row">
-                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
-                    <span>Samsung A05 — restock now</span>
+                <!-- 4-col KPI strip -->
+                <div class="cmd-kpi-strip">
+                  <div class="cmd-kpi-item kpi-green">
+                    <div class="cmd-kpi-val">MWK 12.4M</div>
+                    <div class="cmd-kpi-lbl">Revenue (30d)</div>
+                    <div class="cmd-kpi-delta up">↑ +22%</div>
                   </div>
-                  <div class="dash-alert-row">
-                    <div class="dash-alert-dot dash-alert-dot--red"></div>
-                    <span>Sale below cost detected</span>
+                  <div class="cmd-kpi-item kpi-blue">
+                    <div class="cmd-kpi-val">38%</div>
+                    <div class="cmd-kpi-lbl">Gross Margin</div>
+                    <div class="cmd-kpi-delta up">↑ Healthy</div>
                   </div>
-                  <div class="dash-alert-row">
-                    <div class="dash-alert-dot dash-alert-dot--green"></div>
-                    <span>Agent Mwale: 12 sales today</span>
+                  <div class="cmd-kpi-item kpi-indigo">
+                    <div class="cmd-kpi-val">386</div>
+                    <div class="cmd-kpi-lbl">Transactions</div>
+                    <div class="cmd-kpi-delta up">↑ +14 today</div>
                   </div>
-                  <div class="dash-alert-row">
-                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
-                    <span>USB-C Charger — low stock</span>
+                  <div class="cmd-kpi-item kpi-amber">
+                    <div class="cmd-kpi-val">24</div>
+                    <div class="cmd-kpi-lbl">Active Agents</div>
+                    <div class="cmd-kpi-delta warn">2 alerts</div>
                   </div>
                 </div>
-              </div>
-            </div>
+                <!-- Revenue line chart -->
+                <div class="cmd-chart-panel">
+                  <div class="cmd-chart-header">
+                    <span class="cmd-chart-title">Revenue Trend &mdash; 2026</span>
+                    <div class="cmd-chart-legend">
+                      <span class="cmd-legend-dot" style="background:#10b981;"></span>
+                      <span class="cmd-legend-label">Revenue</span>
+                      <span class="cmd-legend-dot" style="background:#3b82f6;margin-left:4px;"></span>
+                      <span class="cmd-legend-label">Margin</span>
+                    </div>
+                    <span class="cmd-chart-up-badge">+22% MoM</span>
+                  </div>
+                  <svg class="cmd-chart-svg" viewBox="0 0 280 65" preserveAspectRatio="none" aria-hidden="true">
+                    <!-- Y grid lines -->
+                    <line x1="0" y1="15" x2="280" y2="15" stroke="#f1f5f9" stroke-width="0.8"/>
+                    <line x1="0" y1="30" x2="280" y2="30" stroke="#f1f5f9" stroke-width="0.8"/>
+                    <line x1="0" y1="45" x2="280" y2="45" stroke="#f1f5f9" stroke-width="0.8"/>
+                    <!-- Revenue area fill -->
+                    <path d="M0,60 L23,55 L46,48 L69,52 L92,44 L115,36 L138,30 L161,38 L184,26 L207,20 L230,15 L253,11 L276,7 L280,6 L280,65 L0,65 Z" fill="rgba(16,185,129,0.12)"/>
+                    <!-- Revenue line -->
+                    <polyline points="0,60 23,55 46,48 69,52 92,44 115,36 138,30 161,38 184,26 207,20 230,15 253,11 276,7" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Margin line (secondary) -->
+                    <polyline points="0,58 23,54 46,50 69,53 92,47 115,42 138,38 161,44 184,35 207,30 230,26 253,22 276,18" fill="none" stroke="#3b82f6" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3,2"/>
+                    <!-- Highlight dots on latest -->
+                    <circle cx="253" cy="11" r="2.5" fill="#10b981" stroke="#fff" stroke-width="0.8"/>
+                    <circle cx="276" cy="7" r="2.5" fill="#10b981" stroke="#fff" stroke-width="0.8"/>
+                    <!-- Annotation: peak -->
+                    <line x1="230" y1="15" x2="230" y2="65" stroke="#e2e8f0" stroke-width="0.6" stroke-dasharray="2,2"/>
+                    <text x="228" y="13" font-size="4" fill="#94a3b8" text-anchor="middle">Peak</text>
+                  </svg>
+                  <div class="cmd-xaxis" aria-hidden="true">
+                    <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span>
+                  </div>
+                </div>
+                <!-- Bottom row: alerts + system health -->
+                <div class="cmd-bottom-row">
+                  <div class="cmd-panel-mini">
+                    <div class="cmd-panel-title">Active Alerts</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot red"></span>2 invoices overdue — MWK 2.1M</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot amber"></span>Samsung A05 — restock needed</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot green"></span>Agent Mwale: 12 sales today</div>
+                  </div>
+                  <div class="cmd-panel-mini">
+                    <div class="cmd-panel-title">System Health</div>
+                    <div class="cmd-health-row"><span>Subscriptions</span><span class="cmd-status-ok">● Healthy</span></div>
+                    <div class="cmd-health-row"><span>Inventory</span><span class="cmd-status-warn">● Watch</span></div>
+                    <div class="cmd-health-row"><span>Collections</span><span class="cmd-status-ok">● 87%</span></div>
+                  </div>
+                </div>
+              </div><!-- /cmd-main -->
+            </div><!-- /cmd-layout -->
           </div>
           </div><!-- /Panel 1 -->
 
           <!-- Panel 2: Renewable Energy Dashboard Preview -->
           <div class="dash-panel dash-panel--hidden" id="dashPanel1" aria-label="Renewable Energy dashboard preview" data-testid="energy-preview-panel">
-          <div class="dash-mock energy-mock" style="height:100%;overflow:hidden;">
-            <div class="dash-mock-topbar">
+          <div class="dash-mock energy-mock" style="height:100%;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="dash-mock-topbar" style="flex-shrink:0;">
               <div class="dash-dots">
                 <div class="dash-dot dash-dot--red"></div>
                 <div class="dash-dot dash-dot--yellow"></div>
                 <div class="dash-dot dash-dot--green"></div>
               </div>
               <div class="dash-mock-title">Emajinet Energy &mdash; Site Overview</div>
-              <div></div>
+              <div style="font-size:0.52rem;color:#047857;font-weight:700;background:#d1fae5;padding:0.1rem 0.4rem;border-radius:4px;">3 Sites Active</div>
             </div>
-            <div class="dash-mock-body" style="padding:0.9rem 1rem;">
-              <div class="dash-mock-greeting">Renewable Energy &middot; April 2026</div>
-              <!-- KPI Row 1 -->
-              <div class="dash-kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:0.75rem;">
-                <div class="dash-kpi energy-kpi">
-                  <div class="dash-kpi-label">Installed Capacity</div>
-                  <div class="dash-kpi-value">5.0 kW</div>
-                  <div class="dash-kpi-delta">3 active sites</div>
+            <div class="cmd-layout" style="flex:1;min-height:0;">
+              <!-- Energy mini sidenav -->
+              <div class="cmd-sidenav" style="background:#052e16;" aria-hidden="true">
+                <div class="cmd-nav-brand" style="color:#34d399;">⚡ NRG</div>
+                <div class="cmd-nav-item active" style="color:#34d399;background:rgba(52,211,153,0.15);">
+                  <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+                  Overview
                 </div>
-                <div class="dash-kpi energy-kpi">
-                  <div class="dash-kpi-label">Generated Today</div>
-                  <div class="dash-kpi-value">12.4 kWh</div>
-                  <div class="dash-kpi-delta">↑ vs yesterday</div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,12 5,7 9,10 15,3"/></svg>
+                  Output
                 </div>
-                <div class="dash-kpi energy-kpi">
-                  <div class="dash-kpi-label">Battery Health</div>
-                  <div class="dash-kpi-value">91%</div>
-                  <div class="dash-kpi-delta">Optimal</div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5"/><path d="M8 3v5l3 3"/></svg>
+                  Forecast
+                </div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="12" height="7" rx="1"/><path d="M5 6V4a3 3 0 0 1 6 0v2"/></svg>
+                  Battery
+                </div>
+                <div class="cmd-nav-item">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5l1.5 3H6.5z"/></svg>
+                  Simulate
                 </div>
               </div>
-              <!-- 2-col row -->
-              <div class="dash-row" style="gap:0.5rem;">
-                <div class="dash-card energy-card" style="padding:0.75rem;">
-                  <div class="dash-card-title">Alerts &amp; Status</div>
-                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
-                    <div class="dash-alert-dot dash-alert-dot--amber"></div>
-                    <span>2 maintenance alerts</span>
-                  </div>
-                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
-                    <div class="dash-alert-dot dash-alert-dot--red"></div>
-                    <span>Blackout risk: 18:30&ndash;21:00</span>
-                  </div>
-                  <div class="dash-alert-row energy-alert-row" style="font-size:0.6rem;">
-                    <div class="dash-alert-dot dash-alert-dot--green"></div>
-                    <span>System status: Healthy</span>
-                  </div>
-                  <div class="energy-status-row">
-                    <span><span class="energy-dot-healthy"></span>Est. savings</span>
-                    <span style="color:#047857;font-weight:700;">MWK 185,000/mo</span>
+              <!-- Energy main content -->
+              <div class="cmd-main" style="background:#f0fdf4;">
+                <!-- Header -->
+                <div class="cmd-header">
+                  <span class="cmd-title" style="color:#052e16;">Energy Output &middot; April 2026</span>
+                  <div class="cmd-live-pill" style="background:#d1fae5;color:#065f46;">
+                    <span class="cmd-live-dot" style="background:#10b981;"></span>Live Monitoring
                   </div>
                 </div>
-                <div class="dash-card energy-card" style="padding:0.75rem;">
-                  <div class="dash-card-title">Generation Forecast</div>
-                  <div style="font-size:0.6rem;color:#94a3b8;margin-bottom:4px;">Hourly kWh output (today)</div>
-                  <div class="energy-mini-bar-wrap" aria-hidden="true">
-                    <div class="energy-mini-bar" style="height:35%;"></div>
-                    <div class="energy-mini-bar" style="height:55%;"></div>
-                    <div class="energy-mini-bar" style="height:80%;"></div>
-                    <div class="energy-mini-bar" style="height:100%;background:rgba(16,185,129,0.55);"></div>
-                    <div class="energy-mini-bar" style="height:90%;"></div>
-                    <div class="energy-mini-bar" style="height:70%;"></div>
-                    <div class="energy-mini-bar" style="height:50%;"></div>
-                    <div class="energy-mini-bar" style="height:30%;"></div>
+                <!-- 4-col KPI strip -->
+                <div class="cmd-kpi-strip">
+                  <div class="cmd-kpi-item" style="border-top:2px solid #10b981;border-color:#bbf7d0 #bbf7d0 #bbf7d0;border-top-color:#10b981;">
+                    <div class="cmd-kpi-val" style="color:#047857;">5.0 kW</div>
+                    <div class="cmd-kpi-lbl">Installed</div>
+                    <div class="cmd-kpi-delta up">3 sites</div>
                   </div>
-                  <div class="energy-status-row">
-                    <span>Peak: 12:00–14:00</span>
-                    <span style="color:#047857;">3.8 kWh peak</span>
+                  <div class="cmd-kpi-item" style="border-top:2px solid #059669;border-color:#bbf7d0 #bbf7d0 #bbf7d0;border-top-color:#059669;">
+                    <div class="cmd-kpi-val" style="color:#047857;">12.4 kWh</div>
+                    <div class="cmd-kpi-lbl">Generated</div>
+                    <div class="cmd-kpi-delta up">↑ vs yesterday</div>
+                  </div>
+                  <div class="cmd-kpi-item" style="border-top:2px solid #34d399;border-color:#bbf7d0 #bbf7d0 #bbf7d0;border-top-color:#34d399;">
+                    <div class="cmd-kpi-val" style="color:#047857;">91%</div>
+                    <div class="cmd-kpi-lbl">Battery</div>
+                    <div class="cmd-kpi-delta up">Optimal</div>
+                  </div>
+                  <div class="cmd-kpi-item" style="border-top:2px solid #6ee7b7;border-color:#bbf7d0 #bbf7d0 #bbf7d0;border-top-color:#6ee7b7;">
+                    <div class="cmd-kpi-val" style="color:#047857;">185K</div>
+                    <div class="cmd-kpi-lbl">MWK Saved/mo</div>
+                    <div class="cmd-kpi-delta up">↑ Est.</div>
                   </div>
                 </div>
-              </div>
-            </div>
+                <!-- Energy output chart -->
+                <div class="nrg-chart-panel">
+                  <div class="cmd-chart-header">
+                    <span class="cmd-chart-title" style="color:#065f46;">Hourly Output (kWh) &mdash; Today</span>
+                    <div class="cmd-chart-legend">
+                      <span class="cmd-legend-dot" style="background:#10b981;"></span>
+                      <span class="cmd-legend-label">Solar</span>
+                      <span class="cmd-legend-dot" style="background:#6ee7b7;margin-left:4px;"></span>
+                      <span class="cmd-legend-label">Battery</span>
+                    </div>
+                    <span class="cmd-chart-up-badge" style="background:#d1fae5;color:#065f46;">Peak 12:00</span>
+                  </div>
+                  <svg class="cmd-chart-svg" viewBox="0 0 280 60" preserveAspectRatio="none" aria-hidden="true">
+                    <line x1="0" y1="15" x2="280" y2="15" stroke="#d1fae5" stroke-width="0.8"/>
+                    <line x1="0" y1="30" x2="280" y2="30" stroke="#d1fae5" stroke-width="0.8"/>
+                    <line x1="0" y1="45" x2="280" y2="45" stroke="#d1fae5" stroke-width="0.8"/>
+                    <!-- Solar output area -->
+                    <path d="M0,58 L20,55 L40,48 L60,38 L80,24 L100,16 L120,10 L140,8 L160,10 L180,16 L200,26 L220,40 L240,52 L260,57 L280,59 L280,62 L0,62 Z" fill="rgba(16,185,129,0.18)"/>
+                    <!-- Solar line -->
+                    <polyline points="0,58 20,55 40,48 60,38 80,24 100,16 120,10 140,8 160,10 180,16 200,26 220,40 240,52 260,57 280,59" fill="none" stroke="#10b981" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Battery discharge line -->
+                    <polyline points="0,56 20,54 40,52 60,48 80,42 100,36 120,32 140,30 160,32 180,36 200,42 220,50 240,55 260,58 280,60" fill="none" stroke="#6ee7b7" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3,2"/>
+                    <!-- Peak annotation -->
+                    <circle cx="140" cy="8" r="2.5" fill="#10b981" stroke="#fff" stroke-width="0.8"/>
+                    <line x1="140" y1="8" x2="140" y2="60" stroke="#bbf7d0" stroke-width="0.6" stroke-dasharray="2,2"/>
+                    <text x="142" y="14" font-size="4" fill="#065f46">3.8 kWh</text>
+                  </svg>
+                  <div class="cmd-xaxis" aria-hidden="true">
+                    <span>6am</span><span>8am</span><span>10am</span><span>12pm</span><span>2pm</span><span>4pm</span><span>6pm</span>
+                  </div>
+                </div>
+                <!-- Bottom row: alerts + simulation panel -->
+                <div class="cmd-bottom-row">
+                  <div class="cmd-panel-mini" style="border-color:#bbf7d0;">
+                    <div class="cmd-panel-title" style="color:#047857;">Site Alerts</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot amber"></span>Site B — maintenance due</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot red"></span>Blackout risk: 18:30–21:00</div>
+                    <div class="cmd-alert-row"><span class="cmd-dot green"></span>Site A: Healthy · 4.2 kWh</div>
+                  </div>
+                  <div class="nrg-sim-panel">
+                    <div class="nrg-sim-title">⚡ Simulation</div>
+                    <div class="nrg-sim-row"><span>Add 2 kW panel</span><span class="nrg-sim-val">+41% output</span></div>
+                    <div class="nrg-sim-row"><span>Peak shift</span><span class="nrg-sim-val">−MWK 22K/mo</span></div>
+                    <!-- Sparkline trend -->
+                    <div class="nrg-sparkline-wrap" aria-hidden="true">
+                      <div class="nrg-spark-bar" style="height:35%;"></div>
+                      <div class="nrg-spark-bar" style="height:50%;"></div>
+                      <div class="nrg-spark-bar" style="height:70%;"></div>
+                      <div class="nrg-spark-bar peak" style="height:100%;"></div>
+                      <div class="nrg-spark-bar" style="height:90%;"></div>
+                      <div class="nrg-spark-bar" style="height:65%;"></div>
+                      <div class="nrg-spark-bar" style="height:45%;"></div>
+                      <div class="nrg-spark-bar" style="height:30%;"></div>
+                    </div>
+                  </div>
+                </div>
+              </div><!-- /cmd-main -->
+            </div><!-- /cmd-layout -->
           </div>
           </div><!-- /Panel 2 -->
 
@@ -3336,23 +3696,33 @@
   <div class="cred-strip" role="complementary" aria-label="Platform trust indicators">
     <div class="cred-strip-inner">
       <div class="cred-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span><strong>30-day free trial</strong> — no credit card</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><strong>Live monitoring</strong></span>
       </div>
       <div class="cred-divider"></div>
       <div class="cred-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-        <span><strong>Mobile-first</strong> — works on any phone</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span><strong>Audit-ready records</strong></span>
       </div>
       <div class="cred-divider"></div>
       <div class="cred-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span><strong>Multi-location</strong> — manage multiple branches</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        <span><strong>IoT-ready</strong></span>
       </div>
       <div class="cred-divider"></div>
       <div class="cred-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span><strong>Real-time</strong> — data updates instantly</span>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span><strong>API integrations</strong></span>
+      </div>
+      <div class="cred-divider"></div>
+      <div class="cred-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span><strong>Role-based access</strong></span>
+      </div>
+      <div class="cred-divider"></div>
+      <div class="cred-item">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span><strong>Built for African businesses</strong></span>
       </div>
     </div>
   </div>

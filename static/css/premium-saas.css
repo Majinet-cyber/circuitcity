@@ -1,0 +1,502 @@
+/* =============================================================
+   Emajinet Premium SaaS Design System — v1.0
+   Overrides noisy colors, card borders, and adds calm spacing.
+   Load LAST in base.html so it wins the cascade.
+   NO DARK MODE — light-only, calm, data-focused.
+   ============================================================= */
+
+/* ── Brand overrides: shift primary to green ── */
+:root {
+  --cc-brand: #059669;          /* emerald-600 — primary green */
+  --cc-brand-lt: #ecfdf5;      /* emerald-50  */
+  --cc-brand-600: #047857;     /* emerald-700 hover */
+  --cc-brand-glow: rgba(5,150,105,.15);
+
+  /* Neutral surfaces */
+  --cc-surface:    #ffffff;
+  --cc-surface-2:  #f8fafc;
+  --cc-surface-3:  #f1f5f9;
+  --cc-line:       #e2e8f0;
+  --cc-line-soft:  #f1f5f9;
+
+  /* Text hierarchy */
+  --cc-ink:        #0f172a;
+  --cc-ink-2:      #334155;
+  --cc-ink-3:      #64748b;
+  --cc-ink-4:      #94a3b8;
+
+  /* Semantic */
+  --cc-success:    #059669;
+  --cc-warn:       #d97706;
+  --cc-danger:     #dc2626;
+  --cc-info:       #0891b2;
+
+  /* Shadow — calmer, less dramatic */
+  --cc-shadow-sm:  0 1px 3px rgba(15,23,42,.06);
+  --cc-shadow:     0 2px 8px rgba(15,23,42,.07);
+  --cc-shadow-md:  0 4px 16px rgba(15,23,42,.08);
+  --cc-shadow-lg:  0 8px 28px rgba(15,23,42,.10);
+
+  /* Radius — slightly tighter for premium look */
+  --cc-radius-sm:  6px;
+  --cc-radius:     10px;
+  --cc-radius-lg:  14px;
+
+  /* Typography rhythm */
+  --cc-num-xl: 2.25rem;
+  --cc-num-lg: 1.75rem;
+  --cc-num-md: 1.35rem;
+  --cc-label-sm: .7rem;
+  --cc-label: .75rem;
+}
+
+/* ── Remove excessive card noise ── */
+.card, .glass-card, .en-card, .kpi-card {
+  border-width: 1px !important;
+  border-color: var(--cc-line) !important;
+  box-shadow: var(--cc-shadow) !important;
+  background: var(--cc-surface) !important;
+}
+
+/* ── MetricCard component ── */
+.cc-metric-card {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius-lg);
+  padding: 1.25rem 1.1rem;
+  box-shadow: var(--cc-shadow-sm);
+  transition: transform .15s ease, box-shadow .15s ease;
+  position: relative;
+  overflow: hidden;
+}
+.cc-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--cc-shadow-md);
+}
+.cc-metric-card .cc-num {
+  font-size: var(--cc-num-lg);
+  font-weight: 800;
+  color: var(--cc-ink);
+  line-height: 1.05;
+  letter-spacing: -.02em;
+}
+.cc-metric-card .cc-label {
+  font-size: var(--cc-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--cc-ink-3);
+  margin-top: .25rem;
+}
+.cc-metric-card .cc-meta {
+  font-size: .72rem;
+  color: var(--cc-ink-4);
+  margin-top: .15rem;
+}
+
+/* ── InsightTile component ── */
+.cc-insight-tile {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius-lg);
+  padding: 1.1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+  cursor: pointer;
+}
+.cc-insight-tile:hover {
+  border-color: var(--cc-brand);
+  box-shadow: 0 0 0 3px var(--cc-brand-glow);
+  transform: translateY(-2px);
+  color: inherit;
+}
+.cc-insight-tile .cc-tile-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.cc-insight-tile .cc-tile-name {
+  font-size: .88rem;
+  font-weight: 700;
+  color: var(--cc-ink);
+}
+.cc-insight-tile .cc-tile-insight {
+  font-size: .75rem;
+  color: var(--cc-ink-3);
+}
+.cc-insight-tile .cc-tile-badge {
+  display: inline-block;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.cc-tile-badge--good    { background: #f0fdf4; color: #059669; }
+.cc-tile-badge--warn    { background: #fffbeb; color: #d97706; }
+.cc-tile-badge--alert   { background: #fef2f2; color: #dc2626; }
+.cc-tile-badge--neutral { background: #f8fafc; color: #64748b; }
+
+/* ── StatusRow component ── */
+.cc-status-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .65rem .75rem;
+  border-radius: var(--cc-radius);
+  border: 1px solid var(--cc-line);
+  background: var(--cc-surface);
+  transition: background .12s ease;
+  margin-bottom: .4rem;
+}
+.cc-status-row:hover { background: var(--cc-surface-2); }
+.cc-status-row .cc-status-name {
+  flex: 1;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--cc-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-status-row .cc-status-pct {
+  font-size: .82rem;
+  font-weight: 700;
+  width: 3.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.cc-status-row .cc-progress {
+  width: 80px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--cc-line);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.cc-status-row .cc-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .4s ease;
+}
+.cc-status-badge {
+  display: inline-block;
+  padding: .15rem .5rem;
+  border-radius: 999px;
+  font-size: .65rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.cc-status-badge--healthy  { background: #f0fdf4; color: #059669; border: 1px solid #bbf7d0; }
+.cc-status-badge--warning  { background: #fffbeb; color: #d97706; border: 1px solid #fde68a; }
+.cc-status-badge--offline  { background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; }
+
+/* ── AlertList component ── */
+.cc-alert-list { display: flex; flex-direction: column; }
+.cc-alert-row {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .6rem .7rem;
+  border-bottom: 1px solid var(--cc-line-soft);
+  transition: background .1s ease;
+}
+.cc-alert-row:last-child { border-bottom: none; }
+.cc-alert-row:hover { background: var(--cc-surface-2); }
+.cc-alert-row .cc-alert-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--cc-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .9rem;
+  flex-shrink: 0;
+}
+.cc-alert-row.sev-critical .cc-alert-icon { background: #fef2f2; color: #dc2626; }
+.cc-alert-row.sev-high     .cc-alert-icon { background: #fff7ed; color: #d97706; }
+.cc-alert-row.sev-medium   .cc-alert-icon { background: #fffbeb; color: #ca8a04; }
+.cc-alert-row.sev-low      .cc-alert-icon { background: #f0fdf4; color: #059669; }
+.cc-alert-row .cc-alert-msg {
+  flex: 1;
+  font-size: .83rem;
+  font-weight: 600;
+  color: var(--cc-ink);
+}
+.cc-alert-row .cc-alert-sub {
+  font-size: .72rem;
+  color: var(--cc-ink-3);
+  margin-top: .1rem;
+}
+.cc-alert-row .cc-alert-time {
+  font-size: .68rem;
+  color: var(--cc-ink-4);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cc-sev-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.cc-sev-dot--critical { background: #dc2626; }
+.cc-sev-dot--high     { background: #d97706; }
+.cc-sev-dot--medium   { background: #ca8a04; }
+.cc-sev-dot--low      { background: #059669; }
+
+/* ── SectionHeader component ── */
+.cc-section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.cc-section-title {
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--cc-ink-3);
+  margin: 0;
+}
+.cc-section-link {
+  font-size: .78rem;
+  color: var(--cc-brand);
+  text-decoration: none;
+  font-weight: 600;
+}
+.cc-section-link:hover { text-decoration: underline; color: var(--cc-brand-600); }
+
+/* ── Card container ── */
+.cc-card {
+  background: var(--cc-surface);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius-lg);
+  padding: 1.25rem 1.35rem;
+  box-shadow: var(--cc-shadow-sm);
+}
+
+/* ── EmptyState component ── */
+.cc-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+.cc-empty-state .cc-empty-icon {
+  font-size: 2.5rem;
+  opacity: .2;
+  margin-bottom: .75rem;
+}
+.cc-empty-state .cc-empty-msg {
+  font-size: .88rem;
+  color: var(--cc-ink-3);
+  margin-bottom: 1rem;
+}
+
+/* ── Live pulse indicator ── */
+.cc-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  position: relative;
+}
+.cc-live-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: rgba(16,185,129,.3);
+  animation: cc-pulse 2s ease-in-out infinite;
+}
+@keyframes cc-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.8); opacity: 0; }
+}
+
+/* ── SkeletonLoader component ── */
+.cc-skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: cc-shimmer 1.5s infinite;
+  border-radius: var(--cc-radius-sm);
+}
+@keyframes cc-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── SimulationPanel ── */
+.cc-sim-panel {
+  background: linear-gradient(135deg, #faf5ff, #ede9fe);
+  border: 1px solid #ddd6fe;
+  border-radius: var(--cc-radius-lg);
+  padding: 1.35rem;
+}
+.cc-sim-card {
+  background: var(--cc-surface);
+  border: 1px solid #e9d5ff;
+  border-radius: var(--cc-radius);
+  padding: .9rem 1rem;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.cc-sim-card:hover {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139,92,246,.12);
+}
+.cc-sim-card .cc-sim-title {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--cc-ink);
+  margin-bottom: .25rem;
+}
+.cc-sim-card .cc-sim-desc {
+  font-size: .77rem;
+  color: var(--cc-ink-3);
+}
+.cc-sim-result {
+  margin-top: .6rem;
+  padding: .5rem .65rem;
+  border-radius: var(--cc-radius-sm);
+  font-size: .78rem;
+  display: none;
+}
+.cc-sim-result.show { display: block; }
+.cc-sim-result--green  { background: #f0fdf4; color: #166534; }
+.cc-sim-result--blue   { background: #eff6ff; color: #1e40af; }
+.cc-sim-result--amber  { background: #fef3c7; color: #92400e; }
+
+/* ── Chart container with toggle ── */
+.cc-chart-wrap {
+  position: relative;
+}
+.cc-chart-toggles {
+  display: flex;
+  gap: .3rem;
+}
+.cc-chart-toggle {
+  padding: .25rem .6rem;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--cc-line);
+  background: transparent;
+  color: var(--cc-ink-3);
+  transition: all .12s ease;
+}
+.cc-chart-toggle.active {
+  background: var(--cc-brand);
+  color: #fff;
+  border-color: var(--cc-brand);
+}
+.cc-chart-toggle:hover:not(.active) {
+  border-color: var(--cc-brand);
+  color: var(--cc-brand);
+}
+
+/* ── Trend badge ── */
+.cc-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+}
+.cc-trend--up   { background: #f0fdf4; color: #059669; }
+.cc-trend--down { background: #fef2f2; color: #dc2626; }
+.cc-trend--flat { background: #f8fafc; color: #64748b; }
+
+/* ── Hover lift utility ── */
+.cc-hover-lift {
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.cc-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--cc-shadow-md);
+}
+
+/* ── Improve Bootstrap primary buttons to use green ── */
+.btn-success,
+.btn-primary.btn-green {
+  background-color: var(--cc-brand) !important;
+  border-color: var(--cc-brand) !important;
+}
+.btn-success:hover,
+.btn-primary.btn-green:hover {
+  background-color: var(--cc-brand-600) !important;
+  border-color: var(--cc-brand-600) !important;
+}
+
+/* ── Dashboard hero stat row ── */
+.cc-hero-stats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+.cc-hero-stat .cc-hero-stat-val {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.1;
+}
+.cc-hero-stat .cc-hero-stat-lbl {
+  font-size: .68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: rgba(255,255,255,.6);
+  margin-top: .1rem;
+}
+
+/* ── Narrow separator between sections ── */
+.cc-divider {
+  height: 1px;
+  background: var(--cc-line);
+  margin: 1.5rem 0;
+}
+
+/* ── Reduce heading noise in dashboard cards ── */
+.en-section-title,
+.cc-section-title {
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .08em !important;
+  color: var(--cc-ink-3) !important;
+}
+
+/* ── Responsive helpers ── */
+.cc-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+.cc-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.cc-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+@media (max-width: 768px) {
+  .cc-grid-3, .cc-grid-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+  .cc-grid-2, .cc-grid-3, .cc-grid-4 { grid-template-columns: 1fr; }
+}

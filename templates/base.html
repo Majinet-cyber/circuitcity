@@ -148,6 +148,8 @@
 
   <!-- FINAL: versioned overrides must load LAST to win the cascade -->
   <link rel="stylesheet" href="{% static 'css/v2-overrides.2025-09-25.css' %}?v={{ ASSET_V }}">
+  <!-- Premium SaaS design system — loads last to win cascade -->
+  <link rel="stylesheet" href="{% static 'css/premium-saas.css' %}?v={{ ASSET_V }}">
   {% endwith %}
 
   <style>

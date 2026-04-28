@@ -785,8 +785,27 @@ def dashboard(request):
                 {"name": "Grace Zimba", "sales_count": 53, "revenue": _D("2120000")},
                 {"name": "Patrick Njobvu", "sales_count": 47, "revenue": _D("1880000")},
             ]
+        # Demo sales_revenue (period metric) and agents_total
+        _demo_if_zero("sales_revenue", _D("12400000.00"))
+        _demo_if_zero("agents_total", 24)
+        _demo_if_zero("wallet_balance", _D("5500000.00"))
 
     ctx["using_demo"] = using_demo
+
+    # -------------------------------------------------------------------
+    # Per-metric "awaiting" flags — shown even when NOT in full demo mode.
+    # These let the template render elegant non-zero states instead of plain
+    # zeros for metrics that are genuinely absent (but real data may exist
+    # outside the selected period filter).
+    # -------------------------------------------------------------------
+    ctx["mrr_awaiting"] = not using_demo and ctx.get("mrr_sum", 0) == 0
+    ctx["collection_awaiting"] = not using_demo and ctx.get("collection_rate", 0) == 0
+    ctx["wallet_awaiting"] = not using_demo and ctx.get("wallet_in_30d", 0) == 0 and ctx.get("wallet_out_30d", 0) == 0
+
+    # Net stock movement (computed once, used by template arithmetic-free)
+    _stock_in = ctx.get("stock_in_7d", 0) or 0
+    _stock_out = ctx.get("stock_out_7d", 0) or 0
+    ctx["net_stock_7d"] = _stock_in - _stock_out
 
     # -------------------------------------------------------------------
     # Summary context helpers for template rendering

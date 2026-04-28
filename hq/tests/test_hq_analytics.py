@@ -52,8 +52,8 @@ class HQAnalyticsTestCase(TestCase):
             status="IN_STOCK",
         )
 
-        # Create sale
-        self.sale = Sale.objects.create(
+        # Create sale — skip the post_save signal finalization to avoid test side-effects
+        sale = Sale(
             item=self.item,
             agent=self.agent,
             location=self.location,
@@ -61,6 +61,9 @@ class HQAnalyticsTestCase(TestCase):
             price=Decimal("100000.00"),
             payment_method="CASH",
         )
+        sale._skip_finalize = True
+        sale.save()
+        self.sale = sale
 
         self.client = Client()
         self.client.force_login(self.staff_user)

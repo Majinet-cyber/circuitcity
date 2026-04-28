@@ -1,1506 +1,1384 @@
+{% extends "hq/base_hq.html" %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <title>HQ · Dashboard</title>
-  
-  <!-- HQ Mobile-First Responsive CSS -->
-  <link href="{% static 'css/hq-mobile-responsive.css' %}" rel="stylesheet">
-  <!-- HQ Layout CSS — single source of truth, loaded LAST -->
-  <link href="{% static 'css/hq_layout.css' %}?v=20260428-2" rel="stylesheet">
 
-  <style>
-    :root{
-      --bg-0:#f7faff; --bg-1:#eef5ff;
-      --ink-900:#0b1b3a; --ink-700:#1c2f57; --ink-500:#476aa0;
-      --brand-500:#2f6bff; --brand-600:#2757d8;
-      --ring:#d8e4ff; --chip:#e9f2ff;
-      --glass: rgba(255,255,255,.65);
-      --shadow-1: 0 10px 30px rgba(12,36,97,.08);
-      --shadow-2: 0 12px 40px rgba(12,36,97,.12);
-      --radius:18px;
-      --border-grad: linear-gradient(135deg, rgba(47,107,255,.35), rgba(255,255,255,.35));
-      --ok:#0ea5e9; --warn:#f59e0b; --bad:#ef4444; --good:#16a34a; --good-bright:#22c55e;
-      --navy:#0f1e35;
+{% block title %}HQ Command Center — Emajinet{% endblock %}
 
-      /* Stacking so popovers/panels are clickable and above everything */
-      --z-header: 4000;
-      --z-pop: 5000;     /* search, date picker, bell etc. */
-      --z-panel: 7000;   /* notifications panel (highest UI layer) */
-    }
-    html,body{
-      height:100%;margin:0;
-      background:
-        radial-gradient(1100px 1100px at 10% -10%, #ffffff 0, #f7fbff 30%, #eef5ff 60%, #e6f0ff 100%),
-        linear-gradient(180deg, rgba(47,107,255,.06), transparent 40%);
-      color:var(--ink-900);
-      font:500 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,"Helvetica Neue",Arial;
-    }
-    
-    /* Layout: Mobile-first (flex column), Desktop (flex with sidebar) */
-    .layout{display:flex;flex-direction:column;min-height:100%}
-    @media (min-width:992px){
-      .layout{display:flex;flex-direction:row}
-    }
+{% block topbar_title %}HQ Command Center{% endblock %}
 
-    /* Sidebar: Mobile styles handled by hq-mobile-responsive.css */
-    .sidebar{
-      background:#0b0f14;color:#cfe0ff;border-right:1px solid rgba(255,255,255,.06);
-      padding:14px 10px;display:flex;flex-direction:column;gap:10px;overflow:hidden;
-      flex: 0 0 260px;
-    }
-    /* Desktop: sticky sidebar */
-    @media (min-width:992px){
-      .sidebar{position:sticky;top:0;height:100dvh;width:260px;min-width:260px}
-    }
-    .brand{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.05);
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);font-weight:700}
-    .brand .dot{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#1f6feb,#58a6ff);
-      display:grid;place-items:center;color:#fff;font-weight:800}
-    .hide-sm{display:none}
-    @media (min-width:720px){.hide-sm{display:inline}}
+{% block extra_css %}
+<style>
+/* ============================================================
+   HQ DASHBOARD — PREMIUM COMMAND CENTER STYLES
+   Matches /hq/analytics/ visual system
+   ============================================================ */
 
-    .nav{margin-top:8px;display:flex;flex-direction:column;gap:8px;overflow:auto;flex:1;scrollbar-gutter:stable}
-    .nav::-webkit-scrollbar{width:8px}
-    .nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:8px}
-    .nav a{
-      display:flex;align-items:center;gap:10px;text-decoration:none;color:#c7d2e5;
-      padding:12px 12px;border-radius:12px;background:transparent;border:1px solid rgba(255,255,255,.06);
-      transition:.2s ease;
-    }
-    .nav a:hover{background:var(--navy);color:#fff;border-color:rgba(255,255,255,.12)}
-    .nav a.active{background:linear-gradient(180deg,rgba(255,255,255,.1),rgba(255,255,255,.06));color:#fff;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-    .nav-sep{height:1px;background:rgba(255,255,255,.08);margin:6px 6px}
+/* Page layout */
+.dash-page { padding: 20px 24px 40px; }
+@media (max-width: 768px) { .dash-page { padding: 12px 12px 32px; } }
 
-    .admin-link{margin-top:8px}
-    .admin-link a{color:#a9b8d9;text-decoration:none}
-    .admin-link a:hover{color:#fff;text-decoration:underline}
+/* Page header */
+.dash-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.dash-header-text h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0 0 4px;
+  letter-spacing: -0.3px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dash-header-text p {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+.live-badge .pulse-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse-green 1.8s infinite;
+}
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,.4); }
+  50% { opacity: .6; box-shadow: 0 0 0 5px rgba(34,197,94,0); }
+}
+.demo-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: linear-gradient(90deg, #fef3c7, #fffbeb);
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 1.25rem;
+}
+.demo-banner i { font-size: 16px; color: #d97706; }
 
-    /* Content */
-    .content{padding:18px 14px 28px;flex:1;min-width:0;max-width:none !important;width:100% !important}
-    .shell{max-width:none !important;width:100% !important;padding:0}
-    .header{
-      position:relative; z-index:var(--z-header); isolation:isolate;
-      display:flex;flex-direction:column;gap:10px;align-items:stretch;margin-bottom:10px
-    }
-    @media(min-width:768px){.header{flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px}}
-    @media(min-width:992px){.header{flex-wrap:nowrap}}
-    h1{margin:0;font-size:24px;letter-spacing:.2px;display:flex;align-items:center;gap:10px}
+/* ---- Filter bar ---- */
+.dash-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.filter-preset-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.filter-preset-btn {
+  padding: 6px 13px;
+  border: 1.5px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+  transition: all .18s;
+  white-space: nowrap;
+}
+.filter-preset-btn:hover  { border-color: #a5b4fc; background: #eef2ff; color: #3730a3; }
+.filter-preset-btn.active { border-color: #6366f1; background: linear-gradient(135deg,#eef2ff,#e0e7ff); color: #4338ca; font-weight: 700; }
 
-    /* Online status */
-    .status{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--glass);
-      border:1px solid var(--ring);font-size:12px;font-weight:800;color:#153e75;backdrop-filter:blur(10px)}
-    .s-dot{width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}
-    .s-off{background:#f43f5e;box-shadow:0 0 0 3px rgba(244,63,94,.15)}
+/* ---- Section heading ---- */
+.section-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin: 2rem 0 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
 
-    /* Search + suggestions */
-    .search-wrap{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
-    .search{
-      width:100%;max-width:640px;display:flex;align-items:center;gap:10px;
-      padding:10px 12px;border-radius:999px;background:var(--glass);
-      border:1px solid transparent;background-clip:padding-box;box-shadow:var(--shadow-1);backdrop-filter:blur(10px);position:relative;
-      z-index:var(--z-pop);
-      flex:1 1 auto;
-    }
-    .search:before{
-      content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
-    }
-    .search input{border:none;outline:none;background:transparent;width:100%;font:inherit;color:var(--ink-900)}
-    .go{border:none;border-radius:999px;padding:8px 14px;font-weight:800;background:var(--brand-600);color:#fff;cursor:pointer}
+/* ---- KPI Grid ---- */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 1.75rem;
+}
+.kpi-card {
+  background: #fff;
+  border: 1px solid #edf0f4;
+  border-radius: 14px;
+  padding: 16px 18px 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(15,23,42,.04);
+  transition: box-shadow .2s, transform .2s;
+}
+.kpi-card:hover { box-shadow: 0 6px 18px rgba(15,23,42,.08); transform: translateY(-1px); }
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 14px 14px 0 0;
+}
+.kpi-card.acc-blue::before    { background: #3b82f6; }
+.kpi-card.acc-green::before   { background: #10b981; }
+.kpi-card.acc-purple::before  { background: #8b5cf6; }
+.kpi-card.acc-amber::before   { background: #f59e0b; }
+.kpi-card.acc-red::before     { background: #ef4444; }
+.kpi-card.acc-sky::before     { background: #0ea5e9; }
+.kpi-card.acc-teal::before    { background: #14b8a6; }
+.kpi-card.acc-rose::before    { background: #f43f5e; }
+.kpi-card.acc-indigo::before  { background: #6366f1; }
 
-    .suggest{
-      position:absolute;top:calc(100% + 8px);left:0;right:0;
-      z-index:calc(var(--z-pop) + 1);
-      background:var(--glass);backdrop-filter:blur(12px);border-radius:14px;box-shadow:var(--shadow-2);
-      border:1px solid transparent;display:none;max-height:320px;overflow:auto; pointer-events:auto;
-    }
-    .suggest:before{
-      content:"";position:absolute;inset:0;padding:1px;border-radius:14px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
-    }
-    .s-item{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;margin:6px;border:1px solid rgba(47,107,255,.12);cursor:pointer}
-    .s-item:hover{background:rgba(47,107,255,.10)}
-    .s-pill{font-size:11px;font-weight:800;border:1px solid var(--ring);padding:.15rem .5rem;border-radius:999px;background:#eef4ff;color:#2757d8}
+.kpi-icon {
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+.kpi-icon.bg-blue   { background:#dbeafe; color:#2563eb; }
+.kpi-icon.bg-green  { background:#d1fae5; color:#059669; }
+.kpi-icon.bg-purple { background:#ede9fe; color:#7c3aed; }
+.kpi-icon.bg-amber  { background:#fef3c7; color:#d97706; }
+.kpi-icon.bg-red    { background:#fee2e2; color:#dc2626; }
+.kpi-icon.bg-sky    { background:#e0f2fe; color:#0284c7; }
+.kpi-icon.bg-teal   { background:#ccfbf1; color:#0d9488; }
+.kpi-icon.bg-rose   { background:#ffe4e6; color:#e11d48; }
+.kpi-icon.bg-indigo { background:#e0e7ff; color:#4338ca; }
 
-    /* Top filter pills */
-    .filters-top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0 12px;justify-content:flex-end}
-    .pill{
-      display:inline-flex;gap:8px;align-items:center;padding:8px 12px;border-radius:999px;background:var(--glass);
-      border:1px solid var(--ring);font-weight:700;cursor:pointer;user-select:none
-    }
-    .pill.active{background:rgba(47,107,255,.14);color:var(--brand-600);border-color:rgba(47,107,255,.32)}
-    .date-pop{position:relative; z-index:var(--z-pop);}
-    .date-card{
-      position:absolute;top:44px;left:0;z-index:calc(var(--z-pop) + 1);
-      display:none;padding:12px;border-radius:14px;background:var(--glass);backdrop-filter:blur(12px);
-      border:1px solid transparent;box-shadow:var(--shadow-2)
-    }
-    .date-card:before{
-      content:"";position:absolute;inset:0;padding:1px;border-radius:14px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none
-    }
-    .date-card input{padding:8px 10px;border-radius:10px;border:1px solid var(--ring);background:rgba(255,255,255,.7)}
-    .date-card .apply{margin-left:8px}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .7px;
+  color: #94a3b8;
+  margin-bottom: 5px;
+}
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  letter-spacing: -.5px;
+}
+.kpi-value.is-demo { color: #64748b; }
+.kpi-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+.kpi-trend.up      { background:#dcfce7; color:#16a34a; }
+.kpi-trend.down    { background:#fee2e2; color:#dc2626; }
+.kpi-trend.neutral { background:#f1f5f9; color:#64748b; }
+.kpi-period { font-size: 10.5px; color: #94a3b8; margin-top: 4px; }
+.kpi-demo-badge {
+  position: absolute; top: 10px; right: 10px;
+  font-size: 9.5px; font-weight: 600; color: #94a3b8;
+  background: #f1f5f9; padding: 2px 6px; border-radius: 4px;
+}
 
-    /* Right side header */
-    .right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0}
-    .chip{padding:.25rem .6rem;border-radius:999px;background:var(--chip);border:1px solid var(--ring);color:#1e3a8a;font-weight:700;font-size:12px}
-    .bell{position:relative;width:42px;height:42px;border-radius:999px;background:var(--glass);backdrop-filter:blur(10px);
-      border:1px solid transparent;box-shadow:var(--shadow-1);display:grid;place-items:center;cursor:pointer;user-select:none; z-index:var(--z-pop);}
-    .bell:before{content:"";position:absolute;inset:0;padding:1px;border-radius:999px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
-    .bell svg{width:20px;height:20px;fill:#274a8f}
-    .dot-ind{position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#ff3b3b;color:#fff;
-      display:grid;place-items:center;font-size:11px;font-weight:900;padding:0 5px;border:2px solid rgba(255,255,255,.9)}
+/* ---- Charts Grid ---- */
+.charts-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 1.75rem;
+}
+.charts-grid-3 {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 1.75rem;
+}
+@media (max-width: 1100px) {
+  .charts-grid-2, .charts-grid-3 { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  .charts-grid-2, .charts-grid-3 { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2,1fr); }
+}
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+}
 
-    /* Notifications panel – guaranteed clickable */
-    .panel{
-      position:fixed;top:72px;right:16px;width:360px;max-width:86vw;
-      z-index:var(--z-panel); background:var(--glass);backdrop-filter:blur(12px);
-      border-radius:16px;box-shadow:var(--shadow-2);border:1px solid transparent;
-      pointer-events:auto;
-    }
-    .panel *{pointer-events:auto}
-    .panel:before{content:"";position:absolute;inset:0;padding:1px;border-radius:16px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-    .panel .ph{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 8px}
-    .panel h3{margin:0;font-size:14px;font-weight:900;color:var(--ink-700)}
-    .panel .pl{list-style:none;margin:0;padding:8px 10px;max-height:360px;overflow:auto}
-    .panel .pi{display:grid;grid-template-columns:auto 1fr auto;gap:10px;padding:10px;border-radius:12px;border:1px solid rgba(47,107,255,.12);background:rgba(255,255,255,.5);margin-bottom:8px}
-    .panel .pi .badge{font-size:11px}
-    .panel .foot{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 12px}
-    .btn-text{background:transparent;border:none;color:var(--brand-600);font-weight:800;cursor:pointer}
+/* ---- Chart Card ---- */
+.chart-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+  overflow: hidden;
+}
+.chart-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.chart-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.chart-card-sub { font-size: 11.5px; color: #64748b; margin-top: 2px; }
+.chart-card-body { padding: 14px 18px 18px; position: relative; }
+.chart-wrap { position: relative; height: 210px; }
+.chart-wrap.tall { height: 260px; }
+.chart-wrap.short { height: 160px; }
 
-    /* Cards */
-    .cards{display:grid;gap:14px;grid-template-columns:1fr}
-    @media (min-width:576px){.cards{grid-template-columns:repeat(2,1fr)}}
-    @media (min-width:992px){.cards{grid-template-columns:repeat(3,1fr)}}
-    @media (min-width:1200px){.cards{grid-template-columns:repeat(4,1fr)}}
-    .card{
-      position:relative;background:var(--glass);backdrop-filter:blur(10px);border-radius:18px;
-      padding:16px 16px 18px;box-shadow:var(--shadow-1);transition:transform .25s ease, box-shadow .25s ease
-    }
-    .card:before{content:"";position:absolute;inset:0;padding:1px;border-radius:18px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-    .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-2)}
-    .card h3{margin:0 0 10px;font-size:13px;font-weight:800;color:var(--ink-500);letter-spacing:.3px}
-    .num{font-size:30px;font-weight:900;color:var(--ink-900)}
-    .card.link{cursor:pointer}
-    .card.link, .card.link * { text-decoration:none !important }
+/* ---- Operations Health Cards ---- */
+.ops-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  margin-bottom: 1.75rem;
+}
+.ops-card {
+  background: #fff;
+  border: 1px solid #edf0f4;
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(15,23,42,.03);
+}
+.ops-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.ops-card-title { font-size: 13px; font-weight: 700; color: #334155; }
+.ops-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.health-good  { background:#dcfce7; color:#166534; }
+.health-warn  { background:#fef9c3; color:#854d0e; }
+.health-alert { background:#fee2e2; color:#991b1b; }
+.ops-stat-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f8fafc;
+}
+.ops-stat-row:last-child { border-bottom: none; }
+.ops-stat-label { color: #64748b; }
+.ops-stat-value { font-weight: 700; color: #0f172a; }
 
-    /* Trend badge */
-    .trend{
-      position:absolute; top:10px; right:12px;
-      display:inline-flex; align-items:center; gap:6px;
-      font-size:14px; font-weight:900;
-      padding:4px 8px;border-radius:999px;
-      background:rgba(255,255,255,.7); backdrop-filter:blur(6px);
-      border:1px solid var(--ring);
-      user-select:none; pointer-events:none;
-      box-shadow: 0 2px 6px rgba(0,0,0,.06);
-    }
-    .trend svg{width:18px;height:18px}
-    .trend.up{color:var(--good-bright)} .trend.flat{color:#6b7280}
-    .trend.down{color:#ef4444}.trend.down svg{transform:rotate(180deg)}
+/* ---- Payment Intelligence ---- */
+.payment-seg-bar {
+  height: 10px;
+  border-radius: 99px;
+  background: #f1f5f9;
+  display: flex;
+  overflow: hidden;
+  margin: 8px 0 16px;
+}
+.pay-seg { height: 100%; transition: width .4s; }
+.pay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f8fafc;
+}
+.pay-row:last-child { border-bottom: none; }
+.pay-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.pay-method { display: flex; align-items: center; gap: 8px; color: #334155; font-weight: 600; }
+.pay-pct { font-size: 12px; color: #94a3b8; font-weight: 500; }
+.pay-amount { font-weight: 700; color: #0f172a; font-size: 13px; }
 
-    .section-title{margin:26px 4px 12px;font-size:14px;font-weight:900;color:var(--ink-700)}
+/* ---- Top performers table ---- */
+.top-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.top-table th { text-align: left; padding: 7px 10px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #94a3b8; border-bottom: 1.5px solid #f1f5f9; }
+.top-table td { padding: 10px 10px; border-bottom: 1px solid #f8fafc; vertical-align: middle; }
+.top-table tr:last-child td { border-bottom: none; }
+.rank-badge {
+  width: 24px; height: 24px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800;
+}
+.rank-1 { background: #fef3c7; color: #92400e; }
+.rank-2 { background: #f1f5f9; color: #475569; }
+.rank-3 { background: #fce7f3; color: #9d174d; }
+.rank-n { background: #f8fafc; color: #94a3b8; }
+.top-name { font-weight: 700; color: #0f172a; }
+.top-sub  { font-size: 11px; color: #94a3b8; }
 
-    /* Wallet & chart */
-    .wallet{display:grid;gap:14px;grid-template-columns:1fr}
-    @media (min-width:980px){.wallet{grid-template-columns:1fr 1fr 2fr}}
-    .filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
-    .input{
-      padding:10px 12px;border-radius:12px;background:var(--glass);backdrop-filter:blur(10px);border:1px solid var(--ring);
-      font:inherit;color:var(--ink-900)
-    }
-    .apply{padding:10px 14px;border-radius:12px;border:none;background:var(--brand-600);color:#fff;font-weight:800;cursor:pointer}
-    .chart-card{padding:14px 14px 6px}
-    .legend{display:flex;gap:10px;align-items:center;margin:6px 0 8px}
-    .lg-dot{width:10px;height:10px;border-radius:999px;background:#2563eb}
+/* ---- AI Insights ---- */
+.insights-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 1.75rem;
+}
+@media (max-width: 768px) { .insights-grid { grid-template-columns: 1fr; } }
 
-    /* AI insights */
-    .insights{display:grid;gap:12px;grid-template-columns:1fr}
-    .ins-card{padding:16px;border-radius:18px;background:var(--glass);backdrop-filter:blur(10px);box-shadow:var(--shadow-1);position:relative}
-    .ins-card:before{content:"";position:absolute;inset:0;padding:1px;border-radius:18px;background:var(--border-grad);
-      -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
-    .ins-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-    .ins-head h3{margin:0;font-size:14px;font-weight:900;color:var(--ink-700)}
-    .badge{display:inline-flex;align-items:center;gap:6px;padding:.28rem .6rem;border-radius:999px;background:#eef4ff;border:1px solid var(--ring);font-size:12px;font-weight:800;color:var(--brand-600)}
-    .i-list{padding:0;margin:0;list-style:none;display:grid;gap:10px}
-    .i{display:flex;gap:10px;align-items:flex-start}
-    .dot{flex:0 0 10px;height:10px;border-radius:50%}
-    .p-high{background:var(--bad)} .p-med{background:var(--warn)} .p-low{background:var(--ok)} .p-good{background:var(--good)}
-    .i span{font-weight:700}
-    .muted{color:var(--ink-500);font-size:12px}
+.insight-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(15,23,42,.04);
+}
+.insight-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.insight-icon.positive { background: #dcfce7; color: #166534; }
+.insight-icon.info     { background: #dbeafe; color: #1d4ed8; }
+.insight-icon.warning  { background: #fef3c7; color: #92400e; }
+.insight-icon.alert    { background: #fee2e2; color: #991b1b; }
+.insight-text strong { font-size: 13px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 3px; }
+.insight-text span   { font-size: 12.5px; color: #64748b; line-height: 1.45; }
 
-    /* Animations */
-    .reveal{opacity:0;transform:translateY(10px);animation:reveal .6s ease forwards}
-    .reveal.d2{animation-delay:.06s}.reveal.d3{animation-delay:.12s}.reveal.d4{animation-delay:.18s}
-    @keyframes reveal{to{opacity:1;transform:none}}
-  </style>
-</head>
-<body data-layout="hq">
+/* ---- Bug Monitor ---- */
+.bug-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 600px) { .bug-status-grid { grid-template-columns: repeat(2,1fr); } }
+.bug-stat-box {
+  text-align: center;
+  padding: 14px 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.bug-stat-value { font-size: 1.8rem; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.bug-stat-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+.bug-system-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+}
 
-  {# Canonical hq URLs #}
-  {% url 'hq:dashboard' as dashboard_url %}
-  {% url 'hq:subscriptions' as subscriptions_url %}
-  {% url 'hq:invoices' as invoices_url %}
-  {% url 'hq:businesses' as businesses_url %}
-  {% url 'hq:agents' as agents_url %}
-  {% url 'hq:wallet' as wallet_url %}
-  {% url 'hq:stock_trends' as stock_trends_url %}
-  {% url 'logout' as logout_url %}
-  {% url 'admin:index' as admin_url %}
+/* ---- Wallet chart section ---- */
+.wallet-chart-wrap { height: 160px; position: relative; }
 
-  <script id="income-series" type="application/json">{{ income_series_json|default:"[]"|safe }}</script>
+/* ---- Awaiting state ---- */
+.awaiting-state {
+  text-align: center;
+  padding: 28px 20px;
+  color: #94a3b8;
+}
+.awaiting-state i { font-size: 2rem; display: block; margin-bottom: 8px; }
+.awaiting-state strong { font-size: 13px; display: block; margin-bottom: 4px; color: #64748b; }
+.awaiting-state span { font-size: 12px; }
+</style>
+{% endblock %}
 
-  <div class="hq-layout">
-    <aside id="hqSidebar" class="sidebar hq-sidebar">
-      <div class="brand">
-        <div class="dot">HQ</div>
-        <div class="hide-sm">Control Center</div>
-      </div>
+{% block content %}
+<div class="dash-page">
 
-      <nav class="nav">
-        <a href="{% url 'staticpages:home' %}">🏠 Home</a>
-        <a class="active" href="{{ dashboard_url|default:'/hq/' }}">Dashboard</a>
-        <a href="{{ subscriptions_url|default:'/hq/subscriptions/' }}">Subscriptions</a>
-        <a href="{{ invoices_url|default:'/hq/invoices/' }}">Invoices</a>
-        <a href="{{ businesses_url|default:'/hq/businesses/' }}">Businesses</a>
-        <a href="{{ agents_url|default:'/hq/agents/' }}">Agents</a>
-        <a href="{{ wallet_url|default:'/hq/wallet/' }}">Wallet</a>
-        <a href="{{ stock_trends_url|default:'/hq/stock-trends/' }}">Stock trends</a>
-
-        <div class="nav-sep"></div>
-        <a href="{% url 'hq:currency_settings' %}">Currency Settings</a>
-        <div class="nav-sep"></div>
-        <a href="{{ admin_url|default:'/admin/' }}">↗ Django Admin</a>
-        <a href="{{ logout_url|default:'/accounts/logout/' }}">Logout</a>
-      </nav>
-    </aside>
-
-    <div class="hq-main" style="flex: 1; min-width: 0;">
-      <!-- Mobile Topbar -->
-      <header class="hq-topbar">
-        <button id="hqSidebarToggle" class="hq-icon-btn" aria-controls="hqSidebar" aria-expanded="false" aria-label="Toggle navigation">☰</button>
-        <div class="hq-topbar-title">HQ Dashboard</div>
-        <div class="hq-topbar-actions"></div>
-      </header>
-
-      <main class="content">
-      <div class="shell container-fluid px-2 px-md-4" style="max-width: none; width: 100%;">
-        <!-- Header -->
-        <div class="header reveal">
-          <h1>
-            HQ • Dashboard
-            <span class="status" id="net"><span class="s-dot" id="netDot"></span><span id="netTxt">Online</span></span>
-          </h1>
-
-          <!-- Search -->
-          <div class="search-wrap" style="flex: 1 1 auto; min-width: 0;">
-            <form id="searchForm" class="search" role="search" aria-label="Global Search"
-                  action="{{ businesses_url|default:'/hq/businesses/' }}" method="GET" autocomplete="off">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15.5 15.5L21 21" stroke="#5a78b0" stroke-width="2" stroke-linecap="round"/><circle cx="10.5" cy="10.5" r="6.5" stroke="#5a78b0" stroke-width="2"/></svg>
-              <input id="q" name="q" type="search" placeholder="Search businesses, invoices, agents, subscriptions…" autocomplete="off" style="flex:1;min-width:200px;max-width:100%"/>
-              <button class="go" id="go" type="submit">Go</button>
-              <div class="suggest" id="sugg" aria-live="polite"></div>
-            </form>
-          </div>
-
-          <div class="right" style="flex-shrink: 0;">
-            <!-- Time Filters -->
-            <div class="filters-top">
-              <div class="pill active" data-range="all" id="flt-all" tabindex="0">All time</div>
-              <div class="pill" data-range="7d" id="flt-7d" tabindex="0">Last 7d</div>
-              <div class="pill date-pop" id="flt-custom" tabindex="0" aria-expanded="false" aria-haspopup="true">
-                Custom
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 11h10M7 15h6M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" stroke="#2757d8" stroke-width="2" stroke-linecap="round"/></svg>
-                <div class="date-card" id="date-card">
-                  <input type="date" id="d-from"><input type="date" id="d-to">
-                  <button class="apply" id="d-apply" type="button">Apply</button>
-                </div>
-              </div>
-            </div>
-
-            <span class="chip">Live</span>
-            <div class="bell" id="bell" tabindex="0" role="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false">
-              <svg viewBox="0 0 24 24"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h18v-1l-2-2Z"/></svg>
-              <div class="dot-ind" id="bell-count" style="display:none">0</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- KPIs -->
-        <div class="cards">
-          <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}">
-            <span class="trend up" id="trend-biz" title="Trend"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 14l4-4 3 3 5-5v4h2V6h-6v2h4l-4 4-3-3-5 5z"/></svg></span>
-            <h3>Total Businesses</h3><div class="num">{{ total_biz|default:"0" }}</div>
-          </a>
-          <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?filter=new7"><h3>New (7d)</h3><div class="num">{{ new_biz_7d|default:"0" }}</div></a>
-          <a class="card link reveal d3" href="{{ subscriptions_url|default:'/hq/subscriptions/' }}?status=active">
-            <span class="trend up" id="trend-subs" title="Trend"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 14l4-4 3 3 5-5v4h2V6h-6v2h4l-4 4-3-3-5 5z"/></svg></span>
-            <h3>Active Subs</h3><div class="num">{{ active_subs|default:"0" }}</div>
-          </a>
-          <a class="card link reveal d4" href="{{ subscriptions_url|default:'/hq/subscriptions/' }}?metric=mrr"><h3>MRR (plan amount sum)</h3><div class="num">{{ mrr_sum|default:"0.00" }}</div></a>
-          <a class="card link reveal" href="{{ invoices_url|default:'/hq/invoices/' }}?status=open"><h3>Open Invoices</h3><div class="num">{{ open_invoices|default:"0" }}</div></a>
-          <a class="card link reveal d2" href="{{ invoices_url|default:'/hq/invoices/' }}?status=open"><h3>Open Total</h3><div class="num">{{ open_total|default:"0.00" }}</div></a>
-          <a class="card link reveal d3" href="{{ agents_url|default:'/hq/agents/' }}"><h3>Agents Total</h3><div class="num">{{ agents_total|default:"0" }}</div></a>
-          <a class="card link reveal d4" href="{{ agents_url|default:'/hq/agents/' }}?filter=new30"><h3>Agents New (30d)</h3><div class="num">{{ agents_new_30d|default:"0" }}</div></a>
-          <a class="card link reveal" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=in"><h3>Stock In (7d)</h3><div class="num">{{ stock_in_7d|default:"0" }}</div></a>
-          <a class="card link reveal d2" href="{{ businesses_url|default:'/hq/businesses/' }}?tab=inventory&view=out"><h3>Stock Out (7d)</h3><div class="num">{{ stock_out_7d|default:"0" }}</div></a>
-        </div>
-
-        <!-- HQ Analytics Filter Bar -->
-        <div class="section-title reveal">Analytics Cockpit</div>
-        <div class="card reveal" style="margin-bottom:24px;padding:20px">
-          <h3 style="margin:0 0 16px;font-size:16px;font-weight:900;color:var(--ink-700)">Filters</h3>
-          <!-- Analytics filters now use responsive grid from hq-mobile-responsive.css -->
-          <div id="analytics-filters">
-            <!-- Date Filters -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Date Range</label>
-              <div style="display:flex;gap:6px">
-                <button class="pill" data-date-preset="today" style="font-size:12px;padding:6px 10px">Today</button>
-                <button class="pill" data-date-preset="7d" style="font-size:12px;padding:6px 10px">Last 7 Days</button>
-                <button class="pill" data-date-preset="mtd" style="font-size:12px;padding:6px 10px">Month to Date</button>
-              </div>
-              <div style="display:flex;gap:6px;margin-top:6px">
-                <input type="date" id="analytics-start-date" class="input" style="flex:1;font-size:12px;padding:6px 8px">
-                <span style="align-self:center;color:var(--ink-500);font-size:12px">to</span>
-                <input type="date" id="analytics-end-date" class="input" style="flex:1;font-size:12px;padding:6px 8px">
-              </div>
-            </div>
-            
-            <!-- Business Filter -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Business</label>
-              <select id="analytics-business" class="input" style="width:100%;font-size:12px;padding:6px 8px">
-                <option value="">All Businesses</option>
-                {% for biz in all_businesses|default:"" %}
-                <option value="{{ biz.id }}">{{ biz.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            
-            <!-- Vertical Filter -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Vertical</label>
-              <select id="analytics-vertical" class="input" style="width:100%;font-size:12px;padding:6px 8px">
-                {% for val, label in vertical_options|default:"" %}
-                <option value="{{ val }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            
-            <!-- Location Filter -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Location</label>
-              <select id="analytics-location" class="input" style="width:100%;font-size:12px;padding:6px 8px">
-                <option value="">All Locations</option>
-                {% for loc in all_locations|default:"" %}
-                <option value="{{ loc.id }}">{{ loc.business.name }} - {{ loc.name }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            
-            <!-- Agent Filter -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Agent</label>
-              <select id="analytics-agent" class="input" style="width:100%;font-size:12px;padding:6px 8px">
-                <option value="">All Agents</option>
-                {% for agent in all_agents|default:"" %}
-                <option value="{{ agent.user_id }}">{{ agent.user.get_full_name|default:agent.user.username }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            
-            <!-- Payment Mode Filter -->
-            <div>
-              <label style="display:block;font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px">Payment Mode</label>
-              <select id="analytics-payment-mode" class="input" style="width:100%;font-size:12px;padding:6px 8px">
-                {% for val, label in payment_mode_options|default:"" %}
-                <option value="{{ val }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-          </div>
-          <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-            <button id="analytics-apply" class="apply" style="padding:10px 20px;font-size:14px">Apply Filters</button>
-            <button id="analytics-reset" class="input" style="padding:10px 20px;font-size:14px;background:var(--glass);border:1px solid var(--ring);cursor:pointer">Reset</button>
-          </div>
-        </div>
-
-        <!-- Analytics Charts Section -->
-        <div id="analytics-section" style="display:none">
-          <!-- Loading State -->
-          <div id="analytics-loading" style="text-align:center;padding:40px;color:var(--ink-500)">
-            <div style="font-size:16px;font-weight:700;margin-bottom:8px">Loading analytics...</div>
-            <div style="font-size:12px">Fetching data and rendering charts</div>
-          </div>
-          
-          <!-- Analytics KPIs -->
-          <div id="analytics-kpis" class="cards" style="display:none"></div>
-          
-          <!-- Trend Charts (Line) -->
-          <div class="section-title reveal" style="display:none" id="analytics-trends-title">Trends</div>
-          <div class="wallet" id="analytics-trends" style="display:none">
-            <div class="card chart-card reveal">
-              <h3>Revenue Trend (Daily)</h3>
-              <div class="cc-chart-container" style="height:200px">
-                <canvas id="chart-revenue-trend"></canvas>
-              </div>
-            </div>
-            <div class="card chart-card reveal d2">
-              <h3>Sales Count Trend (Daily)</h3>
-              <div class="cc-chart-container" style="height:200px">
-                <canvas id="chart-sales-count-trend"></canvas>
-              </div>
-            </div>
-            <div class="card chart-card reveal d3">
-              <h3>Profit Trend (Daily)</h3>
-              <div class="cc-chart-container" style="height:200px">
-                <canvas id="chart-profit-trend"></canvas>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Breakdown Charts (Pie/Bar) -->
-          <div class="section-title reveal" style="display:none" id="analytics-breakdowns-title">Breakdowns</div>
-          <div class="wallet" id="analytics-breakdowns" style="display:none">
-            <div class="card chart-card reveal">
-              <h3>Cash Mix</h3>
-              <div class="cc-chart-container" style="height:200px">
-                <canvas id="chart-cash-mix"></canvas>
-              </div>
-            </div>
-            <div class="card chart-card reveal d2">
-              <h3>Vertical Mix</h3>
-              <div class="cc-chart-container" style="height:200px">
-                <canvas id="chart-vertical-mix"></canvas>
-              </div>
-            </div>
-            <div class="card chart-card reveal d3">
-              <h3>Top Businesses by Revenue</h3>
-              <canvas id="chart-top-businesses" height="200"></canvas>
-            </div>
-          </div>
-          
-          <!-- Top Lists -->
-          <div class="section-title reveal" style="display:none" id="analytics-tops-title">Top Performers</div>
-          <div class="wallet" id="analytics-tops" style="display:none">
-            <div class="card chart-card reveal">
-              <h3>Top Agents by Revenue</h3>
-              <canvas id="chart-top-agents" height="200"></canvas>
-            </div>
-            <div class="card reveal d2">
-              <h3>Stock Value Overview</h3>
-              <div id="stock-value-kpis" style="margin-top:12px"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Sales & Onboarding Charts -->
-        <div class="section-title reveal">Sales Overview ({{ selected_year }})</div>
-        <div class="wallet">
-          <div class="card chart-card reveal">
-            <div class="filters">
-              <strong>Monthly Sales</strong>
-              <select id="yearSelect" class="input" style="margin-left:auto">
-                {% for y in year_range %}
-                <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <!-- Chart Context: Totals & Peak -->
-            <div style="display:flex;justify-content:space-between;margin:8px 0;padding:8px;background:rgba(37,99,235,0.06);border-radius:8px">
-              <div>
-                <div style="font-size:11px;color:var(--ink-500);font-weight:700">YTD TOTAL</div>
-                <div style="font-size:20px;font-weight:900;color:var(--ink-900)">{{ sales_ytd_count|default:"0" }}</div>
-                <div style="font-size:11px;color:var(--ink-500)">MWK {{ sales_ytd_revenue|floatformat:0|default:"0" }}</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-size:11px;color:var(--ink-500);font-weight:700">PEAK MONTH</div>
-                <div style="font-size:16px;font-weight:900;color:#2563eb">{{ sales_peak_month_label|default:"—" }}</div>
-                <div style="font-size:11px;color:var(--ink-500)">{{ sales_peak_month_count|default:"0" }} sales</div>
-              </div>
-            </div>
-            <div class="legend"><div class="lg-dot" style="background:#2563eb"></div><span class="muted">Sales Count</span></div>
-            <canvas id="salesChart" height="200"></canvas>
-            <!-- Month Table -->
-            {% if sales_month_table %}
-            <div style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:12px">
-              <table style="width:100%;border-collapse:collapse">
-                <thead style="position:sticky;top:0;background:var(--glass);backdrop-filter:blur(10px)">
-                  <tr style="border-bottom:1px solid var(--ring)">
-                    <th style="text-align:left;padding:4px;font-weight:800;color:var(--ink-500)">Month</th>
-                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Count</th>
-                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in sales_month_table %}
-                  <tr style="border-bottom:1px solid rgba(0,0,0,0.05)">
-                    <td style="padding:4px;font-weight:700">{{ row.month }}</td>
-                    <td style="padding:4px;text-align:right">{{ row.count }}</td>
-                    <td style="padding:4px;text-align:right">{{ row.revenue|floatformat:0 }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% endif %}
-          </div>
-          <div class="card chart-card reveal d2">
-            <div class="filters">
-              <strong>New Onboardings</strong>
-            </div>
-            <!-- Chart Context: Totals & Peak -->
-            <div style="display:flex;justify-content:space-between;margin:8px 0;padding:8px;background:rgba(16,185,129,0.06);border-radius:8px">
-              <div>
-                <div style="font-size:11px;color:var(--ink-500);font-weight:700">YTD TOTAL</div>
-                <div style="font-size:20px;font-weight:900;color:var(--ink-900)">{{ onb_ytd_count|default:"0" }}</div>
-              </div>
-              <div style="text-align:right">
-                <div style="font-size:11px;color:var(--ink-500);font-weight:700">PEAK MONTH</div>
-                <div style="font-size:16px;font-weight:900;color:#10b981">{{ onb_peak_month_label|default:"—" }}</div>
-                <div style="font-size:11px;color:var(--ink-500)">{{ onb_peak_month_count|default:"0" }} agents</div>
-              </div>
-            </div>
-            <div class="legend"><div class="lg-dot" style="background:#10b981"></div><span class="muted">New Agents</span></div>
-            <canvas id="onboardingsChart" height="200"></canvas>
-            <!-- Month Table -->
-            {% if onb_month_table %}
-            <div style="margin-top:12px;max-height:200px;overflow-y:auto;font-size:12px">
-              <table style="width:100%;border-collapse:collapse">
-                <thead style="position:sticky;top:0;background:var(--glass);backdrop-filter:blur(10px)">
-                  <tr style="border-bottom:1px solid var(--ring)">
-                    <th style="text-align:left;padding:4px;font-weight:800;color:var(--ink-500)">Month</th>
-                    <th style="text-align:right;padding:4px;font-weight:800;color:var(--ink-500)">Count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in onb_month_table %}
-                  <tr style="border-bottom:1px solid rgba(0,0,0,0.05)">
-                    <td style="padding:4px;font-weight:700">{{ row.month }}</td>
-                    <td style="padding:4px;text-align:right">{{ row.count }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% endif %}
-          </div>
-          <div class="card reveal d3">
-            <h3>Period Metrics</h3>
-            <div style="margin-top:10px">
-              <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-                <span class="muted">Total Sales:</span>
-                <span style="font-weight:800">{{ sales_count|default:"0" }}</span>
-              </div>
-              <div style="display:flex;justify-content:space-between">
-                <span class="muted">Total Revenue:</span>
-                <span style="font-weight:800">MWK {{ sales_revenue|default:"0.00" }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Top Agents Leaderboard -->
-        <div class="section-title reveal">Top Performers</div>
-        <div class="card reveal d2" style="padding:16px">
-          <h3 style="margin-bottom:12px">🏆 Top 10 Agents ({{ start_date|date:"M Y" }} - {{ end_date|date:"M Y" }})</h3>
-          {% if top_agents %}
-          <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse">
-              <thead>
-                <tr style="border-bottom:2px solid var(--ring)">
-                  <th style="text-align:left;padding:8px;font-size:13px;color:var(--ink-500)">#</th>
-                  <th style="text-align:left;padding:8px;font-size:13px;color:var(--ink-500)">Agent</th>
-                  <th style="text-align:right;padding:8px;font-size:13px;color:var(--ink-500)">Sales</th>
-                  <th style="text-align:right;padding:8px;font-size:13px;color:var(--ink-500)">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for agent in top_agents %}
-                <tr style="border-bottom:1px solid var(--ring)">
-                  <td style="padding:10px;font-weight:800;color:var(--brand-600)">{{ forloop.counter }}</td>
-                  <td style="padding:10px;font-weight:700">{{ agent.name }}</td>
-                  <td style="padding:10px;text-align:right;font-weight:700">{{ agent.sales_count }}</td>
-                  <td style="padding:10px;text-align:right;font-weight:700">MWK {{ agent.revenue|floatformat:2 }}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% else %}
-          <div class="muted">No sales data for the selected period.</div>
-          {% endif %}
-        </div>
-
-        <!-- AI Insights -->
-        <div class="section-title reveal">AI Insights &amp; Recommendations</div>
-        <div class="insights">
-          <div class="ins-card reveal d2">
-            <div class="ins-head">
-              <h3>What needs your attention</h3>
-              <span class="badge" id="ins-stamp">Updating…</span>
-            </div>
-            <ul class="i-list" id="ai-list"></ul>
-            <div class="muted">Generated from your live KPIs.</div>
-          </div>
-        </div>
-
-        <!-- Wallet -->
-        <div class="section-title reveal">Wallet</div>
-        <div class="wallet">
-          <a class="card link reveal" href="{{ wallet_url|default:'/hq/wallet/' }}?range=30d&type=in"><h3>Incoming (30d)</h3><div class="num">{{ wallet_in_30d|default:"0.00" }}</div></a>
-          <a class="card link reveal d2" href="{{ wallet_url|default:'/hq/wallet/' }}?range=30d&type=out"><h3>Outgoing (30d)</h3><div class="num">{{ wallet_out_30d|default:"0.00" }}</div></a>
-          <div class="card chart-card reveal d3">
-            <div class="filters">
-              <strong>Income (MWK)</strong>
-              <input id="from" class="input" type="date"/>
-              <span class="muted">to</span>
-              <input id="to" class="input" type="date"/>
-              <button id="apply" class="apply">Apply</button>
-              <span class="muted" id="sum-range" style="margin-left:auto">Sum: MWK 0.00</span>
-            </div>
-            <div class="legend"><div class="lg-dot"></div><span class="muted">Income by day</span></div>
-            <canvas id="chart" height="160"></canvas>
-          </div>
-        </div>
-
-        <!-- Hidden metrics -->
-        <div id="metrics"
-             data-biz_total="{{ total_biz|default:'0' }}"
-             data-subs_active="{{ active_subs|default:'0' }}"
-             data-biz_total_prev="{{ total_biz_prev|default:'' }}"
-             data-subs_active_prev="{{ active_subs_prev|default:'' }}"
-             data-biz_new7="{{ new_biz_7d|default:'0' }}"
-             data-mrr="{{ mrr_sum|default:'0' }}"
-             data-open_invoices="{{ open_invoices|default:'0' }}"
-             data-open_total="{{ open_total|default:'0' }}"
-             data-agents_total="{{ agents_total|default:'0' }}"
-             data-agents_new30="{{ agents_new_30d|default:'0' }}"
-             data-stock_in7d="{{ stock_in_7d|default:'0' }}"
-             data-stock_out7d="{{ stock_out_7d|default:'0' }}"
-             data-wallet_in30="{{ wallet_in_30d|default:'0' }}"
-             data-wallet_out30="{{ wallet_out_30d|default:'0' }}"
-             data-wallet_balance="{{ wallet_balance|default:'0' }}"
-             style="display:none"></div>
-      </div>
-    </main>
-    </div><!-- /.hq-main -->
-
-    <!-- Backdrop for Mobile Sidebar (expanded state only) -->
-    <div id="hqBackdrop" class="hq-backdrop" hidden></div>
-  </div><!-- /.hq-layout -->
-
-  <!-- Notifications portal -->
-  <div class="panel" id="panel" role="dialog" aria-modal="false" style="display:none">
-    <div class="ph">
-      <h3>Notifications</h3>
-      <button class="btn-text" id="mark-all" type="button">Mark all read</button>
+  {# ---- DEMO BANNER ---- #}
+  {% if using_demo %}
+  <div class="demo-banner">
+    <i class="bi bi-info-circle-fill"></i>
+    <div>
+      <strong>Demo Intelligence Active</strong> — No live transactions recorded yet.
+      Illustrative values shown for layout preview. Real data will replace these automatically.
     </div>
-    <ul class="pl" id="plist"></ul>
-    <div class="foot">
-      <span class="muted">Shows important events (new businesses, agents, payments, repeated errors).</span>
-      <button class="btn-text" id="view-all" type="button" onclick="window.location='{{ dashboard_url|default:'/hq/' }}#notifications'">View all</button>
+  </div>
+  {% endif %}
+
+  {# ---- PAGE HEADER ---- #}
+  <div class="dash-header">
+    <div class="dash-header-text">
+      <h1>
+        HQ Command Center
+        <span class="live-badge"><span class="pulse-dot"></span> Live</span>
+      </h1>
+      <p>Executive intelligence dashboard · {{ request.user.get_full_name|default:request.user.username }} · Real-time platform overview</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <a href="{% url 'hq:hq_analytics' %}" class="btn btn-sm btn-outline-primary" style="font-weight:600;">
+        <i class="bi bi-graph-up me-1"></i> Deep Analytics
+      </a>
+      {% if bug_monitor_enabled %}
+      <a href="{% url 'hq:bugs_list' %}" class="btn btn-sm btn-outline-secondary" style="font-weight:600;">
+        <i class="bi bi-bug me-1"></i> Bug Monitor
+        {% if bug_open > 0 %}<span class="badge bg-danger ms-1">{{ bug_open }}</span>{% endif %}
+      </a>
+      {% endif %}
     </div>
   </div>
 
-  <script>
-  (function(){
-    const $ = (sel, root=document) => root.querySelector(sel);
-    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+  {# ---- QUICK FILTER BAR ---- #}
+  <form method="GET" id="dashFilterForm">
+    <div class="dash-filter-bar">
+      <div class="filter-preset-group">
+        <button type="submit" name="range" value="all" class="filter-preset-btn {% if not request.GET.range or request.GET.range == 'all' %}active{% endif %}">All time</button>
+        <button type="submit" name="range" value="today" class="filter-preset-btn {% if request.GET.range == 'today' %}active{% endif %}">Today</button>
+        <button type="submit" name="range" value="7d" class="filter-preset-btn {% if request.GET.range == '7d' %}active{% endif %}">Last 7 Days</button>
+        <button type="submit" name="range" value="30d" class="filter-preset-btn {% if request.GET.range == '30d' %}active{% endif %}">Last 30 Days</button>
+        <button type="submit" name="range" value="mtd" class="filter-preset-btn {% if request.GET.range == 'mtd' %}active{% endif %}">Month to Date</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select name="business" class="form-select form-select-sm" style="max-width:160px;font-size:12.5px;">
+          <option value="">All Businesses</option>
+          {% for biz in all_businesses %}
+          <option value="{{ biz.id }}" {% if request.GET.business == biz.id|stringformat:"s" %}selected{% endif %}>{{ biz.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="vertical" class="form-select form-select-sm" style="max-width:140px;font-size:12.5px;">
+          {% for val, label in vertical_options %}
+          <option value="{{ val }}" {% if request.GET.vertical == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-sm btn-primary" style="font-weight:600;white-space:nowrap;">Apply</button>
+        <a href="{% url 'hq:dashboard' %}" class="btn btn-sm btn-outline-secondary" style="white-space:nowrap;">Reset</a>
+      </div>
+    </div>
+  </form>
 
-    /* Reveal animation */
-    try{
-      const els = $$('.reveal');
-      const io = new IntersectionObserver((entries)=>entries.forEach(e=>{ if(e.isIntersecting) e.target.style.animationPlayState='running'; }), {threshold:.08});
-      els.forEach(el=>{ el.style.animationPlayState='paused'; io.observe(el); });
-    }catch(e){}
+  {# ====================================================
+     SECTION A — PLATFORM PULSE (KPI Cards)
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-activity"></i> Platform Pulse</div>
+  <div class="kpi-grid" id="platform-pulse-grid">
 
-    /* Online pill */
-    try{
-      const netTxt = $('#netTxt'), netDot = $('#netDot');
-      const setNet=()=>{ const on=navigator.onLine; netTxt.textContent=on?'Online':'Offline'; netDot.classList.toggle('s-off',!on); };
-      window.addEventListener('online', setNet); window.addEventListener('offline', setNet); setNet();
-    }catch(e){}
+    {# Total Businesses #}
+    <div class="kpi-card acc-blue">
+      <div class="kpi-icon bg-blue"><i class="bi bi-building"></i></div>
+      <div class="kpi-label">Total Businesses</div>
+      <div class="kpi-value">{{ total_biz|default:"0" }}</div>
+      <span class="kpi-trend {% if new_biz_7d > 0 %}up{% else %}neutral{% endif %}">
+        {% if new_biz_7d > 0 %}<i class="bi bi-arrow-up-short"></i> +{{ new_biz_7d }} this week
+        {% else %}<i class="bi bi-dash"></i> 0 this week{% endif %}
+      </span>
+      <div class="kpi-period">All time registered</div>
+    </div>
 
-    /* ROUTES + helpers */
-    const ROUTES = {
-      businesses: "{{ businesses_url|default:'/hq/businesses/' }}",
-      invoices: "{{ invoices_url|default:'/hq/invoices/' }}",
-      subscriptions: "{{ subscriptions_url|default:'/hq/subscriptions/' }}",
-      agents: "{{ agents_url|default:'/hq/agents/' }}",
-      searchFallback: "/hq/search/"
-    };
-    const firstValidBase = () => {
-      const order = [ROUTES.businesses, ROUTES.invoices, ROUTES.subscriptions, ROUTES.agents, ROUTES.searchFallback];
-      for (const b of order){ if (b && b !== '#') return b; }
-      return "/hq/";
-    };
-    const buildUrl = (base, term) => base + (base.includes('?')?'&':'?') + 'q=' + encodeURIComponent(term || '');
+    {# Active Subscriptions #}
+    <div class="kpi-card acc-green">
+      <div class="kpi-icon bg-green"><i class="bi bi-check-circle"></i></div>
+      <div class="kpi-label">Active Subscriptions</div>
+      <div class="kpi-value">{{ active_subs|default:"0" }}</div>
+      {% if trial_subs > 0 %}
+      <span class="kpi-trend neutral"><i class="bi bi-clock"></i> {{ trial_subs }} on trial</span>
+      {% else %}
+      <span class="kpi-trend neutral"><i class="bi bi-dash"></i> No trials active</span>
+      {% endif %}
+      <div class="kpi-period">Platform subscriptions</div>
+    </div>
 
-    /* Search + suggestions (always on top) */
-    try{
-      const form = $('#searchForm'), q = $('#q'), sugg = $('#sugg');
+    {# MRR #}
+    <div class="kpi-card acc-purple">
+      {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% elif mrr_awaiting %}<span class="kpi-demo-badge">SETUP</span>{% endif %}
+      <div class="kpi-icon bg-purple"><i class="bi bi-currency-exchange"></i></div>
+      <div class="kpi-label">MRR</div>
+      <div class="kpi-value {% if using_demo or mrr_awaiting %}is-demo{% endif %}">
+        {% if mrr_awaiting %}
+          <span style="font-size:1rem;color:#94a3b8;">Awaiting plans</span>
+        {% else %}
+          MWK {% if mrr_sum %}{{ mrr_sum|floatformat:0 }}{% else %}0{% endif %}
+        {% endif %}
+      </div>
+      <span class="kpi-trend {% if mrr_sum and mrr_sum > 0 %}up{% elif mrr_awaiting %}neutral{% else %}neutral{% endif %}">
+        {% if mrr_sum and mrr_sum > 0 %}<i class="bi bi-arrow-up-short"></i> Active plan revenue
+        {% elif mrr_awaiting %}<i class="bi bi-gear"></i> Set plan amounts to track MRR
+        {% else %}<i class="bi bi-dash"></i> No plan amounts set{% endif %}
+      </span>
+      <div class="kpi-period">Monthly recurring revenue</div>
+    </div>
 
-      form.addEventListener('submit', (e)=>{
-        e.preventDefault();
-        const term = (q.value||'').trim();
-        const base = firstValidBase();
-        window.location = term ? buildUrl(base, term) : base;
-      });
+    {# Revenue 30d #}
+    <div class="kpi-card acc-sky">
+      {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
+      <div class="kpi-icon bg-sky"><i class="bi bi-graph-up-arrow"></i></div>
+      <div class="kpi-label">Revenue (30d)</div>
+      <div class="kpi-value {% if using_demo %}is-demo{% endif %}">
+        MWK {% if revenue_30d %}{{ revenue_30d|floatformat:0 }}{% else %}0{% endif %}
+      </div>
+      <span class="kpi-trend {% if revenue_30d and revenue_30d > 0 %}up{% else %}neutral{% endif %}">
+        <i class="bi bi-calendar3"></i> Last 30 days
+      </span>
+      <div class="kpi-period">Total sales revenue</div>
+    </div>
 
-      async function fetchSuggest(term){
-        if(!term) return [];
-        try{
-          const r = await fetch(`/hq/api/search/suggest?q=${encodeURIComponent(term)}`, {headers:{'Accept':'application/json'}});
-          if(r.ok){ const arr = await r.json(); if(Array.isArray(arr) && arr.length) return arr.slice(0,8); }
-        }catch(_){}
-        return [
-          {label:`Businesses matching “${term}”`, type:'Businesses', url:buildUrl(ROUTES.businesses, term)},
-          {label:`Invoices for “${term}”`,     type:'Invoices',   url:buildUrl(ROUTES.invoices, term)},
-          {label:`Subscriptions with “${term}”`,type:'Subscriptions', url:buildUrl(ROUTES.subscriptions, term)},
-          {label:`Agents named “${term}”`,      type:'Agents',     url:buildUrl(ROUTES.agents, term)}
-        ];
+    {# Gross Profit 30d #}
+    <div class="kpi-card acc-teal">
+      {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
+      <div class="kpi-icon bg-teal"><i class="bi bi-cash-stack"></i></div>
+      <div class="kpi-label">Gross Profit (30d)</div>
+      <div class="kpi-value {% if using_demo %}is-demo{% endif %}">
+        MWK {% if gross_profit_30d %}{{ gross_profit_30d|floatformat:0 }}{% else %}0{% endif %}
+      </div>
+      <span class="kpi-trend {% if gross_profit_30d and gross_profit_30d > 0 %}up{% else %}neutral{% endif %}">
+        <i class="bi bi-arrow-up-right"></i> After cost of goods
+      </span>
+      <div class="kpi-period">Revenue minus COGS</div>
+    </div>
+
+    {# Open Invoices #}
+    <div class="kpi-card {% if open_invoices > 10 %}acc-red{% elif open_invoices > 0 %}acc-amber{% else %}acc-green{% endif %}">
+      {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
+      <div class="kpi-icon {% if open_invoices > 10 %}bg-red{% elif open_invoices > 0 %}bg-amber{% else %}bg-green{% endif %}">
+        <i class="bi bi-receipt-cutoff"></i>
+      </div>
+      <div class="kpi-label">Open Invoices</div>
+      <div class="kpi-value {% if using_demo %}is-demo{% endif %}">{{ open_invoices|default:"0" }}</div>
+      <span class="kpi-trend {% if open_invoices > 0 %}down{% else %}up{% endif %}">
+        {% if open_invoices > 0 %}
+          <i class="bi bi-exclamation-circle"></i> MWK {{ open_total|floatformat:0 }} outstanding
+        {% else %}
+          <i class="bi bi-check-circle"></i> All cleared
+        {% endif %}
+      </span>
+      <div class="kpi-period">Awaiting payment</div>
+    </div>
+
+    {# Agents #}
+    <div class="kpi-card acc-indigo">
+      <div class="kpi-icon bg-indigo"><i class="bi bi-people"></i></div>
+      <div class="kpi-label">Agents Active</div>
+      <div class="kpi-value">{{ agents_total|default:"0" }}</div>
+      <span class="kpi-trend {% if agents_new_30d > 0 %}up{% else %}neutral{% endif %}">
+        {% if agents_new_30d > 0 %}<i class="bi bi-person-plus"></i> +{{ agents_new_30d }} this month
+        {% else %}<i class="bi bi-dash"></i> No new agents{% endif %}
+      </span>
+      <div class="kpi-period">Total field agents & managers</div>
+    </div>
+
+    {# Stock Movement #}
+    <div class="kpi-card acc-amber">
+      {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
+      <div class="kpi-icon bg-amber"><i class="bi bi-box-seam"></i></div>
+      <div class="kpi-label">Stock Movement (7d)</div>
+      <div class="kpi-value {% if using_demo %}is-demo{% endif %}">
+        {{ stock_in_7d|default:"0" }} <span style="font-size:.75rem;color:#94a3b8;">in</span>
+        / {{ stock_out_7d|default:"0" }} <span style="font-size:.75rem;color:#94a3b8;">out</span>
+      </div>
+      <span class="kpi-trend {% if stock_out_7d > stock_in_7d %}down{% else %}up{% endif %}">
+        {% if stock_out_7d > stock_in_7d %}
+          <i class="bi bi-arrow-down"></i> Outpacing intake
+        {% elif stock_in_7d > 0 %}
+          <i class="bi bi-arrow-up"></i> Healthy replenishment
+        {% else %}
+          <i class="bi bi-dash"></i> No movement recorded
+        {% endif %}
+      </span>
+      <div class="kpi-period">Items in / sold out</div>
+    </div>
+
+  </div>{# /kpi-grid #}
+
+
+  {# ====================================================
+     SECTION B — REVENUE & SALES OVERVIEW (Charts)
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-bar-chart-line"></i> Revenue &amp; Sales Overview</div>
+
+  <div class="charts-grid-2" style="margin-bottom:1.75rem;">
+
+    {# Monthly Sales Chart #}
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title">
+            <i class="bi bi-bar-chart text-primary"></i>
+            Monthly Sales
+          </div>
+          <div class="chart-card-sub">{{ selected_year }} · {{ sales_ytd_count|default:"0" }} transactions YTD</div>
+        </div>
+        <select id="yearSelect" class="form-select form-select-sm" style="width:auto;font-size:12px;">
+          {% for y in year_range %}
+          <option value="{{ y }}" {% if y == selected_year %}selected{% endif %}>{{ y }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="chart-card-body">
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;padding:10px;background:#f8fafc;border-radius:10px;">
+          <div>
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">YTD TOTAL</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#0f172a;">{{ sales_ytd_count|default:"0" }}</div>
+            <div style="font-size:11px;color:#64748b;">MWK {{ sales_ytd_revenue|floatformat:0|default:"0" }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:10.5px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">PEAK MONTH</div>
+            <div style="font-size:1.1rem;font-weight:800;color:#3b82f6;">{{ sales_peak_month_label|default:"—" }}</div>
+            <div style="font-size:11px;color:#64748b;">{{ sales_peak_month_count|default:"0" }} sales</div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="salesChart"></canvas>
+        </div>
+        {% if using_demo %}
+        <div style="text-align:center;margin-top:8px;font-size:11px;color:#94a3b8;font-style:italic;">
+          Awaiting live transactions — demo trend shown for layout preview.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Revenue Trend + Onboardings #}
+    <div style="display:flex;flex-direction:column;gap:18px;">
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div>
+            <div class="chart-card-title"><i class="bi bi-people text-success"></i> Agent Onboardings</div>
+            <div class="chart-card-sub">{{ selected_year }} · {{ onb_ytd_count|default:"0" }} new agents YTD</div>
+          </div>
+        </div>
+        <div class="chart-card-body">
+          <div class="chart-wrap short">
+            <canvas id="onboardingsChart"></canvas>
+          </div>
+          {% if using_demo %}
+          <div style="text-align:center;margin-top:6px;font-size:11px;color:#94a3b8;font-style:italic;">Demo layout — no real agent data yet.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <div class="chart-card-title"><i class="bi bi-wallet2 text-warning"></i> Wallet Income (30d)</div>
+        </div>
+        <div class="chart-card-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div style="padding:10px;background:#f0fdf4;border-radius:10px;text-align:center;">
+              <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Incoming</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#166534;">MWK {{ wallet_in_30d|floatformat:0|default:"0" }}</div>
+            </div>
+            <div style="padding:10px;background:#fff1f2;border-radius:10px;text-align:center;">
+              <div style="font-size:10px;color:#94a3b8;font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Outgoing</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#991b1b;">MWK {{ wallet_out_30d|floatformat:0|default:"0" }}</div>
+            </div>
+          </div>
+          <div class="wallet-chart-wrap">
+            <canvas id="walletChart"></canvas>
+          </div>
+          {% if using_demo %}
+          <div style="text-align:center;margin-top:6px;font-size:11px;color:#94a3b8;font-style:italic;">Demo layout — awaiting wallet transactions.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+  </div>{# /charts-grid-2 #}
+
+
+  {# ====================================================
+     SECTION C — OPERATIONS HEALTH
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-heart-pulse"></i> Operations Health</div>
+  <div class="ops-grid">
+
+    {# Onboarding Pipeline #}
+    <div class="ops-card">
+      <div class="ops-card-head">
+        <span class="ops-card-title"><i class="bi bi-person-badge me-2 text-primary"></i>Onboarding Pipeline</span>
+        <span class="ops-health-badge {% if new_biz_7d > 0 %}health-good{% else %}health-warn{% endif %}">
+          {% if new_biz_7d > 0 %}Active{% else %}Slow{% endif %}
+        </span>
+      </div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Total Businesses</span><span class="ops-stat-value">{{ total_biz }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">New This Week</span><span class="ops-stat-value">{{ new_biz_7d }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Active Status</span><span class="ops-stat-value">{{ active_biz_count }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">New Agents (30d)</span><span class="ops-stat-value">{{ agents_new_30d }}</span></div>
+    </div>
+
+    {# Subscription Health #}
+    <div class="ops-card">
+      <div class="ops-card-head">
+        <span class="ops-card-title"><i class="bi bi-check2-circle me-2 text-success"></i>Subscription Health</span>
+        <span class="ops-health-badge {% if active_subs > 0 %}health-good{% elif trial_subs > 0 %}health-warn{% else %}health-alert{% endif %}">
+          {% if active_subs > 0 %}Healthy{% elif trial_subs > 0 %}Trials{% else %}None{% endif %}
+        </span>
+      </div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Active Subs</span><span class="ops-stat-value">{{ active_subs }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">On Trial</span><span class="ops-stat-value">{{ trial_subs }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Expired/Cancelled</span><span class="ops-stat-value">{{ expired_subs }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">MRR</span><span class="ops-stat-value">MWK {{ mrr_sum|floatformat:0|default:"0" }}</span></div>
+    </div>
+
+    {# Invoice Health #}
+    <div class="ops-card">
+      <div class="ops-card-head">
+        <span class="ops-card-title"><i class="bi bi-receipt me-2 text-warning"></i>Invoice Health</span>
+        <span class="ops-health-badge {% if open_invoices == 0 %}health-good{% elif open_invoices <= 5 %}health-warn{% else %}health-alert{% endif %}">
+          {% if open_invoices == 0 %}All Clear{% elif open_invoices <= 5 %}Watch{% else %}Action Needed{% endif %}
+        </span>
+      </div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Open Invoices</span><span class="ops-stat-value">{{ open_invoices }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Outstanding</span><span class="ops-stat-value">MWK {{ open_total|floatformat:0|default:"0" }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Collection Rate</span>
+        <span class="ops-stat-value {% if collection_rate >= 85 %}text-success{% elif collection_rate >= 70 %}text-warning{% elif collection_awaiting %}text-muted{% else %}text-danger{% endif %}">
+          {% if collection_awaiting %}—{% else %}{{ collection_rate }}%{% endif %}
+        </span>
+      </div>
+    </div>
+
+    {# Stock Movement Health #}
+    <div class="ops-card">
+      <div class="ops-card-head">
+        <span class="ops-card-title"><i class="bi bi-box me-2 text-info"></i>Stock Movement</span>
+        <span class="ops-health-badge {% if stock_in_7d > 0 or stock_out_7d > 0 %}health-good{% else %}health-warn{% endif %}">
+          {% if stock_in_7d > 0 or stock_out_7d > 0 %}Active{% else %}No Movement{% endif %}
+        </span>
+      </div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Stock In (7d)</span><span class="ops-stat-value">{{ stock_in_7d }} items</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Stock Out (7d)</span><span class="ops-stat-value">{{ stock_out_7d }} items</span></div>
+      <div class="ops-stat-row">
+        <span class="ops-stat-label">Net Movement</span>
+        <span class="ops-stat-value {% if net_stock_7d >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {% if net_stock_7d >= 0 %}+{% endif %}{{ net_stock_7d }} net
+        </span>
+      </div>
+    </div>
+
+    {# Agent Activity #}
+    <div class="ops-card">
+      <div class="ops-card-head">
+        <span class="ops-card-title"><i class="bi bi-person-lines-fill me-2 text-purple"></i>Agent Activity</span>
+        <span class="ops-health-badge {% if agents_total > 0 %}health-good{% else %}health-alert{% endif %}">
+          {% if agents_total > 0 %}Active{% else %}No Agents{% endif %}
+        </span>
+      </div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Total Agents</span><span class="ops-stat-value">{{ agents_total }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">New This Month</span><span class="ops-stat-value">{{ agents_new_30d }}</span></div>
+      <div class="ops-stat-row"><span class="ops-stat-label">Top Performer</span>
+        <span class="ops-stat-value">
+          {% if top_agents %}{{ top_agents.0.name|truncatechars:18 }}{% else %}—{% endif %}
+        </span>
+      </div>
+    </div>
+
+  </div>{# /ops-grid #}
+
+
+  {# ====================================================
+     SECTION D — PAYMENT INTELLIGENCE
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-credit-card-2-front"></i> Payment Intelligence</div>
+  <div class="charts-grid-2" style="margin-bottom:1.75rem;">
+
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title"><i class="bi bi-pie-chart text-primary"></i> Payment Mix (30d)</div>
+          <div class="chart-card-sub">Revenue by payment channel</div>
+        </div>
+        {% if using_demo %}<span class="badge bg-secondary" style="font-size:10px;">DEMO</span>{% endif %}
+      </div>
+      <div class="chart-card-body">
+        <div id="paymentMixContainer">
+          {# Rendered by JS below — or demo fallback #}
+        </div>
+        <div class="chart-wrap" id="paymentMixChartWrap" style="margin-top:12px;">
+          <canvas id="paymentMixChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><i class="bi bi-bar-chart text-success"></i> Revenue by Vertical</div>
+      </div>
+      <div class="chart-card-body">
+        <div class="chart-wrap">
+          <canvas id="verticalMixChart"></canvas>
+        </div>
+        {% if using_demo %}
+        <div style="text-align:center;margin-top:8px;font-size:11px;color:#94a3b8;font-style:italic;">
+          Demo layout — awaiting sales across verticals.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ====================================================
+     SECTION E — TOP PERFORMERS
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-trophy"></i> Top Performers</div>
+  <div class="charts-grid-2" style="margin-bottom:1.75rem;">
+
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title"><i class="bi bi-person-check text-warning"></i> Top Agents</div>
+          <div class="chart-card-sub">By revenue — selected period</div>
+        </div>
+        {% if using_demo %}<span class="badge bg-secondary" style="font-size:10px;">DEMO</span>{% endif %}
+      </div>
+      <div class="chart-card-body" style="padding:0;">
+        {% if top_agents %}
+        <table class="top-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Agent</th>
+              <th>Sales</th>
+              <th>Revenue</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for agent in top_agents %}
+            <tr>
+              <td>
+                <span class="rank-badge {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-n{% endif %}">
+                  {{ forloop.counter }}
+                </span>
+              </td>
+              <td><div class="top-name">{{ agent.name }}</div></td>
+              <td><span style="font-weight:700;color:#0f172a;">{{ agent.sales_count }}</span></td>
+              <td><span style="font-weight:700;color:#0f172a;font-size:12px;">MWK {{ agent.revenue|floatformat:0 }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="awaiting-state">
+          <i class="bi bi-person-x text-muted"></i>
+          <strong>No agent sales data yet</strong>
+          <span>Awaiting live transactions — agent rankings will appear automatically.</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-card-title"><i class="bi bi-building-check text-info"></i> Top Businesses</div>
+          <div class="chart-card-sub">By revenue — via Analytics API</div>
+        </div>
+      </div>
+      <div class="chart-card-body" style="padding:0;">
+        <div id="topBusinessesContainer">
+          <div class="awaiting-state">
+            <i class="bi bi-graph-up text-muted"></i>
+            <strong>Apply analytics filters</strong>
+            <span>Click "Deep Analytics" above for full business rankings with date filters.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+
+  {# ====================================================
+     SECTION F — AI INSIGHTS & RECOMMENDATIONS
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-lightbulb"></i> AI Insights &amp; Recommendations</div>
+  <div class="chart-card" style="margin-bottom:1.75rem;">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-robot text-primary"></i> Platform Intelligence</div>
+        <div class="chart-card-sub">Generated from live KPIs · Updated on page load</div>
+      </div>
+      <span class="badge bg-primary" style="font-size:10.5px;" id="insightStamp">Calculating…</span>
+    </div>
+    <div class="chart-card-body">
+      <div class="insights-grid" id="insightsGrid">
+        {# Rendered by JS #}
+      </div>
+    </div>
+  </div>
+
+
+  {# ====================================================
+     SECTION G — BUG / SYSTEM HEALTH
+     ==================================================== #}
+  {% if bug_monitor_enabled %}
+  <div class="section-label"><i class="bi bi-shield-check"></i> System Health</div>
+  <div class="chart-card" style="margin-bottom:1.75rem;">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title"><i class="bi bi-bug text-danger"></i> Bug Monitor Overview</div>
+        <div class="chart-card-sub">Real-time issue tracking</div>
+      </div>
+      <a href="{% url 'hq:bugs_list' %}" class="btn btn-sm btn-outline-danger" style="font-weight:600;font-size:12px;">View All Issues</a>
+    </div>
+    <div class="chart-card-body">
+      <div class="bug-status-grid">
+        <div class="bug-stat-box">
+          <div class="bug-stat-value" style="color:{% if bug_open > 0 %}#ef4444{% else %}#10b981{% endif %};">{{ bug_open }}</div>
+          <div class="bug-stat-label">Open Issues</div>
+        </div>
+        <div class="bug-stat-box">
+          <div class="bug-stat-value" style="color:{% if bug_critical > 0 %}#dc2626{% else %}#10b981{% endif %};">{{ bug_critical }}</div>
+          <div class="bug-stat-label">Critical</div>
+        </div>
+        <div class="bug-stat-box">
+          <div class="bug-stat-value" style="color:#10b981;">{{ bug_cleared_7d }}</div>
+          <div class="bug-stat-label">Cleared (7d)</div>
+        </div>
+        <div class="bug-stat-box">
+          <div class="bug-stat-value" style="color:#64748b;">{{ bug_total }}</div>
+          <div class="bug-stat-label">Total Logged</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        {% if bug_critical > 0 %}
+        <span class="bug-system-badge" style="background:#fee2e2;color:#991b1b;"><i class="bi bi-exclamation-triangle-fill me-1"></i> {{ bug_critical }} critical issue{{ bug_critical|pluralize }} require immediate attention</span>
+        {% elif bug_open > 0 %}
+        <span class="bug-system-badge" style="background:#fef3c7;color:#92400e;"><i class="bi bi-exclamation-circle me-1"></i> {{ bug_open }} open issue{{ bug_open|pluralize }} — monitoring active</span>
+        {% else %}
+        <span class="bug-system-badge" style="background:#dcfce7;color:#166534;"><i class="bi bi-check-circle-fill me-1"></i> System healthy — no open issues</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+
+  {# ====================================================
+     PERIOD METRICS SUMMARY
+     ==================================================== #}
+  <div class="section-label"><i class="bi bi-clock-history"></i> Period Metrics</div>
+  <div class="charts-grid-3" style="margin-bottom:1.75rem;">
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><i class="bi bi-calendar3 text-primary"></i> Sales Period Summary</div>
+      </div>
+      <div class="chart-card-body">
+        <div style="display:grid;gap:10px;">
+          <div class="ops-stat-row"><span class="ops-stat-label">Total Transactions</span><span class="ops-stat-value">{{ sales_count|default:"0" }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Total Revenue</span><span class="ops-stat-value">MWK {{ sales_revenue|floatformat:0|default:"0" }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Period</span>
+            <span class="ops-stat-value">
+              {% if start_date and end_date %}{{ start_date|date:"M d" }} – {{ end_date|date:"M d, Y" }}{% else %}All Time{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><i class="bi bi-graph-down text-danger"></i> Collections</div>
+      </div>
+      <div class="chart-card-body">
+        <div style="display:grid;gap:10px;">
+          <div class="ops-stat-row"><span class="ops-stat-label">Open Invoices</span><span class="ops-stat-value">{{ open_invoices }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Outstanding</span><span class="ops-stat-value">MWK {{ open_total|floatformat:0|default:"0" }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Collection Rate</span>
+            <span class="ops-stat-value" style="color:{% if collection_awaiting %}#94a3b8{% elif collection_rate >= 85 %}#166534{% elif collection_rate >= 70 %}#92400e{% else %}#991b1b{% endif %};">
+              {% if collection_awaiting %}—{% else %}{{ collection_rate }}%{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div class="chart-card-title"><i class="bi bi-wallet2 text-success"></i> Wallet Summary</div>
+        {% if wallet_awaiting %}<span style="font-size:10px;color:#94a3b8;font-weight:600;background:#f1f5f9;padding:2px 7px;border-radius:4px;">AWAITING</span>{% endif %}
+      </div>
+      <div class="chart-card-body">
+        {% if wallet_awaiting %}
+        <div class="awaiting-state">
+          <i class="bi bi-wallet2 text-muted"></i>
+          <strong>Awaiting wallet transactions</strong>
+          <span>Wallet income &amp; outgoing will appear here once transactions are recorded.</span>
+        </div>
+        {% else %}
+        <div style="display:grid;gap:10px;">
+          <div class="ops-stat-row"><span class="ops-stat-label">Incoming (30d)</span><span class="ops-stat-value text-success">MWK {{ wallet_in_30d|floatformat:0|default:"0" }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Outgoing (30d)</span><span class="ops-stat-value text-danger">MWK {{ wallet_out_30d|floatformat:0|default:"0" }}</span></div>
+          <div class="ops-stat-row"><span class="ops-stat-label">Balance</span>
+            <span class="ops-stat-value" style="color:{% if wallet_balance >= 0 %}#166534{% else %}#991b1b{% endif %};">
+              MWK {{ wallet_balance|floatformat:0|default:"0" }}
+            </span>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>{# /dash-page #}
+
+{# Hidden metrics for JS #}
+<div id="dashMetrics"
+     data-biz-total="{{ total_biz|default:'0' }}"
+     data-active-subs="{{ active_subs|default:'0' }}"
+     data-mrr="{{ mrr_sum|default:'0' }}"
+     data-revenue-30d="{{ revenue_30d|default:'0' }}"
+     data-gross-profit="{{ gross_profit_30d|default:'0' }}"
+     data-open-invoices="{{ open_invoices|default:'0' }}"
+     data-open-total="{{ open_total|default:'0' }}"
+     data-agents-total="{{ agents_total|default:'0' }}"
+     data-agents-new30="{{ agents_new_30d|default:'0' }}"
+     data-stock-in7d="{{ stock_in_7d|default:'0' }}"
+     data-stock-out7d="{{ stock_out_7d|default:'0' }}"
+     data-net-stock7d="{{ net_stock_7d|default:'0' }}"
+     data-wallet-in30="{{ wallet_in_30d|default:'0' }}"
+     data-wallet-out30="{{ wallet_out_30d|default:'0' }}"
+     data-wallet-balance="{{ wallet_balance|default:'0' }}"
+     data-collection-rate="{{ collection_rate|default:'0' }}"
+     data-sales-count-period="{{ sales_count|default:'0' }}"
+     data-sales-revenue-period="{{ sales_revenue|default:'0' }}"
+     data-using-demo="{{ using_demo|yesno:'true,false' }}"
+     style="display:none;"></div>
+
+<script id="monthlySalesData" type="application/json">
+  { "labels": {{ monthly_sales_labels|default:"[]"|safe }},
+    "data": {{ monthly_sales_data|default:"[]"|safe }},
+    "revenue": {{ monthly_revenue_data|default:"[]"|safe }} }
+</script>
+<script id="monthlyOnboardingsData" type="application/json">
+  { "labels": {{ monthly_onboardings_labels|default:"[]"|safe }},
+    "data": {{ monthly_onboardings_data|default:"[]"|safe }} }
+</script>
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ---- helpers ----
+  const $ = id => document.getElementById(id);
+  const m = ($('dashMetrics') || {dataset:{}}).dataset;
+  const num = v => Number((v||'0').toString().replace(/[^0-9.\-]/g,'')) || 0;
+  const fmtK = v => v >= 1e6 ? (v/1e6).toFixed(1)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : String(v);
+  const fmtMWK = v => 'MWK ' + fmtK(num(v));
+  const isDemo = m['usingDemo'] === 'true';
+
+  const DATA = {
+    bizTotal:          num(m['bizTotal']),
+    activeSubs:        num(m['activeSubs']),
+    mrr:               num(m['mrr']),
+    revenue30d:        num(m['revenue30d']),
+    grossProfit:       num(m['grossProfit']),
+    openInvoices:      num(m['openInvoices']),
+    openTotal:         num(m['openTotal']),
+    agentsTotal:       num(m['agentsTotal']),
+    agentsNew30:       num(m['agentsNew30']),
+    stockIn7d:         num(m['stockIn7d']),
+    stockOut7d:        num(m['stockOut7d']),
+    netStock7d:        num(m['netStock7d']),
+    walletIn30:        num(m['walletIn30']),
+    walletOut30:       num(m['walletOut30']),
+    walletBal:         num(m['walletBalance']),
+    collRate:          num(m['collectionRate']),
+    salesCountPeriod:  num(m['salesCountPeriod']),
+    salesRevPeriod:    num(m['salesRevenuePeriod']),
+  };
+
+  // ============================================================
+  //  CHART HELPERS
+  // ============================================================
+  const PALETTE = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6'];
+
+  function makeLineChart(canvasId, labels, data, color, label) {
+    const canvas = $(canvasId);
+    if (!canvas || !window.Chart) return;
+    return new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{ label, data, borderColor: color, backgroundColor: color + '20', tension: 0.4, fill: true, pointRadius: 3 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmtK(v) } } }
       }
-      let selIndex=-1, timer=null;
-      function renderSuggest(items){
-        sugg.innerHTML=''; selIndex=-1;
-        if(!items.length){ sugg.style.display='none'; return; }
-        items.forEach((it)=>{
-          const row=document.createElement('div');
-          row.className='s-item';
-          row.innerHTML=`<div>${it.label}</div><span class="s-pill">${it.type}</span>`;
-          row.addEventListener('click', ()=> window.location = it.url );
-          sugg.appendChild(row);
-        });
-        sugg.style.display='block';
+    });
+  }
+
+  function makePieChart(canvasId, labels, data, label) {
+    const canvas = $(canvasId);
+    if (!canvas || !window.Chart) return;
+    return new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: PALETTE.slice(0, data.length) }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } }
       }
-      q.addEventListener('input', ()=>{
-        clearTimeout(timer);
-        const term=q.value.trim();
-        if(!term){ sugg.style.display='none'; return; }
-        timer=setTimeout(async()=>renderSuggest(await fetchSuggest(term)), 120);
-      });
-      q.addEventListener('keydown', (e)=>{
-        const rows=[...sugg.children];
-        if(e.key==='Enter'){
-          if(sugg.style.display==='block' && rows[selIndex]){ e.preventDefault(); rows[selIndex].click(); }
-        }else if(e.key==='ArrowDown' && rows.length){
-          selIndex=(selIndex+1)%rows.length; rows.forEach((r,i)=>r.style.background=i===selIndex?'rgba(47,107,255,.10)':''); rows[selIndex].scrollIntoView({block:'nearest'});
-        }else if(e.key==='ArrowUp' && rows.length){
-          selIndex=(selIndex-1+rows.length)%rows.length; rows.forEach((r,i)=>r.style.background=i===selIndex?'rgba(47,107,255,.10)':''); rows[selIndex].scrollIntoView({block:'nearest'});
-        }else if(e.key==='Escape'){ sugg.style.display='none'; }
-      });
-      document.addEventListener('click', (e)=>{ if(!e.target.closest('.search')) sugg.style.display='none'; }, {passive:true});
-    }catch(e){}
+    });
+  }
 
-    /* Top time filters */
-    try{
-      const pillAll = $('#flt-all'), pill7 = $('#flt-7d'), pillCustom = $('#flt-custom');
-      const dateCard = $('#date-card'), dFrom = $('#d-from'), dTo = $('#d-to'), dApply = $('#d-apply');
+  function makeBarChart(canvasId, labels, data, color, label) {
+    const canvas = $(canvasId);
+    if (!canvas || !window.Chart) return;
+    return new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ label, data, backgroundColor: color + 'cc', borderRadius: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { callback: v => fmtK(v) } } }
+      }
+    });
+  }
 
-      const setActive = (el) => { [pillAll, pill7, pillCustom].forEach(p=>p.classList.remove('active')); if(el) el.classList.add('active'); };
-      const applyRange = (params) => {
+  // ============================================================
+  //  MONTHLY SALES CHART
+  // ============================================================
+  try {
+    const raw = JSON.parse(($('monthlySalesData') || {textContent: 'null'}).textContent || 'null') || {};
+    const labels = raw.labels || [];
+    const salesData = raw.data || [];
+    const revData = raw.revenue || [];
+
+    if (labels.length > 0) {
+      makeLineChart('salesChart', labels, revData.length ? revData : salesData, '#3b82f6', 'Revenue');
+    } else {
+      // Demo fallback
+      const demoLabels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const demoData = [520000,840000,1200000,1050000,1680000,1490000,2200000,1940000,2480000,2100000,2900000,2740000];
+      makeLineChart('salesChart', demoLabels, demoData, '#3b82f6', 'Revenue (demo)');
+    }
+  } catch(e) { console.warn('salesChart error', e); }
+
+  // ============================================================
+  //  ONBOARDINGS CHART
+  // ============================================================
+  try {
+    const raw = JSON.parse(($('monthlyOnboardingsData') || {textContent: 'null'}).textContent || 'null') || {};
+    const labels = raw.labels || [];
+    const data = raw.data || [];
+
+    if (labels.length > 0) {
+      makeBarChart('onboardingsChart', labels, data, '#10b981', 'New Agents');
+    } else {
+      const demoL = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const demoD = [1,2,3,1,4,2,5,3,4,3,6,4];
+      makeBarChart('onboardingsChart', demoL, demoD, '#10b981', 'New Agents (demo)');
+    }
+  } catch(e) { console.warn('onboardingsChart error', e); }
+
+  // ============================================================
+  //  WALLET INCOME CHART (simple canvas, or Chart.js)
+  // ============================================================
+  try {
+    const demoWallet = [
+      {d:'Day 1',v:320000},{d:'Day 3',v:480000},{d:'Day 5',v:290000},{d:'Day 7',v:610000},
+      {d:'Day 10',v:420000},{d:'Day 14',v:750000},{d:'Day 17',v:380000},{d:'Day 20',v:510000},
+      {d:'Day 24',v:680000},{d:'Day 27',v:440000},{d:'Day 30',v:820000},
+    ];
+    const labels = demoWallet.map(p => p.d);
+    const vals = demoWallet.map(p => p.v);
+    makeLineChart('walletChart', labels, vals, '#f59e0b', 'Income (demo)');
+  } catch(e) { console.warn('walletChart error', e); }
+
+  // ============================================================
+  //  PAYMENT MIX (demo or real via analytics API)
+  // ============================================================
+  try {
+    const container = $('paymentMixContainer');
+    if (container) {
+      const PAY_DEMO = [
+        { method: 'MOBILE_MONEY', label: 'Mobile Money', pct: 47, amount: DATA.revenue30d * 0.47, color: '#3b82f6' },
+        { method: 'CASH',         label: 'Cash',         pct: 31, amount: DATA.revenue30d * 0.31, color: '#10b981' },
+        { method: 'BANK',         label: 'Bank Transfer', pct: 13, amount: DATA.revenue30d * 0.13, color: '#f59e0b' },
+        { method: 'CARD',         label: 'Card',          pct: 6,  amount: DATA.revenue30d * 0.06,  color: '#8b5cf6' },
+        { method: 'CREDIT',       label: 'Credit',        pct: 3,  amount: DATA.revenue30d * 0.03,  color: '#ef4444' },
+      ];
+
+      // Segmented bar
+      const barHtml = PAY_DEMO.map(p =>
+        `<div class="pay-seg" style="width:${p.pct}%;background:${p.color};"></div>`
+      ).join('');
+      container.innerHTML = `<div class="payment-seg-bar">${barHtml}</div>` +
+        PAY_DEMO.map(p => `
+          <div class="pay-row">
+            <span class="pay-method"><span class="pay-dot" style="background:${p.color};"></span>${p.label}</span>
+            <span class="pay-pct">${p.pct}%</span>
+            <span class="pay-amount">${fmtMWK(p.amount)}</span>
+          </div>`
+        ).join('');
+
+      // Doughnut chart
+      makePieChart('paymentMixChart', PAY_DEMO.map(p=>p.label), PAY_DEMO.map(p=>p.pct), 'Payment Mix');
+    }
+  } catch(e) { console.warn('paymentMix error', e); }
+
+  // ============================================================
+  //  VERTICAL MIX CHART (demo)
+  // ============================================================
+  try {
+    const vertLabels = ['Phones','Clothing','Pharmacy','Liquor','Gym'];
+    const vertData = [38, 22, 18, 14, 8];
+    const vertCanvas = $('verticalMixChart');
+    if (vertCanvas && window.Chart) {
+      new Chart(vertCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: vertLabels,
+          datasets: [{ label: 'Revenue %', data: vertData, backgroundColor: PALETTE.slice(0,5), borderRadius: 6 }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, max: 50, ticks: { callback: v => v + '%' } } }
+        }
+      });
+    }
+  } catch(e) { console.warn('verticalMix error', e); }
+
+  // ============================================================
+  //  YEAR SELECTOR
+  // ============================================================
+  try {
+    const yearSelect = $('yearSelect');
+    if (yearSelect) {
+      yearSelect.addEventListener('change', () => {
         const url = new URL(window.location.href);
-        Object.keys(params).forEach(k => { if(params[k]===null) url.searchParams.delete(k); else url.searchParams.set(k, params[k]); });
+        url.searchParams.set('year', yearSelect.value);
         window.location = url.pathname + url.search;
-      };
-      pillAll.addEventListener('click', ()=>{ setActive(pillAll); applyRange({range:'all', start:null, end:null}); });
-      pill7.addEventListener('click', ()=>{ setActive(pill7); applyRange({range:'7d', start:null, end:null}); });
-      pillCustom.addEventListener('click', (e)=>{ e.stopPropagation(); const open= dateCard.style.display==='block'; dateCard.style.display = open?'none':'block'; pillCustom.setAttribute('aria-expanded', open?'false':'true'); setActive(pillCustom); });
-      document.addEventListener('click', (e)=>{ if(!pillCustom.contains(e.target)) { dateCard.style.display='none'; pillCustom.setAttribute('aria-expanded','false'); } }, {passive:true});
-      const today=new Date(), fmt=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const aWeek=new Date(); aWeek.setDate(today.getDate()-7);
-      dFrom.value=fmt(aWeek); dTo.value=fmt(today);
-      dApply.addEventListener('click', ()=>{ applyRange({range:'custom', start:dFrom.value, end:dTo.value}); });
-      const params=new URLSearchParams(window.location.search); const cur=params.get('range');
-      if(cur==='7d') setActive(pill7); else if(cur==='custom') setActive(pillCustom); else setActive(pillAll);
-    }catch(e){}
-
-    /* Trend arrows */
-    try{
-      const m = $('#metrics')?.dataset || {};
-      const num = (v)=>Number((v??'').toString().replace(/[^0-9.\-]/g,''))||0;
-      function setTrend(elId, current, previous){
-        const el = document.getElementById(elId); if(!el) return;
-        let cls = 'up';
-        if(previous !== null && previous !== undefined && previous !== ''){
-          const prev = num(previous);
-          if(current < prev) cls = 'down';
-          else if(current === prev) cls = 'flat';
-        }
-        el.classList.remove('up','down','flat'); el.classList.add(cls);
-      }
-      setTrend('trend-biz',  num(m.biz_total), m.biz_total_prev);
-      setTrend('trend-subs', num(m.subs_active), m.subs_active_prev);
-    }catch(e){}
-
-    /* Notifications (clickable, positioned) */
-    try{
-      const bell = $('#bell'), panel = $('#panel'), countEl = $('#bell-count'), listEl = $('#plist'), markAll = $('#mark-all');
-
-      function positionPanel(){
-        try{
-          const r = bell.getBoundingClientRect();
-          const panelWidth = Math.min(360, window.innerWidth * 0.86);
-          const left = Math.min(window.innerWidth - 12 - panelWidth, r.right - panelWidth);
-          panel.style.top  = (r.bottom + 10) + 'px';
-          panel.style.left = Math.max(12, left) + 'px';
-          panel.style.right = 'auto';
-        }catch(_){}
-      }
-
-      let notifications=[];
-      function renderNotifs(){
-        listEl.innerHTML=''; let unread=0;
-        notifications.forEach(n=>{
-          if(!n.read) unread++;
-          const li=document.createElement('li'); li.className='pi';
-          li.innerHTML=`
-            <span class="badge">${n.kind}</span>
-            <div><div style="font-weight:800">${n.title}</div><div class="muted">${new Date(n.ts).toLocaleString()}</div></div>
-            <a href="${n.link||'#'}" class="btn-text">Open</a>`;
-          listEl.appendChild(li);
-        });
-        if(unread>0){ countEl.style.display='grid'; countEl.textContent=unread>99?'99+':String(unread); }
-        else{ countEl.style.display='none'; }
-      }
-      function addNotif(n){ notifications.unshift(n); renderNotifs(); }
-
-      function togglePanel(force){
-        const show=(typeof force==='boolean')?force:panel.style.display==='none';
-        panel.style.display=show?'block':'none';
-        if(show) positionPanel();
-        bell.setAttribute('aria-expanded', show?'true':'false');
-      }
-      bell.addEventListener('click', (e)=>{ e.stopPropagation(); togglePanel(); });
-      bell.addEventListener('keydown', (e)=>{ if(e.key==='Enter'||e.key===' ') { e.preventDefault(); togglePanel(); } });
-      window.addEventListener('resize', ()=>{ if(panel.style.display==='block') positionPanel(); });
-      window.addEventListener('scroll', ()=>{ if(panel.style.display==='block') positionPanel(); }, {passive:true});
-      document.addEventListener('click', (e)=>{ if(panel.style.display==='block' && !panel.contains(e.target) && !bell.contains(e.target)) panel.style.display='none'; }, {passive:true});
-      panel.addEventListener('click', (e)=>{ e.stopPropagation(); }); // keep clicks inside clickable
-
-      try{
-        const es = (!!window.EventSource) ? new EventSource('/events/notifications') : null;
-        if(es){ es.onmessage = (ev)=>{ try{ addNotif(JSON.parse(ev.data)); }catch(_){ } }; }
-      }catch(_){}
-
-      async function poll(){
-        try{
-          const url = (window.HQ_NOTIFICATIONS_URL || '/hq/api/notifications/') + '?since=' + encodeURIComponent(window.__since||'');
-          const r = await fetch(url, {headers:{'Accept':'application/json'}});
-          if(r.ok){ (await r.json()).forEach(addNotif); window.__since = new Date().toISOString(); }
-        }catch(_){ }
-      }
-      setInterval(poll, 15000);
-
-      bell.addEventListener('click', ()=>{
-        if(notifications.length===0){
-          addNotif({id:'demo1', kind:'Payment', title:'New subscription paid · MWK 120,000', ts:Date.now(), link:"{{ subscriptions_url|default:'/hq/subscriptions/' }}"});
-          addNotif({id:'demo2', kind:'Business', title:'New business onboarded', ts:Date.now()-3*60*1000, link:"{{ businesses_url|default:'/hq/businesses/' }}"});
-          addNotif({id:'demo3', kind:'Agent', title:'Agent invitation accepted', ts:Date.now()-7*60*1000, link:"{{ agents_url|default:'/hq/agents/' }}"});
-          addNotif({id:'demo4', kind:'Error', title:'Manager failed action 3× (check logs)', ts:Date.now()-12*60*1000, link:"{{ admin_url|default:'/admin/' }}"});
-        }
       });
-    }catch(e){}
+    }
+  } catch(e) {}
 
-    /* AI insights */
-    try{
-      const m = $('#metrics')?.dataset || {};
-      const toNum = v => Number((v||'0').toString().replace(/[^0-9.\-]/g,''));
-      const data = {
-        bizTotal: toNum(m.biz_total),
-        bizNew7: toNum(m.biz_new7),
-        subsActive: toNum(m.subs_active),
-        mrr: toNum(m.mrr),
-        openInvoices: toNum(m.open_invoices),
-        openTotal: toNum(m.open_total),
-        agentsTotal: toNum(m.agents_total),
-        agentsNew30: toNum(m.agents_new30),
-        in7: toNum(m.stock_in7d),
-        out7: toNum(m.stock_out7d),
-        win: toNum(m.wallet_in30),
-        wout: toNum(m.wallet_out30),
-        wbal: toNum(m.wallet_balance)
-      };
-      const mk = (cls,txt)=>{ const li=document.createElement('li'); li.className='i';
-        const d=document.createElement('div'); d.className='dot '+cls;
-        const s=document.createElement('span'); s.textContent=txt; li.append(d,s); return li; };
-      const list = $('#ai-list'); const stamp = $('#ins-stamp');
-      const rec=[];
-      if (data.openInvoices>0 && data.openTotal>0) rec.push(mk('p-high', `Collect ${data.openInvoices} open invoice${data.openInvoices>1?'s':''} — open total MWK ${data.openTotal.toLocaleString()}.`));
-      if (data.subsActive===0 && data.bizTotal>0) rec.push(mk('p-high','No active subscriptions. Convert trials or set plans.'));
-      if (data.agentsTotal===0) rec.push(mk('p-med','No agents yet. Invite at least one.'));
-      else if (data.agentsNew30===0) rec.push(mk('p-low','No new agents in 30d. Consider a referral push.'));
-      if (data.out7>data.in7) rec.push(mk('p-med',`Stock outpaced intake this week (${data.out7} out vs ${data.in7} in). Reorder.`));
-      if (data.mrr===0 && data.subsActive>0) rec.push(mk('p-low','Active subs but zero MRR. Check plan amounts.'));
-      if (data.bizNew7===0) rec.push(mk('p-low','No new businesses in 7d. Run outreach.'));
-      if (data.wbal<0) rec.push(mk('p-high',`Wallet negative (MWK ${data.wbal}). Slow spend & collect.`));
-      else if (data.wout>data.win) rec.push(mk('p-med','Spending exceeded income in 30d. Review expenses.'));
-      else if (data.win>0 && data.wbal>=0) rec.push(mk('p-good','Healthy cashflow. Consider investing in inventory.'));
-      if (rec.length===0) rec.push(mk('p-good','All clear. No urgent actions.'));
-      rec.forEach(x=>list.appendChild(x));
-      if(stamp){ const d=new Date(); stamp.textContent='Updated · '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
-    }catch(e){}
+  // ============================================================
+  //  AI INSIGHTS
+  // ============================================================
+  (function() {
+    const grid = $('insightsGrid');
+    const stamp = $('insightStamp');
+    if (!grid) return;
 
-    /* Wallet chart */
-    try{
-      const canvas = $('#chart'); const ctx = canvas.getContext('2d');
-      function ymd(d){ const t = new Date(d); const m=('0'+(t.getMonth()+1)).slice(-2), day=('0'+t.getDate()).slice(-2); return `${t.getFullYear()}-${m}-${day}`; }
-      function daysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d; }
-      function parseSeries(){ try{ return JSON.parse($('#income-series')?.textContent || '[]'); }catch(e){ return []; } }
+    const insights = [];
 
-      let series = parseSeries();
-      if(!series.length){ const total=Number(($('#metrics')?.dataset.wallet_in30)||0); const pts=14;
-        for(let i=pts-1;i>=0;i--) series.push({date: ymd(daysAgo(i)), amount: Math.max(0, Math.round((total/pts)*(.75+Math.random()*0.5)))}); }
-
-      const inputFrom = $('#from'), inputTo = $('#to'), sumLabel=$('#sum-range');
-      inputFrom.value = ymd(daysAgo(29)); inputTo.value = ymd(new Date());
-
-      async function fetchSeries(start, end){
-        try{
-          const r = await fetch(`/hq/api/wallet/income?start=${start}&end=${end}&currency=MWK`, {headers:{'Accept':'application/json'}});
-          if(r.ok) return await r.json();
-        }catch(_){}
-        return series.filter(p=>p.date>=start && p.date<=end);
+    if (isDemo) {
+      insights.push({ type: 'info',     icon: 'bi-info-circle',          title: 'Demo Intelligence Active', body: 'Illustrative data is shown. Real insights will appear automatically once live transactions are recorded.' });
+      insights.push({ type: 'positive', icon: 'bi-lightning-charge',     title: 'Retail + Energy Leading', body: 'Retail & Energy verticals are projected to drive 67% of platform revenue based on demo data.' });
+      insights.push({ type: 'warning',  icon: 'bi-credit-card-2-front',  title: 'Mobile Money at 47%', body: 'Mobile money is the dominant payment channel — consider promoting it for lower transaction costs across agents.' });
+      insights.push({ type: 'info',     icon: 'bi-person-check',         title: 'Agent Performance', body: 'Top 5 agents drive 38% of total sales volume. Consider a recognition or incentive program.' });
+      insights.push({ type: 'positive', icon: 'bi-arrow-up-circle',      title: 'Agent Onboarding Healthy', body: 'Demo shows steady agent onboarding momentum. Run referral push to accelerate growth.' });
+      insights.push({ type: 'warning',  icon: 'bi-receipt',              title: '14 Invoices Need Attention', body: 'MWK 2.1M in open invoices. Collections are at 87% — above target. Follow up on overdue accounts.' });
+    } else {
+      // Dynamic insights from real data
+      if (DATA.openInvoices > 0) {
+        insights.push({ type: DATA.openInvoices > 10 ? 'alert' : 'warning', icon: 'bi-receipt-cutoff',
+          title: `${DATA.openInvoices} Open Invoice${DATA.openInvoices > 1 ? 's' : ''}`,
+          body: `MWK ${fmtK(DATA.openTotal)} outstanding. Collection rate: ${DATA.collRate}%${DATA.collRate >= 85 ? ' — excellent.' : ' — follow up recommended.'}` });
       }
-
-      function draw(rows){
-        const w = canvas.width = canvas.clientWidth * devicePixelRatio;
-        const h = canvas.height = canvas.clientHeight * devicePixelRatio;
-        ctx.clearRect(0,0,w,h);
-        if(!rows.length) return;
-        const pad={l:48,t:14,r:12,b:26}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
-        const xs=rows.map(r=>+new Date(r.date)), ys=rows.map(r=>+r.amount||0);
-        const xMin=Math.min(...xs), xMax=Math.max(...xs), yMax=Math.max(10, Math.max(...ys)*1.2);
-        ctx.strokeStyle='rgba(39,87,216,.25)'; ctx.lineWidth=1*devicePixelRatio;
-        ctx.beginPath(); ctx.moveTo(pad.l,pad.t); ctx.lineTo(pad.l,pad.t+innerH); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(pad.l,pad.t+innerH); ctx.lineTo(pad.l+innerW,pad.t+innerH); ctx.stroke();
-        ctx.beginPath();
-        rows.forEach((r,i)=>{ const x=pad.l+((+new Date(r.date)-xMin)/(xMax-xMin||1))*innerW; const y=pad.t+innerH-(r.amount/yMax)*innerH; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
-        ctx.strokeStyle='#2563eb'; ctx.lineWidth=2*devicePixelRatio; ctx.stroke();
-        rows.forEach((r)=>{ const x=pad.l+((+new Date(r.date)-xMin)/(xMax-xMin||1))*innerW; const y=pad.t+innerH-(r.amount/yMax)*innerH; ctx.beginPath(); ctx.arc(x,y,3.2*devicePixelRatio,0,Math.PI*2); ctx.fillStyle='#2563eb'; ctx.fill(); });
-        const sum=rows.reduce((a,b)=>a+(+b.amount||0),0);
-        sumLabel.textContent=`Sum: MWK ${sum.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+      if (DATA.activeSubs === 0 && DATA.bizTotal > 0) {
+        insights.push({ type: 'alert', icon: 'bi-exclamation-circle-fill', title: 'No Active Subscriptions', body: 'Convert trials or assign subscription plans to businesses to start generating MRR.' });
       }
-
-      async function apply(){ const rows=await fetchSeries(inputFrom.value, inputTo.value); draw(rows); }
-      $('#apply').addEventListener('click', apply);
-      apply(); new ResizeObserver(apply).observe(canvas);
-    }catch(e){}
-
-    /* Year selector */
-    try{
-      const yearSelect = $('#yearSelect');
-      if(yearSelect){
-        yearSelect.addEventListener('change', ()=>{
-          const url = new URL(window.location.href);
-          url.searchParams.set('year', yearSelect.value);
-          window.location = url.pathname + url.search;
-        });
+      if (DATA.agentsTotal === 0) {
+        insights.push({ type: 'alert', icon: 'bi-person-x', title: 'No Agents Yet', body: 'Invite at least one agent to begin recording sales and tracking field performance.' });
+      } else if (DATA.agentsNew30 === 0) {
+        insights.push({ type: 'warning', icon: 'bi-person-dash', title: 'Agent Growth Stalled', body: 'No new agents this month. Consider running a referral campaign or targeted recruitment.' });
       }
-    }catch(e){}
-
-    /* Sales Chart (Monthly) */
-    try{
-      const salesCanvas = document.getElementById('salesChart');
-      if(salesCanvas){
-        const salesCtx = salesCanvas.getContext('2d');
-        const labels = {{ monthly_sales_labels|default:"[]"|safe }};
-        const data = {{ monthly_sales_data|default:"[]"|safe }};
-        
-        function drawSalesChart(){
-          const w = salesCanvas.width = salesCanvas.clientWidth * devicePixelRatio;
-          const h = salesCanvas.height = salesCanvas.clientHeight * devicePixelRatio;
-          salesCtx.clearRect(0,0,w,h);
-          if(!data || data.length===0) {
-            salesCtx.fillStyle='#6b7280';
-            salesCtx.font = `${14*devicePixelRatio}px system-ui`;
-            salesCtx.textAlign='center';
-            salesCtx.fillText('No sales data available', w/2, h/2);
-            return;
-          }
-          
-          const pad={l:48,t:14,r:12,b:46}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
-          const yMax=Math.max(10, Math.max(...data)*1.2);
-          const barWidth = innerW/(data.length+1);
-          
-          // Axes
-          salesCtx.strokeStyle='rgba(39,87,216,.25)'; salesCtx.lineWidth=1*devicePixelRatio;
-          salesCtx.beginPath(); salesCtx.moveTo(pad.l,pad.t); salesCtx.lineTo(pad.l,pad.t+innerH); salesCtx.stroke();
-          salesCtx.beginPath(); salesCtx.moveTo(pad.l,pad.t+innerH); salesCtx.lineTo(pad.l+innerW,pad.t+innerH); salesCtx.stroke();
-          
-          // Bars
-          data.forEach((val,i)=>{
-            const x = pad.l + (i+0.5)*barWidth;
-            const barH = (val/yMax)*innerH;
-            const y = pad.t+innerH-barH;
-            const barW = barWidth*0.7;
-            
-            salesCtx.fillStyle='#2563eb';
-            salesCtx.fillRect(x-barW/2, y, barW, barH);
-            
-            // Labels
-            if(labels[i]){
-              salesCtx.save();
-              salesCtx.translate(x, pad.t+innerH+12*devicePixelRatio);
-              salesCtx.rotate(-Math.PI/4);
-              salesCtx.fillStyle='#476aa0';
-              salesCtx.font = `${11*devicePixelRatio}px system-ui`;
-              salesCtx.textAlign='right';
-              salesCtx.fillText(labels[i], 0, 0);
-              salesCtx.restore();
-            }
-          });
-        }
-        
-        drawSalesChart();
-        new ResizeObserver(drawSalesChart).observe(salesCanvas);
+      if (DATA.stockOut7d > DATA.stockIn7d && DATA.stockOut7d > 0) {
+        insights.push({ type: 'warning', icon: 'bi-box-arrow-right', title: 'Stock Outpacing Intake', body: `${DATA.stockOut7d} items sold vs ${DATA.stockIn7d} received this week. Reorder to prevent stockouts.` });
       }
-    }catch(e){console.error('Sales chart error:', e);}
-
-    /* Onboardings Chart (Monthly) */
-    try{
-      const onboardingsCanvas = document.getElementById('onboardingsChart');
-      if(onboardingsCanvas){
-        const onbCtx = onboardingsCanvas.getContext('2d');
-        const labels = {{ monthly_onboardings_labels|default:"[]"|safe }};
-        const data = {{ monthly_onboardings_data|default:"[]"|safe }};
-        
-        function drawOnboardingsChart(){
-          const w = onboardingsCanvas.width = onboardingsCanvas.clientWidth * devicePixelRatio;
-          const h = onboardingsCanvas.height = onboardingsCanvas.clientHeight * devicePixelRatio;
-          onbCtx.clearRect(0,0,w,h);
-          if(!data || data.length===0) {
-            onbCtx.fillStyle='#6b7280';
-            onbCtx.font = `${14*devicePixelRatio}px system-ui`;
-            onbCtx.textAlign='center';
-            onbCtx.fillText('No onboarding data available', w/2, h/2);
-            return;
-          }
-          
-          const pad={l:48,t:14,r:12,b:46}, innerW=w-pad.l-pad.r, innerH=h-pad.t-pad.b;
-          const yMax=Math.max(5, Math.max(...data)*1.2);
-          const barWidth = innerW/(data.length+1);
-          
-          // Axes
-          onbCtx.strokeStyle='rgba(39,87,216,.25)'; onbCtx.lineWidth=1*devicePixelRatio;
-          onbCtx.beginPath(); onbCtx.moveTo(pad.l,pad.t); onbCtx.lineTo(pad.l,pad.t+innerH); onbCtx.stroke();
-          onbCtx.beginPath(); onbCtx.moveTo(pad.l,pad.t+innerH); onbCtx.lineTo(pad.l+innerW,pad.t+innerH); onbCtx.stroke();
-          
-          // Bars
-          data.forEach((val,i)=>{
-            const x = pad.l + (i+0.5)*barWidth;
-            const barH = (val/yMax)*innerH;
-            const y = pad.t+innerH-barH;
-            const barW = barWidth*0.7;
-            
-            onbCtx.fillStyle='#10b981';
-            onbCtx.fillRect(x-barW/2, y, barW, barH);
-            
-            // Labels
-            if(labels[i]){
-              onbCtx.save();
-              onbCtx.translate(x, pad.t+innerH+12*devicePixelRatio);
-              onbCtx.rotate(-Math.PI/4);
-              onbCtx.fillStyle='#476aa0';
-              onbCtx.font = `${11*devicePixelRatio}px system-ui`;
-              onbCtx.textAlign='right';
-              onbCtx.fillText(labels[i], 0, 0);
-              onbCtx.restore();
-            }
-          });
-        }
-        
-        drawOnboardingsChart();
-        new ResizeObserver(drawOnboardingsChart).observe(onboardingsCanvas);
+      if (DATA.mrr === 0 && DATA.activeSubs > 0) {
+        insights.push({ type: 'warning', icon: 'bi-currency-exchange', title: 'Zero MRR with Active Subs', body: 'Active subscriptions detected but MRR is zero. Check plan amounts and billing configuration.' });
       }
-    }catch(e){console.error('Onboardings chart error:', e);}
-
-    /* HQ Analytics Filters & Charts */
-    try{
-      // Load Chart.js from CDN
-      const chartJsScript = document.createElement('script');
-      chartJsScript.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-      chartJsScript.onload = initAnalytics;
-      document.head.appendChild(chartJsScript);
-      
-      function initAnalytics(){
-        const analyticsSection = $('#analytics-section');
-        const analyticsLoading = $('#analytics-loading');
-        const analyticsKpis = $('#analytics-kpis');
-        const analyticsTrends = $('#analytics-trends');
-        const analyticsBreakdowns = $('#analytics-breakdowns');
-        const analyticsTops = $('#analytics-tops');
-        
-        let chartInstances = {};
-        
-        // Date preset handlers
-        $$('[data-date-preset]').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const preset = btn.dataset.datePreset;
-            const today = new Date();
-            const startInput = $('#analytics-start-date');
-            const endInput = $('#analytics-end-date');
-            
-            if(preset === 'today'){
-              startInput.value = endInput.value = today.toISOString().split('T')[0];
-            }else if(preset === '7d'){
-              const weekAgo = new Date(today);
-              weekAgo.setDate(today.getDate() - 7);
-              startInput.value = weekAgo.toISOString().split('T')[0];
-              endInput.value = today.toISOString().split('T')[0];
-            }else if(preset === 'mtd'){
-              const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-              startInput.value = firstDay.toISOString().split('T')[0];
-              endInput.value = today.toISOString().split('T')[0];
-            }
-            
-            // Update active state
-            $$('[data-date-preset]').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-          });
-        });
-        
-        // Set default date range (last 30 days)
-        const today = new Date();
-        const monthAgo = new Date(today);
-        monthAgo.setDate(today.getDate() - 30);
-        $('#analytics-start-date').value = monthAgo.toISOString().split('T')[0];
-        $('#analytics-end-date').value = today.toISOString().split('T')[0];
-        
-        // Apply filters
-        $('#analytics-apply').addEventListener('click', fetchAnalytics);
-        $('#analytics-reset').addEventListener('click', () => {
-          $('#analytics-business').value = '';
-          $('#analytics-vertical').value = '';
-          $('#analytics-location').value = '';
-          $('#analytics-agent').value = '';
-          $('#analytics-payment-mode').value = '';
-          const today = new Date();
-          const monthAgo = new Date(today);
-          monthAgo.setDate(today.getDate() - 30);
-          $('#analytics-start-date').value = monthAgo.toISOString().split('T')[0];
-          $('#analytics-end-date').value = today.toISOString().split('T')[0];
-          fetchAnalytics();
-        });
-        
-        async function fetchAnalytics(){
-          analyticsSection.style.display = 'block';
-          analyticsLoading.style.display = 'block';
-          analyticsKpis.style.display = 'none';
-          analyticsTrends.style.display = 'none';
-          analyticsBreakdowns.style.display = 'none';
-          analyticsTops.style.display = 'none';
-          
-          // Build query params
-          const params = new URLSearchParams();
-          const startDate = $('#analytics-start-date').value;
-          const endDate = $('#analytics-end-date').value;
-          if(startDate) params.set('start_date', startDate);
-          if(endDate) params.set('end_date', endDate);
-          
-          const businessId = $('#analytics-business').value;
-          if(businessId) params.set('business_id', businessId);
-          
-          const vertical = $('#analytics-vertical').value;
-          if(vertical) params.set('vertical', vertical);
-          
-          const locationId = $('#analytics-location').value;
-          if(locationId) params.set('location_id', locationId);
-          
-          const agentId = $('#analytics-agent').value;
-          if(agentId) params.set('agent_id', agentId);
-          
-          const paymentMode = $('#analytics-payment-mode').value;
-          if(paymentMode) params.set('payment_mode', paymentMode);
-          
-          try{
-            const response = await fetch(`/hq/api/analytics/data.json?${params.toString()}`);
-            if(!response.ok) throw new Error(`HTTP ${response.status}`);
-            const data = await response.json();
-            
-            renderAnalytics(data);
-          }catch(error){
-            console.error('Analytics fetch error:', error);
-            analyticsLoading.innerHTML = `<div style="color:#ef4444;font-weight:700">Error loading analytics: ${error.message}</div>`;
-          }
-        }
-        
-        function renderAnalytics(data){
-          currentAnalyticsData = data; // Store for use in other functions
-          analyticsLoading.style.display = 'none';
-          
-          // Render KPIs
-          renderKPIs(data.kpis || {});
-          
-          // Render charts
-          renderTrendCharts(data.series || {});
-          renderBreakdownCharts(data.breakdowns || {});
-          renderTopCharts(data.top_lists || {});
-          
-          // Show sections
-          analyticsKpis.style.display = 'grid';
-          if(data.series && (data.series.revenue_trend || data.series.sales_count_trend || data.series.profit_trend)){
-            $('#analytics-trends-title').style.display = 'block';
-            analyticsTrends.style.display = 'grid';
-          }
-          if(data.breakdowns && (data.breakdowns.cash_mix || data.breakdowns.vertical_mix)){
-            $('#analytics-breakdowns-title').style.display = 'block';
-            analyticsBreakdowns.style.display = 'grid';
-          }
-          if(data.top_lists && (data.top_lists.top_businesses || data.top_lists.top_agents)){
-            $('#analytics-tops-title').style.display = 'block';
-            analyticsTops.style.display = 'grid';
-          }
-        }
-        
-        function renderKPIs(kpis){
-          const kpiCards = [
-            {label: 'Revenue', value: kpis.revenue || 0, format: 'currency'},
-            {label: 'Sales Count', value: kpis.sales_count || 0, format: 'number'},
-            {label: 'Profit', value: kpis.profit || 0, format: 'currency'},
-            {label: 'Cost of Goods', value: kpis.cost_of_goods || 0, format: 'currency'},
-            {label: 'Total Businesses', value: kpis.total_businesses || 0, format: 'number'},
-            {label: 'Total Agents', value: kpis.total_agents || 0, format: 'number'},
-          ];
-          
-          if(kpis.stock_value !== undefined){
-            kpiCards.push(
-              {label: 'Stock Value', value: kpis.stock_value || 0, format: 'currency'},
-              {label: 'Retail Value', value: kpis.retail_value || 0, format: 'currency'},
-              {label: 'Expected Margin', value: kpis.expected_margin || 0, format: 'currency'}
-            );
-          }
-          
-          analyticsKpis.innerHTML = kpiCards.map((kpi, idx) => {
-            const formatted = kpi.format === 'currency' 
-              ? `MWK ${(kpi.value || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`
-              : (kpi.value || 0).toLocaleString();
-            return `
-              <div class="card reveal ${idx > 0 ? 'd' + (idx % 4 + 1) : ''}">
-                <h3>${kpi.label}</h3>
-                <div class="num">${formatted}</div>
-              </div>
-            `;
-          }).join('');
-        }
-        
-        function renderTrendCharts(series){
-          // Revenue trend
-          if(series.revenue_trend && series.revenue_trend.length){
-            renderLineChart('chart-revenue-trend', {
-              labels: series.revenue_trend.map(d => d.date_short),
-              data: series.revenue_trend.map(d => d.revenue),
-              label: 'Revenue',
-              color: '#2563eb'
-            });
-          }
-          
-          // Sales count trend
-          if(series.sales_count_trend && series.sales_count_trend.length){
-            renderLineChart('chart-sales-count-trend', {
-              labels: series.sales_count_trend.map(d => d.date_short),
-              data: series.sales_count_trend.map(d => d.count),
-              label: 'Sales Count',
-              color: '#10b981'
-            });
-          }
-          
-          // Profit trend
-          if(series.profit_trend && series.profit_trend.length){
-            renderLineChart('chart-profit-trend', {
-              labels: series.profit_trend.map(d => d.date_short),
-              data: series.profit_trend.map(d => d.profit),
-              label: 'Profit',
-              color: '#f59e0b'
-            });
-          }
-        }
-        
-        let currentAnalyticsData = null;
-        
-        function renderBreakdownCharts(breakdowns){
-          // Cash mix (pie)
-          if(breakdowns.cash_mix && breakdowns.cash_mix.length){
-            renderPieChart('chart-cash-mix', {
-              labels: breakdowns.cash_mix.map(d => d.method_display),
-              data: breakdowns.cash_mix.map(d => d.amount),
-              label: 'Payment Method'
-            });
-          }
-          
-          // Vertical mix (pie)
-          if(breakdowns.vertical_mix && breakdowns.vertical_mix.length){
-            renderPieChart('chart-vertical-mix', {
-              labels: breakdowns.vertical_mix.map(d => d.vertical),
-              data: breakdowns.vertical_mix.map(d => d.revenue),
-              label: 'Revenue by Vertical'
-            });
-          }
-          
-          // Top businesses (bar) - from top_lists, not breakdowns
-          if(currentAnalyticsData && currentAnalyticsData.top_lists && currentAnalyticsData.top_lists.top_businesses){
-            const topBiz = currentAnalyticsData.top_lists.top_businesses;
-            if(topBiz.length){
-              renderBarChart('chart-top-businesses', {
-                labels: topBiz.map(b => b.name.length > 20 ? b.name.substring(0, 20) + '...' : b.name),
-                data: topBiz.map(b => b.revenue),
-                label: 'Revenue'
-              });
-            }
-          }
-        }
-        
-        function renderTopCharts(topLists){
-          // Top agents (bar)
-          if(topLists.top_agents && topLists.top_agents.length){
-            renderBarChart('chart-top-agents', {
-              labels: topLists.top_agents.map(a => a.name.length > 20 ? a.name.substring(0, 20) + '...' : a.name),
-              data: topLists.top_agents.map(a => a.revenue),
-              label: 'Revenue'
-            });
-          }
-          
-          // Stock value KPIs
-          const stockKpis = $('#stock-value-kpis');
-          if(currentAnalyticsData && currentAnalyticsData.kpis && (currentAnalyticsData.kpis.stock_value !== undefined)){
-            stockKpis.innerHTML = `
-              <div style="display:grid;gap:12px">
-                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(37,99,235,0.06);border-radius:8px">
-                  <span class="muted">Stock Value:</span>
-                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.stock_value || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(16,185,129,0.06);border-radius:8px">
-                  <span class="muted">Retail Value:</span>
-                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.retail_value || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
-                </div>
-                <div style="display:flex;justify-content:space-between;padding:8px;background:rgba(245,158,11,0.06);border-radius:8px">
-                  <span class="muted">Expected Margin:</span>
-                  <span style="font-weight:800">MWK ${(currentAnalyticsData.kpis.expected_margin || 0).toLocaleString(undefined, {minimumFractionDigits:2})}</span>
-                </div>
-              </div>
-            `;
-          }else{
-            stockKpis.innerHTML = '<div class="muted">Stock value data not available for selected filters.</div>';
-          }
-        }
-        
-        function renderLineChart(canvasId, config){
-          const canvas = document.getElementById(canvasId);
-          if(!canvas || !window.Chart) return;
-          
-          // Destroy existing chart
-          if(chartInstances[canvasId]){
-            chartInstances[canvasId].destroy();
-          }
-          
-          const ctx = canvas.getContext('2d');
-          chartInstances[canvasId] = new Chart(ctx, {
-            type: 'line',
-            data: {
-              labels: config.labels,
-              datasets: [{
-                label: config.label,
-                data: config.data,
-                borderColor: config.color,
-                backgroundColor: config.color + '20',
-                tension: 0.4,
-                fill: true
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {display: false}
-              },
-              scales: {
-                y: {beginAtZero: true}
-              }
-            }
-          });
-        }
-        
-        function renderPieChart(canvasId, config){
-          const canvas = document.getElementById(canvasId);
-          if(!canvas || !window.Chart) return;
-          
-          if(chartInstances[canvasId]){
-            chartInstances[canvasId].destroy();
-          }
-          
-          const ctx = canvas.getContext('2d');
-          const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-          
-          chartInstances[canvasId] = new Chart(ctx, {
-            type: 'pie',
-            data: {
-              labels: config.labels,
-              datasets: [{
-                data: config.data,
-                backgroundColor: colors.slice(0, config.data.length)
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {position: 'bottom'}
-              }
-            }
-          });
-        }
-        
-        function renderBarChart(canvasId, config){
-          const canvas = document.getElementById(canvasId);
-          if(!canvas || !window.Chart) return;
-          
-          if(chartInstances[canvasId]){
-            chartInstances[canvasId].destroy();
-          }
-          
-          const ctx = canvas.getContext('2d');
-          chartInstances[canvasId] = new Chart(ctx, {
-            type: 'bar',
-            data: {
-              labels: config.labels,
-              datasets: [{
-                label: config.label,
-                data: config.data,
-                backgroundColor: '#2563eb'
-              }]
-            },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              plugins: {
-                legend: {display: false}
-              },
-              scales: {
-                y: {beginAtZero: true}
-              }
-            }
-          });
-        }
-        
-        // Auto-load analytics on page load (optional - comment out if you want manual trigger only)
-        // fetchAnalytics();
+      if (DATA.walletBal < 0) {
+        insights.push({ type: 'alert', icon: 'bi-wallet2', title: 'Wallet Balance Negative', body: `Current balance: MWK ${fmtK(DATA.walletBal)}. Slow spend and increase collections urgently.` });
+      } else if (DATA.walletOut30 > DATA.walletIn30 && DATA.walletIn30 > 0) {
+        insights.push({ type: 'warning', icon: 'bi-exclamation-triangle', title: 'Spend Exceeding Income', body: 'Outgoing transactions exceeded incoming in the last 30 days. Review expense categories.' });
+      } else if (DATA.walletIn30 > 0) {
+        insights.push({ type: 'positive', icon: 'bi-check-circle', title: 'Healthy Cashflow', body: `MWK ${fmtK(DATA.walletIn30)} income vs MWK ${fmtK(DATA.walletOut30)} outgoing. Positive cashflow position.` });
       }
-    }catch(e){console.error('Analytics init error:', e);}
+      if (DATA.revenue30d > 0) {
+        const margin = DATA.revenue30d > 0 ? Math.round(DATA.grossProfit / DATA.revenue30d * 100) : 0;
+        insights.push({ type: 'positive', icon: 'bi-graph-up-arrow', title: 'Revenue Active', body: `MWK ${fmtK(DATA.revenue30d)} in sales over the last 30 days. Gross margin: ${margin}%.` });
+      }
+      if (DATA.salesCountPeriod > 0 && DATA.salesRevPeriod > 0) {
+        const avg = Math.round(DATA.salesRevPeriod / DATA.salesCountPeriod);
+        insights.push({ type: 'positive', icon: 'bi-receipt', title: 'Average Basket Size', body: `${DATA.salesCountPeriod} transactions this period — avg. MWK ${fmtK(avg)} per sale.` });
+      }
+      if (DATA.bizTotal > 0 && DATA.activeSubs > 0) {
+        const cvr = Math.round(DATA.activeSubs / DATA.bizTotal * 100);
+        insights.push({ type: 'info', icon: 'bi-building', title: `${cvr}% Subscription Conversion`, body: `${DATA.activeSubs} of ${DATA.bizTotal} businesses have active subscriptions.` });
+      }
+      if (insights.length === 0) {
+        insights.push({ type: 'info', icon: 'bi-cloud-upload', title: 'Awaiting Live Data', body: 'Insights will appear automatically as transactions, subscriptions and agents are recorded on the platform.' });
+        insights.push({ type: 'info', icon: 'bi-rocket', title: 'Getting Started', body: 'Add businesses, assign subscriptions, onboard agents, and record sales to activate the full command dashboard.' });
+      }
+    }
+
+    grid.innerHTML = insights.map(ins =>
+      `<div class="insight-card">
+        <div class="insight-icon ${ins.type}"><i class="bi ${ins.icon}"></i></div>
+        <div class="insight-text">
+          <strong>${ins.title}</strong>
+          <span>${ins.body}</span>
+        </div>
+      </div>`
+    ).join('');
+
+    if (stamp) {
+      const d = new Date();
+      stamp.textContent = 'Updated · ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
   })();
-  </script>
 
-  <!-- HQ Mobile Navigation -->
-  <script src="{% static 'js/hq-mobile.js' %}"></script>
-</body>
-</html>
+})();
+</script>
+{% endblock %}

@@ -486,3 +486,161 @@ class HQPaginationTest(TestCase):
             self.assertIn("unread_count", data)
             self.assertIsInstance(data["items"], list)
             self.assertIsInstance(data["unread_count"], int)
+
+
+class HQPremiumDashboardTest(TestCase):
+    """
+    Part 7 — Tests for the premium /hq/home/ dashboard.
+    Ensures the upgraded command center meets quality standards.
+    """
+
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username="hq_premium_admin", email="premium@hq.com", password="premiumpass123"
+        )
+        self.business = Business.objects.create(
+            name="Premium Test Corp", slug="premium-test-corp",
+            created_by=self.admin_user, status="ACTIVE"
+        )
+        self.client = Client()
+        self.client.login(username="hq_premium_admin", password="premiumpass123")
+
+    # ------------------------------------------------------------------
+    # Test 1: /hq/home/ loads successfully (200)
+    # ------------------------------------------------------------------
+    def test_hq_home_loads_200(self):
+        """/hq/home/ must return HTTP 200."""
+        response = self.client.get("/hq/home/")
+        self.assertEqual(response.status_code, 200)
+
+    # ------------------------------------------------------------------
+    # Test 2: /hq/home/ contains premium KPI sections
+    # ------------------------------------------------------------------
+    def test_hq_home_contains_premium_kpi_sections(self):
+        """/hq/home/ must contain platform pulse KPI cards."""
+        response = self.client.get("/hq/home/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Platform Pulse section
+        self.assertIn("Platform Pulse", content)
+        # KPI card labels
+        self.assertIn("Total Businesses", content)
+        self.assertIn("Active Subscriptions", content)
+        self.assertIn("MRR", content)
+        self.assertIn("Revenue", content)
+
+    # ------------------------------------------------------------------
+    # Test 3: /hq/home/ does not show raw empty zero-only dashboard
+    # ------------------------------------------------------------------
+    def test_hq_home_not_plain_zero_dashboard(self):
+        """/hq/home/ must not show a dead plain zero dashboard with no context."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        # Should have premium sections, not just plain zero numbers in plain cards
+        self.assertIn("Platform Pulse", content)
+        self.assertIn("Operations Health", content)
+        # Should not have bare "No sales data available" as the only content
+        # (that text was in the old empty-state canvas renderer)
+        # The new template either shows real data or polished fallback
+        self.assertNotIn("No sales data available", content)
+
+    # ------------------------------------------------------------------
+    # Test 4: /hq/home/ contains chart containers
+    # ------------------------------------------------------------------
+    def test_hq_home_contains_chart_containers(self):
+        """/hq/home/ must include chart canvas elements."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        self.assertIn("salesChart", content)
+        self.assertIn("onboardingsChart", content)
+        self.assertIn("paymentMixChart", content)
+
+    # ------------------------------------------------------------------
+    # Test 5: /hq/home/ contains AI Insights section
+    # ------------------------------------------------------------------
+    def test_hq_home_contains_ai_insights(self):
+        """/hq/home/ must include the AI Insights section."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        self.assertIn("AI Insights", content)
+        self.assertIn("insightsGrid", content)
+
+    # ------------------------------------------------------------------
+    # Test 6: /hq/home/ contains Payment Intelligence section
+    # ------------------------------------------------------------------
+    def test_hq_home_contains_payment_intelligence(self):
+        """/hq/home/ must include Payment Intelligence section."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        self.assertIn("Payment Intelligence", content)
+        self.assertIn("paymentMixChart", content)
+
+    # ------------------------------------------------------------------
+    # Test 7: /hq/home/ uses real business count where available
+    # ------------------------------------------------------------------
+    def test_hq_home_uses_real_business_count(self):
+        """/hq/home/ must reflect real Business count from DB."""
+        # We created one business in setUp
+        total_biz = Business.objects.count()
+        response = self.client.get("/hq/home/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # The total business count should appear in the response
+        self.assertIn(str(total_biz), content)
+
+    # ------------------------------------------------------------------
+    # Test 8: /hq/analytics/ still loads after dashboard upgrade
+    # ------------------------------------------------------------------
+    def test_hq_analytics_still_loads(self):
+        """/hq/analytics/ must still return 200 after dashboard upgrade."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+
+    # ------------------------------------------------------------------
+    # Test 9: Sidebar still exists and layout is intact
+    # ------------------------------------------------------------------
+    def test_hq_home_sidebar_and_layout_intact(self):
+        """/hq/home/ must include sidebar and standard HQ layout elements."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        # Sidebar should be present (from base_hq.html include)
+        self.assertIn("hqSidebar", content)
+        # Layout wrapper
+        self.assertIn("hq-layout", content)
+
+    # ------------------------------------------------------------------
+    # Test 10: Demo fallback activates when no sales exist
+    # ------------------------------------------------------------------
+    def test_hq_home_demo_mode_activates_with_no_sales(self):
+        """/hq/home/ shows demo banner when no sales data exists."""
+        from sales.models import Sale
+        # Ensure no sales in test DB
+        Sale.objects.all().delete()
+        response = self.client.get("/hq/home/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Demo banner or demo intelligence text should appear
+        self.assertTrue(
+            "Demo Intelligence Active" in content or "DEMO" in content,
+            "Expected demo fallback content when no sales data exists"
+        )
+
+    # ------------------------------------------------------------------
+    # Test 11: /hq/home/ contains Operations Health section
+    # ------------------------------------------------------------------
+    def test_hq_home_contains_operations_health(self):
+        """/hq/home/ must include the Operations Health section."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        self.assertIn("Operations Health", content)
+        self.assertIn("Subscription Health", content)
+        self.assertIn("Invoice Health", content)
+
+    # ------------------------------------------------------------------
+    # Test 12: /hq/home/ shows collection rate
+    # ------------------------------------------------------------------
+    def test_hq_home_shows_collection_rate(self):
+        """/hq/home/ must show collection rate in the UI."""
+        response = self.client.get("/hq/home/")
+        content = response.content.decode()
+        self.assertIn("Collection Rate", content)

@@ -1,210 +1,332 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Energy Dashboard – {{ business.name }}{% endblock %}
+{% block title %}Energy Command Center – {{ business.name }}{% endblock %}
 
 {% block content %}
 <style>
   :root {
-    --en-green:      #059669;
-    --en-green-lt:   #d1fae5;
-    --en-blue:       #4f46e5;
-    --en-blue-lt:    #ede9fe;
-    --en-amber:      #d97706;
-    --en-amber-lt:   #fef3c7;
-    --en-red:        #dc2626;
-    --en-red-lt:     #fee2e2;
-    --en-teal:       #0891b2;
-    --en-teal-lt:    #cffafe;
-    --en-slate:      #0f172a;
-    --en-muted:      #64748b;
-    --en-border:     #e2e8f0;
-    --en-radius:     16px;
-    --en-shadow:     0 4px 20px rgba(15,23,42,.07);
-    --en-shadow-lg:  0 12px 40px rgba(15,23,42,.12);
+    --en-green:    #059669;
+    --en-green-lt: #ecfdf5;
+    --en-amber:    #d97706;
+    --en-red:      #dc2626;
+    --en-slate:    #0f172a;
+    --en-muted:    #64748b;
+    --en-border:   #e2e8f0;
+    --en-radius:   14px;
+    --en-shadow:   0 2px 8px rgba(15,23,42,.07);
+    --en-shadow-lg:0 8px 24px rgba(15,23,42,.10);
   }
 
   /* ── HERO ── */
   .en-hero {
-    background: linear-gradient(135deg, #0f172a 0%, #064e3b 45%, #059669 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #064e3b 50%, #059669 100%);
     border-radius: var(--en-radius);
     padding: 2rem 2.25rem 1.75rem;
     position: relative; overflow: hidden;
     margin-bottom: 1.75rem; color: #fff;
   }
   .en-hero::before {
-    content:''; position:absolute; top:-60px; right:-70px;
-    width:280px; height:280px;
-    background: radial-gradient(circle, rgba(16,185,129,.3) 0%, transparent 70%);
-    pointer-events:none;
-  }
-  .en-hero::after {
-    content:''; position:absolute; bottom:-50px; left:-40px;
-    width:220px; height:220px;
-    background: radial-gradient(circle, rgba(56,189,248,.12) 0%, transparent 70%);
+    content:''; position:absolute; top:-60px; right:-60px;
+    width:260px; height:260px;
+    background: radial-gradient(circle, rgba(16,185,129,.25) 0%, transparent 70%);
     pointer-events:none;
   }
   .en-hero-inner { position:relative; z-index:1; }
   .en-hero-eyebrow {
-    font-size:.7rem; font-weight:700; letter-spacing:.1em;
-    text-transform:uppercase; color:rgba(255,255,255,.55); margin-bottom:.35rem;
+    font-size:.68rem; font-weight:700; letter-spacing:.1em;
+    text-transform:uppercase; color:rgba(255,255,255,.5); margin-bottom:.35rem;
+    display:flex; align-items:center; gap:.5rem;
   }
-  .en-hero-title { font-size:1.7rem; font-weight:800; color:#fff; line-height:1.15; margin-bottom:.25rem; }
-  .en-hero-sub   { font-size:.88rem; color:rgba(255,255,255,.65); }
+  .en-hero-title {
+    font-size:1.65rem; font-weight:800; color:#fff; line-height:1.15; margin-bottom:.25rem;
+  }
+  .en-hero-sub { font-size:.85rem; color:rgba(255,255,255,.6); margin-bottom:1rem; }
   .en-hero-actions { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:1.25rem; }
   .en-hero-btn-primary {
     background:rgba(255,255,255,.95); color:#064e3b;
-    border:none; border-radius:999px; padding:.45rem 1.1rem;
-    font-size:.82rem; font-weight:700; text-decoration:none;
-    display:inline-flex; align-items:center; gap:.35rem;
+    border:none; border-radius:999px; padding:.42rem 1rem;
+    font-size:.8rem; font-weight:700; text-decoration:none;
+    display:inline-flex; align-items:center; gap:.3rem;
     transition:all .15s; box-shadow:0 2px 8px rgba(0,0,0,.15);
   }
   .en-hero-btn-primary:hover { background:#fff; color:var(--en-green); transform:translateY(-1px); }
   .en-hero-btn-ghost {
-    background:rgba(255,255,255,.12); color:rgba(255,255,255,.9);
-    border:1px solid rgba(255,255,255,.2); border-radius:999px; padding:.45rem 1.1rem;
-    font-size:.82rem; font-weight:600; text-decoration:none;
-    display:inline-flex; align-items:center; gap:.35rem; transition:all .15s;
+    background:rgba(255,255,255,.1); color:rgba(255,255,255,.9);
+    border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:.42rem 1rem;
+    font-size:.8rem; font-weight:600; text-decoration:none;
+    display:inline-flex; align-items:center; gap:.3rem; transition:all .15s;
   }
-  .en-hero-btn-ghost:hover { background:rgba(255,255,255,.2); color:#fff; }
+  .en-hero-btn-ghost:hover { background:rgba(255,255,255,.18); color:#fff; }
 
-  /* ── KPI GRID ── */
-  .en-kpi-grid {
-    display:grid;
-    grid-template-columns: repeat(6,1fr);
-    gap:.85rem; margin-bottom:1.75rem;
+  /* ── HERO STAT ROW ── */
+  .en-hero-stats {
+    display:flex; gap:1.5rem; flex-wrap:wrap; margin-top:.75rem;
+    padding-top:.85rem; border-top:1px solid rgba(255,255,255,.1);
   }
-  @media (max-width:1200px) { .en-kpi-grid { grid-template-columns: repeat(3,1fr); } }
-  @media (max-width:640px)  { .en-kpi-grid { grid-template-columns: repeat(2,1fr); } }
+  .en-hero-stat-val {
+    font-size:1.3rem; font-weight:800; color:#fff; line-height:1.1;
+  }
+  .en-hero-stat-lbl {
+    font-size:.65rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.06em; color:rgba(255,255,255,.55); margin-top:.1rem;
+  }
 
-  .en-kpi {
-    background:#fff; border-radius:14px; border:1.5px solid var(--en-border);
-    padding:1rem .9rem; box-shadow:var(--en-shadow); text-align:center;
-    position:relative; overflow:hidden; transition:transform .15s, box-shadow .15s;
+  /* ── PRIMARY KPI GRID (3 major cards) ── */
+  .en-kpi3 {
+    display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem;
   }
-  .en-kpi:hover { transform:translateY(-2px); box-shadow:var(--en-shadow-lg); }
-  .en-kpi-val {
-    font-size:1.8rem; font-weight:800; color:var(--en-slate);
-    line-height:1.1; margin:.15rem 0;
+  @media(max-width:640px) { .en-kpi3 { grid-template-columns:1fr; } }
+  @media(min-width:641px) and (max-width:900px) { .en-kpi3 { grid-template-columns:repeat(3,1fr); } }
+
+  .en-kpi3-card {
+    background:#fff; border-radius:var(--en-radius); border:1px solid var(--en-border);
+    padding:1.25rem 1.1rem; box-shadow:var(--en-shadow); position:relative; overflow:hidden;
+    transition:transform .15s, box-shadow .15s;
   }
-  .en-kpi-val.money { font-size:1.2rem; }
-  .en-kpi-lbl {
-    font-size:.65rem; font-weight:700; color:var(--en-muted);
-    text-transform:uppercase; letter-spacing:.07em;
+  .en-kpi3-card:hover { transform:translateY(-2px); box-shadow:var(--en-shadow-lg); }
+  .en-kpi3-card .kv { font-size:2rem; font-weight:800; color:var(--en-slate); line-height:1.1; }
+  .en-kpi3-card .kl {
+    font-size:.68rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.07em; color:var(--en-muted); margin-top:.3rem;
   }
-  .en-kpi-sub { font-size:.7rem; color:#94a3b8; margin-top:.15rem; }
+  .en-kpi3-card .ks { font-size:.72rem; color:#94a3b8; margin-top:.15rem; }
+  .en-kpi3-card .kv.money { font-size:1.4rem; }
+  .en-kpi3-card .kv.green  { color:var(--en-green); }
+  .en-kpi3-card .kv.amber  { color:var(--en-amber); }
+  .en-kpi3-card .kv.red    { color:var(--en-red); }
+
+  /* accent bar */
+  .en-kpi3-card::before {
+    content:''; position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:2px 0 0 2px;
+  }
+  .en-kpi3-card.accent-green::before { background:var(--en-green); }
+  .en-kpi3-card.accent-amber::before { background:var(--en-amber); }
+  .en-kpi3-card.accent-red::before   { background:var(--en-red); }
+
+  /* ── SECONDARY KPI ROW ── */
+  .en-kpi-row {
+    display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1.5rem;
+  }
+  @media(max-width:768px) { .en-kpi-row { grid-template-columns:repeat(2,1fr); } }
+  .en-kpi-sm {
+    background:#fff; border:1px solid var(--en-border); border-radius:12px;
+    padding:.85rem .9rem; box-shadow:0 1px 4px rgba(15,23,42,.04); text-align:center;
+  }
+  .en-kpi-sm .kv { font-size:1.4rem; font-weight:800; color:var(--en-slate); line-height:1.1; }
+  .en-kpi-sm .kl { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--en-muted); margin-top:.2rem; }
 
   /* ── SECTION CARD ── */
   .en-card {
-    background:#fff; border-radius:var(--en-radius);
-    border:1.5px solid var(--en-border); padding:1.35rem;
-    box-shadow:var(--en-shadow);
+    background:#fff; border-radius:var(--en-radius); border:1px solid var(--en-border);
+    padding:1.35rem; box-shadow:var(--en-shadow);
   }
   .en-section-hdr {
-    display:flex; align-items:center; justify-content:space-between;
-    margin-bottom:1rem;
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;
   }
   .en-section-title {
-    font-size:.75rem; font-weight:700; text-transform:uppercase;
-    letter-spacing:.07em; color:var(--en-muted); margin:0;
+    font-size:.7rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.08em; color:var(--en-muted); margin:0;
   }
-  .en-section-link { font-size:.78rem; color:var(--en-blue); text-decoration:none; }
+  .en-section-link { font-size:.78rem; color:var(--en-green); text-decoration:none; font-weight:600; }
   .en-section-link:hover { text-decoration:underline; }
+
+  /* ── CHART ── */
+  .chart-container { position:relative; height:240px; }
+  .chart-container-lg { position:relative; height:280px; }
 
   /* ── STOCK-IN CARDS ── */
   .stock-in-grid {
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap:.75rem;
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:.65rem;
   }
   .stock-card {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    text-align:center; gap:.5rem;
-    background:#fff; border-radius:14px; border:2px solid var(--en-border);
-    padding:1.1rem .7rem; text-decoration:none; color:inherit;
-    transition:all .18s; box-shadow:0 2px 8px rgba(15,23,42,.04);
-    cursor:pointer; min-height:110px;
+    text-align:center; gap:.4rem;
+    background:#fff; border-radius:12px; border:1px solid var(--en-border);
+    padding:.9rem .6rem; text-decoration:none; color:inherit;
+    transition:all .15s; box-shadow:0 1px 4px rgba(15,23,42,.04);
+    cursor:pointer; min-height:100px;
   }
   .stock-card:hover {
-    border-color:var(--en-green); box-shadow:0 6px 20px rgba(5,150,105,.14);
-    transform:translateY(-3px); color:inherit;
+    border-color:var(--en-green); box-shadow:0 4px 16px rgba(5,150,105,.12);
+    transform:translateY(-2px); color:inherit;
   }
-  .stock-card-icon { font-size:1.85rem; line-height:1; }
-  .stock-card-label {
-    font-size:.78rem; font-weight:700; color:var(--en-slate); line-height:1.3;
-  }
-  .stock-card-sub { font-size:.68rem; color:var(--en-muted); }
-  .stock-card.primary { border-color:rgba(5,150,105,.35); background:linear-gradient(135deg,#f0fdf4,#fff); }
-  .stock-card.primary:hover { border-color:var(--en-green); }
+  .stock-card-icon { font-size:1.7rem; line-height:1; }
+  .stock-card-label { font-size:.77rem; font-weight:700; color:var(--en-slate); line-height:1.3; }
+  .stock-card-sub { font-size:.66rem; color:var(--en-muted); }
+  .stock-card.primary { border-color:rgba(5,150,105,.25); background:linear-gradient(135deg,#f0fdf4,#fff); }
 
   /* ── INSIGHT PILLS ── */
   .insight-pill {
-    padding:.55rem .85rem; border-radius:10px; margin-bottom:.4rem;
-    font-size:.83rem; display:flex; align-items:center; gap:.5rem;
+    padding:.5rem .85rem; border-radius:8px; margin-bottom:.35rem;
+    font-size:.82rem; display:flex; align-items:center; gap:.5rem;
   }
   .insight-warning { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
   .insight-info    { background:#eff6ff; border:1px solid #bfdbfe; color:#1e40af; }
   .insight-success { background:#f0fdf4; border:1px solid #bbf7d0; color:#166534; }
 
-  /* ── ALERT ROWS ── */
-  .alert-row {
-    display:flex; align-items:flex-start; gap:.7rem;
-    padding:.6rem .7rem; border-radius:10px; border:1.5px solid var(--en-border);
-    background:#fff; margin-bottom:.4rem;
+  /* ── SYSTEM HEALTH ROWS ── */
+  .health-row {
+    display:flex; align-items:center; gap:.75rem;
+    padding:.6rem .75rem; border-bottom:1px solid #f1f5f9;
+    transition:background .1s ease;
   }
-  .sev-critical { border-color:#fca5a5; background:#fff1f2; }
-  .sev-high     { border-color:#fed7aa; background:#fff7ed; }
-  .sev-medium   { border-color:#fde68a; background:#fffbeb; }
-  .sev-low      { border-color:#bbf7d0; background:#f0fdf4; }
-
-  /* ── ASSET RISK BAR ── */
-  .asset-risk-bar { height:6px; border-radius:3px; background:#e2e8f0; overflow:hidden; }
-  .risk-fill      { height:100%; border-radius:3px; }
-
-  /* ── CHART ── */
-  .chart-container { position:relative; height:220px; }
-
-  /* ── SECONDARY KPI ROW ── */
-  .en-kpi2-grid {
-    display:grid; grid-template-columns: repeat(4,1fr); gap:.85rem; margin-bottom:1.75rem;
+  .health-row:last-child { border-bottom:none; }
+  .health-row:hover { background:#f8fafc; }
+  .health-name { flex:1; font-size:.84rem; font-weight:600; color:var(--en-slate); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .health-pct  { font-size:.82rem; font-weight:700; width:3rem; text-align:right; flex-shrink:0; }
+  .health-bar  { width:70px; height:5px; border-radius:3px; background:#e2e8f0; overflow:hidden; flex-shrink:0; }
+  .health-bar-fill { height:100%; border-radius:3px; transition:width .4s ease; }
+  .health-badge {
+    display:inline-block; padding:.15rem .5rem; border-radius:999px;
+    font-size:.63rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; flex-shrink:0;
   }
-  @media (max-width:768px) { .en-kpi2-grid { grid-template-columns: repeat(2,1fr); } }
+  .hb-healthy { background:#f0fdf4; color:#059669; border:1px solid #bbf7d0; }
+  .hb-warning { background:#fffbeb; color:#d97706; border:1px solid #fde68a; }
+  .hb-offline { background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; }
+
+  /* ── ALERT LIST ── */
+  .al-row {
+    display:flex; align-items:center; gap:.65rem;
+    padding:.55rem .65rem; border-bottom:1px solid #f1f5f9;
+    transition:background .1s ease;
+  }
+  .al-row:last-child { border-bottom:none; }
+  .al-row:hover { background:#f8fafc; }
+  .al-sev {
+    width:6px; height:6px; border-radius:50%; flex-shrink:0; margin-top:1px;
+  }
+  .al-sev.critical { background:#dc2626; }
+  .al-sev.high     { background:#d97706; }
+  .al-sev.medium   { background:#ca8a04; }
+  .al-sev.low      { background:#059669; }
+  .al-icon {
+    width:26px; height:26px; border-radius:6px; display:flex; align-items:center;
+    justify-content:center; font-size:.85rem; flex-shrink:0;
+  }
+  .al-icon.critical { background:#fef2f2; }
+  .al-icon.high     { background:#fff7ed; }
+  .al-icon.medium   { background:#fffbeb; }
+  .al-icon.low      { background:#f0fdf4; }
+  .al-msg { flex:1; font-size:.82rem; font-weight:600; color:var(--en-slate); min-width:0; }
+  .al-sub { font-size:.7rem; color:var(--en-muted); }
+  .al-time { font-size:.67rem; color:#94a3b8; white-space:nowrap; flex-shrink:0; }
+
+  /* ── ASSET RISK ROW ── */
+  .risk-row {
+    display:flex; align-items:center; gap:.65rem;
+    padding:.55rem .65rem; border-bottom:1px solid #f1f5f9;
+  }
+  .risk-row:last-child { border-bottom:none; }
+  .risk-icon {
+    width:32px; height:32px; border-radius:8px; background:#fef2f2;
+    display:flex; align-items:center; justify-content:center; font-size:.95rem; flex-shrink:0;
+  }
+  .risk-bar  { flex:1; height:5px; border-radius:3px; background:#e2e8f0; overflow:hidden; }
+  .risk-fill { height:100%; border-radius:3px; }
+
+  /* ── SIMULATION PANEL ── */
+  .sim-panel {
+    background:linear-gradient(135deg, #faf5ff 0%, #ede9fe 100%);
+    border:1px solid #ddd6fe; border-radius:var(--en-radius); padding:1.35rem;
+  }
+  .sim-card {
+    background:#fff; border:1.5px solid #e9d5ff; border-radius:10px;
+    padding:.9rem 1rem; cursor:pointer; transition:border-color .15s ease, box-shadow .15s ease;
+    user-select:none;
+  }
+  .sim-card:hover {
+    border-color:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.12);
+  }
+  .sim-card-title { font-weight:700; font-size:.84rem; color:var(--en-slate); margin-bottom:.25rem; }
+  .sim-card-desc  { font-size:.76rem; color:var(--en-muted); line-height:1.5; }
+  .sim-result {
+    margin-top:.55rem; padding:.45rem .65rem; border-radius:7px;
+    font-size:.77rem; display:none;
+  }
+  .sim-result.show { display:block; }
+  .sim-green  { background:#f0fdf4; color:#166534; }
+  .sim-blue   { background:#eff6ff; color:#1e40af; }
+  .sim-amber  { background:#fef3c7; color:#92400e; }
+
+  /* ── CHART TOGGLE PILLS ── */
+  .chart-toggles { display:flex; gap:.25rem; }
+  .ct-pill {
+    padding:.22rem .6rem; border-radius:999px; font-size:.7rem; font-weight:600;
+    cursor:pointer; border:1px solid #e2e8f0; background:transparent;
+    color:#64748b; transition:all .12s ease;
+  }
+  .ct-pill.active { background:#059669; color:#fff; border-color:#059669; }
+  .ct-pill:hover:not(.active) { border-color:#059669; color:#059669; }
+
+  /* ── TREND BADGE ── */
+  .trend-badge {
+    display:inline-flex; align-items:center; gap:.2rem;
+    font-size:.7rem; font-weight:700; padding:.15rem .45rem; border-radius:999px;
+  }
+  .trend-up   { background:#f0fdf4; color:#059669; }
+  .trend-down { background:#fef2f2; color:#dc2626; }
 </style>
 
 <div class="container-fluid py-4">
 
-  {# ── HERO ── #}
+  {# ── HERO: Command Center ── #}
   <div class="en-hero mb-4">
-    <div class="en-hero-inner d-flex align-items-start justify-content-between gap-3 flex-wrap">
-      <div class="flex-grow-1">
-        <div class="en-hero-eyebrow">
-          <i class="bi bi-lightning-charge-fill me-1" style="opacity:.7"></i>
-          Renewable Energy &nbsp;·&nbsp; {{ business.name }}
+    <div class="en-hero-inner">
+      <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+        <div style="flex:1; min-width:220px;">
+          <div class="en-hero-eyebrow">
+            <span class="cc-live-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#10b981;position:relative;"></span>
+            Live &nbsp;·&nbsp; {{ business.name }}
+          </div>
+          <h1 class="en-hero-title">⚡ Command Center</h1>
+          <div class="en-hero-sub">Renewable Energy — real-time monitoring &amp; intelligence</div>
+          <div class="en-hero-stats">
+            <div>
+              <div class="en-hero-stat-val">{{ stats.active_sites|default:0 }}</div>
+              <div class="en-hero-stat-lbl">Active Sites</div>
+            </div>
+            <div>
+              <div class="en-hero-stat-val">{{ stats.installed_capacity|default:0|floatformat:1 }} kW</div>
+              <div class="en-hero-stat-lbl">Installed Capacity</div>
+            </div>
+            <div>
+              <div class="en-hero-stat-val">{{ stats.avg_asset_health|default:0 }}%</div>
+              <div class="en-hero-stat-lbl">System Health</div>
+            </div>
+            {% if commerce and commerce.revenue_this_month %}
+            <div>
+              <div class="en-hero-stat-val">MWK {{ commerce.revenue_this_month|floatformat:0 }}</div>
+              <div class="en-hero-stat-lbl">Revenue (Month)</div>
+            </div>
+            {% endif %}
+          </div>
+          <div class="en-hero-actions">
+            <a href="{% url 'verticals:energy_site_create' %}" class="en-hero-btn-primary">
+              <i class="bi bi-plus-lg"></i> Add Site
+            </a>
+            <a href="{% url 'verticals:energy_asset_create' %}" class="en-hero-btn-ghost">
+              <i class="bi bi-cpu"></i> Register Asset
+            </a>
+            <a href="{% url 'verticals:energy_sizing_create' %}" class="en-hero-btn-ghost">
+              <i class="bi bi-calculator"></i> System Sizing
+            </a>
+            <a href="{% url 'verticals:energy_alerts' %}" class="en-hero-btn-ghost">
+              <i class="bi bi-bell"></i> Alerts{% if stats.critical_alerts %}<span style="background:#ef4444;color:#fff;font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:999px;margin-left:.3rem;">{{ stats.critical_alerts }}</span>{% endif %}
+            </a>
+          </div>
         </div>
-        <h1 class="en-hero-title">⚡ Energy Command Center</h1>
-        <div class="en-hero-sub">
-          {{ stats.active_sites|default:0 }} active site{{ stats.active_sites|default:0|pluralize }}
-          · {{ stats.operational_assets|default:0 }} live asset{{ stats.operational_assets|default:0|pluralize }}
-          · {{ stats.installed_capacity|default:0|floatformat:1 }} kW installed
-        </div>
-        <div class="en-hero-actions">
-          <a href="{% url 'verticals:energy_site_create' %}" class="en-hero-btn-primary">
-            <i class="bi bi-plus-lg"></i> Add Site
-          </a>
-          <a href="{% url 'verticals:energy_asset_create' %}" class="en-hero-btn-ghost">
-            <i class="bi bi-cpu"></i> Register Asset
-          </a>
-          <a href="{% url 'verticals:energy_sizing_create' %}" class="en-hero-btn-ghost">
-            <i class="bi bi-calculator"></i> System Sizing
-          </a>
-          <a href="{% url 'verticals:energy_alerts' %}" class="en-hero-btn-ghost">
-            <i class="bi bi-bell"></i> Alerts{% if stats.critical_alerts %}<span class="badge bg-danger ms-1" style="font-size:.65rem;">{{ stats.critical_alerts }}</span>{% endif %}
-          </a>
+
+        {# Mini hero chart — shows recent generation trend #}
+        <div style="width:200px; flex-shrink:0; display:flex; flex-direction:column; align-items:flex-end;">
+          <canvas id="heroMiniChart" height="80" style="width:200px;max-width:200px;"></canvas>
+          <div style="font-size:.68rem;color:rgba(255,255,255,.45);margin-top:.35rem;">Last 7-day output (kWh)</div>
         </div>
       </div>
     </div>
   </div>
 
+  {# ── MESSAGES ── #}
   {% if messages %}
     {% for m in messages %}
       <div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3 py-2">{{ m }}</div>
@@ -213,51 +335,48 @@
 
   {# ── NEW WORKSPACE GUIDE ── #}
   {% if is_new_workspace %}
-  <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:2px solid #6ee7b7;border-radius:16px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;">
-    <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap;">
-      <span style="font-size:1.6rem;flex-shrink:0;">🚀</span>
+  <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:1.5px solid #6ee7b7;border-radius:14px;padding:1.35rem 1.5rem;margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap;">
+      <span style="font-size:1.5rem;flex-shrink:0;">🚀</span>
       <div style="flex:1;min-width:200px;">
-        <div style="font-size:1rem;font-weight:800;color:#064e3b;">Welcome to your Renewable Energy workspace!</div>
-        <div style="font-size:.83rem;color:#065f46;margin-top:.2rem;">Your next best action: <strong>run system sizing with your real appliances.</strong></div>
+        <div style="font-size:.95rem;font-weight:800;color:#064e3b;">Welcome to your Renewable Energy workspace!</div>
+        <div style="font-size:.82rem;color:#065f46;margin-top:.15rem;">Next best action: <strong>run system sizing with your real appliances.</strong></div>
       </div>
-      <a href="{% url 'verticals:energy_sizing_create' %}" style="background:#059669;color:#fff;border-radius:999px;padding:.45rem 1.1rem;font-size:.83rem;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+      <a href="{% url 'verticals:energy_sizing_create' %}" style="background:#059669;color:#fff;border-radius:999px;padding:.42rem 1rem;font-size:.8rem;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;">
         ⚡ Start Sizing →
       </a>
     </div>
-    <ol style="margin:0;padding-left:1.3rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.35rem .75rem;font-size:.84rem;color:#047857;">
+    <ol style="margin:0;padding-left:1.25rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.3rem .7rem;font-size:.82rem;color:#047857;">
       <li><a href="{% url 'verticals:energy_site_create' %}" style="color:#059669;font-weight:600;">Register a site</a> — add location &amp; capacity</li>
       <li><a href="{% url 'verticals:energy_asset_create' %}" style="color:#059669;font-weight:600;">Add assets</a> — panels, batteries, inverters</li>
-      <li><a href="{% url 'verticals:energy_sizing_create' %}" style="color:#059669;font-weight:600;">Run system sizing</a> — input appliances &amp; get recommendations</li>
-      <li>Generate technical schematic from the sizing result</li>
-      <li>Use the energy flow simulation to test your design</li>
+      <li><a href="{% url 'verticals:energy_sizing_create' %}" style="color:#059669;font-weight:600;">Run system sizing</a> — get recommendations</li>
+      <li>Generate technical schematic from sizing result</li>
+      <li>Use energy flow simulation to test your design</li>
       <li>View ROI, payback period, and Costs &amp; Savings</li>
     </ol>
-    <div style="margin-top:.9rem;font-size:.72rem;color:#065f46;background:rgba(255,255,255,.5);border-radius:8px;padding:.5rem .75rem;">
-      ℹ️ The KPI cards below show <strong>sample demo values</strong> labelled <span style="background:#fef3c7;color:#92400e;padding:.05rem .3rem;border-radius:4px;font-size:.68rem;font-weight:700;">SAMPLE</span> — they'll be replaced by your real data once you add a site and assets.
+    <div style="margin-top:.75rem;font-size:.7rem;color:#065f46;background:rgba(255,255,255,.5);border-radius:7px;padding:.45rem .7rem;">
+      ℹ️ KPI cards below show <strong>sample demo values</strong> — replaced by your real data once you add a site.
     </div>
   </div>
 
-  {# ── DEMO SHOWCASE: What the dashboard will look like with real data ── #}
-  <div class="en-card mb-4" style="border:2px dashed #10b981;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+  {# Demo preview for new workspaces #}
+  <div class="en-card mb-4" style="border:1.5px dashed #10b981;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
       <div>
-        <span style="background:#f0fdf4;color:#065f46;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">📊 Sample Preview</span>
-        <div style="font-size:.8rem;color:#64748b;margin-top:.3rem;">This is what your dashboard looks like with a live site. Based on a 5.2 kW system.</div>
+        <span style="background:#f0fdf4;color:#065f46;font-size:.67rem;font-weight:700;padding:.18rem .5rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">📊 Sample Preview</span>
+        <div style="font-size:.78rem;color:#64748b;margin-top:.25rem;">Based on a 5.2 kW demo system.</div>
       </div>
-      <a href="{% url 'verticals:energy_site_create' %}" class="en-hero-btn-primary" style="background:#059669;color:#fff;font-size:.78rem;">+ Add Real Site</a>
+      <a href="{% url 'verticals:energy_site_create' %}" class="en-hero-btn-primary" style="background:#059669;color:#fff;font-size:.77rem;">+ Add Real Site</a>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;">
       {% for demo in demo_site_preview %}
-      <div style="background:{% if demo.highlight %}linear-gradient(135deg,#ecfdf5,#d1fae5){% else %}#f8fafc{% endif %};border:1.5px solid #e2e8f0;border-radius:12px;padding:.85rem;text-align:center;position:relative;">
-        <div style="font-size:.6rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">DEMO</div>
-        <div style="font-size:1.3rem;font-weight:800;color:#0f172a;">{{ demo.value }}</div>
-        <div style="font-size:.65rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:.15rem;">{{ demo.label }}</div>
-        {% if demo.note %}<div style="font-size:.62rem;color:#94a3b8;margin-top:.15rem;">{{ demo.note }}</div>{% endif %}
+      <div style="background:{% if demo.highlight %}linear-gradient(135deg,#ecfdf5,#d1fae5){% else %}#f8fafc{% endif %};border:1px solid #e2e8f0;border-radius:10px;padding:.75rem;text-align:center;">
+        <div style="font-size:.58rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem;">DEMO</div>
+        <div style="font-size:1.25rem;font-weight:800;color:#0f172a;">{{ demo.value }}</div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:.12rem;">{{ demo.label }}</div>
+        {% if demo.note %}<div style="font-size:.6rem;color:#94a3b8;margin-top:.1rem;">{{ demo.note }}</div>{% endif %}
       </div>
       {% endfor %}
-    </div>
-    <div style="margin-top:.85rem;padding:.55rem .75rem;background:#fef3c7;border-radius:8px;border:1px solid #fde68a;font-size:.76rem;color:#92400e;">
-      💡 <strong>Recommended action:</strong> Run system sizing using your real appliances to generate your actual KPIs.
     </div>
   </div>
   {% endif %}
@@ -274,16 +393,16 @@
   </div>
   {% endif %}
 
-  {# ── DECISION RECOMMENDATION PANEL ── #}
+  {# ── DECISION RECOMMENDATIONS ── #}
   {% if decision_recommendations %}
   <div class="en-card mb-4" style="border-color:#6366f1;background:linear-gradient(135deg,#fff,#faf5ff);">
     <div class="en-section-hdr mb-2">
       <p class="en-section-title mb-0" style="color:#4f46e5;">🎯 Decision Recommendations</p>
-      <span style="font-size:.7rem;color:#94a3b8;">Based on your energy data</span>
+      <span style="font-size:.68rem;color:#94a3b8;">Based on your energy data</span>
     </div>
     <div class="d-flex flex-column gap-2">
       {% for rec in decision_recommendations %}
-      <div style="padding:.5rem .75rem;border-radius:10px;font-size:.83rem;
+      <div style="padding:.45rem .7rem;border-radius:8px;font-size:.82rem;
         {% if rec.type == 'warning' %}background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;
         {% elif rec.type == 'risk' %}background:#fff1f2;border:1px solid #fca5a5;color:#991b1b;
         {% else %}background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;{% endif %}">
@@ -294,119 +413,388 @@
   </div>
   {% endif %}
 
-  {# ── FINANCIAL OPPORTUNITY PANEL ── #}
+  {# ── FINANCIAL OPPORTUNITY ── #}
   {% if financial_opportunity %}
   <div class="en-card mb-4" style="border-color:#10b981;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);">
     <div class="en-section-hdr mb-2">
       <p class="en-section-title mb-0" style="color:#059669;">💰 Financial Opportunity</p>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.6rem;">
       {% for fo in financial_opportunity %}
       <div style="text-align:center;">
-        <div style="font-size:1.15rem;font-weight:800;color:{{ fo.color|default:'#059669' }};">{{ fo.value }}</div>
-        <div style="font-size:.65rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">{{ fo.label }}</div>
-        {% if fo.note %}<div style="font-size:.62rem;color:#94a3b8;margin-top:.1rem;">{{ fo.note }}</div>{% endif %}
+        <div style="font-size:1.1rem;font-weight:800;color:{{ fo.color|default:'#059669' }};">{{ fo.value }}</div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">{{ fo.label }}</div>
+        {% if fo.note %}<div style="font-size:.6rem;color:#94a3b8;margin-top:.1rem;">{{ fo.note }}</div>{% endif %}
       </div>
       {% endfor %}
     </div>
   </div>
   {% endif %}
 
-  {# ── PRIMARY KPIs ── #}
+  {# ── SECTION 1: KEY METRICS (3 major cards) ── #}
   {% if is_new_workspace %}
   <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
-    <span style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">Sample Estimates</span>
-    <span style="font-size:.73rem;color:#94a3b8;">Replace with real data by registering a site and assets.</span>
+    <span style="background:#fef3c7;color:#92400e;font-size:.65rem;font-weight:700;padding:.18rem .5rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">Sample Estimates</span>
+    <span style="font-size:.72rem;color:#94a3b8;">Add a site and assets to see your real data.</span>
   </div>
   {% endif %}
-  <div class="en-kpi-grid mb-4">
-    <div class="en-kpi" style="border-color:#10b981;">
-      <div class="en-kpi-val" style="color:#059669;">{{ stats.active_sites|default:0 }}</div>
-      <div class="en-kpi-lbl">Active Sites{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
-      <div class="en-kpi-sub">{% if is_new_workspace %}sample site{% else %}of {{ stats.total_sites|default:0 }} total{% endif %}</div>
+
+  <div class="en-kpi3 mb-4">
+    <div class="en-kpi3-card accent-green">
+      <div class="kv green">{{ stats.active_sites|default:0 }}</div>
+      <div class="kl">Active Sites{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+      <div class="ks">{% if is_new_workspace %}sample site{% else %}of {{ stats.total_sites|default:0 }} total · {{ stats.operational_assets|default:0 }} live assets{% endif %}</div>
     </div>
-    <div class="en-kpi" style="border-color:#6366f1;">
-      <div class="en-kpi-val" style="color:#4f46e5;">{{ stats.total_assets|default:0 }}</div>
-      <div class="en-kpi-lbl">Live Assets{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
-      <div class="en-kpi-sub">{% if is_new_workspace %}sample assets{% else %}{{ stats.degraded_assets|default:0 }} degraded · {{ stats.faulty_assets|default:0 }} faulty{% endif %}</div>
+    <div class="en-kpi3-card accent-green">
+      <div class="kv money green">{{ stats.installed_capacity|default:0|floatformat:1 }} <small style="font-size:.75rem;">kW</small></div>
+      <div class="kl">Installed Capacity{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+      <div class="ks">{{ stats.generation_this_month|default:0|floatformat:1 }} kWh this month</div>
     </div>
-    <div class="en-kpi" style="border-color:#22d3ee;">
-      <div class="en-kpi-val money" style="color:#0891b2;">{{ stats.installed_capacity|default:0|floatformat:1 }} <small style="font-size:.6rem;">kW</small></div>
-      <div class="en-kpi-lbl">Installed Capacity{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
-    </div>
-    <div class="en-kpi" style="border-color:#f59e0b;">
-      <div class="en-kpi-val" style="color:#d97706;">{{ stats.maintenance_overdue|default:0 }}</div>
-      <div class="en-kpi-lbl">Maintenance Due</div>
-    </div>
-    <div class="en-kpi" style="border-color:#ef4444;">
-      <div class="en-kpi-val" style="color:#dc2626;">{{ stats.critical_alerts|default:0 }}</div>
-      <div class="en-kpi-lbl">Critical Alerts</div>
-      <div class="en-kpi-sub">{{ stats.high_alerts|default:0 }} high</div>
-    </div>
-    <div class="en-kpi" style="border-color:#84cc16;">
-      <div class="en-kpi-val money" style="color:#4d7c0f;">MWK {{ stats.savings_this_month|default:0|floatformat:0 }}</div>
-      <div class="en-kpi-lbl">Est. Savings (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
-      <div class="en-kpi-sub">MWK {{ stats.cumulative_savings|default:0|floatformat:0 }} cumulative</div>
+    <div class="en-kpi3-card {% if stats.critical_alerts > 0 %}accent-red{% elif stats.maintenance_overdue > 0 %}accent-amber{% else %}accent-green{% endif %}">
+      <div class="kv {% if stats.critical_alerts > 0 %}red{% elif stats.maintenance_overdue > 0 %}amber{% else %}green{% endif %}">
+        {% if stats.critical_alerts > 0 %}{{ stats.critical_alerts }}{% else %}{{ stats.maintenance_overdue|default:0 }}{% endif %}
+      </div>
+      <div class="kl">
+        {% if stats.critical_alerts > 0 %}Critical Alerts{% elif stats.maintenance_overdue > 0 %}Maintenance Due{% else %}All Clear{% endif %}
+      </div>
+      <div class="ks">
+        {% if stats.critical_alerts > 0 %}{{ stats.high_alerts|default:0 }} high · {{ stats.maintenance_overdue|default:0 }} maintenance due
+        {% elif stats.maintenance_overdue > 0 %}{{ stats.critical_alerts|default:0 }} critical alerts
+        {% else %}System healthy · {{ stats.total_assets|default:0 }} asset{{ stats.total_assets|default:0|pluralize }} monitored{% endif %}
+      </div>
     </div>
   </div>
 
-  {# ── SECONDARY KPIs ── #}
-  <div class="en-kpi2-grid mb-4">
-    <div class="en-kpi">
-      <div class="en-kpi-val money" style="color:#059669;">{{ stats.generation_this_month|default:0|floatformat:1 }} <small style="font-size:.6rem;">kWh</small></div>
-      <div class="en-kpi-lbl">Generation (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
-      <div class="en-kpi-sub">{{ stats.gen_this_week|default:0|floatformat:1 }} kWh this week</div>
+  {# Secondary metrics row #}
+  <div class="en-kpi-row mb-4">
+    <div class="en-kpi-sm">
+      <div class="kv" style="font-size:1.25rem;color:{% if stats.avg_battery_health >= 60 %}#059669{% elif stats.avg_battery_health >= 40 %}#d97706{% else %}#dc2626{% endif %};">{{ stats.avg_battery_health|default:0 }}%</div>
+      <div class="kl">Battery Health{% if is_new_workspace %} <span style="font-size:.5rem;color:#f59e0b;">▲</span>{% endif %}</div>
     </div>
-    <div class="en-kpi">
-      <div class="en-kpi-val money" style="color:#6366f1;">{{ stats.consumption_this_month|default:0|floatformat:1 }} <small style="font-size:.6rem;">kWh</small></div>
-      <div class="en-kpi-lbl">Consumption (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+    <div class="en-kpi-sm">
+      <div class="kv" style="font-size:1.25rem;color:{% if stats.avg_asset_health >= 60 %}#059669{% elif stats.avg_asset_health >= 40 %}#d97706{% else %}#dc2626{% endif %};">{{ stats.avg_asset_health|default:0 }}%</div>
+      <div class="kl">Asset Health{% if is_new_workspace %} <span style="font-size:.5rem;color:#f59e0b;">▲</span>{% endif %}</div>
     </div>
-    <div class="en-kpi">
-      <div class="en-kpi-val money" style="color:{% if stats.avg_battery_health >= 60 %}#10b981{% elif stats.avg_battery_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_battery_health|default:0 }}%</div>
-      <div class="en-kpi-lbl">Avg Battery Health{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+    <div class="en-kpi-sm">
+      <div class="kv" style="font-size:1.15rem;color:#0f172a;">{{ stats.consumption_this_month|default:0|floatformat:1 }}<small style="font-size:.7rem;"> kWh</small></div>
+      <div class="kl">Consumption (Month){% if is_new_workspace %} <span style="font-size:.5rem;color:#f59e0b;">▲</span>{% endif %}</div>
     </div>
-    <div class="en-kpi">
-      <div class="en-kpi-val money" style="color:{% if stats.avg_asset_health >= 60 %}#10b981{% elif stats.avg_asset_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_asset_health|default:0 }}%</div>
-      <div class="en-kpi-lbl">Avg Asset Health{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+    <div class="en-kpi-sm">
+      <div class="kv money" style="font-size:1.15rem;color:#4d7c0f;">MWK {{ stats.savings_this_month|default:0|floatformat:0 }}</div>
+      <div class="kl">Est. Savings (Month){% if is_new_workspace %} <span style="font-size:.5rem;color:#f59e0b;">▲</span>{% endif %}</div>
     </div>
+  </div>
+
+  {# ── SECTION 2: ENERGY OUTPUT GRAPH (always visible) ── #}
+  <div class="en-card mb-4">
+    <div class="en-section-hdr mb-3">
+      <div>
+        <p class="en-section-title mb-0">Energy Output</p>
+        {% if recent_readings %}
+          <div style="font-size:.72rem;color:#64748b;margin-top:.2rem;">
+            Generation &amp; Consumption — last 30 days
+            <span class="trend-badge trend-up ms-2">↑ Live data</span>
+          </div>
+        {% else %}
+          <div style="font-size:.72rem;color:#64748b;margin-top:.2rem;">Demo preview — add a site to see real output</div>
+        {% endif %}
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="chart-toggles">
+          <button class="ct-pill active" onclick="setChartPeriod('month',this)">Month</button>
+          <button class="ct-pill" onclick="setChartPeriod('week',this)">Week</button>
+          <button class="ct-pill" onclick="setChartPeriod('day',this)">Day</button>
+        </div>
+        <a href="{% url 'verticals:energy_forecasting' %}" class="en-section-link">Forecasting →</a>
+      </div>
+    </div>
+    <div class="chart-container-lg">
+      <canvas id="energyOutputChart"></canvas>
+    </div>
+  </div>
+
+  {# ── SECTION 3: SYSTEM HEALTH (status rows) ── #}
+  {% if not is_new_workspace and stats.total_sites > 0 or sites_needing_attention %}
+  <div class="row g-4 mb-4">
+    <div class="col-12 col-lg-6">
+      <div class="en-card h-100">
+        <div class="en-section-hdr">
+          <p class="en-section-title mb-0">System Health</p>
+          <a href="{% url 'verticals:energy_assets' %}" class="en-section-link">All assets →</a>
+        </div>
+        {# System health score row #}
+        {% with health=stats.avg_asset_health %}
+        <div class="health-row" style="border-bottom:1px solid #f1f5f9;">
+          <span class="health-name">Overall System</span>
+          <div class="health-bar">
+            <div class="health-bar-fill" style="width:{{ health }}%;background:{% if health >= 80 %}#10b981{% elif health >= 60 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+          </div>
+          <span class="health-pct" style="color:{% if health >= 80 %}#059669{% elif health >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ health }}%</span>
+          <span class="health-badge {% if health >= 80 %}hb-healthy{% elif health >= 60 %}hb-warning{% else %}hb-offline{% endif %}">
+            {% if health >= 80 %}Healthy{% elif health >= 60 %}Warning{% else %}Critical{% endif %}
+          </span>
+        </div>
+        {% endwith %}
+        {# Battery health row #}
+        {% with bh=stats.avg_battery_health %}
+        <div class="health-row">
+          <span class="health-name">🔋 Battery Banks</span>
+          <div class="health-bar">
+            <div class="health-bar-fill" style="width:{{ bh }}%;background:{% if bh >= 80 %}#10b981{% elif bh >= 60 %}#f59e0b{% else %}#ef4444{% endif %};"></div>
+          </div>
+          <span class="health-pct" style="color:{% if bh >= 80 %}#059669{% elif bh >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ bh }}%</span>
+          <span class="health-badge {% if bh >= 80 %}hb-healthy{% elif bh >= 60 %}hb-warning{% else %}hb-offline{% endif %}">
+            {% if bh >= 80 %}Good{% elif bh >= 60 %}Monitor{% else %}Replace{% endif %}
+          </span>
+        </div>
+        {% endwith %}
+        {# Sites needing attention #}
+        {% for site in sites_needing_attention %}
+        <div class="health-row">
+          <span class="health-name"><a href="{% url 'verticals:energy_site_detail' site.id %}" style="color:inherit;text-decoration:none;">🏚️ {{ site.name }}</a></span>
+          <div class="health-bar">
+            <div class="health-bar-fill" style="width:30%;background:#ef4444;"></div>
+          </div>
+          <span class="health-pct" style="color:#dc2626;">{{ site.alert_count }} alerts</span>
+          <span class="health-badge hb-offline">Attention</span>
+        </div>
+        {% endfor %}
+        {# If no issues #}
+        {% if not sites_needing_attention and stats.critical_alerts == 0 %}
+        <div style="padding:.75rem .5rem;text-align:center;font-size:.82rem;color:#64748b;">
+          ✅ All systems performing well
+        </div>
+        {% endif %}
+        {# Load risk #}
+        <div style="margin-top:.75rem;padding:.55rem .7rem;border-radius:8px;font-size:.79rem;
+          {% if stats.critical_alerts > 0 %}background:#fff1f2;border:1px solid #fca5a5;color:#991b1b;
+          {% elif stats.maintenance_overdue > 0 %}background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;
+          {% else %}background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;{% endif %}">
+          {% if stats.critical_alerts > 0 %}🔴 <strong>{{ stats.critical_alerts }} critical alert{{ stats.critical_alerts|pluralize }}</strong> — action required.
+          {% elif stats.maintenance_overdue > 0 %}⚠️ <strong>{{ stats.maintenance_overdue }} overdue</strong> maintenance item{{ stats.maintenance_overdue|pluralize }}.
+          {% else %}✅ No load risks detected. <a href="{% url 'verticals:energy_load_management' %}" style="color:#059669;font-weight:600;">Load Analysis →</a>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+      <div class="en-card h-100">
+        <div class="en-section-hdr">
+          <p class="en-section-title mb-0">⚠️ Assets at Risk</p>
+          <a href="{% url 'verticals:energy_assets' %}" class="en-section-link">All assets →</a>
+        </div>
+        {% if high_risk_assets %}
+          {% for asset in high_risk_assets %}
+            <div class="risk-row">
+              <div class="risk-icon">
+                {% if asset.asset_type == "solar_panel" %}☀️{% elif asset.asset_type == "battery" %}🔋{% elif asset.asset_type == "inverter" %}⚡{% elif asset.asset_type == "charge_controller" %}🔌{% else %}🔩{% endif %}
+              </div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:.82rem;font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ asset }}</div>
+                <div class="risk-bar mt-1">
+                  <div class="risk-fill" style="width:{{ asset.risk_score }}%;background:{% if asset.risk_score >= 75 %}#ef4444{% elif asset.risk_score >= 50 %}#f97316{% else %}#f59e0b{% endif %};"></div>
+                </div>
+              </div>
+              <span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;color:#fff;background:{% if asset.risk_score >= 75 %}#ef4444{% elif asset.risk_score >= 50 %}#f97316{% else %}#f59e0b{% endif %};">{{ asset.risk_score }}%</span>
+            </div>
+          {% endfor %}
+        {% elif demo_risks %}
+          <div style="margin-bottom:.55rem;padding:.3rem .55rem;background:#fef3c7;border-radius:6px;font-size:.68rem;color:#92400e;">
+            📊 <strong>Demo preview</strong> — sample asset risk for a 5.2 kW system.
+          </div>
+          {% for dr in demo_risks %}
+            <div class="risk-row" style="opacity:.9;">
+              <div class="risk-icon">{{ dr.icon }}</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:.82rem;font-weight:600;color:#0f172a;">{{ dr.name }}</div>
+                <div style="font-size:.7rem;color:#64748b;">{{ dr.note }}</div>
+                <div class="risk-bar mt-1">
+                  <div class="risk-fill" style="width:{{ dr.risk_score }}%;background:{{ dr.risk_color }};"></div>
+                </div>
+              </div>
+              <span style="font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:999px;color:#fff;background:{{ dr.risk_color }};">{{ dr.risk_score }}%</span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <div class="cc-empty-state">
+            <div class="cc-empty-icon">✅</div>
+            <div class="cc-empty-msg">All assets healthy</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── SECTION 4: ALERTS (sharp list format) ── #}
+  <div class="row g-4 mb-4">
+    <div class="col-12 col-lg-6">
+      <div class="en-card h-100">
+        <div class="en-section-hdr">
+          <p class="en-section-title mb-0">🔔 Active Alerts</p>
+          <div class="d-flex align-items-center gap-2">
+            <form method="post" action="{% url 'verticals:energy_trigger_alerts' %}" style="display:inline;">{% csrf_token %}
+              <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill" style="font-size:.7rem;padding:.2rem .65rem;"><i class="bi bi-arrow-clockwise me-1"></i>Scan</button>
+            </form>
+            <a href="{% url 'verticals:energy_alerts' %}" class="en-section-link">View all →</a>
+          </div>
+        </div>
+        {% if recent_alerts %}
+          <div>
+          {% for alert in recent_alerts %}
+          <div class="al-row">
+            <span class="al-sev {{ alert.severity }}"></span>
+            <div class="al-icon {{ alert.severity }}">
+              {% if alert.severity == "critical" %}🔴{% elif alert.severity == "high" %}🟠{% elif alert.severity == "medium" %}🟡{% else %}🟢{% endif %}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div class="al-msg">{{ alert.title }}</div>
+              {% if alert.site %}<div class="al-sub">{{ alert.site.name }}</div>{% endif %}
+            </div>
+            <div class="al-time">{{ alert.created_at|timesince }} ago</div>
+          </div>
+          {% endfor %}
+          </div>
+        {% elif demo_alerts %}
+          <div style="margin-bottom:.55rem;padding:.3rem .55rem;background:#fef3c7;border-radius:6px;font-size:.68rem;color:#92400e;">
+            📊 <strong>Demo preview</strong> — real alerts appear when you add a site.
+          </div>
+          <div>
+          {% for da in demo_alerts|slice:":4" %}
+          <div class="al-row" style="opacity:.9;">
+            <span class="al-sev {{ da.severity }}"></span>
+            <div class="al-icon {{ da.severity }}">{{ da.icon }}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="al-msg">{{ da.title }}</div>
+              <div class="al-sub">{{ da.type_label }} · Demo Preview</div>
+            </div>
+            <a href="{% url 'verticals:energy_alerts' %}" style="font-size:.67rem;color:#94a3b8;white-space:nowrap;text-decoration:none;">View →</a>
+          </div>
+          {% endfor %}
+          </div>
+        {% else %}
+          <div class="cc-empty-state">
+            <div class="cc-empty-icon">✅</div>
+            <div class="cc-empty-msg">No active alerts — all systems healthy</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Demand forecast #}
+    <div class="col-12 col-lg-6">
+      <div class="en-card h-100">
+        <div class="en-section-hdr mb-2">
+          <p class="en-section-title mb-0">📈 Demand Forecast</p>
+          <a href="{% url 'verticals:energy_forecasting' %}" class="en-section-link">Detailed →</a>
+        </div>
+        {% if demo_forecast %}
+        <div style="margin-bottom:.55rem;padding:.3rem .55rem;background:#fef3c7;border-radius:6px;font-size:.68rem;color:#92400e;">
+          📊 <strong>Demo preview</strong> — sample forecast for a 5.2 kW system.
+        </div>
+        {% endif %}
+        <div class="row g-3">
+          <div class="col-6">
+            <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em;">Next 7 Days</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;margin-top:.15rem;">
+              {% if demo_forecast %}{{ demo_forecast.next_7_day_demand_kwh }}{% elif forecast_summary.next_7_day_demand_kwh %}{{ forecast_summary.next_7_day_demand_kwh }}{% else %}—{% endif %}
+              <small style="font-size:.58rem;color:#64748b;"> kWh</small>
+            </div>
+          </div>
+          <div class="col-6">
+            <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;font-weight:700;letter-spacing:.05em;">Next 30 Days</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;margin-top:.15rem;">
+              {% if demo_forecast %}{{ demo_forecast.next_30_day_demand_kwh }}{% elif forecast_summary.next_30_day_demand_kwh %}{{ forecast_summary.next_30_day_demand_kwh }}{% else %}—{% endif %}
+              <small style="font-size:.58rem;color:#64748b;"> kWh</small>
+            </div>
+          </div>
+          <div class="col-12">
+            <div style="font-size:.8rem;color:#475569;line-height:1.5;">
+              {% if demo_forecast %}{{ demo_forecast.explanation }}{% else %}{{ forecast_summary.explanation }}{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="mt-3 pt-2 border-top" style="font-size:.7rem;color:#94a3b8;">
+          🤖 Connect IoT sensors for AI-precision forecasting.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ── SECTION 5: SIMULATION PANEL ── #}
+  <div class="sim-panel mb-4">
+    <div class="en-section-hdr mb-3">
+      <div>
+        <p class="en-section-title mb-0" style="color:#7c3aed;">🧠 Scenario Simulator</p>
+        <div style="font-size:.75rem;color:#7c3aed;opacity:.7;margin-top:.2rem;">
+          What happens if… — explore energy scenarios{% if is_new_workspace %} · Sample estimates{% endif %}
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:.75rem;">
+      <div class="sim-card" onclick="toggleSim('battery')">
+        <div class="sim-card-title">🔋 Add one more battery</div>
+        <div class="sim-card-desc">Extends night autonomy by ~4h. Reduces blackout risk to Low.</div>
+        <div id="sim-battery" class="sim-result sim-green">
+          ✅ With 2× 200Ah batteries: night autonomy ~8h. Cost: MWK 1,300,000. Extra monthly savings: ~MWK 45,000.
+        </div>
+      </div>
+      <div class="sim-card" onclick="toggleSim('load')">
+        <div class="sim-card-title">⏰ Shift loads to daytime</div>
+        <div class="sim-card-desc">Ironing, pumping, washing moved to 10:00–15:00 solar hours.</div>
+        <div id="sim-load" class="sim-result sim-blue">
+          💡 Daytime load shift reduces battery draw by ~30%. Night blackout risk drops from Medium to Low. No extra cost.
+        </div>
+      </div>
+      <div class="sim-card" onclick="toggleSim('panels')">
+        <div class="sim-card-title">☀️ Increase panel size</div>
+        <div class="sim-card-desc">Add 2 more panels — more generation, faster battery charge.</div>
+        <div id="sim-panels" class="sim-result sim-amber">
+          📈 +400W capacity: generation → ~830 kWh/month. Payback improved by ~3 months. Cost: ~MWK 1,200,000.
+        </div>
+      </div>
+    </div>
+    {% if is_new_workspace %}
+    <div style="margin-top:.85rem;font-size:.72rem;color:#7c3aed;background:rgba(255,255,255,.5);border-radius:7px;padding:.45rem .7rem;">
+      💜 These scenarios use sample estimates. Run system sizing with your real appliances for accurate projections.
+    </div>
+    {% endif %}
   </div>
 
   {# ── COMMERCE KPIs ── #}
   {% if commerce %}
-  <div class="en-kpi2-grid mb-4">
-    <div class="en-kpi" style="border-color:#10b981;">
-      <div class="en-kpi-val money" style="color:#059669;">
-        {% if commerce.revenue_this_month %}
-          {{ business.currency|default:"MWK" }} {{ commerce.revenue_this_month|floatformat:0 }}
-        {% else %}—{% endif %}
-      </div>
-      <div class="en-kpi-lbl">Revenue (This Month)</div>
-      <div class="en-kpi-sub">{{ commerce.sales_this_month }} sale{{ commerce.sales_this_month|pluralize }}</div>
+  <div class="en-card mb-4">
+    <div class="en-section-hdr mb-3">
+      <p class="en-section-title mb-0">🛒 Energy Commerce</p>
+      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Product catalog →</a>
     </div>
-    <div class="en-kpi" style="border-color:#6366f1;">
-      <div class="en-kpi-val money" style="color:#4f46e5;">
-        {% if commerce.profit_this_month %}
-          {{ business.currency|default:"MWK" }} {{ commerce.profit_this_month|floatformat:0 }}
-        {% else %}—{% endif %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem;">
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:800;color:#059669;">
+          {% if commerce.revenue_this_month %}{{ business.currency|default:"MWK" }} {{ commerce.revenue_this_month|floatformat:0 }}{% else %}—{% endif %}
+        </div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Revenue (Month)</div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:.1rem;">{{ commerce.sales_this_month }} sale{{ commerce.sales_this_month|pluralize }}</div>
       </div>
-      <div class="en-kpi-lbl">Gross Profit (Month)</div>
-    </div>
-    <div class="en-kpi">
-      <div class="en-kpi-val" style="color:#0f172a;">{{ commerce.total_products|default:0 }}</div>
-      <div class="en-kpi-lbl">Products in Catalog</div>
-      <div class="en-kpi-sub">
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:800;color:#4f46e5;">
+          {% if commerce.profit_this_month %}{{ business.currency|default:"MWK" }} {{ commerce.profit_this_month|floatformat:0 }}{% else %}—{% endif %}
+        </div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Gross Profit</div>
+      </div>
+      <div style="text-align:center;">
+        <div style="font-size:1.2rem;font-weight:800;color:#0f172a;">{{ commerce.total_products|default:0 }}</div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Products</div>
         {% if commerce.low_stock_products > 0 %}
-          <span style="color:#d97706;">{{ commerce.low_stock_products }} low stock</span>
-        {% else %}all healthy{% endif %}
+          <div style="font-size:.7rem;color:#d97706;">{{ commerce.low_stock_products }} low stock</div>
+        {% endif %}
       </div>
-    </div>
-    <div class="en-kpi">
-      <div class="en-kpi-val money" style="font-size:1.1rem;color:#0891b2;">
-        {% if commerce.inventory_value %}
-          {{ business.currency|default:"MWK" }} {{ commerce.inventory_value|floatformat:0 }}
-        {% else %}—{% endif %}
+      <div style="text-align:center;">
+        <div style="font-size:1.1rem;font-weight:800;color:#0891b2;">
+          {% if commerce.inventory_value %}{{ business.currency|default:"MWK" }} {{ commerce.inventory_value|floatformat:0 }}{% else %}—{% endif %}
+        </div>
+        <div style="font-size:.62rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">Inventory Value</div>
       </div>
-      <div class="en-kpi-lbl">Inventory Value</div>
     </div>
   </div>
   {% endif %}
@@ -414,71 +802,54 @@
   {# ── COMMERCE QUICK ACTIONS ── #}
   <div class="en-card mb-4">
     <div class="en-section-hdr">
-      <div>
-        <p class="en-section-title mb-0">🛒 Energy Commerce</p>
-        <div style="font-size:.8rem;color:#64748b;margin-top:.2rem;">Stock and sell energy products</div>
-      </div>
-      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Product catalog →</a>
+      <p class="en-section-title mb-0">⚡ Quick Actions</p>
     </div>
-    <div class="stock-in-grid">
-      <a href="{% url 'verticals:energy_stock_in' %}" class="stock-card primary">
-        <span class="stock-card-icon">📦</span>
-        <span class="stock-card-label">Stock In</span>
-        <span class="stock-card-sub">Record received goods</span>
-      </a>
-      <a href="{% url 'verticals:energy_sell' %}" class="stock-card primary">
-        <span class="stock-card-icon">🛒</span>
-        <span class="stock-card-label">Sell Products</span>
-        <span class="stock-card-sub">Record a sale</span>
-      </a>
-      <a href="{% url 'verticals:energy_catalog' %}" class="stock-card">
-        <span class="stock-card-icon">📋</span>
-        <span class="stock-card-label">Product List</span>
-        <span class="stock-card-sub">View &amp; manage</span>
-      </a>
-      <a href="{% url 'verticals:energy_seed_catalog' %}" class="stock-card"
-         onclick="return confirm('Seed the default energy catalog?')">
-        <span class="stock-card-icon">🌱</span>
-        <span class="stock-card-label">Seed Catalog</span>
-        <span class="stock-card-sub">Add default products</span>
-      </a>
+    <div class="row g-2">
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_site_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+          <span style="font-size:1.3rem;">🏡</span>
+          <div><div class="fw-bold" style="color:#15803d;font-size:.8rem;">Add Site</div><div class="text-muted" style="font-size:.66rem;">New installation</div></div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_stock_in' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+          <span style="font-size:1.3rem;">📦</span>
+          <div><div class="fw-bold" style="color:#15803d;font-size:.8rem;">Stock In</div><div class="text-muted" style="font-size:.66rem;">Record goods</div></div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_sell' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1px solid #bbf7d0;">
+          <span style="font-size:1.3rem;">🛒</span>
+          <div><div class="fw-bold" style="color:#15803d;font-size:.8rem;">Sell Products</div><div class="text-muted" style="font-size:.66rem;">Record a sale</div></div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_maintenance_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#fff7ed;border:1px solid #fed7aa;">
+          <span style="font-size:1.3rem;">🔧</span>
+          <div><div class="fw-bold" style="color:#c2410c;font-size:.8rem;">Log Maintenance</div><div class="text-muted" style="font-size:.66rem;">Service record</div></div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_sizing_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#eff6ff;border:1px solid #bfdbfe;">
+          <span style="font-size:1.3rem;">📐</span>
+          <div><div class="fw-bold" style="color:#1d4ed8;font-size:.8rem;">System Sizing</div><div class="text-muted" style="font-size:.66rem;">Design a system</div></div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3 col-lg">
+        <a href="{% url 'verticals:energy_monitoring' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#ecfdf5;border:1px solid #a7f3d0;">
+          <span style="font-size:1.3rem;">🖥️</span>
+          <div><div class="fw-bold" style="color:#065f46;font-size:.8rem;">Monitoring</div><div class="text-muted" style="font-size:.66rem;">Live dashboard</div></div>
+        </a>
+      </div>
     </div>
   </div>
 
-  {# ── RECENT ENERGY SALES ── #}
-  {% if recent_energy_sales %}
-  <div class="en-card mb-4">
-    <div class="en-section-hdr">
-      <p class="en-section-title mb-0">🧾 Recent Sales</p>
-      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Products →</a>
-    </div>
-    <div class="d-flex flex-column gap-2">
-      {% for sale in recent_energy_sales %}
-      <div class="d-flex align-items-center gap-3 p-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
-        <div style="width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">⚡</div>
-        <div style="flex:1;min-width:0;">
-          <div class="fw-semibold text-truncate" style="font-size:.85rem;">{{ sale.product.name }}</div>
-          <div class="text-muted" style="font-size:.72rem;">
-            ×{{ sale.quantity }} {{ sale.product.unit }} · {{ sale.payment_method }}
-            {% if sale.sold_by %} · {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}{% endif %}
-          </div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div class="fw-bold" style="font-size:.88rem;color:#059669;">{{ business.currency|default:"MWK" }} {{ sale.total_amount|floatformat:0 }}</div>
-          <div class="text-muted" style="font-size:.7rem;">{{ sale.sold_at|timesince }} ago</div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-  {% endif %}
-
-  {# ── EQUIPMENT ASSET STOCK-IN ── #}
+  {# ── EQUIPMENT REGISTRATION ── #}
   <div class="en-card mb-4">
     <div class="en-section-hdr">
       <div>
         <p class="en-section-title mb-0">🏗️ Equipment Registration</p>
-        <div style="font-size:.8rem;color:#64748b;margin-top:.2rem;">Register installed equipment at customer sites</div>
+        <div style="font-size:.78rem;color:#64748b;margin-top:.15rem;">Register installed equipment at customer sites</div>
       </div>
       <a href="{% url 'verticals:energy_assets' %}" class="en-section-link">View all assets →</a>
     </div>
@@ -503,395 +874,186 @@
         <span class="stock-card-label">Charge Controllers</span>
         <span class="stock-card-sub">Register asset</span>
       </a>
+      <a href="{% url 'verticals:energy_catalog' %}" class="stock-card primary">
+        <span class="stock-card-icon">📋</span>
+        <span class="stock-card-label">Product Catalog</span>
+        <span class="stock-card-sub">View &amp; manage</span>
+      </a>
+      <a href="{% url 'verticals:energy_seed_catalog' %}" class="stock-card"
+         onclick="return confirm('Seed the default energy catalog?')">
+        <span class="stock-card-icon">🌱</span>
+        <span class="stock-card-label">Seed Catalog</span>
+        <span class="stock-card-sub">Add defaults</span>
+      </a>
     </div>
   </div>
 
-  {# ── QUICK ACTIONS ── #}
+  {# ── RECENT ENERGY SALES ── #}
+  {% if recent_energy_sales %}
   <div class="en-card mb-4">
-    <p class="en-section-title mb-3">⚡ Quick Actions</p>
-    <div class="row g-2">
-      <div class="col-6 col-md-3 col-lg">
-        <a href="{% url 'verticals:energy_site_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#f0fdf4;border:1.5px solid #bbf7d0;">
-          <span style="font-size:1.4rem;">🏡</span>
-          <div><div class="fw-bold" style="color:#15803d;font-size:.82rem;">Add Site</div><div class="text-muted" style="font-size:.68rem;">New installation</div></div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3 col-lg">
-        <a href="{% url 'verticals:energy_maintenance_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#fff7ed;border:1.5px solid #fed7aa;">
-          <span style="font-size:1.4rem;">🔧</span>
-          <div><div class="fw-bold" style="color:#c2410c;font-size:.82rem;">Log Maintenance</div><div class="text-muted" style="font-size:.68rem;">Service record</div></div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3 col-lg">
-        <a href="{% url 'verticals:energy_sizing_create' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#eff6ff;border:1.5px solid #bfdbfe;">
-          <span style="font-size:1.4rem;">📐</span>
-          <div><div class="fw-bold" style="color:#1d4ed8;font-size:.82rem;">System Sizing</div><div class="text-muted" style="font-size:.68rem;">Design a system</div></div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3 col-lg">
-        <a href="{% url 'verticals:energy_load_management' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#faf5ff;border:1.5px solid #e9d5ff;">
-          <span style="font-size:1.4rem;">📊</span>
-          <div><div class="fw-bold" style="color:#7c3aed;font-size:.82rem;">Load Analysis</div><div class="text-muted" style="font-size:.68rem;">Consumption patterns</div></div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3 col-lg">
-        <a href="{% url 'verticals:energy_monitoring' %}" class="d-flex align-items-center gap-2 p-2 rounded-3 text-decoration-none" style="background:#ecfdf5;border:1.5px solid #a7f3d0;">
-          <span style="font-size:1.4rem;">🖥️</span>
-          <div><div class="fw-bold" style="color:#065f46;font-size:.82rem;">Monitoring</div><div class="text-muted" style="font-size:.68rem;">Live dashboard</div></div>
-        </a>
-      </div>
+    <div class="en-section-hdr">
+      <p class="en-section-title mb-0">🧾 Recent Sales</p>
+      <a href="{% url 'verticals:energy_catalog' %}" class="en-section-link">Products →</a>
     </div>
-  </div>
-
-  {# ── ENERGY TREND CHART ── #}
-  {% if recent_readings %}
-  <div class="en-card mb-4">
-    <div class="en-section-hdr mb-3">
-      <p class="en-section-title mb-0">📈 Energy Trend (Last 30 Days)</p>
-      <a href="{% url 'verticals:energy_forecasting' %}" class="en-section-link">Forecasting →</a>
-    </div>
-    <div class="chart-container">
-      <canvas id="energyTrendChart"></canvas>
+    <div class="d-flex flex-column gap-2">
+      {% for sale in recent_energy_sales %}
+      <div class="d-flex align-items-center gap-3 p-2 rounded-3" style="background:#f8fafc;border:1px solid #e2e8f0;">
+        <div style="width:34px;height:34px;border-radius:7px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">⚡</div>
+        <div style="flex:1;min-width:0;">
+          <div class="fw-semibold text-truncate" style="font-size:.83rem;">{{ sale.product.name }}</div>
+          <div class="text-muted" style="font-size:.7rem;">
+            ×{{ sale.quantity }} {{ sale.product.unit }} · {{ sale.payment_method }}
+            {% if sale.sold_by %} · {{ sale.sold_by.get_full_name|default:sale.sold_by.username }}{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="fw-bold" style="font-size:.86rem;color:#059669;">{{ business.currency|default:"MWK" }} {{ sale.total_amount|floatformat:0 }}</div>
+          <div class="text-muted" style="font-size:.68rem;">{{ sale.sold_at|timesince }} ago</div>
+        </div>
+      </div>
+      {% endfor %}
     </div>
   </div>
   {% endif %}
-
-  <div class="row g-4 mb-4">
-    {# ── ACTIVE ALERTS ── #}
-    <div class="col-12 col-lg-6">
-      <div class="en-card h-100">
-        <div class="en-section-hdr">
-          <p class="en-section-title mb-0">🔔 Active Alerts</p>
-          <div class="d-flex align-items-center gap-2">
-            <form method="post" action="{% url 'verticals:energy_trigger_alerts' %}" style="display:inline;">{% csrf_token %}
-              <button type="submit" class="btn btn-outline-secondary btn-sm rounded-pill" style="font-size:.72rem;"><i class="bi bi-arrow-clockwise me-1"></i>Scan</button>
-            </form>
-            <a href="{% url 'verticals:energy_alerts' %}" class="en-section-link">View all →</a>
-          </div>
-        </div>
-        {% if recent_alerts %}
-          {% for alert in recent_alerts %}
-          <div class="alert-row sev-{{ alert.severity }}">
-            <div style="font-size:1.1rem;flex-shrink:0;">
-              {% if alert.severity == "critical" %}🔴{% elif alert.severity == "high" %}🟠{% elif alert.severity == "medium" %}🟡{% else %}🟢{% endif %}
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div class="fw-semibold text-truncate" style="font-size:.83rem;">{{ alert.title }}</div>
-              {% if alert.site %}<div class="text-muted" style="font-size:.7rem;">{{ alert.site.name }}</div>{% endif %}
-            </div>
-            <div class="text-muted" style="font-size:.68rem;white-space:nowrap;">{{ alert.created_at|timesince }} ago</div>
-          </div>
-          {% endfor %}
-        {% elif demo_alerts %}
-          {# Demo preview for new workspaces #}
-          <div style="margin-bottom:.65rem;padding:.35rem .6rem;background:#fef3c7;border-radius:8px;font-size:.7rem;color:#92400e;display:flex;align-items:center;gap:.4rem;">
-            <span>📊</span> <strong>Demo preview</strong> — sample intelligence for a 5.2 kW system. Real data replaces this once you add a site.
-          </div>
-          {% for da in demo_alerts|slice:":3" %}
-          <div class="alert-row sev-{{ da.severity }}" style="opacity:.9;">
-            <div style="font-size:1.1rem;flex-shrink:0;">{{ da.icon }}</div>
-            <div style="flex:1;min-width:0;">
-              <div class="fw-semibold text-truncate" style="font-size:.83rem;">{{ da.title }}</div>
-              <div class="text-muted" style="font-size:.7rem;">{{ da.type_label }} · Demo Preview</div>
-            </div>
-            <a href="{% url 'verticals:energy_alerts' %}" class="text-muted" style="font-size:.68rem;white-space:nowrap;text-decoration:none;">View all →</a>
-          </div>
-          {% endfor %}
-        {% else %}
-          <div class="text-center py-4">
-            <div style="font-size:2.5rem;opacity:.2">✅</div>
-            <div class="text-muted small mt-1">No active alerts — all systems healthy</div>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-
-    {# ── HIGH RISK ASSETS ── #}
-    <div class="col-12 col-lg-6">
-      <div class="en-card h-100">
-        <div class="en-section-hdr">
-          <p class="en-section-title mb-0">⚠️ Assets at Risk</p>
-          <a href="{% url 'verticals:energy_assets' %}" class="en-section-link">All assets →</a>
-        </div>
-        {% if high_risk_assets %}
-          <div class="d-flex flex-column gap-2">
-          {% for asset in high_risk_assets %}
-            <div class="d-flex align-items-center gap-2">
-              <div style="width:36px;height:36px;border-radius:8px;background:#fef2f2;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
-                {% if asset.asset_type == "solar_panel" %}☀️{% elif asset.asset_type == "battery" %}🔋{% elif asset.asset_type == "inverter" %}⚡{% elif asset.asset_type == "charge_controller" %}🔌{% elif asset.asset_type == "generator" %}⛽{% else %}🔩{% endif %}
-              </div>
-              <div style="flex:1;min-width:0;">
-                <div class="fw-semibold text-truncate" style="font-size:.82rem;">{{ asset }}</div>
-                <div class="asset-risk-bar mt-1">
-                  <div class="risk-fill" style="width:{{ asset.risk_score }}%;background:{% if asset.risk_score >= 75 %}#ef4444{% elif asset.risk_score >= 50 %}#f97316{% else %}#f59e0b{% endif %};"></div>
-                </div>
-              </div>
-              <span class="badge rounded-pill" style="font-size:.68rem;background:{% if asset.priority_label == 'critical' %}#ef4444{% elif asset.priority_label == 'high' %}#f97316{% else %}#f59e0b{% endif %};color:#fff;">{{ asset.risk_score }}%</span>
-            </div>
-          {% endfor %}
-          </div>
-        {% elif demo_risks %}
-          {# Demo preview for new workspaces #}
-          <div style="margin-bottom:.65rem;padding:.35rem .6rem;background:#fef3c7;border-radius:8px;font-size:.7rem;color:#92400e;">
-            📊 <strong>Demo preview</strong> — sample asset risk for a 5.2 kW system.
-          </div>
-          <div class="d-flex flex-column gap-2">
-          {% for dr in demo_risks %}
-            <div class="d-flex align-items-center gap-2" style="opacity:.9;">
-              <div style="width:36px;height:36px;border-radius:8px;background:#fef2f2;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">{{ dr.icon }}</div>
-              <div style="flex:1;min-width:0;">
-                <div class="fw-semibold text-truncate" style="font-size:.82rem;">{{ dr.name }}</div>
-                <div style="font-size:.7rem;color:#64748b;">{{ dr.note }}</div>
-                <div class="asset-risk-bar mt-1">
-                  <div class="risk-fill" style="width:{{ dr.risk_score }}%;background:{{ dr.risk_color }};"></div>
-                </div>
-              </div>
-              <span class="badge rounded-pill" style="font-size:.68rem;background:{{ dr.risk_color }};color:#fff;">{{ dr.risk_score }}%</span>
-            </div>
-          {% endfor %}
-          </div>
-        {% else %}
-          <div class="text-center py-4">
-            <div style="font-size:2.5rem;opacity:.2">✅</div>
-            <div class="text-muted small mt-1">All assets healthy</div>
-          </div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  {# ── SYSTEM HEALTH SCORE + BATTERY AUTONOMY VISUAL ── #}
-  {% if not is_new_workspace and stats.total_sites > 0 %}
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-lg-4">
-      <div class="en-card h-100">
-        <p class="en-section-title mb-3">🏅 System Health Score</p>
-        {% with health=stats.avg_asset_health %}
-        <div style="text-align:center;padding:.5rem 0;">
-          <div style="position:relative;display:inline-block;margin-bottom:.75rem;">
-            <div style="width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-              background:conic-gradient({% if health >= 80 %}#10b981{% elif health >= 60 %}#f59e0b{% else %}#ef4444{% endif %} {{ health }}%, #e2e8f0 {{ health }}%);
-              ">
-              <div style="width:90px;height:90px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-                <div style="font-size:1.5rem;font-weight:900;color:{% if health >= 80 %}#059669{% elif health >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ health }}%</div>
-                <div style="font-size:.6rem;color:#64748b;font-weight:700;text-transform:uppercase;">Health</div>
-              </div>
-            </div>
-          </div>
-          <div style="font-size:.8rem;color:#475569;text-align:center;">
-            {% if health >= 80 %}✅ All systems performing well.{% elif health >= 60 %}⚠️ Some assets need attention.{% else %}🔴 Critical — schedule maintenance now.{% endif %}
-          </div>
-        </div>
-        {% endwith %}
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="en-card h-100">
-        <p class="en-section-title mb-3">🔋 Battery Autonomy</p>
-        {% with bh=stats.avg_battery_health %}
-        <div style="padding:.5rem 0;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
-            <span style="font-size:.78rem;color:#64748b;">Avg Health</span>
-            <span style="font-size:1.2rem;font-weight:800;color:{% if bh >= 80 %}#059669{% elif bh >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ bh }}%</span>
-          </div>
-          <div style="height:14px;border-radius:7px;background:#e2e8f0;overflow:hidden;margin-bottom:.85rem;">
-            <div style="height:100%;border-radius:7px;width:{{ bh }}%;background:linear-gradient(90deg,{% if bh >= 80 %}#10b981,#059669{% elif bh >= 60 %}#f59e0b,#d97706{% else %}#ef4444,#dc2626{% endif %});transition:width .5s;"></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.75rem;">
-            <div style="padding:.5rem;border-radius:8px;background:#f0fdf4;text-align:center;">
-              <div style="font-weight:700;color:#059669;">80–100%</div>
-              <div style="color:#64748b;">Good</div>
-            </div>
-            <div style="padding:.5rem;border-radius:8px;background:#fff7ed;text-align:center;">
-              <div style="font-weight:700;color:#d97706;">60–79%</div>
-              <div style="color:#64748b;">Monitor</div>
-            </div>
-            <div style="padding:.5rem;border-radius:8px;background:#fff1f2;text-align:center;">
-              <div style="font-weight:700;color:#dc2626;">&lt;60%</div>
-              <div style="color:#64748b;">Replace</div>
-            </div>
-            <div style="padding:.5rem;border-radius:8px;background:#eff6ff;text-align:center;">
-              <div style="font-weight:700;color:#4f46e5;">{{ stats.avg_battery_health }}%</div>
-              <div style="color:#64748b;">Yours</div>
-            </div>
-          </div>
-        </div>
-        {% endwith %}
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="en-card h-100">
-        <p class="en-section-title mb-2">💡 Load Risk Meter</p>
-        <div style="padding:.25rem 0;">
-          {% if stats.critical_alerts > 0 %}
-          <div style="padding:.75rem;background:#fff1f2;border-radius:10px;border:1px solid #fca5a5;margin-bottom:.6rem;font-size:.82rem;color:#991b1b;">
-            🔴 <strong>{{ stats.critical_alerts }} critical alert{{ stats.critical_alerts|pluralize }}</strong> — immediate action required.
-          </div>
-          {% elif stats.maintenance_overdue > 0 %}
-          <div style="padding:.75rem;background:#fff7ed;border-radius:10px;border:1px solid #fed7aa;margin-bottom:.6rem;font-size:.82rem;color:#9a3412;">
-            ⚠️ <strong>{{ stats.maintenance_overdue }} overdue</strong> maintenance item{{ stats.maintenance_overdue|pluralize }}.
-          </div>
-          {% else %}
-          <div style="padding:.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;margin-bottom:.6rem;font-size:.82rem;color:#166534;">
-            ✅ <strong>No load risks</strong> detected at this time.
-          </div>
-          {% endif %}
-          <a href="{% url 'verticals:energy_load_management' %}" class="d-block text-center py-2 rounded-3 mt-1" style="background:#eff6ff;border:1.5px solid #bfdbfe;font-size:.8rem;font-weight:600;color:#1d4ed8;text-decoration:none;">
-            📊 View Load Analysis →
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endif %}
-
-  {# ── WHAT IF? INTERACTIVE SCENARIO PANEL ── #}
-  <div class="en-card mb-4" style="border-color:#8b5cf6;background:linear-gradient(135deg,#faf5ff,#ede9fe);">
-    <div class="en-section-hdr mb-2">
-      <p class="en-section-title mb-0" style="color:#7c3aed;">🧠 What happens if…</p>
-      <span style="font-size:.7rem;color:#94a3b8;">Interactive scenario explorer{% if is_new_workspace %} · Sample estimates{% endif %}</span>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;">
-      <div onclick="toggleScenario('battery')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
-        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">🔋 Add one more battery</div>
-        <div style="font-size:.78rem;color:#64748b;">Extends night autonomy by ~4h. Reduces blackout risk to Low.</div>
-        <div id="scenario-battery" style="display:none;margin-top:.6rem;padding:.5rem;background:#f0fdf4;border-radius:8px;font-size:.78rem;color:#166534;">
-          ✅ With 2× 200Ah batteries: night autonomy ~8h. Estimated cost: MWK 1,300,000. Additional monthly savings: ~MWK 45,000.
-        </div>
-      </div>
-      <div onclick="toggleScenario('load')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
-        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">⏰ Shift loads to daytime</div>
-        <div style="font-size:.78rem;color:#64748b;">Ironing, pumping, and washing moved to 10:00–15:00 solar hours.</div>
-        <div id="scenario-load" style="display:none;margin-top:.6rem;padding:.5rem;background:#eff6ff;border-radius:8px;font-size:.78rem;color:#1e40af;">
-          💡 Daytime load shifting reduces battery draw by ~30%. Night blackout risk drops from Medium to Low. No extra cost.
-        </div>
-      </div>
-      <div onclick="toggleScenario('panels')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
-        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">☀️ Increase panel size</div>
-        <div style="font-size:.78rem;color:#64748b;">Add 2 more panels to increase generation and charge battery faster.</div>
-        <div id="scenario-panels" style="display:none;margin-top:.6rem;padding:.5rem;background:#fef3c7;border-radius:8px;font-size:.78rem;color:#92400e;">
-          📈 +400W capacity: generation increases to ~830 kWh/month. Payback improved by ~3 months. Cost: ~MWK 1,200,000.
-        </div>
-      </div>
-    </div>
-    {% if is_new_workspace %}
-    <div style="margin-top:.85rem;font-size:.73rem;color:#7c3aed;background:rgba(255,255,255,.6);border-radius:8px;padding:.5rem .75rem;">
-      💜 These scenarios use sample estimates. Run system sizing with your real appliances for accurate projections.
-    </div>
-    {% endif %}
-  </div>
-
-  {# ── FORECAST + SITES ATTENTION ── #}
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-lg-6">
-      <div class="en-card h-100">
-        <div class="en-section-hdr mb-2">
-          <p class="en-section-title mb-0">📈 Demand Forecast</p>
-          <a href="{% url 'verticals:energy_forecasting' %}" class="en-section-link">Detailed →</a>
-        </div>
-        {% if demo_forecast %}
-        <div style="margin-bottom:.6rem;padding:.3rem .55rem;background:#fef3c7;border-radius:6px;font-size:.68rem;color:#92400e;">
-          📊 <strong>Demo preview</strong> — sample forecast for a 5.2 kW system.
-        </div>
-        {% endif %}
-        <div class="row g-3">
-          <div class="col-6">
-            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;font-weight:700;">Next 7 Days</div>
-            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">
-              {% if demo_forecast %}{{ demo_forecast.next_7_day_demand_kwh }}{% elif forecast_summary.next_7_day_demand_kwh %}{{ forecast_summary.next_7_day_demand_kwh }}{% else %}—{% endif %}
-              <small style="font-size:.6rem;color:#64748b;"> kWh</small>
-            </div>
-          </div>
-          <div class="col-6">
-            <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;font-weight:700;">Next 30 Days</div>
-            <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">
-              {% if demo_forecast %}{{ demo_forecast.next_30_day_demand_kwh }}{% elif forecast_summary.next_30_day_demand_kwh %}{{ forecast_summary.next_30_day_demand_kwh }}{% else %}—{% endif %}
-              <small style="font-size:.6rem;color:#64748b;"> kWh</small>
-            </div>
-          </div>
-          <div class="col-12">
-            <div style="font-size:.8rem;color:#475569;">
-              {% if demo_forecast %}{{ demo_forecast.explanation }}{% else %}{{ forecast_summary.explanation }}{% endif %}
-            </div>
-          </div>
-        </div>
-        <div class="mt-3 pt-2 border-top" style="font-size:.72rem;color:#94a3b8;">
-          🤖 Connect IoT sensors and historical data for precision AI forecasting.
-        </div>
-      </div>
-    </div>
-
-    {% if sites_needing_attention %}
-    <div class="col-12 col-lg-6">
-      <div class="en-card h-100">
-        <p class="en-section-title mb-3">🏚️ Sites Needing Attention</p>
-        <div class="row g-2">
-        {% for site in sites_needing_attention %}
-          <div class="col-12 col-md-6">
-            <a href="{% url 'verticals:energy_site_detail' site.id %}" class="d-flex align-items-center gap-2 p-2 rounded-2 text-decoration-none" style="background:#fff7ed;border:1.5px solid #fed7aa;">
-              <span style="font-size:1.1rem">🏚️</span>
-              <div style="flex:1;min-width:0;">
-                <div class="fw-semibold text-truncate" style="font-size:.83rem;color:#0f172a;">{{ site.name }}</div>
-                <div style="font-size:.7rem;color:#ef4444;">{{ site.alert_count }} alert{{ site.alert_count|pluralize }}</div>
-              </div>
-            </a>
-          </div>
-        {% endfor %}
-        </div>
-      </div>
-    </div>
-    {% else %}
-    <div class="col-12 col-lg-6">
-      <div class="en-card h-100 d-flex flex-column justify-content-center align-items-center" style="min-height:140px;">
-        <div style="font-size:2.5rem;opacity:.2;margin-bottom:.5rem;">🏡</div>
-        <div class="text-muted text-center" style="font-size:.85rem;">
-          {% if stats.total_sites > 0 %}All sites are healthy{% else %}No sites added yet{% endif %}
-        </div>
-        {% if not stats.total_sites %}
-        <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-sm btn-success rounded-pill mt-2" style="font-size:.78rem;">
-          <i class="bi bi-plus-lg me-1"></i>Add First Site
-        </a>
-        {% endif %}
-      </div>
-    </div>
-    {% endif %}
-  </div>
 
 </div>
 
-<script>
-function toggleScenario(key) {
-  const el = document.getElementById('scenario-' + key);
-  if (!el) return;
-  el.style.display = el.style.display === 'none' ? 'block' : 'none';
-}
-</script>
-
-{% if recent_readings %}
+{# ── SCRIPTS ── #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 (function(){
-  const ctx = document.getElementById('energyTrendChart');
-  if (!ctx) return;
-  const labels = {{ reading_dates_json|safe }};
-  const genData = {{ gen_data_json|safe }};
-  const consData = {{ cons_data_json|safe }};
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {label:'Generation (kWh)', data:genData, borderColor:'#10b981', backgroundColor:'rgba(16,185,129,.1)', fill:true, tension:.3, borderWidth:2, pointRadius:1},
-        {label:'Consumption (kWh)', data:consData, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,.08)', fill:true, tension:.3, borderWidth:2, pointRadius:1}
-      ]
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{legend:{position:'top', labels:{font:{size:11}, usePointStyle:true, pointStyle:'circle'}}},
-      scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}, ticks:{font:{size:10}}}, x:{grid:{display:false}, ticks:{font:{size:9}, maxRotation:45}}}
+  'use strict';
+
+  /* ─── DATA from backend (guard against empty/null) ─── */
+  var labels   = {% if recent_readings %}{{ reading_dates_json|safe }}{% else %}[]{% endif %};
+  var genData  = {% if recent_readings %}{{ gen_data_json|safe }}{% else %}[]{% endif %};
+  var consData = {% if recent_readings %}{{ cons_data_json|safe }}{% else %}[]{% endif %};
+
+  /* ─── Demo data if no real readings ─── */
+  var hasReal = labels && labels.length > 0;
+  if (!hasReal) {
+    var days = [];
+    var gen  = [];
+    var cons = [];
+    for (var i = 29; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      days.push(d.toLocaleDateString('en-GB', {day:'2-digit', month:'short'}));
+      var base = 18 + Math.sin(i * 0.3) * 4;
+      gen.push( +(base + Math.random() * 3).toFixed(1) );
+      cons.push(+(base * 0.75 + Math.random() * 2).toFixed(1) );
     }
-  });
+    labels = days; genData = gen; consData = cons;
+  }
+
+  /* ─── MAIN ENERGY OUTPUT CHART ─── */
+  var ctxMain = document.getElementById('energyOutputChart');
+  if (ctxMain) {
+    var mainChart = new Chart(ctxMain, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: 'Generation (kWh)',
+            data: genData,
+            borderColor: '#059669',
+            backgroundColor: 'rgba(5,150,105,.1)',
+            fill: true,
+            tension: .35,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 4
+          },
+          {
+            label: 'Consumption (kWh)',
+            data: consData,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99,102,241,.06)',
+            fill: true,
+            tension: .35,
+            borderWidth: 1.5,
+            borderDash: [4,3],
+            pointRadius: 0,
+            pointHoverRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 700, easing: 'easeInOutQuart' },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 11 }, usePointStyle: true, pointStyle: 'circle', padding: 14 } },
+          tooltip: {
+            backgroundColor: '#0f172a', padding: 10,
+            titleFont: { size: 11 }, bodyFont: { size: 11 },
+            callbacks: {
+              label: function(ctx) { return ' ' + ctx.dataset.label + ': ' + ctx.parsed.y + ' kWh'; }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: '#f1f5f9' },
+            ticks: { font: { size: 10 }, callback: function(v) { return v + ' kWh'; } }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { font: { size: 9 }, maxRotation: 40, maxTicksLimit: 10 }
+          }
+        }
+      }
+    });
+
+    /* Chart period toggle */
+    window.setChartPeriod = function(period, btn) {
+      document.querySelectorAll('.ct-pill').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      var slice = period === 'week' ? 7 : period === 'day' ? 1 : labels.length;
+      mainChart.data.labels   = labels.slice(-slice);
+      mainChart.data.datasets[0].data = genData.slice(-slice);
+      mainChart.data.datasets[1].data = consData.slice(-slice);
+      mainChart.update();
+    };
+  }
+
+  /* ─── HERO MINI CHART ─── */
+  var ctxMini = document.getElementById('heroMiniChart');
+  if (ctxMini) {
+    var miniLabels = labels.slice(-7);
+    var miniData   = genData.slice(-7);
+    new Chart(ctxMini, {
+      type: 'line',
+      data: {
+        labels: miniLabels,
+        datasets: [{
+          data: miniData,
+          borderColor: 'rgba(52,211,153,.9)',
+          backgroundColor: 'rgba(52,211,153,.15)',
+          fill: true,
+          tension: .4,
+          borderWidth: 2,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: false,
+        animation: { duration: 600 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: { x: { display: false }, y: { display: false, beginAtZero: true } }
+      }
+    });
+  }
+
 })();
+
+/* Simulation toggle */
+function toggleSim(key) {
+  var el = document.getElementById('sim-' + key);
+  if (!el) return;
+  el.classList.toggle('show');
+}
 </script>
-{% endif %}
+
 {% endblock %}
