@@ -63,6 +63,17 @@
     </div>
   </header>
 
+  {% if is_demo %}
+  <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:2px dashed #ca8a04;border-radius:16px;padding:14px 20px;display:flex;align-items:center;gap:12px;" data-testid="groceries-demo-banner">
+    <span style="font-size:1.5rem;">🛒</span>
+    <div>
+      <strong style="color:#92400e;">Demo Preview</strong>
+      <span style="color:#78350f;font-size:0.875rem;margin-left:8px;">Sample values shown. Real data will appear once you add products and record sales.</span>
+      <a href="{% url 'groceries:product_add' %}" style="color:#d97706;font-weight:700;margin-left:8px;">Add your first product →</a>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Wholesale/Retail Toggle -->
   <section class="mode-toggle-block">
     <div class="mode-label">Sale Mode Filter</div>

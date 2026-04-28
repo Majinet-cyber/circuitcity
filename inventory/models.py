@@ -1923,3 +1923,32 @@ try:
     )
 except ImportError:
     pass
+
+
+# ---------------------------------------------------------------------------
+# IoT monitoring models
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_iot import (  # noqa: F401, E402
+        IoTDevice,
+        IoTReading,
+        IoTDeviceStatus,
+        IoTDeviceType,
+    )
+except ImportError:
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Mobile Money vertical models
+# ---------------------------------------------------------------------------
+try:
+    from inventory.models_mobilemoney import (  # noqa: F401, E402
+        MobileMoneyTransaction,
+        MobileMoneyCredit,
+        MobileMoneyReconciliation,
+        MobileMoneyNetwork,
+        MobileMoneyTxType,
+    )
+except ImportError:
+    pass

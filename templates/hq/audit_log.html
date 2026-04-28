@@ -1,0 +1,92 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Audit Log — Emajinet HQ{% endblock %}
+{% block topbar_title %}Admin Audit Log{% endblock %}
+
+{% block extra_css %}
+<style>
+  .al-table { font-size: .84rem; }
+  .al-table th { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: #6c757d; font-weight: 600; }
+  .badge-action { background: #e9ecef; color: #212529; font-weight: 500; font-size: .72rem; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-0 fw-bold"><i class="bi bi-journal-check me-2 text-secondary"></i>Admin Audit Log</h1>
+    <p class="text-muted small mb-0">Immutable trail of all HQ admin actions. Read-only.</p>
+  </div>
+  <a href="{% url 'hq:bugs_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-bug me-1"></i>Bug Monitor
+  </a>
+</div>
+
+<!-- Filters -->
+<form method="get" class="d-flex flex-wrap gap-2 mb-3 align-items-end">
+  <div>
+    <label class="form-label small fw-semibold d-block mb-1">Action contains</label>
+    <input type="text" name="action" class="form-control form-control-sm" value="{{ action_filter }}" placeholder="bug_cleared…">
+  </div>
+  <div>
+    <label class="form-label small fw-semibold d-block mb-1">Actor</label>
+    <input type="text" name="actor" class="form-control form-control-sm" value="{{ actor_filter }}" placeholder="username…">
+  </div>
+  <div>
+    <label class="form-label small fw-semibold d-block mb-1">From date</label>
+    <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+  </div>
+  <div class="d-flex gap-2 align-items-end">
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel me-1"></i>Filter</button>
+    <a href="{% url 'hq:audit_log' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+  </div>
+</form>
+
+{% if entries %}
+<div class="table-responsive">
+  <table class="table table-hover al-table">
+    <thead class="table-light">
+      <tr>
+        <th>When</th>
+        <th>Actor</th>
+        <th>Action</th>
+        <th>Target</th>
+        <th>IP</th>
+        <th>Before → After</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td class="text-nowrap text-muted small">{{ entry.created_at|date:"Y-m-d H:i:s" }}</td>
+        <td class="fw-semibold">{{ entry.actor.username|default:"system" }}</td>
+        <td><span class="badge badge-action">{{ entry.action }}</span></td>
+        <td>
+          <span class="text-muted small">{{ entry.target_model }}</span>
+          {% if entry.target_repr %}<br><span class="small">{{ entry.target_repr|truncatechars:60 }}</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ entry.ip_address|default:"—" }}</td>
+        <td class="small text-muted">
+          {% if entry.before or entry.after %}
+            <details>
+              <summary style="cursor:pointer">Show changes</summary>
+              <div class="mt-1" style="font-family:monospace;font-size:.72rem;background:#f8f9fa;padding:.5rem;border-radius:4px;">
+                {% if entry.before %}<div><strong>Before:</strong> {{ entry.before }}</div>{% endif %}
+                {% if entry.after %}<div><strong>After:</strong> {{ entry.after }}</div>{% endif %}
+              </div>
+            </details>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-journal display-4 d-block mb-3"></i>
+  <p class="mb-0">No audit log entries found.</p>
+</div>
+{% endif %}
+{% endblock %}

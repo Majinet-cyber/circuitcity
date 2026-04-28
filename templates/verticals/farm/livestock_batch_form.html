@@ -2,125 +2,350 @@
 
 {% block title %}New Livestock Batch - Farm Manager{% endblock %}
 
+{% block extra_css %}
+<style>
+.preset-section { margin-bottom: 2rem; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 1rem; }
+.preset-card {
+  border: 2px solid #e2e8f0; border-radius: 14px; padding: 14px 10px; text-align: center;
+  cursor: pointer; transition: all 0.18s ease; background: #fff; user-select: none;
+}
+.preset-card:hover { border-color: #3b82f6; background: #eff6ff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59,130,246,0.12); }
+.preset-card.selected { border-color: #2563eb; background: #dbeafe; box-shadow: 0 4px 16px rgba(37,99,235,0.18); }
+.preset-card .emoji { font-size: 2rem; display: block; margin-bottom: 6px; }
+.preset-card .label { font-size: 0.82rem; font-weight: 700; color: #1e3a5f; }
+.preset-card .hint { font-size: 0.72rem; color: #64748b; margin-top: 3px; }
+.animal-tab { cursor: pointer; padding: 10px 18px; border-radius: 99px; border: 2px solid #e2e8f0; font-weight: 700; font-size: 0.875rem; background: #fff; transition: all 0.15s; margin-right: 8px; margin-bottom: 8px; display: inline-flex; align-items: center; gap: 6px; }
+.animal-tab:hover { border-color: #3b82f6; background: #eff6ff; }
+.animal-tab.active { border-color: #16a34a; background: #dcfce7; color: #15803d; }
+.consequence-card { border-left: 4px solid #fbbf24; background: #fefce8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 0.87rem; color: #78350f; }
+.consequence-card.blue { border-color: #3b82f6; background: #eff6ff; color: #1e40af; }
+.consequence-card.green { border-color: #16a34a; background: #dcfce7; color: #14532d; }
+.consequence-card.red { border-color: #ef4444; background: #fee2e2; color: #991b1b; }
+.feed-badge { display: inline-block; padding: 4px 10px; border-radius: 99px; font-size: 0.78rem; font-weight: 700; background: #f1f5f9; color: #475569; margin: 2px; }
+#preset-summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; margin-bottom: 1.5rem; display: none; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container py-4" style="max-width: 600px;">
-    <nav aria-label="breadcrumb" class="mb-3">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
-            <li class="breadcrumb-item"><a href="/verticals/farm/livestock/">Livestock</a></li>
-            <li class="breadcrumb-item active">New Batch</li>
-        </ol>
-    </nav>
+<div class="container py-4" style="max-width: 700px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/verticals/farm/livestock/">Livestock</a></li>
+      <li class="breadcrumb-item active">New Batch</li>
+    </ol>
+  </nav>
 
-    <div class="card border-0 shadow-sm">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create Livestock Batch</h5>
-        </div>
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-
-                <div class="mb-3">
-                    <label for="name" class="form-label">Batch Name *</label>
-                    <input type="text" class="form-control" id="name" name="name" 
-                           placeholder="e.g., Gilts Group 1, Layer Chickens Batch A" required autofocus>
-                </div>
-
-                <div class="mb-3">
-                    <label for="animal_type" class="form-label">Animal Type *</label>
-                    <select class="form-select" id="animal_type" name="animal_type" required>
-                        {% for value, label in animal_types %}
-                        <option value="{{ value }}" {% if value == subtype_default %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="mb-3">
-                    <label for="animal_subtype" class="form-label">Subtype (quick pick) *</label>
-                    <select class="form-select" id="animal_subtype" name="animal_subtype"></select>
-                    <small class="text-muted">Choose broilers, layers, piglets, dairy cattle, etc.</small>
-                </div>
-
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Cost per head (MWK)</label>
-                        <input type="number" class="form-control" name="cost_basis_per_head_mwk" step="0.01" min="0" placeholder="Optional">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Expected sale / head (MWK)</label>
-                        <input type="number" class="form-control" name="expected_sale_price_mwk" step="0.01" min="0" placeholder="Optional">
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="initial_count" class="form-label">Initial Count</label>
-                    <input type="number" class="form-control" id="initial_count" name="initial_count" 
-                           min="0" value="0">
-                    <small class="text-muted">Starting number of animals (will create purchase event)</small>
-                </div>
-
-                <hr>
-                <h6 class="text-muted mb-3">Valuation Settings (Optional)</h6>
-
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="valuation_enabled" name="valuation_enabled">
-                    <label class="form-check-label" for="valuation_enabled">Enable valuation estimates</label>
-                </div>
-
-                <div class="row">
-                    <div class="col-6 mb-3">
-                        <label for="avg_weight_kg" class="form-label">Avg Weight (kg)</label>
-                        <input type="number" class="form-control" id="avg_weight_kg" name="avg_weight_kg" 
-                               step="0.1" min="0">
-                    </div>
-                    <div class="col-6 mb-3">
-                        <label for="price_per_kg" class="form-label">Price per kg (MWK)</label>
-                        <input type="number" class="form-control" id="price_per_kg" name="price_per_kg" 
-                               step="0.01" min="0">
-                    </div>
-                </div>
-
-                <div class="mb-3">
-                    <label for="price_per_animal" class="form-label">OR Price per Animal (MWK)</label>
-                    <input type="number" class="form-control" id="price_per_animal" name="price_per_animal" 
-                           step="0.01" min="0">
-                </div>
-
-                <div class="mb-3">
-                    <label for="notes" class="form-label">Notes</label>
-                    <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success btn-lg">
-                        <i class="bi bi-check-circle"></i> Create Batch
-                    </button>
-                    <a href="/verticals/farm/livestock/" class="btn btn-outline-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
+  <!-- Step 1: Choose animal type tab -->
+  <div class="preset-section">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:12px;">1. Choose Animal Type</h5>
+    <div>
+      <button type="button" class="animal-tab active" onclick="showPresets('pigs', this)" data-testid="tab-pigs">🐖 Pigs</button>
+      <button type="button" class="animal-tab" onclick="showPresets('chickens', this)" data-testid="tab-chickens">🐔 Chickens</button>
+      <button type="button" class="animal-tab" onclick="showPresets('cattle', this)" data-testid="tab-cattle">🐄 Cattle</button>
+      <button type="button" class="animal-tab" onclick="showPresets('goats', this)" data-testid="tab-goats">🐐 Goats</button>
+      <button type="button" class="animal-tab" onclick="showPresets('custom', this)">✏️ Custom</button>
     </div>
+  </div>
+
+  <!-- Step 2: Pick preset -->
+  <div class="preset-section" id="preset-picker">
+    <h5 style="font-weight:800;color:#0f172a;margin-bottom:12px;">2. Pick a Preset <span style="font-size:0.8rem;font-weight:500;color:#64748b;">(we'll prefill the form)</span></h5>
+
+    <!-- Pig presets -->
+    <div id="presets-pigs" class="preset-grid" data-testid="pig-presets">
+      <div class="preset-card" onclick="selectPreset('pigs','piglets',this)" data-testid="preset-piglets"><span class="emoji">🐷</span><span class="label">Piglets</span><span class="hint">0–4 weeks</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','weaners',this)" data-testid="preset-weaners"><span class="emoji">🐽</span><span class="label">Weaners</span><span class="hint">4–8 weeks</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','growers',this)" data-testid="preset-growers"><span class="emoji">🐖</span><span class="label">Growers</span><span class="hint">2–4 months</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','fattening',this)" data-testid="preset-fattening"><span class="emoji">🥩</span><span class="label">Fattening</span><span class="hint">4–6 months</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','gilts',this)" data-testid="preset-gilts"><span class="emoji">🐷</span><span class="label">Gilts</span><span class="hint">Young sows</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','sows',this)" data-testid="preset-sows"><span class="emoji">🐖</span><span class="label">Sows</span><span class="hint">Breeding sows</span></div>
+      <div class="preset-card" onclick="selectPreset('pigs','boars',this)" data-testid="preset-boars"><span class="emoji">🐗</span><span class="label">Boars</span><span class="hint">Breeding males</span></div>
+    </div>
+
+    <!-- Chicken presets -->
+    <div id="presets-chickens" class="preset-grid" style="display:none;" data-testid="chicken-presets">
+      <div class="preset-card" onclick="selectPreset('chickens','broilers',this)" data-testid="preset-broilers"><span class="emoji">🍗</span><span class="label">Broilers</span><span class="hint">6 weeks to market</span></div>
+      <div class="preset-card" onclick="selectPreset('chickens','layers',this)" data-testid="preset-layers"><span class="emoji">🥚</span><span class="label">Layers</span><span class="hint">Egg production</span></div>
+      <div class="preset-card" onclick="selectPreset('chickens','chicks',this)" data-testid="preset-chicks"><span class="emoji">🐣</span><span class="label">Chicks</span><span class="hint">Day-old</span></div>
+      <div class="preset-card" onclick="selectPreset('chickens','pullets',this)" data-testid="preset-pullets"><span class="emoji">🐥</span><span class="label">Pullets</span><span class="hint">8–18 weeks</span></div>
+      <div class="preset-card" onclick="selectPreset('chickens','cockerels',this)" data-testid="preset-cockerels"><span class="emoji">🐓</span><span class="label">Cockerels</span><span class="hint">Young males</span></div>
+      <div class="preset-card" onclick="selectPreset('chickens','local',this)" data-testid="preset-local"><span class="emoji">🐔</span><span class="label">Local Chickens</span><span class="hint">Scavenger breed</span></div>
+    </div>
+
+    <!-- Cattle presets -->
+    <div id="presets-cattle" class="preset-grid" style="display:none;">
+      <div class="preset-card" onclick="selectPreset('cattle','calves',this)"><span class="emoji">🐄</span><span class="label">Calves</span><span class="hint">0–6 months</span></div>
+      <div class="preset-card" onclick="selectPreset('cattle','heifers',this)"><span class="emoji">🐮</span><span class="label">Heifers</span><span class="hint">Young females</span></div>
+      <div class="preset-card" onclick="selectPreset('cattle','bulls',this)"><span class="emoji">🐂</span><span class="label">Bulls</span><span class="hint">Breeding males</span></div>
+      <div class="preset-card" onclick="selectPreset('cattle','dairy',this)"><span class="emoji">🥛</span><span class="label">Dairy Cows</span><span class="hint">Milk production</span></div>
+      <div class="preset-card" onclick="selectPreset('cattle','beef',this)"><span class="emoji">🥩</span><span class="label">Beef Cattle</span><span class="hint">For slaughter</span></div>
+    </div>
+
+    <!-- Goat presets -->
+    <div id="presets-goats" class="preset-grid" style="display:none;">
+      <div class="preset-card" onclick="selectPreset('goats','kids',this)"><span class="emoji">🐐</span><span class="label">Kids</span><span class="hint">0–3 months</span></div>
+      <div class="preset-card" onclick="selectPreset('goats','does',this)"><span class="emoji">🐐</span><span class="label">Does</span><span class="hint">Female goats</span></div>
+      <div class="preset-card" onclick="selectPreset('goats','bucks',this)"><span class="emoji">🐐</span><span class="label">Bucks</span><span class="hint">Breeding males</span></div>
+      <div class="preset-card" onclick="selectPreset('goats','wethers',this)"><span class="emoji">🐐</span><span class="label">Wethers</span><span class="hint">Castrated males</span></div>
+    </div>
+
+    <!-- Custom (no presets) -->
+    <div id="presets-custom" style="display:none;">
+      <p class="text-muted">Fill in the form below manually for custom livestock.</p>
+    </div>
+  </div>
+
+  <!-- Preset summary card -->
+  <div id="preset-summary" data-testid="preset-summary">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <span id="summary-emoji" style="font-size:2rem;"></span>
+      <div>
+        <strong id="summary-title" style="font-size:1.05rem;color:#0f172a;display:block;"></strong>
+        <span id="summary-cycle" style="font-size:0.8rem;color:#64748b;"></span>
+      </div>
+    </div>
+    <div id="summary-feed" style="margin-bottom:10px;"></div>
+    <div id="summary-notes" style="font-size:0.85rem;color:#475569;margin-bottom:10px;"></div>
+    <div id="summary-consequences"></div>
+  </div>
+
+  <!-- Step 3: Form -->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-success text-white">
+      <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Create Livestock Batch</h5>
+    </div>
+    <div class="card-body">
+      <form method="post" data-testid="livestock-batch-form">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label for="name" class="form-label">Batch Name *</label>
+          <input type="text" class="form-control" id="name" name="name"
+                 placeholder="e.g., Broilers Batch A, Gilts Group 1" required autofocus>
+        </div>
+
+        <div class="mb-3">
+          <label for="animal_type" class="form-label">Animal Type *</label>
+          <select class="form-select" id="animal_type" name="animal_type" required>
+            {% for value, label in animal_types %}
+            <option value="{{ value }}" {% if value == subtype_default %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label for="animal_subtype" class="form-label">Subtype *</label>
+          <select class="form-select" id="animal_subtype" name="animal_subtype"></select>
+          <small class="text-muted">Prefilled from preset — adjust if needed</small>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Cost per head (MWK)</label>
+            <input type="number" class="form-control" id="cost_basis" name="cost_basis_per_head_mwk" step="0.01" min="0" placeholder="Sample estimate prefilled">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Expected sale / head (MWK)</label>
+            <input type="number" class="form-control" id="expected_sale" name="expected_sale_price_mwk" step="0.01" min="0" placeholder="Sample estimate prefilled">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label for="initial_count" class="form-label">Initial Count</label>
+          <input type="number" class="form-control" id="initial_count" name="initial_count" min="0" value="0">
+          <small class="text-muted">Starting number of animals</small>
+        </div>
+
+        <div class="mb-3">
+          <label for="notes" class="form-label">Notes / Vaccination / Health Reminders</label>
+          <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Health status, vaccination schedule, feed plan..."></textarea>
+        </div>
+
+        <hr>
+        <h6 class="text-muted mb-3">Valuation Settings (Optional)</h6>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="valuation_enabled" name="valuation_enabled">
+          <label class="form-check-label" for="valuation_enabled">Enable valuation estimates</label>
+        </div>
+        <div class="row">
+          <div class="col-6 mb-3">
+            <label class="form-label">Avg Weight (kg)</label>
+            <input type="number" class="form-control" id="avg_weight_kg" name="avg_weight_kg" step="0.1" min="0">
+          </div>
+          <div class="col-6 mb-3">
+            <label class="form-label">Price per kg (MWK)</label>
+            <input type="number" class="form-control" id="price_per_kg" name="price_per_kg" step="0.01" min="0">
+          </div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-check-circle"></i> Create Batch
+          </button>
+          <a href="/verticals/farm/livestock/" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
 <script>
-(function(){
-  var map = {{ subtype_map_json|safe }};
-  var labels = {{ subtype_labels_json|safe }};
+(function() {
+  // Subtype map from Django
+  var subtypeMap = {{ subtype_map_json|safe }};
+  var subtypeLabels = {{ subtype_labels_json|safe }};
+
+  // Preset data: animal → subtype → {cost, sale, cycle, feeds, notes, consequences}
+  var PRESETS = {
+    pigs: {
+      piglets:  { subtype:'piglets', cost:5000,  sale:25000, cycle:'8–12 weeks to weaner', feeds:['Pig Starter','Water (constant)'], notes:'Keep warm. Prevent damp bedding. Watch for respiratory illness.', consequences:['Mortality under 5% is key','Strong housing prevents losses'] },
+      weaners:  { subtype:'weaners', cost:8000,  sale:30000, cycle:'8–16 weeks to grower', feeds:['Pig Grower','Clean water'], notes:'Transition from sow milk. Watch for post-weaning diarrhea.', consequences:['Consistent feed = faster growth','Water access is critical'] },
+      growers:  { subtype:'growers', cost:12000, sale:45000, cycle:'2–4 months', feeds:['Pig Grower','Maize bran supplement'], notes:'Monitor weight weekly. Deworm at entry.', consequences:['Feed cost is your biggest cost','Profit depends on mortality control'] },
+      fattening:{ subtype:'fattening', cost:20000, sale:65000, cycle:'4–6 months total', feeds:['Pig Finisher','High energy diet'], notes:'Provide 2–3 kg feed/day. Maintain good housing ventilation.', consequences:['Pigs need strong housing and water access','Timing to market matters for margins'] },
+      gilts:    { subtype:'gilts',  cost:30000, sale:80000, cycle:'6–8 months to first breeding', feeds:['Pig Grower','Mineral supplement'], notes:'First breeding at 7–8 months. Monitor body condition.', consequences:['Good gilt selection improves herd genetics','Profit from litter production'] },
+      sows:     { subtype:'sows',   cost:80000, sale:120000, cycle:'114 days gestation', feeds:['Pig Sow Meal','Gestation ration'], notes:'Provide 2 kg feed/day gestation, 5 kg lactation. Vitamin supplement.', consequences:['Sow productivity drives your profitability','Litter size determines ROI'] },
+      boars:    { subtype:'boars',  cost:60000, sale:100000, cycle:'Breeding season', feeds:['Pig Maintenance Meal'], notes:'1 boar per 15–20 sows. Monitor libido and body condition.', consequences:['Boar quality affects conception rates','Keep active and in good health'] },
+    },
+    chickens: {
+      broilers: { subtype:'broilers', cost:900,  sale:4500, cycle:'6 weeks to market', feeds:['Broiler Starter (0–2 wks)','Broiler Grower (2–4 wks)','Broiler Finisher (4–6 wks)'], notes:'Strict 6-week cycle. 23 hr light. Strict biosecurity. Withdraw feed 8–12 hrs before slaughter.', consequences:['Broilers require strict timing and feed discipline','Every extra day = more feed cost','Mortality over 5% will crush margin'] },
+      layers:   { subtype:'layers',  cost:2500, sale:8000, cycle:'18 months production', feeds:['Chick Mash (0–8 wks)','Grower Mash (8–18 wks)','Layer Mash (18+ wks)'], notes:'First egg at ~18 weeks. Provide 16 hrs light. Calcium supplement important.', consequences:['Egg income is steady but requires consistency','Feed cost drives profitability','Culling non-layers is important'] },
+      chicks:   { subtype:'chicks',  cost:500,  sale:1200, cycle:'4–6 weeks to pullet/broiler', feeds:['Chick Starter Mash','Clean warm water'], notes:'Temperature critical: 35°C week 1, reduce by 3°C/week. Prevent coccidiosis.', consequences:['Mortality in first 2 weeks is highest risk','Temperature management is key'] },
+      pullets:  { subtype:'pullets', cost:2000, sale:5000, cycle:'18 weeks to lay', feeds:['Grower Mash','Pullet Developer'], notes:'Transition to layer diet at 18 weeks. Restrict feed from 8–18 weeks.', consequences:['Good pullet growth = better layer performance','Body weight at 18 wks predicts lay rate'] },
+      cockerels:{ subtype:'cockerels', cost:1500, sale:4000, cycle:'12 weeks to market', feeds:['Broiler Starter','Grower Mash'], notes:'Slower growth than broilers. Better for local market. Forages well.', consequences:['Lower input costs than broilers','Good local market demand'] },
+      local:    { subtype:'local_chickens', cost:800, sale:3500, cycle:'5–6 months', feeds:['Scavenge + supplemental grain','Clean water'], notes:'Minimal intervention. Newcastle disease vaccination essential. Longer growth period.', consequences:['Very low cost — ideal for beginners','Slower growth but strong local market demand'] },
+    },
+    cattle: {
+      calves:   { subtype:'calves',  cost:80000, sale:250000, cycle:'18–24 months', feeds:['Milk/milk replacer','Calf starter'], notes:'Vaccination at 4 months. Dehorn early.', consequences:['Long cycle requires patience','High value at maturity'] },
+      heifers:  { subtype:'heifers', cost:150000, sale:350000, cycle:'18 months to breeding age', feeds:['Grass/pasture','Mineral lick'], notes:'First breeding at 15–18 months. Monitor body condition.', consequences:['Future herd replacement value','Good grazing management is key'] },
+      bulls:    { subtype:'bulls',   cost:200000, sale:500000, cycle:'Breeding season', feeds:['Pasture','High energy supplement'], notes:'1 bull per 20–25 cows. Fertility test annually.', consequences:['Bull quality drives herd performance'] },
+      dairy:    { subtype:'dairy_cows', cost:300000, sale:150000, cycle:'305-day lactation', feeds:['Dairy meal','Grass silage'], notes:'Milk production 10–20 L/day. Dry off 60 days before calving.', consequences:['Milk income is daily and steady','Feed quality directly affects yield'] },
+      beef:     { subtype:'beef_cattle', cost:120000, sale:400000, cycle:'18–24 months finish', feeds:['Grass/rangeland','Supplemental grain'], notes:'Target 250kg+ carcass weight. Vaccinate for FMD, anthrax.', consequences:['Large capital tied up for long period','Market timing critical for price'] },
+    },
+    goats: {
+      kids:    { subtype:'kids',    cost:8000, sale:25000, cycle:'3–6 months', feeds:['Dam milk','Goat starter'], notes:'Colostrum in first 6 hours is essential.', consequences:['Kids are high mortality risk first 2 weeks'] },
+      does:    { subtype:'does',    cost:25000, sale:45000, cycle:'5-month gestation', feeds:['Pasture','Browse'], notes:'Breeding at 7 months. Average 2 kids per kidding.', consequences:['Does drive herd productivity'] },
+      bucks:   { subtype:'bucks',   cost:30000, sale:60000, cycle:'Breeding season', feeds:['Pasture','Supplement'], notes:'1 buck per 20 does. Evaluate fertility.', consequences:['Buck quality improves herd genetics'] },
+      wethers: { subtype:'wethers', cost:12000, sale:35000, cycle:'8–12 months to market', feeds:['Pasture','Grain supplement'], notes:'Castrated males grow well for meat.', consequences:['Good meat value with low management'] },
+    },
+    custom: {},
+  };
+
+  var currentAnimal = 'pigs';
+  var currentPreset = null;
+
+  // Show/hide preset grids
+  window.showPresets = function(animal, tabBtn) {
+    currentAnimal = animal;
+    currentPreset = null;
+    document.querySelectorAll('.animal-tab').forEach(t => t.classList.remove('active'));
+    tabBtn.classList.add('active');
+    ['pigs','chickens','cattle','goats','custom'].forEach(a => {
+      var el = document.getElementById('presets-' + a);
+      if (el) el.style.display = (a === animal) ? '' : 'none';
+    });
+    // Update form animal_type select
+    var typeSel = document.getElementById('animal_type');
+    if (typeSel) {
+      for (var i = 0; i < typeSel.options.length; i++) {
+        if (typeSel.options[i].value === animal) { typeSel.selectedIndex = i; break; }
+      }
+      typeSel.dispatchEvent(new Event('change'));
+    }
+    document.getElementById('preset-summary').style.display = 'none';
+    document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+  };
+
+  window.selectPreset = function(animal, presetKey, cardEl) {
+    document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+    cardEl.classList.add('selected');
+    currentPreset = presetKey;
+
+    var preset = PRESETS[animal] && PRESETS[animal][presetKey];
+    if (!preset) return;
+
+    // Prefill form fields
+    var typeSel = document.getElementById('animal_type');
+    if (typeSel) {
+      for (var i = 0; i < typeSel.options.length; i++) {
+        if (typeSel.options[i].value === animal) { typeSel.selectedIndex = i; break; }
+      }
+      typeSel.dispatchEvent(new Event('change'));
+    }
+
+    // Set subtype after rebuild
+    setTimeout(function() {
+      var subSel = document.getElementById('animal_subtype');
+      if (subSel && preset.subtype) {
+        for (var i = 0; i < subSel.options.length; i++) {
+          if (subSel.options[i].value === preset.subtype) { subSel.selectedIndex = i; break; }
+        }
+      }
+    }, 50);
+
+    // Prefill cost / sale
+    if (preset.cost) document.getElementById('cost_basis').value = preset.cost;
+    if (preset.sale) document.getElementById('expected_sale').value = preset.sale;
+
+    // Prefill notes
+    if (preset.notes) document.getElementById('notes').value = preset.notes;
+
+    // Prefill batch name if blank
+    var nameEl = document.getElementById('name');
+    if (nameEl && !nameEl.value.trim()) {
+      nameEl.value = cardEl.querySelector('.label').textContent + ' Batch';
+    }
+
+    // Show summary card
+    var summary = document.getElementById('preset-summary');
+    summary.style.display = 'block';
+    document.getElementById('summary-emoji').textContent = cardEl.querySelector('.emoji').textContent;
+    document.getElementById('summary-title').textContent = cardEl.querySelector('.label').textContent + ' — Sample Estimates';
+    document.getElementById('summary-cycle').textContent = preset.cycle || '';
+
+    // Feed guidance
+    var feedHtml = '<strong style="font-size:0.8rem;text-transform:uppercase;color:#64748b;letter-spacing:0.05em;">Feed Guidance</strong><br>';
+    (preset.feeds || []).forEach(function(f) {
+      feedHtml += '<span class="feed-badge">' + f + '</span>';
+    });
+    document.getElementById('summary-feed').innerHTML = feedHtml;
+
+    // Notes
+    document.getElementById('summary-notes').textContent = preset.notes || '';
+
+    // Consequences
+    var conseqHtml = '';
+    (preset.consequences || []).forEach(function(c, i) {
+      var cls = i % 3 === 0 ? 'consequence-card' : (i % 3 === 1 ? 'consequence-card blue' : 'consequence-card green');
+      conseqHtml += '<div class="' + cls + '">💡 ' + c + '</div>';
+    });
+    document.getElementById('summary-consequences').innerHTML = conseqHtml;
+  };
+
+  // Subtype dropdown rebuild
+  var subtypeMapData = {{ subtype_map_json|safe }};
+  var subtypeLabelData = {{ subtype_labels_json|safe }};
   var typeSel = document.getElementById('animal_type');
   var subSel = document.getElementById('animal_subtype');
+
   function rebuild() {
     var t = typeSel.value;
-    var allowed = map[t] || [];
+    var allowed = subtypeMapData[t] || [];
     subSel.innerHTML = '';
-    allowed.forEach(function(code){
+    allowed.forEach(function(code) {
       var o = document.createElement('option');
       o.value = code;
-      o.textContent = labels[code] || code;
+      o.textContent = subtypeLabelData[code] || code;
       subSel.appendChild(o);
     });
   }
   typeSel.addEventListener('change', rebuild);
   rebuild();
+
+  // Trigger initial pig presets visible
+  var pigTab = document.querySelector('.animal-tab.active');
+  if (pigTab) { /* already showing pigs */ }
 })();
 </script>
 {% endblock %}
-

@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reconciliation · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:20px 12px;" data-testid="mm-reconciliation">
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
+    <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.5rem;font-weight:800;color:#0f172a;">🧮 Daily Reconciliation</h1>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;{% if msg.tags == 'success' %}background:#dcfce7;color:#15803d;{% else %}background:#fee2e2;color:#991b1b;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- Form -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
+      <h3 style="font-weight:800;margin:0 0 16px;">Record Reconciliation</h3>
+      <form method="post" data-testid="reconciliation-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Date *</label>
+          <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Opening Cash (MWK)</label>
+          <input type="number" name="opening_cash" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Opening E-Float (MWK)</label>
+          <input type="number" name="opening_float" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Actual Closing Cash (MWK) *</label>
+          <input type="number" name="actual_closing_cash" class="form-control" min="0" step="0.01" placeholder="Count your cash" required>
+        </div>
+        <p style="font-size:0.82rem;color:#64748b;margin-bottom:12px;">Cash in/out totals are auto-aggregated from today's recorded transactions.</p>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Notes</label>
+          <textarea name="notes" class="form-control" rows="2" placeholder="Shortage explanation, handover notes..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-dark w-100 fw-bold">Save Reconciliation</button>
+      </form>
+    </div>
+
+    <!-- History -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
+      <h3 style="font-weight:800;margin:0 0 16px;">History (30 days)</h3>
+      {% for recon in reconciliations %}
+      <div style="border:1px solid {% if recon.difference < 0 %}#fca5a5{% elif recon.difference > 0 %}#86efac{% else %}#e2e8f0{% endif %};border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <strong style="color:#0f172a;">{{ recon.date }}</strong>
+          <span style="font-weight:700;{% if recon.difference < 0 %}color:#dc2626;{% elif recon.difference > 0 %}color:#16a34a;{% else %}color:#64748b;{% endif %}">
+            {% if recon.difference > 0 %}+{% endif %}MK {{ recon.difference|floatformat:0|intcomma }}
+          </span>
+        </div>
+        <div style="font-size:0.8rem;color:#64748b;margin-top:4px;">
+          In: MK {{ recon.total_cash_in|floatformat:0|intcomma }} · Out: MK {{ recon.total_cash_out|floatformat:0|intcomma }} · Expected: MK {{ recon.expected_closing_cash|floatformat:0|intcomma }}
+        </div>
+      </div>
+      {% empty %}
+      <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No reconciliations yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

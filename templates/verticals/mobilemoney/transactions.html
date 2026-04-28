@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Transactions · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:20px 12px;" data-testid="mm-transactions">
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
+    <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.5rem;font-weight:800;color:#0f172a;">💰 Record Transaction</h1>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;{% if msg.tags == 'success' %}background:#dcfce7;color:#15803d;{% else %}background:#fee2e2;color:#991b1b;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <!-- Form -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
+      <h3 style="font-weight:800;margin:0 0 16px;color:#0f172a;">New Transaction</h3>
+      <form method="post" data-testid="transaction-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Transaction Type *</label>
+          <select name="tx_type" class="form-select" required>
+            {% for val, lbl in tx_types %}
+            <option value="{{ val }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Network *</label>
+          <select name="network" class="form-select" required>
+            {% for val, lbl in networks %}
+            <option value="{{ val }}">{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Amount (MWK) *</label>
+          <input type="number" name="amount" class="form-control" required min="1" step="0.01" placeholder="0.00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Commission Earned (MWK)</label>
+          <input type="number" name="commission" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Customer Phone</label>
+          <input type="text" name="customer_phone" class="form-control" placeholder="0999 xxx xxx">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Reference Number</label>
+          <input type="text" name="reference_number" class="form-control" placeholder="Network reference">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Notes</label>
+          <input type="text" name="notes" class="form-control" placeholder="Optional notes">
+        </div>
+        <button type="submit" class="btn btn-success w-100 fw-bold" data-testid="record-transaction-btn">Record Transaction</button>
+      </form>
+    </div>
+
+    <!-- Recent transactions list -->
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
+      <h3 style="font-weight:800;margin:0 0 16px;color:#0f172a;">Recent (50)</h3>
+      {% for tx in transactions %}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:0.875rem;">
+        <div>
+          <span style="font-weight:700;color:#0f172a;">{{ tx.get_tx_type_display }}</span>
+          <span style="color:#64748b;margin-left:6px;">{{ tx.get_network_display }}</span>
+          {% if tx.customer_phone %}<small style="display:block;color:#94a3b8;">{{ tx.customer_phone }}</small>{% endif %}
+        </div>
+        <div style="text-align:right;">
+          <strong>MK {{ tx.amount|floatformat:0|intcomma }}</strong>
+          <small style="display:block;color:#94a3b8;">{{ tx.created_at|date:"d M H:i" }}</small>
+        </div>
+      </div>
+      {% empty %}
+      <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No transactions yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

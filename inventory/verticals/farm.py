@@ -378,6 +378,52 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     profit_trend_json = json.dumps(snapshot.profit_trend_data)
     expense_breakdown_json = json.dumps(snapshot.expense_breakdown)
     
+    # === DEMO DATA: show clearly-labeled sample values when workspace is empty ===
+    is_demo = (
+        not ledger_entries
+        and snapshot.total_livestock_count == 0
+        and active_seasons_count == 0
+    )
+    
+    if is_demo:
+        import json as _json
+        demo_profit_trend = [
+            {"month": m, "year": 2026, "net_profit": v, "income": v + 80000, "expenses": 80000}
+            for m, v in [("Nov", 180000), ("Dec", 220000), ("Jan", 310000), ("Feb", 270000), ("Mar", 350000), ("Apr", 420000)]
+        ]
+        demo_expense_breakdown = [
+            {"category": "Fertilizer", "amount": 140000, "percentage": 39},
+            {"category": "Labour", "amount": 90000, "percentage": 25},
+            {"category": "Seed", "amount": 70000, "percentage": 19},
+            {"category": "Transport", "amount": 35000, "percentage": 10},
+            {"category": "Veterinary", "amount": 25000, "percentage": 7},
+        ]
+        profit_trend_json = _json.dumps(demo_profit_trend)
+        expense_breakdown_json = _json.dumps(demo_expense_breakdown)
+        demo_marketplace_extras = {
+            "marketplace_farm_live_count": 3,
+            "marketplace_live_total_count": 3,
+            "marketplace_enquiry_unread_count": 2,
+            "farm_dashboard_livestock_units": 45,
+            "farm_dashboard_stock_value_estimate_mwk": Decimal("135000"),
+            "farm_dashboard_risky_margin_batches": 0,
+            "farm_dashboard_low_photo_batches": 0,
+            "farm_operational_prompts": [],
+        }
+        demo_crops_breakdown = [
+            {"name": "Maize Season A", "crop_type": "Maize", "area": 2.0, "area_unit": "ha", "weeks_since_planting": 8, "stage": "Week 8", "status": "Active", "emoji": "🌽"},
+            {"name": "Groundnuts Plot B", "crop_type": "Groundnuts", "area": 1.5, "area_unit": "ha", "weeks_since_planting": 4, "stage": "Week 4", "status": "Active", "emoji": "🥜"},
+            {"name": "Soya Beans C", "crop_type": "Soya", "area": 1.0, "area_unit": "ha", "weeks_since_planting": 2, "stage": "Week 2", "status": "Active", "emoji": "🫘"},
+        ]
+        demo_livestock_by_type = {
+            "Pigs": {"count": 25, "icon": "🐖"},
+            "Chickens": {"count": 20, "icon": "🐔"},
+        }
+    else:
+        demo_marketplace_extras = _safe_farm_marketplace_dashboard_extras(business, batches, ledger_qs, today)
+        demo_crops_breakdown = crops_breakdown
+        demo_livestock_by_type = livestock_by_type
+
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Farm Manager",
@@ -386,42 +432,46 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         # SSOT snapshot (all computed values)
         "snapshot": snapshot,
         
-        # Filter state (NEW)
+        # Demo mode flag
+        "is_demo": is_demo,
+        
+        # Filter state
         "filter_state": filter_state,
         "filter_options": filter_options,
         
-        # Chart data (JSON for Chart.js)
+        # Chart data (JSON for Chart.js — demo or real)
         "profit_trend_json": profit_trend_json,
         "expense_breakdown_json": expense_breakdown_json,
         
         # For backwards compatibility with existing template parts
-        "profit_this_month": snapshot.net_profit_mwk,
-        "income_this_month": snapshot.total_income_mwk,
-        "expenses_this_month": snapshot.total_expenses_mwk,
-        "sales_count_this_month": snapshot.sales_count,
-        "top_expense_categories": snapshot.expense_breakdown,
+        # Demo values override zeros when no real data
+        "profit_this_month": Decimal("420000") if is_demo else snapshot.net_profit_mwk,
+        "income_this_month": Decimal("780000") if is_demo else snapshot.total_income_mwk,
+        "expenses_this_month": Decimal("360000") if is_demo else snapshot.total_expenses_mwk,
+        "sales_count_this_month": 12 if is_demo else snapshot.sales_count,
+        "top_expense_categories": demo_expense_breakdown if is_demo else snapshot.expense_breakdown,
         
         # Livestock display data
         "livestock_batches": batches,
         "livestock_snapshots": livestock_snapshots,
-        "total_livestock_count": snapshot.total_livestock_count,
-        "total_livestock_value": snapshot.total_livestock_value,
-        "livestock_by_type": livestock_by_type,  # NEW: for dashboard breakdown
+        "total_livestock_count": 45 if is_demo else snapshot.total_livestock_count,
+        "total_livestock_value": Decimal("135000") if is_demo else snapshot.total_livestock_value,
+        "livestock_by_type": demo_livestock_by_type,
         
         # Crops
         "active_seasons": active_seasons,
-        "crops_breakdown": crops_breakdown,  # NEW: detailed crop info
+        "crops_breakdown": demo_crops_breakdown,
         
-        # Assets preview (NEW)
+        # Assets preview
         "assets_preview": assets_preview,
         "total_assets_value": total_assets_value,
         "assets_count": assets_count,
         
-        # AI Insights (NEW)
+        # AI Insights
         "ai_insights": ai_insights_data,
         
         # Marketplace & operational prompts
-        **(_safe_farm_marketplace_dashboard_extras(business, batches, ledger_qs, today)),
+        **demo_marketplace_extras,
         
         # Recent activity
         "recent_entries": recent_entries,
@@ -430,10 +480,6 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "alerts": snapshot.alerts,
         "alerts_count": len(snapshot.alerts),
         "critical_alerts_count": snapshot.critical_alerts_count,
-        
-        # NOTE: Quick action buttons (Add Expense, Add Sale, Livestock Event, New Season)
-        # were REMOVED from dashboard per Jan 2026 redesign. These actions are accessible
-        # via sidebar navigation to their respective pages (Expenses, Sales, Livestock, Seasons).
     })
     
     return render(request, "verticals/farm/dashboard.html", ctx)

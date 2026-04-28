@@ -1,0 +1,239 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}Bug Monitor — Emajinet HQ{% endblock %}
+{% block topbar_title %}Bug Monitor{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Control Center Cards ─────────────────────────────────────── */
+  .bm-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px,1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .bm-card { background: #fff; border-radius: 12px; padding: 1.1rem 1.2rem; box-shadow: 0 1px 4px rgba(0,0,0,.08); border-left: 4px solid var(--card-accent, #6c757d); }
+  .bm-card .bm-num { font-size: 2rem; font-weight: 700; line-height: 1; color: var(--card-accent, #212529); }
+  .bm-card .bm-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #6c757d; margin-top: .25rem; }
+  .bm-card.open      { --card-accent: #dc3545; }
+  .bm-card.critical  { --card-accent: #6f42c1; }
+  .bm-card.new-today { --card-accent: #fd7e14; }
+  .bm-card.recurring { --card-accent: #0d6efd; }
+  .bm-card.errors500 { --card-accent: #dc3545; }
+  .bm-card.cleared   { --card-accent: #198754; }
+
+  /* ── Filters bar ──────────────────────────────────────────────── */
+  .bm-filters { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1.2rem; }
+  .bm-filters form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: flex-end; }
+  .bm-filters .form-label { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #495057; margin-bottom: .2rem; }
+  .bm-filters select, .bm-filters input[type=text], .bm-filters input[type=date] { font-size: .85rem; min-width: 120px; }
+
+  /* ── Table ────────────────────────────────────────────────────── */
+  .bm-table { font-size: .84rem; }
+  .bm-table th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: #6c757d; font-weight: 600; border-top: none; }
+  .bm-table td { vertical-align: middle; }
+  .bm-table tr.new    td:first-child { border-left: 3px solid #dc3545; }
+  .bm-table tr.investigating td:first-child { border-left: 3px solid #fd7e14; }
+  .bm-table tr.cleared td:first-child { border-left: 3px solid #198754; }
+  .bm-table tr.ignored td:first-child { border-left: 3px solid #6c757d; opacity: .6; }
+
+  /* ── Badges ───────────────────────────────────────────────────── */
+  .badge-sev-low      { background: #198754; }
+  .badge-sev-medium   { background: #fd7e14; }
+  .badge-sev-high     { background: #dc3545; }
+  .badge-sev-critical { background: #6f42c1; }
+  .badge-stat-new          { background: #dc3545; }
+  .badge-stat-investigating { background: #fd7e14; }
+  .badge-stat-cleared      { background: #198754; }
+  .badge-stat-ignored      { background: #6c757d; }
+
+  .bm-path { font-family: monospace; font-size: .78rem; color: #495057; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .bm-title { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; font-weight: 500; }
+  .bm-recur { font-size: .72rem; font-weight: 700; color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-0 fw-bold"><i class="bi bi-bug me-2 text-danger"></i>Bug Monitor</h1>
+    <p class="text-muted small mb-0">All-seeing, without snooping. Payloads are sanitized.</p>
+  </div>
+  <a href="{% url 'hq:audit_log' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-journal-text me-1"></i>Audit Log
+  </a>
+</div>
+
+<!-- ── Summary Cards ────────────────────────────────────────────── -->
+<div class="bm-cards">
+  <div class="bm-card open">
+    <div class="bm-num">{{ open_count }}</div>
+    <div class="bm-label">Open Bugs</div>
+  </div>
+  <div class="bm-card critical">
+    <div class="bm-num">{{ critical_count }}</div>
+    <div class="bm-label">Critical</div>
+  </div>
+  <div class="bm-card new-today">
+    <div class="bm-num">{{ new_today }}</div>
+    <div class="bm-label">New Today</div>
+  </div>
+  <div class="bm-card recurring">
+    <div class="bm-num">{{ recurring_count }}</div>
+    <div class="bm-label">Recurring</div>
+  </div>
+  <div class="bm-card errors500">
+    <div class="bm-num">{{ errors_500_today }}</div>
+    <div class="bm-label">500s Today</div>
+  </div>
+  <div class="bm-card cleared">
+    <div class="bm-num">{{ cleared_week }}</div>
+    <div class="bm-label">Cleared This Week</div>
+  </div>
+</div>
+
+<!-- ── Filters ───────────────────────────────────────────────────── -->
+<div class="bm-filters">
+  <form method="get" action="">
+    <div>
+      <label class="form-label d-block">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label d-block">Severity</label>
+      <select name="severity" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for val, label in severity_choices %}
+          <option value="{{ val }}" {% if severity_filter == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="form-label d-block">HTTP Code</label>
+      <select name="status_code" class="form-select form-select-sm">
+        <option value="">Any</option>
+        <option value="500" {% if code_filter == "500" %}selected{% endif %}>500</option>
+        <option value="404" {% if code_filter == "404" %}selected{% endif %}>404</option>
+        <option value="403" {% if code_filter == "403" %}selected{% endif %}>403</option>
+        <option value="400" {% if code_filter == "400" %}selected{% endif %}>400</option>
+      </select>
+    </div>
+    <div>
+      <label class="form-label d-block">Path contains</label>
+      <input type="text" name="path" class="form-control form-control-sm" placeholder="/api/..." value="{{ path_filter }}">
+    </div>
+    <div>
+      <label class="form-label d-block">From</label>
+      <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+    </div>
+    <div>
+      <label class="form-label d-block">To</label>
+      <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+    </div>
+    <div>
+      <label class="form-label d-block">Recurring only</label>
+      <select name="recurring" class="form-select form-select-sm">
+        <option value="">No</option>
+        <option value="1" {% if recurring_only %}selected{% endif %}>Yes</option>
+      </select>
+    </div>
+    <div class="d-flex gap-2 align-items-end">
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-funnel me-1"></i>Filter
+      </button>
+      <a href="{% url 'hq:bugs_list' %}" class="btn btn-sm btn-outline-secondary">Clear</a>
+    </div>
+  </form>
+</div>
+
+<!-- ── Issues Table ──────────────────────────────────────────────── -->
+{% if issues %}
+<form method="post" action="{% url 'hq:bug_bulk_action' %}">
+  {% csrf_token %}
+  <div class="d-flex gap-2 mb-2 align-items-center">
+    <select name="action" class="form-select form-select-sm" style="max-width:220px">
+      <option value="">Bulk action…</option>
+      {% if can_manage_bugs %}
+      <option value="mark_investigating">Mark Investigating</option>
+      <option value="mark_cleared">Mark Cleared</option>
+      <option value="mark_ignored">Ignore</option>
+      {% endif %}
+    </select>
+    <button type="submit" class="btn btn-sm btn-outline-secondary">Apply</button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover bm-table align-middle">
+      <thead class="table-light">
+        <tr>
+          <th><input type="checkbox" id="selectAll" class="form-check-input"></th>
+          <th>Severity</th>
+          <th>Status</th>
+          <th>Error / Title</th>
+          <th>Code</th>
+          <th>Path</th>
+          <th>Hits</th>
+          <th>Last Seen</th>
+          <th>Assigned</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for issue in issues %}
+        <tr class="{{ issue.status }}">
+          <td><input type="checkbox" name="issue_ids" value="{{ issue.pk }}" class="form-check-input issue-check"></td>
+          <td>
+            <span class="badge badge-sev-{{ issue.severity }}">{{ issue.get_severity_display }}</span>
+          </td>
+          <td>
+            <span class="badge badge-stat-{{ issue.status }}">{{ issue.get_status_display }}</span>
+          </td>
+          <td>
+            <span class="bm-title" title="{{ issue.title }}">
+              <span class="text-muted me-1 small">{{ issue.error_type }}</span>
+              {{ issue.title|truncatechars:70 }}
+            </span>
+          </td>
+          <td>
+            {% if issue.status_code %}
+              <code class="{% if issue.status_code == 500 %}text-danger{% elif issue.status_code == 404 %}text-warning{% else %}text-secondary{% endif %}">{{ issue.status_code }}</code>
+            {% else %}—{% endif %}
+          </td>
+          <td><span class="bm-path" title="{{ issue.path }}">{{ issue.path|truncatechars:50 }}</span></td>
+          <td>
+            {% if issue.occurrence_count > 1 %}
+              <span class="bm-recur"><i class="bi bi-arrow-repeat"></i> {{ issue.occurrence_count }}</span>
+            {% else %}
+              <span class="text-muted">1</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap text-muted small">{{ issue.last_seen_at|timesince }} ago</td>
+          <td class="text-muted small">{{ issue.assigned_to.username|default:"—" }}</td>
+          <td>
+            <a href="{% url 'hq:bug_detail' pk=issue.pk %}" class="btn btn-xs btn-sm btn-outline-primary py-0 px-2">
+              View
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-check-circle display-4 d-block mb-3 text-success"></i>
+  <p class="mb-0 fw-semibold">No issues found</p>
+  <p class="small">Great — no bugs matching your filters.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('selectAll')?.addEventListener('change', function () {
+  document.querySelectorAll('.issue-check').forEach(cb => cb.checked = this.checked);
+});
+</script>
+{% endblock %}

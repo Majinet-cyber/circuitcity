@@ -815,6 +815,182 @@ def test_landing_metrics_fallback_js_present(client):
 # PHASE 4 — Gym dashboard clean (no dev leakage in rendered output)
 # ===========================================================================
 
+# ===========================================================================
+# ENERGY DEMO SIMULATION SECTION
+# ===========================================================================
+
+def test_landing_page_energy_simulation_section_present(client):
+    """
+    Landing page must render the flagship Renewable Energy daily simulation section.
+    The section must use the landing page light theme — not a dark navy background.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert 'id="energy-demo-simulation"' in content, (
+        "Energy demo simulation section must be present on the landing page"
+    )
+    assert "energy-sim-heading" in content or "See tomorrow" in content, (
+        "Energy simulation section must have its flagship heading"
+    )
+
+    # Section must use light background, not dark navy
+    assert "#0a1628" not in content or "energy-demo-simulation" not in content.split("#0a1628")[0].split("energy-demo-simulation")[-1], (
+        "Energy simulation section must not use the dark navy #0a1628 background"
+    )
+    # Light background colour must be present in the section
+    assert "#f0fdf9" in content, (
+        "Energy simulation section must use the light green #f0fdf9 background"
+    )
+
+
+def test_landing_page_energy_simulation_demo_badge(client):
+    """
+    Energy simulation section must be clearly labelled as demo data — not real.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Demo simulation" in content, (
+        "Energy simulation section must contain 'Demo simulation' disclaimer"
+    )
+    assert "connect real site data" in content, (
+        "Energy simulation must instruct users to connect real data inside Emajinet"
+    )
+
+
+def test_landing_page_energy_simulation_controls_present(client):
+    """
+    Energy simulation section must contain interactive slider and play button.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert 'id="demoSimSlider"' in content, (
+        "Energy simulation must have a time slider (demoSimSlider)"
+    )
+    assert 'id="demoSimPlayBtn"' in content, (
+        "Energy simulation must have a play button (demoSimPlayBtn)"
+    )
+    assert 'min="0"' in content and 'max="1440"' in content, (
+        "Slider must span 0–1440 minutes (full 24-hour day)"
+    )
+
+
+def test_landing_page_energy_simulation_blackout_risk_text(client):
+    """
+    Energy simulation section must contain blackout risk text in the risk panel.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert "Blackout risk" in content, (
+        "Energy simulation must contain 'Blackout risk' in the risk panel"
+    )
+    assert "22:30" in content, (
+        "Energy simulation must reference the ~22:30 blackout risk time"
+    )
+    assert "energy-risk-panel" in content, (
+        "Risk panel element (energy-risk-panel) must be present"
+    )
+
+
+def test_landing_page_energy_simulation_kpi_cards_present(client):
+    """
+    Energy simulation section must contain all five KPI card elements.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    for element_id in ["demoSimSolar", "demoSimLoad", "demoSimBattery", "demoSimNet", "demoSimStatus"]:
+        assert f'id="{element_id}"' in content, (
+            f"KPI card element #{element_id} must be present in energy simulation section"
+        )
+
+
+def test_landing_page_energy_simulation_chart_canvas_present(client):
+    """
+    Energy simulation must contain a canvas element for the chart.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    assert 'id="demoSimChart"' in content, (
+        "Energy simulation chart canvas (demoSimChart) must be present"
+    )
+
+
+def test_landing_page_energy_simulation_mobile_visibility(client):
+    """
+    Energy simulation section must not be hidden at mobile widths.
+    The section must not contain display:none or visibility:hidden on its root element.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # The section exists and is not globally hidden
+    assert 'id="energy-demo-simulation"' in content
+
+    # Responsive grid class must be present for mobile stacking
+    assert "demo-sim-kpi-grid" in content, (
+        "KPI grid must use responsive class for mobile stacking"
+    )
+
+    # Media queries for the simulation section must be present
+    assert "@media" in content, "Page must include responsive media queries"
+
+
+def test_landing_page_still_loads_with_simulation(client):
+    """
+    Existing landing page must still load correctly after adding energy simulation.
+    All other verticals and key sections must still be present.
+    """
+    url = reverse("staticpages:home")
+    response = client.get(url)
+
+    assert response.status_code == 200
+    content = response.content.decode()
+
+    # Core page elements must still be present
+    assert "How It Works" in content
+    assert "Get Started" in content
+    assert "Emajinet" in content
+
+    # Other verticals must not have been removed
+    assert "Farm" in content or "Pharmacy" in content or "Grocery" in content, (
+        "Other vertical types must still be present on the page"
+    )
+
+    # Pricing/CTA must still be present
+    assert "pricing" in content.lower() or "Get Started" in content
+
+    # Partners must still be present
+    assert "airtel" in content.lower() or "partner" in content.lower(), (
+        "Partners section must still be present after adding energy simulation"
+    )
+
+
 @pytest.mark.django_db
 def test_gym_dashboard_clean_render(client):
     """

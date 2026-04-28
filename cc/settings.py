@@ -281,6 +281,8 @@ INSTALLED_APPS = [
     "corrections.apps.CorrectionsConfig",  # vertical-aware data corrections (Feb 2026)
     # Email backend
     "anymail",  # SendGrid email backend via django-anymail
+    # Developer integrations & webhook infrastructure
+    "integrations",
 ]
 
 # Optional dev/helper apps
@@ -347,6 +349,11 @@ MIDDLEWARE = [
     # ✅ SECURITY: Safe error responses (no stack traces, generic messages)
     # Must be LAST to catch all exceptions
     "cc.middleware_security.SafeErrorResponseMiddleware",
+    # ✅ BUG MONITOR: Capture unhandled exceptions into SystemIssue.
+    # Placed after SafeErrorResponseMiddleware so process_exception is called
+    # BEFORE SafeErrorResponseMiddleware in reverse-middleware order.
+    # Never intercepts (always returns None); never causes user-facing failures.
+    "hq.middleware.BugCaptureMiddleware",
 ]
 
 print("[cc.settings] Final MIDDLEWARE:", MIDDLEWARE)
@@ -1063,6 +1070,16 @@ PAYCHANGU_SECRET_KEY = os.environ.get("PAYCHANGU_SECRET_KEY", "")
 PAYCHANGU_WEBHOOK_SECRET = os.environ.get("PAYCHANGU_WEBHOOK_SECRET", "")
 PAYCHANGU_WEBHOOK_DEBUG = env_bool("PAYCHANGU_WEBHOOK_DEBUG", False)
 PAYCHANGU_API_BASE = os.environ.get("PAYCHANGU_API_BASE", "https://api.paychangu.com")
+
+# ---------------------------------------------------------------------------
+# Emajinet Integrations — Webhook secret
+# ---------------------------------------------------------------------------
+# External partners must include this token as:
+#   Authorization: Bearer <token>
+#   OR X-Emajinet-Webhook-Token: <token>
+# If unset in dev mode, requests are allowed with a warning.
+# In production (DEBUG=False), an unset secret will REJECT all webhook requests.
+EMAJINET_WEBHOOK_SECRET = os.environ.get("EMAJINET_WEBHOOK_SECRET", "")
 
 # Production guard: prevent test mode in production
 # Allow test mode in CI/tests (where DEBUG=False is expected but real payments should never happen)

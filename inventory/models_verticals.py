@@ -2244,7 +2244,19 @@ class GrocerySale(models.Model):
     """
     Records a sale of grocery product.
     Supports both retail and wholesale modes.
+
+    Note: The underlying DB table was created by an older migration and contains
+    legacy columns (sale_type, total_amount, customer_name, customer_phone,
+    is_deleted, created_at) that are NOT NULL without defaults. All of these
+    are declared here so Django always provides safe values on INSERT.
     """
+
+    SALE_TYPE_CHOICES = [
+        ("regular", "Regular"),
+        ("discount", "Discount"),
+        ("wholesale", "Wholesale"),
+        ("correction", "Correction"),
+    ]
 
     business = models.ForeignKey(Business, on_delete=models.CASCADE, related_name="grocery_sales", db_index=True)
     product = models.ForeignKey("inventory.MerchProduct", on_delete=models.PROTECT, related_name="grocery_sales")
@@ -2252,7 +2264,7 @@ class GrocerySale(models.Model):
     # Sale details
     quantity = models.PositiveIntegerField(default=1)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
-    total_price = models.DecimalField(max_digits=12, decimal_places=2)
+    total_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
 
     # Sale mode (retail or wholesale)
     sale_mode = models.CharField(
@@ -2266,6 +2278,15 @@ class GrocerySale(models.Model):
         help_text="Whether this was a retail or wholesale sale",
     )
 
+    # Legacy field: sale_type was the original categorisation column (NOT NULL in DB).
+    # Kept in model so Django always provides a value on INSERT.
+    sale_type = models.CharField(
+        max_length=30,
+        choices=SALE_TYPE_CHOICES,
+        default="regular",
+        help_text="Type of sale (regular, discount, wholesale, correction)",
+    )
+
     # Cost tracking (for profit calculation)
     unit_cost = models.DecimalField(
         max_digits=10,
@@ -2277,6 +2298,14 @@ class GrocerySale(models.Model):
         max_digits=12, decimal_places=2, default=Decimal("0.00"), help_text="Total cost of goods sold"
     )
 
+    # Legacy field: total_amount mirrors total_price (old schema used total_amount, NOT NULL in DB).
+    total_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Legacy field: mirrors total_price for backward DB compatibility",
+    )
+
     # Payment method
     payment_method = models.CharField(
         max_length=20,
@@ -2286,11 +2315,20 @@ class GrocerySale(models.Model):
         help_text="Payment method used for this sale",
     )
 
+    # Legacy customer fields (NOT NULL in old DB schema; blank allowed in new records).
+    customer_name = models.CharField(max_length=200, default="", blank=True)
+    customer_phone = models.CharField(max_length=20, default="", blank=True)
+
+    # Legacy soft-delete flag (NOT NULL in old DB schema).
+    is_deleted = models.BooleanField(default=False)
+
     # Metadata
     sold_by = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL, related_name="grocery_sales_made"
     )
     sold_at = models.DateTimeField(default=timezone.now, db_index=True)
+    # Legacy created_at (NOT NULL in old DB schema).
+    created_at = models.DateTimeField(default=timezone.now)
     notes = models.TextField(blank=True, default="")
 
     class Meta:
@@ -2310,6 +2348,8 @@ class GrocerySale(models.Model):
             self.total_price = Decimal(self.quantity) * self.unit_price
         if not self.total_cost:
             self.total_cost = Decimal(self.quantity) * self.unit_cost
+        # Keep legacy total_amount in sync with total_price
+        self.total_amount = self.total_price
         super().save(*args, **kwargs)
 
     @property

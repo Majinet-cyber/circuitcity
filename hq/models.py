@@ -5,6 +5,15 @@ from django.conf import settings
 from django.utils import timezone
 from decimal import Decimal
 
+# Bug Monitor and Admin Audit Log models
+from .models_bugmonitor import (  # noqa: F401
+    SystemIssue,
+    SystemIssueOccurrence,
+    AdminAuditLog,
+    IssueStatus,
+    IssueSeverity,
+)
+
 
 class HQPaymentMark(models.Model):
     """

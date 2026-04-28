@@ -455,6 +455,11 @@ urlpatterns += [
     path("landing/", include_or_raise("staticpages.urls", "staticpages")),
 ]
 
+# Integrations — webhook endpoints (CSRF-exempt, token-authenticated)
+urlpatterns += [
+    path("api/webhooks/", include("integrations.urls", namespace="integrations")),
+]
+
 # Root + global alias
 urlpatterns += [
     path("", root_redirect, name="root"),
@@ -694,6 +699,10 @@ urlpatterns += [
     path("pharmacy/", include_or_raise("inventory.urls_pharmacy", "pharmacy")),
     path("groceries/", include_or_raise("inventory.urls_groceries", "groceries")),
     path("cement/", include_or_raise("inventory.urls_cement", "cement")),
+    # Mobile Money vertical
+    path("mobile-money/", include_or_raise("inventory.urls_mobilemoney", "mobilemoney")),
+    # IoT monitoring
+    path("iot/", include_or_raise("inventory.urls_iot", "iot")),
     # Car Dealer vertical
     path("car-dealer/", include_or_raise("inventory.urls_car_dealer", "car_dealer")),
     # Public marketplace

@@ -4,11 +4,12 @@ Groceries Vertical - Simple retail store for food and household items
 """
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -17,6 +18,8 @@ from inventory.business_kinds import BusinessKind
 from inventory.helpers import get_active_business
 from inventory.models import MerchProduct
 from inventory.models_verticals import GrocerySale
+
+logger = logging.getLogger(__name__)
 from inventory.verticals.groceries_seed import (
     CATEGORIES,
     SEED_ITEMS,
@@ -127,8 +130,27 @@ def dashboard(request):
     # Recent stock-ins (last 10 products added/updated)
     recent_products = products.order_by("-id")[:10]
 
+    # Demo preview when workspace is empty
+    is_demo = total_products == 0 and sold_today_count == 0
+    if is_demo:
+        total_revenue = Decimal("12400")
+        total_profit = Decimal("3200")
+        total_stock_value = Decimal("48000")
+        items_in_stock = 312
+        sold_today_count = 8
+        # Fake low-stock items for demo
+        class _FakeProduct:
+            def __init__(self, name, cat, qty, unit):
+                self.name = name; self.category = cat; self.quantity_in_stock = qty; self.base_unit = unit
+        low_stock_items = [
+            _FakeProduct("Sugar 2kg", "food", 3, "pcs"),
+            _FakeProduct("Cooking Oil 2L", "food", 2, "pcs"),
+            _FakeProduct("Bread", "food", 4, "pcs"),
+        ]
+
     context = {
         "business": business,
+        "is_demo": is_demo,
         "total_revenue": total_revenue,
         "total_profit": total_profit,
         "total_costs": total_costs,
@@ -366,47 +388,63 @@ def sell(request):
         try:
             product_id = int(request.POST.get("product_id", 0))
             quantity = int(request.POST.get("quantity", 0))
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Invalid input: {e}")
+            return redirect("groceries:sell")
 
-            product = MerchProduct.objects.select_for_update().get(
-                pk=product_id, business=business, kind=BusinessKind.GROCERY, is_active=True
-            )
+        if quantity <= 0:
+            messages.error(request, "Quantity must be greater than 0")
+            return redirect("groceries:sell")
 
-            if quantity <= 0:
-                messages.error(request, "Quantity must be greater than 0")
-                return redirect("groceries:sell")
+        # Get sale mode (retail/wholesale)
+        sale_mode = request.POST.get("sale_mode", "retail").strip()
+        if sale_mode not in ["retail", "wholesale"]:
+            sale_mode = "retail"
 
-            if product.quantity_in_stock < quantity:
-                messages.error(
-                    request, f"Insufficient stock. Available: {product.quantity_in_stock}, Requested: {quantity}"
-                )
-                return redirect("groceries:sell")
+        # Normalise payment_method to lowercase DB choices: cash / bank / mobile_money
+        raw_pm = request.POST.get("payment_method", "cash").strip().lower()
+        payment_method = raw_pm if raw_pm in {"cash", "bank", "mobile_money"} else "cash"
+        notes = request.POST.get("notes", "")
 
-            # Get sale mode (retail/wholesale)
-            sale_mode = request.POST.get("sale_mode", "retail").strip()
-            if sale_mode not in ["retail", "wholesale"]:
-                sale_mode = "retail"
-
+        try:
             with transaction.atomic():
-                # Calculate totals
-                unit_cost = product.cost_price or Decimal("0")
-                unit_price = product.selling_price or Decimal("0")
-                total_cost = unit_cost * quantity
-                total_revenue = unit_price * quantity
-                profit = total_revenue - total_cost
+                # --- Lock the product row INSIDE the atomic block (correct select_for_update usage) ---
+                try:
+                    product = MerchProduct.objects.select_for_update().get(
+                        pk=product_id,
+                        business=business,
+                        kind=BusinessKind.GROCERY,
+                        is_active=True,
+                    )
+                except MerchProduct.DoesNotExist:
+                    messages.error(request, "Product not found or not available")
+                    return redirect("groceries:sell")
 
-                # Validate stock
+                # Stock validation (re-checked inside lock)
                 if product.quantity_in_stock < quantity:
                     messages.error(
-                        request, f"Insufficient stock. Available: {product.quantity_in_stock}, Requested: {quantity}"
+                        request,
+                        f"Insufficient stock. Available: {product.quantity_in_stock}, "
+                        f"Requested: {quantity}",
                     )
                     return redirect("groceries:sell")
 
-                # Decrease stock
+                # --- Explicit field calculation ---
+                unit_cost = product.cost_price or Decimal("0")
+                unit_price = product.selling_price or Decimal("0")
+                total_cost = unit_cost * Decimal(quantity)
+                total_revenue = unit_price * Decimal(quantity)
+                profit = total_revenue - total_cost
+
+                # --- Reduce stock ---
                 product.quantity_in_stock -= quantity
                 product.save(update_fields=["quantity_in_stock"])
 
-                # Create sale record for proper tracking
-                GrocerySale.objects.create(
+                # --- Create sale record: ALL required DB fields explicitly provided ---
+                # Legacy NOT NULL columns (old DB schema: sale_type, total_amount,
+                # customer_name, customer_phone, is_deleted, created_at) are included
+                # so SQLite's FK enforcement never sees a NULL where NOT NULL is required.
+                sale = GrocerySale.objects.create(
                     business=business,
                     product=product,
                     quantity=quantity,
@@ -415,18 +453,55 @@ def sell(request):
                     unit_cost=unit_cost,
                     total_cost=total_cost,
                     sale_mode=sale_mode,
-                    payment_method=request.POST.get("payment_method", "CASH"),
+                    sale_type="regular",
+                    total_amount=total_revenue,
+                    customer_name="",
+                    customer_phone="",
+                    is_deleted=False,
+                    payment_method=payment_method,
                     sold_by=request.user,
-                    notes=request.POST.get("notes", ""),
+                    notes=notes,
                 )
 
-                messages.success(
-                    request,
-                    f"✅ Sold {quantity} {product.base_unit} of {product.name} ({sale_mode}). "
-                    f"Revenue: MK {total_revenue:,.2f}, Profit: MK {profit:,.2f}",
-                )
-                return redirect("groceries:sell")
+                # --- Success message via on_commit ---
+                # CRITICAL: Using transaction.on_commit() ensures the success message is
+                # queued ONLY after the DB transaction has truly committed. If the commit
+                # fails (e.g. deferred FK violation), on_commit callbacks are NOT fired,
+                # so no false-positive success message ever appears alongside an error.
+                _qty = quantity
+                _unit = product.base_unit
+                _name = product.name
+                _mode = sale_mode
+                _rev = total_revenue
+                _prof = profit
 
+                def _success(_qty=_qty, _unit=_unit, _name=_name, _mode=_mode,
+                             _rev=_rev, _prof=_prof):
+                    messages.success(
+                        request,
+                        f"✅ Sold {_qty} {_unit} of {_name} ({_mode}). "
+                        f"Revenue: MK {_rev:,.2f}, Profit: MK {_prof:,.2f}",
+                    )
+
+                transaction.on_commit(_success)
+
+            # Redirect OUTSIDE the atomic block so it only runs on successful commit
+            return redirect("groceries:sell")
+
+        except IntegrityError as e:
+            # Log the full traceback so the server log tells us exactly which FK failed
+            logger.exception(
+                "GrocerySale IntegrityError for business=%s product=%s user=%s",
+                business.id if business else None,
+                product_id,
+                request.user.id if request.user.is_authenticated else None,
+            )
+            messages.error(
+                request,
+                f"Sale could not be saved due to a database constraint error. "
+                f"Please contact support if this persists. (Detail: {e})",
+            )
+            return redirect("groceries:sell")
         except MerchProduct.DoesNotExist:
             messages.error(request, "Product not found")
             return redirect("groceries:sell")
@@ -434,6 +509,11 @@ def sell(request):
             messages.error(request, f"Invalid input: {e}")
             return redirect("groceries:sell")
         except Exception as e:
+            logger.exception(
+                "GrocerySale unexpected error for business=%s product=%s",
+                business.id if business else None,
+                product_id,
+            )
             messages.error(request, f"Error processing sale: {e}")
             return redirect("groceries:sell")
 

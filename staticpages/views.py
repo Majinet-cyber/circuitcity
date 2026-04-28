@@ -919,6 +919,63 @@ def landing_metrics_api(request):
     return JsonResponse(payload)
 
 
+def developers(request):
+    """
+    Public Developers page — IoT webhooks, ESP32 integration, credit scoring API foundation,
+    and Mobile Money integrations.
+    """
+    webhook_example = """{
+  "device_id": "esp32-energy-001",
+  "type": "energy",
+  "readings": {
+    "voltage": 12.6,
+    "current": 4.2,
+    "power": 52.9,
+    "battery_soc": 78,
+    "temperature": 31.5
+  },
+  "timestamp": "2026-04-28T07:00:00Z"
+}"""
+    arduino_snippet = """// ESP32 → Emajinet Webhook Example
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+const char* ssid = "YOUR_WIFI";
+const char* password = "YOUR_PASS";
+const char* webhookUrl = "https://emajinet.africa/iot/webhook/";
+const char* apiKey = "YOUR_DEVICE_API_KEY";
+
+void sendReading(float voltage, float current, float power) {
+  HTTPClient http;
+  http.begin(webhookUrl);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", "Bearer " + String(apiKey));
+
+  StaticJsonDocument<256> doc;
+  doc["device_id"] = "esp32-energy-001";
+  doc["type"] = "energy";
+  doc["readings"]["voltage"] = voltage;
+  doc["readings"]["current"] = current;
+  doc["readings"]["power"] = power;
+  doc["readings"]["temperature"] = 31.5;
+
+  String body;
+  serializeJson(doc, body);
+  int code = http.POST(body);
+  http.end();
+}
+
+void loop() {
+  sendReading(12.6, 4.2, 52.9);
+  delay(60000); // Every 60 seconds
+}"""
+    return render(request, "staticpages/developers.html", {
+        "webhook_example": webhook_example,
+        "arduino_snippet": arduino_snippet,
+    })
+
+
 def sitemap_xml(request):
     """
     Generate sitemap.xml with public, indexable pages only.

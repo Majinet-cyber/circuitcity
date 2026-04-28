@@ -36,6 +36,7 @@ class BusinessKind(models.TextChoices):
     CAR_HIRE = "car_hire", "Car Hire Service"  # NEW: Fleet management & trip bookings
     CAR_DEALER = "car_dealer", "Car Dealer"  # NEW: Vehicle dealership & marketplace
     ENERGY = "energy", "Renewable Energy"  # NEW: Solar, battery & energy management
+    MOBILE_MONEY = "mobile_money", "Mobile Money Agent"  # NEW: Mobile money agent reconciliation
 
 
 __all__ = ["BusinessKind"]

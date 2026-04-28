@@ -5,6 +5,17 @@ from django.views.generic import RedirectView
 from . import views
 from . import views_business_directory as v
 
+# Bug Monitor and Accounts views (always available)
+try:
+    from . import views_bugmonitor
+except ImportError:
+    views_bugmonitor = None
+
+try:
+    from . import views_accounts
+except ImportError:
+    views_accounts = None
+
 # Optional imports with defensive handling
 try:
     from . import views_currency_settings
@@ -106,6 +117,29 @@ urlpatterns = [
     path("api/business-search/", v.business_search_api, name="business_search_api"),
     path("businesses/<int:business_id>/quick-action/", v.quick_action, name="quick_action"),
 ]
+
+# =========================
+# Bug Monitor routes
+# =========================
+if views_bugmonitor is not None:
+    urlpatterns.extend([
+        path("bugs/",                  views_bugmonitor.bugs_list,    name="bugs_list"),
+        path("bugs/<uuid:pk>/",        views_bugmonitor.bug_detail,   name="bug_detail"),
+        path("bugs/<uuid:pk>/action/", views_bugmonitor.bug_action,   name="bug_action"),
+        path("bugs/bulk-action/",      views_bugmonitor.bug_bulk_action, name="bug_bulk_action"),
+        path("audit/",                 views_bugmonitor.audit_log,    name="audit_log"),
+    ])
+
+# =========================
+# Accounts management routes
+# =========================
+if views_accounts is not None:
+    urlpatterns.extend([
+        path("accounts/",                       views_accounts.accounts_list,          name="accounts_list"),
+        path("accounts/<int:user_id>/",         views_accounts.account_detail,         name="account_detail"),
+        path("accounts/<int:user_id>/groups/",  views_accounts.account_assign_groups,  name="account_assign_groups"),
+        path("accounts/<int:user_id>/toggle/",  views_accounts.account_toggle_active,  name="account_toggle_active"),
+    ])
 
 # Conditionally add optional routes
 if views_currency_settings is not None:

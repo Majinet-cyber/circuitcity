@@ -3006,6 +3006,7 @@
         <a href="{% url 'marketplace:home' %}">Marketplace</a>
         <a href="{% url 'staticpages:pricing' %}">Pricing</a>
         <a href="{% url 'staticpages:about' %}">About</a>
+        <a href="{% url 'staticpages:developers' %}">Developers</a>
       </div>
 
       <div class="nav-actions">
@@ -3025,6 +3026,7 @@
         <a href="#how-it-works">How It Works</a>
         <a href="{% url 'staticpages:pricing' %}">Pricing</a>
         <a href="{% url 'staticpages:contact' %}">Contact</a>
+        <a href="{% url 'staticpages:developers' %}">Developers</a>
         <a href="{% url 'login' %}" class="btn btn-secondary">Sign In</a>
         <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Get Started Free</a>
       </div>
@@ -3652,6 +3654,493 @@
       #energy-capability-grid { grid-template-columns: 1fr; }
     }
   </style>
+
+  <!-- ============================================================
+       FLAGSHIP: RENEWABLE ENERGY DAILY SIMULATION DEMO
+  ============================================================ -->
+  <section id="energy-demo-simulation" aria-label="Renewable Energy Daily Simulation Demo" style="
+    background: #f0fdf9;
+    border-top: 1px solid #d1fae5;
+    border-bottom: 1px solid #d1fae5;
+    padding: 4.5rem 0 4rem;
+  ">
+    <div class="container">
+
+      {# Section header #}
+      <div style="text-align:center;max-width:680px;margin:0 auto 2.5rem;">
+        <span style="
+          display:inline-flex;align-items:center;gap:0.45rem;
+          background:#ecfdf5;border:1px solid #6ee7b7;
+          color:#065f46;font-size:0.7rem;font-weight:700;
+          letter-spacing:0.09em;text-transform:uppercase;
+          padding:0.3rem 0.8rem;border-radius:20px;margin-bottom:1.1rem;
+        ">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          Renewable Energy · Live Simulation
+        </span>
+        <h2 id="energy-sim-heading" style="
+          font-size:clamp(1.7rem,3.8vw,2.6rem);font-weight:800;
+          color:#0f172a;line-height:1.18;letter-spacing:-0.025em;
+          margin-bottom:0.9rem;
+        ">
+          See tomorrow's blackout<br>before it happens.
+        </h2>
+        <p style="font-size:1rem;color:#475569;line-height:1.7;max-width:580px;margin:0 auto 1.25rem;">
+          Emajinet simulates solar generation, load demand, battery state, blackout risk,
+          energy shortfall, and savings across a normal day — before a business invests
+          in panels, batteries, or an inverter.
+        </p>
+        <span id="energy-demo-badge" style="
+          display:inline-flex;align-items:center;gap:0.4rem;
+          background:#fef3c7;border:1px solid #fde68a;
+          color:#92400e;font-size:0.72rem;font-weight:600;
+          padding:0.25rem 0.75rem;border-radius:14px;
+        ">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Demo simulation — connect real site data inside Emajinet.
+        </span>
+      </div>
+
+      {# Simulation card #}
+      <div id="energy-sim-card" style="
+        background:#ffffff;
+        border:1.5px solid #d1fae5;
+        border-radius:20px;
+        padding:1.75rem 1.75rem 1.5rem;
+        max-width:900px;
+        margin:0 auto;
+        box-shadow:0 4px 24px rgba(16,185,129,0.08),0 1px 4px rgba(0,0,0,0.04);
+      ">
+
+        {# Time controls #}
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;flex-wrap:wrap;padding-bottom:1.125rem;border-bottom:1px solid #f1f5f9;">
+          <span style="font-size:0.78rem;font-weight:700;color:#64748b;white-space:nowrap;">Time of Day</span>
+          <input type="range" id="demoSimSlider" min="0" max="1440" value="480" step="15" aria-label="Simulation time of day" style="flex:1;min-width:160px;accent-color:#10b981;cursor:pointer;">
+          <span id="demoSimTime" style="font-size:1.1rem;font-weight:800;color:#0891b2;min-width:4rem;font-feature-settings:'tnum';letter-spacing:.02em;">08:00</span>
+          <button id="demoSimPlayBtn" aria-label="Play simulation" style="
+            display:inline-flex;align-items:center;gap:0.4rem;
+            background:#10b981;color:#fff;
+            border:none;border-radius:30px;
+            padding:0.35rem 1rem;font-size:0.78rem;font-weight:700;
+            cursor:pointer;white-space:nowrap;
+            transition:background 0.2s;
+          ">▶ Play</button>
+        </div>
+
+        {# KPI cards row #}
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:0.625rem;margin-bottom:1rem;" class="demo-sim-kpi-grid">
+
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:0.7rem 0.5rem;text-align:center;">
+            <div id="demoSimSolarIcon" style="font-size:1.1rem;margin-bottom:0.15rem;">🌙</div>
+            <div id="demoSimSolar" style="font-size:1.2rem;font-weight:800;color:#d97706;letter-spacing:-.01em;">0 W</div>
+            <div style="font-size:0.6rem;color:#78716c;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.15rem;">Solar Output</div>
+          </div>
+
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:0.7rem 0.5rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.15rem;">⚡</div>
+            <div id="demoSimLoad" style="font-size:1.2rem;font-weight:800;color:#4f46e5;letter-spacing:-.01em;">0 W</div>
+            <div style="font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.15rem;">Load Demand</div>
+          </div>
+
+          <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:0.7rem 0.5rem;text-align:center;">
+            <div id="demoSimBatIcon" style="font-size:1.1rem;margin-bottom:0.15rem;">🔋</div>
+            <div id="demoSimBattery" style="font-size:1.2rem;font-weight:800;color:#059669;letter-spacing:-.01em;">70%</div>
+            <div style="font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.15rem;">Battery State</div>
+            <div style="height:4px;border-radius:2px;background:#e2e8f0;margin-top:0.3rem;overflow:hidden;">
+              <div id="demoSimBatFill" style="height:100%;width:70%;background:#10b981;border-radius:2px;transition:width 0.3s ease,background 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <div style="background:#e0f2fe;border:1px solid #bae6fd;border-radius:12px;padding:0.7rem 0.5rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.15rem;">🔁</div>
+            <div id="demoSimNet" style="font-size:1.2rem;font-weight:800;color:#0891b2;letter-spacing:-.01em;">0 W</div>
+            <div style="font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.15rem;">Net Power</div>
+          </div>
+
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:0.7rem 0.5rem;text-align:center;">
+            <div style="font-size:1.1rem;margin-bottom:0.15rem;">🛡️</div>
+            <div id="demoSimStatus" style="font-size:0.82rem;font-weight:700;color:#059669;line-height:1.25;">Normal</div>
+            <div style="font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-top:0.15rem;">System State</div>
+          </div>
+
+        </div>
+
+        {# Energy balance strip #}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;margin-bottom:1rem;font-size:0.78rem;text-align:center;">
+          <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:9px;padding:0.45rem 0.25rem;">
+            <span id="demoSimServed" style="font-weight:800;color:#059669;">0</span>
+            <span style="color:#6b7280;"> kWh served</span>
+          </div>
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:0.45rem 0.25rem;">
+            <span id="demoSimShortfall" style="font-weight:800;color:#dc2626;">0</span>
+            <span style="color:#6b7280;"> kWh shortfall</span>
+          </div>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:0.45rem 0.25rem;">
+            <span id="demoSimSavedMWK" style="font-weight:800;color:#d97706;">MWK 0</span>
+            <span style="color:#6b7280;"> saved</span>
+          </div>
+        </div>
+
+        {# Canvas chart #}
+        <div style="position:relative;height:175px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:1rem;">
+          <canvas id="demoSimChart" aria-label="Energy flow chart" role="img" style="width:100%;height:100%;display:block;"></canvas>
+          <div aria-hidden="true" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:0.6rem;color:#94a3b8;white-space:nowrap;">
+            ☀ Solar (amber) · ⚡ Load (indigo) · 🔋 Battery % (green) · cursor (cyan)
+          </div>
+        </div>
+
+        {# Dynamic warning panel #}
+        <div id="demoSimWarning" style="display:none;border-radius:10px;padding:0.55rem 0.875rem;margin-bottom:0.75rem;font-size:0.82rem;font-weight:600;"></div>
+
+        {# Static risk panel — always shown #}
+        <div id="energy-risk-panel" style="
+          background:#fff1f2;
+          border:1px solid #fecaca;
+          border-radius:12px;padding:0.875rem 1rem;
+          margin-bottom:0.875rem;
+        ">
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#991b1b;margin-bottom:0.5rem;">
+            ⚠ Predicted Risk Events — Today's Simulation
+          </div>
+          <ul style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:0.35rem;">
+            <li style="font-size:0.8rem;color:#7f1d1d;display:flex;align-items:flex-start;gap:0.5rem;">
+              <span aria-hidden="true" style="flex-shrink:0;margin-top:1px;">🔴</span>
+              <span><strong>Blackout risk begins around 22:30</strong> — battery depletes if loads are not reduced after evening peak.</span>
+            </li>
+            <li style="font-size:0.8rem;color:#7f1d1d;display:flex;align-items:flex-start;gap:0.5rem;">
+              <span aria-hidden="true" style="flex-shrink:0;margin-top:1px;">🟠</span>
+              <span><strong>Battery drops below safe level after evening peak</strong> — high load from 17:00–21:00 drains reserve built during solar hours.</span>
+            </li>
+            <li style="font-size:0.8rem;color:#065f46;display:flex;align-items:flex-start;gap:0.5rem;">
+              <span aria-hidden="true" style="flex-shrink:0;margin-top:1px;">💡</span>
+              <span><strong>Shift ironing/pumping to solar hours</strong> to improve battery autonomy and reduce blackout probability by up to 60%.</span>
+            </li>
+          </ul>
+        </div>
+
+        {# Dynamic recommendations area #}
+        <div id="demoSimRecs"></div>
+
+      </div>
+
+      {# Bottom CTA #}
+      <div style="text-align:center;margin-top:2.25rem;">
+        <a href="{% url 'staticpages:pricing' %}" style="
+          display:inline-flex;align-items:center;gap:0.5rem;
+          background:#059669;color:#fff;
+          border-radius:30px;padding:0.75rem 2rem;
+          font-size:0.9375rem;font-weight:700;
+          text-decoration:none;
+          box-shadow:0 4px 16px rgba(5,150,105,0.22);
+          transition:background 0.2s,box-shadow 0.2s;
+        " class="energy-sim-cta-btn">
+          Run a Real Simulation for Your Site
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <p style="font-size:0.8rem;color:#64748b;margin-top:0.75rem;">Full system sizing, payback analysis, and blackout prediction — inside Emajinet.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <style>
+    @media (max-width: 680px) {
+      .demo-sim-kpi-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+      }
+    }
+    @media (max-width: 420px) {
+      .demo-sim-kpi-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+      #energy-sim-card {
+        padding: 1.25rem 1rem 1rem !important;
+      }
+    }
+    .energy-sim-cta-btn:hover {
+      background: #047857 !important;
+      box-shadow: 0 6px 22px rgba(5,150,105,0.32) !important;
+    }
+  </style>
+
+  <script>
+  (function() {
+    'use strict';
+    // ── Demo constants (hardcoded — no real data) ──────────────────
+    var ARRAY_KW   = 5.0;
+    var INV_KW     = 5.0;
+    var BAT_USABLE = 7.5;   // kWh
+    var PEAK_W     = 3500;  // W
+    var TARIFF     = 185;   // MWK/kWh
+
+    // ── DOM refs ───────────────────────────────────────────────────
+    var slider   = document.getElementById('demoSimSlider');
+    var simTime  = document.getElementById('demoSimTime');
+    var simSolar = document.getElementById('demoSimSolar');
+    var simSolarIcon = document.getElementById('demoSimSolarIcon');
+    var simLoad  = document.getElementById('demoSimLoad');
+    var simBatt  = document.getElementById('demoSimBattery');
+    var simBatFill = document.getElementById('demoSimBatFill');
+    var simBatIcon = document.getElementById('demoSimBatIcon');
+    var simNet   = document.getElementById('demoSimNet');
+    var simStat  = document.getElementById('demoSimStatus');
+    var simWarn  = document.getElementById('demoSimWarning');
+    var simRecs  = document.getElementById('demoSimRecs');
+    var simServed = document.getElementById('demoSimServed');
+    var simShortfall = document.getElementById('demoSimShortfall');
+    var simSavedMWK  = document.getElementById('demoSimSavedMWK');
+    var canvas   = document.getElementById('demoSimChart');
+    var playBtn  = document.getElementById('demoSimPlayBtn');
+
+    if (!slider || !canvas) return;
+
+    var playInterval = null;
+
+    // ── Solar curve: bell centred at 13:00 ─────────────────────────
+    function solarAt(m) {
+      var h = m / 60;
+      if (h < 6.5 || h > 18.5) return 0;
+      var t = (h - 6.5) / (18.5 - 6.5);
+      var bell = Math.sin(t * Math.PI);
+      var cloud = 1 - 0.08 * Math.abs(Math.sin(m / 137));
+      return Math.max(0, bell * ARRAY_KW * 1000 * 0.87 * cloud);
+    }
+
+    // ── Load curve: morning + evening peaks ────────────────────────
+    function loadAt(m) {
+      var h = m / 60;
+      if (h >= 0   && h < 5)   return PEAK_W * 0.10;
+      if (h >= 5   && h < 6.5) return PEAK_W * 0.35;
+      if (h >= 6.5 && h < 8)   return PEAK_W * 0.75;
+      if (h >= 8   && h < 12)  return PEAK_W * 0.45;
+      if (h >= 12  && h < 14)  return PEAK_W * 0.55;
+      if (h >= 14  && h < 17)  return PEAK_W * 0.40;
+      if (h >= 17  && h < 21)  return PEAK_W * 0.95;
+      if (h >= 21  && h < 23)  return PEAK_W * 0.55;
+      return PEAK_W * 0.12;
+    }
+
+    // ── Pre-compute 24-hour battery trace ──────────────────────────
+    var batTrace = [];
+    (function () {
+      var batWh = BAT_USABLE * 1000 * 0.70;
+      for (var t = 0; t <= 1440; t += 15) {
+        batTrace.push(batWh);
+        var net = (solarAt(t) - loadAt(t)) * (15 / 60);
+        batWh = Math.max(0, Math.min(BAT_USABLE * 1000, batWh + net));
+      }
+    }());
+
+    function batAt(m) {
+      return batTrace[Math.min(Math.floor(m / 15), batTrace.length - 1)];
+    }
+
+    // ── Daily balance totals ───────────────────────────────────────
+    var balance = (function () {
+      var served = 0, shortfall = 0;
+      for (var t = 0; t < 1440; t += 15) {
+        var s = solarAt(t), l = loadAt(t), b = batAt(t);
+        var avail = s + (b > 0 ? Math.min(l, b) : 0);
+        served    += Math.min(avail, l) * (15 / 60);
+        shortfall += Math.max(0, l - avail) * (15 / 60);
+      }
+      return {
+        served:    (served / 1000).toFixed(1),
+        shortfall: (shortfall / 1000).toFixed(1)
+      };
+    }());
+
+    if (simServed)    simServed.textContent    = balance.served;
+    if (simShortfall) simShortfall.textContent  = balance.shortfall;
+    if (simSavedMWK)  simSavedMWK.textContent  = 'MWK ' + Math.round(parseFloat(balance.served) * TARIFF).toLocaleString();
+
+    // ── Canvas chart (light-mode palette) ──────────────────────────
+    function drawChart(currentMin) {
+      var dpr = window.devicePixelRatio || 1;
+      canvas.width  = canvas.offsetWidth  * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      var ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      var W = canvas.offsetWidth, H = canvas.offsetHeight;
+      ctx.clearRect(0, 0, W, H);
+
+      var maxW  = Math.max(ARRAY_KW * 1000 * 0.9, PEAK_W, 500);
+      var steps = [];
+      for (var t = 0; t <= 1440; t += 15) {
+        steps.push({ t: t, s: solarAt(t), l: loadAt(t), b: batAt(t) / (BAT_USABLE * 1000) * 100 });
+      }
+      function xP(t) { return (t / 1440) * (W - 4) + 2; }
+      function yPow(v) { return H - (Math.min(v, maxW) / maxW) * (H - 22) - 12; }
+      function yBat(p) { return H - (p / 100) * (H - 22) - 12; }
+
+      // Night shading (very light, for light bg)
+      ctx.fillStyle = 'rgba(15,23,42,0.04)';
+      ctx.fillRect(0, 0, xP(6.5 * 60), H);
+      ctx.fillRect(xP(18.5 * 60), 0, W - xP(18.5 * 60), H);
+
+      // Solar fill
+      ctx.beginPath();
+      ctx.moveTo(xP(0), H);
+      steps.forEach(function (p) { ctx.lineTo(xP(p.t), yPow(p.s)); });
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(245,158,11,0.14)';
+      ctx.fill();
+
+      // Solar line
+      ctx.beginPath();
+      steps.forEach(function (p, i) { i === 0 ? ctx.moveTo(xP(p.t), yPow(p.s)) : ctx.lineTo(xP(p.t), yPow(p.s)); });
+      ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
+
+      // Load line
+      ctx.beginPath();
+      steps.forEach(function (p, i) { i === 0 ? ctx.moveTo(xP(p.t), yPow(p.l)) : ctx.lineTo(xP(p.t), yPow(p.l)); });
+      ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 2; ctx.stroke();
+
+      // Battery % (dashed green)
+      ctx.beginPath();
+      steps.forEach(function (p, i) { i === 0 ? ctx.moveTo(xP(p.t), yBat(p.b)) : ctx.lineTo(xP(p.t), yBat(p.b)); });
+      ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Time cursor
+      var cx = xP(currentMin);
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H);
+      ctx.strokeStyle = '#0891b2'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Hour labels
+      ctx.fillStyle = '#94a3b8'; ctx.font = '8px Inter,system-ui,sans-serif';
+      for (var hh = 0; hh <= 24; hh += 3) {
+        ctx.fillText(hh + ':00', xP(hh * 60) - 8, H - 1);
+      }
+    }
+
+    // ── Update display ─────────────────────────────────────────────
+    function update() {
+      var m   = parseInt(slider.value, 10);
+      var h   = Math.floor(m / 60);
+      var min = m % 60;
+      simTime.textContent = (h < 10 ? '0' + h : h) + ':' + (min < 10 ? '0' + min : min);
+
+      var solar  = solarAt(m);
+      var load   = loadAt(m);
+      var batWh  = batAt(m);
+      var batPct = Math.round((batWh / (BAT_USABLE * 1000)) * 100);
+      var net    = solar - load;
+
+      // Solar icon
+      if (simSolarIcon) {
+        simSolarIcon.textContent = (h >= 6.5 && h <= 18.5) ? (solar > PEAK_W * 0.3 ? '☀️' : '⛅') : '🌙';
+      }
+
+      // Numeric values
+      simSolar.textContent = solar >= 1000 ? (solar / 1000).toFixed(1) + ' kW' : Math.round(solar) + ' W';
+      simLoad.textContent  = load  >= 1000 ? (load  / 1000).toFixed(1) + ' kW' : Math.round(load)  + ' W';
+      simBatt.textContent  = batPct + '%';
+      simNet.textContent   = (net >= 0 ? '+' : '') + (Math.abs(net) >= 1000 ? (net / 1000).toFixed(1) + ' kW' : Math.round(net) + ' W');
+      simNet.style.color   = net >= 0 ? '#059669' : '#dc2626';
+
+      // Battery bar
+      var batColor = batPct < 15 ? '#dc2626' : batPct < 35 ? '#ea580c' : batPct < 60 ? '#d97706' : '#059669';
+      simBatt.style.color = batColor;
+      simBatFill.style.width      = batPct + '%';
+      simBatFill.style.background = batColor;
+      simBatIcon.textContent = batPct >= 70 ? '🔋' : batPct >= 40 ? '🪫' : '⚡';
+
+      // Status and warnings
+      var warnings = [], recs = [];
+      var status = '✅ Normal', statColor = '#059669';
+
+      if (batWh <= 50 && solar < load) {
+        status    = '🔴 Blackout Risk';
+        statColor = '#dc2626';
+        warnings.push('<strong>⚠ Battery depleted — blackout risk at ' + simTime.textContent + '!</strong> Unless grid/generator backup is active, loads will be interrupted.');
+      } else if (batPct < 20) {
+        status    = '🟠 Low Battery';
+        statColor = '#ea580c';
+        warnings.push('🪫 Battery below 20% at ' + simTime.textContent + '. Evening loads may cause blackout. Reduce non-critical loads or activate backup.');
+      } else if (load > INV_KW * 1000 * 0.88) {
+        status    = '🟡 Inverter Stressed';
+        statColor = '#d97706';
+        warnings.push('⚠ Load approaching inverter comfort zone. Peak demand may cause tripping.');
+      } else if (solar > load * 1.4 && batPct > 95) {
+        status    = '⚡ Surplus';
+        statColor = '#4f46e5';
+        recs.push('☀️ Solar surplus! Run water heater or other resistive loads during peak sun hours.');
+      } else if (h >= 6.5 && h <= 18.5 && solar < load * 0.3) {
+        status    = '⛅ Low Generation';
+        statColor = '#d97706';
+      } else if (h >= 6.5 && h <= 18.5) {
+        status    = '🔆 Charging';
+        statColor = '#059669';
+      }
+
+      simStat.textContent = status;
+      simStat.style.color = statColor;
+
+      // Blackout projection
+      if (batPct > 20 && h < 22) {
+        for (var fwd = m; fwd <= 1440; fwd += 15) {
+          var fpct = Math.round((batTrace[Math.min(Math.floor(fwd/15), batTrace.length-1)] / (BAT_USABLE*1000)) * 100);
+          if (fpct <= 0 && fwd > m + 60) {
+            var dh = Math.floor(fwd/60), dm = fwd % 60;
+            recs.push('📉 Battery projected to reach 0% at ' + (dh<10?'0'+dh:dh) + ':' + (dm<10?'0'+dm:dm) + '. Reduce loads or activate backup before then.');
+            break;
+          }
+        }
+      }
+      if (h >= 10 && h <= 15 && solar > load) {
+        recs.push('🌞 Solar covers daytime demand. Ideal window for washing, ironing, and water heating.');
+      }
+      if (h >= 17 && h <= 21) {
+        recs.push('🌆 Evening peak — solar dropping. Battery supplying the deficit. Shed non-critical loads to extend runtime.');
+      }
+
+      // Render warnings (light-mode colours)
+      if (warnings.length) {
+        simWarn.style.display    = '';
+        simWarn.style.background = statColor === '#dc2626' ? '#fff1f2' : '#fff7ed';
+        simWarn.style.border     = '1.5px solid ' + (statColor === '#dc2626' ? '#fecaca' : '#fed7aa');
+        simWarn.style.color      = statColor;
+        simWarn.innerHTML        = warnings.join('<br>');
+      } else {
+        simWarn.style.display = 'none';
+      }
+      if (simRecs) {
+        simRecs.innerHTML = recs.map(function (r) {
+          return '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:0.35rem 0.7rem;margin-bottom:0.3rem;font-size:0.78rem;color:#1e40af;">' + r + '</div>';
+        }).join('');
+      }
+
+      if (canvas.getContext) drawChart(m);
+    }
+
+    // ── Play animation ─────────────────────────────────────────────
+    playBtn.addEventListener('click', function () {
+      if (playInterval) {
+        clearInterval(playInterval);
+        playInterval = null;
+        playBtn.textContent = '▶ Play';
+        playBtn.style.background = '#10b981';
+      } else {
+        playBtn.textContent = '⏸ Pause';
+        playBtn.style.background = '#6366f1';
+        playInterval = setInterval(function () {
+          var v = parseInt(slider.value, 10) + 15;
+          if (v > 1440) v = 0;
+          slider.value = v;
+          update();
+        }, 80);
+      }
+    });
+
+    slider.addEventListener('input', update);
+
+    // Initial render after layout
+    requestAnimationFrame(function () { requestAnimationFrame(update); });
+  }());
+  </script>
 
   <!-- ============================================================
        BUSINESS SIMULATOR
@@ -4668,6 +5157,7 @@
             <a href="{% url 'staticpages:pricing' %}">Pricing</a>
             <a href="{% url 'marketplace:home' %}">Marketplace</a>
             <a href="{% url 'staticpages:simulator' %}">Business Simulator</a>
+            <a href="{% url 'staticpages:developers' %}">Developers</a>
           </div>
         </div>
         <div>

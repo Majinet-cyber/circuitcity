@@ -539,6 +539,20 @@
         </div>
     </div>
 
+    <!-- Demo Preview Banner (shown when no real data exists) -->
+    {% if is_demo %}
+    <div style="background:linear-gradient(135deg,#fefce8,#fef9c3);border:2px dashed #ca8a04;border-radius:16px;padding:14px 20px;margin-bottom:1.25rem;display:flex;align-items:center;gap:12px;" data-testid="demo-preview-banner">
+      <span style="font-size:1.5rem;">🌱</span>
+      <div>
+        <strong style="color:#92400e;">Demo Preview</strong>
+        <span style="color:#78350f;font-size:0.875rem;margin-left:8px;">These are sample estimates to show what your dashboard will look like once you start recording data.</span>
+        <span style="color:#78350f;font-size:0.875rem;margin-left:4px;">
+          <a href="{% url 'verticals:farm_expenses' %}" style="color:#d97706;font-weight:700;">Add your first record →</a>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Alerts Section (if any) -->
     {% if alerts %}
     <div class="alerts-section" data-testid="farm-alerts">

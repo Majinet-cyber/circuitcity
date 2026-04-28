@@ -57,8 +57,21 @@
     <li class="{% if '/support/hq/' in request.path %}active{% endif %}">
       <a href="{{ url_hq_tickets|default:'/support/hq/tickets/' }}"><i class="bi bi-ticket-perforated"></i><span>Tickets</span></a>
     </li>
+    <li class="{% if '/hq/bugs' in request.path %}active{% endif %}">
+      <a href="{% url 'hq:bugs_list' %}"><i class="bi bi-bug"></i><span>Bug Monitor</span></a>
+    </li>
+    <li class="{% if '/hq/audit' in request.path %}active{% endif %}">
+      <a href="{% url 'hq:audit_log' %}"><i class="bi bi-journal-check"></i><span>Admin Audit</span></a>
+    </li>
     <li class="{% if '/audit/logs' in request.path %}active{% endif %}">
-      <a href="{{ url_audit_logs|default:'/audit/logs/' }}"><i class="bi bi-journal-text"></i><span>Audit Logs</span></a>
+      <a href="{{ url_audit_logs|default:'/audit/logs/' }}"><i class="bi bi-journal-text"></i><span>Business Audit</span></a>
+    </li>
+  </ul>
+
+  <div class="cc-section">Admin Access</div>
+  <ul class="cc-nav">
+    <li class="{% if '/hq/accounts' in request.path %}active{% endif %}">
+      <a href="{% url 'hq:accounts_list' %}"><i class="bi bi-person-badge"></i><span>HQ Accounts</span></a>
     </li>
   </ul>
 

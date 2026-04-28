@@ -1,0 +1,132 @@
+{% extends "hq/base_hq.html" %}
+{% load static %}
+
+{% block title %}{{ account.username }} — Emajinet HQ{% endblock %}
+{% block topbar_title %}Account: {{ account.username }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .acc-section { background:#fff; border-radius:10px; padding:1.2rem 1.4rem; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:1rem; }
+  .acc-section h6 { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:#6c757d; font-weight:700; margin-bottom:.75rem; }
+  .role-badge { font-size:.75rem; background:#e9ecef; color:#495057; border-radius:20px; padding:3px 10px; font-weight:500; margin:2px; display:inline-block; }
+  .role-badge.super { background:#6f42c1; color:#fff; }
+  .audit-row { border-bottom:1px solid #f1f1f1; padding:.4rem 0; font-size:.82rem; }
+  .audit-row:last-child { border-bottom:none; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{% url 'hq:accounts_list' %}">Accounts</a></li>
+    <li class="breadcrumb-item active">{{ account.username }}</li>
+  </ol>
+</nav>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+
+    <!-- Account summary -->
+    <div class="acc-section">
+      <h6><i class="bi bi-person-circle me-1"></i>Account Info</h6>
+      <dl class="row mb-0 small">
+        <dt class="col-4 text-muted">Username</dt><dd class="col-8 fw-semibold">{{ account.username }}</dd>
+        <dt class="col-4 text-muted">Email</dt><dd class="col-8">{{ account.email|default:"—" }}</dd>
+        <dt class="col-4 text-muted">Full Name</dt><dd class="col-8">{{ account.get_full_name|default:"—" }}</dd>
+        <dt class="col-4 text-muted">Staff</dt><dd class="col-8">{{ account.is_staff|yesno:"Yes,No" }}</dd>
+        <dt class="col-4 text-muted">Superuser</dt><dd class="col-8">{{ account.is_superuser|yesno:"Yes,No" }}</dd>
+        <dt class="col-4 text-muted">Active</dt><dd class="col-8">
+          {% if account.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}
+        </dd>
+        <dt class="col-4 text-muted">Joined</dt><dd class="col-8">{{ account.date_joined|date:"Y-m-d H:i" }}</dd>
+        <dt class="col-4 text-muted">Last login</dt><dd class="col-8">{{ account.last_login|date:"Y-m-d H:i"|default:"Never" }}</dd>
+      </dl>
+    </div>
+
+    <!-- Current roles -->
+    <div class="acc-section">
+      <h6><i class="bi bi-shield me-1"></i>Current Roles</h6>
+      {% if account.is_superuser %}<span class="role-badge super">Superuser</span>{% endif %}
+      {% for g in account.groups.all %}<span class="role-badge">{{ g.name }}</span>{% endfor %}
+      {% if not account.groups.all and not account.is_superuser %}<span class="text-muted small">No roles assigned.</span>{% endif %}
+    </div>
+
+    <!-- Role assignment form -->
+    {% if can_manage_roles %}
+    <div class="acc-section">
+      <h6><i class="bi bi-person-badge me-1"></i>Assign Roles</h6>
+      <form method="post" action="{% url 'hq:account_assign_groups' user_id=account.pk %}">
+        {% csrf_token %}
+        <div class="mb-3">
+          {% for g in groups %}
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="groups" value="{{ g.pk }}"
+              id="grp_{{ g.pk }}"
+              {% if g in account.groups.all %}checked{% endif %}>
+            <label class="form-check-label" for="grp_{{ g.pk }}">{{ g.name }}</label>
+          </div>
+          {% endfor %}
+        </div>
+        {% if request.user.is_superuser %}
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="is_superuser" value="1"
+            id="chkSuperuser" {% if account.is_superuser %}checked{% endif %}>
+          <label class="form-check-label text-danger fw-semibold" for="chkSuperuser">Superuser</label>
+        </div>
+        {% endif %}
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-save me-1"></i>Save Roles
+        </button>
+      </form>
+    </div>
+
+    <!-- Activate / Deactivate -->
+    <div class="acc-section">
+      <h6><i class="bi bi-toggle-on me-1"></i>Account Status</h6>
+      <form method="post" action="{% url 'hq:account_toggle_active' user_id=account.pk %}">
+        {% csrf_token %}
+        {% if account.is_active %}
+          <button type="submit" class="btn btn-sm btn-outline-danger"
+            onclick="return confirm('Deactivate {{ account.username }}?')">
+            <i class="bi bi-person-x me-1"></i>Deactivate Account
+          </button>
+        {% else %}
+          <button type="submit" class="btn btn-sm btn-outline-success">
+            <i class="bi bi-person-check me-1"></i>Activate Account
+          </button>
+        {% endif %}
+      </form>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-5">
+    <!-- Audit trail -->
+    <div class="acc-section">
+      <h6><i class="bi bi-journal-check me-1"></i>Audit Trail for This Account</h6>
+      {% if audit_entries %}
+        {% for entry in audit_entries %}
+        <div class="audit-row">
+          <div class="d-flex justify-content-between">
+            <span class="badge bg-light text-dark border">{{ entry.action }}</span>
+            <span class="text-muted" style="font-size:.7rem">{{ entry.created_at|date:"m-d H:i" }}</span>
+          </div>
+          <div class="text-muted small">by {{ entry.actor.username|default:"system" }}</div>
+          {% if entry.before or entry.after %}
+          <details class="mt-1">
+            <summary class="small text-muted" style="cursor:pointer">Show changes</summary>
+            <div style="font-family:monospace;font-size:.7rem;background:#f8f9fa;padding:.4rem;border-radius:4px;margin-top:.3rem">
+              {% if entry.before %}Before: {{ entry.before }}<br>{% endif %}
+              {% if entry.after %}After: {{ entry.after }}{% endif %}
+            </div>
+          </details>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted small mb-0">No audit trail for this account yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
