@@ -1,70 +1,217 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Reconciliation · Mobile Money · {{ business.name }}{% endblock %}
+{% block title %}End of Day Clearance · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mm-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.mm-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.mm-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+  text-decoration: none; border: 1px solid; transition: all 0.15s;
+  background: #fff; border-color: #e2e8f0; color: #0f172a;
+}
+.mm-nav-btn:hover { background: #f8fafc; }
+.mm-nav-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+.recon-grid { display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
+.mm-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 22px; }
+
+/* Today's summary preview */
+.today-summary {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+  background: #f8fafc; border-radius: 12px; padding: 14px; margin-bottom: 20px;
+}
+.ts-item { text-align: center; }
+.ts-label { font-size: 0.68rem; text-transform: uppercase; font-weight: 700; color: #64748b; letter-spacing: 0.05em; margin-bottom: 3px; }
+.ts-value { font-size: 1rem; font-weight: 900; color: #0f172a; }
+
+/* Recon history items */
+.recon-item {
+  border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+  border-left: 4px solid;
+}
+.recon-balanced  { background: #f0fdf4; border-color: #22c55e; }
+.recon-shortage  { background: #fef2f2; border-color: #ef4444; }
+.recon-overage   { background: #fffbeb; border-color: #f59e0b; }
+.recon-minor     { background: #fffbeb; border-color: #f59e0b; }
+
+/* Variance display */
+.variance-display {
+  border-radius: 16px; padding: 20px 24px; margin-bottom: 0;
+  text-align: center;
+}
+.vd-label { font-size: 0.75rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.07em; margin-bottom: 8px; }
+.vd-amount { font-size: 2rem; font-weight: 900; line-height: 1; }
+.vd-status { font-size: 0.85rem; font-weight: 700; margin-top: 6px; }
+
+/* Traffic light */
+.traffic-dot {
+  width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 6px;
+}
+
+@media (max-width: 800px) { .recon-grid { grid-template-columns: 1fr; } .today-summary { grid-template-columns: repeat(2, 1fr); } }
+</style>
+{% endblock %}
 
 {% block content %}
-<div style="max-width:900px;margin:0 auto;padding:20px 12px;" data-testid="mm-reconciliation">
-  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
+<div class="mm-wrap" data-testid="mm-reconciliation">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
     <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
-    <h1 style="margin:0;font-size:1.5rem;font-weight:800;color:#0f172a;">🧮 Daily Reconciliation</h1>
+    <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#0f172a;">End of Day Clearance</h1>
+  </div>
+
+  <div class="mm-nav">
+    <a href="{% url 'mobilemoney:transactions' %}" class="mm-nav-btn">Transactions</a>
+    <a href="{% url 'mobilemoney:credits' %}" class="mm-nav-btn">Credits & Debts</a>
+    <a href="{% url 'mobilemoney:commissions' %}" class="mm-nav-btn">Commissions</a>
+    <a href="{% url 'mobilemoney:reconciliation' %}" class="mm-nav-btn active">End of Day</a>
+    <a href="{% url 'mobilemoney:settlements' %}" class="mm-nav-btn">Settlements</a>
   </div>
 
   {% if messages %}
   {% for msg in messages %}
-  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;{% if msg.tags == 'success' %}background:#dcfce7;color:#15803d;{% else %}background:#fee2e2;color:#991b1b;{% endif %}">{{ msg }}</div>
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600;{% if 'error' in msg.tags %}background:#fee2e2;color:#991b1b;{% else %}background:#dcfce7;color:#15803d;{% endif %}">{{ msg }}</div>
   {% endfor %}
   {% endif %}
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+  <div class="recon-grid">
     <!-- Form -->
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
-      <h3 style="font-weight:800;margin:0 0 16px;">Record Reconciliation</h3>
+    <div class="mm-card">
+      <h3 style="margin:0 0 16px;font-size:0.95rem;font-weight:800;color:#0f172a;">Daily Reconciliation</h3>
+
+      <!-- Today's auto-aggregated summary -->
+      <div class="today-summary">
+        <div class="ts-item">
+          <div class="ts-label">Cash In</div>
+          <div class="ts-value" style="color:#16a34a;">MK {{ today_cash_in|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="ts-item">
+          <div class="ts-label">Cash Out</div>
+          <div class="ts-value" style="color:#dc2626;">MK {{ today_cash_out|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="ts-item">
+          <div class="ts-label">Commissions</div>
+          <div class="ts-value" style="color:#d97706;">MK {{ today_commission|floatformat:0|intcomma }}</div>
+        </div>
+      </div>
+      <p style="font-size:0.78rem;color:#64748b;margin:-8px 0 16px;text-align:center;">
+        {{ today_tx_count }} transaction{% if today_tx_count != 1 %}s{% endif %} today — auto-aggregated from records
+      </p>
+
       <form method="post" data-testid="reconciliation-form">
         {% csrf_token %}
         <div class="mb-3">
-          <label class="form-label fw-semibold">Date *</label>
-          <input type="date" name="date" class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Date *</label>
+          <input type="date" name="date" class="form-control form-control-sm" value="{{ today|date:'Y-m-d' }}" required>
+        </div>
+        <div class="row mb-3 g-2">
+          <div class="col">
+            <label class="form-label fw-semibold" style="font-size:0.85rem;">Opening Cash (MWK)</label>
+            <input type="number" name="opening_cash" class="form-control form-control-sm" min="0" step="0.01" value="{{ opening_cash_suggestion|floatformat:2 }}" placeholder="0.00">
+            <small class="text-muted" style="font-size:0.7rem;">From yesterday's closing</small>
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold" style="font-size:0.85rem;">Opening E-Float (MWK)</label>
+            <input type="number" name="opening_float" class="form-control form-control-sm" min="0" step="0.01" value="{{ opening_float_suggestion|floatformat:2 }}" placeholder="0.00">
+          </div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Opening Cash (MWK)</label>
-          <input type="number" name="opening_cash" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Actual Closing Cash — Count Your Cash *</label>
+          <input type="number" name="actual_closing_cash" class="form-control" min="0" step="0.01" placeholder="Physical cash in drawer right now" required
+            style="font-size:1.1rem;font-weight:700;padding:14px;border:2px solid #e2e8f0;border-radius:12px;">
+          <small class="text-muted" style="font-size:0.72rem;">Count every note and coin. Enter the exact amount.</small>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Opening E-Float (MWK)</label>
-          <input type="number" name="opening_float" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Handover Notes</label>
+          <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Shortage explanation, shift handover notes, incidents..."></textarea>
         </div>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Actual Closing Cash (MWK) *</label>
-          <input type="number" name="actual_closing_cash" class="form-control" min="0" step="0.01" placeholder="Count your cash" required>
-        </div>
-        <p style="font-size:0.82rem;color:#64748b;margin-bottom:12px;">Cash in/out totals are auto-aggregated from today's recorded transactions.</p>
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Notes</label>
-          <textarea name="notes" class="form-control" rows="2" placeholder="Shortage explanation, handover notes..."></textarea>
-        </div>
-        <button type="submit" class="btn btn-dark w-100 fw-bold">Save Reconciliation</button>
+        <button type="submit" class="btn btn-dark w-100 fw-bold" style="padding:12px;">
+          Save End of Day Clearance
+        </button>
       </form>
     </div>
 
     <!-- History -->
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
-      <h3 style="font-weight:800;margin:0 0 16px;">History (30 days)</h3>
-      {% for recon in reconciliations %}
-      <div style="border:1px solid {% if recon.difference < 0 %}#fca5a5{% elif recon.difference > 0 %}#86efac{% else %}#e2e8f0{% endif %};border-radius:10px;padding:12px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <strong style="color:#0f172a;">{{ recon.date }}</strong>
-          <span style="font-weight:700;{% if recon.difference < 0 %}color:#dc2626;{% elif recon.difference > 0 %}color:#16a34a;{% else %}color:#64748b;{% endif %}">
-            {% if recon.difference > 0 %}+{% endif %}MK {{ recon.difference|floatformat:0|intcomma }}
-          </span>
+    <div>
+      <div class="mm-card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 16px;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">
+          Reconciliation History (30 days)
+        </h3>
+
+        {% if reconciliations %}
+        {% for recon in reconciliations %}
+        <div class="recon-item
+          {% if recon.difference == 0 %}recon-balanced
+          {% elif recon.difference < 0 and recon.difference > -5000 %}recon-minor
+          {% elif recon.difference < 0 %}recon-shortage
+          {% else %}recon-overage{% endif %}
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <span class="traffic-dot" style="background:
+                  {% if recon.difference == 0 %}#22c55e
+                  {% elif recon.difference < 0 and recon.difference > -5000 %}#f59e0b
+                  {% elif recon.difference < 0 %}#ef4444
+                  {% else %}#f59e0b{% endif %};"></span>
+                <strong style="color:#0f172a;font-size:0.9rem;">{{ recon.date }}</strong>
+              </div>
+              <div style="font-size:0.78rem;color:#64748b;">
+                In: MK {{ recon.total_cash_in|floatformat:0|intcomma }}
+                · Out: MK {{ recon.total_cash_out|floatformat:0|intcomma }}
+                {% if recon.total_commissions > 0 %}· Comm: MK {{ recon.total_commissions|floatformat:0|intcomma }}{% endif %}
+              </div>
+              <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px;">
+                Expected MK {{ recon.expected_closing_cash|floatformat:0|intcomma }}
+                · Actual MK {{ recon.actual_closing_cash|floatformat:0|intcomma }}
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:1.2rem;font-weight:900;
+                {% if recon.difference == 0 %}color:#16a34a;
+                {% elif recon.difference < 0 %}color:#dc2626;
+                {% else %}color:#d97706;{% endif %}">
+                {% if recon.difference > 0 %}+{% endif %}MK {{ recon.difference|floatformat:0|intcomma }}
+              </div>
+              <div style="font-size:0.72rem;font-weight:700;
+                {% if recon.difference == 0 %}color:#16a34a;
+                {% elif recon.difference < 0 %}color:#dc2626;
+                {% else %}color:#d97706;{% endif %}">
+                {% if recon.difference == 0 %}BALANCED
+                {% elif recon.difference < 0 %}SHORTAGE
+                {% else %}OVERAGE{% endif %}
+              </div>
+            </div>
+          </div>
+          {% if recon.notes %}
+          <div style="font-size:0.75rem;color:#64748b;margin-top:6px;border-top:1px solid rgba(0,0,0,0.05);padding-top:6px;">
+            {{ recon.notes }}
+          </div>
+          {% endif %}
         </div>
-        <div style="font-size:0.8rem;color:#64748b;margin-top:4px;">
-          In: MK {{ recon.total_cash_in|floatformat:0|intcomma }} · Out: MK {{ recon.total_cash_out|floatformat:0|intcomma }} · Expected: MK {{ recon.expected_closing_cash|floatformat:0|intcomma }}
+        {% endfor %}
+        {% else %}
+        <div style="text-align:center;padding:40px 0;color:#94a3b8;">
+          <div style="font-size:2.5rem;margin-bottom:8px;">🧮</div>
+          <p style="margin:0;font-size:0.875rem;">No reconciliations recorded yet.</p>
+          <p style="margin:6px 0 0;font-size:0.78rem;">Use the form to record your first end-of-day clearance.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- How to guide -->
+      <div class="mm-card" style="background:#f8fafc;">
+        <h3 style="margin:0 0 12px;font-size:0.85rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.05em;">How Reconciliation Works</h3>
+        <div style="font-size:0.8rem;color:#64748b;line-height:1.7;">
+          <p style="margin:0 0 8px;"><strong style="color:#0f172a;">Expected Cash</strong> = Opening Cash + Cash In − Cash Out</p>
+          <p style="margin:0 0 8px;"><strong style="color:#16a34a;">GREEN</strong> = Balanced (actual = expected)</p>
+          <p style="margin:0 0 8px;"><strong style="color:#d97706;">AMBER</strong> = Minor mismatch (under MWK 5,000)</p>
+          <p style="margin:0;"><strong style="color:#dc2626;">RED</strong> = Shortage or significant overage</p>
         </div>
       </div>
-      {% empty %}
-      <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No reconciliations yet.</p>
-      {% endfor %}
     </div>
   </div>
 </div>

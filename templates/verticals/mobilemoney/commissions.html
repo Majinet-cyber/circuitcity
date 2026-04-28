@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Commissions · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mm-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.mm-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.mm-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+  text-decoration: none; border: 1px solid; transition: all 0.15s;
+  background: #fff; border-color: #e2e8f0; color: #0f172a;
+}
+.mm-nav-btn:hover { background: #f8fafc; }
+.mm-nav-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+/* KPI row */
+.comm-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+.ck-card {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px 18px;
+}
+.ck-label { font-size: 0.7rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.06em; color: #64748b; margin-bottom: 5px; }
+.ck-value { font-size: 1.6rem; font-weight: 900; color: #0f172a; line-height: 1; }
+.ck-sub { font-size: 0.72rem; color: #94a3b8; margin-top: 4px; }
+
+/* Grid */
+.comm-grid { display: grid; grid-template-columns: 1fr 380px; gap: 20px; }
+.mm-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
+
+/* Provider split */
+.provider-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.prov-card { border-radius: 12px; padding: 14px 16px; }
+.prov-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 5px; }
+.prov-value { font-size: 1.4rem; font-weight: 900; }
+.prov-bar { height: 6px; border-radius: 3px; background: rgba(0,0,0,0.08); overflow: hidden; margin-top: 8px; }
+.prov-fill { height: 100%; border-radius: 3px; }
+
+/* Breakdown table */
+.breakdown-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #f1f5f9; }
+.breakdown-row:last-child { border-bottom: none; }
+
+/* Rule item */
+.rule-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.rule-item.inactive { opacity: 0.5; }
+
+@media (max-width: 800px) { .comm-grid { grid-template-columns: 1fr; } .comm-kpis { grid-template-columns: repeat(2, 1fr); } .provider-split { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mm-wrap" data-testid="mm-commissions">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+    <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
+    <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#0f172a;">Commissions</h1>
+  </div>
+
+  <div class="mm-nav">
+    <a href="{% url 'mobilemoney:transactions' %}" class="mm-nav-btn">Transactions</a>
+    <a href="{% url 'mobilemoney:credits' %}" class="mm-nav-btn">Credits & Debts</a>
+    <a href="{% url 'mobilemoney:commissions' %}" class="mm-nav-btn active">Commissions</a>
+    <a href="{% url 'mobilemoney:reconciliation' %}" class="mm-nav-btn">End of Day</a>
+    <a href="{% url 'mobilemoney:settlements' %}" class="mm-nav-btn">Settlements</a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600;{% if 'error' in msg.tags %}background:#fee2e2;color:#991b1b;{% else %}background:#dcfce7;color:#15803d;{% endif %}">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Commission KPIs -->
+  <div class="comm-kpis">
+    <div class="ck-card" style="border-top:4px solid #f59e0b;">
+      <div class="ck-label">Today</div>
+      <div class="ck-value">MK {{ today_commission|floatformat:0|intcomma }}</div>
+      <div class="ck-sub">{{ today }}</div>
+    </div>
+    <div class="ck-card" style="border-top:4px solid #3b82f6;">
+      <div class="ck-label">This Week</div>
+      <div class="ck-value">MK {{ week_commission|floatformat:0|intcomma }}</div>
+      <div class="ck-sub">Mon–{{ today|date:"D" }}</div>
+    </div>
+    <div class="ck-card" style="border-top:4px solid #10b981;">
+      <div class="ck-label">This Month</div>
+      <div class="ck-value">MK {{ month_commission|floatformat:0|intcomma }}</div>
+      <div class="ck-sub">{{ today|date:"F Y" }}</div>
+    </div>
+    <div class="ck-card" style="border-top:4px solid #6366f1;">
+      <div class="ck-label">All Time</div>
+      <div class="ck-value">MK {{ all_time_commission|floatformat:0|intcomma }}</div>
+      <div class="ck-sub">Lifetime total</div>
+    </div>
+  </div>
+
+  <div class="comm-grid">
+    <!-- Left: breakdowns -->
+    <div>
+      <!-- Provider split -->
+      <div class="mm-card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 14px;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">Provider Split (This Month)</h3>
+        <div class="provider-split">
+          <div class="prov-card" style="background:#fff7ed;border:1px solid #fed7aa;">
+            <div class="prov-label" style="color:#c2410c;">Airtel Money</div>
+            <div class="prov-value" style="color:#c2410c;">MK {{ airtel_month_commission|floatformat:0|intcomma }}</div>
+            {% with total=airtel_month_commission|add:tnm_month_commission %}
+            {% if total > 0 %}
+            <div class="prov-bar">
+              <div class="prov-fill" style="width:{% widthratio airtel_month_commission total 100 %}%;background:#f97316;"></div>
+            </div>
+            {% endif %}
+            {% endwith %}
+          </div>
+          <div class="prov-card" style="background:#eff6ff;border:1px solid #bfdbfe;">
+            <div class="prov-label" style="color:#1d4ed8;">TNM Mpamba</div>
+            <div class="prov-value" style="color:#1d4ed8;">MK {{ tnm_month_commission|floatformat:0|intcomma }}</div>
+            {% with total=airtel_month_commission|add:tnm_month_commission %}
+            {% if total > 0 %}
+            <div class="prov-bar">
+              <div class="prov-fill" style="width:{% widthratio tnm_month_commission total 100 %}%;background:#3b82f6;"></div>
+            </div>
+            {% endif %}
+            {% endwith %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Transaction type breakdown -->
+      <div class="mm-card">
+        <h3 style="margin:0 0 14px;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">By Transaction Type (This Month)</h3>
+        {% if tx_breakdown %}
+        {% with max_comm=tx_breakdown.0.total_comm %}
+        {% for row in tx_breakdown %}
+        {% if row.total_comm > 0 %}
+        <div class="breakdown-row">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.85rem;font-weight:700;color:#0f172a;margin-bottom:3px;">{{ row.tx_label }}</div>
+            <div style="background:#f1f5f9;border-radius:3px;height:5px;overflow:hidden;margin-right:16px;">
+              <div style="height:100%;background:#f59e0b;border-radius:3px;width:{% widthratio row.total_comm max_comm 100 %}%;"></div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:0.88rem;font-weight:800;color:#0f172a;">MK {{ row.total_comm|floatformat:0|intcomma }}</div>
+            <div style="font-size:0.72rem;color:#94a3b8;">{{ row.count }} tx</div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% endwith %}
+        {% else %}
+        <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No commission-generating transactions this month yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Right: commission rules -->
+    <div>
+      <div class="mm-card" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 14px;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">Commission Rules</h3>
+        <p style="font-size:0.78rem;color:#64748b;margin:0 0 14px;">
+          Rules are used to auto-calculate commission when recording transactions. If no rule matches, commission defaults to 0.
+        </p>
+
+        {% for rule in commission_rules %}
+        <div class="rule-item {% if not rule.is_active %}inactive{% endif %}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:0.85rem;font-weight:700;color:#0f172a;">
+                {{ rule.get_network_display }} — {{ rule.get_tx_type_display }}
+              </div>
+              <div style="font-size:0.78rem;color:#64748b;margin-top:2px;">
+                {{ rule.get_rule_type_display }}:
+                {% if rule.rule_type == 'percentage' %}
+                  {{ rule.percentage_rate|floatformat:4 }}% ({{ rule.percentage_rate|floatformat:2 }}%)
+                {% elif rule.rule_type == 'fixed' %}
+                  MWK {{ rule.fixed_amount|floatformat:0|intcomma }}
+                {% else %}
+                  MWK {{ rule.fixed_amount|floatformat:0|intcomma }} for MWK {{ rule.min_amount|floatformat:0|intcomma }}{% if rule.max_amount %}–{{ rule.max_amount|floatformat:0|intcomma }}{% else %}+{% endif %}
+                {% endif %}
+              </div>
+              {% if rule.min_amount > 0 or rule.max_amount %}
+              <div style="font-size:0.72rem;color:#94a3b8;margin-top:2px;">
+                Amount range: MWK {{ rule.min_amount|floatformat:0|intcomma }} – {% if rule.max_amount %}{{ rule.max_amount|floatformat:0|intcomma }}{% else %}no limit{% endif %}
+              </div>
+              {% endif %}
+            </div>
+            {% if rule.is_active %}
+            <form method="post" style="flex-shrink:0;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="deactivate_rule">
+              <input type="hidden" name="rule_id" value="{{ rule.id }}">
+              <button type="submit" class="btn btn-sm" style="font-size:0.72rem;padding:3px 8px;border:1px solid #fca5a5;color:#dc2626;background:#fff;">Remove</button>
+            </form>
+            {% else %}
+            <span style="font-size:0.72rem;color:#94a3b8;font-weight:600;">Inactive</span>
+            {% endif %}
+          </div>
+        </div>
+        {% empty %}
+        <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No commission rules configured.</p>
+        {% endfor %}
+      </div>
+
+      <!-- Add rule form -->
+      <div class="mm-card" style="background:#f8fafc;border-style:dashed;">
+        <h3 style="margin:0 0 14px;font-size:0.85rem;font-weight:800;color:#475569;text-transform:uppercase;letter-spacing:0.05em;">Add Commission Rule</h3>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_rule">
+          <div class="row mb-2 g-2">
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:0.78rem;">Network</label>
+              <select name="network" class="form-select form-select-sm">
+                {% for val, lbl in networks %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:0.78rem;">TX Type</label>
+              <select name="tx_type" class="form-select form-select-sm">
+                {% for val, lbl in tx_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label fw-semibold" style="font-size:0.78rem;">Rule Type</label>
+            <select name="rule_type" class="form-select form-select-sm" id="ruleTypeSelect" onchange="updateRuleFields(this.value)">
+              {% for val, lbl in rule_types %}<option value="{{ val }}">{{ lbl }}</option>{% endfor %}
+            </select>
+          </div>
+          <div id="fieldPercentage" class="mb-2">
+            <label class="form-label fw-semibold" style="font-size:0.78rem;">Percentage Rate (e.g. 0.015 = 1.5%)</label>
+            <input type="number" name="percentage_rate" class="form-control form-control-sm" step="0.0001" min="0" placeholder="0.0150">
+          </div>
+          <div id="fieldFixed" class="mb-2" style="display:none;">
+            <label class="form-label fw-semibold" style="font-size:0.78rem;">Fixed Amount (MWK)</label>
+            <input type="number" name="fixed_amount" class="form-control form-control-sm" step="0.01" min="0" placeholder="0.00">
+          </div>
+          <div class="row mb-2 g-2">
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:0.78rem;">Min Amount (MWK)</label>
+              <input type="number" name="min_amount" class="form-control form-control-sm" step="0.01" min="0" value="0" placeholder="0">
+            </div>
+            <div class="col-6">
+              <label class="form-label fw-semibold" style="font-size:0.78rem;">Max Amount (blank = no limit)</label>
+              <input type="number" name="max_amount" class="form-control form-control-sm" step="0.01" min="0" placeholder="No limit">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold">Add Rule</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateRuleFields(type) {
+  document.getElementById('fieldPercentage').style.display = type === 'percentage' ? 'block' : 'none';
+  document.getElementById('fieldFixed').style.display = (type === 'fixed' || type === 'slab') ? 'block' : 'none';
+}
+</script>
+{% endblock %}

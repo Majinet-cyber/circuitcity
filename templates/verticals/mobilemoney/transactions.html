@@ -1,86 +1,313 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Transactions · Mobile Money · {{ business.name }}{% endblock %}
+{% block title %}Record Transaction · Mobile Money · {{ business.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.mm-wrap { max-width: 1100px; margin: 0 auto; padding: 20px 14px; }
+.mm-nav { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
+.mm-nav-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+  text-decoration: none; border: 1px solid; transition: all 0.15s;
+  background: #fff; border-color: #e2e8f0; color: #0f172a;
+}
+.mm-nav-btn:hover { background: #f8fafc; }
+.mm-nav-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+.mm-nav-btn.primary { background: #10b981; color: #fff; border-color: #10b981; }
+.mm-grid { display: grid; grid-template-columns: 420px 1fr; gap: 20px; }
+.mm-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 20px; }
+
+/* Transaction type quick buttons */
+.tx-type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+.tx-btn {
+  border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px 8px;
+  text-align: center; cursor: pointer; transition: all 0.15s; background: #fff;
+  font-size: 0.78rem; font-weight: 700; color: #475569;
+}
+.tx-btn:hover { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+.tx-btn.selected { border-color: #10b981; background: #f0fdf4; color: #15803d; }
+.tx-btn .tb-icon { font-size: 1.2rem; display: block; margin-bottom: 3px; }
+
+/* Float indicator */
+.float-indicator {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #bfdbfe; border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 16px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.fi-label { font-size: 0.75rem; color: #1d4ed8; font-weight: 700; }
+.fi-value { font-size: 1.1rem; font-weight: 900; color: #1e40af; }
+
+/* Movement preview */
+.movement-preview {
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 10px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 0.8rem; color: #475569;
+}
+.movement-preview strong { color: #0f172a; }
+
+/* TX rows */
+.tx-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+}
+.tx-row:last-child { border-bottom: none; }
+.tx-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 700;
+}
+.tx-send_money    { background: #dcfce7; color: #15803d; }
+.tx-receive_money { background: #fee2e2; color: #991b1b; }
+.tx-cash_in       { background: #dcfce7; color: #15803d; }
+.tx-cash_out      { background: #fee2e2; color: #991b1b; }
+.tx-float_purchase{ background: #dbeafe; color: #1d4ed8; }
+.tx-airtime       { background: #ede9fe; color: #6d28d9; }
+.tx-bill_payment  { background: #f3e8ff; color: #7c3aed; }
+.tx-reversal      { background: #fef9c3; color: #854d0e; }
+.tx-failed        { background: #fee2e2; color: #991b1b; }
+.tx-correction    { background: #f1f5f9; color: #475569; }
+.tx-adjustment    { background: #f1f5f9; color: #475569; }
+
+@media (max-width: 800px) {
+  .mm-grid { grid-template-columns: 1fr; }
+  .tx-type-grid { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+{% endblock %}
 
 {% block content %}
-<div style="max-width:900px;margin:0 auto;padding:20px 12px;" data-testid="mm-transactions">
-  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;">
+<div class="mm-wrap" data-testid="mm-transactions">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
     <a href="{% url 'mobilemoney:dashboard' %}" style="color:#64748b;font-size:0.875rem;">&larr; Dashboard</a>
-    <h1 style="margin:0;font-size:1.5rem;font-weight:800;color:#0f172a;">💰 Record Transaction</h1>
+    <h1 style="margin:0;font-size:1.4rem;font-weight:900;color:#0f172a;">Record Transaction</h1>
+  </div>
+
+  <div class="mm-nav">
+    <a href="{% url 'mobilemoney:transactions' %}" class="mm-nav-btn active">Transactions</a>
+    <a href="{% url 'mobilemoney:credits' %}" class="mm-nav-btn">Credits & Debts</a>
+    <a href="{% url 'mobilemoney:commissions' %}" class="mm-nav-btn">Commissions</a>
+    <a href="{% url 'mobilemoney:reconciliation' %}" class="mm-nav-btn">End of Day</a>
+    <a href="{% url 'mobilemoney:settlements' %}" class="mm-nav-btn">Settlements</a>
   </div>
 
   {% if messages %}
   {% for msg in messages %}
-  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;{% if msg.tags == 'success' %}background:#dcfce7;color:#15803d;{% else %}background:#fee2e2;color:#991b1b;{% endif %}">{{ msg }}</div>
+  <div style="padding:12px 16px;border-radius:10px;margin-bottom:12px;font-weight:600;{% if 'error' in msg.tags %}background:#fee2e2;color:#991b1b;{% else %}background:#dcfce7;color:#15803d;{% endif %}">
+    {{ msg }}
+  </div>
   {% endfor %}
   {% endif %}
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-    <!-- Form -->
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
-      <h3 style="font-weight:800;margin:0 0 16px;color:#0f172a;">New Transaction</h3>
-      <form method="post" data-testid="transaction-form">
+  <div class="mm-grid">
+    <!-- ── Form ──────────────────────────────────────────────────────── -->
+    <div class="mm-card">
+      <!-- Float indicator -->
+      <div class="float-indicator">
+        <span class="fi-label">Current E-Float</span>
+        <span class="fi-value">MK {{ float_balance|floatformat:0|intcomma }}</span>
+      </div>
+
+      <!-- Quick type selection -->
+      <div style="margin-bottom:14px;">
+        <div style="font-size:0.75rem;text-transform:uppercase;font-weight:700;color:#64748b;letter-spacing:0.06em;margin-bottom:8px;">Quick Select Transaction Type</div>
+        <div class="tx-type-grid" id="txTypeGrid">
+          <button type="button" class="tx-btn" onclick="selectTxType('send_money', this)">
+            <span class="tb-icon">📤</span>Send Money
+          </button>
+          <button type="button" class="tx-btn" onclick="selectTxType('receive_money', this)">
+            <span class="tb-icon">📥</span>Receive Money
+          </button>
+          <button type="button" class="tx-btn" onclick="selectTxType('cash_in', this)">
+            <span class="tb-icon">💵</span>Cash In
+          </button>
+          <button type="button" class="tx-btn" onclick="selectTxType('cash_out', this)">
+            <span class="tb-icon">💸</span>Cash Out
+          </button>
+          <button type="button" class="tx-btn" onclick="selectTxType('float_purchase', this)">
+            <span class="tb-icon">🔄</span>Float Purchase
+          </button>
+          <button type="button" class="tx-btn" onclick="selectTxType('airtime', this)">
+            <span class="tb-icon">📱</span>Airtime
+          </button>
+        </div>
+      </div>
+
+      <!-- Movement preview -->
+      <div class="movement-preview" id="movementPreview">
+        <strong>Movement:</strong> Select a transaction type to see balance impact.
+      </div>
+
+      <form method="post" data-testid="transaction-form" id="txForm">
         {% csrf_token %}
         <div class="mb-3">
-          <label class="form-label fw-semibold">Transaction Type *</label>
-          <select name="tx_type" class="form-select" required>
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Transaction Type *</label>
+          <select name="tx_type" class="form-select form-select-sm" id="txTypeSelect" required onchange="updatePreview(this.value)">
             {% for val, lbl in tx_types %}
             <option value="{{ val }}">{{ lbl }}</option>
             {% endfor %}
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Network *</label>
-          <select name="network" class="form-select" required>
-            {% for val, lbl in networks %}
-            <option value="{{ val }}">{{ lbl }}</option>
-            {% endfor %}
-          </select>
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Network *</label>
+          <div style="display:flex;gap:8px;">
+            <label style="flex:1;cursor:pointer;">
+              <input type="radio" name="network" value="airtel" checked style="display:none;" id="net_airtel">
+              <div id="net_airtel_btn" onclick="selectNetwork('airtel')" style="border:2px solid #f97316;border-radius:10px;padding:10px;text-align:center;background:#fff7ed;color:#c2410c;font-weight:700;font-size:0.85rem;cursor:pointer;">
+                📶 Airtel Money
+              </div>
+            </label>
+            <label style="flex:1;cursor:pointer;">
+              <input type="radio" name="network" value="tnm" style="display:none;" id="net_tnm">
+              <div id="net_tnm_btn" onclick="selectNetwork('tnm')" style="border:2px solid #e2e8f0;border-radius:10px;padding:10px;text-align:center;background:#fff;color:#475569;font-weight:700;font-size:0.85rem;cursor:pointer;">
+                📶 TNM Mpamba
+              </div>
+            </label>
+          </div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Amount (MWK) *</label>
-          <input type="number" name="amount" class="form-control" required min="1" step="0.01" placeholder="0.00">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Amount (MWK) *</label>
+          <input type="number" name="amount" id="txAmount" class="form-control form-control-sm" required min="1" step="0.01" placeholder="0.00" oninput="updateCommissionPreview()">
+        </div>
+        <div class="row mb-3 g-2">
+          <div class="col">
+            <label class="form-label fw-semibold" style="font-size:0.85rem;">Commission (MWK)</label>
+            <input type="number" name="commission" id="txCommission" class="form-control form-control-sm" min="0" step="0.01" placeholder="Auto">
+            <small class="text-muted" style="font-size:0.72rem;">Leave blank to auto-calculate</small>
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold" style="font-size:0.85rem;">Charges (MWK)</label>
+            <input type="number" name="charges" class="form-control form-control-sm" min="0" step="0.01" placeholder="0.00" value="0">
+          </div>
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Commission Earned (MWK)</label>
-          <input type="number" name="commission" class="form-control" min="0" step="0.01" placeholder="0.00" value="0">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Customer Name</label>
+          <input type="text" name="customer_name" class="form-control form-control-sm" placeholder="Optional — helps track credits">
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Customer Phone</label>
-          <input type="text" name="customer_phone" class="form-control" placeholder="0999 xxx xxx">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Customer Phone</label>
+          <input type="text" name="customer_phone" class="form-control form-control-sm" placeholder="0999 xxx xxx">
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Reference Number</label>
-          <input type="text" name="reference_number" class="form-control" placeholder="Network reference">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Reference Number</label>
+          <input type="text" name="reference_number" class="form-control form-control-sm" placeholder="Network reference code">
         </div>
         <div class="mb-3">
-          <label class="form-label fw-semibold">Notes</label>
-          <input type="text" name="notes" class="form-control" placeholder="Optional notes">
+          <label class="form-label fw-semibold" style="font-size:0.85rem;">Notes</label>
+          <input type="text" name="notes" class="form-control form-control-sm" placeholder="Optional notes">
         </div>
-        <button type="submit" class="btn btn-success w-100 fw-bold" data-testid="record-transaction-btn">Record Transaction</button>
+        <button type="submit" class="btn btn-success w-100 fw-bold" data-testid="record-transaction-btn">
+          Record Transaction
+        </button>
       </form>
     </div>
 
-    <!-- Recent transactions list -->
-    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;">
-      <h3 style="font-weight:800;margin:0 0 16px;color:#0f172a;">Recent (50)</h3>
+    <!-- ── Transaction history ────────────────────────────────────────── -->
+    <div class="mm-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3 style="margin:0;font-size:0.9rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:0.04em;">Recent Transactions (60)</h3>
+      </div>
+      {% if transactions %}
       {% for tx in transactions %}
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;font-size:0.875rem;">
-        <div>
-          <span style="font-weight:700;color:#0f172a;">{{ tx.get_tx_type_display }}</span>
-          <span style="color:#64748b;margin-left:6px;">{{ tx.get_network_display }}</span>
-          {% if tx.customer_phone %}<small style="display:block;color:#94a3b8;">{{ tx.customer_phone }}</small>{% endif %}
+      <div class="tx-row">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <span class="tx-badge tx-{{ tx.tx_type }}">{{ tx.get_tx_type_display }}</span>
+            <span style="font-size:0.72rem;color:#64748b;font-weight:600;">{{ tx.get_network_display }}</span>
+          </div>
+          {% if tx.customer_name %}
+          <div style="font-size:0.78rem;color:#475569;margin-top:2px;">{{ tx.customer_name }}</div>
+          {% elif tx.customer_phone %}
+          <div style="font-size:0.78rem;color:#94a3b8;margin-top:2px;">{{ tx.customer_phone }}</div>
+          {% endif %}
+          {% if tx.reference_number %}
+          <div style="font-size:0.7rem;color:#94a3b8;">Ref: {{ tx.reference_number }}</div>
+          {% endif %}
         </div>
-        <div style="text-align:right;">
-          <strong>MK {{ tx.amount|floatformat:0|intcomma }}</strong>
-          <small style="display:block;color:#94a3b8;">{{ tx.created_at|date:"d M H:i" }}</small>
+        <div style="text-align:right;flex-shrink:0;">
+          <strong style="color:#0f172a;font-size:0.9rem;">MK {{ tx.amount|floatformat:0|intcomma }}</strong>
+          {% if tx.commission > 0 %}
+          <div style="font-size:0.72rem;color:#10b981;font-weight:700;">+MK {{ tx.commission|floatformat:0|intcomma }} comm</div>
+          {% endif %}
+          {% if tx.cash_movement != 0 %}
+          <div style="font-size:0.7rem;color:{% if tx.cash_movement > 0 %}#16a34a{% else %}#dc2626{% endif %};">
+            Cash {% if tx.cash_movement > 0 %}+{% endif %}{{ tx.cash_movement|floatformat:0|intcomma }}
+          </div>
+          {% endif %}
+          <div style="font-size:0.7rem;color:#94a3b8;">{{ tx.created_at|date:"d M, g:i A" }}</div>
         </div>
       </div>
-      {% empty %}
-      <p style="color:#94a3b8;margin:0;font-size:0.875rem;">No transactions yet.</p>
       {% endfor %}
+      {% else %}
+      <div style="text-align:center;padding:40px 0;color:#94a3b8;">
+        <div style="font-size:2.5rem;margin-bottom:8px;">📭</div>
+        <p style="margin:0;font-size:0.875rem;">No transactions yet.</p>
+        <p style="margin:6px 0 0;font-size:0.78rem;">Use the form to record your first transaction.</p>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
+
+<script>
+const movementInfo = {{ tx_movements_info|default:"{}" | safe }};
+
+const movementInfoMap = {
+  "send_money":     "Cash IN (+), Float OUT (−)",
+  "receive_money":  "Cash OUT (−), Float IN (+)",
+  "cash_in":        "Cash IN (+), Float OUT (−)",
+  "cash_out":       "Cash OUT (−), Float IN (+)",
+  "float_purchase": "Cash OUT (−), Float IN (+)",
+  "airtime":        "Float OUT only (−)",
+  "bill_payment":   "Float OUT only (−)",
+  "reversal":       "No automatic movement — set manually",
+  "failed":         "No movement",
+  "correction":     "No automatic movement — set manually",
+  "adjustment":     "No automatic movement — set manually",
+};
+
+function updatePreview(txType) {
+  const preview = document.getElementById('movementPreview');
+  const info = movementInfoMap[txType] || 'Select a type.';
+  preview.innerHTML = '<strong>Movement:</strong> ' + info;
+}
+
+function selectTxType(type, btn) {
+  document.querySelectorAll('.tx-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const sel = document.getElementById('txTypeSelect');
+  sel.value = type;
+  updatePreview(type);
+}
+
+function selectNetwork(net) {
+  document.getElementById('net_airtel').checked = net === 'airtel';
+  document.getElementById('net_tnm').checked = net === 'tnm';
+  const airtelBtn = document.getElementById('net_airtel_btn');
+  const tnmBtn = document.getElementById('net_tnm_btn');
+  if (net === 'airtel') {
+    airtelBtn.style.borderColor = '#f97316';
+    airtelBtn.style.background = '#fff7ed';
+    airtelBtn.style.color = '#c2410c';
+    tnmBtn.style.borderColor = '#e2e8f0';
+    tnmBtn.style.background = '#fff';
+    tnmBtn.style.color = '#475569';
+  } else {
+    tnmBtn.style.borderColor = '#3b82f6';
+    tnmBtn.style.background = '#eff6ff';
+    tnmBtn.style.color = '#1d4ed8';
+    airtelBtn.style.borderColor = '#e2e8f0';
+    airtelBtn.style.background = '#fff';
+    airtelBtn.style.color = '#475569';
+  }
+}
+
+function updateCommissionPreview() {
+  // Could be extended with live AJAX commission preview
+}
+
+// Init
+updatePreview(document.getElementById('txTypeSelect').value);
+</script>
 {% endblock %}

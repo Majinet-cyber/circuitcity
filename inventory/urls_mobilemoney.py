@@ -12,4 +12,6 @@ urlpatterns = [
     path("credits/", mobilemoney.credits, name="credits"),
     path("credits/<int:credit_id>/repay/", mobilemoney.credit_repayment, name="credit_repayment"),
     path("reconciliation/", mobilemoney.reconciliation, name="reconciliation"),
+    path("commissions/", mobilemoney.commissions, name="commissions"),
+    path("settlements/", mobilemoney.settlements, name="settlements"),
 ]
