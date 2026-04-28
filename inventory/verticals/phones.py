@@ -244,6 +244,8 @@ def dashboard(request):
     electronics_sold_in_range = 0
     electronics_revenue = Decimal("0.00")
     electronics_cog = Decimal("0.00")
+    # Pre-define so that the try block can safely accumulate before the main COGS line
+    _electronics_cog_addition = Decimal("0.00")
     today_sales_count = sold_items.filter(
         Q(sold_at__gte=today_start, sold_at__lt=today_end) |
         Q(sold_at__isnull=True, received_at=now.date())
@@ -316,7 +318,7 @@ def dashboard(request):
         stock_selling_value += e_stock_selling
         units_sold += electronics_sold_in_range
         revenue += electronics_revenue
-        cost_of_goods += electronics_cog
+        _electronics_cog_addition = electronics_cog
     except Exception:
         pass
 
@@ -327,13 +329,20 @@ def dashboard(request):
     # Revenue, COGS, and Profit all derive from range_sales (sold items in period)
 
     # COGS: Cost of goods sold (sum of order_price for sold items in period)
-    cost_of_goods = range_sales.aggregate(
-        total=Coalesce(Sum("order_price"), Decimal("0.00"), output_field=DecimalField())
-    )["total"] or Decimal("0.00")
+    # Include electronics COGS that was captured above in the try block
+    cost_of_goods = (
+        range_sales.aggregate(
+            total=Coalesce(Sum("order_price"), Decimal("0.00"), output_field=DecimalField())
+        )["total"] or Decimal("0.00")
+    ) + _electronics_cog_addition
 
     # Business Costs: Operational costs from Admin Wallet (same period)
     # CRITICAL: Agents should NOT see global business costs unless assignable to them
-    from wallet.models import WalletTransaction, Ledger, TxnType
+    try:
+        from wallet.models import WalletTransaction, Ledger, TxnType
+        _wallet_available = True
+    except ImportError:
+        _wallet_available = False
 
     # Convert datetime to date for effective_date comparison (only if dates provided)
     if start_date is not None and end_date is not None:
@@ -344,51 +353,49 @@ def dashboard(request):
         period_start_date = None
         period_end_date = None
 
-    if is_manager:
-        # Managers see all business costs
-        business_costs_query = WalletTransaction.objects.filter(
-            business=business,
-            ledger=Ledger.COMPANY,
-            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-        )
-        if period_start_date is not None and period_end_date is not None:
-            business_costs_query = business_costs_query.filter(
-                effective_date__gte=period_start_date,
-                effective_date__lt=period_end_date,
-            )
-        business_costs_sum = business_costs_query.aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"), output_field=DecimalField())
-        )["total"] or Decimal("0.00")
-        # Costs are stored as negative, so we take absolute value for display
-        business_costs = abs(business_costs_sum)
-    else:
-        # Agents: Check if costs can be assigned to them
-        # If WalletTransaction has assigned_to/agent/created_by, filter by that
-        # Otherwise, show 0 (agents don't see global costs)
-        business_costs_query = WalletTransaction.objects.filter(
-            business=business,
-            ledger=Ledger.COMPANY,
-            type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
-        )
-        if period_start_date is not None and period_end_date is not None:
-            business_costs_query = business_costs_query.filter(
-                effective_date__gte=period_start_date,
-                effective_date__lt=period_end_date,
-            )
-
-        # Try to scope costs to agent if possible
-        if hasattr(WalletTransaction, "assigned_to"):
-            business_costs_query = business_costs_query.filter(assigned_to=actor_user)
-        elif hasattr(WalletTransaction, "created_by"):
-            business_costs_query = business_costs_query.filter(created_by=actor_user)
-        else:
-            # No agent-assignment field exists, agents see 0 costs
-            business_costs_query = business_costs_query.none()
-
-        business_costs_sum = business_costs_query.aggregate(
-            total=Coalesce(Sum("amount"), Decimal("0.00"), output_field=DecimalField())
-        )["total"] or Decimal("0.00")
-        business_costs = abs(business_costs_sum)
+    business_costs = Decimal("0.00")
+    if _wallet_available:
+        try:
+            if is_manager:
+                # Managers see all business costs
+                business_costs_query = WalletTransaction.objects.filter(
+                    business=business,
+                    ledger=Ledger.COMPANY,
+                    type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+                )
+                if period_start_date is not None and period_end_date is not None:
+                    business_costs_query = business_costs_query.filter(
+                        effective_date__gte=period_start_date,
+                        effective_date__lt=period_end_date,
+                    )
+                business_costs_sum = business_costs_query.aggregate(
+                    total=Coalesce(Sum("amount"), Decimal("0.00"), output_field=DecimalField())
+                )["total"] or Decimal("0.00")
+                business_costs = abs(business_costs_sum)
+            else:
+                # Agents see only their own costs if assignable
+                business_costs_query = WalletTransaction.objects.filter(
+                    business=business,
+                    ledger=Ledger.COMPANY,
+                    type__in=[TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING],
+                )
+                if period_start_date is not None and period_end_date is not None:
+                    business_costs_query = business_costs_query.filter(
+                        effective_date__gte=period_start_date,
+                        effective_date__lt=period_end_date,
+                    )
+                if hasattr(WalletTransaction, "assigned_to"):
+                    business_costs_query = business_costs_query.filter(assigned_to=actor_user)
+                elif hasattr(WalletTransaction, "created_by"):
+                    business_costs_query = business_costs_query.filter(created_by=actor_user)
+                else:
+                    business_costs_query = business_costs_query.none()
+                business_costs_sum = business_costs_query.aggregate(
+                    total=Coalesce(Sum("amount"), Decimal("0.00"), output_field=DecimalField())
+                )["total"] or Decimal("0.00")
+                business_costs = abs(business_costs_sum)
+        except Exception:
+            business_costs = Decimal("0.00")
 
     # Total Costs = COGS + Business Costs (MUST match breakdown)
     total_costs = cost_of_goods + business_costs
@@ -826,6 +833,10 @@ def dashboard(request):
     except Exception:
         # Gracefully degrade if helpers not available
         pass
+
+    # Low-stock widgets (template expects iterables; optional queries can refine later)
+    low_stock_phones: list = []
+    low_stock_electronics: list = []
 
     # Update context with dashboard data
     ctx.update(

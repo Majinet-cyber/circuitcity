@@ -45,10 +45,13 @@
     </table>
   </div>
   {% else %}
-  <div class="text-center py-5">
-    <div style="font-size:3rem;opacity:.2">🔧</div>
-    <h5 class="mt-3 text-muted">No maintenance records yet</h5>
-    <a href="{% url 'verticals:energy_maintenance_create' %}" class="btn btn-warning rounded-pill mt-2">Log First Record</a>
+  <div style="max-width:480px;margin:3rem auto;text-align:center;">
+    <div style="font-size:3.5rem;margin-bottom:1rem;">🔧</div>
+    <h5 class="fw-bold mb-2" style="color:#0f172a;">No maintenance records yet</h5>
+    <p class="text-muted mb-3" style="font-size:.88rem;">Log service visits, cleaning, battery checks, and repairs. Maintenance history helps predict failures and keeps asset health scores accurate.</p>
+    <a href="{% url 'verticals:energy_maintenance_create' %}" class="btn btn-warning rounded-pill px-4">
+      <i class="bi bi-plus-lg me-1"></i>Log First Maintenance Record
+    </a>
   </div>
   {% endif %}
 </div>

@@ -255,26 +255,45 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "text": f"{sizing_count} system sizing proposal{'s' if sizing_count > 1 else ''} created.",
         })
 
+    # ── Demo/placeholder detection ──────────────────────────────────────────
+    # A workspace is "new" (empty) if it has no sites AND no assets AND no readings.
+    # In that state we inject clearly-labeled sample estimates so the dashboard
+    # doesn't look dead. Real data always overrides placeholder values.
+    is_new_workspace = (total_sites == 0 and total_assets == 0)
+    _DEMO = {
+        "active_sites": 1,
+        "total_assets": 4,
+        "installed_capacity": Decimal("5.2"),
+        "generation_this_month": Decimal("620"),
+        "consumption_this_month": Decimal("480"),
+        "avg_battery_health": 96,
+        "avg_asset_health": 94,
+        "savings_this_month": Decimal("185000"),
+        "label": "sample estimate",
+    }
+
     ctx["stats"] = {
         "total_sites": total_sites,
-        "active_sites": active_sites,
-        "total_assets": total_assets,
+        "active_sites": active_sites if not is_new_workspace else _DEMO["active_sites"],
+        "total_assets": total_assets if not is_new_workspace else _DEMO["total_assets"],
         "operational_assets": operational_assets,
         "degraded_assets": degraded_assets,
         "faulty_assets": faulty_assets,
         "critical_alerts": critical_alerts,
         "high_alerts": high_alerts,
         "maintenance_overdue": maintenance_overdue,
-        "savings_this_month": savings_this_month,
+        "savings_this_month": savings_this_month if not is_new_workspace else _DEMO["savings_this_month"],
         "cumulative_savings": cumulative_savings,
-        "generation_this_month": generation_this_month,
-        "consumption_this_month": consumption_this_month,
+        "generation_this_month": generation_this_month if not is_new_workspace else _DEMO["generation_this_month"],
+        "consumption_this_month": consumption_this_month if not is_new_workspace else _DEMO["consumption_this_month"],
         "gen_this_week": gen_this_week,
-        "installed_capacity": installed_capacity,
-        "avg_battery_health": round(avg_battery_health),
-        "avg_inverter_health": round(avg_inverter_health),
-        "avg_asset_health": round(avg_asset_health),
+        "installed_capacity": installed_capacity if not is_new_workspace else _DEMO["installed_capacity"],
+        "avg_battery_health": round(avg_battery_health) if not is_new_workspace else _DEMO["avg_battery_health"],
+        "avg_inverter_health": round(avg_inverter_health) if not is_new_workspace else _DEMO["avg_asset_health"],
+        "avg_asset_health": round(avg_asset_health) if not is_new_workspace else _DEMO["avg_asset_health"],
     }
+    ctx["is_new_workspace"] = is_new_workspace
+    ctx["demo_label"] = _DEMO["label"] if is_new_workspace else ""
     ctx["recent_alerts"] = recent_alerts
     ctx["sites_needing_attention"] = sites_needing_attention
     ctx["high_risk_assets"] = high_risk_assets
@@ -285,6 +304,135 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     ctx["reading_dates_json"] = json.dumps(reading_dates)
     ctx["gen_data_json"] = json.dumps(gen_data)
     ctx["cons_data_json"] = json.dumps(cons_data)
+
+    # Demo site preview cards for new workspaces
+    if is_new_workspace:
+        ctx["demo_site_preview"] = [
+            {"label": "Site Name", "value": "Solar Demo Site", "note": "Sample preview"},
+            {"label": "Installed Capacity", "value": "5.2 kW", "highlight": True},
+            {"label": "Monthly Generation", "value": "620 kWh", "highlight": True},
+            {"label": "Monthly Consumption", "value": "480 kWh"},
+            {"label": "Battery Health", "value": "96%", "highlight": True},
+            {"label": "Asset Health", "value": "94%"},
+            {"label": "Est. Savings/Month", "value": "MWK 185,000", "highlight": True, "note": "vs grid tariff"},
+            {"label": "Blackout Risk", "value": "Medium", "note": "Needs sizing review"},
+        ]
+    else:
+        ctx["demo_site_preview"] = []
+
+    # Decision recommendations (real data)
+    decision_recs = []
+    if is_new_workspace:
+        decision_recs = [
+            {"type": "info", "text": "Your next best action is to add real appliances and run system sizing to get accurate recommendations."},
+            {"type": "info", "text": "Start with 'Add Site' to register your first installation location."},
+        ]
+    else:
+        if avg_battery_health > 0 and avg_battery_health < 60:
+            decision_recs.append({"type": "risk", "text": f"Battery health at {avg_battery_health:.0f}% — plan replacement before the next rainy season to avoid prolonged blackouts."})
+        if maintenance_overdue > 0:
+            decision_recs.append({"type": "warning", "text": f"{maintenance_overdue} asset(s) have overdue maintenance. Battery checks should happen monthly."})
+        if critical_alerts > 0:
+            decision_recs.append({"type": "risk", "text": f"Critical alerts should be handled before adding more loads. {critical_alerts} critical alert(s) require action."})
+        if generation_this_month > 0 and consumption_this_month > generation_this_month:
+            ratio = float(consumption_this_month / generation_this_month)
+            decision_recs.append({"type": "warning", "text": f"Consumption is {ratio:.1f}× generation this month. Shift non-critical loads to solar hours (10:00–15:00)."})
+        if sizing_count == 0 and total_sites > 0:
+            decision_recs.append({"type": "info", "text": "No system sizing runs yet. Run sizing using your actual appliances to get payback and ROI projections."})
+        if not decision_recs:
+            decision_recs.append({"type": "info", "text": "System looks healthy. Review forecasting data and plan for peak season demand."})
+    ctx["decision_recommendations"] = decision_recs
+
+    # Financial opportunity panel
+    financial_opp = []
+    if is_new_workspace:
+        financial_opp = [
+            {"label": "Sample Investment", "value": "MWK 3,500,000", "color": "#4f46e5", "note": "Estimate — run sizing for your actual quote"},
+            {"label": "Monthly Savings", "value": "MWK 185,000", "color": "#059669", "note": "vs grid tariff at MWK 185/kWh"},
+            {"label": "Annual Savings", "value": "MWK 2,220,000", "color": "#059669"},
+            {"label": "Payback Period", "value": "~18.9 months", "color": "#0891b2", "note": "Battery cost dominates payback"},
+            {"label": "Key Decision", "value": "Battery cost drives payback", "color": "#d97706", "note": "Reduce night loads or shift usage to solar hours"},
+        ]
+    elif savings_this_month > 0:
+        financial_opp = [
+            {"label": "This Month Savings", "value": f"MWK {int(savings_this_month):,}", "color": "#059669"},
+            {"label": "Cumulative Savings", "value": f"MWK {int(cumulative_savings):,}", "color": "#059669"},
+        ]
+        if generation_this_month > 0:
+            monthly_mwk = float(generation_this_month) * 185
+            financial_opp.append({"label": "Grid Offset Value", "value": f"MWK {int(monthly_mwk):,}", "color": "#4f46e5", "note": "at MWK 185/kWh"})
+    ctx["financial_opportunity"] = financial_opp if (is_new_workspace or savings_this_month > 0) else []
+
+    # ── Demo alerts and risks for new workspaces ────────────────────────────
+    if is_new_workspace:
+        ctx["demo_alerts"] = [
+            {
+                "severity": "medium",
+                "icon": "🟡",
+                "title": "Evening load may drain battery by midnight",
+                "description": "Based on a 5.2 kW system with 200Ah battery: high evening loads (TV, pumping, lighting) after 20:00 risk depleting battery before 00:00.",
+                "action": "Shift heavy loads (ironing, pumping, washing) to 10:00–15:00 solar hours.",
+                "type_label": "Load Risk",
+                "demo": True,
+            },
+            {
+                "severity": "low",
+                "icon": "🟢",
+                "title": "Clean panels monthly to protect generation",
+                "description": "Dust and dirt on panels can reduce generation by up to 15%. Schedule a monthly panel cleaning to maintain optimal output.",
+                "action": "Schedule technician visit: panel inspection + cleaning.",
+                "type_label": "Maintenance",
+                "demo": True,
+            },
+            {
+                "severity": "low",
+                "icon": "🟢",
+                "title": "Adding one more battery improves night autonomy",
+                "description": "Current sample system has a medium blackout risk after 22:00. Adding one 200Ah battery extends night autonomy by approximately 4 hours.",
+                "action": "Review battery sizing — run system sizing with real load data.",
+                "type_label": "Capacity",
+                "demo": True,
+            },
+            {
+                "severity": "low",
+                "icon": "🟢",
+                "title": "ROI improves if you shift high-consumption loads",
+                "description": "Moving ironing, water pumping, or washing to 10:00–15:00 (peak solar hours) reduces battery draw and shortens payback period by 2–3 months.",
+                "action": "Configure load scheduling — talk to your installer.",
+                "type_label": "Optimization",
+                "demo": True,
+            },
+        ]
+        ctx["demo_risks"] = [
+            {
+                "name": "Inverter (Demo)",
+                "asset_type": "inverter",
+                "icon": "⚡",
+                "risk_score": 82,
+                "risk_color": "#ef4444",
+                "note": "Inverter load reaches 82% during evening peak",
+                "demo": True,
+            },
+            {
+                "name": "Battery Bank (Demo)",
+                "asset_type": "battery",
+                "icon": "🔋",
+                "risk_score": 55,
+                "risk_color": "#f97316",
+                "note": "Battery may drop below 30% after 22:00",
+                "demo": True,
+            },
+        ]
+        ctx["demo_forecast"] = {
+            "next_7_day_demand_kwh": "113.7",
+            "next_30_day_demand_kwh": "480",
+            "explanation": "Sample estimate: based on 5.2 kW system generating 620 kWh/month.",
+            "demo": True,
+        }
+    else:
+        ctx["demo_alerts"] = []
+        ctx["demo_risks"] = []
+        ctx["demo_forecast"] = None
 
     # Commerce KPIs (energy retail)
     try:
@@ -690,9 +838,14 @@ def alerts_list(request: HttpRequest) -> HttpResponse:
 
     alerts = []
     severity_choices = []
+    is_demo_alerts = False
+    demo_alerts = []
+
     if m:
         EnergyAlert = m["EnergyAlert"]
         AlertSeverity = m["AlertSeverity"]
+        EnergySite = m["EnergySite"]
+        EnergyAsset = m["EnergyAsset"]
         show_resolved = request.GET.get("resolved") == "1"
         qs = EnergyAlert.objects.filter(business=biz)
         if not show_resolved:
@@ -700,12 +853,57 @@ def alerts_list(request: HttpRequest) -> HttpResponse:
         alerts = qs.select_related("site", "asset").order_by("-created_at")[:100]
         severity_choices = AlertSeverity.choices
 
+        # Show demo alerts if no real sites/assets exist
+        has_sites = EnergySite.objects.filter(business=biz).exists()
+        has_assets = EnergyAsset.objects.filter(business=biz).exists()
+        if not has_sites and not has_assets and not alerts:
+            is_demo_alerts = True
+            demo_alerts = [
+                {
+                    "severity": "medium", "icon": "🟡",
+                    "title": "Evening load may drain battery by midnight",
+                    "description": "Based on a 5.2 kW system with 200Ah battery: high evening loads (TV, pumping, lighting) after 20:00 risk depleting battery before 00:00.",
+                    "action": "Shift heavy loads (ironing, pumping, washing) to 10:00–15:00 solar hours.",
+                    "type_label": "Load Risk",
+                },
+                {
+                    "severity": "low", "icon": "🟢",
+                    "title": "Current sample system has medium blackout risk after 22:00",
+                    "description": "Without a second battery, nights with high TV + appliance loads risk partial blackout. This is a sizing gap, not a fault.",
+                    "action": "Run system sizing with real appliances to get an accurate battery recommendation.",
+                    "type_label": "Sizing",
+                },
+                {
+                    "severity": "low", "icon": "🟢",
+                    "title": "Clean panels monthly to protect generation",
+                    "description": "Dust and debris can reduce solar output by 10–15%. A monthly cleaning routine protects your investment.",
+                    "action": "Schedule technician visit: panel inspection + cleaning.",
+                    "type_label": "Maintenance",
+                },
+                {
+                    "severity": "low", "icon": "🟢",
+                    "title": "Move ironing, pumping, or washing to solar hours",
+                    "description": "Running high-wattage appliances between 10:00–15:00 uses direct solar power, saving battery charge for night use.",
+                    "action": "Configure load scheduling for high-demand appliances.",
+                    "type_label": "Optimization",
+                },
+                {
+                    "severity": "low", "icon": "🟢",
+                    "title": "Adding one battery improves night autonomy by ~4 hours",
+                    "description": "Sample ROI calculation: one 200Ah battery at MWK 650,000 extends night autonomy and reduces blackout risk significantly.",
+                    "action": "Review battery sizing — run system sizing with your real load data.",
+                    "type_label": "ROI",
+                },
+            ]
+
     return render(request, "energy/alerts.html", {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "alerts": alerts,
         "show_resolved": request.GET.get("resolved") == "1",
         "severity_choices": severity_choices,
+        "is_demo_alerts": is_demo_alerts,
+        "demo_alerts": demo_alerts,
     })
 
 
@@ -781,11 +979,39 @@ def economics(request: HttpRequest) -> HttpResponse:
                 float(totals["cumulative_savings"] / totals["installation_cost"] * 100), 1
             )
 
+    is_demo_economics = (len(sites_data) == 0 and totals["cumulative_savings"] == Decimal("0"))
+    economics_recs = []
+    if is_demo_economics:
+        economics_recs = [
+            {"type": "info", "text": "Run system sizing using your real appliances to get accurate payback and ROI projections."},
+            {"type": "info", "text": "Payback improves if grid tariff or diesel costs rise. Track monthly savings to confirm system performance."},
+        ]
+    else:
+        if totals["cumulative_savings"] > 0 and totals["installation_cost"] > 0:
+            ratio = float(totals["cumulative_savings"] / totals["installation_cost"])
+            if ratio < 0.3:
+                economics_recs.append({"type": "info", "text": f"Savings so far represent {ratio*100:.0f}% of investment. System is on track — keep logging monthly savings records."})
+        economics_recs.append({"type": "info", "text": "Payback improves if grid tariff or diesel costs rise. Ensure monthly savings records are logged for all sites."})
+
+    demo_econ_cards = [
+        {"label": "Total Investment", "value": "MWK 3,500,000", "color": "#4f46e5", "note": "5.2 kW system estimate"},
+        {"label": "Monthly Savings", "value": "MWK 185,000", "color": "#059669", "note": "vs grid at MWK 185/kWh"},
+        {"label": "Annual Savings", "value": "MWK 2,220,000", "color": "#059669"},
+        {"label": "Payback Period", "value": "~18.9 months", "color": "#0891b2", "note": "After installation"},
+        {"label": "25-Year ROI", "value": "~1,490%", "color": "#6366f1", "note": "With 5% tariff escalation"},
+        {"label": "Monthly Reserve", "value": "MWK 5,833", "color": "#f59e0b", "note": "2% maintenance reserve/year"},
+        {"label": "Battery Replacement", "value": "Year 10", "color": "#dc2626", "note": "Set aside MWK 50,000/month"},
+        {"label": "Grid vs Solar", "value": "37× cheaper", "color": "#059669", "note": "After payback vs diesel"},
+    ] if is_demo_economics else []
+
     return render(request, "energy/economics.html", {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "sites_data": sites_data,
         "totals": totals,
+        "is_demo_economics": is_demo_economics,
+        "economics_recs": economics_recs,
+        "demo_econ_cards": demo_econ_cards,
     })
 
 
@@ -967,6 +1193,12 @@ def system_sizing_create(request: HttpRequest) -> HttpResponse:
             except EnergySite.DoesNotExist:
                 pass
 
+        def _dec(val, default="0"):
+            try:
+                return Decimal(val) if val and str(val).strip() else None
+            except InvalidOperation:
+                return None
+
         try:
             run = SystemSizingRun.objects.create(
                 business=biz,
@@ -991,6 +1223,20 @@ def system_sizing_create(request: HttpRequest) -> HttpResponse:
                 simultaneity_factor=Decimal(request.POST.get("simultaneity_factor", "0.70") or "0.70"),
                 future_growth_pct=int(request.POST.get("future_growth_pct", "20") or "20"),
                 safety_margin_pct=int(request.POST.get("safety_margin_pct", "15") or "15"),
+                energy_tariff_per_kwh=_dec(request.POST.get("energy_tariff_per_kwh", "")),
+                diesel_cost_per_litre=_dec(request.POST.get("diesel_cost_per_litre", "")),
+                installation_cost_pct=_dec(request.POST.get("installation_cost_pct", "")),
+                annual_maintenance_pct=_dec(request.POST.get("annual_maintenance_pct", "")),
+                tariff_escalation_pct=Decimal(request.POST.get("tariff_escalation_pct", "5.0") or "5.0"),
+                discount_rate_pct=Decimal(request.POST.get("discount_rate_pct", "10.0") or "10.0"),
+                # Editable component cost assumptions
+                cost_per_panel_wp=_dec(request.POST.get("cost_per_panel_wp", "")),
+                cost_per_battery_kwh=_dec(request.POST.get("cost_per_battery_kwh", "")),
+                cost_per_inverter_kw=_dec(request.POST.get("cost_per_inverter_kw", "")),
+                cost_per_cc_amp=_dec(request.POST.get("cost_per_cc_amp", "")),
+                cost_wiring_lump=_dec(request.POST.get("cost_wiring_lump", "")),
+                cost_breakers_lump=_dec(request.POST.get("cost_breakers_lump", "")),
+                cost_mounting_lump=_dec(request.POST.get("cost_mounting_lump", "")),
                 notes=request.POST.get("notes", "").strip(),
                 assumptions=request.POST.get("assumptions", "").strip(),
                 prepared_by=request.user,
@@ -999,12 +1245,13 @@ def system_sizing_create(request: HttpRequest) -> HttpResponse:
             # Parse appliance rows
             names = request.POST.getlist("appliance_name")
             wattages = request.POST.getlist("appliance_wattage")
+            surges = request.POST.getlist("appliance_surge")
             quantities = request.POST.getlist("appliance_quantity")
             hours_list = request.POST.getlist("appliance_hours")
             categories = request.POST.getlist("appliance_category")
             priorities = request.POST.getlist("appliance_priority")
             periods = request.POST.getlist("appliance_period")
-            criticals = request.POST.getlist("appliance_critical")
+            criticals = set(request.POST.getlist("appliance_critical"))
 
             for i, name in enumerate(names):
                 name = name.strip()
@@ -1022,11 +1269,18 @@ def system_sizing_create(request: HttpRequest) -> HttpResponse:
                     hours = Decimal(hours_list[i] if i < len(hours_list) else "1")
                 except (InvalidOperation, IndexError):
                     hours = Decimal("1")
+                surge_w = None
+                try:
+                    sv = surges[i] if i < len(surges) else ""
+                    surge_w = Decimal(sv) if sv and sv.strip() else None
+                except (InvalidOperation, IndexError):
+                    surge_w = None
 
                 SizingAppliance.objects.create(
                     sizing_run=run,
                     name=name,
                     wattage=wattage,
+                    surge_wattage=surge_w,
                     quantity=qty,
                     hours_per_day=hours,
                     category=categories[i] if i < len(categories) else "custom",
@@ -1197,10 +1451,30 @@ def monitoring(request: HttpRequest) -> HttpResponse:
                 "capacity_kw": site.installed_capacity_kw or 0,
             })
 
+    is_demo_monitoring = (len(sites_data) == 0)
+    monitoring_recs = []
+    if not is_demo_monitoring:
+        # Real-data recommendations
+        for sd in sites_data:
+            if sd["avg_health"] < 60:
+                monitoring_recs.append({"type": "warning", "text": f"{sd['site'].name}: Battery reaches low state by 22:00; reduce evening loads."})
+            if sd["active_alerts"] > 0:
+                monitoring_recs.append({"type": "risk", "text": f"{sd['site'].name}: {sd['active_alerts']} alert(s) require attention before adding more loads."})
+        if not monitoring_recs:
+            monitoring_recs.append({"type": "info", "text": "All monitored sites are within normal operating parameters."})
+
+    demo_monitoring_sites = [
+        {"name": "Solar Demo Site", "type": "Residential", "assets": 4, "gen_7d": 43.4, "cons_7d": 33.6, "capacity": 5.2, "health": 94, "alert": None},
+        {"name": "Backup Office System", "type": "Commercial", "assets": 2, "gen_7d": 18.2, "cons_7d": 21.0, "capacity": 2.5, "health": 78, "alert": "Battery health below 80% — schedule inspection"},
+    ] if is_demo_monitoring else []
+
     return render(request, "energy/monitoring.html", {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "sites_data": sites_data,
+        "is_demo_monitoring": is_demo_monitoring,
+        "demo_monitoring_sites": demo_monitoring_sites,
+        "monitoring_recs": monitoring_recs,
     })
 
 
@@ -1259,10 +1533,23 @@ def load_management(request: HttpRequest) -> HttpResponse:
                 "recommendations": recommendations,
             })
 
+    is_demo_load = (len(sites_load) == 0)
+    load_recs = []
+    if not is_demo_load:
+        for sl in sites_load:
+            if sl["overload_risk"]:
+                load_recs.append({"type": "risk", "text": f"{sl['site'].name}: Running iron + fridge + TV together may exceed inverter comfort zone. Stagger appliances."})
+            if float(sl["avg_daily_cons"]) > float(sl["avg_daily_gen"]) * 1.2:
+                load_recs.append({"type": "warning", "text": f"{sl['site'].name}: Evening loads are responsible for most blackout risk. Move washing/ironing to 10:00–15:00."})
+        if not load_recs:
+            load_recs.append({"type": "info", "text": "Shift non-critical loads to 10:00–15:00 to maximise solar usage and reduce battery drain."})
+
     return render(request, "energy/load_management.html", {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "sites_load": sites_load,
+        "is_demo_load": is_demo_load,
+        "load_recs": load_recs,
     })
 
 
@@ -1852,12 +2139,96 @@ def energy_stock_in(request: HttpRequest) -> HttpResponse:
 
     products = EnergyProduct.objects.filter(business=biz, is_active=True).order_by("category", "name")
     category_choices = EnergyProductCategory.choices
+
+    # Wizard presets: product family → subtype → prefilled values
+    import json as _json
+    wizard_presets = _json.dumps({
+        "solar_panel": {
+            "subtypes": [
+                {"label": "100W Mono Panel", "name": "100W Mono Solar Panel", "cost": 185000, "price": 240000, "unit": "unit", "notes": "100W monocrystalline panel. Suitable for small lighting kits."},
+                {"label": "200W Mono Panel", "name": "200W Mono Solar Panel", "cost": 320000, "price": 420000, "unit": "unit", "notes": "200W monocrystalline panel. Ideal for home starter systems."},
+                {"label": "350W Mono Panel", "name": "350W Mono Solar Panel", "cost": 480000, "price": 620000, "unit": "unit", "notes": "350W monocrystalline. Good for medium home or office systems."},
+                {"label": "450W Mono Panel", "name": "450W Mono Solar Panel", "cost": 580000, "price": 750000, "unit": "unit", "notes": "450W monocrystalline. High output for large systems."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "battery": {
+            "subtypes": [
+                {"label": "100Ah 12V AGM", "name": "100Ah 12V AGM Battery", "cost": 320000, "price": 420000, "unit": "unit", "notes": "AGM sealed battery. Good for moderate cycle life. 12V 100Ah ≈ 1.2kWh."},
+                {"label": "200Ah 12V AGM", "name": "200Ah 12V AGM Battery", "cost": 580000, "price": 750000, "unit": "unit", "notes": "AGM sealed battery. 12V 200Ah ≈ 2.4kWh usable at 50% DoD."},
+                {"label": "100Ah Lithium (LiFePO4)", "name": "100Ah 12V Lithium LiFePO4 Battery", "cost": 780000, "price": 1000000, "unit": "unit", "notes": "Lithium iron phosphate. 80% DoD, 2000+ cycles. Best long-term ROI."},
+                {"label": "200Ah Lithium (LiFePO4)", "name": "200Ah 12V Lithium LiFePO4 Battery", "cost": 1450000, "price": 1900000, "unit": "unit", "notes": "200Ah lithium ≈ 4.8kWh usable. Excellent for night autonomy."},
+                {"label": "Gel Battery 100Ah", "name": "100Ah 12V Gel Battery", "cost": 350000, "price": 450000, "unit": "unit", "notes": "Gel battery. Maintenance-free. Better than AGM in high temperatures."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "inverter": {
+            "subtypes": [
+                {"label": "1kW Pure Sine Inverter", "name": "1kW Pure Sine Inverter", "cost": 280000, "price": 370000, "unit": "unit", "notes": "1000W pure sine wave. Suitable for lighting + small appliances."},
+                {"label": "3kW Hybrid Inverter", "name": "3kW Hybrid Solar Inverter", "cost": 750000, "price": 980000, "unit": "unit", "notes": "3kW hybrid inverter with built-in MPPT charge controller."},
+                {"label": "5kW Hybrid Inverter", "name": "5kW Hybrid Solar Inverter", "cost": 1200000, "price": 1550000, "unit": "unit", "notes": "5kW hybrid with MPPT. Suitable for large homes and small offices."},
+                {"label": "5kW Off-Grid Inverter", "name": "5kW Off-Grid Inverter", "cost": 950000, "price": 1250000, "unit": "unit", "notes": "5kW off-grid inverter. No grid tie. Use for rural/off-grid sites."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "charge_controller": {
+            "subtypes": [
+                {"label": "20A MPPT Controller", "name": "20A MPPT Charge Controller", "cost": 95000, "price": 130000, "unit": "unit", "notes": "20A MPPT. For small systems up to 260W at 12V."},
+                {"label": "40A MPPT Controller", "name": "40A MPPT Charge Controller", "cost": 175000, "price": 230000, "unit": "unit", "notes": "40A MPPT. For medium systems up to 520W at 12V."},
+                {"label": "60A MPPT Controller", "name": "60A MPPT Charge Controller", "cost": 290000, "price": 380000, "unit": "unit", "notes": "60A MPPT. For larger systems."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "pico_system": {
+            "subtypes": [
+                {"label": "Phone Charging Kit", "name": "Pico Solar Phone Charging Kit", "cost": 25000, "price": 38000, "unit": "unit", "notes": "Small panel + USB output for phone charging. Suitable for rural areas."},
+                {"label": "Lighting Kit (3 lights)", "name": "Pico Solar Lighting Kit (3 Lights)", "cost": 55000, "price": 80000, "unit": "unit", "notes": "3-LED lighting kit + small solar panel. Includes phone charging port."},
+                {"label": "TV + Lighting Kit", "name": "Pico Solar TV + Lighting Kit", "cost": 185000, "price": 250000, "unit": "unit", "notes": "Supports small LED TV + 4 lights + phone charging. ~80W panel."},
+                {"label": "Shop Starter Kit", "name": "Pico Solar Shop Starter Kit", "cost": 320000, "price": 430000, "unit": "unit", "notes": "For small shops: 100W panel + 50Ah battery + inverter + 4 lights + USB."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "solar_kit": {
+            "subtypes": [
+                {"label": "Home Starter Kit (1kW)", "name": "1kW Home Solar Starter Kit", "cost": 1200000, "price": 1600000, "unit": "set", "notes": "Complete kit: 2×200W panels + 100Ah AGM + 1kW inverter + cabling."},
+                {"label": "Home System (2kW)", "name": "2kW Home Solar System Kit", "cost": 2200000, "price": 2900000, "unit": "set", "notes": "4×200W panels + 200Ah AGM + 2kW inverter + cabling + MC4 connectors."},
+                {"label": "Business System (5kW)", "name": "5kW Business Solar System Kit", "cost": 4800000, "price": 6300000, "unit": "set", "notes": "5kW complete kit for small offices or shops. Includes all components."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "set", "notes": ""},
+            ]
+        },
+        "cable_protection": {
+            "subtypes": [
+                {"label": "4mm² DC Solar Cable (per metre)", "name": "4mm² DC Solar Cable", "cost": 1800, "price": 2500, "unit": "metre", "notes": "4mm² copper solar cable (red or black). For panel-to-controller runs."},
+                {"label": "6mm² DC Cable (per metre)", "name": "6mm² DC Solar Cable", "cost": 2500, "price": 3500, "unit": "metre", "notes": "6mm² for high-current runs. Use for battery-to-inverter connections."},
+                {"label": "MC4 Connector Pair", "name": "MC4 Solar Connector Pair", "cost": 1500, "price": 2500, "unit": "pair", "notes": "Waterproof MC4 connectors. For panel-to-panel or panel-to-cable joints."},
+                {"label": "Circuit Breaker 63A DC", "name": "63A DC Circuit Breaker", "cost": 18000, "price": 28000, "unit": "unit", "notes": "DC-rated breaker for battery-to-inverter protection."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "appliance": {
+            "subtypes": [
+                {"label": "LED Bulb 9W", "name": "LED Bulb 9W", "cost": 3500, "price": 5500, "unit": "unit", "notes": "9W LED, E27. Suitable for solar-powered lighting."},
+                {"label": "LED Bulb 15W", "name": "LED Bulb 15W", "cost": 5500, "price": 8000, "unit": "unit", "notes": "15W LED, E27. Bright enough for shop or living room."},
+                {"label": "DC Fan 12V", "name": "12V DC Ceiling Fan", "cost": 65000, "price": 95000, "unit": "unit", "notes": "12V DC fan. Draws only 25W. Ideal for solar-powered rooms."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+        "mounting": {
+            "subtypes": [
+                {"label": "Roof Mount Rail (per set)", "name": "Solar Panel Roof Mount Rail Set", "cost": 45000, "price": 68000, "unit": "set", "notes": "Aluminium roof mounting rails for 2 panels. Includes L-brackets."},
+                {"label": "Ground Mount Frame (2 panels)", "name": "Solar Ground Mount Frame (2 Panels)", "cost": 85000, "price": 120000, "unit": "set", "notes": "Adjustable angle ground mount for 2 panels. Galvanized steel."},
+                {"label": "Custom/Other", "name": "", "cost": 0, "price": 0, "unit": "unit", "notes": ""},
+            ]
+        },
+    })
+
     ctx = {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "products": products,
         "category_choices": category_choices,
         "today": timezone.now().date().isoformat(),
+        "wizard_presets": wizard_presets,
     }
     return render(request, "energy/stock_in.html", ctx)
 
@@ -1950,11 +2321,43 @@ def energy_sell(request: HttpRequest) -> HttpResponse:
         EnergyProduct.objects.filter(business=biz, is_active=True, quantity_in_stock__gt=0)
         .order_by("category", "name")
     )
+
+    # Group products by category for the sell wizard
+    import json as _json
+    products_by_category: dict = {}
+    for p in products:
+        cat = p.get_category_display() if hasattr(p, "get_category_display") else p.category
+        cat_key = p.category
+        if cat_key not in products_by_category:
+            products_by_category[cat_key] = {"label": cat, "products": []}
+        products_by_category[cat_key]["products"].append({
+            "id": p.id,
+            "name": p.name,
+            "price": float(p.selling_price),
+            "cost": float(p.cost_price),
+            "stock": p.quantity_in_stock,
+            "unit": p.unit,
+        })
+
+    sell_categories = [
+        {"key": "solar_panel", "label": "Solar Panel", "icon": "☀️", "desc": "Monocrystalline panels"},
+        {"key": "battery", "label": "Battery", "icon": "🔋", "desc": "AGM, Gel, Lithium"},
+        {"key": "inverter", "label": "Inverter", "icon": "⚡", "desc": "Off-grid & hybrid"},
+        {"key": "charge_controller", "label": "Charge Controller", "icon": "🔌", "desc": "MPPT controllers"},
+        {"key": "pico_system", "label": "Pico Kit", "icon": "🔆", "desc": "Starter solar kits"},
+        {"key": "solar_kit", "label": "Full System Package", "icon": "🏡", "desc": "Complete system bundles"},
+        {"key": "cable_protection", "label": "Cable & Protection", "icon": "🔧", "desc": "Cables, connectors, breakers"},
+        {"key": "appliance", "label": "Appliance / Load", "icon": "💡", "desc": "LED bulbs, fans, DC appliances"},
+        {"key": "mounting", "label": "Mounting Structure", "icon": "🏗️", "desc": "Roof & ground mounts"},
+    ]
+
     ctx = {
         "business": biz,
         "BUSINESS_VERTICAL": "energy",
         "products": products,
         "payment_choices": EnergyItemSale.PAYMENT_CHOICES if EnergyItemSale else [],
+        "products_by_category_json": _json.dumps(products_by_category),
+        "sell_categories": sell_categories,
     }
     return render(request, "energy/sell.html", ctx)
 

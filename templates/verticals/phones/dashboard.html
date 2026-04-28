@@ -509,6 +509,49 @@
     </div>
   </section>
   {% endif %}
+
+  <!-- RECOMMENDED ACTIONS PANEL -->
+  <section class="recent-block" style="background:linear-gradient(135deg,#eff6ff,#f8fafc);border:1.5px solid #bfdbfe;">
+    <h2 class="section-title" style="color:#1e40af;margin-bottom:14px">
+      <i class="bi bi-lightbulb-fill" style="color:#3b82f6"></i> Recommended Actions
+    </h2>
+    <div style="display:flex;flex-direction:column;gap:.55rem;">
+      {% if dashboard_kpis.stock_on_hand == 0 and not dashboard_kpis.units_sold %}
+      <div style="padding:.65rem .9rem;background:#fff1f2;border:1px solid #fca5a5;border-radius:10px;font-size:.85rem;color:#991b1b;">
+        🔴 <strong>No stock and no sales.</strong> Add phone, laptop, or desktop inventory to get started. <a href="{% url 'inventory:scan_in' %}" style="color:#1d4ed8;">Scan In →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.profit_margin < 10 and dashboard_kpis.units_sold > 0 %}
+      <div style="padding:.65rem .9rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:.85rem;color:#9a3412;">
+        ⚠️ <strong>Profit margin is low ({{ dashboard_kpis.profit_margin|floatformat:1 }}%).</strong> Review cost prices and selling prices for all models.
+      </div>
+      {% endif %}
+      {% if low_stock_phones or low_stock_electronics %}
+      <div style="padding:.65rem .9rem;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;font-size:.85rem;color:#92400e;">
+        📦 <strong>{{ low_stock_phones|length|add:low_stock_electronics|length }} model{{ low_stock_phones|length|add:low_stock_electronics|length|pluralize }} running low.</strong> Restock before stock runs out.
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.category_breakdown.laptops.stock == 0 %}
+      <div style="padding:.65rem .9rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:.85rem;color:#1e40af;">
+        💻 <strong>No laptops in stock.</strong> Laptop stock is zero. <a href="{% url 'inventory:electronics_stock_in' %}" style="color:#1d4ed8;">Add laptops →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.category_breakdown.desktops.stock == 0 %}
+      <div style="padding:.65rem .9rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;font-size:.85rem;color:#5b21b6;">
+        🖥️ <strong>No desktops in stock.</strong> Desktop stock is zero. <a href="{% url 'inventory:electronics_stock_in' %}" style="color:#6d28d9;">Add desktops →</a>
+      </div>
+      {% endif %}
+      {% if dashboard_kpis.stock_on_hand > 0 and dashboard_kpis.units_sold == 0 %}
+      <div style="padding:.65rem .9rem;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;font-size:.85rem;color:#065f46;">
+        🛒 <strong>Stock in but no sales in {{ dashboard_kpis.range_label|lower }}.</strong> Use Scan &amp; Sell to start recording sales. <a href="{% url 'inventory:scan_sell_landing' %}" style="color:#059669;">Sell →</a>
+      </div>
+      {% endif %}
+      <div style="padding:.65rem .9rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;font-size:.85rem;color:#166534;">
+        💡 <strong>High-margin accessories improve cash flow.</strong> Add cables, cases, and chargers — they sell fast with high margins. <a href="{% url 'verticals:phones_accessories_dashboard' %}" style="color:#059669;">Accessories →</a>
+      </div>
+    </div>
+  </section>
+
 </div>
 
 <script>

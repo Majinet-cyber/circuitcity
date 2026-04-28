@@ -641,7 +641,43 @@
             </div>
             {% endif %}
         </div>
+
+        <!-- Marketplace -->
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Marketplace (farm)</span>
+                <div class="kpi-icon income">
+                    <i class="bi bi-shop-window"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ marketplace_farm_live_count|default:0 }}</div>
+            <div class="kpi-subtitle">Live farm-tagged listings</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Inquiries (unread)</span>
+                <div class="kpi-icon cost">
+                    <i class="bi bi-envelope-exclamation"></i>
+                </div>
+            </div>
+            <div class="kpi-value">{{ marketplace_enquiry_unread_count|default:0 }}</div>
+            <div class="kpi-subtitle">All live listings: {{ marketplace_live_total_count|default:0 }}</div>
+        </div>
     </div>
+
+    {% if farm_operational_prompts %}
+    <div class="alerts-section" data-testid="farm-operational-prompts" style="margin-top:0.5rem;">
+        {% for p in farm_operational_prompts|slice:":4" %}
+        <div class="alert-card {{ p.severity|default:'info' }}">
+            <div class="alert-icon"><i class="bi bi-lightbulb"></i></div>
+            <div class="alert-content">
+                <p class="alert-title">{{ p.title }}</p>
+                <p class="alert-message">{{ p.message }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Charts Row -->
     <div class="charts-row">

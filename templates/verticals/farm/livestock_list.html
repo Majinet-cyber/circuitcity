@@ -27,9 +27,12 @@
         {% for bs in batch_snapshots %}
         <div class="col-md-6 col-lg-4">
             <div class="card border-0 shadow-sm h-100">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">{{ bs.batch.name }}</h5>
-                    <small class="text-muted">{{ bs.batch.get_animal_type_display }}</small>
+                <div class="card-header bg-light d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="mb-0">{{ bs.batch.name }}</h5>
+                        <small class="text-muted">{{ bs.batch.get_animal_type_display }} — {{ bs.batch.get_animal_subtype_display }}</small>
+                    </div>
+                    <a href="{% url 'verticals:farm_livestock_detail' batch_id=bs.batch.pk %}" class="btn btn-sm btn-primary rounded-pill">Manage</a>
                 </div>
                 <div class="card-body">
                     <div class="row text-center">

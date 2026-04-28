@@ -67,9 +67,24 @@
       <div class="form-text">Set to <strong>Live</strong> for the listing to appear publicly.</div>
     </div>
 
+    {% if vertical_meta_rows %}
+    <div class="form-section">
+      <div class="section-title">Listing specifics</div>
+      <p class="small text-muted mb-2">Add detail once — it carries through to the public page.</p>
+      {% for row in vertical_meta_rows %}
+      <div class="mb-2">
+        <label class="form-label fw-semibold small mb-0">{{ row.label }}</label>
+        <input type="text" class="form-control" name="meta_{{ row.field }}"
+               value="{{ row.value|default:'' }}" placeholder="{{ row.label }}">
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
     {# Photos #}
     <div class="form-section">
       <div class="section-title">Photos</div>
+      <p class="small text-muted">Listings with a clear main photo and a few extra angles get more enquiries.</p>
       {% if listing.primary_image or listing.media_file %}
       <div class="mb-2">
         <div class="text-muted small mb-1">Current primary image:</div>

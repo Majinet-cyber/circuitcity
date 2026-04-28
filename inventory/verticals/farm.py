@@ -20,16 +20,31 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.models_farm import (
+    FARM_SUBTYPES_BY_ANIMAL,
+    FarmAnimalGender,
+    FarmAnimalType,
+    FarmBatchImage,
     FarmCropSeason,
     FarmEntryType,
     FarmExpenseCategory,
+    FarmHealthStatus,
     FarmLedgerEntry,
     FarmLivestockBatch,
     FarmLivestockEvent,
+    FarmLivestockSubType,
     FarmPaymentMethod,
+    FarmSaleAvailability,
     FarmSeasonStatus,
     FarmUnit,
+    FarmVaccinationStatus,
+    subtype_choices_for_animal_type,
 )
+from inventory.models import Location
+from inventory.services.farm_marketplace import (
+    sync_livestock_batch_to_marketplace,
+    unpublish_livestock_batch_listing,
+)
+from tenants.utils_roles import is_manager
 from inventory.services.farm_manager import (
     AlertItem,
     compute_alerts,
@@ -44,6 +59,142 @@ from inventory.services.farm_manager import (
 from inventory.verticals import base
 from tenants.utils import require_business
 from django.urls import reverse
+
+
+def _safe_farm_marketplace_dashboard_extras(business, batches, ledger_qs, today):
+    try:
+        return _farm_marketplace_dashboard_extras(business, batches, ledger_qs, today)
+    except Exception:
+        return {
+            "marketplace_farm_live_count": 0,
+            "marketplace_live_total_count": 0,
+            "marketplace_enquiry_unread_count": 0,
+            "farm_dashboard_livestock_units": 0,
+            "farm_dashboard_stock_value_estimate_mwk": Decimal("0"),
+            "farm_dashboard_risky_margin_batches": 0,
+            "farm_dashboard_low_photo_batches": 0,
+            "farm_operational_prompts": [],
+        }
+
+
+def _farm_marketplace_dashboard_extras(business, batches, ledger_qs, today):
+    """Marketplace KPIs + short operational prompts for the farm dashboard."""
+    from django.db.models import Sum
+
+    from inventory.models_marketplace import ListingStatus, MarketplaceEnquiry, MarketplaceListing
+
+    try:
+        marketplace_farm_live_count = MarketplaceListing.objects.filter(
+            business=business, vertical="farm", status=ListingStatus.LIVE
+        ).count()
+        marketplace_live_total_count = MarketplaceListing.objects.filter(
+            business=business, status=ListingStatus.LIVE
+        ).count()
+        marketplace_enquiry_unread_count = MarketplaceEnquiry.objects.filter(
+            business=business, is_read=False
+        ).count()
+    except Exception:
+        marketplace_farm_live_count = 0
+        marketplace_live_total_count = 0
+        marketplace_enquiry_unread_count = 0
+
+    livestock_units = sum(b.count_current or 0 for b in batches)
+    est_stock_value = Decimal("0")
+    risky_margin_batches = 0
+    low_photo_batches = 0
+    for b in batches:
+        ev = getattr(b, "estimated_value_mwk", None)
+        if ev:
+            est_stock_value += ev
+        if getattr(b, "margin_band", None) == "risky":
+            risky_margin_batches += 1
+        if (
+            (b.count_current or 0) > 0
+            and not b.primary_image
+            and not b.gallery_images.exists()
+        ):
+            low_photo_batches += 1
+
+    prompts = []
+    for b in batches:
+        if (
+            getattr(b, "margin_band", None) == "risky"
+            and (b.cost_basis_per_head_mwk or b.expected_sale_price_mwk)
+        ):
+            prompts.append(
+                {
+                    "severity": "warning",
+                    "title": "Pricing under pressure",
+                    "message": f'{b.name}: margin looks negative or very thin — review ask vs cost.',
+                }
+            )
+        if (
+            "layer" in (b.animal_subtype or "")
+            and not (b.egg_production_status or "").strip()
+        ):
+            prompts.append(
+                {
+                    "severity": "info",
+                    "title": "Track egg output",
+                    "message": f"You marked layers for {b.name} — add egg production notes when ready.",
+                }
+            )
+        if (
+            (b.count_current or 0) > 0
+            and not b.marketplace_listing_id
+            and (
+                getattr(b, "effective_asking_price_per_head_mwk", None)
+                or b.expected_sale_price_mwk
+            )
+        ):
+            prompts.append(
+                {
+                    "severity": "info",
+                    "title": "Ready to publish",
+                    "message": f"{b.name} has stock and an asking price — publish to marketplace from batch detail.",
+                }
+            )
+
+    feed_spend_mwk = None
+    try:
+        feed_spend_mwk = ledger_qs.filter(
+            entry_type=FarmEntryType.EXPENSE,
+            category=FarmExpenseCategory.FEED,
+            date__month=today.month,
+            date__year=today.year,
+        ).aggregate(total=Sum("amount_mwk"))["total"]
+    except Exception:
+        feed_spend_mwk = None
+
+    if feed_spend_mwk and feed_spend_mwk > Decimal("0") and low_photo_batches > 0:
+        prompts.append(
+            {
+                "severity": "info",
+                "title": "Photos lift enquiries",
+                "message": "Listings with photos convert better — add a primary photo on key batches.",
+            }
+        )
+
+    seen = set()
+    deduped = []
+    for p in prompts:
+        key = (p["title"], p["message"])
+        if key not in seen:
+            seen.add(key)
+            deduped.append(p)
+        if len(deduped) >= 8:
+            break
+
+    return {
+        "marketplace_farm_live_count": marketplace_farm_live_count,
+        "marketplace_live_total_count": marketplace_live_total_count,
+        "marketplace_enquiry_unread_count": marketplace_enquiry_unread_count,
+        "farm_dashboard_livestock_units": livestock_units,
+        "farm_dashboard_stock_value_estimate_mwk": est_stock_value,
+        "farm_dashboard_risky_margin_batches": risky_margin_batches,
+        "farm_dashboard_low_photo_batches": low_photo_batches,
+        "farm_operational_prompts": deduped,
+    }
 
 
 # ==============================================================================
@@ -268,6 +419,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         
         # AI Insights (NEW)
         "ai_insights": ai_insights_data,
+        
+        # Marketplace & operational prompts
+        **(_safe_farm_marketplace_dashboard_extras(business, batches, ledger_qs, today)),
         
         # Recent activity
         "recent_entries": recent_entries,
@@ -515,15 +669,23 @@ def livestock_batch_create(request: HttpRequest) -> HttpResponse:
     
     if request.method == "POST":
         try:
+            animal_type = request.POST.get("animal_type", FarmAnimalType.PIGS)
+            st_raw = request.POST.get("animal_subtype", FarmLivestockSubType.UNSPECIFIED)
+            allowed = {a[0] for a in subtype_choices_for_animal_type(animal_type)}
+            if st_raw not in allowed:
+                st_raw = FarmLivestockSubType.UNSPECIFIED
             batch = FarmLivestockBatch.objects.create(
                 business=business,
-                animal_type=request.POST.get("animal_type", "pigs"),
+                animal_type=animal_type,
+                animal_subtype=st_raw,
                 name=request.POST.get("name", ""),
                 count_current=int(request.POST.get("initial_count", 0)),
                 valuation_enabled=request.POST.get("valuation_enabled") == "on",
-                avg_weight_kg=request.POST.get("avg_weight_kg") or None,
-                price_per_kg_mwk=request.POST.get("price_per_kg") or None,
-                price_per_animal_mwk=request.POST.get("price_per_animal") or None,
+                avg_weight_kg=_farm_parse_decimal(request.POST.get("avg_weight_kg")),
+                price_per_kg_mwk=_farm_parse_decimal(request.POST.get("price_per_kg")),
+                price_per_animal_mwk=_farm_parse_decimal(request.POST.get("price_per_animal")),
+                cost_basis_per_head_mwk=_farm_parse_decimal(request.POST.get("cost_basis_per_head_mwk")),
+                expected_sale_price_mwk=_farm_parse_decimal(request.POST.get("expected_sale_price_mwk")),
                 notes=request.POST.get("notes", ""),
                 created_by=request.user,
             )
@@ -545,12 +707,25 @@ def livestock_batch_create(request: HttpRequest) -> HttpResponse:
         except Exception as e:
             messages.error(request, f"Error creating batch: {e}")
     
-    from inventory.models_farm import FarmAnimalType
-    ctx.update({
-        "active_tab": "livestock",
-        "animal_types": FarmAnimalType.choices,
-    })
-    
+    import json
+    from django.core.serializers.json import DjangoJSONEncoder
+
+    ctx.update(
+        {
+            "active_tab": "livestock",
+            "animal_types": FarmAnimalType.choices,
+            "subtype_default": FarmAnimalType.PIGS,
+            "subtype_labels_json": json.dumps(
+                {c.value: c.label for c in FarmLivestockSubType},
+                cls=DjangoJSONEncoder,
+            ),
+            "subtype_map_json": json.dumps(
+                {k: list(v) for k, v in FARM_SUBTYPES_BY_ANIMAL.items()},
+                cls=DjangoJSONEncoder,
+            ),
+        }
+    )
+
     return render(request, "verticals/farm/livestock_batch_form.html", ctx)
 
 
@@ -628,6 +803,143 @@ def livestock_add_event(request: HttpRequest) -> HttpResponse:
     })
     
     return render(request, "verticals/farm/livestock_add_event.html", ctx)
+
+
+def _farm_parse_decimal(raw: str | None):
+    if not raw or not str(raw).strip():
+        return None
+    try:
+        return Decimal(str(raw).strip().replace(",", ""))
+    except Exception:
+        return None
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+@require_http_methods(["GET", "POST"])
+def livestock_batch_detail(request: HttpRequest, batch_id: int) -> HttpResponse:
+    """Batch detail: metadata, margin, photos, publish to marketplace."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    batch = get_object_or_404(FarmLivestockBatch, pk=batch_id, business=business)
+    from django.core.serializers.json import DjangoJSONEncoder
+    import json
+
+    if request.method == "POST":
+        action = request.POST.get("_action", "").strip()
+        if action == "publish_listing":
+            if not is_manager(request.user, business):
+                messages.error(request, "Only managers can publish marketplace listings.")
+                return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+            try:
+                sync_livestock_batch_to_marketplace(batch, request.user, business)
+                messages.success(request, "Livestock listing published to the marketplace.")
+            except Exception as e:
+                messages.error(request, f"Could not publish: {e}")
+            return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+        if action == "unpublish_listing":
+            if not is_manager(request.user, business):
+                messages.error(request, "Only managers can change marketplace listings.")
+                return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+            try:
+                unpublish_livestock_batch_listing(batch)
+                messages.info(request, "Marketplace listing taken offline (still linked for re-publish).")
+            except Exception as e:
+                messages.error(request, f"Could not update listing: {e}")
+            return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+        if action == "add_gallery":
+            if not is_manager(request.user, business):
+                messages.error(request, "Only managers can upload photos.")
+                return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+            f = request.FILES.get("gallery_image")
+            if f:
+                nxt = batch.gallery_images.count()
+                FarmBatchImage.objects.create(
+                    batch=batch,
+                    image=f,
+                    sort_order=nxt,
+                    caption=request.POST.get("caption", "")[:200],
+                )
+                messages.success(request, "Photo added to gallery.")
+            return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+        # Save batch details (default POST)
+        st_raw = request.POST.get("animal_subtype", FarmLivestockSubType.UNSPECIFIED)
+        allowed = {a[0] for a in subtype_choices_for_animal_type(request.POST.get("animal_type", batch.animal_type))}
+        if st_raw not in allowed:
+            st_raw = FarmLivestockSubType.UNSPECIFIED
+        batch.animal_type = request.POST.get("animal_type", batch.animal_type)
+        batch.animal_subtype = st_raw
+        batch.name = request.POST.get("name", batch.name).strip() or batch.name
+        batch.breed_text = request.POST.get("breed_text", "")[:120]
+        batch.gender = request.POST.get("gender", batch.gender)
+        batch.notes = request.POST.get("notes", "")
+        am = request.POST.get("age_months", "").strip()
+        batch.age_months = int(am) if am.isdigit() else None
+        batch.health_status = request.POST.get("health_status", batch.health_status)
+        batch.vaccination_status = request.POST.get("vaccination_status", batch.vaccination_status)
+        batch.feed_growth_stage = request.POST.get("feed_growth_stage", "")[:80]
+        batch.egg_production_status = request.POST.get("egg_production_status", "")[:80]
+        batch.dairy_output_note = request.POST.get("dairy_output_note", "")[:200]
+        batch.sale_availability = request.POST.get("sale_availability", batch.sale_availability)
+        batch.is_featured_listing = request.POST.get("is_featured_listing") == "on"
+        batch.cost_basis_per_head_mwk = _farm_parse_decimal(request.POST.get("cost_basis_per_head_mwk"))
+        batch.expected_sale_price_mwk = _farm_parse_decimal(request.POST.get("expected_sale_price_mwk"))
+        loc_id = request.POST.get("location_id", "").strip()
+        if loc_id.isdigit():
+            loc = Location.objects.filter(pk=int(loc_id), business=business).first()
+            batch.location = loc
+        elif loc_id == "":
+            batch.location = None
+        v_on = request.POST.get("valuation_enabled") == "on"
+        batch.valuation_enabled = v_on
+        batch.avg_weight_kg = _farm_parse_decimal(request.POST.get("avg_weight_kg"))
+        batch.price_per_kg_mwk = _farm_parse_decimal(request.POST.get("price_per_kg"))
+        batch.price_per_animal_mwk = _farm_parse_decimal(request.POST.get("price_per_animal"))
+        if "primary_image" in request.FILES and request.FILES.get("primary_image"):
+            batch.primary_image = request.FILES["primary_image"]
+        try:
+            batch.save()
+            messages.success(request, "Batch details saved.")
+        except Exception as e:
+            messages.error(request, f"Save failed: {e}")
+        return redirect("verticals:farm_livestock_detail", batch_id=batch.pk)
+
+    from inventory.models_marketplace import ListingStatus
+
+    listing = getattr(batch, "marketplace_listing", None)
+    all_events = FarmLivestockEvent.objects.filter(batch__business=business)
+    events_data = [livestock_event_to_data(e) for e in all_events]
+    batch_data = livestock_batch_to_data(batch)
+    snapshot = compute_livestock_snapshot(batch_data, events_data, timezone.now().date())
+
+    ctx.update(
+        {
+            "active_tab": "livestock",
+            "batch": batch,
+            "snapshot": snapshot,
+            "subtype_choices": subtype_choices_for_animal_type(batch.animal_type),
+            "animal_types": FarmAnimalType.choices,
+            "health_statuses": FarmHealthStatus.choices,
+            "vaccination_statuses": FarmVaccinationStatus.choices,
+            "genders": FarmAnimalGender.choices,
+            "sale_availability_choices": FarmSaleAvailability.choices,
+            "locations": Location.objects.filter(business=business),
+            "listing": listing,
+            "listing_is_live": bool(listing and listing.status == ListingStatus.LIVE),
+            "is_manager": is_manager(request.user, business),
+            "margin_band": batch.margin_band,
+            "margin_pct": batch.margin_pct_vs_cost,
+            "subtype_labels_json": json.dumps(
+                {c.value: c.label for c in FarmLivestockSubType},
+                cls=DjangoJSONEncoder,
+            ),
+            "subtype_map_json": json.dumps(
+                {k: list(v) for k, v in FARM_SUBTYPES_BY_ANIMAL.items()}, cls=DjangoJSONEncoder
+            ),
+        }
+    )
+    return render(request, "verticals/farm/livestock_batch_detail.html", ctx)
 
 
 # ==============================================================================

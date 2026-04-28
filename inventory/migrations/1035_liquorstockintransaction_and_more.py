@@ -62,35 +62,47 @@ class Migration(migrations.Migration):
                 "ordering": ["-created_at"],
             },
         ),
-        migrations.RenameIndex(
-            model_name="marketplaceenquiry",
-            new_name="inventory_m_busines_595aab_idx",
-            old_name="inventory_m_busines_7a2d4e_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="marketplaceenquiry",
-            new_name="inventory_m_listing_295cdd_idx",
-            old_name="inventory_m_listing_5c8b9f_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="marketplaceenquiry",
-            new_name="inventory_m_created_89aaf6_idx",
-            old_name="inventory_m_created_1e6a7c_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="marketplacelisting",
-            new_name="inventory_m_busines_b3b99a_idx",
-            old_name="inventory_m_busines_e6b7e3_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="marketplacelisting",
-            new_name="inventory_m_vertica_7bba40_idx",
-            old_name="inventory_m_vertica_8f4c2a_idx",
-        ),
-        migrations.RenameIndex(
-            model_name="marketplacelisting",
-            new_name="inventory_m_created_e9d9e2_idx",
-            old_name="inventory_m_created_9d3f1b_idx",
+        # These RenameIndex ops were generated when migration 1034 used
+        # auto-generated index names (hash-based). Migration 1034 was later
+        # updated to use explicit names that match the "new" names below, so on
+        # a fresh install the old names never exist and the DB operations would
+        # crash. Wrapping in SeparateDatabaseAndState with no database ops:
+        #   - Fresh install: 1034 already created indexes with the new names → no-op ✓
+        #   - Production: 1035 was applied before this change → DB already correct ✓
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.RenameIndex(
+                    model_name="marketplaceenquiry",
+                    new_name="inventory_m_busines_595aab_idx",
+                    old_name="inventory_m_busines_7a2d4e_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="marketplaceenquiry",
+                    new_name="inventory_m_listing_295cdd_idx",
+                    old_name="inventory_m_listing_5c8b9f_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="marketplaceenquiry",
+                    new_name="inventory_m_created_89aaf6_idx",
+                    old_name="inventory_m_created_1e6a7c_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="marketplacelisting",
+                    new_name="inventory_m_busines_b3b99a_idx",
+                    old_name="inventory_m_busines_e6b7e3_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="marketplacelisting",
+                    new_name="inventory_m_vertica_7bba40_idx",
+                    old_name="inventory_m_vertica_8f4c2a_idx",
+                ),
+                migrations.RenameIndex(
+                    model_name="marketplacelisting",
+                    new_name="inventory_m_created_e9d9e2_idx",
+                    old_name="inventory_m_created_9d3f1b_idx",
+                ),
+            ],
+            database_operations=[],
         ),
         migrations.AddField(
             model_name="liquorstockintransaction",

@@ -452,7 +452,13 @@ def vehicle_detail(request: HttpRequest, pk: int) -> HttpResponse:
         return redirect("car_dealer:vehicle_detail", pk=pk)
 
     gallery_images = vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at") if hasattr(vehicle, "gallery_images") else []
-    marketplace_listing = vehicle.marketplace_listing
+    try:
+        marketplace_listing = vehicle.marketplace_listing
+    except Exception:
+        # FK may point to a deleted listing — heal it
+        vehicle.marketplace_listing = None
+        vehicle.save(update_fields=["marketplace_listing"])
+        marketplace_listing = None
 
     return render(
         request,
@@ -468,6 +474,10 @@ def vehicle_detail(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+_ALLOWED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+_MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 def _handle_vehicle_image_upload(request, vehicle):
     """Handle photo upload POST from vehicle detail page."""
     CarDealerVehicleImage = _get_image_model()
@@ -480,9 +490,22 @@ def _handle_vehicle_image_upload(request, vehicle):
         messages.warning(request, "No images selected.")
         return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
 
+    import os as _os
     existing_count = vehicle.gallery_images.count()
     added = 0
+    skipped = 0
     for i, img_file in enumerate(images[:20]):
+        # Validate extension
+        ext = _os.path.splitext(img_file.name or "")[1].lower()
+        if ext not in _ALLOWED_IMAGE_EXTS:
+            messages.warning(request, f"Skipped '{img_file.name}': only JPEG, PNG, and WEBP are allowed.")
+            skipped += 1
+            continue
+        # Validate size
+        if img_file.size > _MAX_IMAGE_BYTES:
+            messages.warning(request, f"Skipped '{img_file.name}': file exceeds 10 MB limit.")
+            skipped += 1
+            continue
         try:
             is_cover = existing_count == 0 and i == 0
             CarDealerVehicleImage.objects.create(
@@ -494,12 +517,14 @@ def _handle_vehicle_image_upload(request, vehicle):
             )
             added += 1
         except Exception as err:
-            log.warning("Image upload error: %s", err)
+            log.warning("Image upload error for vehicle %s: %s", vehicle.pk, err)
+            messages.warning(request, f"Could not save '{img_file.name}': {err}")
+            skipped += 1
 
     if added:
-        messages.success(request, f"{added} photo(s) added.")
-    else:
-        messages.error(request, "Could not save photos.")
+        messages.success(request, f"{added} photo{'s' if added != 1 else ''} added successfully.")
+    if not added and not skipped:
+        messages.error(request, "Could not save any photos. Please try again.")
     return redirect("car_dealer:vehicle_detail", pk=vehicle.pk)
 
 
@@ -677,7 +702,10 @@ def _sync_vehicle_images_to_listing(vehicle, listing):
         return
 
     # Remove old listing images and re-add from vehicle gallery
-    listing.images.all().delete()
+    try:
+        listing.images.all().delete()
+    except Exception as e:
+        log.warning("Could not clear old listing images: %s", e)
 
     for i, vimg in enumerate(gallery):
         try:

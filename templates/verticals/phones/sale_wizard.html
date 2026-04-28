@@ -820,8 +820,14 @@
         {% endfor %}
       </div>
       {% else %}
-      <div class="alert alert-warning" style="padding: 20px; margin: 20px 0; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px;">
-        <strong>⚠️</strong> No phone brands available yet. Add phone products first.
+      <div style="padding:24px; margin:20px 0; background:#fff7ed; border:1.5px solid #fed7aa; border-radius:14px; text-align:center;">
+        <div style="font-size:2.5rem;margin-bottom:.75rem;opacity:.6;">📱</div>
+        <div style="font-size:1rem;font-weight:700;color:#9a3412;margin-bottom:.4rem;">No phone products in stock yet</div>
+        <div style="font-size:.85rem;color:#9a3412;margin-bottom:1rem;">Stock in phones first. Or use the Scan &amp; Sell landing to sell Laptops or Desktops.</div>
+        <div style="display:flex;gap:.65rem;justify-content:center;flex-wrap:wrap;">
+          <a href="{% url 'inventory:scan_in' %}" style="background:#3b82f6;color:#fff;border-radius:999px;padding:.5rem 1.1rem;font-size:.85rem;font-weight:700;text-decoration:none;">📦 Scan In Stock</a>
+          <a href="{% url 'inventory:scan_sell_landing' %}" style="background:#fff;color:#3b82f6;border:1.5px solid #93c5fd;border-radius:999px;padding:.5rem 1.1rem;font-size:.85rem;font-weight:700;text-decoration:none;">🛒 Sell Laptops/Desktops</a>
+        </div>
       </div>
       {% endif %}
       {% endif %}

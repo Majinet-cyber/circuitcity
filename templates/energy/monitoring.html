@@ -27,6 +27,20 @@
     <a href="{% url 'verticals:energy_dashboard' %}" class="btn btn-outline-secondary btn-sm rounded-pill"><i class="bi bi-arrow-left me-1"></i>Dashboard</a>
   </div>
 
+  {# ── Decision recommendation ── #}
+  {% if monitoring_recs %}
+  <div class="mb-3">
+    {% for rec in monitoring_recs %}
+    <div style="padding:.5rem .75rem;border-radius:10px;font-size:.82rem;margin-bottom:.3rem;
+      {% if rec.type == 'warning' %}background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;
+      {% elif rec.type == 'risk' %}background:#fff1f2;border:1px solid #fca5a5;color:#991b1b;
+      {% else %}background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;{% endif %}">
+      {% if rec.type == 'warning' %}⚠️{% elif rec.type == 'risk' %}🔴{% else %}💡{% endif %} {{ rec.text }}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if sites_data %}
     {% for sd in sites_data %}
       <div class="mon-card">
@@ -81,11 +95,57 @@
         </div>
       </div>
     {% endfor %}
+
+  {% elif is_demo_monitoring %}
+    {# ── PLACEHOLDER / DEMO monitoring state ── #}
+    <div class="mb-3 p-3 rounded-3 d-flex align-items-center gap-2" style="background:#fff7ed;border:1.5px solid #fed7aa;">
+      <span style="font-size:1.1rem;">📊</span>
+      <div style="font-size:.82rem;color:#92400e;">
+        <strong>Sample Preview</strong> — This is a demo of what monitoring looks like with a live site.
+        <a href="{% url 'verticals:energy_site_create' %}" style="color:#059669;font-weight:600;">Add a real site</a> to activate live monitoring.
+      </div>
+    </div>
+
+    {# Demo site status cards #}
+    {% for demo in demo_monitoring_sites %}
+    <div class="mon-card" style="border:1.5px dashed #fed7aa;">
+      <div style="position:absolute;top:.5rem;right:.75rem;background:#fef3c7;color:#92400e;font-size:.62rem;font-weight:700;padding:.1rem .4rem;border-radius:10px;text-transform:uppercase;">DEMO</div>
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div>
+          <span class="status-dot" style="background:#10b981;"></span>
+          <span class="fw-bold" style="font-size:1rem;color:#0f172a;">{{ demo.name }}</span>
+          <span class="text-muted" style="font-size:.78rem;"> · {{ demo.type }}</span>
+        </div>
+        <span class="text-muted" style="font-size:.72rem;">{{ demo.assets }} sample assets</span>
+      </div>
+      <div class="row g-2">
+        <div class="col-6 col-md-2"><div class="site-metric"><div class="site-metric-val" style="color:#059669;">{{ demo.gen_7d }}</div><div class="site-metric-label">Gen 7d (kWh)</div></div></div>
+        <div class="col-6 col-md-2"><div class="site-metric"><div class="site-metric-val" style="color:#6366f1;">{{ demo.cons_7d }}</div><div class="site-metric-label">Cons 7d (kWh)</div></div></div>
+        <div class="col-6 col-md-2"><div class="site-metric"><div class="site-metric-val">{{ demo.capacity }}</div><div class="site-metric-label">Capacity (kW)</div></div></div>
+        <div class="col-6 col-md-2"><div class="site-metric"><div class="site-metric-val" style="color:#10b981;">{{ demo.health }}%</div><div class="site-metric-label">Avg Health</div></div></div>
+        <div class="col-12 col-md-4">
+          <div style="font-size:.72rem;color:#64748b;margin-bottom:.3rem;">Asset Health</div>
+          <div class="health-bar"><div class="health-fill" style="width:{{ demo.health }}%;background:#10b981;"></div></div>
+          {% if demo.alert %}<div style="font-size:.72rem;color:#f97316;margin-top:.3rem;font-weight:600;">⚠ {{ demo.alert }}</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    {# Demo alerts #}
+    <div class="mon-card mt-2" style="border:1.5px dashed #fed7aa;">
+      <div style="font-size:.7rem;font-weight:700;color:#92400e;text-transform:uppercase;margin-bottom:.5rem;">📢 Sample Alerts (Demo)</div>
+      <div style="font-size:.82rem;background:#fff1f2;border:1px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;margin-bottom:.4rem;color:#991b1b;">🔴 Battery reached low state by 22:00 last night — reduce evening loads or add backup.</div>
+      <div style="font-size:.82rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:.5rem .75rem;margin-bottom:.4rem;color:#9a3412;">🟠 Solar output 18% below expected — check panel cleanliness and connections.</div>
+      <div style="font-size:.82rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:.5rem .75rem;color:#166534;">🟢 Inverter operating within normal range — no action required.</div>
+    </div>
+
   {% else %}
     <div class="text-center py-5">
       <div style="font-size:4rem;opacity:.15;">📡</div>
       <h5 class="text-muted mt-2">No active sites to monitor</h5>
       <p class="text-muted small">Add sites and start entering readings to see monitoring data.</p>
+      <a href="{% url 'verticals:energy_site_create' %}" class="btn btn-success rounded-pill mt-2 btn-sm">Add First Site</a>
     </div>
   {% endif %}
 

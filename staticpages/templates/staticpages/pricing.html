@@ -557,7 +557,8 @@
         {% endif %}
         <h2 class="tier-name">{{ plan.name }}</h2>
         <p class="tier-description">{{ plan.description }}</p>
-        <div class="tier-price">{{ plan.currency }} {{ plan.amount|floatformat:0 }}</div>
+        <div class="tier-price">MWK {{ plan.amount|floatformat:0 }}</div>
+        <div style="font-size: 0.82rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.65){% else %}#94a3b8{% endif %}; margin-top: 0.1rem; margin-bottom: 0.1rem;">≈ USD {{ plan.amount_usd }} / month</div>
         <p class="tier-price-note">per month, billed monthly</p>
         <a href="{% url 'accounts:signup_manager' %}" class="btn {% if plan.code == 'growth' %}btn-primary{% else %}btn-outline{% endif %}" style="display: block; width: 100%; margin-bottom: 1.5rem;">Start free trial</a>
         <ul class="tier-features">
@@ -569,6 +570,9 @@
       {% endfor %}
 
     </div>
+    <p style="text-align:center; font-size: 0.75rem; color: #94a3b8; margin-top: 1rem;">
+      {{ PRICING_USD_RATE_NOTE|default:"USD equivalent is approximate and may vary with exchange rate." }}
+    </p>
   </section>
 
   <!-- Custom Plan Section -->

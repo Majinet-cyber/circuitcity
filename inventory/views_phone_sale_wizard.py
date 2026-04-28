@@ -219,7 +219,11 @@ def _wizard_step_brand(request, ctx, business):
 
     # If no brands available, show friendly error message
     if not brands:
-        ctx["brand_error"] = "No phone brands available yet. Add phone products first."
+        ctx["brand_error"] = (
+            "No phone products in stock yet. "
+            "Stock in phones first, or use the Scan & Sell landing to sell Laptops or Desktops."
+        )
+        ctx["scan_sell_landing_url"] = "/inventory/scan-sell/"  # fallback link
 
     ctx.update(
         {

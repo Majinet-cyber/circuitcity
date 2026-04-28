@@ -117,22 +117,22 @@
 
       {# Quick-add catalog #}
       <div class="d-flex flex-wrap gap-1 mb-3" id="catalogBtns">
-        <button type="button" class="catalog-btn" onclick="addCatalog('LED Lights','lighting',10,6)">💡 LED Lights (10W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('TV (LED 40\\'\\')','entertainment',80,5)">📺 TV (80W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Fridge/Freezer','refrigeration',150,24)">🧊 Fridge (150W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Desktop Computer','computing',200,8)">💻 Computer (200W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Laptop','computing',65,8)">💻 Laptop (65W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Printer','computing',50,2)">🖨️ Printer (50W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('WiFi Router','telecom',15,24)">📡 Router (15W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Ceiling Fan','hvac',75,10)">🌀 Fan (75W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('AC Unit (1HP)','hvac',750,8)">❄️ AC 1HP (750W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Water Pump','pumping',750,3)">💧 Pump (750W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Phone Charging','charging',10,4)">🔌 Phone Charger (10W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('POS Terminal','computing',15,12)">🏷️ POS (15W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Security Camera','security',15,24)">📷 Camera (15W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Welding Machine','industrial',3500,4)">⚡ Welder (3500W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Borehole Pump','pumping',1500,6)">🕳️ Borehole (1500W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Cold Room','refrigeration',2000,24)">🏭 Cold Room (2000W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('LED Lights','lighting',10,6,10)">💡 LED Lights (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('TV (LED 40in)','entertainment',80,5,80)">📺 TV (80W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Fridge/Freezer','refrigeration',150,24,500)">🧊 Fridge (150W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Desktop Computer','computing',200,8,200)">💻 Computer (200W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Laptop','computing',65,8,65)">💻 Laptop (65W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Printer','computing',50,2,50)">🖨️ Printer (50W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('WiFi Router','telecom',15,24,15)">📡 Router (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Ceiling Fan','hvac',75,10,225)">🌀 Fan (75W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('AC Unit (1HP)','hvac',750,8,2250)">❄️ AC 1HP (750W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Water Pump','pumping',750,3,2250)">💧 Pump (750W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Phone Charging','charging',10,4,10)">🔌 Phone Charger (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('POS Terminal','computing',15,12,15)">🏷️ POS (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Security Camera','security',15,24,15)">📷 Camera (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Welding Machine','industrial',3500,4,7000)">⚡ Welder (3500W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Borehole Pump','pumping',1500,6,4500)">🕳️ Borehole (1500W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Cold Room','refrigeration',2000,24,6000)">🏭 Cold Room (2000W)</button>
       </div>
 
       <div id="applianceRows"></div>
@@ -140,6 +140,88 @@
       <button type="button" class="btn-add-appliance mt-2" onclick="addRow()">
         <i class="bi bi-plus-circle me-2"></i>Add Custom Appliance
       </button>
+    </div>
+
+    {# === COMPONENT COST ASSUMPTIONS === #}
+    <div class="sizing-section" style="border-color:#10b981;">
+      <h6><i class="bi bi-cash-stack me-2" style="color:#10b981;"></i>Component Cost Assumptions
+        <small style="font-weight:400;text-transform:none;font-size:.7rem;color:#94a3b8;">
+          — Malawi-market defaults pre-filled. Adjust to match your supplier quotes.
+        </small>
+      </h6>
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Panel Cost (MWK/Wp)</label>
+          <input type="number" step="1" name="cost_per_panel_wp" value="650" class="form-control" min="50" placeholder="650">
+          <div class="form-text">e.g. MWK 650 per Wp</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Battery Cost (MWK/kWh)</label>
+          <input type="number" step="1000" name="cost_per_battery_kwh" value="450000" class="form-control" min="0" placeholder="450000">
+          <div class="form-text">e.g. MWK 450,000/kWh</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Inverter Cost (MWK/kW)</label>
+          <input type="number" step="1000" name="cost_per_inverter_kw" value="180000" class="form-control" min="0" placeholder="180000">
+          <div class="form-text">e.g. MWK 180,000/kW</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Charge Controller (MWK/A)</label>
+          <input type="number" step="100" name="cost_per_cc_amp" value="12000" class="form-control" min="0" placeholder="12000">
+          <div class="form-text">e.g. MWK 12,000/Amp</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Cable/Wiring (MWK lump)</label>
+          <input type="number" step="1000" name="cost_wiring_lump" value="150000" class="form-control" min="0" placeholder="150000">
+          <div class="form-text">DC+AC cables total</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Breakers/Protection (MWK)</label>
+          <input type="number" step="1000" name="cost_breakers_lump" value="80000" class="form-control" min="0" placeholder="80000">
+          <div class="form-text">MCBs, isolators, fuses</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Mounting Structure (MWK)</label>
+          <input type="number" step="1000" name="cost_mounting_lump" value="50000" class="form-control" min="0" placeholder="50000">
+          <div class="form-text">Roof/ground mounts</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Installation Labour (%)</label>
+          <input type="number" step="0.1" name="installation_cost_pct" value="15" class="form-control" placeholder="15">
+          <div class="form-text">% of CapEx (default 15%)</div>
+        </div>
+      </div>
+    </div>
+
+    {# === ROI ASSUMPTIONS === #}
+    <div class="sizing-section">
+      <h6><i class="bi bi-cash-coin me-2"></i>ROI & Tariff Assumptions <small style="font-weight:400;text-transform:none;font-size:.7rem;color:#94a3b8;">(uses Malawi defaults if left blank)</small></h6>
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Grid Tariff (MWK/kWh)</label>
+          <input type="number" step="1" name="energy_tariff_per_kwh" value="" class="form-control" placeholder="185">
+          <div class="form-text">Default: MWK 185/kWh</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Diesel Cost (MWK/litre)</label>
+          <input type="number" step="1" name="diesel_cost_per_litre" value="" class="form-control" placeholder="3500">
+          <div class="form-text">Used when generator enabled</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Annual Maintenance (%)</label>
+          <input type="number" step="0.1" name="annual_maintenance_pct" value="" class="form-control" placeholder="2">
+          <div class="form-text">Default: 2% of CapEx/year</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Tariff Escalation (%/yr)</label>
+          <input type="number" step="0.1" name="tariff_escalation_pct" value="5" class="form-control">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Discount Rate (%)</label>
+          <input type="number" step="0.1" name="discount_rate_pct" value="10" class="form-control">
+          <div class="form-text">For NPV calculation</div>
+        </div>
+      </div>
     </div>
 
     {# === NOTES === #}
@@ -171,20 +253,31 @@ let rowIdx = 0;
 const categories = [{% for val, label in appliance_categories %}["{{ val }}","{{ label }}"],{% endfor %}];
 const priorities = [{% for val, label in priorities %}["{{ val }}","{{ label }}"],{% endfor %}];
 
-function addRow(name='', cat='custom', wattage='', hours='', qty=1) {
+function addRow(name='', cat='custom', wattage='', hours='', qty=1, surge='', critical=false, unitCost='', notes='') {
   const i = rowIdx++;
   const catOpts = categories.map(c => `<option value="${c[0]}" ${c[0]===cat?'selected':''}>${c[1]}</option>`).join('');
   const priOpts = priorities.map(p => `<option value="${p[0]}" ${p[0]==='medium'?'selected':''}>${p[1]}</option>`).join('');
+  const surgeMultiplier = surge && wattage ? (surge / wattage).toFixed(1) : '';
   const html = `
     <div class="appliance-row" id="row_${i}">
       <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-3"><label class="form-label" style="font-size:.72rem;">Appliance</label><input type="text" name="appliance_name" value="${name}" class="form-control form-control-sm" placeholder="Name" required></div>
-        <div class="col-6 col-md-1"><label class="form-label" style="font-size:.72rem;">Qty</label><input type="number" name="appliance_quantity" value="${qty}" class="form-control form-control-sm" min="1"></div>
-        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Wattage (W)</label><input type="number" name="appliance_wattage" value="${wattage}" class="form-control form-control-sm" min="1" required></div>
-        <div class="col-6 col-md-1"><label class="form-label" style="font-size:.72rem;">Hrs/Day</label><input type="number" name="appliance_hours" value="${hours}" step="0.5" class="form-control form-control-sm" min="0.5" max="24"></div>
-        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Category</label><select name="appliance_category" class="form-select form-select-sm">${catOpts}</select></div>
-        <div class="col-6 col-md-2"><label class="form-label" style="font-size:.72rem;">Priority</label><select name="appliance_priority" class="form-select form-select-sm">${priOpts}</select></div>
-        <div class="col-3 col-md-1 d-flex align-items-end">
+        <div class="col-12 col-md-3"><label class="form-label" style="font-size:.72rem;">Appliance Name</label><input type="text" name="appliance_name" value="${name}" class="form-control form-control-sm" placeholder="e.g. LED Bulb" required></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Qty</label><input type="number" name="appliance_quantity" value="${qty}" class="form-control form-control-sm" min="1"></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Watts (W)</label><input type="number" name="appliance_wattage" value="${wattage}" class="form-control form-control-sm" min="1" required></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Hrs/Day</label><input type="number" name="appliance_hours" value="${hours}" step="0.5" class="form-control form-control-sm" min="0.5" max="24"></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Surge (W)</label><input type="number" name="appliance_surge" value="${surge}" class="form-control form-control-sm" min="0" placeholder="opt."></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Unit Cost (MWK)</label><input type="number" name="appliance_unit_cost" value="${unitCost}" class="form-control form-control-sm" min="0" placeholder="opt."></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Category</label><select name="appliance_category" class="form-select form-select-sm">${catOpts}</select></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Priority</label><select name="appliance_priority" class="form-select form-select-sm">${priOpts}</select></div>
+        <div class="col-2 col-md-1 d-flex flex-column align-items-center">
+          <label class="form-label" style="font-size:.65rem;">Critical?</label>
+          <input type="checkbox" name="appliance_critical" value="${i}" class="form-check-input mt-1" style="width:1.2rem;height:1.2rem;" ${critical?'checked':''}>
+        </div>
+        <div class="col-12 col-md-2">
+          <label class="form-label" style="font-size:.72rem;">Notes/Priority</label>
+          <input type="text" name="appliance_notes" value="${notes}" class="form-control form-control-sm" placeholder="e.g. Fridge — never switch off">
+        </div>
+        <div class="col-4 col-md-1 d-flex align-items-end">
           <input type="hidden" name="appliance_period" value="both">
           <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="document.getElementById('row_${i}').remove()"><i class="bi bi-trash"></i></button>
         </div>
@@ -193,8 +286,8 @@ function addRow(name='', cat='custom', wattage='', hours='', qty=1) {
   document.getElementById('applianceRows').insertAdjacentHTML('beforeend', html);
 }
 
-function addCatalog(name, cat, watts, hours) {
-  addRow(name, cat, watts, hours, 1);
+function addCatalog(name, cat, watts, hours, surgeWatts, notes='') {
+  addRow(name, cat, watts, hours, 1, surgeWatts||'', false, '', notes);
 }
 </script>
 {% endblock %}

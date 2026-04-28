@@ -164,6 +164,7 @@
 
   {# ================= FARM MANAGER ================= #}
   {% if business_kind == "farm" %}
+  {% url 'inventory:manage_listings' as url_farm_marketplace %}
   <div class="menu-group">FARM MANAGER</div>
   <ul class="navlist">
     <li><a class="navlink" href="{% url 'verticals:farm_dashboard' %}" data-cy="nav-dashboard"><i class="bi bi-house-door"></i> Dashboard</a></li>
@@ -175,6 +176,12 @@
     <li><a class="navlink" href="{% url 'verticals:farm_locations' %}" data-cy="nav-farm-locations"><i class="bi bi-geo-alt"></i> Locations</a></li>
     <li><a class="navlink" href="{% url 'verticals:farm_reports' %}" data-cy="nav-farm-reports"><i class="bi bi-graph-up-arrow"></i> Metrics & Reports</a></li>
   </ul>
+  {% if url_farm_marketplace %}
+  <div class="menu-group">MARKETPLACE</div>
+  <ul class="navlist">
+    <li><a class="navlink" href="{{ url_farm_marketplace }}" data-cy="nav-farm-marketplace"><i class="bi bi-shop-window"></i> My Listings</a></li>
+  </ul>
+  {% endif %}
   <div class="menu-group">SUBSCRIPTION</div>
   <ul class="navlist">
     <li><a class="navlink" href="{% url 'billing:plans' %}" data-cy="nav-farm-billing"><i class="bi bi-credit-card-2-front"></i> Billing</a></li>

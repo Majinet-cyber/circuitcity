@@ -57,6 +57,48 @@ def _biz(request) -> "Business | None":
 log = logging.getLogger(__name__)
 
 
+def _collect_vertical_metadata_from_post(request: HttpRequest, business: Business) -> dict[str, str]:
+    """Gather vertical_metadata keys from POST (meta_<field>)."""
+    try:
+        from inventory.marketplace_vertical_config import get_vertical_config
+
+        cfg = get_vertical_config(getattr(business, "business_kind", "") or "") or {}
+    except Exception:
+        cfg = {}
+    meta: dict[str, str] = {}
+    for fn in cfg.get("listing_fields") or []:
+        val = request.POST.get(f"meta_{fn}", "").strip()
+        if val:
+            meta[fn] = val
+    return meta
+
+
+def _vertical_meta_input_rows(business: Business, listing=None, form_data: dict | None = None):
+    """Template-friendly rows for listing-specific metadata fields."""
+    try:
+        from inventory.marketplace_vertical_config import get_vertical_config
+
+        cfg = get_vertical_config(getattr(business, "business_kind", "") or "") or {}
+    except Exception:
+        cfg = {}
+    ml = cfg.get("metadata_labels") or {}
+    merged_listing_meta = (listing.vertical_metadata if listing else {}) or {}
+    fd = form_data or {}
+    rows = []
+    for fn in cfg.get("listing_fields") or []:
+        fd_key = f"meta_{fn}"
+        raw = fd.get(fd_key)
+        val = merged_listing_meta.get(fn, "") if raw is None else raw
+        rows.append(
+            {
+                "field": fn,
+                "label": ml.get(fn, fn.replace("_", " ").title()),
+                "value": val if val is not None else "",
+            }
+        )
+    return rows
+
+
 # =============================================================================
 # PUBLIC VIEWS
 # =============================================================================
@@ -324,15 +366,17 @@ def create_listing(request: HttpRequest) -> HttpResponse:
 
     def _re_render(extra_form_data: dict | None = None):
         """Helper: re-render the create form, merging any extra POST data."""
+        fd = extra_form_data or form_data
         return render(
             request,
             "marketplace/manage/create_edit.html",
             {
-                "form_data": extra_form_data or form_data,
+                "form_data": fd,
                 "business": business,
                 "vertical_config": vertical_config,
                 "ListingStatus": ListingStatus,
                 "editing": False,
+                "vertical_meta_rows": _vertical_meta_input_rows(business, listing=None, form_data=fd),
             },
         )
 
@@ -362,6 +406,7 @@ def create_listing(request: HttpRequest) -> HttpResponse:
                 messages.error(request, "Invalid price — please enter a valid number.")
                 return _re_render(form_data)
 
+        vm = _collect_vertical_metadata_from_post(request, business)
         try:
             listing = MarketplaceListing.objects.create(
                 business=business,
@@ -375,6 +420,7 @@ def create_listing(request: HttpRequest) -> HttpResponse:
                 address=address,
                 location_text=location_text,
                 status=status if status in dict(ListingStatus.choices) else ListingStatus.DRAFT,
+                vertical_metadata=vm,
                 created_by=request.user,
             )
 
@@ -410,16 +456,20 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
         vertical_config = {}
 
     def _re_render(fd: dict | None = None):
+        merged_fd = fd or {}
         return render(
             request,
             "marketplace/manage/create_edit.html",
             {
                 "listing": listing,
-                "form_data": fd or {},
+                "form_data": merged_fd,
                 "business": business,
                 "vertical_config": vertical_config,
                 "ListingStatus": ListingStatus,
                 "editing": True,
+                "vertical_meta_rows": _vertical_meta_input_rows(
+                    business, listing=listing, form_data=merged_fd
+                ),
             },
         )
 
@@ -447,7 +497,9 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
                 messages.error(request, "Invalid price — please enter a valid number.")
                 return _re_render(form_data)
 
+        vm_post = _collect_vertical_metadata_from_post(request, business)
         try:
+            prev_title = listing.title
             listing.title = title
             listing.description = description
             listing.price = price
@@ -455,11 +507,14 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
             listing.contact_email = contact_email
             listing.address = address
             listing.location_text = location_text
+            merged_vm = dict(listing.vertical_metadata or {})
+            merged_vm.update(vm_post)
+            listing.vertical_metadata = merged_vm
             if status in dict(ListingStatus.choices):
                 listing.status = status
             if media_file:
                 listing.media_file = media_file
-            if title != listing.title:
+            if title != prev_title:
                 listing.listing_slug = ""
             listing.save()
 

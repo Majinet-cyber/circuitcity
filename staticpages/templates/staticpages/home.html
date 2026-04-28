@@ -2151,15 +2151,10 @@
        PARTNERS / TRUST STRIP
     ============================================================ */
     .partners-strip {
-      padding: 3.5rem 0;
+      padding: 2.5rem 0;
       background: var(--bg-subtle);
       border-top: 1px solid var(--border);
-    }
-    .partners-strip-inner {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 0 2rem;
-      text-align: center;
+      overflow: hidden;
     }
     .partners-strip-label {
       font-size: 0.75rem;
@@ -2167,49 +2162,83 @@
       text-transform: uppercase;
       letter-spacing: 0.12em;
       color: var(--text-light);
-      margin-bottom: 1.5rem;
+      text-align: center;
+      margin-bottom: 1.25rem;
     }
-    .partners-logos {
+    .partners-marquee-wrapper {
+      overflow: hidden;
+      position: relative;
+      /* fade edges */
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    }
+    .partners-marquee-track {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 3rem;
-      flex-wrap: wrap;
+      gap: 0;
+      width: max-content;
+      animation: partnersMarquee 28s linear infinite;
+    }
+    .partners-marquee-track:hover {
+      animation-play-state: paused;
+    }
+    @keyframes partnersMarquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .partners-marquee-track {
+        animation: none;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: auto;
+        gap: 2rem;
+      }
+      .partners-marquee-track .partner-logo-set:last-child { display: none; }
+      .partners-marquee-wrapper { -webkit-mask-image: none; mask-image: none; }
+    }
+    .partner-logo-set {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0;
     }
     .partner-logo {
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      font-size: 1.125rem;
+      font-size: 1rem;
       font-weight: 700;
       color: var(--text-light);
       filter: grayscale(100%);
       opacity: 0.5;
-      transition: filter var(--transition-base), opacity var(--transition-base), color var(--transition-base);
+      transition: filter 0.2s, opacity 0.2s, color 0.2s;
       text-decoration: none;
+      white-space: nowrap;
+      padding: 0 2.5rem;
     }
     .partner-logo:hover {
       filter: grayscale(0%);
       opacity: 1;
     }
     .partner-logo--paychangu:hover { color: #2563eb; }
-    .partner-logo--airtel:hover { color: #e11d48; }
-    .partner-logo--tnm:hover { color: #2563eb; }
+    .partner-logo--airtel:hover    { color: #e11d48; }
+    .partner-logo--tnm:hover       { color: #0ea5e9; }
+    .partner-logo--twilio:hover    { color: #f22f46; }
+    .partner-logo--sendgrid:hover  { color: #1a82e2; }
     .partner-logo-icon {
-      width: 32px; height: 32px;
+      width: 28px; height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 8px;
+      border-radius: 7px;
+      flex-shrink: 0;
     }
-    .partner-divider {
+    .partner-sep {
       width: 1px;
-      height: 28px;
+      height: 24px;
       background: var(--border);
-    }
-    @media (max-width: 600px) {
-      .partners-logos { gap: 1.5rem; }
-      .partner-divider { display: none; }
+      flex-shrink: 0;
     }
 
     /* ============================================================
@@ -3347,10 +3376,8 @@
     </div>
   </section>
 
-  <!-- ============================================================
-       PRODUCT DEPTH
-  ============================================================ -->
-  <section class="section section--light" id="product-depth">
+  <!-- Daily Reporting section removed -->
+  <section class="section section--light" id="product-depth" style="display:none;">
     <div class="container">
       <div class="product-depth">
         <div class="product-depth-text">
@@ -3751,10 +3778,10 @@
     <div style="text-align: center; margin-bottom: 2.5rem; max-width: 1200px; margin-left: auto; margin-right: auto; padding: 0 2rem;">
       <span class="eyebrow">Built for your industry</span>
       <h2 style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: -0.02em;">
-        Purpose-built for every type of African business.
+        Specialised for your business.
       </h2>
       <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 620px; margin: 0 auto;">
-        Not generic forms — purpose-built workflows shaped around how your specific business operates.
+        Purpose-built workflows for serious operators. Built around how your business actually runs.
       </p>
     </div>
 
@@ -4489,8 +4516,9 @@
           <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;">MOST POPULAR</span>
           {% endif %}
           <div style="font-size: 1rem; font-weight: 700; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.9){% else %}var(--text){% endif %}; margin-bottom: 0.25rem;">{{ plan.name }}</div>
-          <div style="font-size: 1.75rem; font-weight: 800; color: {% if plan.code == 'growth' %}#fff{% else %}var(--brand){% endif %}; margin-bottom: 0.125rem;">{{ plan.currency }} {{ plan.amount|floatformat:0 }}</div>
-          <div style="font-size: 0.75rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.65){% else %}var(--text-muted){% endif %}; margin-bottom: 1rem;">/month</div>
+          <div style="font-size: 1.75rem; font-weight: 800; color: {% if plan.code == 'growth' %}#fff{% else %}var(--brand){% endif %}; line-height: 1.15;">MWK {{ plan.amount|floatformat:0 }}</div>
+          <div style="font-size: 0.75rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.65){% else %}var(--text-muted){% endif %}; margin-bottom: 0.15rem;">/month</div>
+          <div style="font-size: 0.72rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.5){% else %}#94a3b8{% endif %}; margin-bottom: 1rem;">≈ USD {{ plan.amount_usd }} / month</div>
           <ul style="list-style: none; padding: 0; margin: 0 0 1.25rem; font-size: 0.875rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.85){% else %}var(--text-muted){% endif %}; display: flex; flex-direction: column; gap: 0.4rem;">
             {% for feature in plan.features|slice:":4" %}
             <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
@@ -4508,6 +4536,9 @@
 
       <div style="text-align: center;">
         <a href="{% url 'staticpages:pricing' %}" class="btn btn-secondary" style="display: inline-flex;">See full pricing &rarr;</a>
+        <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.75rem;">
+          {{ PRICING_USD_RATE_NOTE|default:"USD equivalent is approximate and may vary with exchange rate." }}
+        </p>
       </div>
     </div>
   </section>
@@ -4529,51 +4560,90 @@
   <!-- ============================================================
        PARTNERS
   ============================================================ -->
-  <div class="partners-strip" role="complementary" aria-label="Partners">
-    <div class="partners-strip-inner">
-      <div class="partners-strip-label">Partners</div>
-      <div class="partners-logos">
-        <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" aria-label="PayChangu">
-          <span class="partner-logo-icon" style="background:#eff6ff;border-radius:8px;padding:2px;">
-            <img src="{% static 'img/partners/paychangu-logo.svg' %}"
-                 alt="PayChangu"
-                 width="28" height="28"
-                 style="object-fit:contain;border-radius:6px;"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;border-radius:6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+  <div class="partners-strip" role="complementary" aria-label="Partners and integrations">
+    <div class="partners-strip-label">Partners &amp; Integrations</div>
+    <div class="partners-marquee-wrapper">
+      <div class="partners-marquee-track" aria-hidden="false">
+        {# First copy #}
+        <div class="partner-logo-set">
+          <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" aria-label="PayChangu payments">
+            <span class="partner-logo-icon" style="background:#eff6ff;">
+              <img src="{% static 'img/partners/paychangu-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#2563eb;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
             </span>
-          </span>
-          PayChangu
-        </a>
-        <div class="partner-divider"></div>
-        <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
-          <span class="partner-logo-icon" style="background:#fff0f3;border-radius:8px;padding:2px;">
-            <img src="{% static 'img/partners/airtel-logo.svg' %}"
-                 alt="Airtel Money"
-                 width="28" height="28"
-                 style="object-fit:contain;border-radius:6px;"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#e11d48;border-radius:6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            PayChangu
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
+            <span class="partner-logo-icon" style="background:#fff0f3;">
+              <img src="{% static 'img/partners/airtel-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#e11d48;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
             </span>
-          </span>
-          Airtel Money
-        </a>
-        <div class="partner-divider"></div>
-        <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" aria-label="TNM Mpamba">
-          <span class="partner-logo-icon" style="background:#e0f2fe;border-radius:8px;padding:2px;">
-            <img src="{% static 'img/partners/tnm-logo.svg' %}"
-                 alt="TNM Mpamba"
-                 width="28" height="28"
-                 style="object-fit:contain;border-radius:6px;"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-            <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;border-radius:6px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            Airtel Money
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" aria-label="TNM Mpamba">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <img src="{% static 'img/partners/tnm-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#0ea5e9;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg></span>
             </span>
-          </span>
-          TNM Mpamba
-        </a>
+            TNM Mpamba
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--twilio" aria-label="Twilio SMS & messaging">
+            <span class="partner-logo-icon" style="background:#fff1f2;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#F22F46"/><circle cx="20" cy="20" r="6" fill="white"/><circle cx="40" cy="20" r="6" fill="white"/><circle cx="20" cy="40" r="6" fill="white"/><circle cx="40" cy="40" r="6" fill="white"/></svg>
+            </span>
+            Twilio
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--sendgrid" aria-label="SendGrid email delivery">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" rx="10" fill="#1A82E2"/><path d="M10 10h20v20H10zM30 30h20v20H30z" fill="white"/><path d="M30 10h20v20H30z" fill="rgba(255,255,255,0.4)"/><path d="M10 30h20v20H10z" fill="rgba(255,255,255,0.4)"/></svg>
+            </span>
+            SendGrid
+          </a>
+        </div>
+        {# Duplicate for seamless loop #}
+        <div class="partner-logo-set" aria-hidden="true">
+          <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#eff6ff;">
+              <img src="{% static 'img/partners/paychangu-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#2563eb;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+            </span>
+            PayChangu
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#fff0f3;">
+              <img src="{% static 'img/partners/airtel-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#e11d48;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+            </span>
+            Airtel Money
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <img src="{% static 'img/partners/tnm-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#0ea5e9;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg></span>
+            </span>
+            TNM Mpamba
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--twilio" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#fff1f2;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#F22F46"/><circle cx="20" cy="20" r="6" fill="white"/><circle cx="40" cy="20" r="6" fill="white"/><circle cx="20" cy="40" r="6" fill="white"/><circle cx="40" cy="40" r="6" fill="white"/></svg>
+            </span>
+            Twilio
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--sendgrid" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" rx="10" fill="#1A82E2"/><path d="M10 10h20v20H10zM30 30h20v20H30z" fill="white"/><path d="M30 10h20v20H30z" fill="rgba(255,255,255,0.4)"/><path d="M10 30h20v20H10z" fill="rgba(255,255,255,0.4)"/></svg>
+            </span>
+            SendGrid
+          </a>
+        </div>
       </div>
     </div>
   </div>

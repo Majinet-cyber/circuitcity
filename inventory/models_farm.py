@@ -230,6 +230,145 @@ class FarmAnimalType(models.TextChoices):
     OTHER = "other", "Other"
 
 
+class FarmLivestockSubType(models.TextChoices):
+    """Practical subtypes for batches — quick-picks in the UI, not free-text only."""
+
+    UNSPECIFIED = "unspecified", "Select subtype (use quick-picks below)"
+    CHICKEN_BROILERS = "chicken_broilers", "Broilers"
+    CHICKEN_LAYERS = "chicken_layers", "Layers"
+    CHICKEN_INDIGENOUS = "chicken_indigenous", "Indigenous / local chickens"
+    CHICKEN_HYBRID = "chicken_hybrid", "Hybrid chickens"
+    CHICKEN_CHICKS = "chicken_chicks", "Chicks"
+    CHICKEN_POL = "chicken_point_of_lay", "Point-of-lay birds"
+    PIG_LOCAL = "pig_local", "Local pigs"
+    PIG_HYBRID = "pig_hybrid", "Hybrid / improved pigs"
+    PIG_PIGLETS = "pig_piglets", "Piglets"
+    PIG_GROWERS = "pig_growers", "Growers / fattening"
+    PIG_SOWS = "pig_sows", "Sows"
+    PIG_BOARS = "pig_boars", "Boars"
+    GOAT_LOCAL = "goat_local", "Local goats"
+    GOAT_BOER = "goat_boer", "Boer / improved breeds"
+    GOAT_KIDS = "goat_kids", "Kids (young goats)"
+    GOAT_BREEDING_MALE = "goat_breeding_male", "Breeding males"
+    GOAT_BREEDING_FEMALE = "goat_breeding_female", "Breeding females"
+    CATTLE_LOCAL = "cattle_local", "Local cattle"
+    CATTLE_DAIRY = "cattle_dairy", "Dairy cattle"
+    CATTLE_BEEF = "cattle_beef", "Beef cattle"
+    CATTLE_CALVES = "cattle_calves", "Calves"
+    CATTLE_HEIFERS = "cattle_heifers", "Heifers"
+    CATTLE_BULLS = "cattle_bulls", "Bulls"
+    DUCKS_DEFAULT = "ducks_default", "Ducks"
+    DUCKS_LAYER = "ducks_layer", "Layer ducks"
+    RABBITS_BROILER = "rabbits_broiler", "Rabbits (meat)"
+    RABBITS_BREEDING = "rabbits_breeding", "Rabbits (breeding)"
+    SHEEP_BREEDING = "sheep_breeding", "Sheep (breeding)"
+    SHEEP_LAMBS = "sheep_lambs", "Lambs"
+    FISH_POND = "fish_pond", "General pond fish"
+    FISH_TILAPIA = "fish_tilapia", "Tilapia"
+    FISH_CATFISH = "fish_catfish", "Catfish"
+    OTHER_GENERIC = "other_generic", "Other / custom"
+
+
+# Quick-pick subtypes by animal (values must exist on FarmLivestockSubType)
+FARM_SUBTYPES_BY_ANIMAL: dict[str, list[str]] = {
+    FarmAnimalType.CHICKENS: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.CHICKEN_BROILERS,
+        FarmLivestockSubType.CHICKEN_LAYERS,
+        FarmLivestockSubType.CHICKEN_INDIGENOUS,
+        FarmLivestockSubType.CHICKEN_HYBRID,
+        FarmLivestockSubType.CHICKEN_CHICKS,
+        FarmLivestockSubType.CHICKEN_POL,
+    ],
+    FarmAnimalType.PIGS: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.PIG_LOCAL,
+        FarmLivestockSubType.PIG_HYBRID,
+        FarmLivestockSubType.PIG_PIGLETS,
+        FarmLivestockSubType.PIG_GROWERS,
+        FarmLivestockSubType.PIG_SOWS,
+        FarmLivestockSubType.PIG_BOARS,
+    ],
+    FarmAnimalType.GOATS: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.GOAT_LOCAL,
+        FarmLivestockSubType.GOAT_BOER,
+        FarmLivestockSubType.GOAT_KIDS,
+        FarmLivestockSubType.GOAT_BREEDING_MALE,
+        FarmLivestockSubType.GOAT_BREEDING_FEMALE,
+    ],
+    FarmAnimalType.CATTLE: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.CATTLE_LOCAL,
+        FarmLivestockSubType.CATTLE_DAIRY,
+        FarmLivestockSubType.CATTLE_BEEF,
+        FarmLivestockSubType.CATTLE_CALVES,
+        FarmLivestockSubType.CATTLE_HEIFERS,
+        FarmLivestockSubType.CATTLE_BULLS,
+    ],
+    FarmAnimalType.DUCKS: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.DUCKS_DEFAULT,
+        FarmLivestockSubType.DUCKS_LAYER,
+    ],
+    FarmAnimalType.RABBITS: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.RABBITS_BROILER,
+        FarmLivestockSubType.RABBITS_BREEDING,
+    ],
+    FarmAnimalType.SHEEP: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.SHEEP_BREEDING,
+        FarmLivestockSubType.SHEEP_LAMBS,
+    ],
+    FarmAnimalType.FISH: [
+        FarmLivestockSubType.UNSPECIFIED,
+        FarmLivestockSubType.FISH_POND,
+        FarmLivestockSubType.FISH_TILAPIA,
+        FarmLivestockSubType.FISH_CATFISH,
+    ],
+    FarmAnimalType.OTHER: [FarmLivestockSubType.OTHER_GENERIC, FarmLivestockSubType.UNSPECIFIED],
+}
+
+
+def subtype_choices_for_animal_type(animal_type: str) -> list[tuple[str, str]]:
+    """Return (value, label) tuples for the guided UI for this animal type."""
+    keys = FARM_SUBTYPES_BY_ANIMAL.get(
+        animal_type,
+        [FarmLivestockSubType.UNSPECIFIED, FarmLivestockSubType.OTHER_GENERIC],
+    )
+    label_by_val = {c.value: c.label for c in FarmLivestockSubType}
+    return [(k, label_by_val.get(k, k)) for k in keys]
+
+
+class FarmAnimalGender(models.TextChoices):
+    NA = "na", "Not specified"
+    MIXED = "mixed", "Mixed flock / herd"
+    MALE = "male", "Male"
+    FEMALE = "female", "Female"
+
+
+class FarmHealthStatus(models.TextChoices):
+    UNKNOWN = "unknown", "Not recorded"
+    GOOD = "good", "Good"
+    WATCH = "watch", "Under observation"
+    TREATING = "treating", "Under treatment / vet care"
+
+
+class FarmVaccinationStatus(models.TextChoices):
+    UNKNOWN = "unknown", "Not recorded"
+    CURRENT = "current", "Vaccination current"
+    PARTIAL = "partial", "Partial / needs booster"
+    NONE = "none", "None on record"
+
+
+class FarmSaleAvailability(models.TextChoices):
+    """Marketplace / trade readiness for a batch or crop line."""
+    AVAILABLE_NOW = "available_now", "Available now"
+    PREORDER = "preorder", "Preorder / future date"
+    RESERVED = "reserved", "Reserved (spoken for)"
+
+
 class FarmLivestockBatch(models.Model):
     """
     Tracks a batch/group of livestock animals.
@@ -259,6 +398,97 @@ class FarmLivestockBatch(models.Model):
     name = models.CharField(
         max_length=100,
         help_text="Batch name, e.g. 'Gilts Batch 1', 'Layer Chickens Group A'",
+    )
+    animal_subtype = models.CharField(
+        max_length=40,
+        choices=FarmLivestockSubType.choices,
+        default=FarmLivestockSubType.UNSPECIFIED,
+        db_index=True,
+        help_text="Practical subtype (broilers, layers, piglets, etc.)",
+    )
+    breed_text = models.CharField(
+        max_length=120,
+        blank=True,
+        default="",
+        help_text="Breed or strain (optional, free text)",
+    )
+    gender = models.CharField(
+        max_length=12,
+        choices=FarmAnimalGender.choices,
+        default=FarmAnimalGender.NA,
+        blank=True,
+    )
+    age_months = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Typical or average age in months (for the batch)",
+    )
+    health_status = models.CharField(
+        max_length=20,
+        choices=FarmHealthStatus.choices,
+        default=FarmHealthStatus.UNKNOWN,
+    )
+    vaccination_status = models.CharField(
+        max_length=20,
+        choices=FarmVaccinationStatus.choices,
+        default=FarmVaccinationStatus.UNKNOWN,
+    )
+    feed_growth_stage = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Feed or growth stage (e.g. starter, grower, finisher)",
+    )
+    egg_production_status = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="For layers: production level or status",
+    )
+    dairy_output_note = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="For dairy: output note (e.g. litres per day)",
+    )
+    cost_basis_per_head_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Your cost per head (for margin checks)",
+    )
+    expected_sale_price_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Asking or expected sale price per head (marketplace & margin)",
+    )
+    sale_availability = models.CharField(
+        max_length=20,
+        choices=FarmSaleAvailability.choices,
+        default=FarmSaleAvailability.AVAILABLE_NOW,
+    )
+    is_featured_listing = models.BooleanField(
+        default=False,
+        help_text="Highlight on internal dashboard and metadata for marketplace",
+    )
+    marketplace_listing = models.OneToOneField(
+        "inventory.MarketplaceListing",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farm_livestock_batch",
+    )
+    last_marketplace_sync_at = models.DateTimeField(null=True, blank=True)
+    primary_image = models.ImageField(
+        upload_to="farm/batch/%Y/%m/",
+        null=True,
+        blank=True,
+        help_text="Primary photo for this batch (used for marketplace cover)",
     )
     
     # Current state (updated from events)
@@ -317,6 +547,7 @@ class FarmLivestockBatch(models.Model):
         indexes = [
             models.Index(fields=["business", "animal_type"]),
             models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "animal_subtype"]),
         ]
         verbose_name = "Farm Livestock Batch"
         verbose_name_plural = "Farm Livestock Batches"
@@ -339,6 +570,57 @@ class FarmLivestockBatch(models.Model):
             return self.count_current * self.avg_weight_kg * self.price_per_kg_mwk
         
         return None
+
+    @property
+    def effective_asking_price_per_head_mwk(self) -> Decimal | None:
+        """Price used for marketplace & margin (explicit ask, else valuation per head)."""
+        if self.expected_sale_price_mwk is not None:
+            return self.expected_sale_price_mwk
+        return self.price_per_animal_mwk
+
+    @property
+    def margin_pct_vs_cost(self) -> Decimal | None:
+        """
+        Return margin % = (ask - cost) / ask * 100 when both cost and ask are set.
+        """
+        ask = self.effective_asking_price_per_head_mwk
+        if ask is None or self.cost_basis_per_head_mwk is None or ask <= 0:
+            return None
+        return (ask - self.cost_basis_per_head_mwk) / ask * Decimal("100")
+
+    @property
+    def margin_band(self) -> str:
+        """
+        healthy | caution | risky | unknown
+        """
+        m = self.margin_pct_vs_cost
+        if m is None:
+            return "unknown"
+        if m < Decimal("0"):
+            return "risky"
+        if m < Decimal("10"):
+            return "caution"
+        return "healthy"
+
+
+class FarmBatchImage(models.Model):
+    """Extra photos for a livestock batch (synced to marketplace when publishing)."""
+
+    batch = models.ForeignKey(
+        FarmLivestockBatch,
+        on_delete=models.CASCADE,
+        related_name="gallery_images",
+    )
+    image = models.ImageField(upload_to="farm/batch_gallery/%Y/%m/")
+    caption = models.CharField(max_length=200, blank=True, default="")
+    sort_order = models.PositiveSmallIntegerField(default=0, db_index=True)
+    uploaded_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["sort_order", "uploaded_at"]
+
+    def __str__(self) -> str:
+        return f"Batch image {self.batch_id} #{self.sort_order}"
 
 
 class FarmLivestockEventType(models.TextChoices):
@@ -617,6 +899,12 @@ class FarmCropCategory(models.TextChoices):
     LEGUMES = "legumes", "Legumes"
     ROOTS_TUBERS = "roots_tubers", "Roots & Tubers"
     VEGETABLES = "vegetables", "Vegetables"
+    EGGS = "eggs", "Eggs"
+    MILK = "milk", "Milk & dairy"
+    ANIMAL_FEED = "animal_feed", "Animal feed"
+    FERTILIZER = "fertilizer", "Fertilizer / manure"
+    FRESH_PRODUCE = "fresh_produce", "Fresh produce"
+    SEEDLINGS = "seedlings", "Seedlings & saplings"
 
 
 # Malawi crop catalog - used for seeding and display
@@ -651,6 +939,27 @@ MALAWI_CROP_CATALOG = {
         {"name": "Cabbage", "emoji": "🥬", "unit": "head"},
         {"name": "Okra", "emoji": "🥒", "unit": "kg"},
         {"name": "Rape/Leafy Greens", "emoji": "🥬", "unit": "bundle"},
+    ],
+    "eggs": [
+        {"name": "Tray (30 eggs)", "emoji": "🥚", "unit": "item"},
+        {"name": "Crate (large)", "emoji": "🥚", "unit": "item"},
+    ],
+    "milk": [
+        {"name": "Fresh milk", "emoji": "🥛", "unit": "litre"},
+    ],
+    "animal_feed": [
+        {"name": "Layer mash", "emoji": "🌾", "unit": "kg"},
+        {"name": "Broiler starter", "emoji": "🌾", "unit": "kg"},
+        {"name": "Pig grower", "emoji": "🌾", "unit": "kg"},
+    ],
+    "fertilizer": [
+        {"name": "Organic manure (bulk)", "emoji": "🪴", "unit": "item"},
+    ],
+    "fresh_produce": [
+        {"name": "Tomatoes (fresh)", "emoji": "🍅", "unit": "kg"},
+    ],
+    "seedlings": [
+        {"name": "Maize seedlings (tray)", "emoji": "🌱", "unit": "item"},
     ],
 }
 
@@ -688,6 +997,41 @@ class FarmCrop(models.Model):
         validators=[MinValueValidator(Decimal("0"))],
         help_text="Current available quantity (updated by harvests/sales)",
     )
+    cost_basis_per_unit_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Unit cost (for margin estimation)",
+    )
+    list_price_per_unit_mwk = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+        help_text="Asking price per unit for marketplace & margin",
+    )
+    sale_availability = models.CharField(
+        max_length=20,
+        choices=FarmSaleAvailability.choices,
+        default=FarmSaleAvailability.AVAILABLE_NOW,
+    )
+    is_featured_listing = models.BooleanField(default=False)
+    primary_image = models.ImageField(
+        upload_to="farm/crop/%Y/%m/",
+        null=True,
+        blank=True,
+    )
+    marketplace_listing = models.OneToOneField(
+        "inventory.MarketplaceListing",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="farm_crop_line",
+    )
+    last_marketplace_sync_at = models.DateTimeField(null=True, blank=True)
     
     # Status
     is_active = models.BooleanField(default=True)
@@ -708,6 +1052,31 @@ class FarmCrop(models.Model):
     
     def __str__(self):
         return f"{self.name} ({self.get_category_display()})"
+
+    @property
+    def margin_pct_vs_cost(self) -> Decimal | None:
+        if (
+            self.list_price_per_unit_mwk is None
+            or self.cost_basis_per_unit_mwk is None
+            or self.list_price_per_unit_mwk <= 0
+        ):
+            return None
+        return (
+            (self.list_price_per_unit_mwk - self.cost_basis_per_unit_mwk)
+            / self.list_price_per_unit_mwk
+            * Decimal("100")
+        )
+
+    @property
+    def margin_band(self) -> str:
+        m = self.margin_pct_vs_cost
+        if m is None:
+            return "unknown"
+        if m < Decimal("0"):
+            return "risky"
+        if m < Decimal("10"):
+            return "caution"
+        return "healthy"
 
 
 class FarmCropSale(models.Model):

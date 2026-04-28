@@ -752,6 +752,53 @@ class SystemSizingRun(models.Model):
         max_digits=5, decimal_places=2, default=Decimal("8.0"),
         help_text="Annual inflation assumption (%)",
     )
+    energy_tariff_per_kwh = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Grid electricity tariff (MWK/kWh) — overrides default if set",
+    )
+    diesel_cost_per_litre = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Diesel fuel cost per litre (MWK) — used when generator enabled",
+    )
+    installation_cost_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Installation cost as % of CapEx (overrides default 15%)",
+    )
+    annual_maintenance_pct = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Annual maintenance cost as % of CapEx (overrides default 2%)",
+    )
+
+    # === Editable component cost assumptions (migration 1055) ===
+    cost_per_panel_wp = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Solar panel cost per Wp (MWK). Default: 650",
+    )
+    cost_per_battery_kwh = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Battery cost per kWh (MWK). Default: 450,000",
+    )
+    cost_per_inverter_kw = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Inverter cost per kW (MWK). Default: 180,000",
+    )
+    cost_per_cc_amp = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Charge controller cost per Amp (MWK). Default: 12,000",
+    )
+    cost_wiring_lump = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Cable/wiring lump-sum (MWK). Default: 150,000",
+    )
+    cost_breakers_lump = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Breakers/protection lump-sum (MWK). Default: 80,000",
+    )
+    cost_mounting_lump = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Mounting structure lump-sum (MWK). Default: 50,000",
+    )
+
     tariff_escalation_pct = models.DecimalField(
         max_digits=5, decimal_places=2, default=Decimal("5.0"),
         help_text="Annual tariff/energy cost escalation (%)",

@@ -100,7 +100,7 @@ class TestCementStockInSimplified:
         
         # Should redirect to step 2
         assert response.status_code == 302
-        assert '?step=2' in response.url
+        assert 'step=2' in response.url
 
     def test_step2_shows_pricing_form(self, client, cement_setup):
         """Step 2 shows quantity and pricing form"""
@@ -206,7 +206,7 @@ class TestCementStockInSimplified:
         
         # Should stay on step 2 (redirect back with error)
         assert response.status_code == 302
-        assert '?step=2' in response.url
+        assert 'step=2' in response.url
 
     def test_price_history_created_on_price_change(self, client, cement_setup):
         """Price history is created when prices change"""
@@ -291,5 +291,5 @@ class TestCementStockInEdgeCases:
         
         # Should redirect back to step 1 with error
         assert response.status_code == 302
-        assert '?step=1' in response.url
+        assert 'step=1' in response.url
 

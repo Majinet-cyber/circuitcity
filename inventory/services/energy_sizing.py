@@ -38,19 +38,36 @@ def _pct(val: Decimal) -> Decimal:
 
 
 # ---------------------------------------------------------------------------
-# Reference pricing (MWK) — [AI_HOOK] replace with live API / catalogue
+# Reference pricing (MWK) — Malawi-market defaults
+# All can be overridden per sizing run via cost_per_* fields on SystemSizingRun
 # ---------------------------------------------------------------------------
 
-PRICE_PER_PANEL_W = D("650")
-PRICE_PER_BATTERY_KWH = D("450000")
-PRICE_PER_INVERTER_KW = D("180000")
-PRICE_PER_CHARGE_CONTROLLER_A = D("12000")
-PRICE_PER_GENERATOR_KVA = D("120000")
+PRICE_PER_PANEL_W = D("650")           # MWK per Wp
+PRICE_PER_BATTERY_KWH = D("450000")   # MWK per kWh
+PRICE_PER_INVERTER_KW = D("180000")   # MWK per kW
+PRICE_PER_CHARGE_CONTROLLER_A = D("12000")  # MWK per Amp
+PRICE_PER_GENERATOR_KVA = D("120000")  # MWK per kVA
+PRICE_WIRING_DEFAULT = D("150000")    # MWK lump sum
+PRICE_BREAKERS_DEFAULT = D("80000")   # MWK lump sum
+PRICE_MOUNTING_DEFAULT = D("50000")   # MWK lump sum
 INSTALLATION_FRACTION = D("0.15")
 ANNUAL_MAINTENANCE_FRACTION = D("0.02")
 SYSTEM_LIFETIME_YEARS = 25
 GRID_TARIFF_PER_KWH = D("185")
 DIESEL_KWH_PER_LITRE = D("3.0")
+
+
+def _run_costs(run):
+    """Return per-run component cost assumptions, falling back to Malawi defaults."""
+    return {
+        "panel_wp":    _d(getattr(run, "cost_per_panel_wp", None))    or PRICE_PER_PANEL_W,
+        "battery_kwh": _d(getattr(run, "cost_per_battery_kwh", None)) or PRICE_PER_BATTERY_KWH,
+        "inverter_kw": _d(getattr(run, "cost_per_inverter_kw", None)) or PRICE_PER_INVERTER_KW,
+        "cc_amp":      _d(getattr(run, "cost_per_cc_amp", None))       or PRICE_PER_CHARGE_CONTROLLER_A,
+        "wiring":      _d(getattr(run, "cost_wiring_lump", None))      or PRICE_WIRING_DEFAULT,
+        "breakers":    _d(getattr(run, "cost_breakers_lump", None))    or PRICE_BREAKERS_DEFAULT,
+        "mounting":    _d(getattr(run, "cost_mounting_lump", None))    or PRICE_MOUNTING_DEFAULT,
+    }
 
 
 def compute_sizing(run) -> dict[str, Any]:
@@ -179,33 +196,44 @@ def compute_sizing(run) -> dict[str, Any]:
         run.estimated_runtime_hours = None
 
     # ------------------------------------------------------------------
-    # 8. Economic analysis
+    # 8. Economic analysis — use per-run editable cost assumptions
     # ------------------------------------------------------------------
-    capex_panels = panel_count * panel_wp * PRICE_PER_PANEL_W
-    capex_battery = total_battery_kwh * PRICE_PER_BATTERY_KWH
-    capex_inverter = inverter_kw * PRICE_PER_INVERTER_KW
-    capex_cc = cc_amps * PRICE_PER_CHARGE_CONTROLLER_A
+    costs = _run_costs(run)
+    capex_panels  = D(str(panel_count)) * panel_wp * costs["panel_wp"]
+    capex_battery = total_battery_kwh * costs["battery_kwh"]
+    capex_inverter = inverter_kw * costs["inverter_kw"]
+    capex_cc      = cc_amps * costs["cc_amp"]
+    capex_wiring  = costs["wiring"]
+    capex_breakers = costs["breakers"]
+    capex_mounting = costs["mounting"]
     capex_gen = ZERO
     if run.has_generator and run.recommended_generator_kva:
         capex_gen = run.recommended_generator_kva * PRICE_PER_GENERATOR_KVA
 
-    total_capex = capex_panels + capex_battery + capex_inverter + capex_cc + capex_gen
-    install_cost = (total_capex * INSTALLATION_FRACTION).quantize(D("0.01"))
-    annual_maint = (total_capex * ANNUAL_MAINTENANCE_FRACTION).quantize(D("0.01"))
-
+    total_capex = (
+        capex_panels + capex_battery + capex_inverter + capex_cc
+        + capex_wiring + capex_breakers + capex_mounting + capex_gen
+    )
     run.estimated_capex = total_capex.quantize(D("0.01"))
+
+    # Use custom pct overrides if user supplied them, else fall back to defaults
+    inst_pct = _d(getattr(run, "installation_cost_pct", None)) or ZERO
+    maint_pct = _d(getattr(run, "annual_maintenance_pct", None)) or ZERO
+    install_cost = (total_capex * (inst_pct / HUNDRED if inst_pct > ZERO else INSTALLATION_FRACTION)).quantize(D("0.01"))
+    annual_maint = (total_capex * (maint_pct / HUNDRED if maint_pct > ZERO else ANNUAL_MAINTENANCE_FRACTION)).quantize(D("0.01"))
     run.estimated_installation_cost = install_cost
     run.estimated_annual_maintenance = annual_maint
 
     daily_kwh = run.total_daily_demand_kwh or ZERO
     monthly_kwh = daily_kwh * D("30")
-    grid_savings = monthly_kwh * GRID_TARIFF_PER_KWH
+    effective_tariff = _d(getattr(run, "energy_tariff_per_kwh", None)) or GRID_TARIFF_PER_KWH
+    grid_savings = monthly_kwh * effective_tariff
     run.grid_savings_monthly = grid_savings.quantize(D("0.01"))
     run.projected_monthly_savings = grid_savings.quantize(D("0.01"))
     run.projected_annual_savings = (grid_savings * D("12")).quantize(D("0.01"))
 
     if run.has_generator:
-        fuel_cost = _d(run.generator_fuel_cost_per_litre, D("3500"))
+        fuel_cost = _d(getattr(run, "diesel_cost_per_litre", None)) or _d(run.generator_fuel_cost_per_litre, D("3500"))
         lph = _d(run.generator_litres_per_hour, D("2.5"))
         gen_hours_offset = float(daily_kwh / D("3.0")) if daily_kwh > ZERO else 0
         diesel_offset = D(str(gen_hours_offset)) * lph * fuel_cost * D("30")
@@ -239,13 +267,32 @@ def compute_sizing(run) -> dict[str, Any]:
         ).quantize(D("0.1"))
 
     # ------------------------------------------------------------------
-    # 9. Component summary
+    # 9. Component summary (includes cost breakdown)
     # ------------------------------------------------------------------
     run.component_summary = {
-        "panels": {"count": panel_count, "wattage_each": float(panel_wp), "total_kw": float(array_kw)},
-        "battery": {"total_kwh": float(total_battery_kwh), "usable_kwh": float(usable_kwh), "voltage": int(batt_v)},
-        "inverter": {"kw": float(inverter_kw), "loading_pct": float(run.inverter_loading_pct or 0)},
-        "charge_controller": {"amps": float(cc_amps)},
+        "panels": {
+            "count": panel_count, "wattage_each": float(panel_wp), "total_kw": float(array_kw),
+            "unit_cost_per_wp": float(costs["panel_wp"]),
+            "total_cost": float(capex_panels.quantize(D("0.01"))),
+        },
+        "battery": {
+            "total_kwh": float(total_battery_kwh), "usable_kwh": float(usable_kwh), "voltage": int(batt_v),
+            "unit_cost_per_kwh": float(costs["battery_kwh"]),
+            "total_cost": float(capex_battery.quantize(D("0.01"))),
+        },
+        "inverter": {
+            "kw": float(inverter_kw), "loading_pct": float(run.inverter_loading_pct or 0),
+            "unit_cost_per_kw": float(costs["inverter_kw"]),
+            "total_cost": float(capex_inverter.quantize(D("0.01"))),
+        },
+        "charge_controller": {
+            "amps": float(cc_amps),
+            "unit_cost_per_amp": float(costs["cc_amp"]),
+            "total_cost": float(capex_cc.quantize(D("0.01"))),
+        },
+        "wiring": {"cost": float(capex_wiring)},
+        "breakers": {"cost": float(capex_breakers)},
+        "mounting": {"cost": float(capex_mounting)},
         "generator": {"kva": float(run.recommended_generator_kva or 0)} if run.has_generator else None,
     }
 
@@ -303,20 +350,84 @@ def compute_sizing(run) -> dict[str, Any]:
     if run.payback_years and run.payback_years > D("8"):
         warns.append(
             f"Payback period is {float(run.payback_years):.1f} years, which is relatively long. "
-            "Review whether a smaller, phased approach could improve economics."
+            "Battery cost dominates CapEx — reduce night loads or increase solar daytime usage to improve payback."
         )
 
     if run.estimated_runtime_hours and run.estimated_runtime_hours < D("3"):
         warns.append(
             f"Battery runtime is only {float(run.estimated_runtime_hours):.1f} hours at full load. "
-            "Consider increasing battery capacity or autonomy days."
+            "Battery will likely deplete by early evening. Consider increasing battery capacity or autonomy days."
+        )
+
+    # System voltage guidance
+    if batt_v >= D("48"):
+        recs.append(
+            f"48V system voltage chosen — correct for this load size. "
+            "48V reduces cable current and losses, improving efficiency."
+        )
+    elif batt_v >= D("24"):
+        recs.append(
+            "24V system — suitable for small residential loads. "
+            "Consider upgrading to 48V if the system grows beyond 3 kW."
+        )
+    else:
+        warns.append(
+            "12V system — only recommended for very small loads (<1 kW). "
+            "High cable currents will cause significant losses at this scale."
+        )
+
+    # Undersized battery warning
+    if usable_kwh > ZERO and night_daily_wh > ZERO:
+        night_kwh = night_daily_wh / THOUSAND
+        coverage_pct = float(usable_kwh / night_kwh * HUNDRED) if night_kwh > ZERO else 100
+        if coverage_pct < 60:
+            warns.append(
+                f"Battery covers only {coverage_pct:.0f}% of nighttime loads. "
+                "Expect blackout after solar hours unless generator/grid backup is active."
+            )
+        elif coverage_pct < 90:
+            warns.append(
+                f"Battery covers {coverage_pct:.0f}% of nighttime loads — marginal. "
+                "Add one more battery string to eliminate blackout risk."
+            )
+
+    # Critical vs non-critical circuit guidance
+    if critical_loads and non_critical:
+        non_critical_wh = sum((a.adjusted_daily_wh for a in non_critical), ZERO)
+        non_critical_pct = float(non_critical_wh / total_daily_wh * HUNDRED) if total_daily_wh > ZERO else 0
+        recs.append(
+            f"Non-critical loads ({non_critical_pct:.0f}% of total demand) should be on a separate circuit. "
+            "Reduce non-critical loads in evenings to extend battery life and reduce blackout risk."
+        )
+
+    # Payback battery dominance check
+    if capex_battery > (total_capex * D("0.5")):
+        pct = float(capex_battery / total_capex * HUNDRED)
+        warns.append(
+            f"Battery cost is {pct:.0f}% of total CapEx — driving a long payback. "
+            "Reduce night loads or shift consumption to solar hours for faster payback."
         )
 
     if panel_count > 0:
-        recs.append(f"Recommended: {panel_count}x {int(panel_wp)}W panels ({float(array_kw):.1f} kW array).")
+        # Panel config recommendation
+        panels_per_string = int(batt_v) // 12 if int(batt_v) >= 12 else 1
+        strings = max(1, -(-panel_count // max(panels_per_string, 1)))  # ceiling division
+        if strings == 1:
+            config_note = f"{panel_count} panels in series to reach {int(batt_v)}V"
+        elif panels_per_string == 1:
+            config_note = f"{panel_count} panels in parallel"
+        else:
+            config_note = f"{panels_per_string} panels/string × {strings} strings (series-parallel)"
+        recs.append(
+            f"Recommended: {panel_count}× {int(panel_wp)}W panels ({float(array_kw):.1f} kW array). "
+            f"Connection: {config_note}."
+        )
     if total_battery_kwh > ZERO:
-        recs.append(f"Battery bank: {float(total_battery_kwh):.1f} kWh total ({float(usable_kwh):.1f} kWh usable).")
-    recs.append(f"Inverter: {float(inverter_kw):.0f} kW recommended.")
+        recs.append(
+            f"Battery bank: {float(total_battery_kwh):.1f} kWh total ({float(usable_kwh):.1f} kWh usable). "
+            f"Autonomy: {float(_d(run.autonomy_days, ONE)):.1f} day(s) at design load."
+        )
+    recs.append(f"Inverter: {float(inverter_kw):.0f} kW — sized for peak demand with surge headroom.")
 
     run.recommendations = recs
     run.warnings = warns

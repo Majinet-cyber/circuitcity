@@ -5,7 +5,7 @@
 
 {% block content %}
 <style>
-  .sell-page { max-width:860px; margin:0 auto; padding:1.25rem; }
+  .sell-page { max-width:900px; margin:0 auto; padding:1.25rem; }
   .sell-hero {
     background:linear-gradient(135deg,#0f172a 0%,#1e40af 50%,#3b82f6 100%);
     border-radius:16px; padding:1.5rem 2rem; color:#fff; margin-bottom:1.75rem;
@@ -18,6 +18,50 @@
     color:rgba(255,255,255,.9); border-radius:999px; font-size:.82rem; font-weight:600;
     text-decoration:none; transition:all .15s; }
   .btn-back:hover { background:rgba(255,255,255,.2); color:#fff; }
+
+  /* ── Stepper ── */
+  .stepper { display:flex; align-items:center; gap:.5rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .step-pill { display:flex; align-items:center; gap:.4rem; padding:.4rem .85rem;
+    border-radius:999px; font-size:.78rem; font-weight:700; background:#f1f5f9;
+    color:#94a3b8; border:1.5px solid #e2e8f0; cursor:pointer; transition:all .15s; }
+  .step-pill.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .step-pill.done { background:#dbeafe; color:#1e40af; border-color:#93c5fd; }
+  .step-connector { flex:1; height:2px; background:#e2e8f0; min-width:16px; max-width:40px; }
+
+  /* ── Step panels ── */
+  .step-panel { display:none; }
+  .step-panel.active { display:block; }
+
+  /* ── Category cards ── */
+  .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.75rem; }
+  .cat-card {
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:.4rem;
+    background:#fff; border-radius:14px; border:2px solid #e2e8f0; padding:1.1rem .7rem;
+    cursor:pointer; min-height:110px; transition:all .18s; box-shadow:0 2px 8px rgba(15,23,42,.04);
+  }
+  .cat-card:hover { border-color:#2563eb; box-shadow:0 6px 20px rgba(37,99,235,.14); transform:translateY(-3px); }
+  .cat-card.selected { border-color:#2563eb; background:linear-gradient(135deg,#eff6ff,#fff); }
+  .cat-card-icon { font-size:1.85rem; line-height:1; }
+  .cat-card-label { font-size:.78rem; font-weight:700; color:#0f172a; }
+  .cat-card-sub { font-size:.65rem; color:#64748b; }
+
+  /* ── Product list ── */
+  .product-list { display:flex; flex-direction:column; gap:.5rem; }
+  .product-row {
+    display:flex; align-items:center; gap:.85rem; padding:.75rem 1rem;
+    border:1.5px solid #e2e8f0; border-radius:12px; background:#fff; cursor:pointer;
+    transition:all .15s;
+  }
+  .product-row:hover { border-color:#2563eb; background:#eff6ff; }
+  .product-row.selected { border-color:#2563eb; background:linear-gradient(135deg,#eff6ff,#fff); }
+  .prod-icon { width:40px; height:40px; border-radius:10px; background:#eff6ff;
+    display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0; }
+  .prod-name { font-size:.88rem; font-weight:700; color:#0f172a; }
+  .prod-meta { font-size:.75rem; color:#64748b; }
+  .prod-price { font-size:1rem; font-weight:800; color:#1e40af; white-space:nowrap; }
+  .prod-stock { font-size:.72rem; color:#64748b; }
+
+  /* ── Form ── */
   .form-card { background:#fff; border-radius:16px; border:1.5px solid #e2e8f0;
     padding:1.75rem; box-shadow:0 4px 16px rgba(15,23,42,.06); }
   .form-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
@@ -29,34 +73,48 @@
   .form-group label { display:block; font-size:.8rem; font-weight:700; color:#374151; margin-bottom:.4rem; }
   .form-control-en { width:100%; padding:.65rem .9rem; border:1.5px solid #e2e8f0;
     border-radius:10px; font-size:.9rem; color:#0f172a; transition:border-color .15s; }
-  .form-control-en:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
-  select.form-control-en { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
-  .product-detail-card { background:#f8fafc; border:1.5px solid #e2e8f0;
-    border-radius:12px; padding:1rem; margin-top:.75rem; display:none; }
-  .product-detail-card.show { display:block; }
-  .prod-name { font-size:1rem; font-weight:700; color:#0f172a; }
-  .prod-meta { font-size:.8rem; color:#64748b; margin-top:.25rem; }
+  .form-control-en:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.1); }
+  select.form-control-en { appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
+
+  /* ── Price summary ── */
   .price-summary { background:linear-gradient(135deg,#eff6ff,#fff);
     border:1.5px solid #bfdbfe; border-radius:12px; padding:1rem;
     margin-top:1rem; display:flex; gap:1.5rem; flex-wrap:wrap; }
   .price-item { text-align:center; }
   .price-label { font-size:.7rem; font-weight:700; color:#64748b; text-transform:uppercase; }
   .price-val { font-size:1.25rem; font-weight:800; color:#1e40af; }
-  .btn-submit { width:100%; padding:.85rem;
-    background:linear-gradient(135deg,#2563eb,#1d4ed8);
-    color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700;
-    cursor:pointer; transition:all .2s; margin-top:1rem; }
-  .btn-submit:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,99,235,.3); }
+
+  /* ── Addon suggestions ── */
+  .addon-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.6rem; margin-top:.85rem; }
+  .addon-card { padding:.65rem .85rem; border-radius:10px; border:1.5px solid #e2e8f0;
+    background:#f8fafc; font-size:.8rem; cursor:pointer; transition:all .15s; }
+  .addon-card:hover { border-color:#2563eb; background:#eff6ff; }
+  .addon-card.selected { border-color:#2563eb; background:#eff6ff; }
+  .addon-name { font-weight:700; color:#0f172a; }
+  .addon-sub { font-size:.68rem; color:#64748b; margin-top:.15rem; }
+
+  /* ── Buttons ── */
+  .btn-primary-blue { padding:.7rem 1.5rem; background:linear-gradient(135deg,#2563eb,#1d4ed8);
+    color:#fff; border:none; border-radius:10px; font-size:.92rem; font-weight:700;
+    cursor:pointer; transition:all .2s; }
+  .btn-primary-blue:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(37,99,235,.3); }
+  .btn-outline-en { padding:.6rem 1.2rem; background:transparent; border:1.5px solid #e2e8f0;
+    border-radius:10px; font-size:.88rem; font-weight:600; color:#64748b; cursor:pointer; transition:all .15s; }
+  .btn-outline-en:hover { border-color:#2563eb; color:#2563eb; }
+
+  /* ── Empty state ── */
   .empty-state { text-align:center; padding:3rem; color:#94a3b8; }
 </style>
 
 <div class="sell-page">
   <div class="sell-hero">
     <div>
-      <h1>🛒 Energy Sale</h1>
-      <div class="sub">{{ business.name }} · Record a product sale</div>
+      <h1>🛒 Energy Sell Wizard</h1>
+      <div class="sub">{{ business.name }} · Premium sell flow</div>
     </div>
-    <div style="display:flex;gap:.5rem;">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
       <a href="{% url 'verticals:energy_catalog' %}" class="btn-back">📦 Products</a>
       <a href="{% url 'verticals:energy_dashboard' %}" class="btn-back">← Dashboard</a>
     </div>
@@ -69,85 +127,163 @@
   {% endif %}
 
   {% if products %}
-  <div class="form-card">
-    <form method="post" id="sellForm">
-      {% csrf_token %}
 
-      <p class="form-section-title">Select Product</p>
+  {# Stepper #}
+  <div class="stepper">
+    <div class="step-pill active" id="pill-1" onclick="goStep(1)"><span>1</span> Item Type</div>
+    <div class="step-connector"></div>
+    <div class="step-pill" id="pill-2"><span>2</span> Select Product</div>
+    <div class="step-connector"></div>
+    <div class="step-pill" id="pill-3"><span>3</span> Confirm Sale</div>
+  </div>
 
-      <div class="form-group">
-        <label>Product <span style="color:#ef4444;">*</span></label>
-        <select name="product_id" class="form-control-en" id="productSelect" required>
-          <option value="">— Choose product —</option>
-          {% for p in products %}
-            <option value="{{ p.id }}"
-                    data-price="{{ p.selling_price }}"
-                    data-cost="{{ p.cost_price }}"
-                    data-stock="{{ p.quantity_in_stock }}"
-                    data-unit="{{ p.unit }}"
-                    data-name="{{ p.name }}">
-              {{ p.name }} — {{ p.quantity_in_stock }} {{ p.unit }} available
-            </option>
-          {% endfor %}
-        </select>
-        <div class="product-detail-card" id="productDetail">
-          <div class="prod-name" id="detailName"></div>
-          <div class="prod-meta" id="detailStock"></div>
+  {# ── Step 1: Item Type ── #}
+  <div class="step-panel active" id="step-1">
+    <div class="form-card">
+      <p class="form-section-title">Step 1 — What are you selling?</p>
+      <div class="cat-grid">
+        {% for cat in sell_categories %}
+        <div class="cat-card" onclick="selectCategory('{{ cat.key }}', '{{ cat.label }}', '{{ cat.icon }}')">
+          <span class="cat-card-icon">{{ cat.icon }}</span>
+          <span class="cat-card-label">{{ cat.label }}</span>
+          <span class="cat-card-sub">{{ cat.desc }}</span>
         </div>
+        {% endfor %}
       </div>
-
-      <p class="form-section-title" style="margin-top:1.5rem;">Sale Details</p>
-
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Quantity <span style="color:#ef4444;">*</span></label>
-          <input type="number" name="quantity" id="qtyInput" class="form-control-en"
-                 min="1" value="1" required>
-        </div>
-        <div class="form-group">
-          <label>Unit Price</label>
-          <input type="number" name="unit_price" id="unitPriceInput" class="form-control-en"
-                 min="0" step="0.01" value="0">
-        </div>
-        <div class="form-group">
-          <label>Payment Method</label>
-          <select name="payment_method" class="form-control-en">
-            {% for code, label in payment_choices %}
-              <option value="{{ code }}">{{ label }}</option>
+      <div style="margin-top:1.25rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
+        <p style="font-size:.8rem;color:#64748b;font-weight:600;margin-bottom:.5rem;">Or jump to any product directly:</p>
+        <div style="display:flex;gap:.65rem;flex-wrap:wrap;">
+          <select id="quickProductSelect" class="form-control-en" style="flex:1;min-width:180px;" onchange="quickSelectProduct()">
+            <option value="">— Quick select product —</option>
+            {% for p in products %}
+              <option value="{{ p.id }}" data-price="{{ p.selling_price }}" data-cost="{{ p.cost_price }}" data-stock="{{ p.quantity_in_stock }}" data-unit="{{ p.unit }}" data-name="{{ p.name }}">
+                {{ p.name }} — {{ p.quantity_in_stock }} available
+              </option>
             {% endfor %}
           </select>
-        </div>
-        <div class="form-group">
-          <label>Customer Name</label>
-          <input type="text" name="customer_name" class="form-control-en" placeholder="Optional">
-        </div>
-        <div class="form-group form-full">
-          <label>Notes</label>
-          <input type="text" name="notes" class="form-control-en" placeholder="Optional">
+          <button type="button" class="btn-primary-blue" onclick="useQuickProduct()">Use →</button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div class="price-summary" id="priceSummary" style="display:none;">
-        <div class="price-item">
-          <div class="price-label">Unit Price</div>
-          <div class="price-val" id="summaryUnit">—</div>
+  {# ── Step 2: Product Selection ── #}
+  <div class="step-panel" id="step-2">
+    <div class="form-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+        <p class="form-section-title mb-0">Step 2 — Select Product</p>
+        <span id="selectedCatLabel" style="font-size:.8rem;color:#64748b;background:#f1f5f9;padding:.25rem .65rem;border-radius:999px;"></span>
+      </div>
+      <div id="productList" class="product-list"></div>
+      <div style="margin-top:1rem;display:flex;gap:.65rem;">
+        <button type="button" class="btn-outline-en" onclick="goStep(1)">← Back</button>
+      </div>
+    </div>
+  </div>
+
+  {# ── Step 3: Confirm Sale ── #}
+  <div class="step-panel" id="step-3">
+    <div class="form-card">
+      <div id="selectedProductBanner" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:12px;padding:.9rem 1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:.85rem;flex-wrap:wrap;">
+        <span id="bannerIcon" style="font-size:1.5rem;flex-shrink:0;">⚡</span>
+        <div style="flex:1;min-width:0;">
+          <div id="bannerName" style="font-size:1rem;font-weight:700;color:#1e40af;"></div>
+          <div id="bannerStock" style="font-size:.78rem;color:#64748b;"></div>
         </div>
-        <div class="price-item">
-          <div class="price-label">Quantity</div>
-          <div class="price-val" id="summaryQty">—</div>
-        </div>
-        <div class="price-item">
-          <div class="price-label">Total</div>
-          <div class="price-val" id="summaryTotal" style="color:#059669;">—</div>
-        </div>
-        <div class="price-item">
-          <div class="price-label">Est. Profit</div>
-          <div class="price-val" id="summaryProfit" style="color:#059669;">—</div>
-        </div>
+        <button type="button" class="btn-outline-en" onclick="goStep(2)" style="font-size:.78rem;">Change →</button>
       </div>
 
-      <button type="submit" class="btn-submit">✅ Record Sale</button>
-    </form>
+      <form method="post" id="sellForm">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" id="hiddenProductId">
+
+        <p class="form-section-title">Sale Details</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Quantity <span style="color:#ef4444;">*</span></label>
+            <input type="number" name="quantity" id="fieldQty" class="form-control-en" min="1" value="1" required oninput="updateSummary()">
+          </div>
+          <div class="form-group">
+            <label>Unit Price</label>
+            <input type="number" name="unit_price" id="fieldUnitPrice" class="form-control-en" min="0" step="0.01" value="0" oninput="updateSummary()">
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method" class="form-control-en">
+              {% for code, label in payment_choices %}
+                <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" name="customer_name" class="form-control-en" placeholder="Optional">
+          </div>
+          <div class="form-group form-full">
+            <label>Notes</label>
+            <input type="text" name="notes" class="form-control-en" placeholder="Optional">
+          </div>
+        </div>
+
+        {# Live price summary #}
+        <div class="price-summary" id="priceSummary" style="display:none;">
+          <div class="price-item">
+            <div class="price-label">Unit Price</div>
+            <div class="price-val" id="summaryUnit">—</div>
+          </div>
+          <div class="price-item">
+            <div class="price-label">Quantity</div>
+            <div class="price-val" id="summaryQty">—</div>
+          </div>
+          <div class="price-item">
+            <div class="price-label">Total</div>
+            <div class="price-val" id="summaryTotal" style="color:#059669;">—</div>
+          </div>
+          <div class="price-item">
+            <div class="price-label">Est. Profit</div>
+            <div class="price-val" id="summaryProfit" style="color:#059669;">—</div>
+          </div>
+          <div class="price-item">
+            <div class="price-label">Margin</div>
+            <div class="price-val" id="summaryMargin">—</div>
+          </div>
+        </div>
+
+        {# Stock impact #}
+        <div id="stockImpact" style="margin-top:.75rem;padding:.6rem .85rem;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;font-size:.8rem;color:#9a3412;display:none;">
+          📦 <strong>Stock after this sale:</strong> <span id="stockAfter">—</span> units remaining.
+        </div>
+
+        {# Add-on suggestions #}
+        <div style="margin-top:1.25rem;">
+          <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">💡 Suggested Add-ons</div>
+          <div class="addon-grid">
+            <div class="addon-card">
+              <div class="addon-name">🔧 Installation</div>
+              <div class="addon-sub">Professional installation service</div>
+            </div>
+            <div class="addon-card">
+              <div class="addon-name">🔌 Cabling Set</div>
+              <div class="addon-sub">DC cables + connectors + breaker</div>
+            </div>
+            <div class="addon-card">
+              <div class="addon-name">🔋 Extra Battery</div>
+              <div class="addon-sub">Improve night autonomy</div>
+            </div>
+            <div class="addon-card">
+              <div class="addon-name">🛡️ Maintenance Plan</div>
+              <div class="addon-sub">Annual panel cleaning + check</div>
+            </div>
+          </div>
+          <div style="font-size:.72rem;color:#94a3b8;margin-top:.4rem;">Tip: create separate sale records for add-on items.</div>
+        </div>
+
+        <div style="display:flex;gap:.75rem;margin-top:1.5rem;flex-wrap:wrap;">
+          <button type="button" class="btn-outline-en" onclick="goStep(2)">← Back</button>
+          <button type="submit" class="btn-primary-blue">✅ Confirm Sale</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   {% else %}
@@ -155,59 +291,137 @@
     <div class="empty-state">
       <div style="font-size:3rem;opacity:.2;margin-bottom:1rem;">📭</div>
       <p style="font-size:1rem;font-weight:600;color:#475569;">No products in stock</p>
-      <p style="font-size:.88rem;">Stock in products before recording a sale.</p>
-      <a href="{% url 'verticals:energy_stock_in' %}" class="btn btn-success rounded-pill mt-2">
-        📦 Go to Stock-In
-      </a>
+      <p style="font-size:.88rem;">Stock in energy products before recording a sale.</p>
+      <div style="display:flex;gap:.65rem;justify-content:center;margin-top:1rem;flex-wrap:wrap;">
+        <a href="{% url 'verticals:energy_stock_in' %}" class="btn btn-success rounded-pill" style="font-size:.85rem;">
+          📦 Stock In Products
+        </a>
+        <a href="{% url 'verticals:energy_seed_catalog' %}" class="btn btn-outline-secondary rounded-pill" style="font-size:.85rem;"
+           onclick="return confirm('Seed the default energy catalog?')">
+          🌱 Seed Default Catalog
+        </a>
+      </div>
     </div>
   </div>
   {% endif %}
 </div>
 
 <script>
-const currency = '{{ business.currency|default:"MWK" }}';
+const BY_CAT = {{ products_by_category_json|safe }};
+const CURRENCY = '{{ business.currency|default:"MWK" }}';
+const CAT_ICONS = {
+  solar_panel:'☀️', battery:'🔋', inverter:'⚡', charge_controller:'🔌',
+  pico_system:'🔆', solar_kit:'🏡', cable_protection:'🔧', appliance:'💡', mounting:'🏗️', other:'📦'
+};
+
+let selectedProduct = null;
 
 function fmt(n) {
-  return currency + ' ' + Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+  return CURRENCY + ' ' + Number(n).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+}
+
+function goStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step-' + i).classList.remove('active');
+    const pill = document.getElementById('pill-' + i);
+    if (i < n) pill.className = 'step-pill done';
+    else if (i === n) pill.className = 'step-pill active';
+    else pill.className = 'step-pill';
+  });
+  document.getElementById('step-' + n).classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function selectCategory(key, label, icon) {
+  document.getElementById('selectedCatLabel').textContent = icon + ' ' + label;
+  const catData = BY_CAT[key];
+  const listEl = document.getElementById('productList');
+  listEl.innerHTML = '';
+  if (!catData || !catData.products || catData.products.length === 0) {
+    listEl.innerHTML = '<div style="text-align:center;padding:2rem;color:#94a3b8;font-size:.88rem;">No products in stock for this category. <a href="{% url "verticals:energy_stock_in" %}" style="color:#2563eb;">Stock in first →</a></div>';
+  } else {
+    catData.products.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'product-row';
+      row.innerHTML =
+        '<div class="prod-icon">' + (CAT_ICONS[key] || '📦') + '</div>' +
+        '<div style="flex:1;min-width:0;"><div class="prod-name">' + p.name + '</div><div class="prod-meta">' + p.stock + ' ' + p.unit + ' available</div></div>' +
+        '<div style="text-align:right;flex-shrink:0;"><div class="prod-price">' + fmt(p.price) + '</div><div class="prod-stock">per ' + p.unit + '</div></div>';
+      row.onclick = () => chooseProduct(p, CAT_ICONS[key] || '📦');
+      listEl.appendChild(row);
+    });
+  }
+  goStep(2);
+}
+
+function chooseProduct(p, icon) {
+  selectedProduct = p;
+  document.getElementById('hiddenProductId').value = p.id;
+  document.getElementById('bannerIcon').textContent = icon;
+  document.getElementById('bannerName').textContent = p.name;
+  document.getElementById('bannerStock').textContent = p.stock + ' ' + p.unit + ' in stock · Selling price: ' + fmt(p.price);
+  document.getElementById('fieldUnitPrice').value = p.price;
+  document.getElementById('fieldQty').value = 1;
+  updateSummary();
+  goStep(3);
+}
+
+function quickSelectProduct() {
+  // Just highlights it; useQuickProduct() does the action
+}
+
+function useQuickProduct() {
+  const sel = document.getElementById('quickProductSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) { alert('Please select a product first.'); return; }
+  const p = {
+    id: opt.value,
+    name: opt.dataset.name,
+    price: parseFloat(opt.dataset.price) || 0,
+    cost: parseFloat(opt.dataset.cost) || 0,
+    stock: parseInt(opt.dataset.stock) || 0,
+    unit: opt.dataset.unit || 'unit',
+  };
+  chooseProduct(p, '📦');
 }
 
 function updateSummary() {
-  const sel = document.getElementById('productSelect');
-  const opt = sel.options[sel.selectedIndex];
-  const qty = parseFloat(document.getElementById('qtyInput').value) || 0;
-  const unitPrice = parseFloat(document.getElementById('unitPriceInput').value) || 0;
-  const cost = parseFloat(opt.dataset.cost) || 0;
+  if (!selectedProduct) return;
+  const qty = parseFloat(document.getElementById('fieldQty').value) || 0;
+  const unitPrice = parseFloat(document.getElementById('fieldUnitPrice').value) || 0;
+  const cost = selectedProduct.cost || 0;
+  const stock = selectedProduct.stock || 0;
   const total = qty * unitPrice;
   const profit = qty * (unitPrice - cost);
+  const margin = unitPrice > 0 ? ((unitPrice - cost) / unitPrice * 100) : 0;
   const summary = document.getElementById('priceSummary');
 
-  if (qty > 0 && unitPrice > 0 && opt.value) {
+  if (qty > 0 && unitPrice > 0) {
     summary.style.display = 'flex';
     document.getElementById('summaryUnit').textContent = fmt(unitPrice);
     document.getElementById('summaryQty').textContent = qty;
     document.getElementById('summaryTotal').textContent = fmt(total);
-    document.getElementById('summaryProfit').textContent = fmt(profit);
-    document.getElementById('summaryProfit').style.color = profit >= 0 ? '#059669' : '#dc2626';
+    const profEl = document.getElementById('summaryProfit');
+    profEl.textContent = fmt(profit);
+    profEl.style.color = profit >= 0 ? '#059669' : '#dc2626';
+    const margEl = document.getElementById('summaryMargin');
+    margEl.textContent = margin.toFixed(1) + '%';
+    margEl.style.color = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
   } else {
     summary.style.display = 'none';
   }
-}
 
-document.getElementById('productSelect').addEventListener('change', function() {
-  const opt = this.options[this.selectedIndex];
-  const detail = document.getElementById('productDetail');
-  if (opt.value) {
-    detail.classList.add('show');
-    document.getElementById('detailName').textContent = opt.dataset.name;
-    document.getElementById('detailStock').textContent = opt.dataset.stock + ' ' + opt.dataset.unit + ' available';
-    document.getElementById('unitPriceInput').value = opt.dataset.price;
+  // Stock impact
+  const impact = document.getElementById('stockImpact');
+  if (qty > 0 && qty <= stock) {
+    impact.style.display = 'block';
+    document.getElementById('stockAfter').textContent = (stock - qty) + ' ' + selectedProduct.unit;
+    impact.style.background = (stock - qty) < 3 ? '#fff1f2' : '#fff7ed';
+    impact.style.borderColor = (stock - qty) < 3 ? '#fca5a5' : '#fed7aa';
+    impact.style.color = (stock - qty) < 3 ? '#991b1b' : '#9a3412';
   } else {
-    detail.classList.remove('show');
+    impact.style.display = 'none';
   }
-  updateSummary();
-});
-
-document.getElementById('qtyInput').addEventListener('input', updateSummary);
-document.getElementById('unitPriceInput').addEventListener('input', updateSummary);
+}
 </script>
 {% endblock %}

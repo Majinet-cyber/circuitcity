@@ -96,7 +96,7 @@ class TestCementStockInFlowUpdated(TestCase):
             {"product_id": cement_product.id}
         )
         assert response.status_code == 302  # Redirect to step 2
-        assert "?step=2" in response.url
+        assert "step=2" in response.url
         
         # Step 2: Add stock
         response = self.client.post(
@@ -167,7 +167,7 @@ class TestCementStockInFlowUpdated(TestCase):
         
         # Should redirect back to step 2 (error)
         assert response.status_code == 302
-        assert "?step=2" in response.url
+        assert "step=2" in response.url
 
     def test_step2_rejects_zero_price(self):
         """Step 2 validation: zero prices are rejected"""
@@ -282,5 +282,5 @@ class TestCementStockInEdgeCases(TestCase):
         
         # Should redirect with error
         assert response.status_code == 302
-        assert "?step=1" in response.url
+        assert "step=1" in response.url
 

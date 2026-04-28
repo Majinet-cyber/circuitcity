@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}{{ batch.name }} — Livestock{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:920px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item"><a href="/verticals/farm/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/verticals/farm/livestock/">Livestock</a></li>
+      <li class="breadcrumb-item active">{{ batch.name }}</li>
+    </ol>
+  </nav>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="h3 fw-bold mb-1">{{ batch.name }}</h1>
+      <div class="text-muted small">{{ batch.get_animal_type_display }} · {{ batch.get_animal_subtype_display }}</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if margin_band == 'healthy' %}
+      <span class="badge rounded-pill bg-success-subtle text-success border border-success">Margin: healthy</span>
+      {% elif margin_band == 'caution' %}
+      <span class="badge rounded-pill bg-warning-subtle text-dark border">Margin: caution</span>
+      {% elif margin_band == 'risky' %}
+      <span class="badge rounded-pill bg-danger-subtle text-danger border">Margin: risky</span>
+      {% else %}
+      <span class="badge rounded-pill bg-secondary-subtle text-secondary border">Add cost + ask price for margin</span>
+      {% endif %}
+      {% if margin_pct is not None %}
+      <span class="text-muted small">{{ margin_pct|floatformat:1 }}% est. margin</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Current count</div>
+          <div class="fs-2 fw-bold text-primary">{{ snapshot.count_current|intcomma }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Marketplace</div>
+          {% if listing_is_live %}
+          <div class="text-success fw-bold">Live</div>
+          <a class="small" href="{% url 'inventory:manage_listings' %}">Manage listings</a>
+          {% elif listing %}
+          <div class="text-secondary">{{ listing.get_status_display }}</div>
+          {% else %}
+          <div class="text-muted">Not published</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+          <div class="text-muted text-uppercase small fw-bold">Photos</div>
+          <div class="small">{% if batch.primary_image or batch.gallery_images.count %}Ready{% else %}<span class="text-warning">Add photos for better conversion</span>{% endif %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="mb-4">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Identity &amp; classification</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Batch name *</label>
+          <input class="form-control" name="name" value="{{ batch.name }}" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Species *</label>
+          <select class="form-select" name="animal_type" id="id_animal_type" required>
+            {% for v, l in animal_types %}
+            <option value="{{ v }}" {% if batch.animal_type == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Subtype *</label>
+          <select class="form-select" name="animal_subtype" id="id_animal_subtype">
+            {% for v, l in subtype_choices %}
+            <option value="{{ v }}" {% if batch.animal_subtype == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Breed / strain (optional)</label>
+          <input class="form-control" name="breed_text" value="{{ batch.breed_text }}" placeholder="e.g. Landrace, local Sasso, etc.">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Gender profile</label>
+          <select class="form-select" name="gender">
+            {% for v, l in genders %}
+            <option value="{{ v }}" {% if batch.gender == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Age (months)</label>
+          <input class="form-control" type="number" name="age_months" min="0" value="{{ batch.age_months|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Farm location</label>
+          <select class="form-select" name="location_id">
+            <option value="">—</option>
+            {% for loc in locations %}
+            <option value="{{ loc.pk }}" {% if batch.location_id == loc.pk %}selected{% endif %}>{{ loc.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Health &amp; production signals</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Health</label>
+          <select class="form-select" name="health_status">
+            {% for v, l in health_statuses %}
+            <option value="{{ v }}" {% if batch.health_status == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Vaccination</label>
+          <select class="form-select" name="vaccination_status">
+            {% for v, l in vaccination_statuses %}
+            <option value="{{ v }}" {% if batch.vaccination_status == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Feed / growth stage</label>
+          <input class="form-control" name="feed_growth_stage" value="{{ batch.feed_growth_stage }}" placeholder="Starter, grower…">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Egg production (layers)</label>
+          <input class="form-control" name="egg_production_status" value="{{ batch.egg_production_status }}" placeholder="Crates/week">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Dairy output note</label>
+          <input class="form-control" name="dairy_output_note" value="{{ batch.dairy_output_note }}" placeholder="Litres/day">
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Pricing &amp; marketplace readiness</div>
+      <div class="card-body row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Cost per head (MWK)</label>
+          <input class="form-control" name="cost_basis_per_head_mwk" inputmode="decimal"
+                 value="{{ batch.cost_basis_per_head_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Expected sale price / head (MWK)</label>
+          <input class="form-control" name="expected_sale_price_mwk" inputmode="decimal"
+                 value="{{ batch.expected_sale_price_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Availability</label>
+          <select class="form-select" name="sale_availability">
+            {% for v, l in sale_availability_choices %}
+            <option value="{{ v }}" {% if batch.sale_availability == v %}selected{% endif %}>{{ l }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_featured_listing" id="feat" {% if batch.is_featured_listing %}checked{% endif %}>
+            <label class="form-check-label" for="feat">Feature this line for marketplace metadata</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Valuation (optional)</div>
+      <div class="card-body row g-3">
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="valuation_enabled" id="val_on" {% if batch.valuation_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="val_on">Enable valuation estimates</label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Avg weight (kg)</label>
+          <input class="form-control" name="avg_weight_kg" value="{{ batch.avg_weight_kg|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Price per kg (MWK)</label>
+          <input class="form-control" name="price_per_kg" value="{{ batch.price_per_kg_mwk|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Price per animal (MWK)</label>
+          <input class="form-control" name="price_per_animal" value="{{ batch.price_per_animal_mwk|default:'' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-light fw-bold">Photos</div>
+      <div class="card-body row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Primary image</label>
+          {% if batch.primary_image %}
+          <div class="mb-2"><img src="{{ batch.primary_image.url }}" alt="" class="rounded border" style="max-height:120px;"></div>
+          {% endif %}
+          <input class="form-control" type="file" name="primary_image" accept="image/*">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Notes</label>
+          <textarea class="form-control" name="notes" rows="4">{{ batch.notes }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-grid gap-2 d-md-flex">
+      <button type="submit" class="btn btn-primary btn-lg rounded-pill px-4">Save details</button>
+      <a href="/verticals/farm/livestock/" class="btn btn-outline-secondary rounded-pill">Back to list</a>
+    </div>
+  </form>
+
+  {% if is_manager %}
+  <div class="card border-0 shadow-sm mb-4 border-primary border-opacity-25">
+    <div class="card-header bg-primary text-white fw-bold">Marketplace</div>
+    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="publish_listing">
+        <button type="submit" class="btn btn-light text-primary fw-bold rounded-pill">Publish / sync listing</button>
+      </form>
+      <form method="post" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="unpublish_listing">
+        <button type="submit" class="btn btn-outline-light border rounded-pill text-white">Take offline</button>
+      </form>
+      <span class="text-white-50 small ms-md-2">Uses primary + gallery photos. Buyers enquire via public marketplace.</span>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-bold">Gallery</div>
+    <div class="card-body">
+      <div class="row g-2 mb-3">
+        {% for gi in batch.gallery_images.all %}
+        <div class="col-6 col-md-3">
+          <img src="{{ gi.image.url }}" class="img-fluid rounded border" alt="">
+        </div>
+        {% empty %}
+        <p class="text-muted small mb-0">No extra photos yet.</p>
+        {% endfor %}
+      </div>
+      <form method="post" enctype="multipart/form-data" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="_action" value="add_gallery">
+        <div class="col-md-6">
+          <label class="form-label small">Add gallery image</label>
+          <input type="file" name="gallery_image" class="form-control" accept="image/*" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">Caption (optional)</label>
+          <input type="text" name="caption" class="form-control" maxlength="200">
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-outline-primary w-100">Upload</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+(function(){
+  var map = {{ subtype_map_json|safe }};
+  var labels = {{ subtype_labels_json|safe }};
+  var typeSel = document.getElementById('id_animal_type');
+  var subSel = document.getElementById('id_animal_subtype');
+  var current = "{{ batch.animal_subtype|escapejs }}";
+  function rebuild() {
+    var t = typeSel.value;
+    var allowed = map[t] || [];
+    var keep = subSel.value;
+    subSel.innerHTML = '';
+    allowed.forEach(function(code){
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = labels[code] || code;
+      if (code === current || code === keep) { o.selected = true; }
+      subSel.appendChild(o);
+    });
+  }
+  typeSel.addEventListener('change', function(){ current = ''; rebuild(); });
+  rebuild();
+})();
+</script>
+{% endblock %}

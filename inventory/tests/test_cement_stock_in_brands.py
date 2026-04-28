@@ -124,7 +124,7 @@ class CementStockInBrandTests(TestCase):
         
         # Should redirect to step 2
         self.assertEqual(response.status_code, 302)
-        self.assertIn('?step=2', response.url)
+        self.assertIn('step=2', response.url)
 
     def test_step2_shows_selected_product_name(self):
         """

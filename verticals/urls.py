@@ -258,6 +258,11 @@ urlpatterns = [
     
     # Livestock
     path("farm/livestock/", farm.livestock_list, name="farm_livestock_list"),
+    path(
+        "farm/livestock/<int:batch_id>/",
+        farm.livestock_batch_detail,
+        name="farm_livestock_detail",
+    ),
     path("farm/livestock/create/", farm.livestock_batch_create, name="farm_livestock_create"),
     path("farm/livestock/add-batch/", farm.livestock_batch_create, name="farm_livestock_add_batch"),
     path("farm/livestock/add-event/", farm.livestock_add_event, name="farm_livestock_add_event"),

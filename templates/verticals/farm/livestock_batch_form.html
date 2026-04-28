@@ -30,9 +30,26 @@
                     <label for="animal_type" class="form-label">Animal Type *</label>
                     <select class="form-select" id="animal_type" name="animal_type" required>
                         {% for value, label in animal_types %}
-                        <option value="{{ value }}">{{ label }}</option>
+                        <option value="{{ value }}" {% if value == subtype_default %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="animal_subtype" class="form-label">Subtype (quick pick) *</label>
+                    <select class="form-select" id="animal_subtype" name="animal_subtype"></select>
+                    <small class="text-muted">Choose broilers, layers, piglets, dairy cattle, etc.</small>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Cost per head (MWK)</label>
+                        <input type="number" class="form-control" name="cost_basis_per_head_mwk" step="0.01" min="0" placeholder="Optional">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Expected sale / head (MWK)</label>
+                        <input type="number" class="form-control" name="expected_sale_price_mwk" step="0.01" min="0" placeholder="Optional">
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -84,5 +101,26 @@
         </div>
     </div>
 </div>
+<script>
+(function(){
+  var map = {{ subtype_map_json|safe }};
+  var labels = {{ subtype_labels_json|safe }};
+  var typeSel = document.getElementById('animal_type');
+  var subSel = document.getElementById('animal_subtype');
+  function rebuild() {
+    var t = typeSel.value;
+    var allowed = map[t] || [];
+    subSel.innerHTML = '';
+    allowed.forEach(function(code){
+      var o = document.createElement('option');
+      o.value = code;
+      o.textContent = labels[code] || code;
+      subSel.appendChild(o);
+    });
+  }
+  typeSel.addEventListener('change', rebuild);
+  rebuild();
+})();
+</script>
 {% endblock %}
 

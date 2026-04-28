@@ -114,14 +114,14 @@ class TestCatalogRegistry:
         assert handler == "cement_flow"
 
     def test_get_category_handler_welding_materials(self):
-        """Welding Materials should have coming_soon handler"""
+        """Welding Materials uses the generic form handler for stock-in"""
         handler = get_category_handler("welding-materials")
-        assert handler == "coming_soon"
+        assert handler == "generic_form"
 
     def test_get_category_handler_car_spares(self):
-        """Car Spares should have coming_soon handler"""
+        """Car spares use the generic form handler for stock-in"""
         handler = get_category_handler("car-spares")
-        assert handler == "coming_soon"
+        assert handler == "generic_form"
 
     def test_construction_materials_distinct_from_others(self):
         """Construction Materials must be distinct from Welding/Car Spares"""

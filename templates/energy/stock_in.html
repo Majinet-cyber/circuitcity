@@ -5,7 +5,7 @@
 
 {% block content %}
 <style>
-  .si-page { max-width:860px; margin:0 auto; padding:1.25rem; }
+  .si-page { max-width:940px; margin:0 auto; padding:1.25rem; }
   .si-hero {
     background:linear-gradient(135deg,#0f172a 0%,#064e3b 50%,#059669 100%);
     border-radius:16px; padding:1.5rem 2rem; color:#fff; margin-bottom:1.75rem;
@@ -18,6 +18,46 @@
     color:rgba(255,255,255,.9); border-radius:999px; font-size:.82rem; font-weight:600;
     text-decoration:none; transition:all .15s; }
   .btn-back:hover { background:rgba(255,255,255,.2); color:#fff; }
+
+  /* ── Stepper ── */
+  .stepper { display:flex; align-items:center; gap:.5rem; margin-bottom:1.75rem; flex-wrap:wrap; }
+  .step-pill {
+    display:flex; align-items:center; gap:.4rem;
+    padding:.4rem .85rem; border-radius:999px; font-size:.78rem; font-weight:700;
+    background:#f1f5f9; color:#94a3b8; border:1.5px solid #e2e8f0; cursor:pointer; transition:all .15s;
+  }
+  .step-pill.active { background:#059669; color:#fff; border-color:#059669; }
+  .step-pill.done   { background:#d1fae5; color:#065f46; border-color:#6ee7b7; }
+  .step-connector { flex:1; height:2px; background:#e2e8f0; min-width:16px; max-width:40px; }
+
+  /* ── Step panels ── */
+  .step-panel { display:none; }
+  .step-panel.active { display:block; }
+
+  /* ── Family / subtype cards ── */
+  .family-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:.75rem; margin-bottom:1rem; }
+  .family-card {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:.4rem; background:#fff; border-radius:14px;
+    border:2px solid #e2e8f0; padding:1.1rem .7rem; text-decoration:none; color:inherit;
+    cursor:pointer; min-height:110px; transition:all .18s; box-shadow:0 2px 8px rgba(15,23,42,.04);
+  }
+  .family-card:hover { border-color:#059669; box-shadow:0 6px 20px rgba(5,150,105,.14); transform:translateY(-3px); }
+  .family-card.selected { border-color:#059669; background:linear-gradient(135deg,#f0fdf4,#fff); }
+  .family-card-icon { font-size:1.85rem; line-height:1; }
+  .family-card-label { font-size:.78rem; font-weight:700; color:#0f172a; line-height:1.3; }
+  .family-card-sub { font-size:.65rem; color:#64748b; }
+
+  .subtype-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:.65rem; margin-bottom:1rem; }
+  .subtype-card {
+    padding:.8rem 1rem; border-radius:12px; border:1.5px solid #e2e8f0;
+    background:#fff; cursor:pointer; transition:all .15s; font-size:.84rem; font-weight:600; color:#0f172a;
+  }
+  .subtype-card:hover { border-color:#059669; background:#f0fdf4; }
+  .subtype-card.selected { border-color:#059669; background:linear-gradient(135deg,#f0fdf4,#fff); }
+  .subtype-sub { font-size:.71rem; color:#64748b; font-weight:400; margin-top:.2rem; }
+
+  /* ── Form ── */
   .form-card { background:#fff; border-radius:16px; border:1.5px solid #e2e8f0;
     padding:1.75rem; box-shadow:0 4px 16px rgba(15,23,42,.06); }
   .form-section-title { font-size:.72rem; font-weight:700; text-transform:uppercase;
@@ -26,31 +66,48 @@
   .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
   @media(max-width:560px) { .form-grid { grid-template-columns:1fr; } }
   .form-full { grid-column:1/-1; }
-  .form-group label { display:block; font-size:.8rem; font-weight:700; color:#374151;
-    margin-bottom:.4rem; }
+  .form-group label { display:block; font-size:.8rem; font-weight:700; color:#374151; margin-bottom:.4rem; }
   .form-group .hint { font-size:.72rem; color:#94a3b8; margin-top:.2rem; }
   .form-control-en { width:100%; padding:.65rem .9rem; border:1.5px solid #e2e8f0;
     border-radius:10px; font-size:.9rem; color:#0f172a; transition:border-color .15s; }
   .form-control-en:focus { outline:none; border-color:#059669; box-shadow:0 0 0 3px rgba(5,150,105,.1); }
-  select.form-control-en { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
-  .toggle-row { display:flex; gap:.75rem; margin-bottom:1rem; }
-  .toggle-btn { flex:1; padding:.6rem; border-radius:10px; border:1.5px solid #e2e8f0;
-    font-size:.83rem; font-weight:700; cursor:pointer; background:#fff; color:#475569;
-    transition:all .15s; text-align:center; }
-  .toggle-btn.active { border-color:#059669; background:#f0fdf4; color:#059669; }
-  .btn-submit { width:100%; padding:.85rem; background:linear-gradient(135deg,#059669,#047857);
-    color:#fff; border:none; border-radius:12px; font-size:1rem; font-weight:700;
-    cursor:pointer; transition:all .2s; margin-top:1rem; }
-  .btn-submit:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(5,150,105,.3); }
+  select.form-control-en { appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right .75rem center; padding-right:2rem; }
+  .btn-primary-en { padding:.7rem 1.5rem; background:linear-gradient(135deg,#059669,#047857);
+    color:#fff; border:none; border-radius:10px; font-size:.92rem; font-weight:700;
+    cursor:pointer; transition:all .2s; }
+  .btn-primary-en:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(5,150,105,.3); }
+  .btn-outline-en { padding:.6rem 1.2rem; background:transparent; border:1.5px solid #e2e8f0;
+    border-radius:10px; font-size:.88rem; font-weight:600; color:#64748b; cursor:pointer; transition:all .15s; }
+  .btn-outline-en:hover { border-color:#059669; color:#059669; }
+
+  /* ── Manual toggle ── */
+  .manual-toggle-btn { display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem;
+    color:#4f46e5; text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; margin-top:.6rem; }
+  .manual-toggle-btn:hover { color:#3730a3; }
+
+  /* ── Existing product select ── */
+  .existing-select-row { display:flex; gap:.65rem; align-items:center; flex-wrap:wrap; margin-bottom:.75rem; }
+  .existing-select-row select { flex:1; min-width:180px; }
+
+  /* ── Prefill notice ── */
+  .prefill-notice { background:#ecfdf5; border:1.5px solid #6ee7b7; border-radius:10px;
+    padding:.65rem .9rem; font-size:.8rem; color:#065f46; margin-bottom:1rem;
+    display:flex; align-items:center; gap:.5rem; }
 </style>
 
 <div class="si-page">
+  {# Hero #}
   <div class="si-hero">
     <div>
-      <h1>📦 Energy Stock-In</h1>
-      <div class="sub">{{ business.name }} · Record received goods</div>
+      <h1>📦 Energy Stock-In Wizard</h1>
+      <div class="sub">{{ business.name }} · Click-first product wizard</div>
     </div>
-    <a href="{% url 'verticals:energy_catalog' %}" class="btn-back">← Products</a>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <a href="{% url 'verticals:energy_catalog' %}" class="btn-back">📋 Products</a>
+      <a href="{% url 'verticals:energy_dashboard' %}" class="btn-back">← Dashboard</a>
+    </div>
   </div>
 
   {% if messages %}
@@ -59,50 +116,118 @@
     {% endfor %}
   {% endif %}
 
-  <div class="form-card">
-    <form method="post">
-      {% csrf_token %}
+  {# Stepper #}
+  <div class="stepper">
+    <div class="step-pill active" id="pill-1" onclick="goStep(1)"><span>1</span> Product Family</div>
+    <div class="step-connector"></div>
+    <div class="step-pill" id="pill-2"><span>2</span> Subtype</div>
+    <div class="step-connector"></div>
+    <div class="step-pill" id="pill-3"><span>3</span> Details</div>
+    <div class="step-connector"></div>
+    <div class="step-pill" id="pill-4"><span>4</span> Confirm</div>
+  </div>
 
-      <p class="form-section-title">Product</p>
-
-      <div class="toggle-row" id="productToggleRow">
-        <div class="toggle-btn active" id="toggleExisting" onclick="switchMode('existing')">
-          Select Existing
+  {# ── Step 1: Product Family ── #}
+  <div class="step-panel active" id="step-1">
+    <div class="form-card">
+      <p class="form-section-title">Step 1 — Choose Product Family</p>
+      <div class="family-grid">
+        <div class="family-card" onclick="selectFamily('solar_panel')">
+          <span class="family-card-icon">☀️</span>
+          <span class="family-card-label">Solar Panel</span>
+          <span class="family-card-sub">Monocrystalline</span>
         </div>
-        <div class="toggle-btn" id="toggleNew" onclick="switchMode('new')">
-          Add New Product
+        <div class="family-card" onclick="selectFamily('battery')">
+          <span class="family-card-icon">🔋</span>
+          <span class="family-card-label">Battery</span>
+          <span class="family-card-sub">AGM, Gel, Lithium</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('inverter')">
+          <span class="family-card-icon">⚡</span>
+          <span class="family-card-label">Inverter</span>
+          <span class="family-card-sub">Off-grid & Hybrid</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('charge_controller')">
+          <span class="family-card-icon">🔌</span>
+          <span class="family-card-label">Charge Controller</span>
+          <span class="family-card-sub">MPPT</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('pico_system')">
+          <span class="family-card-icon">🔆</span>
+          <span class="family-card-label">Pico Solar System</span>
+          <span class="family-card-sub">Starter kits</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('solar_kit')">
+          <span class="family-card-icon">🏡</span>
+          <span class="family-card-label">Solar Kit</span>
+          <span class="family-card-sub">Complete systems</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('cable_protection')">
+          <span class="family-card-icon">🔧</span>
+          <span class="family-card-label">Cable & Protection</span>
+          <span class="family-card-sub">Cables, breakers</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('appliance')">
+          <span class="family-card-icon">💡</span>
+          <span class="family-card-label">Appliance / Load</span>
+          <span class="family-card-sub">LED, fans, DC</span>
+        </div>
+        <div class="family-card" onclick="selectFamily('mounting')">
+          <span class="family-card-icon">🏗️</span>
+          <span class="family-card-label">Mounting Structure</span>
+          <span class="family-card-sub">Roof & ground</span>
         </div>
       </div>
-
-      <div id="existingPanel" class="form-grid" style="margin-bottom:1rem;">
-        <div class="form-group form-full">
-          <label>Select Product</label>
-          <select name="product_id" class="form-control-en" id="productSelect">
-            <option value="">— Choose product —</option>
-            {% for cat_code, cat_name in category_choices %}
-              {% with cat_products=products %}
-                {% for p in products %}
-                  {% if p.category == cat_code %}
-                    <option value="{{ p.id }}" data-cost="{{ p.cost_price }}" data-price="{{ p.selling_price }}">
-                      [{{ cat_name }}] {{ p.name }} ({{ p.quantity_in_stock }} in stock)
-                    </option>
-                  {% endif %}
-                {% endfor %}
-              {% endwith %}
+      <div style="margin-top:1.25rem;border-top:1px solid #f1f5f9;padding-top:1rem;">
+        <p style="font-size:.8rem;font-weight:600;color:#64748b;margin-bottom:.6rem;">Or select an existing product directly:</p>
+        <div class="existing-select-row">
+          <select id="existingProductSelect" class="form-control-en" onchange="prefillFromExisting()">
+            <option value="">— Choose existing product —</option>
+            {% for p in products %}
+              <option value="{{ p.id }}" data-cost="{{ p.cost_price }}" data-price="{{ p.selling_price }}" data-cat="{{ p.category }}" data-unit="{{ p.unit }}">
+                {{ p.name }} ({{ p.quantity_in_stock }} in stock)
+              </option>
             {% endfor %}
           </select>
+          <button type="button" class="btn-primary-en" onclick="useExistingProduct()" style="white-space:nowrap;">Use This Product →</button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <div id="newPanel" style="display:none;margin-bottom:1rem;">
+  {# ── Step 2: Subtype ── #}
+  <div class="step-panel" id="step-2">
+    <div class="form-card">
+      <p class="form-section-title">Step 2 — Choose Subtype</p>
+      <div id="subtypeGrid" class="subtype-grid"></div>
+      <div style="margin-top:1rem;display:flex;gap:.65rem;">
+        <button type="button" class="btn-outline-en" onclick="goStep(1)">← Back</button>
+      </div>
+    </div>
+  </div>
+
+  {# ── Step 3: Details (form) ── #}
+  <div class="step-panel" id="step-3">
+    <div class="form-card">
+      <div id="prefillNotice" class="prefill-notice" style="display:none;">
+        ✅ <span id="prefillNoticeText">Prefilled with smart defaults. Adjust as needed.</span>
+      </div>
+      <form method="post" id="stockInForm">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" id="hiddenProductId">
+        <input type="hidden" name="new_product_name" id="hiddenProductName">
+        <input type="hidden" name="category" id="hiddenCategory" value="other">
+
+        <p class="form-section-title">Step 3 — Product Details</p>
         <div class="form-grid">
-          <div class="form-group">
+          <div class="form-group form-full">
             <label>Product Name <span style="color:#ef4444;">*</span></label>
-            <input type="text" name="new_product_name" class="form-control-en" placeholder="e.g. 200W Solar Panel">
+            <input type="text" id="fieldProductName" class="form-control-en" placeholder="e.g. 200W Mono Solar Panel">
+            <div class="hint">Edit the name if needed before confirming.</div>
           </div>
           <div class="form-group">
             <label>Category</label>
-            <select name="category" class="form-control-en">
+            <select id="fieldCategory" class="form-control-en">
               {% for code, label in category_choices %}
                 <option value="{{ code }}">{{ label }}</option>
               {% endfor %}
@@ -110,85 +235,215 @@
           </div>
           <div class="form-group">
             <label>Unit</label>
-            <input type="text" name="unit" class="form-control-en" placeholder="unit, metre, kg, set…" value="unit">
+            <input type="text" id="fieldUnit" class="form-control-en" placeholder="unit, metre, set…" value="unit">
           </div>
         </div>
-      </div>
 
-      <p class="form-section-title" style="margin-top:1.5rem;">Stock Details</p>
+        <p class="form-section-title" style="margin-top:1.5rem;">Technical Specs & Notes</p>
+        <div class="form-group form-full" style="margin-bottom:1rem;">
+          <label>Notes / Specs</label>
+          <textarea id="fieldNotes" name="notes" class="form-control-en" rows="2" placeholder="Technical specs, warranty, suggested use case…" style="resize:vertical;"></textarea>
+        </div>
 
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Quantity Received <span style="color:#ef4444;">*</span></label>
-          <input type="number" name="quantity" class="form-control-en" min="1" value="1" required>
+        <p class="form-section-title" style="margin-top:1.5rem;">Step 4 — Quantity & Pricing</p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Quantity Received <span style="color:#ef4444;">*</span></label>
+            <input type="number" name="quantity" id="fieldQty" class="form-control-en" min="1" value="1" required>
+          </div>
+          <div class="form-group">
+            <label>Received Date</label>
+            <input type="date" name="received_date" class="form-control-en" value="{{ today }}">
+          </div>
+          <div class="form-group">
+            <label>Cost Price (per unit)</label>
+            <input type="number" name="cost_price" id="fieldCostPrice" class="form-control-en" min="0" step="0.01" value="0">
+          </div>
+          <div class="form-group">
+            <label>Selling Price (per unit)</label>
+            <input type="number" name="selling_price" id="fieldSellPrice" class="form-control-en" min="0" step="0.01" value="0">
+          </div>
+          <div class="form-group">
+            <label>Supplier</label>
+            <input type="text" name="supplier" class="form-control-en" placeholder="Supplier name (optional)">
+          </div>
         </div>
-        <div class="form-group">
-          <label>Received Date</label>
-          <input type="date" name="received_date" class="form-control-en" value="{{ today }}">
-        </div>
-        <div class="form-group">
-          <label>Cost Price (per unit)</label>
-          <input type="number" name="cost_price" id="costPriceInput" class="form-control-en"
-                 min="0" step="0.01" value="0" placeholder="0.00">
-        </div>
-        <div class="form-group">
-          <label>Selling Price (per unit)</label>
-          <input type="number" name="selling_price" id="sellPriceInput" class="form-control-en"
-                 min="0" step="0.01" value="0" placeholder="0.00">
-        </div>
-        <div class="form-group">
-          <label>Supplier</label>
-          <input type="text" name="supplier" class="form-control-en" placeholder="Supplier name (optional)">
-        </div>
-        <div class="form-group form-full">
-          <label>Notes</label>
-          <input type="text" name="notes" class="form-control-en" placeholder="Optional notes">
-        </div>
-      </div>
 
-      <button type="submit" class="btn-submit">✅ Record Stock-In</button>
-    </form>
+        {# Live margin preview #}
+        <div id="marginPreview" style="background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:12px;padding:1rem;margin-top:.85rem;display:none;">
+          <div style="font-size:.72rem;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.5rem;">📊 Stock Summary Preview</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.5rem;font-size:.83rem;text-align:center;">
+            <div><div style="font-weight:800;color:#059669;" id="prevTotal">—</div><div style="font-size:.68rem;color:#64748b;">Total Cost</div></div>
+            <div><div style="font-weight:800;color:#4f46e5;" id="prevRevenue">—</div><div style="font-size:.68rem;color:#64748b;">Potential Revenue</div></div>
+            <div><div style="font-weight:800;" id="prevMargin">—</div><div style="font-size:.68rem;color:#64748b;">Est. Margin</div></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.75rem;margin-top:1.5rem;flex-wrap:wrap;">
+          <button type="button" class="btn-outline-en" onclick="goStep(2)">← Back</button>
+          <button type="submit" class="btn-primary-en" onclick="syncFormFields()">✅ Record Stock-In</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
 <script>
-function switchMode(mode) {
-  const existingPanel = document.getElementById('existingPanel');
-  const newPanel = document.getElementById('newPanel');
-  const toggleExisting = document.getElementById('toggleExisting');
-  const toggleNew = document.getElementById('toggleNew');
-  const productSelect = document.getElementById('productSelect');
+const PRESETS = {{ wizard_presets|safe }};
+const FAMILY_LABELS = {
+  solar_panel: 'Solar Panel', battery: 'Battery', inverter: 'Inverter',
+  charge_controller: 'Charge Controller', pico_system: 'Pico Solar System',
+  solar_kit: 'Solar Kit', cable_protection: 'Cable & Protection',
+  appliance: 'Appliance/Load', mounting: 'Mounting Structure'
+};
 
-  if (mode === 'existing') {
-    existingPanel.style.display = 'grid';
-    newPanel.style.display = 'none';
-    toggleExisting.classList.add('active');
-    toggleNew.classList.remove('active');
-    productSelect.required = true;
+let selectedFamily = '';
+let selectedSubtype = null;
+let existingProductId = '';
+
+function goStep(n) {
+  [1,2,3].forEach(i => {
+    document.getElementById('step-' + i).classList.remove('active');
+    const pill = document.getElementById('pill-' + i);
+    if (i < n) { pill.className = 'step-pill done'; }
+    else if (i === n) { pill.className = 'step-pill active'; }
+    else { pill.className = 'step-pill'; }
+  });
+  document.getElementById('step-' + n).classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function selectFamily(key) {
+  selectedFamily = key;
+  existingProductId = '';
+  document.getElementById('hiddenProductId').value = '';
+
+  // Build subtype grid
+  const grid = document.getElementById('subtypeGrid');
+  const subtypes = PRESETS[key] ? PRESETS[key].subtypes : [];
+  grid.innerHTML = '';
+  subtypes.forEach((st, i) => {
+    const card = document.createElement('div');
+    card.className = 'subtype-card';
+    card.innerHTML = '<div>' + st.label + '</div>' + (st.notes ? '<div class="subtype-sub">' + st.notes.split('.')[0] + '.</div>' : '');
+    card.onclick = () => selectSubtype(key, i, st);
+    grid.appendChild(card);
+  });
+
+  goStep(2);
+}
+
+function selectSubtype(family, idx, st) {
+  selectedSubtype = st;
+  // Highlight
+  document.querySelectorAll('.subtype-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.subtype-card')[idx].classList.add('selected');
+
+  // Prefill step 3
+  document.getElementById('fieldProductName').value = st.name;
+  document.getElementById('fieldCategory').value = family;
+  document.getElementById('hiddenCategory').value = family;
+  document.getElementById('fieldUnit').value = st.unit || 'unit';
+  document.getElementById('fieldCostPrice').value = st.cost || 0;
+  document.getElementById('fieldSellPrice').value = st.price || 0;
+  document.getElementById('fieldNotes').value = st.notes || '';
+
+  // Show prefill notice
+  const notice = document.getElementById('prefillNotice');
+  notice.style.display = 'flex';
+  document.getElementById('prefillNoticeText').textContent =
+    'Prefilled for "' + st.label + '". Adjust cost, selling price, and quantity as needed.';
+
+  updateMargin();
+  goStep(3);
+}
+
+function prefillFromExisting() {
+  const sel = document.getElementById('existingProductSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) return;
+  document.getElementById('fieldCostPrice').value = opt.dataset.cost || 0;
+  document.getElementById('fieldSellPrice').value = opt.dataset.price || 0;
+  document.getElementById('fieldCategory').value = opt.dataset.cat || 'other';
+  document.getElementById('fieldUnit').value = opt.dataset.unit || 'unit';
+  document.getElementById('fieldProductName').value = opt.text.split(' (')[0];
+}
+
+function useExistingProduct() {
+  const sel = document.getElementById('existingProductSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if (!opt.value) { alert('Please select a product first.'); return; }
+  existingProductId = opt.value;
+  document.getElementById('hiddenProductId').value = opt.value;
+  document.getElementById('hiddenProductName').value = '';
+
+  const notice = document.getElementById('prefillNotice');
+  notice.style.display = 'flex';
+  document.getElementById('prefillNoticeText').textContent = 'Using existing product. Confirm quantity and pricing below.';
+
+  prefillFromExisting();
+  updateMargin();
+
+  // Skip step 2 and go to step 3 directly
+  document.getElementById('pill-2').className = 'step-pill done';
+  goStep(3);
+}
+
+function syncFormFields() {
+  // Move display-only field values into proper form fields
+  const nameField = document.getElementById('fieldProductName');
+  if (!existingProductId && nameField.value) {
+    document.getElementById('hiddenProductName').value = nameField.value;
+  }
+  document.getElementById('hiddenCategory').value = document.getElementById('fieldCategory').value;
+
+  // Sync unit from display field
+  const unitInput = document.getElementById('fieldUnit');
+  // Create a hidden input for unit if not already present
+  let unitHidden = document.getElementById('hiddenUnit');
+  if (!unitHidden) {
+    unitHidden = document.createElement('input');
+    unitHidden.type = 'hidden';
+    unitHidden.name = 'unit';
+    unitHidden.id = 'hiddenUnit';
+    document.getElementById('stockInForm').appendChild(unitHidden);
+  }
+  unitHidden.value = unitInput.value || 'unit';
+}
+
+function updateMargin() {
+  const qty = parseFloat(document.getElementById('fieldQty').value) || 0;
+  const cost = parseFloat(document.getElementById('fieldCostPrice').value) || 0;
+  const price = parseFloat(document.getElementById('fieldSellPrice').value) || 0;
+  const preview = document.getElementById('marginPreview');
+  if (qty > 0 && (cost > 0 || price > 0)) {
+    preview.style.display = 'block';
+    const totalCost = qty * cost;
+    const totalRevenue = qty * price;
+    const margin = price > 0 ? ((price - cost) / price * 100) : 0;
+    document.getElementById('prevTotal').textContent = 'MWK ' + Math.round(totalCost).toLocaleString();
+    document.getElementById('prevRevenue').textContent = 'MWK ' + Math.round(totalRevenue).toLocaleString();
+    const mEl = document.getElementById('prevMargin');
+    mEl.textContent = margin.toFixed(1) + '%';
+    mEl.style.color = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
   } else {
-    existingPanel.style.display = 'none';
-    newPanel.style.display = 'block';
-    toggleExisting.classList.remove('active');
-    toggleNew.classList.add('active');
-    productSelect.required = false;
-    productSelect.value = '';
+    preview.style.display = 'none';
   }
 }
 
-// Pre-fill cost/sell price from selected product
-document.getElementById('productSelect').addEventListener('change', function() {
-  const opt = this.options[this.selectedIndex];
-  if (opt.dataset.cost) document.getElementById('costPriceInput').value = opt.dataset.cost;
-  if (opt.dataset.price) document.getElementById('sellPriceInput').value = opt.dataset.price;
+['fieldQty','fieldCostPrice','fieldSellPrice'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateMargin);
 });
 
-// If product_id pre-selected via query param
+// Support pre-selected product via URL param
 const urlParams = new URLSearchParams(window.location.search);
 const pid = urlParams.get('product_id');
 if (pid) {
-  const sel = document.getElementById('productSelect');
-  sel.value = pid;
-  sel.dispatchEvent(new Event('change'));
+  const sel = document.getElementById('existingProductSelect');
+  if (sel) { sel.value = pid; useExistingProduct(); }
 }
+const prefillFamily = urlParams.get('family');
+if (prefillFamily) { selectFamily(prefillFamily); }
 </script>
 {% endblock %}

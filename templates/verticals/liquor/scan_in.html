@@ -351,7 +351,7 @@
         </div>
     </div>
     
-    <!-- Step 3: Unit Selection (Bottle or Crate) -->
+    <!-- Step 3: Unit Selection (Bottle, Crate, or Pack) -->
     <div id="step-3" class="hidden">
         <h2 class="section-title">
             <span class="step-indicator">Step 3</span>
@@ -362,11 +362,16 @@
                 <span class="unit-icon">🍾</span>
                 Bottles
             </button>
-            <button class="unit-btn" data-unit="crate" onclick="selectUnit('crate')">
+            <button class="unit-btn" data-unit="crate" onclick="selectUnit('crate')" id="crate-btn">
                 <span class="unit-icon">📦</span>
                 Crates
             </button>
+            <button class="unit-btn" data-unit="pack" onclick="selectUnit('pack')" id="pack-btn" style="display:none;">
+                <span class="unit-icon">🧃</span>
+                Packs (6-pack)
+            </button>
         </div>
+        <div id="unit-hint" style="margin-top:0.75rem;font-size:0.85rem;color:#64748b;display:none;"></div>
     </div>
     
     <!-- Step 4: Quantity Selection -->
@@ -401,9 +406,28 @@
         <div class="price-panel" id="cost-price-panel">
             <label for="cost-price">Cost Price (MWK)</label>
             <input type="number" id="cost-price" step="0.01" min="0" placeholder="0.00">
-            <!-- Helper text showing computed per-bottle cost for crates -->
+            <!-- Helper text showing computed per-bottle cost for crates/packs -->
             <div id="cost-helper-text" style="margin-top:12px;padding:12px;background:#f0f9ff;border:2px solid #38bdf8;border-radius:8px;color:#075985;font-size:0.95rem;font-weight:600;display:none;">
                 <i class="bi bi-calculator"></i> <span id="cost-helper-content"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 5b: Spirits Shot Configuration (only for spirits/whiskey) -->
+    <div id="step-5b-shots" class="hidden">
+        <h2 class="section-title">
+            <span class="step-indicator">Step 5b</span>
+            Shots Configuration
+        </h2>
+        <div class="price-panel" style="background:#fffbeb;border-color:#f59e0b;">
+            <div style="margin-bottom:1rem;padding:10px;background:#fef3c7;border-radius:8px;font-size:0.9rem;color:#92400e;">
+                <strong>Spirits sold by shot:</strong> Enter shots per bottle and your selling price per shot. The system calculates cost per shot, profit margin, and total shots automatically.
+            </div>
+            <label for="shots-per-bottle">Shots per Bottle</label>
+            <input type="number" id="shots-per-bottle" step="1" min="1" placeholder="30" value="30" style="margin-bottom:1rem;">
+            <label for="price-per-shot">Selling Price per Shot (MWK)</label>
+            <input type="number" id="price-per-shot" step="0.01" min="0" placeholder="0.00">
+            <div id="shots-calc-preview" style="margin-top:12px;padding:12px;background:#f0fdf4;border:2px solid #4ade80;border-radius:8px;display:none;font-size:0.9rem;color:#065f46;line-height:1.7;">
             </div>
         </div>
     </div>
@@ -489,14 +513,33 @@ function selectProduct(productId, productName) {
     document.querySelectorAll('.product-item').forEach(item => item.classList.remove('selected'));
     document.querySelector(`.product-item[data-product-id="${productId}"]`).classList.add('selected');
     
-    // Hide/show crate option based on category
-    const crateBtn = document.querySelector('.unit-btn[data-unit="crate"]');
-    if (crateBtn) {
-        // Spirits and whiskey cannot use crates
-        if (selectedCategory === 'spirits' || selectedCategory === 'whiskey') {
-            crateBtn.style.display = 'none';
-        } else {
-            crateBtn.style.display = 'block';
+    const crateBtn = document.getElementById('crate-btn');
+    const packBtn = document.getElementById('pack-btn');
+    const unitHint = document.getElementById('unit-hint');
+
+    // Reset visibility
+    if (crateBtn) crateBtn.style.display = 'block';
+    if (packBtn) packBtn.style.display = 'none';
+    if (unitHint) unitHint.style.display = 'none';
+
+    if (selectedCategory === 'spirits' || selectedCategory === 'whiskey') {
+        // Spirits: bottles only, no crates/packs; shots configured later
+        if (crateBtn) crateBtn.style.display = 'none';
+        if (unitHint) {
+            unitHint.textContent = '🥃 Spirits are stocked in bottles. Shot pricing will be configured next.';
+            unitHint.style.display = 'block';
+        }
+    } else if (selectedCategory === 'cider') {
+        // Cider: bottles OR packs
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        if (packBtn) {
+            packBtn.style.display = 'block';
+            packBtn.innerHTML = `<span class="unit-icon">🧃</span> Packs (${packSize}-pack)`;
+        }
+        if (crateBtn) crateBtn.style.display = 'none';  // ciders use packs, not crates
+        if (unitHint) {
+            unitHint.textContent = `🍻 Ciders: stock by bottle or by ${packSize}-pack. Pack price is auto-split per bottle.`;
+            unitHint.style.display = 'block';
         }
     }
     
@@ -512,9 +555,15 @@ function selectUnit(unit) {
     document.querySelectorAll('.unit-btn').forEach(btn => btn.classList.remove('selected'));
     document.querySelector(`.unit-btn[data-unit="${unit}"]`).classList.add('selected');
     
-    // Update labels in step 5 and 6
-    // CRITICAL FIX: Step 5 shows cost per crate/bottle, but Step 6 ALWAYS shows selling price per BOTTLE
-    document.getElementById('unit-label').textContent = unit === 'crate' ? 'Crate' : 'Bottle';
+    // Update labels: Step 5 shows cost per crate/pack/bottle; Step 6 ALWAYS shows per bottle
+    if (unit === 'crate') {
+        document.getElementById('unit-label').textContent = 'Crate';
+    } else if (unit === 'pack') {
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        document.getElementById('unit-label').textContent = `Pack (${packSize}-pack)`;
+    } else {
+        document.getElementById('unit-label').textContent = 'Bottle';
+    }
     document.getElementById('selling-unit-label').textContent = 'Bottle';  // ALWAYS per bottle!
     
     // Show step 4
@@ -568,7 +617,7 @@ function setupCostPriceHandler() {
     const costHelperText = document.getElementById('cost-helper-text');
     const costHelperContent = document.getElementById('cost-helper-content');
     
-    // Show helper text as user types (for crates)
+    // Show helper text as user types (for crates/packs)
     costPriceInput.addEventListener('input', function() {
         const value = parseFloat(this.value);
         if (selectedUnit === 'crate' && value && value > 0 && selectedProductData) {
@@ -577,13 +626,19 @@ function setupCostPriceHandler() {
             costHelperContent.textContent = `≈ MWK ${costPerBottle} per bottle (${bottlesPerCrate} bottles per crate)`;
             costHelperText.style.display = 'block';
             costPricePerBottle = parseFloat(costPerBottle);
+        } else if (selectedUnit === 'pack' && value && value > 0 && selectedProductData) {
+            const packSize = selectedProductData.pack_size || 6;
+            const costPerBottle = (value / packSize).toFixed(2);
+            costHelperContent.textContent = `≈ MWK ${costPerBottle} per bottle (${packSize} bottles per pack)`;
+            costHelperText.style.display = 'block';
+            costPricePerBottle = parseFloat(costPerBottle);
         } else {
             costHelperText.style.display = 'none';
             costPricePerBottle = value;
         }
     });
     
-    // When cost price is entered, hide it and show selling price
+    // When cost price is entered, proceed to next step
     costPriceInput.addEventListener('blur', function() {
         const value = parseFloat(this.value);
         if (value && value > 0) {
@@ -593,28 +648,71 @@ function setupCostPriceHandler() {
             if (selectedUnit === 'crate' && selectedProductData) {
                 const bottlesPerCrate = selectedProductData.bottles_per_crate || 20;
                 costPricePerBottle = value / bottlesPerCrate;
+            } else if (selectedUnit === 'pack' && selectedProductData) {
+                const packSize = selectedProductData.pack_size || 6;
+                costPricePerBottle = value / packSize;
             } else {
                 costPricePerBottle = value;
             }
             
             costPriceEntered = true;
             
-            // Hide cost price panel
             setTimeout(() => {
                 document.getElementById('cost-price-panel').style.display = 'none';
-                
-                // Show step 6 (selling price)
-                document.getElementById('step-6').classList.remove('hidden');
-                document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
-                
-                // Show step 7 (submit)
-                document.getElementById('step-7').classList.remove('hidden');
-                
-                // Setup smart pricing feedback
-                setupSmartPricingFeedback();
+
+                const isSpirits = selectedCategory === 'spirits' || selectedCategory === 'whiskey';
+
+                if (isSpirits) {
+                    // Reveal shots configuration step for spirits
+                    document.getElementById('step-5b-shots').classList.remove('hidden');
+                    document.getElementById('step-5b-shots').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setupShotsPreview();
+                    // Show submit; selling price step hidden for spirits (replaced by shots)
+                    document.getElementById('step-7').classList.remove('hidden');
+                } else {
+                    // Show step 6 (selling price) for beer/cider/wine
+                    document.getElementById('step-6').classList.remove('hidden');
+                    document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('step-7').classList.remove('hidden');
+                    setupSmartPricingFeedback();
+                }
             }, 500);
         }
     }, { once: true });
+}
+
+function setupShotsPreview() {
+    const shotsInput = document.getElementById('shots-per-bottle');
+    const priceInput = document.getElementById('price-per-shot');
+    const preview = document.getElementById('shots-calc-preview');
+
+    function updatePreview() {
+        const shots = parseInt(shotsInput.value) || 0;
+        const pricePerShot = parseFloat(priceInput.value) || 0;
+        const qty = selectedQuantity || 1;
+        const cpb = costPricePerBottle || 0;
+        if (shots <= 0 || pricePerShot <= 0) {
+            preview.style.display = 'none';
+            return;
+        }
+        const costPerShot = shots > 0 ? (cpb / shots) : 0;
+        const profitPerShot = pricePerShot - costPerShot;
+        const revenuePerBottle = shots * pricePerShot;
+        const totalShots = qty * shots;
+        preview.innerHTML = `
+            <strong>Live calculation:</strong><br>
+            Cost per shot: MWK ${costPerShot.toFixed(2)}<br>
+            Selling price/shot: MWK ${pricePerShot.toFixed(2)}<br>
+            Gross profit/shot: MWK ${profitPerShot.toFixed(2)} (${cpb > 0 ? ((profitPerShot/pricePerShot)*100).toFixed(1) : '--'}% margin)<br>
+            Revenue per bottle: MWK ${revenuePerBottle.toFixed(2)} vs cost MWK ${cpb.toFixed(2)}<br>
+            Total shots added: ${totalShots} shots from ${qty} bottle${qty !== 1 ? 's' : ''}
+        `;
+        preview.style.display = 'block';
+    }
+
+    shotsInput.addEventListener('input', updatePreview);
+    priceInput.addEventListener('input', updatePreview);
+    updatePreview();
 }
 
 function setupSmartPricingFeedback() {
@@ -658,10 +756,26 @@ async function submitStockIn() {
         alert('Please complete all steps');
         return;
     }
+
+    const isSpirits = selectedCategory === 'spirits' || selectedCategory === 'whiskey';
     
     // Get final prices
     costPrice = costPrice || parseFloat(document.getElementById('cost-price').value) || 0;
     sellingPrice = parseFloat(document.getElementById('selling-price').value) || 0;
+
+    // Validate spirits shots
+    if (isSpirits) {
+        const shotsPerBottle = parseInt(document.getElementById('shots-per-bottle').value) || 0;
+        const pricePerShot = parseFloat(document.getElementById('price-per-shot').value) || 0;
+        if (shotsPerBottle <= 0) {
+            alert('❌ Shots per bottle must be greater than 0 for spirits sold by shot.');
+            return;
+        }
+        if (pricePerShot < 0) {
+            alert('❌ Selling price per shot cannot be negative.');
+            return;
+        }
+    }
     
     // Prepare form data
     const formData = new FormData();
@@ -671,6 +785,20 @@ async function submitStockIn() {
     formData.append('cost_per_unit', costPrice.toFixed(2));
     if (sellingPrice > 0) {
         formData.append('selling_price', sellingPrice.toFixed(2));
+    }
+
+    // Category-specific fields
+    if (isSpirits) {
+        const shotsPerBottle = parseInt(document.getElementById('shots-per-bottle').value) || 30;
+        const pricePerShot = parseFloat(document.getElementById('price-per-shot').value) || 0;
+        formData.append('shots_per_bottle', shotsPerBottle);
+        if (pricePerShot > 0) {
+            formData.append('price_per_shot', pricePerShot.toFixed(2));
+        }
+    }
+    if (selectedUnit === 'pack') {
+        const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
+        formData.append('pack_size', packSize);
     }
     
     // Get CSRF token
@@ -735,19 +863,21 @@ function resetForm() {
     // Reset all selections
     selectedCategory = null;
     selectedProduct = null;
+    selectedProductData = null;
     selectedUnit = null;
     selectedQuantity = null;
     costPrice = null;
+    costPricePerBottle = null;
     sellingPrice = null;
     costPriceEntered = false;
     
     // Reset UI
     document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
-    document.querySelectorAll('.hidden').forEach(el => el.classList.add('hidden'));
     document.getElementById('step-2').classList.add('hidden');
     document.getElementById('step-3').classList.add('hidden');
     document.getElementById('step-4').classList.add('hidden');
     document.getElementById('step-5').classList.add('hidden');
+    document.getElementById('step-5b-shots').classList.add('hidden');
     document.getElementById('step-6').classList.add('hidden');
     document.getElementById('step-7').classList.add('hidden');
     document.getElementById('cost-price').value = '';
@@ -755,7 +885,22 @@ function resetForm() {
     document.getElementById('custom-qty-input').value = '';
     document.getElementById('custom-qty-input').classList.add('hidden');
     document.getElementById('cost-price-panel').style.display = 'block';
-    
+    document.getElementById('cost-helper-text').style.display = 'none';
+    const shotsPreview = document.getElementById('shots-calc-preview');
+    if (shotsPreview) shotsPreview.style.display = 'none';
+    const shotsInput = document.getElementById('shots-per-bottle');
+    if (shotsInput) shotsInput.value = '30';
+    const pricePerShot = document.getElementById('price-per-shot');
+    if (pricePerShot) pricePerShot.value = '';
+    const unitHint = document.getElementById('unit-hint');
+    if (unitHint) unitHint.style.display = 'none';
+
+    // Restore unit buttons
+    const crateBtn = document.getElementById('crate-btn');
+    const packBtn = document.getElementById('pack-btn');
+    if (crateBtn) crateBtn.style.display = 'block';
+    if (packBtn) packBtn.style.display = 'none';
+
     // Hide feedback
     const feedbackContainer = document.getElementById('pricing-feedback');
     if (feedbackContainer) {

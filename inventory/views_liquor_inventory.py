@@ -253,7 +253,7 @@ def liquor_scan_in(request):
         try:
             product_id = int(request.POST.get("product_id", 0))
             quantity = int(request.POST.get("quantity", 1))
-            unit_type = request.POST.get("unit_type", "bottle")  # "bottle" or "crate"
+            unit_type = request.POST.get("unit_type", "bottle")  # "bottle", "crate", or "pack"
             cost_per_unit = Decimal(request.POST.get("cost_per_unit", "0.00"))
 
             product = MerchProduct.objects.get(
@@ -271,6 +271,20 @@ def liquor_scan_in(request):
 
             if unit_type == "crate":
                 bottles_to_add = quantity * bottles_per_crate
+            elif unit_type == "pack":
+                # Cider pack mode
+                pack_size_raw = request.POST.get("pack_size", "6").strip()
+                try:
+                    pack_size = int(pack_size_raw)
+                    if pack_size <= 0:
+                        raise ValueError("Pack size must be > 0")
+                except (ValueError, TypeError):
+                    messages.error(request, "❌ Invalid pack size.")
+                    return redirect("liquor:scan_in")
+                bottles_to_add = quantity * pack_size
+                # cost_per_unit is cost per pack; derive cost per bottle
+                cost_per_bottle_from_pack = cost_per_unit / Decimal(pack_size) if cost_per_unit > 0 else Decimal("0.00")
+                cost_per_unit = cost_per_bottle_from_pack  # reuse variable for unified path
 
             # Calculate cost per bottle (always store in per-bottle terms)
             cost_per_bottle = cost_per_unit
@@ -291,6 +305,8 @@ def liquor_scan_in(request):
                 if selling_price_raw:
                     try:
                         selling_price = Decimal(selling_price_raw)
+                        if selling_price < 0:
+                            raise ValueError("Selling price cannot be negative")
                         if selling_price > 0:
                             product.price_per_bottle = selling_price
                         else:
@@ -298,7 +314,7 @@ def liquor_scan_in(request):
                     except (ValueError, Exception):
                         selling_price = None
 
-                # Handle spirits shots pricing
+                # Handle spirits shots pricing (bottle-first approach)
                 shots_per_bottle_raw = request.POST.get("shots_per_bottle", "").strip()
                 price_per_shot_raw = request.POST.get("price_per_shot", "").strip()
 
@@ -307,15 +323,23 @@ def liquor_scan_in(request):
                         shots_per_bottle = int(shots_per_bottle_raw)
                         price_per_shot = Decimal(price_per_shot_raw)
 
-                        if shots_per_bottle > 0 and price_per_shot > 0:
-                            product.has_shots = True
-                            product.shots_per_bottle = shots_per_bottle
+                        if shots_per_bottle <= 0:
+                            raise ValueError("Shots per bottle must be greater than 0 for spirits sold by shot")
+                        if price_per_shot < 0:
+                            raise ValueError("Selling price per shot cannot be negative")
+
+                        product.has_shots = True
+                        product.shots_per_bottle = shots_per_bottle
+                        if price_per_shot > 0:
                             product.price_per_shot = price_per_shot
 
-                            # Compute cost per shot
-                            if cost_per_bottle > 0:
-                                product.cost_per_shot = cost_per_bottle / Decimal(shots_per_bottle)
-                    except (ValueError, Exception):
+                        # Compute cost per shot
+                        if cost_per_bottle > 0:
+                            product.cost_per_shot = cost_per_bottle / Decimal(shots_per_bottle)
+                    except ValueError as ve:
+                        messages.error(request, f"❌ Shots pricing error: {ve}")
+                        return redirect("liquor:scan_in")
+                    except Exception:
                         pass
 
                 product.save()
@@ -323,6 +347,12 @@ def liquor_scan_in(request):
                 # Record LiquorStockInTransaction for COGS/history tracking
                 from inventory.models_verticals import LiquorStockInTransaction
                 total_cost_calc = cost_per_bottle * Decimal(bottles_to_add) if cost_per_bottle > 0 else Decimal("0.00")
+                if unit_type == "pack":
+                    note_str = f"Scan-in: {quantity} pack(s) of {pack_size} ({bottles_to_add} bottles)"
+                elif unit_type == "crate":
+                    note_str = f"Scan-in: {quantity} crate(s) ({bottles_to_add} bottles)"
+                else:
+                    note_str = f"Scan-in: {bottles_to_add} bottle(s)"
                 LiquorStockInTransaction.objects.create(
                     business=business,
                     product=product,
@@ -331,7 +361,7 @@ def liquor_scan_in(request):
                     total_cost=total_cost_calc,
                     selling_price_at_time=selling_price,
                     created_by=request.user,
-                    notes=f"Scan-in: {quantity} {'crate(s)' if unit_type == 'crate' else 'bottle(s)'}",
+                    notes=note_str,
                 )
 
                 # Low stock / out-of-stock email alerts
@@ -346,6 +376,8 @@ def liquor_scan_in(request):
             # Build success message
             if unit_type == "crate":
                 success_msg = f"✅ Added: {quantity} crate{'s' if quantity != 1 else ''} ({bottles_to_add} bottles) — {product.name}"
+            elif unit_type == "pack":
+                success_msg = f"✅ Added: {quantity} pack{'s' if quantity != 1 else ''} ({bottles_to_add} bottles) — {product.name}"
             else:
                 success_msg = f"✅ Added: {bottles_to_add} bottle{'s' if bottles_to_add != 1 else ''} — {product.name}"
 
@@ -376,9 +408,11 @@ def liquor_scan_in(request):
                     "name": p.name,
                     "quantity_in_stock": p.quantity_in_stock or 0,
                     "bottles_per_crate": p.bottles_per_crate or 20,  # MALAWI STANDARD: 20 bottles per crate
+                    "pack_size": p.bottles_per_crate if cat == "cider" else None,  # 6 for ciders
                     "supports_crates": p.supports_crates,
                     "has_shots": p.has_shots,
                     "shots_per_bottle": p.shots_per_bottle,
+                    "price_per_shot": float(p.price_per_shot) if p.price_per_shot else None,
                     "category": p.category,
                 }
             )

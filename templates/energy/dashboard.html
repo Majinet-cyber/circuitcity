@@ -211,6 +211,57 @@
     {% endfor %}
   {% endif %}
 
+  {# ── NEW WORKSPACE GUIDE ── #}
+  {% if is_new_workspace %}
+  <div style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border:2px solid #6ee7b7;border-radius:16px;padding:1.5rem 1.75rem;margin-bottom:1.75rem;">
+    <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <span style="font-size:1.6rem;flex-shrink:0;">🚀</span>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:1rem;font-weight:800;color:#064e3b;">Welcome to your Renewable Energy workspace!</div>
+        <div style="font-size:.83rem;color:#065f46;margin-top:.2rem;">Your next best action: <strong>run system sizing with your real appliances.</strong></div>
+      </div>
+      <a href="{% url 'verticals:energy_sizing_create' %}" style="background:#059669;color:#fff;border-radius:999px;padding:.45rem 1.1rem;font-size:.83rem;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;">
+        ⚡ Start Sizing →
+      </a>
+    </div>
+    <ol style="margin:0;padding-left:1.3rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.35rem .75rem;font-size:.84rem;color:#047857;">
+      <li><a href="{% url 'verticals:energy_site_create' %}" style="color:#059669;font-weight:600;">Register a site</a> — add location &amp; capacity</li>
+      <li><a href="{% url 'verticals:energy_asset_create' %}" style="color:#059669;font-weight:600;">Add assets</a> — panels, batteries, inverters</li>
+      <li><a href="{% url 'verticals:energy_sizing_create' %}" style="color:#059669;font-weight:600;">Run system sizing</a> — input appliances &amp; get recommendations</li>
+      <li>Generate technical schematic from the sizing result</li>
+      <li>Use the energy flow simulation to test your design</li>
+      <li>View ROI, payback period, and Costs &amp; Savings</li>
+    </ol>
+    <div style="margin-top:.9rem;font-size:.72rem;color:#065f46;background:rgba(255,255,255,.5);border-radius:8px;padding:.5rem .75rem;">
+      ℹ️ The KPI cards below show <strong>sample demo values</strong> labelled <span style="background:#fef3c7;color:#92400e;padding:.05rem .3rem;border-radius:4px;font-size:.68rem;font-weight:700;">SAMPLE</span> — they'll be replaced by your real data once you add a site and assets.
+    </div>
+  </div>
+
+  {# ── DEMO SHOWCASE: What the dashboard will look like with real data ── #}
+  <div class="en-card mb-4" style="border:2px dashed #10b981;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <span style="background:#f0fdf4;color:#065f46;font-size:.7rem;font-weight:700;padding:.2rem .55rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">📊 Sample Preview</span>
+        <div style="font-size:.8rem;color:#64748b;margin-top:.3rem;">This is what your dashboard looks like with a live site. Based on a 5.2 kW system.</div>
+      </div>
+      <a href="{% url 'verticals:energy_site_create' %}" class="en-hero-btn-primary" style="background:#059669;color:#fff;font-size:.78rem;">+ Add Real Site</a>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.75rem;">
+      {% for demo in demo_site_preview %}
+      <div style="background:{% if demo.highlight %}linear-gradient(135deg,#ecfdf5,#d1fae5){% else %}#f8fafc{% endif %};border:1.5px solid #e2e8f0;border-radius:12px;padding:.85rem;text-align:center;position:relative;">
+        <div style="font-size:.6rem;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem;">DEMO</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#0f172a;">{{ demo.value }}</div>
+        <div style="font-size:.65rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-top:.15rem;">{{ demo.label }}</div>
+        {% if demo.note %}<div style="font-size:.62rem;color:#94a3b8;margin-top:.15rem;">{{ demo.note }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div style="margin-top:.85rem;padding:.55rem .75rem;background:#fef3c7;border-radius:8px;border:1px solid #fde68a;font-size:.76rem;color:#92400e;">
+      💡 <strong>Recommended action:</strong> Run system sizing using your real appliances to generate your actual KPIs.
+    </div>
+  </div>
+  {% endif %}
+
   {# ── INTELLIGENT INSIGHTS ── #}
   {% if intelligent_insights %}
   <div class="mb-4">
@@ -223,21 +274,65 @@
   </div>
   {% endif %}
 
+  {# ── DECISION RECOMMENDATION PANEL ── #}
+  {% if decision_recommendations %}
+  <div class="en-card mb-4" style="border-color:#6366f1;background:linear-gradient(135deg,#fff,#faf5ff);">
+    <div class="en-section-hdr mb-2">
+      <p class="en-section-title mb-0" style="color:#4f46e5;">🎯 Decision Recommendations</p>
+      <span style="font-size:.7rem;color:#94a3b8;">Based on your energy data</span>
+    </div>
+    <div class="d-flex flex-column gap-2">
+      {% for rec in decision_recommendations %}
+      <div style="padding:.5rem .75rem;border-radius:10px;font-size:.83rem;
+        {% if rec.type == 'warning' %}background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;
+        {% elif rec.type == 'risk' %}background:#fff1f2;border:1px solid #fca5a5;color:#991b1b;
+        {% else %}background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;{% endif %}">
+        {% if rec.type == 'warning' %}⚠️{% elif rec.type == 'risk' %}🔴{% else %}💡{% endif %} {{ rec.text }}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── FINANCIAL OPPORTUNITY PANEL ── #}
+  {% if financial_opportunity %}
+  <div class="en-card mb-4" style="border-color:#10b981;background:linear-gradient(135deg,#f0fdf4,#ecfdf5);">
+    <div class="en-section-hdr mb-2">
+      <p class="en-section-title mb-0" style="color:#059669;">💰 Financial Opportunity</p>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.65rem;">
+      {% for fo in financial_opportunity %}
+      <div style="text-align:center;">
+        <div style="font-size:1.15rem;font-weight:800;color:{{ fo.color|default:'#059669' }};">{{ fo.value }}</div>
+        <div style="font-size:.65rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;">{{ fo.label }}</div>
+        {% if fo.note %}<div style="font-size:.62rem;color:#94a3b8;margin-top:.1rem;">{{ fo.note }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ── PRIMARY KPIs ── #}
+  {% if is_new_workspace %}
+  <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem;">
+    <span style="background:#fef3c7;color:#92400e;font-size:.68rem;font-weight:700;padding:.2rem .55rem;border-radius:20px;text-transform:uppercase;letter-spacing:.06em;">Sample Estimates</span>
+    <span style="font-size:.73rem;color:#94a3b8;">Replace with real data by registering a site and assets.</span>
+  </div>
+  {% endif %}
   <div class="en-kpi-grid mb-4">
     <div class="en-kpi" style="border-color:#10b981;">
       <div class="en-kpi-val" style="color:#059669;">{{ stats.active_sites|default:0 }}</div>
-      <div class="en-kpi-lbl">Active Sites</div>
-      <div class="en-kpi-sub">of {{ stats.total_sites|default:0 }} total</div>
+      <div class="en-kpi-lbl">Active Sites{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+      <div class="en-kpi-sub">{% if is_new_workspace %}sample site{% else %}of {{ stats.total_sites|default:0 }} total{% endif %}</div>
     </div>
     <div class="en-kpi" style="border-color:#6366f1;">
-      <div class="en-kpi-val" style="color:#4f46e5;">{{ stats.operational_assets|default:0 }}</div>
-      <div class="en-kpi-lbl">Live Assets</div>
-      <div class="en-kpi-sub">{{ stats.degraded_assets|default:0 }} degraded · {{ stats.faulty_assets|default:0 }} faulty</div>
+      <div class="en-kpi-val" style="color:#4f46e5;">{{ stats.total_assets|default:0 }}</div>
+      <div class="en-kpi-lbl">Live Assets{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+      <div class="en-kpi-sub">{% if is_new_workspace %}sample assets{% else %}{{ stats.degraded_assets|default:0 }} degraded · {{ stats.faulty_assets|default:0 }} faulty{% endif %}</div>
     </div>
     <div class="en-kpi" style="border-color:#22d3ee;">
       <div class="en-kpi-val money" style="color:#0891b2;">{{ stats.installed_capacity|default:0|floatformat:1 }} <small style="font-size:.6rem;">kW</small></div>
-      <div class="en-kpi-lbl">Installed Capacity</div>
+      <div class="en-kpi-lbl">Installed Capacity{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
     </div>
     <div class="en-kpi" style="border-color:#f59e0b;">
       <div class="en-kpi-val" style="color:#d97706;">{{ stats.maintenance_overdue|default:0 }}</div>
@@ -249,9 +344,9 @@
       <div class="en-kpi-sub">{{ stats.high_alerts|default:0 }} high</div>
     </div>
     <div class="en-kpi" style="border-color:#84cc16;">
-      <div class="en-kpi-val money" style="color:#4d7c0f;">{{ business.currency }} {{ stats.cumulative_savings|default:0|floatformat:0 }}</div>
-      <div class="en-kpi-lbl">Total Savings</div>
-      <div class="en-kpi-sub">{{ business.currency }} {{ stats.savings_this_month|default:0|floatformat:0 }} this month</div>
+      <div class="en-kpi-val money" style="color:#4d7c0f;">MWK {{ stats.savings_this_month|default:0|floatformat:0 }}</div>
+      <div class="en-kpi-lbl">Est. Savings (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
+      <div class="en-kpi-sub">MWK {{ stats.cumulative_savings|default:0|floatformat:0 }} cumulative</div>
     </div>
   </div>
 
@@ -259,20 +354,20 @@
   <div class="en-kpi2-grid mb-4">
     <div class="en-kpi">
       <div class="en-kpi-val money" style="color:#059669;">{{ stats.generation_this_month|default:0|floatformat:1 }} <small style="font-size:.6rem;">kWh</small></div>
-      <div class="en-kpi-lbl">Generation (Month)</div>
+      <div class="en-kpi-lbl">Generation (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
       <div class="en-kpi-sub">{{ stats.gen_this_week|default:0|floatformat:1 }} kWh this week</div>
     </div>
     <div class="en-kpi">
       <div class="en-kpi-val money" style="color:#6366f1;">{{ stats.consumption_this_month|default:0|floatformat:1 }} <small style="font-size:.6rem;">kWh</small></div>
-      <div class="en-kpi-lbl">Consumption (Month)</div>
+      <div class="en-kpi-lbl">Consumption (Month){% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
     </div>
     <div class="en-kpi">
       <div class="en-kpi-val money" style="color:{% if stats.avg_battery_health >= 60 %}#10b981{% elif stats.avg_battery_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_battery_health|default:0 }}%</div>
-      <div class="en-kpi-lbl">Avg Battery Health</div>
+      <div class="en-kpi-lbl">Avg Battery Health{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
     </div>
     <div class="en-kpi">
       <div class="en-kpi-val money" style="color:{% if stats.avg_asset_health >= 60 %}#10b981{% elif stats.avg_asset_health >= 40 %}#f59e0b{% else %}#ef4444{% endif %};">{{ stats.avg_asset_health|default:0 }}%</div>
-      <div class="en-kpi-lbl">Avg Asset Health</div>
+      <div class="en-kpi-lbl">Avg Asset Health{% if is_new_workspace %} <span style="font-size:.55rem;color:#f59e0b;">▲sample</span>{% endif %}</div>
     </div>
   </div>
 
@@ -487,6 +582,21 @@
             <div class="text-muted" style="font-size:.68rem;white-space:nowrap;">{{ alert.created_at|timesince }} ago</div>
           </div>
           {% endfor %}
+        {% elif demo_alerts %}
+          {# Demo preview for new workspaces #}
+          <div style="margin-bottom:.65rem;padding:.35rem .6rem;background:#fef3c7;border-radius:8px;font-size:.7rem;color:#92400e;display:flex;align-items:center;gap:.4rem;">
+            <span>📊</span> <strong>Demo preview</strong> — sample intelligence for a 5.2 kW system. Real data replaces this once you add a site.
+          </div>
+          {% for da in demo_alerts|slice:":3" %}
+          <div class="alert-row sev-{{ da.severity }}" style="opacity:.9;">
+            <div style="font-size:1.1rem;flex-shrink:0;">{{ da.icon }}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="fw-semibold text-truncate" style="font-size:.83rem;">{{ da.title }}</div>
+              <div class="text-muted" style="font-size:.7rem;">{{ da.type_label }} · Demo Preview</div>
+            </div>
+            <a href="{% url 'verticals:energy_alerts' %}" class="text-muted" style="font-size:.68rem;white-space:nowrap;text-decoration:none;">View all →</a>
+          </div>
+          {% endfor %}
         {% else %}
           <div class="text-center py-4">
             <div style="font-size:2.5rem;opacity:.2">✅</div>
@@ -520,6 +630,26 @@
             </div>
           {% endfor %}
           </div>
+        {% elif demo_risks %}
+          {# Demo preview for new workspaces #}
+          <div style="margin-bottom:.65rem;padding:.35rem .6rem;background:#fef3c7;border-radius:8px;font-size:.7rem;color:#92400e;">
+            📊 <strong>Demo preview</strong> — sample asset risk for a 5.2 kW system.
+          </div>
+          <div class="d-flex flex-column gap-2">
+          {% for dr in demo_risks %}
+            <div class="d-flex align-items-center gap-2" style="opacity:.9;">
+              <div style="width:36px;height:36px;border-radius:8px;background:#fef2f2;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">{{ dr.icon }}</div>
+              <div style="flex:1;min-width:0;">
+                <div class="fw-semibold text-truncate" style="font-size:.82rem;">{{ dr.name }}</div>
+                <div style="font-size:.7rem;color:#64748b;">{{ dr.note }}</div>
+                <div class="asset-risk-bar mt-1">
+                  <div class="risk-fill" style="width:{{ dr.risk_score }}%;background:{{ dr.risk_color }};"></div>
+                </div>
+              </div>
+              <span class="badge rounded-pill" style="font-size:.68rem;background:{{ dr.risk_color }};color:#fff;">{{ dr.risk_score }}%</span>
+            </div>
+          {% endfor %}
+          </div>
         {% else %}
           <div class="text-center py-4">
             <div style="font-size:2.5rem;opacity:.2">✅</div>
@@ -530,6 +660,127 @@
     </div>
   </div>
 
+  {# ── SYSTEM HEALTH SCORE + BATTERY AUTONOMY VISUAL ── #}
+  {% if not is_new_workspace and stats.total_sites > 0 %}
+  <div class="row g-4 mb-4">
+    <div class="col-12 col-lg-4">
+      <div class="en-card h-100">
+        <p class="en-section-title mb-3">🏅 System Health Score</p>
+        {% with health=stats.avg_asset_health %}
+        <div style="text-align:center;padding:.5rem 0;">
+          <div style="position:relative;display:inline-block;margin-bottom:.75rem;">
+            <div style="width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+              background:conic-gradient({% if health >= 80 %}#10b981{% elif health >= 60 %}#f59e0b{% else %}#ef4444{% endif %} {{ health }}%, #e2e8f0 {{ health }}%);
+              ">
+              <div style="width:90px;height:90px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:1.5rem;font-weight:900;color:{% if health >= 80 %}#059669{% elif health >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ health }}%</div>
+                <div style="font-size:.6rem;color:#64748b;font-weight:700;text-transform:uppercase;">Health</div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size:.8rem;color:#475569;text-align:center;">
+            {% if health >= 80 %}✅ All systems performing well.{% elif health >= 60 %}⚠️ Some assets need attention.{% else %}🔴 Critical — schedule maintenance now.{% endif %}
+          </div>
+        </div>
+        {% endwith %}
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="en-card h-100">
+        <p class="en-section-title mb-3">🔋 Battery Autonomy</p>
+        {% with bh=stats.avg_battery_health %}
+        <div style="padding:.5rem 0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+            <span style="font-size:.78rem;color:#64748b;">Avg Health</span>
+            <span style="font-size:1.2rem;font-weight:800;color:{% if bh >= 80 %}#059669{% elif bh >= 60 %}#d97706{% else %}#dc2626{% endif %};">{{ bh }}%</span>
+          </div>
+          <div style="height:14px;border-radius:7px;background:#e2e8f0;overflow:hidden;margin-bottom:.85rem;">
+            <div style="height:100%;border-radius:7px;width:{{ bh }}%;background:linear-gradient(90deg,{% if bh >= 80 %}#10b981,#059669{% elif bh >= 60 %}#f59e0b,#d97706{% else %}#ef4444,#dc2626{% endif %});transition:width .5s;"></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.75rem;">
+            <div style="padding:.5rem;border-radius:8px;background:#f0fdf4;text-align:center;">
+              <div style="font-weight:700;color:#059669;">80–100%</div>
+              <div style="color:#64748b;">Good</div>
+            </div>
+            <div style="padding:.5rem;border-radius:8px;background:#fff7ed;text-align:center;">
+              <div style="font-weight:700;color:#d97706;">60–79%</div>
+              <div style="color:#64748b;">Monitor</div>
+            </div>
+            <div style="padding:.5rem;border-radius:8px;background:#fff1f2;text-align:center;">
+              <div style="font-weight:700;color:#dc2626;">&lt;60%</div>
+              <div style="color:#64748b;">Replace</div>
+            </div>
+            <div style="padding:.5rem;border-radius:8px;background:#eff6ff;text-align:center;">
+              <div style="font-weight:700;color:#4f46e5;">{{ stats.avg_battery_health }}%</div>
+              <div style="color:#64748b;">Yours</div>
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="en-card h-100">
+        <p class="en-section-title mb-2">💡 Load Risk Meter</p>
+        <div style="padding:.25rem 0;">
+          {% if stats.critical_alerts > 0 %}
+          <div style="padding:.75rem;background:#fff1f2;border-radius:10px;border:1px solid #fca5a5;margin-bottom:.6rem;font-size:.82rem;color:#991b1b;">
+            🔴 <strong>{{ stats.critical_alerts }} critical alert{{ stats.critical_alerts|pluralize }}</strong> — immediate action required.
+          </div>
+          {% elif stats.maintenance_overdue > 0 %}
+          <div style="padding:.75rem;background:#fff7ed;border-radius:10px;border:1px solid #fed7aa;margin-bottom:.6rem;font-size:.82rem;color:#9a3412;">
+            ⚠️ <strong>{{ stats.maintenance_overdue }} overdue</strong> maintenance item{{ stats.maintenance_overdue|pluralize }}.
+          </div>
+          {% else %}
+          <div style="padding:.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;margin-bottom:.6rem;font-size:.82rem;color:#166534;">
+            ✅ <strong>No load risks</strong> detected at this time.
+          </div>
+          {% endif %}
+          <a href="{% url 'verticals:energy_load_management' %}" class="d-block text-center py-2 rounded-3 mt-1" style="background:#eff6ff;border:1.5px solid #bfdbfe;font-size:.8rem;font-weight:600;color:#1d4ed8;text-decoration:none;">
+            📊 View Load Analysis →
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── WHAT IF? INTERACTIVE SCENARIO PANEL ── #}
+  <div class="en-card mb-4" style="border-color:#8b5cf6;background:linear-gradient(135deg,#faf5ff,#ede9fe);">
+    <div class="en-section-hdr mb-2">
+      <p class="en-section-title mb-0" style="color:#7c3aed;">🧠 What happens if…</p>
+      <span style="font-size:.7rem;color:#94a3b8;">Interactive scenario explorer{% if is_new_workspace %} · Sample estimates{% endif %}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.75rem;">
+      <div onclick="toggleScenario('battery')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
+        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">🔋 Add one more battery</div>
+        <div style="font-size:.78rem;color:#64748b;">Extends night autonomy by ~4h. Reduces blackout risk to Low.</div>
+        <div id="scenario-battery" style="display:none;margin-top:.6rem;padding:.5rem;background:#f0fdf4;border-radius:8px;font-size:.78rem;color:#166534;">
+          ✅ With 2× 200Ah batteries: night autonomy ~8h. Estimated cost: MWK 1,300,000. Additional monthly savings: ~MWK 45,000.
+        </div>
+      </div>
+      <div onclick="toggleScenario('load')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
+        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">⏰ Shift loads to daytime</div>
+        <div style="font-size:.78rem;color:#64748b;">Ironing, pumping, and washing moved to 10:00–15:00 solar hours.</div>
+        <div id="scenario-load" style="display:none;margin-top:.6rem;padding:.5rem;background:#eff6ff;border-radius:8px;font-size:.78rem;color:#1e40af;">
+          💡 Daytime load shifting reduces battery draw by ~30%. Night blackout risk drops from Medium to Low. No extra cost.
+        </div>
+      </div>
+      <div onclick="toggleScenario('panels')" style="padding:.9rem 1rem;background:#fff;border-radius:12px;border:1.5px solid #e9d5ff;cursor:pointer;transition:all .2s;" onmouseover="this.style.borderColor='#8b5cf6'" onmouseout="this.style.borderColor='#e9d5ff'">
+        <div style="font-weight:700;font-size:.85rem;color:#0f172a;margin-bottom:.3rem;">☀️ Increase panel size</div>
+        <div style="font-size:.78rem;color:#64748b;">Add 2 more panels to increase generation and charge battery faster.</div>
+        <div id="scenario-panels" style="display:none;margin-top:.6rem;padding:.5rem;background:#fef3c7;border-radius:8px;font-size:.78rem;color:#92400e;">
+          📈 +400W capacity: generation increases to ~830 kWh/month. Payback improved by ~3 months. Cost: ~MWK 1,200,000.
+        </div>
+      </div>
+    </div>
+    {% if is_new_workspace %}
+    <div style="margin-top:.85rem;font-size:.73rem;color:#7c3aed;background:rgba(255,255,255,.6);border-radius:8px;padding:.5rem .75rem;">
+      💜 These scenarios use sample estimates. Run system sizing with your real appliances for accurate projections.
+    </div>
+    {% endif %}
+  </div>
+
   {# ── FORECAST + SITES ATTENTION ── #}
   <div class="row g-4 mb-4">
     <div class="col-12 col-lg-6">
@@ -538,23 +789,30 @@
           <p class="en-section-title mb-0">📈 Demand Forecast</p>
           <a href="{% url 'verticals:energy_forecasting' %}" class="en-section-link">Detailed →</a>
         </div>
+        {% if demo_forecast %}
+        <div style="margin-bottom:.6rem;padding:.3rem .55rem;background:#fef3c7;border-radius:6px;font-size:.68rem;color:#92400e;">
+          📊 <strong>Demo preview</strong> — sample forecast for a 5.2 kW system.
+        </div>
+        {% endif %}
         <div class="row g-3">
           <div class="col-6">
             <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;font-weight:700;">Next 7 Days</div>
             <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">
-              {% if forecast_summary.next_7_day_demand_kwh %}{{ forecast_summary.next_7_day_demand_kwh }}{% else %}—{% endif %}
+              {% if demo_forecast %}{{ demo_forecast.next_7_day_demand_kwh }}{% elif forecast_summary.next_7_day_demand_kwh %}{{ forecast_summary.next_7_day_demand_kwh }}{% else %}—{% endif %}
               <small style="font-size:.6rem;color:#64748b;"> kWh</small>
             </div>
           </div>
           <div class="col-6">
             <div style="font-size:.72rem;color:#64748b;text-transform:uppercase;font-weight:700;">Next 30 Days</div>
             <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">
-              {% if forecast_summary.next_30_day_demand_kwh %}{{ forecast_summary.next_30_day_demand_kwh }}{% else %}—{% endif %}
+              {% if demo_forecast %}{{ demo_forecast.next_30_day_demand_kwh }}{% elif forecast_summary.next_30_day_demand_kwh %}{{ forecast_summary.next_30_day_demand_kwh }}{% else %}—{% endif %}
               <small style="font-size:.6rem;color:#64748b;"> kWh</small>
             </div>
           </div>
           <div class="col-12">
-            <div style="font-size:.8rem;color:#475569;">{{ forecast_summary.explanation }}</div>
+            <div style="font-size:.8rem;color:#475569;">
+              {% if demo_forecast %}{{ demo_forecast.explanation }}{% else %}{{ forecast_summary.explanation }}{% endif %}
+            </div>
           </div>
         </div>
         <div class="mt-3 pt-2 border-top" style="font-size:.72rem;color:#94a3b8;">
@@ -600,6 +858,14 @@
   </div>
 
 </div>
+
+<script>
+function toggleScenario(key) {
+  const el = document.getElementById('scenario-' + key);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
 
 {% if recent_readings %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>

@@ -72,10 +72,20 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="text-center py-5">
-    <div style="font-size:3.5rem;opacity:.2">🔋</div>
-    <h5 class="mt-3 text-muted">No assets registered</h5>
-    <a href="{% url 'verticals:energy_asset_create' %}" class="btn btn-primary rounded-pill mt-2">Register First Asset</a>
+  <div style="max-width:520px;margin:3rem auto;text-align:center;">
+    <div style="font-size:4rem;margin-bottom:1rem;">🔋</div>
+    <h5 class="fw-bold mb-2" style="color:#0f172a;">No assets registered yet</h5>
+    <p class="text-muted mb-3" style="font-size:.9rem;">Register every piece of equipment at your customer sites — solar panels, batteries, inverters, charge controllers, and more. Track health, maintenance, and alerts automatically.</p>
+    <a href="{% url 'verticals:energy_asset_create' %}" class="btn btn-primary rounded-pill px-4 me-2">
+      <i class="bi bi-plus-lg me-1"></i>Register First Asset
+    </a>
+    <div style="margin-top:1.5rem;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;">
+      {% url 'verticals:energy_asset_create' as create_url %}
+      <a href="{{ create_url }}?prefill_type=solar_panel" style="background:#fef3c7;border:1.5px solid #fde68a;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#92400e;font-weight:600;">☀️<br>Solar Panels</a>
+      <a href="{{ create_url }}?prefill_type=battery" style="background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#3730a3;font-weight:600;">🔋<br>Battery Banks</a>
+      <a href="{{ create_url }}?prefill_type=inverter" style="background:#fff1f2;border:1.5px solid #fecdd3;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#9f1239;font-weight:600;">⚡<br>Inverters</a>
+      <a href="{{ create_url }}?prefill_type=charge_controller" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:12px;padding:.75rem;text-decoration:none;font-size:.8rem;color:#065f46;font-weight:600;">🔌<br>Charge Controllers</a>
+    </div>
   </div>
   {% endif %}
 </div>
