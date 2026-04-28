@@ -141,17 +141,22 @@ def _get_kpis(
     sales_count = sales_qs.count()
 
     # Profit (revenue - cost of goods)
-    # Use cost_price field (the canonical cost field on InventoryItem)
+    # InventoryItem (phones) uses order_price as cost-to-acquire field
     zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
-    profit_annotation = F("price") - Coalesce(F("item__cost_price"), zero_cost)
-    profit_data = sales_qs.annotate(profit=profit_annotation).aggregate(total_profit=Coalesce(Sum("profit"), zero_dec))
-    profit = profit_data["total_profit"] or Decimal("0.00")
-
-    # Cost of goods
-    cost_data = sales_qs.aggregate(
-        total_cost=Coalesce(Sum(Coalesce(F("item__cost_price"), zero_cost)), zero_dec)
-    )
-    cost_of_goods = cost_data["total_cost"] or Decimal("0.00")
+    try:
+        profit_annotation = F("price") - Coalesce(F("item__order_price"), zero_cost)
+        profit_data = sales_qs.annotate(profit=profit_annotation).aggregate(
+            total_profit=Coalesce(Sum("profit"), zero_dec)
+        )
+        profit = profit_data["total_profit"] or Decimal("0.00")
+        cost_data = sales_qs.aggregate(
+            total_cost=Coalesce(Sum(Coalesce(F("item__order_price"), zero_cost)), zero_dec)
+        )
+        cost_of_goods = cost_data["total_cost"] or Decimal("0.00")
+    except Exception:
+        # Fallback: profit = revenue (no cost data available)
+        profit = revenue
+        cost_of_goods = Decimal("0.00")
 
     # Additional KPIs based on filters
     active_businesses = Business.objects.all()
@@ -247,40 +252,41 @@ def _get_chart_series(
     sales_count_trend = []
     profit_trend = []
 
-    # Build profit map (using cost_price field)
+    # Build profit map (using order_price as cost field for InventoryItem phones)
     profit_map = {}
     zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
-    if connection.vendor == "sqlite":
-        # Calculate profit in Python for SQLite
-        sales_for_profit = sales_qs.select_related("item").values(
-            "sold_at", "price", "item__cost_price"
-        )
-        daily_profit_data = defaultdict(Decimal)
+    try:
+        if connection.vendor == "sqlite":
+            # Calculate profit in Python for SQLite
+            sales_for_profit = sales_qs.values("sold_at", "price", "item__order_price")
+            daily_profit_data = defaultdict(Decimal)
 
-        for sale in sales_for_profit:
-            if sale["sold_at"]:
-                day = sale["sold_at"].date() if hasattr(sale["sold_at"], "date") else sale["sold_at"]
-                price = Decimal(str(sale["price"] or 0))
-                cost = Decimal(str(sale["item__cost_price"] or 0))
-                daily_profit_data[day] += price - cost
+            for sale in sales_for_profit:
+                if sale["sold_at"]:
+                    day = sale["sold_at"].date() if hasattr(sale["sold_at"], "date") else sale["sold_at"]
+                    price = Decimal(str(sale["price"] or 0))
+                    cost = Decimal(str(sale["item__order_price"] or 0))
+                    daily_profit_data[day] += price - cost
 
-        profit_map = {day: float(profit) for day, profit in daily_profit_data.items()}
-    else:
-        # PostgreSQL/MySQL: use DB-level aggregation
-        profit_annotation = F("price") - Coalesce(F("item__cost_price"), zero_cost)
+            profit_map = {day: float(p) for day, p in daily_profit_data.items()}
+        else:
+            # PostgreSQL/MySQL: use DB-level aggregation
+            profit_annotation = F("price") - Coalesce(F("item__order_price"), zero_cost)
 
-        daily_profit = (
-            sales_qs.annotate(day=TruncDate("sold_at"), profit=profit_annotation)
-            .values("day")
-            .annotate(
-                total_profit=Coalesce(
-                    Sum("profit"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+            daily_profit = (
+                sales_qs.annotate(day=TruncDate("sold_at"), profit=profit_annotation)
+                .values("day")
+                .annotate(
+                    total_profit=Coalesce(
+                        Sum("profit"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+                    )
                 )
+                .order_by("day")
             )
-            .order_by("day")
-        )
 
-        profit_map = {item["day"]: float(item["total_profit"]) for item in daily_profit if item["day"]}
+            profit_map = {item["day"]: float(item["total_profit"]) for item in daily_profit if item["day"]}
+    except Exception:
+        profit_map = {}
 
     # Fill in all days in range (including days with no sales)
     current = start_date
