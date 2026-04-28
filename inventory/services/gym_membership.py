@@ -265,7 +265,9 @@ class GymMembershipService:
         # Inclusive calculation: (end - today).days + 1
         # If end is today, we get (0).days + 1 = 1
         # If end is tomorrow, we get (1).days + 1 = 2
-        return (self.member.membership_end - today).days + 1
+        # Cap at duration_days to prevent "24 / 12" display when today < start_date
+        days_left = (self.member.membership_end - today).days + 1
+        return min(days_left, self.get_duration_days())
     
     def get_days_left_current(self, today: Optional[date] = None) -> int:
         """

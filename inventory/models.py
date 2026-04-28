@@ -607,6 +607,44 @@ class MerchProduct(CompatKwargsMixin, models.Model):
         return max(0, self.shots_per_bottle - self.barman_shots_reserved)
 
     @property
+    def available_shots(self) -> int:
+        """
+        Total available shots in stock.
+        For spirits/whisky: quantity_in_stock is stored in SHOTS (base units).
+        Returns quantity_in_stock directly — this IS the shot count.
+        
+        If quantity_in_stock was incorrectly stored as bottles (legacy data),
+        use available_shots_from_bottles to get the correct count.
+        """
+        if not self.has_shots:
+            return 0
+        return self.quantity_in_stock or 0
+
+    @property
+    def available_shots_from_bottles(self) -> int:
+        """
+        Compute available shots assuming quantity_in_stock is stored in BOTTLES.
+        Use this only for legacy products where stock was not converted to shots.
+        
+        Example: 5 bottles × 28 sellable shots/bottle = 140 shots.
+        """
+        if not self.has_shots or not self.shots_per_bottle:
+            return 0
+        qty = self.quantity_in_stock or 0
+        return qty * self.sellable_shots_per_bottle
+
+    @property
+    def available_glasses(self) -> int:
+        """
+        Total available glasses in stock.
+        For wine: quantity_in_stock is stored in GLASSES (base units).
+        Returns quantity_in_stock directly — this IS the glass count.
+        """
+        if not self.has_glasses:
+            return 0
+        return self.quantity_in_stock or 0
+
+    @property
     def reorder_level(self):
         """
         Safe fallback for reorder level when templates need it.

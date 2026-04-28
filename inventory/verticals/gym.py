@@ -71,7 +71,7 @@ def dashboard(request):
     # ============================================================================
     # DATE RANGE FILTER: Parse querystring (today/last7/mtd/month/all_time)
     # ============================================================================
-    range_param = request.GET.get("range", "mtd").lower()
+    range_param = request.GET.get("range", "this_month").lower()
     now = timezone.now()
     today = timezone.localdate()
     yesterday = today - timedelta(days=1)
@@ -85,6 +85,12 @@ def dashboard(request):
         start_date = today - timedelta(days=6)  # Last 7 days including today
         end_date = today
         range_label = "Last 7 Days"
+    elif range_param == "last_month":
+        # Last calendar month
+        first_day_this_month = today.replace(day=1)
+        end_date = first_day_this_month - timedelta(days=1)
+        start_date = end_date.replace(day=1)
+        range_label = start_date.strftime("%B %Y")
     elif range_param == "month":
         # Specific month picker: ?range=month&month=2026-01
         month_str = request.GET.get("month", "")
@@ -100,26 +106,27 @@ def dashboard(request):
                     end_date = start_date.replace(month=month + 1, day=1) - timedelta(days=1)
                 range_label = start_date.strftime("%B %Y")
             except (ValueError, TypeError):
-                # Invalid month format, fall back to MTD
+                # Invalid month format, fall back to this month
                 start_date = today.replace(day=1)
                 end_date = today
-                range_label = "Month to Date"
-                range_param = "mtd"
+                range_label = "This Month"
+                range_param = "this_month"
         else:
-            # No month specified, fall back to MTD
+            # No month specified, fall back to this month
             start_date = today.replace(day=1)
             end_date = today
-            range_label = "Month to Date"
-            range_param = "mtd"
+            range_label = "This Month"
+            range_param = "this_month"
     elif range_param == "all_time":
         # All time: no date constraints
         start_date = None
         end_date = None
         range_label = "All Time"
-    else:  # mtd (default)
+    else:  # this_month / mtd (default)
+        range_param = "this_month"
         start_date = today.replace(day=1)
         end_date = today
-        range_label = "Month to Date"
+        range_label = "This Month"
 
     # Date ranges for metrics (datetime-aware for paid_at filtering)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

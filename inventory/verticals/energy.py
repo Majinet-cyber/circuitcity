@@ -75,6 +75,27 @@ def _models():
 
 
 # ---------------------------------------------------------------------------
+# Simulations
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def energy_simulations(request: HttpRequest) -> HttpResponse:
+    """
+    Energy Simulations page — interactive scenario engine.
+    Supports Household, Irrigation, Solar Plant, Wind, Hybrid,
+    Blackout/Autonomy, and Diesel Replacement simulations.
+    All calculations are frontend-only (JS) for instant feedback.
+    """
+    biz = get_active_business(request)
+    return render(request, "energy/simulations.html", {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "page_title": "Energy Simulations",
+    })
+
+
+# ---------------------------------------------------------------------------
 # Dashboard
 # ---------------------------------------------------------------------------
 
@@ -1290,18 +1311,21 @@ def system_sizing_create(request: HttpRequest) -> HttpResponse:
                 )
 
             # Run sizing engine
+            log.info("Energy sizing compute starting — run_id=%s title=%r", run.id, run.title)
             from inventory.services.energy_sizing import compute_sizing
             result = compute_sizing(run)
 
             if result.get("ok"):
+                log.info("Energy sizing compute OK — run_id=%s", run.id)
                 messages.success(request, f"System sizing '{run.title}' computed successfully.")
             else:
+                log.warning("Energy sizing compute warning — run_id=%s error=%s", run.id, result.get("error", ""))
                 messages.warning(request, f"Sizing created but needs appliance data: {result.get('error', '')}")
 
             return redirect("verticals:energy_sizing_detail", run_id=run.id)
 
         except Exception as e:
-            log.exception(f"Error creating sizing run: {e}")
+            log.exception("Error creating sizing run: %s", e)
             messages.error(request, f"Error: {e}")
             return redirect(request.path)
 

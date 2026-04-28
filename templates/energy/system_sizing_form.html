@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+<!-- energy-sizing-ui:v2-smart-scenarios -->
 {% block title %}{{ action }} System Sizing – {{ business.name }}{% endblock %}
 
 {% block content %}
@@ -15,13 +15,28 @@
   .btn-add-appliance:hover{background:#f0fdf4;color:#059669;}
   .catalog-btn{font-size:.75rem;padding:.25rem .6rem;border-radius:8px;border:1px solid #e2e8f0;background:#fff;cursor:pointer;transition:all .1s;}
   .catalog-btn:hover{border-color:#10b981;background:#f0fdf4;}
+  /* Project type selector */
+  .project-type-card{border:2px solid #e2e8f0;border-radius:14px;padding:1rem;cursor:pointer;text-align:center;transition:all .2s;background:#fff;}
+  .project-type-card:hover{border-color:#10b981;background:#f0fdf4;}
+  .project-type-card.selected{border-color:#10b981;background:#ecfdf5;box-shadow:0 0 0 3px rgba(16,185,129,.15);}
+  .project-type-card .pt-icon{font-size:2rem;display:block;margin-bottom:.4rem;}
+  .project-type-card .pt-label{font-size:.8rem;font-weight:700;color:#374151;}
+  .project-type-card .pt-desc{font-size:.7rem;color:#6b7280;margin-top:.2rem;}
+  .mode-panel{display:none;}
+  .mode-panel.active{display:block;}
+  .info-box{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:.8rem 1rem;font-size:.8rem;color:#065f46;margin-bottom:1rem;}
+  .warning-box{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:.8rem 1rem;font-size:.8rem;color:#92400e;margin-bottom:1rem;}
+  .preset-btn{border-radius:10px;font-size:.8rem;font-weight:600;}
+  /* Irrigation pump recommendation preview */
+  .pump-preview{background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1.5px solid #6ee7b7;border-radius:14px;padding:1.2rem;display:none;}
+  .pump-preview.visible{display:block;}
 </style>
 
 <div class="container-fluid py-4">
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
       <h4 class="fw-bold mb-0"><i class="bi bi-calculator me-2" style="color:#10b981;"></i>{{ action }} System Sizing</h4>
-      <div class="text-muted small">Design a complete renewable energy system</div>
+      <div class="text-muted small">Design a complete renewable energy system for any project type</div>
     </div>
     <a href="{% url 'verticals:energy_sizing_list' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
       <i class="bi bi-arrow-left me-1"></i>Back
@@ -30,8 +45,427 @@
 
   {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
 
-  <form method="post" id="sizingForm">
+  <form method="post" id="sizingForm" novalidate>
     {% csrf_token %}
+
+    {# ============================================================ #}
+    {#   PROJECT TYPE SELECTOR — Smart Scenario Builder             #}
+    {# ============================================================ #}
+    <div class="sizing-section" style="border-color:#10b981;">
+      <h6><i class="bi bi-grid-3x3-gap me-2" style="color:#10b981;"></i>Project Type
+        <small style="font-weight:400;text-transform:none;font-size:.72rem;color:#94a3b8;">— Choose the type of project to load smart defaults</small>
+      </h6>
+      <div class="row g-3 mb-3" id="projectTypeCards">
+        <div class="col-6 col-md-3">
+          <div class="project-type-card selected" data-type="household" onclick="selectProjectType('household')">
+            <span class="pt-icon">🏠</span>
+            <div class="pt-label">Household</div>
+            <div class="pt-desc">Home solar &amp; backup system</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="project-type-card" data-type="irrigation" onclick="selectProjectType('irrigation')">
+            <span class="pt-icon">🌾</span>
+            <div class="pt-label">Irrigation / Farm</div>
+            <div class="pt-desc">Solar pumping &amp; irrigation</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="project-type-card" data-type="industry" onclick="selectProjectType('industry')">
+            <span class="pt-icon">🏭</span>
+            <div class="pt-label">Industry / Business</div>
+            <div class="pt-desc">Commercial &amp; industrial power</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="project-type-card" data-type="other" onclick="selectProjectType('other')">
+            <span class="pt-icon">⚡</span>
+            <div class="pt-label">Other / Custom</div>
+            <div class="pt-desc">Enter custom loads manually</div>
+          </div>
+        </div>
+      </div>
+      <input type="hidden" name="project_type" id="projectTypeInput" value="household">
+    </div>
+
+    {# ============================================================ #}
+    {#   HOUSEHOLD MODE — Smart Home Inputs                         #}
+    {# ============================================================ #}
+    <div class="mode-panel active sizing-section" id="panel-household" style="border-color:#3b82f6;">
+      <h6><i class="bi bi-house-door me-2" style="color:#3b82f6;"></i>Household System Inputs</h6>
+      <div class="info-box">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Household mode:</strong> Answer simple home questions below. Click "Apply Household Presets" to auto-fill the load schedule.
+        Panel orientation defaulted to <strong>North-facing</strong> (Southern Hemisphere, Malawi).
+      </div>
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Number of Rooms</label>
+          <input type="number" id="hh_rooms" value="5" class="form-control" min="1" max="20">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Number of People</label>
+          <input type="number" id="hh_people" value="6" class="form-control" min="1">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Lighting Points</label>
+          <input type="number" id="hh_lights" value="12" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Number of TVs</label>
+          <input type="number" id="hh_tvs" value="1" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Fridge/Freezer?</label>
+          <select id="hh_fridge" class="form-select">
+            <option value="1" selected>Yes — 1 fridge</option>
+            <option value="2">Yes — 2 fridges</option>
+            <option value="0">No fridge</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Iron?</label>
+          <select id="hh_iron" class="form-select">
+            <option value="1" selected>Yes — occasional use</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Kettle?</label>
+          <select id="hh_kettle" class="form-select">
+            <option value="1" selected>Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Rice Cooker?</label>
+          <select id="hh_rice" class="form-select">
+            <option value="1" selected>Yes</option>
+            <option value="0">No</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Laptops/Desktops</label>
+          <input type="number" id="hh_laptops" value="2" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Fans</label>
+          <input type="number" id="hh_fans" value="3" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Phones to Charge</label>
+          <input type="number" id="hh_phones" value="6" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Water Heater?</label>
+          <select id="hh_heater" class="form-select">
+            <option value="0" selected>No (use solar geyser instead)</option>
+            <option value="1">Yes — electric geyser</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Backup Hours Needed</label>
+          <input type="number" id="hh_backup_hrs" value="6" class="form-control" min="1" max="24">
+          <div class="form-text">Hours to survive a blackout</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Grid Availability</label>
+          <select id="hh_grid" class="form-select">
+            <option value="unreliable" selected>Unreliable / frequent cuts</option>
+            <option value="daily_cuts">Daily power cuts (ESCOM)</option>
+            <option value="off_grid">Off-grid / no grid</option>
+            <option value="reliable">Reliable grid, just backup</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Budget Range</label>
+          <select id="hh_budget" class="form-select">
+            <option value="economy">Economy (MWK 2M–5M)</option>
+            <option value="mid" selected>Mid-range (MWK 5M–12M)</option>
+            <option value="premium">Premium (MWK 12M–25M+)</option>
+          </select>
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label">Preferred System Type</label>
+          <select id="hh_system_type" class="form-select">
+            <option value="solar_battery" selected>Solar + Battery (hybrid)</option>
+            <option value="solar_only">Solar only (grid-tie / no battery)</option>
+            <option value="battery_backup">Battery backup only (UPS-style)</option>
+            <option value="solar_wind">Solar + Wind hybrid</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-success preset-btn" onclick="applyHouseholdPresets()">
+          <i class="bi bi-magic me-1"></i>Apply Household Presets
+        </button>
+        <button type="button" class="btn btn-outline-success preset-btn" onclick="applyHouseholdDemo()">
+          <i class="bi bi-lightning me-1"></i>Load Demo (5-Room Home)
+        </button>
+      </div>
+      <div class="info-box mt-3" id="hh_recommendation" style="display:none;">
+        <strong>Preliminary Recommendation:</strong>
+        <div id="hh_rec_text"></div>
+        <div class="mt-1 text-muted" style="font-size:.75rem;">
+          <em>Estimates are for planning support and should be verified by a qualified technician before installation.</em>
+        </div>
+      </div>
+    </div>
+
+    {# ============================================================ #}
+    {#   IRRIGATION / FARM MODE                                     #}
+    {# ============================================================ #}
+    <div class="mode-panel sizing-section" id="panel-irrigation" style="border-color:#f59e0b;">
+      <h6><i class="bi bi-droplet-half me-2" style="color:#f59e0b;"></i>Irrigation / Farm Energy Inputs</h6>
+      <div class="info-box" style="background:#fffbeb;border-color:#fde68a;color:#92400e;">
+        <i class="bi bi-sun me-1"></i>
+        <strong>Farm mode:</strong> Tell us about your land, crops, and water source.
+        We'll recommend the right pump type, solar array size, and watering schedule.
+        Assumes <strong>Southern Hemisphere</strong>, <strong>North-facing panels</strong>, Malawi solar irradiance ~5.5 PSH.
+      </div>
+      <div class="row g-3">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Land Size</label>
+          <input type="number" id="irr_land_size" value="2" step="0.5" class="form-control" min="0.1">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Land Unit</label>
+          <select id="irr_land_unit" class="form-select">
+            <option value="acres" selected>Acres</option>
+            <option value="hectares">Hectares</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Crop Type</label>
+          <select id="irr_crop" class="form-select">
+            <option value="maize">Maize</option>
+            <option value="tomatoes" selected>Tomatoes</option>
+            <option value="onions">Onions</option>
+            <option value="vegetables">Leafy Vegetables</option>
+            <option value="rice">Rice</option>
+            <option value="sugarcane">Sugarcane</option>
+            <option value="mixed">Mixed Crops</option>
+            <option value="other">Other / Custom</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Irrigation Method</label>
+          <select id="irr_method" class="form-select">
+            <option value="drip" selected>Drip Irrigation</option>
+            <option value="sprinkler">Sprinkler</option>
+            <option value="furrow">Furrow</option>
+            <option value="flood">Flood</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Water Source</label>
+          <select id="irr_source" class="form-select" onchange="toggleBoreholeFields()">
+            <option value="river" selected>River / Stream</option>
+            <option value="dam">Dam / Reservoir</option>
+            <option value="well">Open Well</option>
+            <option value="borehole">Borehole</option>
+            <option value="tank">Storage Tank</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Suction Lift (m)</label>
+          <input type="number" id="irr_suction_lift" value="3" class="form-control" min="0" max="20" oninput="updateIrrTDH()">
+          <div class="form-text">Vertical distance from water surface to pump</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Discharge Head (m)</label>
+          <input type="number" id="irr_discharge_head" value="15" class="form-control" min="0" oninput="updateIrrTDH()">
+          <div class="form-text">Vertical height from pump to field/tank</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Pipe Distance (m)</label>
+          <input type="number" id="irr_distance" value="120" class="form-control" min="0" oninput="updateIrrTDH()">
+          <div class="form-text">Pipe distance from source to field/tank</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Total Dynamic Head (m)</label>
+          <input type="number" id="irr_tdh_display" class="form-control" readonly style="background:#f0fdf4;font-weight:600;">
+          <div class="form-text">Calculated: suction + discharge + friction</div>
+        </div>
+        <div class="col-6 col-md-3 irr-borehole-field" style="display:none;">
+          <label class="form-label">Depth to Water (m)</label>
+          <input type="number" id="irr_depth" value="0" class="form-control" min="0">
+          <div class="form-text">For borehole/well only</div>
+        </div>
+        <div class="col-12" id="irr_suction_warning" style="display:none;">
+          <div class="warning-box">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <strong>Surface pump not recommended.</strong> Suction lift exceeds 7 m — surface pumps cannot reliably draw water from this depth (practical limit ~6–8 m). Use a submersible pump or reposition the pump closer to the water surface.
+            <div class="mt-1" style="font-size:.75rem;">
+              <em>Surface pumps are limited by suction lift, not total head alone. They can push water uphill much better than they can pull water upward.</em>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Daily Irrigation Hours</label>
+          <input type="number" id="irr_hours" value="6" class="form-control" min="1" max="18">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Irrigation Frequency</label>
+          <select id="irr_frequency" class="form-select">
+            <option value="daily" selected>Daily</option>
+            <option value="every_other">Every other day</option>
+            <option value="twice_weekly">Twice weekly</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Season / Peak Month</label>
+          <select id="irr_season" class="form-select">
+            <option value="dry_hot">Dry Season – Hot (Sep–Nov)</option>
+            <option value="dry_cool" selected>Dry Season – Cool (May–Aug)</option>
+            <option value="wet">Wet Season (Dec–Apr)</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Region / Location</label>
+          <select id="irr_region" class="form-select">
+            <option value="lilongwe" selected>Lilongwe (Central)</option>
+            <option value="blantyre">Blantyre (Southern)</option>
+            <option value="mzuzu">Mzuzu (Northern)</option>
+            <option value="zomba">Zomba</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Budget Range</label>
+          <select id="irr_budget" class="form-select">
+            <option value="economy">Economy (MWK 1M–4M)</option>
+            <option value="mid" selected>Mid-range (MWK 4M–12M)</option>
+            <option value="premium">Premium (MWK 12M+)</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Existing Pump?</label>
+          <select id="irr_existing_pump" class="form-select">
+            <option value="no" selected>No — need new pump</option>
+            <option value="yes_surface">Yes — surface pump</option>
+            <option value="yes_submersible">Yes — submersible pump</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Existing Solar Panels?</label>
+          <select id="irr_existing_panels" class="form-select">
+            <option value="no" selected>No — need new panels</option>
+            <option value="yes">Yes — have panels</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Power Source Preference</label>
+          <select id="irr_power_source" class="form-select">
+            <option value="solar_dc" selected>Solar DC Pump (recommended)</option>
+            <option value="solar_ac_vfd">Solar AC Pump + VFD/Controller</option>
+            <option value="petrol_generator">Petrol/Gasoline Generator Pump</option>
+            <option value="diesel_generator">Diesel Generator Pump</option>
+            <option value="hybrid_solar_gen">Hybrid Solar + Generator</option>
+            <option value="grid_ac">Grid AC Pump only</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Night/Evening Pumping?</label>
+          <select id="irr_night_pumping" class="form-select">
+            <option value="no" selected>No — pump during sun hours only</option>
+            <option value="yes">Yes — need pumping after sunset</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-warning preset-btn text-dark" onclick="applyIrrigationPresets()">
+          <i class="bi bi-magic me-1"></i>Calculate Irrigation System
+        </button>
+        <button type="button" class="btn btn-outline-warning preset-btn text-dark" onclick="applyIrrigationDemo()">
+          <i class="bi bi-lightning me-1"></i>Load Demo (2 Acres, Tomatoes)
+        </button>
+      </div>
+
+      {# Irrigation Recommendation Preview #}
+      <div class="pump-preview mt-3" id="irr_recommendation">
+        <h6 class="fw-bold text-success mb-2"><i class="bi bi-check-circle me-1"></i>Irrigation System Recommendation</h6>
+        <div id="irr_rec_text"></div>
+        <div class="mt-2" style="font-size:.75rem;color:#065f46;">
+          <em>Estimates are for planning support. Verify with a qualified irrigation engineer before installation.</em>
+        </div>
+      </div>
+    </div>
+
+    {# ============================================================ #}
+    {#   INDUSTRY MODE                                              #}
+    {# ============================================================ #}
+    <div class="mode-panel sizing-section" id="panel-industry" style="border-color:#8b5cf6;">
+      <h6><i class="bi bi-building me-2" style="color:#8b5cf6;"></i>Industry / Business Inputs</h6>
+      <div class="info-box" style="background:#f5f3ff;border-color:#c4b5fd;color:#4c1d95;">
+        <i class="bi bi-briefcase me-1"></i>
+        <strong>Industry mode:</strong> Tell us about your business operations. We'll recommend a solar/hybrid/diesel-offset system.
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label">Business Type</label>
+          <input type="text" id="ind_biz_type" class="form-control" placeholder="e.g. Supermarket, Factory, School, Clinic">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Operating Hours/Day</label>
+          <input type="number" id="ind_hours" value="10" class="form-control" min="1" max="24">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Peak Load (kW)</label>
+          <input type="number" id="ind_peak_kw" value="15" step="0.5" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Average Load (kW)</label>
+          <input type="number" id="ind_avg_kw" value="8" step="0.5" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Backup Hours Needed</label>
+          <input type="number" id="ind_backup" value="4" class="form-control" min="0">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Critical Loads</label>
+          <input type="text" id="ind_critical" class="form-control" placeholder="e.g. Cold room, servers, POS">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Grid Availability</label>
+          <select id="ind_grid" class="form-select">
+            <option value="unreliable" selected>Unreliable (frequent cuts)</option>
+            <option value="daily_cuts">Daily scheduled cuts</option>
+            <option value="reliable">Mostly reliable</option>
+            <option value="off_grid">No grid</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Using Diesel Generator?</label>
+          <select id="ind_diesel" class="form-select">
+            <option value="yes" selected>Yes — running diesel now</option>
+            <option value="no">No generator</option>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Monthly Diesel Spend (MWK)</label>
+          <input type="number" id="ind_diesel_spend" value="500000" class="form-control" min="0">
+        </div>
+      </div>
+      <div class="mt-3">
+        <button type="button" class="btn btn-purple preset-btn" style="background:#8b5cf6;color:#fff;border:none;" onclick="applyIndustryPresets()">
+          <i class="bi bi-magic me-1"></i>Calculate Industry System
+        </button>
+      </div>
+    </div>
+
+    {# ============================================================ #}
+    {#   OTHER / CUSTOM MODE                                        #}
+    {# ============================================================ #}
+    <div class="mode-panel sizing-section" id="panel-other" style="border-color:#6b7280;">
+      <h6><i class="bi bi-sliders me-2" style="color:#6b7280;"></i>Custom Load Entry</h6>
+      <div class="info-box" style="background:#f9fafb;border-color:#d1d5db;color:#374151;">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong>Custom mode:</strong> Enter your loads manually below in the Load Schedule section. The system will calculate sizing automatically.
+      </div>
+    </div>
 
     {# === PROJECT DETAILS === #}
     <div class="sizing-section">
@@ -39,7 +473,7 @@
       <div class="row g-3">
         <div class="col-12 col-md-6">
           <label class="form-label">Proposal Title *</label>
-          <input type="text" name="title" class="form-control" placeholder="e.g. Lilongwe Office Solar System" required>
+          <input type="text" name="title" class="form-control" id="sizingTitle" placeholder="e.g. Lilongwe Household Solar System" required>
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label">Linked Site (optional)</label>
@@ -68,13 +502,13 @@
       <div class="row g-3">
         <div class="col-12 col-md-4">
           <label class="form-label">Design Objective</label>
-          <select name="design_objective" class="form-select">
+          <select name="design_objective" class="form-select" id="designObjective">
             {% for val, label in objectives %}<option value="{{ val }}" {% if val == "balanced" %}selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
         <div class="col-12 col-md-4">
           <label class="form-label">System Architecture</label>
-          <select name="system_architecture" class="form-select">
+          <select name="system_architecture" class="form-select" id="systemArchitecture">
             {% for val, label in architectures %}<option value="{{ val }}" {% if val == "solar_battery" %}selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
@@ -95,7 +529,7 @@
     <div class="sizing-section">
       <h6><i class="bi bi-sun me-2"></i>Solar & Battery Parameters</h6>
       <div class="row g-3">
-        <div class="col-6 col-md-3"><label class="form-label">Peak Sun Hours/Day</label><input type="number" step="0.1" name="peak_sun_hours" value="5.0" class="form-control"></div>
+        <div class="col-6 col-md-3"><label class="form-label">Peak Sun Hours/Day</label><input type="number" step="0.1" name="peak_sun_hours" value="5.5" class="form-control"></div>
         <div class="col-6 col-md-3"><label class="form-label">Panel Wattage (Wp)</label><input type="number" name="panel_wattage" value="550" class="form-control"></div>
         <div class="col-6 col-md-3"><label class="form-label">Panel Derating (%)</label><input type="number" name="panel_efficiency_pct" value="85" class="form-control" min="50" max="100"></div>
         <div class="col-6 col-md-3"><label class="form-label">Battery DoD (%)</label><input type="number" name="battery_dod_pct" value="80" class="form-control" min="20" max="100"></div>
@@ -113,26 +547,30 @@
     {# === APPLIANCE / LOAD SCHEDULE === #}
     <div class="sizing-section">
       <h6><i class="bi bi-lightning-charge me-2"></i>Appliance / Load Schedule</h6>
-      <p class="text-muted" style="font-size:.8rem;margin-bottom:1rem;">Add each appliance or load. Click quick-add buttons for common appliances, or add custom loads.</p>
+      <p class="text-muted" style="font-size:.8rem;margin-bottom:1rem;">Add each appliance or load. Use project type presets above, click quick-add buttons, or add custom loads manually.</p>
 
       {# Quick-add catalog #}
       <div class="d-flex flex-wrap gap-1 mb-3" id="catalogBtns">
-        <button type="button" class="catalog-btn" onclick="addCatalog('LED Lights','lighting',10,6,10)">💡 LED Lights (10W)</button>
+        <strong style="font-size:.72rem;color:#475569;align-self:center;">Quick-add:</strong>
+        <button type="button" class="catalog-btn" onclick="addCatalog('LED Lights (10W)','lighting',10,6,10)">💡 LED Lights (10W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('TV (LED 40in)','entertainment',80,5,80)">📺 TV (80W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Fridge/Freezer','refrigeration',150,24,500)">🧊 Fridge (150W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Fridge (150W)','refrigeration',150,24,500)">🧊 Fridge (150W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Freezer (200W)','refrigeration',200,24,600)">🧊 Freezer (200W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('Desktop Computer','computing',200,8,200)">💻 Computer (200W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('Laptop','computing',65,8,65)">💻 Laptop (65W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Printer','computing',50,2,50)">🖨️ Printer (50W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('WiFi Router','telecom',15,24,15)">📡 Router (15W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Ceiling Fan','hvac',75,10,225)">🌀 Fan (75W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Ceiling Fan (75W)','hvac',75,10,225)">🌀 Fan (75W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('AC Unit (1HP)','hvac',750,8,2250)">❄️ AC 1HP (750W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('Water Pump','pumping',750,3,2250)">💧 Pump (750W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Phone Charging','charging',10,4,10)">🔌 Phone Charger (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Phone Charger','charging',10,4,10)">🔌 Phone (10W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Electric Kettle','kitchen',2000,0.5,2000)">☕ Kettle (2kW)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Electric Iron','kitchen',1200,1,1200)">👔 Iron (1.2kW)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Rice Cooker','kitchen',700,1.5,700)">🍚 Rice Cooker (700W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('POS Terminal','computing',15,12,15)">🏷️ POS (15W)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('Security Camera','security',15,24,15)">📷 Camera (15W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Solar Pump (1.5kW)','pumping',1500,6,3000)">🌾 Solar Pump (1.5kW)</button>
         <button type="button" class="catalog-btn" onclick="addCatalog('Welding Machine','industrial',3500,4,7000)">⚡ Welder (3500W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Borehole Pump','pumping',1500,6,4500)">🕳️ Borehole (1500W)</button>
-        <button type="button" class="catalog-btn" onclick="addCatalog('Cold Room','refrigeration',2000,24,6000)">🏭 Cold Room (2000W)</button>
+        <button type="button" class="catalog-btn" onclick="addCatalog('Cold Room','refrigeration',2000,24,6000)">🏭 Cold Room (2kW)</button>
       </div>
 
       <div id="applianceRows"></div>
@@ -173,17 +611,14 @@
         <div class="col-6 col-md-3">
           <label class="form-label">Cable/Wiring (MWK lump)</label>
           <input type="number" step="1000" name="cost_wiring_lump" value="150000" class="form-control" min="0" placeholder="150000">
-          <div class="form-text">DC+AC cables total</div>
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">Breakers/Protection (MWK)</label>
           <input type="number" step="1000" name="cost_breakers_lump" value="80000" class="form-control" min="0" placeholder="80000">
-          <div class="form-text">MCBs, isolators, fuses</div>
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">Mounting Structure (MWK)</label>
           <input type="number" step="1000" name="cost_mounting_lump" value="50000" class="form-control" min="0" placeholder="50000">
-          <div class="form-text">Roof/ground mounts</div>
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">Installation Labour (%)</label>
@@ -205,12 +640,10 @@
         <div class="col-6 col-md-3">
           <label class="form-label">Diesel Cost (MWK/litre)</label>
           <input type="number" step="1" name="diesel_cost_per_litre" value="" class="form-control" placeholder="3500">
-          <div class="form-text">Used when generator enabled</div>
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">Annual Maintenance (%)</label>
           <input type="number" step="0.1" name="annual_maintenance_pct" value="" class="form-control" placeholder="2">
-          <div class="form-text">Default: 2% of CapEx/year</div>
         </div>
         <div class="col-6 col-md-3">
           <label class="form-label">Tariff Escalation (%/yr)</label>
@@ -219,7 +652,6 @@
         <div class="col-6 col-md-3">
           <label class="form-label">Discount Rate (%)</label>
           <input type="number" step="0.1" name="discount_rate_pct" value="10" class="form-control">
-          <div class="form-text">For NPV calculation</div>
         </div>
       </div>
     </div>
@@ -234,7 +666,7 @@
         </div>
         <div class="col-12 col-md-6">
           <label class="form-label">Assumptions</label>
-          <textarea name="assumptions" class="form-control" rows="3" placeholder="Key assumptions for this design..."></textarea>
+          <textarea name="assumptions" class="form-control" rows="3" placeholder="e.g. North-facing panels, 5.5 PSH (Malawi average), Southern Hemisphere orientation..."></textarea>
         </div>
       </div>
     </div>
@@ -253,17 +685,370 @@ let rowIdx = 0;
 const categories = [{% for val, label in appliance_categories %}["{{ val }}","{{ label }}"],{% endfor %}];
 const priorities = [{% for val, label in priorities %}["{{ val }}","{{ label }}"],{% endfor %}];
 
+// ============================================================
+// Project Type Selector
+// ============================================================
+function selectProjectType(type) {
+  document.getElementById('projectTypeInput').value = type;
+  // Update card UI
+  document.querySelectorAll('.project-type-card').forEach(c => c.classList.remove('selected'));
+  document.querySelector(`.project-type-card[data-type="${type}"]`).classList.add('selected');
+  // Show/hide panels
+  document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(`panel-${type}`);
+  if (panel) panel.classList.add('active');
+}
+
+function toggleBoreholeFields() {
+  const src = document.getElementById('irr_source').value;
+  const show = src === 'borehole' || src === 'well';
+  document.querySelectorAll('.irr-borehole-field').forEach(el => {
+    el.style.display = show ? '' : 'none';
+  });
+}
+
+// ============================================================
+// Household Presets
+// ============================================================
+function applyHouseholdPresets() {
+  const lights = parseInt(document.getElementById('hh_lights').value) || 12;
+  const tvs = parseInt(document.getElementById('hh_tvs').value) || 1;
+  const fridge = parseInt(document.getElementById('hh_fridge').value) || 1;
+  const iron = parseInt(document.getElementById('hh_iron').value) || 0;
+  const kettle = parseInt(document.getElementById('hh_kettle').value) || 0;
+  const rice = parseInt(document.getElementById('hh_rice').value) || 0;
+  const laptops = parseInt(document.getElementById('hh_laptops').value) || 0;
+  const fans = parseInt(document.getElementById('hh_fans').value) || 0;
+  const phones = parseInt(document.getElementById('hh_phones').value) || 0;
+  const heater = parseInt(document.getElementById('hh_heater').value) || 0;
+
+  document.getElementById('applianceRows').innerHTML = '';
+  rowIdx = 0;
+
+  if (lights > 0) addRow(`LED Lights (${lights} points)`, 'lighting', lights * 10, 6, lights);
+  if (tvs > 0) addRow(`TV x${tvs}`, 'entertainment', 80 * tvs, 5, 80 * tvs);
+  if (fridge > 0) addRow(`Fridge x${fridge}`, 'refrigeration', 150 * fridge, 24, 500 * fridge);
+  if (iron > 0) addRow('Electric Iron', 'kitchen', 1200, 1, 1200);
+  if (kettle > 0) addRow('Electric Kettle', 'kitchen', 2000, 0.5, 2000);
+  if (rice > 0) addRow('Rice Cooker', 'kitchen', 700, 1.5, 700);
+  if (laptops > 0) addRow(`Laptop x${laptops}`, 'computing', 65 * laptops, 8, 65 * laptops);
+  if (fans > 0) addRow(`Ceiling Fan x${fans}`, 'hvac', 75 * fans, 8, 225 * fans);
+  if (phones > 0) addRow(`Phone Charging x${phones}`, 'charging', phones * 10, 4, phones * 10);
+  addRow('WiFi Router', 'telecom', 15, 24, 15);
+  if (heater > 0) addRow('Electric Water Heater', 'kitchen', 2000, 2, 2000);
+
+  // Show preliminary recommendation
+  const totalW = (lights * 10) + (tvs * 80) + (fridge * 150) + (iron * 1200 * 0.04) + (kettle * 2000 * 0.02) +
+                 (rice * 700 * 0.06) + (laptops * 65) + (fans * 75) + (phones * 10) + 15 + (heater * 2000 * 0.08);
+  const dailyKwh = ((lights * 10 * 6) + (tvs * 80 * 5) + (fridge * 150 * 24) + (iron * 1200 * 1) +
+                    (kettle * 2000 * 0.5) + (rice * 700 * 1.5) + (laptops * 65 * 8) + (fans * 75 * 8) +
+                    (phones * 10 * 4) + (15 * 24) + (heater * 2000 * 2)) / 1000;
+  const solarKw = Math.ceil((dailyKwh / 5.5) * 1.25 * 10) / 10;
+  const batteryKwh = Math.ceil(dailyKwh * 0.6 * 1.25 * 10) / 10;
+  const inverterKva = Math.ceil((totalW / 1000) * 1.3 * 10) / 10;
+  const backupHrs = parseInt(document.getElementById('hh_backup_hrs').value) || 6;
+
+  document.getElementById('hh_rec_text').innerHTML = `
+    <div class="row g-2 mt-1">
+      <div class="col-6 col-md-3"><div class="fw-bold text-success">${solarKw} kW</div><div class="small">Solar Array</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold text-success">${batteryKwh} kWh</div><div class="small">Battery Bank</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold text-success">${inverterKva} kVA</div><div class="small">Inverter Size</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold text-success">~${backupHrs}h</div><div class="small">Autonomy</div></div>
+    </div>
+    <div class="mt-2 small">
+      Daily load estimate: <strong>${dailyKwh.toFixed(1)} kWh</strong> &nbsp;|&nbsp;
+      Priority loads: Fridge, lights, phone charging &nbsp;|&nbsp;
+      Load shedding: Defer kettle, iron to daytime solar peak.
+    </div>
+  `;
+  document.getElementById('hh_recommendation').style.display = 'block';
+}
+
+function applyHouseholdDemo() {
+  document.getElementById('hh_rooms').value = 5;
+  document.getElementById('hh_people').value = 6;
+  document.getElementById('hh_lights').value = 12;
+  document.getElementById('hh_tvs').value = 1;
+  document.getElementById('hh_fridge').value = 1;
+  document.getElementById('hh_iron').value = 1;
+  document.getElementById('hh_kettle').value = 1;
+  document.getElementById('hh_rice').value = 1;
+  document.getElementById('hh_laptops').value = 2;
+  document.getElementById('hh_fans').value = 3;
+  document.getElementById('hh_phones').value = 6;
+  document.getElementById('hh_backup_hrs').value = 6;
+  document.getElementById('sizingTitle').value = 'Household Solar System – 5-Room Home';
+  applyHouseholdPresets();
+}
+
+// ============================================================
+// Live TDH calculator — called on field change
+// ============================================================
+function updateIrrTDH() {
+  const suctionLift   = parseFloat(document.getElementById('irr_suction_lift').value) || 0;
+  const dischargeHead = parseFloat(document.getElementById('irr_discharge_head').value) || 0;
+  const pipeDistance  = parseFloat(document.getElementById('irr_distance').value) || 0;
+  const frictionLoss  = pipeDistance * 0.02; // ~0.02 m friction head per m pipe (HDPE, typical velocity)
+  const tdh = suctionLift + dischargeHead + frictionLoss;
+
+  const tdhEl = document.getElementById('irr_tdh_display');
+  if (tdhEl) tdhEl.value = tdh.toFixed(1);
+
+  // Show / hide suction lift warning
+  const warnEl = document.getElementById('irr_suction_warning');
+  if (warnEl) warnEl.style.display = suctionLift > 7 ? 'block' : 'none';
+}
+
+// ============================================================
+// Irrigation Presets — physically-correct pump selection
+// ============================================================
+function applyIrrigationPresets() {
+  const landSize    = parseFloat(document.getElementById('irr_land_size').value) || 2;
+  const landUnit    = document.getElementById('irr_land_unit').value;
+  const crop        = document.getElementById('irr_crop').value;
+  const method      = document.getElementById('irr_method').value;
+  const source      = document.getElementById('irr_source').value;
+  const distance    = parseFloat(document.getElementById('irr_distance').value) || 120;
+  const suctionLift = parseFloat(document.getElementById('irr_suction_lift').value) || 3;
+  const dischargeHead = parseFloat(document.getElementById('irr_discharge_head').value) || 15;
+  const depth       = parseFloat(document.getElementById('irr_depth').value) || 0;
+  const hours       = parseFloat(document.getElementById('irr_hours').value) || 6;
+  const powerSrc    = document.getElementById('irr_power_source').value;
+  const nightPump   = document.getElementById('irr_night_pumping').value;
+
+  // Land area in m² and hectares
+  const landM2 = landUnit === 'acres' ? landSize * 4046.86 : landSize * 10000;
+  const landHa = landM2 / 10000;
+
+  // Crop net water demand (mm/day)
+  const cropWater = {maize:4.5, tomatoes:5.5, onions:4.5, vegetables:4.5, rice:9, sugarcane:7.5, mixed:5, other:5};
+  const mmPerDay  = cropWater[crop] || 5;
+
+  // Irrigation method efficiency (water actually reaching roots / water pumped)
+  const irrEff = {drip:0.875, sprinkler:0.75, furrow:0.575, flood:0.50};
+  const eta_irr = irrEff[method] || 0.75;
+
+  // Net crop volume (m³/day), then gross pumped volume
+  const m3PerDay_net  = (mmPerDay / 1000) * landM2;
+  const m3PerDay_pump = m3PerDay_net / eta_irr;
+
+  // Rice high-demand warning
+  const riceWarn = (crop === 'rice') ? '⚠️ Rice has very high water demand. Verify with an agronomist.' : '';
+
+  // Total dynamic head: suction lift + discharge head + friction loss
+  const frictionLoss = distance * 0.02;
+  const totalHead    = suctionLift + dischargeHead + frictionLoss;
+  // For borehole: suction lift is effectively replaced by the well depth
+  const boreholeDepth = (source === 'borehole' || source === 'well') ? depth : 0;
+  const effectiveTDH  = (source === 'borehole' || source === 'well')
+    ? (boreholeDepth + dischargeHead + frictionLoss)
+    : totalHead;
+
+  // Flow rate (m³/h)
+  const flowM3h = m3PerDay_pump / hours;
+
+  // Pump hydraulic power: P_hyd(kW) = Q(m³/h) × H(m) / 367.2
+  const pumpEff   = 0.50;
+  const pumpHydKw = (flowM3h * effectiveTDH) / 367.2;
+  const pumpElecKw = pumpHydKw / pumpEff;
+  const pumpPowerKw = Math.max(0.37, Math.ceil(pumpElecKw * 10) / 10);
+
+  // Sanity check
+  const sanityWarning = pumpPowerKw > 30
+    ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:.8rem;">
+        ⚠️ <strong>Sizing result appears unusually high (${pumpPowerKw} kW pump).</strong>
+        Check your land size, head, distance, and irrigation hours. Verify unit conversions.
+        For small/medium farms a pump &gt;15 kW is uncommon.
+       </div>`
+    : '';
+
+  // ---------------------------------------------------------------
+  // Physically-correct pump type selection
+  // Engineering rule: surface pump practical suction lift limit = 7 m.
+  // Beyond 7 m suction lift a surface pump cannot reliably draw water.
+  // High discharge head is fine for surface pumps — they push, not pull.
+  // ---------------------------------------------------------------
+  let pumpType, pumpReason, suctionWarnHtml = '';
+  const isBorehole = source === 'borehole' || source === 'well';
+  const isOpenSurface = source === 'river' || source === 'dam' || source === 'tank';
+
+  if (isBorehole || depth > 10) {
+    pumpType   = 'Submersible Solar DC Pump';
+    pumpReason = `Submersible pump required — water source is borehole/deep well${depth > 0 ? ' (depth to water: ' + depth + ' m)' : ''}.`;
+  } else if (suctionLift > 7) {
+    pumpType   = 'Submersible Solar DC Pump';
+    pumpReason = `Submersible pump required — suction lift (${suctionLift} m) exceeds safe limit of 7 m for surface pumps. ` +
+                 `Surface pumps are limited by suction lift, not total head alone. ` +
+                 `Consider relocating pump closer to water surface, or use submersible pump.`;
+    suctionWarnHtml = `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:.8rem;">
+      ⚠️ <strong>Surface pump not recommended.</strong> Suction lift is ${suctionLift} m — exceeds practical limit of 7 m.
+      Surface pumps cannot reliably pull water from this depth. Using submersible pump recommendation.
+    </div>`;
+  } else if (isOpenSurface && suctionLift <= 7 && effectiveTDH <= 40) {
+    pumpType   = effectiveTDH <= 20 ? 'Surface Solar DC Pump' : 'Surface Solar Pump with VFD/Controller';
+    pumpReason = `Surface pump suitable — suction lift (${suctionLift} m) is within safe range ≤ 7 m, ` +
+                 `open water source (${source}), total dynamic head ${effectiveTDH.toFixed(0)} m.`;
+  } else {
+    pumpType   = 'Submersible Solar Pump';
+    pumpReason = `Submersible pump recommended — high total dynamic head (${effectiveTDH.toFixed(0)} m) or non-surface water source.`;
+  }
+
+  // Power-source specific sizing
+  const PSH = 5.5; // Malawi average peak sun hours
+  let archHtml = '';
+  let solarKwTxt = '';
+  let batteryRec = '';
+  let fuelNote   = '';
+
+  if (powerSrc === 'solar_dc') {
+    const solarKw  = Math.ceil((pumpPowerKw / 0.85) * 1.25 * 10) / 10;
+    solarKwTxt     = `${solarKw} kW`;
+    batteryRec     = nightPump === 'yes'
+      ? `Battery bank recommended for night pumping: ~${(pumpPowerKw * 3).toFixed(1)} kWh lithium or ${(pumpPowerKw * 6).toFixed(1)} kWh lead-acid (50% DoD).`
+      : 'Battery storage NOT required. Pump during sun hours → store water in tank, not electricity in battery. Water storage is cheaper.';
+    archHtml = `
+      <div class="mt-2 p-2 rounded" style="background:#f0fdf4;border:1px solid #86efac;font-size:.8rem;">
+        <strong>Architecture: Solar → DC Pump Controller/MPPT → DC Pump → Field/Tank</strong><br>
+        No AC inverter required. Solar panels drive DC pump directly through a solar pump controller/MPPT unit.<br>
+        Optional: float switch (tank full cutoff), dry-run protection, DC disconnect, surge arrestor.
+      </div>`;
+  } else if (powerSrc === 'solar_ac_vfd') {
+    const solarKw  = Math.ceil((pumpPowerKw / 0.82) * 1.3 * 10) / 10;
+    solarKwTxt     = `${solarKw} kW`;
+    batteryRec     = nightPump === 'yes'
+      ? `Battery bank recommended for night pumping.`
+      : 'Battery NOT required if pumping during daylight hours only.';
+    archHtml = `
+      <div class="mt-2 p-2 rounded" style="background:#eff6ff;border:1px solid #93c5fd;font-size:.8rem;">
+        <strong>Architecture: Solar → Solar Pump VFD/Controller → AC Pump → Field/Tank</strong><br>
+        Uses a solar pump VFD (Variable Frequency Drive) — this is a dedicated pump inverter, NOT a household inverter.
+        Provides soft-start, flow control, and pump protection. Suitable for existing AC pumps.
+      </div>`;
+  } else if (powerSrc === 'petrol_generator' || powerSrc === 'diesel_generator') {
+    const fuelType  = powerSrc === 'petrol_generator' ? 'Petrol' : 'Diesel';
+    const fuelLitHr = powerSrc === 'petrol_generator'
+      ? (pumpPowerKw * 0.45).toFixed(1)
+      : (pumpPowerKw * 0.33).toFixed(1);
+    const fuelLitDay = (parseFloat(fuelLitHr) * hours).toFixed(1);
+    const fuelCostDay = (parseFloat(fuelLitDay) * (powerSrc === 'petrol_generator' ? 3200 : 3000)).toFixed(0);
+    solarKwTxt  = 'N/A (generator powered)';
+    batteryRec  = 'Not applicable — generator-driven pump.';
+    fuelNote    = `Est. fuel consumption: ~${fuelLitHr} L/hr → ~${fuelLitDay} L/day → ~MWK ${parseInt(fuelCostDay).toLocaleString()}/day running cost.`;
+    archHtml = `
+      <div class="mt-2 p-2 rounded" style="background:#fefce8;border:1px solid #fde047;font-size:.8rem;">
+        <strong>Architecture: ${fuelType} Generator → AC Pump → Pipe Network → Field/Tank</strong><br>
+        No solar panels or battery required. Generator drives pump directly.<br>
+        ⚠️ High operating cost. Consider solar DC pump for long-term savings.<br>
+        ${fuelNote}
+      </div>`;
+  } else if (powerSrc === 'hybrid_solar_gen') {
+    const solarKw  = Math.ceil((pumpPowerKw / 0.85) * 1.1 * 10) / 10;
+    solarKwTxt     = `${solarKw} kW (daytime) + generator backup`;
+    batteryRec     = 'Battery optional. Use generator for cloudy days or peak demand.';
+    archHtml = `
+      <div class="mt-2 p-2 rounded" style="background:#fdf4ff;border:1px solid #d8b4fe;font-size:.8rem;">
+        <strong>Architecture: Solar DC Pump Controller + Generator Backup</strong><br>
+        Solar runs pump during sun hours. Generator provides backup on cloudy days or for extended pumping.<br>
+        Manual changeover switch recommended. Sizing: generator 1.5× pump rated power.
+      </div>`;
+  } else if (powerSrc === 'grid_ac') {
+    solarKwTxt  = 'N/A (grid powered)';
+    batteryRec  = 'Not required for grid-connected pump.';
+    archHtml = `
+      <div class="mt-2 p-2 rounded" style="background:#f9fafb;border:1px solid #d1d5db;font-size:.8rem;">
+        <strong>Architecture: Grid AC Supply → Motor Starter/VFD → AC Pump → Field/Tank</strong><br>
+        Requires reliable grid supply. Consider surge protection and overload relay.<br>
+        ⚠️ In rural Malawi, grid availability may be unreliable — consider solar DC as primary or backup.
+      </div>`;
+  }
+
+  // Pipe diameter recommendation
+  const pipeDia = flowM3h < 3 ? '50mm HDPE' : flowM3h < 6 ? '63mm HDPE' : flowM3h < 12 ? '90mm HDPE' : '110mm HDPE';
+
+  // ROI vs diesel (only shown for solar options)
+  let roiHtml = '';
+  if (powerSrc === 'solar_dc' || powerSrc === 'solar_ac_vfd' || powerSrc === 'hybrid_solar_gen') {
+    const solarKwNum = parseFloat(solarKwTxt) || (pumpPowerKw / 0.85 * 1.25);
+    const systemCost = solarKwNum * 1000 * 650 + pumpPowerKw * 1000 * 300000;
+    const dieselSavPerMonth = pumpPowerKw * hours * 30 * 3000 / 3;
+    const paybackMonths = Math.round(systemCost / Math.max(dieselSavPerMonth, 1));
+    roiHtml = `<div class="mb-1 small"><strong>Est. payback vs diesel:</strong> ~${paybackMonths} months</div>`;
+  }
+
+  // Populate the appliance table — FIXED: qty = 1, NOT pumpPowerKw * 1000
+  document.getElementById('applianceRows').innerHTML = '';
+  rowIdx = 0;
+  addRow(`${pumpType} (${pumpPowerKw} kW)`, 'pumping', pumpPowerKw * 1000, hours, 1);
+
+  const rec = document.getElementById('irr_rec_text');
+  rec.innerHTML = `
+    ${suctionWarnHtml}
+    ${sanityWarning}
+    ${riceWarn ? `<div class="alert alert-warning py-1 px-2 mb-2" style="font-size:.8rem;">${riceWarn}</div>` : ''}
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-md-3"><div class="fw-bold text-success">${pumpType}</div><div class="small text-muted">Recommended Pump</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold text-warning">${pumpPowerKw} kW</div><div class="small text-muted">Pump Power</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold text-primary">${solarKwTxt}</div><div class="small text-muted">Solar Array</div></div>
+      <div class="col-6 col-md-3"><div class="fw-bold">${m3PerDay_pump.toFixed(0)} m³/day</div><div class="small text-muted">Water to Pump (gross)</div></div>
+    </div>
+    <div class="mb-1 small"><strong>Land:</strong> ${landSize} ${landUnit} (${landM2.toFixed(0)} m²) | Crop: ${crop} | Method: ${method} (${(eta_irr*100).toFixed(0)}% efficiency)</div>
+    <div class="mb-1 small"><strong>Daily water (net crop need):</strong> ${m3PerDay_net.toFixed(1)} m³ | Gross pumped: ${m3PerDay_pump.toFixed(1)} m³ | Flow rate: ${flowM3h.toFixed(1)} m³/h</div>
+    <div class="mb-1 small"><strong>Head breakdown:</strong> Suction lift: ${suctionLift} m + Discharge head: ${dischargeHead} m + Friction: ${frictionLoss.toFixed(1)} m = <strong>TDH ${effectiveTDH.toFixed(1)} m</strong></div>
+    <div class="mb-1 small"><strong>Why this pump:</strong> ${pumpReason}</div>
+    <div class="mb-1 small"><strong>Battery recommendation:</strong> ${batteryRec}</div>
+    <div class="mb-1 small"><strong>Pipe sizing:</strong> ${pipeDia} recommended for ${flowM3h.toFixed(1)} m³/h flow</div>
+    <div class="mb-1 small"><strong>Watering schedule:</strong> Early morning (06:00–09:00) and late afternoon (15:00–18:00) — lower evaporation loss</div>
+    ${roiHtml}
+    ${archHtml}
+    <div class="mt-1 p-2 rounded" style="background:#eff6ff;border:1px solid #bfdbfe;font-size:.75rem;color:#1e40af;">
+      <strong>Engineering note:</strong> Surface pumps are limited by suction lift, not total head alone.
+      They can push water uphill (high discharge head) much better than they can pull water upward (suction lift).
+      Safe suction lift limit ≈ 7 m. Above this, use a submersible pump or lower the pump to the water level.
+    </div>
+    <div class="mt-1 text-muted" style="font-size:.73rem;"><strong>Assumptions:</strong> Pump eff. 50%, irrigation eff. ${(eta_irr*100).toFixed(0)}%, PSH 5.5 hr/day (Malawi avg), friction ~0.02 m/m pipe. Verify on-site before procurement.</div>
+  `;
+  document.getElementById('irr_recommendation').classList.add('visible');
+}
+
+function applyIrrigationDemo() {
+  document.getElementById('irr_land_size').value = 2;
+  document.getElementById('irr_land_unit').value = 'acres';
+  document.getElementById('irr_crop').value = 'tomatoes';
+  document.getElementById('irr_method').value = 'drip';
+  document.getElementById('irr_source').value = 'river';
+  document.getElementById('irr_distance').value = 120;
+  document.getElementById('irr_suction_lift').value = 3;
+  document.getElementById('irr_discharge_head').value = 15;
+  document.getElementById('irr_hours').value = 6;
+  document.getElementById('sizingTitle').value = 'Farm Irrigation – 2 Acres Tomatoes & Vegetables';
+  updateIrrTDH();
+  applyIrrigationPresets();
+}
+
+function applyIndustryPresets() {
+  const peakKw = parseFloat(document.getElementById('ind_peak_kw').value) || 15;
+  const avgKw = parseFloat(document.getElementById('ind_avg_kw').value) || 8;
+  const hours = parseFloat(document.getElementById('ind_hours').value) || 10;
+  const backup = parseFloat(document.getElementById('ind_backup').value) || 4;
+  document.getElementById('applianceRows').innerHTML = '';
+  rowIdx = 0;
+  addRow('Peak Demand Load', 'industrial', peakKw * 1000, hours, peakKw * 1000);
+  addRow('Off-peak Load', 'industrial', avgKw * 500, 24 - hours, avgKw * 500);
+}
+
+// ============================================================
+// Row builder
+// ============================================================
 function addRow(name='', cat='custom', wattage='', hours='', qty=1, surge='', critical=false, unitCost='', notes='') {
   const i = rowIdx++;
   const catOpts = categories.map(c => `<option value="${c[0]}" ${c[0]===cat?'selected':''}>${c[1]}</option>`).join('');
   const priOpts = priorities.map(p => `<option value="${p[0]}" ${p[0]==='medium'?'selected':''}>${p[1]}</option>`).join('');
-  const surgeMultiplier = surge && wattage ? (surge / wattage).toFixed(1) : '';
   const html = `
     <div class="appliance-row" id="row_${i}">
       <div class="row g-2 align-items-end">
-        <div class="col-12 col-md-3"><label class="form-label" style="font-size:.72rem;">Appliance Name</label><input type="text" name="appliance_name" value="${name}" class="form-control form-control-sm" placeholder="e.g. LED Bulb" required></div>
+        <div class="col-12 col-md-3"><label class="form-label" style="font-size:.72rem;">Appliance Name</label><input type="text" name="appliance_name" value="${name}" class="form-control form-control-sm" placeholder="e.g. LED Bulb"></div>
         <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Qty</label><input type="number" name="appliance_quantity" value="${qty}" class="form-control form-control-sm" min="1"></div>
-        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Watts (W)</label><input type="number" name="appliance_wattage" value="${wattage}" class="form-control form-control-sm" min="1" required></div>
+        <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Watts (W)</label><input type="number" name="appliance_wattage" value="${wattage}" class="form-control form-control-sm" min="0"></div>
         <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Hrs/Day</label><input type="number" name="appliance_hours" value="${hours}" step="0.5" class="form-control form-control-sm" min="0.5" max="24"></div>
         <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Surge (W)</label><input type="number" name="appliance_surge" value="${surge}" class="form-control form-control-sm" min="0" placeholder="opt."></div>
         <div class="col-4 col-md-1"><label class="form-label" style="font-size:.72rem;">Unit Cost (MWK)</label><input type="number" name="appliance_unit_cost" value="${unitCost}" class="form-control form-control-sm" min="0" placeholder="opt."></div>
@@ -274,8 +1059,8 @@ function addRow(name='', cat='custom', wattage='', hours='', qty=1, surge='', cr
           <input type="checkbox" name="appliance_critical" value="${i}" class="form-check-input mt-1" style="width:1.2rem;height:1.2rem;" ${critical?'checked':''}>
         </div>
         <div class="col-12 col-md-2">
-          <label class="form-label" style="font-size:.72rem;">Notes/Priority</label>
-          <input type="text" name="appliance_notes" value="${notes}" class="form-control form-control-sm" placeholder="e.g. Fridge — never switch off">
+          <label class="form-label" style="font-size:.72rem;">Notes</label>
+          <input type="text" name="appliance_notes" value="${notes}" class="form-control form-control-sm" placeholder="e.g. Fridge — always on">
         </div>
         <div class="col-4 col-md-1 d-flex align-items-end">
           <input type="hidden" name="appliance_period" value="both">
@@ -289,5 +1074,47 @@ function addRow(name='', cat='custom', wattage='', hours='', qty=1, surge='', cr
 function addCatalog(name, cat, watts, hours, surgeWatts, notes='') {
   addRow(name, cat, watts, hours, 1, surgeWatts||'', false, '', notes);
 }
+
+// ============================================================
+// Form submit validator — visible errors, no silent blocking
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  const form   = document.getElementById('sizingForm');
+  const errBox = document.getElementById('sizingFormError');
+  const btn    = document.getElementById('sizingSubmitBtn');
+
+  form.addEventListener('submit', function(e) {
+    errBox.style.display = 'none';
+    errBox.textContent   = '';
+
+    const errors = [];
+
+    // Validate proposal title
+    const titleEl = document.getElementById('sizingTitle');
+    if (!titleEl || !titleEl.value.trim()) {
+      errors.push('Proposal Title is required.');
+      if (titleEl) {
+        titleEl.classList.add('is-invalid');
+        titleEl.focus();
+      }
+    } else {
+      if (titleEl) titleEl.classList.remove('is-invalid');
+    }
+
+    if (errors.length > 0) {
+      e.preventDefault();
+      errBox.innerHTML = '<strong>Please fix the following before submitting:</strong><ul class="mb-0 mt-1">'
+        + errors.map(m => `<li>${m}</li>`).join('')
+        + '</ul>';
+      errBox.style.display = 'block';
+      errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return false;
+    }
+
+    // Show loading state so user knows submission is happening
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Computing…';
+  });
+});
 </script>
 {% endblock %}

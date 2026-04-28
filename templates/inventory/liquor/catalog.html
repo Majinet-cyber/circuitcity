@@ -215,7 +215,15 @@
       </div>
       <div class="product-stock">
         {% if product.quantity_in_stock %}
-          In stock: {{ product.quantity_in_stock }} bottles
+          {% if product.has_shots %}
+            In stock: {{ product.quantity_in_stock }} shots available
+            {% if product.shots_per_bottle %}<br><small style="color:#94a3b8;">({{ product.shots_per_bottle }} shots/bottle)</small>{% endif %}
+          {% elif product.has_glasses %}
+            In stock: {{ product.quantity_in_stock }} glasses available
+            {% if product.glasses_per_bottle %}<br><small style="color:#94a3b8;">({{ product.glasses_per_bottle }} glasses/bottle)</small>{% endif %}
+          {% else %}
+            In stock: {{ product.quantity_in_stock }} bottle{{ product.quantity_in_stock|pluralize }}
+          {% endif %}
         {% else %}
           Out of stock
         {% endif %}

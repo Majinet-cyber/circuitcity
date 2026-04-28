@@ -292,9 +292,6 @@ def liquor_scan_in(request):
                 cost_per_bottle = cost_per_unit / Decimal(bottles_per_crate)
 
             with transaction.atomic():
-                # Update product stock (in bottles)
-                product.quantity_in_stock = (product.quantity_in_stock or 0) + bottles_to_add
-
                 # Store cost per bottle (single source of truth)
                 if cost_per_bottle > 0:
                     product.cost_per_bottle = cost_per_bottle
@@ -341,6 +338,21 @@ def liquor_scan_in(request):
                         return redirect("liquor:scan_in")
                     except Exception:
                         pass
+
+                # CRITICAL FIX: For spirits/whisky with shot-selling enabled,
+                # store stock in SHOTS (base units), not bottles.
+                # This ensures available_shots displays and prevents overselling correctly.
+                # Example: 5 bottles × 28 sellable shots = 140 shots stored in quantity_in_stock.
+                if product.has_shots and product.shots_per_bottle and product.category in ["spirits", "whiskey"]:
+                    barman_reserved = product.barman_shots_reserved or 2
+                    sellable_shots_per_bottle = max(0, product.shots_per_bottle - barman_reserved)
+                    units_to_add = bottles_to_add * sellable_shots_per_bottle
+                else:
+                    # Beer, cider, wine: store in bottles (base unit = bottle)
+                    units_to_add = bottles_to_add
+
+                # Update product stock in base units
+                product.quantity_in_stock = (product.quantity_in_stock or 0) + units_to_add
 
                 product.save()
 

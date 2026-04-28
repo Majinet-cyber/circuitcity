@@ -32,21 +32,10 @@ def _get_existing_columns_pg(cursor, table_name):
 
 
 def _get_existing_columns_sqlite(cursor, table_name):
-    """Return set of existing column names for SQLite via information_schema."""
-    cursor.execute(
-        """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_name = %s
-        """,
-        [table_name],
-    )
+    """Return set of existing column names for SQLite using PRAGMA table_info."""
+    cursor.execute(f"PRAGMA table_info({table_name})")  # nosec: table name is hard-coded
     rows = cursor.fetchall()
-    if rows:
-        return {row[0] for row in rows}
-    # Fallback for very old SQLite builds that lack information_schema
-    cursor.execute(f"PRAGMA table_info({table_name})")   # nosec: table name is hard-coded
-    return {row[1] for row in cursor.fetchall()}
+    return {row[1] for row in rows}
 
 
 def add_missing_grocerysale_columns(apps, schema_editor):

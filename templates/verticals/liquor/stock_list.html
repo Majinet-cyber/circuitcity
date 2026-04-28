@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-
+<!-- liquor-unit-conversion:v1 -->
 {% block title %}Liquor Stock · {{ business.name }}{% endblock %}
 
 {% block content %}
@@ -304,13 +304,33 @@
         <div class="stock-bar-label">
           <span style="color:#64748b;font-size:.78rem">Stock Level</span>
           <span style="font-weight:800;font-size:1.1rem;color:{% if qty == 0 %}var(--lq-red){% elif qty <= low_stock_threshold %}var(--lq-amber){% else %}var(--lq-green){% endif %}">
-            {{ qty }} bottle{{ qty|pluralize }}
+            {% if product.has_shots %}
+              {# For spirits/whisky: quantity_in_stock is already in SHOTS (base units) #}
+              {{ qty }} shot{{ qty|pluralize }}
+            {% elif product.has_glasses %}
+              {# For wine: quantity_in_stock is already in GLASSES (base units) #}
+              {{ qty }} glass{{ qty|pluralize:"es" }}
+            {% else %}
+              {{ qty }} bottle{{ qty|pluralize }}
+            {% endif %}
           </span>
         </div>
         <div class="stock-bar">
           <div class="stock-bar-fill {% if qty == 0 %}fill-out{% elif qty <= low_stock_threshold %}fill-low{% else %}fill-ok{% endif %}"
                style="width:{% if qty == 0 %}5{% elif qty <= low_stock_threshold %}45{% else %}90{% endif %}%"></div>
         </div>
+        {% if product.has_shots and product.shots_per_bottle and qty > 0 %}
+        <div style="margin-top:4px;font-size:.75rem;color:#7c3aed;font-weight:600;">
+          {{ qty }} shots available
+          <span style="font-weight:400;color:#94a3b8">({{ product.shots_per_bottle }} shots/bottle)</span>
+        </div>
+        {% endif %}
+        {% if product.has_glasses and product.glasses_per_bottle and qty > 0 %}
+        <div style="margin-top:4px;font-size:.75rem;color:#2563eb;font-weight:600;">
+          {{ qty }} glasses available
+          <span style="font-weight:400;color:#94a3b8">({{ product.glasses_per_bottle }} glasses/bottle)</span>
+        </div>
+        {% endif %}
       </div>
 
       <!-- SKU -->

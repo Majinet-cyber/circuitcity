@@ -597,10 +597,48 @@ class EnergySidebarTest(TestCase):
         keys = [i["key"] for i in items]
         self.assertIn("billing", keys)
 
+    def test_energy_sidebar_has_simulations(self):
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        items = get_vertical_sidebar_items("energy")
+        keys = [i["key"] for i in items]
+        self.assertIn("simulations", keys, "Energy sidebar must include Simulations")
+
+    def test_energy_sidebar_simulations_after_sizing(self):
+        """Simulations must appear after System Sizing in utils_verticals sidebar items."""
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        items = get_vertical_sidebar_items("energy")
+        keys = [i["key"] for i in items]
+        self.assertIn("sizing", keys)
+        self.assertIn("simulations", keys)
+        self.assertGreater(
+            keys.index("simulations"), keys.index("sizing"),
+            "Simulations must come after System Sizing in sidebar items"
+        )
+
+    def test_energy_sidebar_simulations_before_economics(self):
+        """Simulations must appear before Costs & Savings in utils_verticals sidebar items."""
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        items = get_vertical_sidebar_items("energy")
+        keys = [i["key"] for i in items]
+        self.assertIn("simulations", keys)
+        self.assertIn("economics", keys)
+        self.assertLess(
+            keys.index("simulations"), keys.index("economics"),
+            "Simulations must come before Costs & Savings (economics) in sidebar items"
+        )
+
+    def test_energy_sidebar_simulations_url(self):
+        """Simulations sidebar item must reference verticals:energy_simulations URL."""
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        items = get_vertical_sidebar_items("energy")
+        sim_item = next((i for i in items if i.get("key") == "simulations"), None)
+        self.assertIsNotNone(sim_item, "Simulations item not found in sidebar items")
+        self.assertEqual(sim_item.get("url"), "verticals:energy_simulations")
+
     def test_energy_sidebar_item_count(self):
         from inventory.utils_verticals import get_vertical_sidebar_items
         items = get_vertical_sidebar_items("energy")
-        self.assertGreaterEqual(len(items), 14, "Energy sidebar should have 14+ items")
+        self.assertGreaterEqual(len(items), 15, "Energy sidebar should have 15+ items")
 
 
 # ---------------------------------------------------------------------------
@@ -1964,7 +2002,10 @@ class EnergySystemSizingUpgradeTest(TestCase):
         self.assertIn("Land Size", content, "Land Size input missing from irrigation section")
 
     def test_sizing_form_irrigation_has_water_head_input(self):
-        """Sizing form irrigation section must include head/elevation input."""
+        """
+        Sizing form irrigation section must include suction lift and discharge head inputs
+        (replaced the old vague 'head/elevation' field with physically-correct split fields).
+        """
         try:
             url = reverse("verticals:energy_sizing_create")
         except NoReverseMatch:
@@ -1973,7 +2014,10 @@ class EnergySystemSizingUpgradeTest(TestCase):
         if resp.status_code != 200:
             self.skipTest("Sizing create page returned non-200")
         content = resp.content.decode()
-        self.assertIn("Head", content, "Head/elevation input missing from irrigation section")
+        self.assertIn("Suction Lift", content, "Suction Lift input missing from irrigation section")
+        self.assertIn("Discharge Head", content, "Discharge Head input missing from irrigation section")
+        self.assertIn("irr_suction_lift", content, "irr_suction_lift element missing from irrigation section")
+        self.assertIn("irr_discharge_head", content, "irr_discharge_head element missing from irrigation section")
 
     def test_sizing_form_irrigation_has_distance_input(self):
         """Sizing form irrigation section must include distance from source input."""
@@ -1986,6 +2030,104 @@ class EnergySystemSizingUpgradeTest(TestCase):
             self.skipTest("Sizing create page returned non-200")
         content = resp.content.decode()
         self.assertIn("Distance", content, "Distance from source input missing")
+
+    def test_sizing_form_irrigation_tdh_display_field_present(self):
+        """Sizing form must include a calculated Total Dynamic Head display field."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("irr_tdh_display", content, "irr_tdh_display field missing — TDH calculator not present")
+        self.assertIn("Total Dynamic Head", content, "Total Dynamic Head label missing from irrigation section")
+
+    def test_sizing_form_irrigation_suction_warning_element_present(self):
+        """Sizing form must include a suction lift warning element that triggers when lift > 7 m."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("irr_suction_warning", content, "irr_suction_warning element missing — suction warning not implemented")
+        self.assertIn("Surface pump not recommended", content, "Suction lift warning text missing")
+
+    def test_sizing_form_irrigation_suction_limit_rule_in_js(self):
+        """Sizing form JS must enforce the 7 m suction lift rule for pump selection."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("suctionLift > 7", content, "JS pump rule 'suctionLift > 7' missing — physics not enforced")
+        self.assertIn("Submersible", content, "Submersible pump recommendation text missing from irrigation JS")
+
+    def test_sizing_form_irrigation_borehole_recommends_submersible(self):
+        """JS pump logic must default to submersible for borehole/well source."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("isBorehole", content, "isBorehole check missing from irrigation JS")
+
+    def test_sizing_form_irrigation_surface_pump_allowed_low_suction(self):
+        """JS must allow surface pump when source is open water and suction lift ≤ 7 m."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("isOpenSurface", content, "isOpenSurface check missing from irrigation JS")
+        self.assertIn("Surface Solar DC Pump", content, "Surface pump option missing from irrigation JS")
+
+    def test_sizing_form_irrigation_engineering_note_present(self):
+        """Form must include the engineering note about suction lift vs discharge head."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn(
+            "suction lift",
+            content.lower(),
+            "Engineering note about suction lift missing from irrigation section",
+        )
+        self.assertIn(
+            "discharge head",
+            content.lower(),
+            "Engineering note about discharge head missing from irrigation section",
+        )
+
+    def test_sizing_form_irrigation_friction_loss_in_tdh_calculation(self):
+        """TDH calculation must include friction loss from pipe distance."""
+        try:
+            url = reverse("verticals:energy_sizing_create")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_create URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest("Sizing create page returned non-200")
+        content = resp.content.decode()
+        self.assertIn("frictionLoss", content, "frictionLoss variable missing from TDH calculation")
+        self.assertIn("updateIrrTDH", content, "updateIrrTDH function missing from irrigation form JS")
 
     def test_sizing_form_has_industry_mode(self):
         """Sizing form must include Industry / Business project mode."""
@@ -2351,8 +2493,9 @@ class EnergySimulationCenterUpgradeTest(TestCase):
         resp = self._get_sim_page()
         content = resp.content.decode()
         self.assertIn("pipeline", content.lower(), "Video pipeline status message missing")
-        # Should not silently fail
-        self.assertNotIn("undefined", content.lower().replace("undefined field", ""))
+        # Should not have unrendered Django template variables ({{ undefined_var }})
+        # Note: JavaScript uses of "undefined" (typeof x !== 'undefined') are expected and allowed.
+        self.assertNotIn("{{ ", content, "Unrendered Django template tag found in response")
 
     # ---- Storyboard export ----
 
@@ -2456,6 +2599,418 @@ class EnergySimulationCenterUpgradeTest(TestCase):
             self.skipTest("energy_economics URL not configured")
         resp = self.client.get(url)
         self.assertNotEqual(resp.status_code, 500, "Costs & Savings returned 500 after upgrade")
+
+    def test_sizing_new_page_contains_simulations_label(self):
+        """GET /verticals/energy/sizing/new/ must contain 'Simulations' in sidebar."""
+        try:
+            url = reverse("verticals:energy_sizing_new")
+        except NoReverseMatch:
+            self.skipTest("energy_sizing_new URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code not in (200, 302):
+            self.skipTest(f"sizing/new/ returned {resp.status_code}")
+        if resp.status_code == 302:
+            resp = self.client.get(resp.url) if resp.url.startswith("/") else resp
+        content = resp.content.decode()
+        self.assertIn("Simulations", content, "Simulations must appear in sidebar on sizing/new/ page")
+
+    def test_dashboard_contains_simulations_label(self):
+        """GET /verticals/energy/dashboard/ must contain 'Simulations' in sidebar."""
+        try:
+            url = reverse("verticals:energy_dashboard")
+        except NoReverseMatch:
+            self.skipTest("energy_dashboard URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code not in (200, 302):
+            self.skipTest(f"dashboard returned {resp.status_code}")
+        content = resp.content.decode()
+        self.assertIn("Simulations", content, "Simulations must appear in sidebar on dashboard page")
+
+    def test_simulations_page_returns_200(self):
+        """GET /verticals/energy/simulations/ must return HTTP 200."""
+        try:
+            url = reverse("verticals:energy_simulations")
+        except NoReverseMatch:
+            self.skipTest("energy_simulations URL not configured")
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200, "Simulations page must return 200")
+
+    def test_simulations_page_contains_sidebar_comment(self):
+        """Simulations page HTML must contain energy-sidebar-simulations:v1 comment."""
+        try:
+            url = reverse("verticals:energy_simulations")
+        except NoReverseMatch:
+            self.skipTest("energy_simulations URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest(f"Simulations page returned {resp.status_code}")
+        content = resp.content.decode()
+        self.assertIn("energy-sidebar-simulations:v1", content,
+                      "HTML comment energy-sidebar-simulations:v1 missing from simulations page")
+
+    def test_simulations_active_state_on_simulations_page(self):
+        """On /verticals/energy/simulations/ the simulations nav item must be active."""
+        try:
+            url = reverse("verticals:energy_simulations")
+        except NoReverseMatch:
+            self.skipTest("energy_simulations URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest(f"Simulations page returned {resp.status_code}")
+        content = resp.content.decode()
+        # The sidebar renders <li class="active"> when path matches active_prefix
+        self.assertIn("nav-energy-simulations", content,
+                      "nav-energy-simulations testid must appear in sidebar on simulations page")
+
+    def test_sidebar_html_has_energy_sidebar_comment(self):
+        """partials/sidebar.html must contain the energy-sidebar-simulations:v1 marker comment."""
+        import os
+        sidebar_path = os.path.normpath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "templates", "partials", "sidebar.html")
+        )
+        if not os.path.exists(sidebar_path):
+            self.skipTest("partials/sidebar.html not found")
+        with open(sidebar_path, encoding="utf-8") as f:
+            content = f.read()
+        self.assertIn("energy-sidebar-simulations:v1", content,
+                      "HTML comment energy-sidebar-simulations:v1 missing from partials/sidebar.html")
+
+    def test_utils_verticals_has_simulations_between_sizing_and_economics(self):
+        """utils_verticals.py energy sidebar items must have simulations between sizing and economics."""
+        from inventory.utils_verticals import get_vertical_sidebar_items
+        try:
+            items = get_vertical_sidebar_items("energy")
+        except Exception:
+            self.skipTest("get_vertical_sidebar_items not available")
+        if not items:
+            self.skipTest("No energy sidebar items returned")
+        keys = [i["key"] for i in items if isinstance(i, dict) and "key" in i]
+        self.assertIn("simulations", keys, "Simulations key missing from utils_verticals energy items")
+        self.assertIn("sizing", keys, "sizing key missing")
+        self.assertIn("economics", keys, "economics key missing")
+        self.assertGreater(keys.index("simulations"), keys.index("sizing"),
+                           "simulations must come after sizing")
+        self.assertLess(keys.index("simulations"), keys.index("economics"),
+                        "simulations must come before economics")
+
+
+# ============================================================
+# LEVEL 1 VISUAL UPGRADE TESTS
+# ============================================================
+
+class EnergySimulationsVisualUpgradeTest(TestCase):
+    """
+    Tests for Level 1 visual quality upgrades on the Energy Simulations page.
+
+    Covers:
+    - Realistic visual container markers present in HTML
+    - Water flow animation elements exist (drip, sprinkler, furrow)
+    - Proposal Visual panels exist (irrigation + household)
+    - Generate Proposal Image button exists
+    - Generate Client Video button exists and is wired (does not fail silently)
+    - Proposal Image modal exists with correct id
+    - CSS animation classes present (plant-row, panel-shimmer)
+    - Adaptive water sources present in SVG (river, borehole, dam, well)
+    - Realistic pump impeller element present
+    - irr_sun_label element present (for sun intensity display)
+    """
+
+    def setUp(self):
+        from django.test import Client as DjClient
+        self.client = DjClient()
+        self.biz = Business.objects.create(
+            name="Energy Visual Test Co",
+            slug="energy-visual-test",
+            status="ACTIVE",
+            business_kind="energy",
+        )
+        self.user = User.objects.create_user(
+            username="energy_vis_user",
+            email="energy_vis@test.com",
+            password="TestPass123!@#",
+        )
+        Membership.objects.create(
+            user=self.user, business=self.biz, role="MANAGER", status="ACTIVE"
+        )
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+    def _get_sim_page(self):
+        try:
+            url = reverse("verticals:energy_simulations")
+        except NoReverseMatch:
+            self.skipTest("energy_simulations URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest(f"Simulations page returned {resp.status_code}")
+        return resp
+
+    def test_simulations_page_has_realistic_visual_container(self):
+        """Page must include data-realistic-visual-container attribute (visual upgrade marker)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "data-realistic-visual-container",
+            content,
+            "data-realistic-visual-container marker missing — visual upgrade not applied",
+        )
+
+    def test_simulations_page_has_water_flow_animation(self):
+        """Page must include animated water flow elements (drip, sprinkler, furrow)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_drip_anim",
+            content,
+            "irr_drip_anim element missing — drip animation not present",
+        )
+        self.assertIn(
+            "irr_sprinkler_anim",
+            content,
+            "irr_sprinkler_anim element missing — sprinkler animation not present",
+        )
+        self.assertIn(
+            "irr_furrow_anim",
+            content,
+            "irr_furrow_anim element missing — furrow animation not present",
+        )
+
+    def test_simulations_page_has_proposal_visual_panel(self):
+        """Page must include at least one Proposal Visual panel."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "proposal-visual-panel",
+            content,
+            "proposal-visual-panel class missing — Proposal Visual panel not added",
+        )
+
+    def test_simulations_page_has_generate_proposal_image_button(self):
+        """Page must contain a 'Generate Proposal Image' button."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "generateProposalImage",
+            content,
+            "generateProposalImage function call missing from page",
+        )
+        self.assertIn(
+            "Generate Proposal Image",
+            content,
+            "'Generate Proposal Image' button text missing from page",
+        )
+
+    def test_simulations_page_generate_client_video_does_not_fail_silently(self):
+        """Generate Client Video button must call openVideoModal (not silently broken)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "openVideoModal",
+            content,
+            "openVideoModal call missing — Generate Client Video button may be broken",
+        )
+        self.assertIn(
+            "videoModalBackdrop",
+            content,
+            "videoModalBackdrop element missing — video modal not present",
+        )
+
+    def test_simulations_page_has_proposal_image_modal(self):
+        """Page must contain the Proposal Image modal element."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "proposalImgModal",
+            content,
+            "proposalImgModal element missing from page",
+        )
+
+    def test_simulations_page_has_realistic_solar_panels_in_svg(self):
+        """Irrigation SVG must contain tilted solar panel cell grid lines (irr_panel_grad)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_panel_grad",
+            content,
+            "irr_panel_grad gradient missing — realistic panel rendering not applied",
+        )
+
+    def test_simulations_page_has_realistic_pump_impeller(self):
+        """Irrigation SVG must include a spinning pump impeller element."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_pump_impeller",
+            content,
+            "irr_pump_impeller element missing — realistic pump housing not applied",
+        )
+
+    def test_simulations_page_has_adaptive_water_sources(self):
+        """Irrigation SVG must include all four water source visuals (river/borehole/dam/well)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        for src in ("irr_src_river", "irr_src_borehole", "irr_src_dam", "irr_src_well"):
+            self.assertIn(
+                src, content,
+                f"Water source element '{src}' missing from irrigation SVG",
+            )
+
+    def test_simulations_page_has_plant_row_css_animation(self):
+        """Page must include plant-row CSS class for crop sway animation."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "plant-row",
+            content,
+            "plant-row CSS class missing — crop sway animation not applied",
+        )
+
+    def test_simulations_page_has_print_client_visual_function(self):
+        """Page must include printClientVisual JS function."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "printClientVisual",
+            content,
+            "printClientVisual JS function missing from page",
+        )
+
+    def test_simulations_page_has_proposal_panel_for_irrigation(self):
+        """Page must contain a Proposal Visual Panel specifically for irrigation."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            'data-realistic-visual-container="irrigation"',
+            content,
+            "Irrigation Proposal Visual Panel missing",
+        )
+
+    def test_simulations_page_has_proposal_panel_for_household(self):
+        """Page must contain a Proposal Visual Panel specifically for household."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            'data-realistic-visual-container="household"',
+            content,
+            "Household Proposal Visual Panel missing",
+        )
+
+    def test_simulations_page_has_download_simulation_storyboard_button(self):
+        """Page must include a 'Download Simulation Storyboard' export button."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Download Simulation Storyboard",
+            content,
+            "'Download Simulation Storyboard' button text missing from page",
+        )
+
+    def test_simulations_page_has_adaptive_water_source_js(self):
+        """updateIRR() must include adaptive water source JS for irr_src_* elements."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_src_label_svg",
+            content,
+            "irr_src_label_svg reference missing — adaptive source JS not applied",
+        )
+        self.assertIn(
+            "irr_src_river",
+            content,
+            "irr_src_river reference missing from JS/SVG",
+        )
+
+    def test_simulations_page_has_pump_speed_adaptive_js(self):
+        """updateIRR() must include pump impeller speed adaptation JS."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_pump_impeller",
+            content,
+            "irr_pump_impeller JS reference missing — pump speed not adaptive",
+        )
+        self.assertIn(
+            "animationDuration",
+            content,
+            "animationDuration not set in JS — pump animation speed not adaptive",
+        )
+
+    def test_simulations_page_has_suction_lift_input(self):
+        """Simulation irrigation panel must have separate suction lift input (not just 'Total Head')."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_suction_lift",
+            content,
+            "irr_suction_lift element missing from simulation irrigation panel",
+        )
+        self.assertIn(
+            "Suction Lift",
+            content,
+            "Suction Lift label missing from simulation irrigation panel",
+        )
+
+    def test_simulations_page_has_discharge_head_input(self):
+        """Simulation irrigation panel must have separate discharge head input."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_discharge_head",
+            content,
+            "irr_discharge_head element missing from simulation irrigation panel",
+        )
+        self.assertIn(
+            "Discharge Head",
+            content,
+            "Discharge Head label missing from simulation irrigation panel",
+        )
+
+    def test_simulations_page_irr_suction_lift_rule_in_js(self):
+        """updateIRR() JS must enforce the 7 m suction lift rule."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "suctionLift > 7",
+            content,
+            "Suction lift > 7 rule missing from simulation updateIRR() JS",
+        )
+
+    def test_simulations_page_irr_borehole_submersible_rule_in_js(self):
+        """updateIRR() JS must recommend submersible for borehole source."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "isBorehole",
+            content,
+            "isBorehole check missing from simulation updateIRR() JS",
+        )
+
+    def test_simulations_page_irr_suction_alert_box_present(self):
+        """Simulation irrigation panel must include a visible alert for suction lift > 7 m."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "irr_suction_alert_box",
+            content,
+            "irr_suction_alert_box element missing from simulation irrigation panel",
+        )
+
+    def test_simulations_page_irr_tdh_breakdown_in_summary(self):
+        """updateIRR() summary must include TDH breakdown with suction and discharge components."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Suction lift:",
+            content,
+            "TDH breakdown with 'Suction lift:' missing from simulation summary JS",
+        )
+        self.assertIn(
+            "frictionLoss",
+            content,
+            "frictionLoss variable missing from simulation updateIRR() TDH calculation",
+        )
 
 
 # ============================================================
@@ -2607,7 +3162,8 @@ class HouseholdSizingSubmitRegressionTest(TestCase):
         """
         Irrigation/industry-only inputs must NOT have a name attribute so they
         cannot participate in form validation and block household submission.
-        Key irrigation-only ids: irr_land_size, irr_head, irr_distance, irr_depth.
+        Key irrigation-only ids: irr_land_size, irr_suction_lift, irr_discharge_head,
+        irr_distance, irr_depth.
         """
         url = self._sizing_url()
         resp = self.client.get(url)
@@ -2615,7 +3171,7 @@ class HouseholdSizingSubmitRegressionTest(TestCase):
             self.skipTest("Page did not return 200")
         content = resp.content.decode()
 
-        irrigation_ids = ["irr_land_size", "irr_head", "irr_distance", "irr_hours"]
+        irrigation_ids = ["irr_land_size", "irr_suction_lift", "irr_discharge_head", "irr_distance", "irr_hours"]
         for field_id in irrigation_ids:
             # Find the input tag with this id
             import re

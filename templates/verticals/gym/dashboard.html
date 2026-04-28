@@ -2,6 +2,7 @@
 {% load static %}
 {% load humanize %}
 {% load money %}
+<!-- gym-cycle-dashboard:v1 -->
 
 {% block title %}Gym · Emajinet{% endblock %}
 
@@ -110,17 +111,21 @@
     <div class="gym-filter-row">
       <h2>Filter</h2>
       <div class="gym-filter-pills">
-        <a href="?range=today"
-           class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
-          Today
+        <a href="?range=this_month"
+           class="btn {% if range_key == 'this_month' or range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
+          This Month
+        </a>
+        <a href="?range=last_month"
+           class="btn {% if range_key == 'last_month' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
+          Last Month
         </a>
         <a href="?range=last7"
            class="btn {% if range_key == 'last7' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
           Last 7 Days
         </a>
-        <a href="?range=mtd"
-           class="btn {% if range_key == 'mtd' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
-          MTD
+        <a href="?range=today"
+           class="btn {% if range_key == 'today' %}btn-primary{% else %}btn-outline-secondary{% endif %} gym-filter-pill">
+          Today
         </a>
         <div class="gym-filter-month-wrap">
           <input type="month"

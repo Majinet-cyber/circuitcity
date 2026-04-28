@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
-
+<!-- energy-simulations:v1-animation-center -->
 {% block title %}Simulation Center – {{ business.name }}{% endblock %}
 
 {% block content %}
@@ -19,13 +19,15 @@
   --energy-teal: #06b6d4;
 }
 
-/* ---- HERO ---- */
+/* ---- HERO — light mode ---- */
 .sim-hero {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #064e3b 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dbeafe 50%, #ecfdf5 100%);
+  color: #0f172a;
   padding: 2.5rem 1.5rem 2rem;
   border-radius: 20px;
   margin-bottom: 2rem;
+  border: 1.5px solid #e2e8f0;
+  box-shadow: 0 4px 24px rgba(16,185,129,0.07);
   position: relative;
   overflow: hidden;
 }
@@ -34,7 +36,7 @@
   position: absolute;
   top: -40px; right: -40px;
   width: 220px; height: 220px;
-  background: radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%);
   border-radius: 50%;
 }
 .sim-hero::after {
@@ -42,22 +44,25 @@
   position: absolute;
   bottom: -60px; left: 30%;
   width: 300px; height: 300px;
-  background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%);
   border-radius: 50%;
 }
-.sim-hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: .4rem; position: relative; z-index: 1; }
-.sim-hero .hero-sub { opacity: .8; font-size: .95rem; margin-bottom: 1.5rem; position: relative; z-index: 1; max-width: 600px; }
+.sim-hero h1 { font-size: 2rem; font-weight: 800; color: #0f172a; margin-bottom: .4rem; position: relative; z-index: 1; }
+.sim-hero .hero-sub { color: #374151; font-size: .95rem; margin-bottom: 1.5rem; position: relative; z-index: 1; max-width: 600px; }
+.sim-hero .hero-eyebrow { font-size:.72rem; font-weight:700; color:#059669; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.3rem; position:relative; z-index:1; }
 
-/* ---- KPI CARDS in Hero ---- */
-.hero-kpi { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);
-  border-radius: 14px; padding: 1rem 1.2rem; backdrop-filter: blur(10px); position: relative; z-index: 1; }
-.hero-kpi .kv { font-size: 1.7rem; font-weight: 800; color: #fff; }
-.hero-kpi .kl { font-size: .72rem; color: rgba(255,255,255,.65); text-transform: uppercase; letter-spacing: .04em; }
+/* ---- KPI CARDS in Hero — light glass ---- */
+.hero-kpi { background: #fff; border: 1.5px solid #e2e8f0;
+  border-radius: 14px; padding: 1rem 1.2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  position: relative; z-index: 1; }
+.hero-kpi .kv { font-size: 1.7rem; font-weight: 800; color: #0f172a; }
+.hero-kpi .kl { font-size: .72rem; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
 .hero-kpi .ki { font-size: 1.3rem; margin-bottom: .3rem; }
-.hero-kpi.green .kv { color: #34d399; }
-.hero-kpi.blue .kv { color: #93c5fd; }
-.hero-kpi.amber .kv { color: #fde68a; }
-.hero-kpi.purple .kv { color: #c4b5fd; }
+.hero-kpi.green .kv { color: #059669; }
+.hero-kpi.blue .kv { color: #2563eb; }
+.hero-kpi.amber .kv { color: #d97706; }
+.hero-kpi.purple .kv { color: #7c3aed; }
 
 /* ---- SIMULATION GALLERY CARDS ---- */
 .sim-gallery-card {
@@ -189,10 +194,11 @@
 .result-card.red .rv { color: #dc2626; }
 .result-card.red .rl { color: #991b1b; }
 
-/* ---- ANIMATION BOX ---- */
+/* ---- ANIMATION BOX — light sky canvas ---- */
 .anim-box {
-  background: #0f172a;
+  background: #f0f9ff;
   border-radius: 16px;
+  border: 1.5px solid #e2e8f0;
   overflow: hidden;
   position: relative;
   min-height: 220px;
@@ -256,24 +262,25 @@
   display: flex; align-items: center; justify-content: center;
 }
 .storyboard-frame {
-  background: linear-gradient(135deg,#0f172a,#1e3a5f);
+  background: linear-gradient(135deg,#f0fdf4,#eff6ff);
+  border: 1.5px solid #d1fae5;
   border-radius: 14px;
   padding: 1.2rem;
-  color: #fff;
+  color: #0f172a;
   margin-bottom: .8rem;
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 .storyboard-frame .sf-num {
-  background: rgba(16,185,129,.2); border: 2px solid #10b981;
-  color: #34d399; font-weight: 800; border-radius: 50%;
+  background: #d1fae5; border: 2px solid #10b981;
+  color: #065f46; font-weight: 800; border-radius: 50%;
   width: 36px; height: 36px; min-width: 36px;
   display: flex; align-items: center; justify-content: center;
   font-size: .85rem;
 }
-.storyboard-frame .sf-title { font-size: .88rem; font-weight: 700; margin-bottom: .2rem; }
-.storyboard-frame .sf-desc { font-size: .75rem; color: rgba(255,255,255,.65); }
+.storyboard-frame .sf-title { font-size: .88rem; font-weight: 700; margin-bottom: .2rem; color: #0f172a; }
+.storyboard-frame .sf-desc { font-size: .75rem; color: #6b7280; }
 
 /* ---- ROI CHART ---- */
 .roi-bar-wrap { display: flex; flex-direction: column; align-items: center; flex: 1; }
@@ -336,6 +343,129 @@
   border-radius: 20px;
   margin-bottom: .5rem;
 }
+
+/* ============================================================
+   LEVEL 1 REALISTIC VISUAL UPGRADES
+   ============================================================ */
+@keyframes sway { 0%,100%{transform:rotate(-1.5deg) translateX(0)} 50%{transform:rotate(1.5deg) translateX(1px)} }
+@keyframes shimmer-pass { 0%{opacity:.08} 50%{opacity:.32} 100%{opacity:.08} }
+@keyframes pump-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} 50%{box-shadow:0 0 8px 4px rgba(16,185,129,.25)} }
+@keyframes water-drip { 0%{transform:translateY(0) scaleY(1);opacity:1} 70%{opacity:.7} 100%{transform:translateY(16px) scaleY(1.4);opacity:0} }
+@keyframes ripple-out { 0%{r:3;opacity:.7} 100%{r:10;opacity:0} }
+
+.plant-row { transform-origin: center 100%; animation: sway 3.8s ease-in-out infinite; }
+.plant-row:nth-child(2) { animation-delay: .5s; animation-duration: 4.2s; }
+.plant-row:nth-child(3) { animation-delay: 1s; animation-duration: 3.5s; }
+.plant-row:nth-child(4) { animation-delay: 1.5s; animation-duration: 4.5s; }
+.plant-row:nth-child(5) { animation-delay: .8s; animation-duration: 3.9s; }
+.panel-shimmer { animation: shimmer-pass 4.5s ease-in-out infinite; }
+
+/* ---- PROPOSAL VISUAL PANEL — light glass ---- */
+.proposal-visual-panel {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 1.4rem 1.5rem 1.2rem;
+  box-shadow: 0 2px 12px rgba(16,185,129,.07);
+  position: relative;
+  overflow: hidden;
+  margin-top: 1.2rem;
+}
+.proposal-visual-panel::before {
+  content: '';
+  position: absolute;
+  top: -50px; right: -50px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(16,185,129,.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.proposal-scene {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f0f9ff;
+  margin-bottom: 1rem;
+  border: 1.5px solid #e0f2fe;
+}
+.proposal-scene svg { width: 100%; display: block; }
+.proposal-badge {
+  display: inline-flex; align-items: center; gap: .3rem;
+  background: #d1fae5; border: 1px solid #6ee7b7;
+  border-radius: 20px; padding: .18rem .65rem;
+  font-size: .68rem; font-weight: 700; color: #065f46; margin-bottom: .4rem;
+}
+
+/* ---- ROI GUIDE PANEL ---- */
+.roi-guide-panel {
+  background: linear-gradient(135deg, #f0fdf4, #eff6ff);
+  border: 1.5px solid #bbf7d0;
+  border-radius: 18px;
+  padding: 1.4rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.roi-guide-panel h5 { font-size:.9rem; font-weight:800; color:#0f172a; margin-bottom:.8rem; }
+.roi-move-card {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: .9rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: .8rem;
+  margin-bottom: .6rem;
+  transition: all .15s;
+}
+.roi-move-card:hover { border-color: #10b981; box-shadow: 0 4px 12px rgba(16,185,129,.1); }
+.roi-move-icon { font-size: 1.3rem; min-width: 1.8rem; }
+.roi-move-title { font-size: .82rem; font-weight: 700; color: #0f172a; margin-bottom: .15rem; }
+.roi-move-desc { font-size: .72rem; color: #6b7280; }
+.roi-move-badge {
+  font-size: .62rem; font-weight: 700; padding: .15rem .5rem; border-radius: 20px;
+  display: inline-block; margin-top: .2rem;
+}
+.badge-payback { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-capex { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.badge-risk { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+.roi-slider-impact { font-size:.7rem; font-weight:700; color:#059669; margin-top:.25rem; }
+.roi-slider-impact.negative { color:#dc2626; }
+.roi-guide-toggle { font-size:.75rem; font-weight:700; color:#059669; cursor:pointer; text-decoration:underline; }
+
+/* ---- WIND INTERPRETATION BADGES ---- */
+.wind-interpretation {
+  border-radius: 10px;
+  padding: .55rem .85rem;
+  font-size: .78rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .4rem;
+}
+.wind-interp-idle { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+.wind-interp-good { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.wind-interp-high { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.wind-interp-ok { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+/* ---- WEBM DOWNLOAD BUTTON ---- */
+.webm-btn {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: .65rem 1.3rem;
+  font-weight: 700;
+  font-size: .83rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  transition: all .2s;
+}
+.webm-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(16,185,129,.3); }
+.webm-btn:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; transform: none; box-shadow: none; }
+.recording-indicator {
+  width: 8px; height: 8px; border-radius: 50%; background: #ef4444;
+  animation: blink .8s infinite; display: inline-block;
+}
 </style>
 
 {# ============================================================ #}
@@ -352,10 +482,26 @@
       </div>
     </div>
 
-    <div class="pipeline-status mb-3">
-      <i class="bi bi-camera-video me-2"></i>
-      <strong>MP4 Video Rendering Pipeline:</strong> Being prepared. Download the simulation storyboard meanwhile —
-      it presents your proposal professionally in any meeting or grant application.
+    {# WebM Download Section #}
+    <div style="background:#f0fdf4;border:1.5px solid #6ee7b7;border-radius:12px;padding:1rem;margin-bottom:1rem;">
+      <div style="font-size:.82rem;font-weight:700;color:#065f46;margin-bottom:.5rem;">
+        <i class="bi bi-camera-video-fill me-2"></i>Download Animation Video (WebM)
+      </div>
+      <div style="font-size:.76rem;color:#374151;margin-bottom:.7rem;">
+        Records the live animation canvas as a WebM video (browser-native). Works in Chrome, Firefox, Edge.
+        Safari users: a storyboard will be offered instead.
+      </div>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <button class="webm-btn" id="webm_record_btn" onclick="startWebMRecording()">
+          <i class="bi bi-record-circle"></i>Record Animation (5 sec)
+        </button>
+        <div id="webm_recording_status" style="font-size:.78rem;color:#059669;display:none;">
+          <span class="recording-indicator"></span> Recording...
+        </div>
+      </div>
+      <div style="font-size:.68rem;color:#6b7280;margin-top:.5rem;">
+        Output: <code>emajinet-<span id="webm_filename_scenario">simulation</span>-animation.webm</code>
+      </div>
     </div>
 
     <div style="font-size:.82rem;font-weight:700;color:#374151;margin-bottom:.8rem;">
@@ -372,7 +518,57 @@
       </button>
       <button class="btn btn-outline-secondary" disabled>
         <i class="bi bi-camera-video me-1"></i>MP4 Export
-        <span class="coming-soon-badge">Pipeline Preparing</span>
+        <span class="coming-soon-badge">WebM available above</span>
+      </button>
+    </div>
+
+    <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:.6rem .9rem;font-size:.75rem;color:#92400e;margin-top:.8rem;">
+      <i class="bi bi-info-circle me-1"></i>
+      <strong>Note:</strong> MP4 format requires server-side encoding (FFmpeg pipeline). This is planned.
+      WebM is a fully open format supported by all modern browsers and YouTube/Vimeo.
+    </div>
+  </div>
+</div>
+
+{# ============================================================ #}
+{#   PROPOSAL IMAGE MODAL                                      #}
+{# ============================================================ #}
+<div class="video-modal-backdrop" id="proposalImgModal">
+  <div class="video-modal">
+    <button class="video-modal-close" onclick="document.getElementById('proposalImgModal').classList.remove('open')">✕</button>
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div style="background:linear-gradient(135deg,#10b981,#3b82f6);border-radius:10px;padding:.65rem;color:#fff;font-size:1.2rem;">🖼️</div>
+      <div>
+        <h5 class="fw-bold mb-0">Generate Proposal Image</h5>
+        <div class="text-muted small">AI-rendered realistic scene for client presentations &amp; grant proposals</div>
+      </div>
+    </div>
+    <div class="pipeline-status mb-3" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4);border-color:#6ee7b7;color:#065f46;">
+      <i class="bi bi-image me-2"></i>
+      <strong>Proposal Image Generation Pipeline:</strong>
+      Being integrated. Use the live simulation SVG scenes and storyboard for client presentations now —
+      they render beautifully in any browser or PDF export.
+    </div>
+    <div style="font-size:.82rem;color:#374151;margin-bottom:.8rem;">
+      <strong>What's coming:</strong>
+      <ul class="mt-1 mb-0" style="font-size:.8rem;color:#475569;">
+        <li>AI-rendered photorealistic farm &amp; home energy installation scenes</li>
+        <li>Custom branding with your business name and logo overlay</li>
+        <li>Downloadable PNG / PDF for proposals and grant applications</li>
+        <li>Before/after comparison visual (diesel vs solar)</li>
+        <li>Branded client-facing infographic from simulation outputs</li>
+      </ul>
+    </div>
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button class="btn btn-success fw-bold" onclick="printClientVisual(_proposalScenario)">
+        <i class="bi bi-printer me-1"></i>Print Current Visual
+      </button>
+      <button class="btn btn-outline-primary" onclick="downloadCurrentSceneAsSVG()">
+        <i class="bi bi-file-earmark-image me-1"></i>Export Scene SVG
+      </button>
+      <button class="btn btn-outline-secondary" disabled>
+        <i class="bi bi-image me-1"></i>AI Image Export
+        <span class="coming-soon-badge">Coming Soon</span>
       </button>
     </div>
   </div>
@@ -384,7 +580,7 @@
   <div class="sim-hero">
     <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
       <div style="position:relative;z-index:1;">
-        <div style="font-size:.72rem;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.3rem;">
+        <div class="hero-eyebrow">
           <i class="bi bi-play-circle me-1"></i>Emajinet · Energy Intelligence Platform
         </div>
         <h1><i class="bi bi-play-circle-fill me-2" style="color:#10b981;"></i>Simulation Center</h1>
@@ -577,6 +773,14 @@
             <button class="btn btn-success dl-btn" onclick="downloadHHReport()"><i class="bi bi-file-earmark-text me-1"></i>Download Proposal</button>
             <button class="btn btn-outline-secondary dl-btn" onclick="downloadHHJson()"><i class="bi bi-braces me-1"></i>Export JSON</button>
           </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-outline-primary dl-btn" onclick="openVideoModal('household')">
+              <i class="bi bi-file-earmark-slides me-1"></i>Download Simulation Storyboard
+            </button>
+            <button class="btn btn-outline-secondary dl-btn" onclick="printClientVisual('household')">
+              <i class="bi bi-printer me-1"></i>Print Client Visual
+            </button>
+          </div>
           <div class="mt-2">
             <button class="video-btn-premium w-100" onclick="openVideoModal('household')">
               <i class="bi bi-camera-video-fill"></i>Generate Client Video
@@ -598,48 +802,52 @@
             <svg viewBox="0 0 640 270" xmlns="http://www.w3.org/2000/svg" id="hh_svg">
               {# Dark background gradient #}
               <defs>
-                <linearGradient id="skyGradHH" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#0f172a"/>
-                  <stop offset="100%" stop-color="#1e3a5f"/>
+                <linearGradient id="skyGradHH" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#bfdbfe"/>
+                  <stop offset="60%" stop-color="#dbeafe"/>
+                  <stop offset="100%" stop-color="#d1fae5"/>
                 </linearGradient>
               </defs>
               <rect width="640" height="270" fill="url(#skyGradHH)"/>
+              {# Ground #}
+              <rect y="230" width="640" height="40" fill="#bbf7d0" opacity=".7"/>
+              <rect y="240" width="640" height="30" fill="#86efac" opacity=".4"/>
 
               {# Sun #}
               <g transform="translate(55,55)">
-                <circle cx="0" cy="0" r="20" fill="#fbbf24" opacity=".9" class="pulse-glow"/>
+                <circle cx="0" cy="0" r="22" fill="#fbbf24" opacity=".95" class="pulse-glow"/>
                 <g style="transform-origin:0px 0px;animation:sun-spin 10s linear infinite;">
-                  <line x1="0" y1="-28" x2="0" y2="-34" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-                  <line x1="20" y1="-20" x2="24" y2="-24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
-                  <line x1="28" y1="0" x2="34" y2="0" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-                  <line x1="20" y1="20" x2="24" y2="24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
-                  <line x1="0" y1="28" x2="0" y2="34" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-                  <line x1="-20" y1="20" x2="-24" y2="24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
-                  <line x1="-28" y1="0" x2="-34" y2="0" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
-                  <line x1="-20" y1="-20" x2="-24" y2="-24" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="0" y1="-30" x2="0" y2="-37" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="21" y1="-21" x2="26" y2="-26" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="30" y1="0" x2="37" y2="0" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="21" y1="21" x2="26" y2="26" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="0" y1="30" x2="0" y2="37" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="-21" y1="21" x2="-26" y2="26" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="-30" y1="0" x2="-37" y2="0" stroke="#f59e0b" stroke-width="3" stroke-linecap="round"/>
+                  <line x1="-21" y1="-21" x2="-26" y2="-26" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
                 </g>
-                <text y="38" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">SUN</text>
+                <text y="40" text-anchor="middle" fill="#d97706" font-size="9" font-weight="bold">SUN</text>
               </g>
 
               {# Solar Panel #}
               <g transform="translate(150,38)">
                 <rect x="-35" y="0" width="70" height="46" rx="4" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5"/>
-                <line x1="-35" y1="15" x2="35" y2="15" stroke="#3b82f6" stroke-width=".8"/>
-                <line x1="-35" y1="31" x2="35" y2="31" stroke="#3b82f6" stroke-width=".8"/>
-                <line x1="-12" y1="0" x2="-12" y2="46" stroke="#3b82f6" stroke-width=".8"/>
-                <line x1="12" y1="0" x2="12" y2="46" stroke="#3b82f6" stroke-width=".8"/>
-                <text y="62" x="0" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
-                <text y="74" x="0" text-anchor="middle" fill="#93c5fd" font-size="8" id="hh_solar_label">3.5 kW</text>
+                <line x1="-35" y1="15" x2="35" y2="15" stroke="#60a5fa" stroke-width=".8"/>
+                <line x1="-35" y1="31" x2="35" y2="31" stroke="#60a5fa" stroke-width=".8"/>
+                <line x1="-12" y1="0" x2="-12" y2="46" stroke="#60a5fa" stroke-width=".8"/>
+                <line x1="12" y1="0" x2="12" y2="46" stroke="#60a5fa" stroke-width=".8"/>
+                <text y="62" x="0" text-anchor="middle" fill="#1e40af" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                <text y="74" x="0" text-anchor="middle" fill="#1e40af" font-size="8" id="hh_solar_label">3.5 kW</text>
               </g>
 
               {# Sun → Panel flow #}
-              <line x1="76" y1="55" x2="115" y2="55" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
+              <line x1="78" y1="55" x2="115" y2="55" stroke="#f59e0b" stroke-width="2" class="flow-line"/>
 
               {# MPPT Controller #}
               <g transform="translate(280,55)">
-                <rect x="-28" y="-18" width="56" height="36" rx="6" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
-                <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="bold">MPPT</text>
-                <text x="0" y="8" text-anchor="middle" fill="#34d399" font-size="7">Controller</text>
+                <rect x="-28" y="-18" width="56" height="36" rx="6" fill="#065f46" stroke="#10b981" stroke-width="1.5"/>
+                <text x="0" y="-4" text-anchor="middle" fill="#6ee7b7" font-size="7.5" font-weight="bold">MPPT</text>
+                <text x="0" y="8" text-anchor="middle" fill="#a7f3d0" font-size="7">Controller</text>
               </g>
 
               {# Panel → MPPT flow #}
@@ -651,8 +859,8 @@
                 <rect x="-9" y="-46" width="18" height="8" rx="2" fill="#10b981"/>
                 <rect x="-20" y="-33" width="40" height="54" rx="4" fill="#10b981" id="hh_batt_fill" style="opacity:.6;"/>
                 <text y="42" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">BATTERY</text>
-                <text y="53" text-anchor="middle" fill="#34d399" font-size="8" id="hh_batt_label">5 kWh</text>
-                <text y="64" text-anchor="middle" fill="#6ee7b7" font-size="8" id="hh_batt_soc">SOC 80%</text>
+                <text y="53" text-anchor="middle" fill="#6ee7b7" font-size="8" id="hh_batt_label">5 kWh</text>
+                <text y="64" text-anchor="middle" fill="#a7f3d0" font-size="8" id="hh_batt_soc">SOC 80%</text>
               </g>
 
               {# MPPT → Battery #}
@@ -660,10 +868,10 @@
 
               {# Inverter #}
               <g transform="translate(420,135)">
-                <rect x="-35" y="-28" width="70" height="56" rx="8" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
-                <text x="0" y="-10" text-anchor="middle" fill="#10b981" font-size="9" font-weight="bold">INVERTER</text>
-                <text x="0" y="5" text-anchor="middle" fill="#34d399" font-size="8" id="hh_inv_label">4.2 kVA</text>
-                <text x="0" y="18" text-anchor="middle" fill="#6ee7b7" font-size="7">DC → AC</text>
+                <rect x="-35" y="-28" width="70" height="56" rx="8" fill="#1e40af" stroke="#3b82f6" stroke-width="2"/>
+                <text x="0" y="-10" text-anchor="middle" fill="#bfdbfe" font-size="9" font-weight="bold">INVERTER</text>
+                <text x="0" y="5" text-anchor="middle" fill="#dbeafe" font-size="8" id="hh_inv_label">4.2 kVA</text>
+                <text x="0" y="18" text-anchor="middle" fill="#93c5fd" font-size="7">DC → AC</text>
               </g>
 
               {# MPPT → Inverter #}
@@ -674,14 +882,14 @@
 
               {# House Loads #}
               <g transform="translate(565,135)">
-                <polygon points="0,-48 48,-10 48,40 -48,40 -48,-10" fill="#1e3a5f" stroke="#60a5fa" stroke-width="2"/>
-                <polygon points="-14,40 -14,14 14,14 14,40" fill="#0f172a" stroke="#60a5fa" stroke-width="1.5"/>
-                <rect x="-30" y="-8" width="16" height="14" fill="#1d4ed8" opacity=".7"/>
-                <rect x="14" y="-8" width="16" height="14" fill="#1d4ed8" opacity=".7"/>
+                <polygon points="0,-48 48,-10 48,40 -48,40 -48,-10" fill="#fff" stroke="#1d4ed8" stroke-width="2"/>
+                <polygon points="-14,40 -14,14 14,14 14,40" fill="#e0f2fe" stroke="#1d4ed8" stroke-width="1.5"/>
+                <rect x="-30" y="-8" width="16" height="14" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
+                <rect x="14" y="-8" width="16" height="14" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1"/>
                 <circle cx="-22" cy="0" r="3" fill="#fbbf24" style="animation:blink 2s infinite;"/>
                 <circle cx="22" cy="0" r="3" fill="#fbbf24" style="animation:blink 2.4s infinite;"/>
-                <text y="58" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">HOUSE</text>
-                <text y="69" text-anchor="middle" fill="#93c5fd" font-size="8" id="hh_load_label">8 kWh/day</text>
+                <text y="58" text-anchor="middle" fill="#1e3a8a" font-size="9" font-weight="bold">HOUSE</text>
+                <text y="69" text-anchor="middle" fill="#1e40af" font-size="8" id="hh_load_label">8 kWh/day</text>
               </g>
 
               {# Inverter → House #}
@@ -689,22 +897,22 @@
 
               {# Blackout Zone warning (conditional, shown via JS) #}
               <g id="hh_blackout_zone" style="display:none;">
-                <rect x="500" y="170" width="120" height="24" rx="6" fill="#7f1d1d" opacity=".8"/>
-                <text x="560" y="186" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold" style="animation:blink 1s infinite;">⚠ BLACKOUT RISK 22:30</text>
+                <rect x="500" y="170" width="120" height="24" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5" opacity=".95"/>
+                <text x="560" y="186" text-anchor="middle" fill="#dc2626" font-size="9" font-weight="bold" style="animation:blink 1s infinite;">⚠ BLACKOUT RISK 22:30</text>
               </g>
 
               {# Grid backup #}
               <g transform="translate(565,220)">
-                <rect x="-25" y="-18" width="50" height="36" rx="6" fill="#374151" stroke="#9ca3af" stroke-width="1.5"/>
-                <line x1="0" y1="-18" x2="0" y2="-30" stroke="#9ca3af" stroke-width="2"/>
-                <line x1="-10" y1="-30" x2="10" y2="-30" stroke="#9ca3af" stroke-width="3"/>
-                <text y="26" text-anchor="middle" fill="#9ca3af" font-size="9">GRID</text>
-                <text x="0" y="8" text-anchor="middle" fill="#d1d5db" font-size="8" id="hh_grid_label">40%</text>
+                <rect x="-25" y="-18" width="50" height="36" rx="6" fill="#f8fafc" stroke="#94a3b8" stroke-width="1.5"/>
+                <line x1="0" y1="-18" x2="0" y2="-30" stroke="#64748b" stroke-width="2"/>
+                <line x1="-10" y1="-30" x2="10" y2="-30" stroke="#64748b" stroke-width="3"/>
+                <text y="26" text-anchor="middle" fill="#374151" font-size="9">GRID</text>
+                <text x="0" y="8" text-anchor="middle" fill="#1f2937" font-size="8" id="hh_grid_label">40%</text>
               </g>
-              <line x1="565" y1="175" x2="565" y2="202" stroke="#6b7280" stroke-width="1.5" stroke-dasharray="4 3" class="flow-line-slow"/>
+              <line x1="565" y1="175" x2="565" y2="202" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 3" class="flow-line-slow"/>
 
               {# Legend #}
-              <text x="10" y="264" fill="#475569" font-size="8">⚡ DC flow &nbsp; — &nbsp; 🔋 Battery buffer &nbsp; — &nbsp; 🏠 AC loads &nbsp; — &nbsp; 🔌 Grid backup</text>
+              <text x="10" y="264" fill="#374151" font-size="8">⚡ DC flow &nbsp;—&nbsp; 🔋 Battery buffer &nbsp;—&nbsp; 🏠 AC loads &nbsp;—&nbsp; 🔌 Grid backup</text>
             </svg>
           </div>
 
@@ -722,6 +930,100 @@
         <div class="sim-card">
           <h5><i class="bi bi-card-text me-2"></i>Scenario Summary &amp; Recommendation</h5>
           <div id="hh_summary" class="small"></div>
+
+          {# ⭐ PROPOSAL VISUAL PANEL — Household #}
+          <div class="proposal-visual-panel" data-realistic-visual-container="household">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="proposal-badge"><i class="bi bi-image me-1"></i>Proposal Visual Preview</div>
+                <div class="fw-semibold mt-1" style="font-size:.88rem;color:#0f172a;">Client-Facing Scene</div>
+                <div style="color:#6b7280;font-size:.74rem;">Client-facing visual generated from scenario inputs</div>
+              </div>
+              <span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:20px;padding:.15rem .55rem;font-size:.65rem;font-weight:700;">LIVE SVG</span>
+            </div>
+            <div class="proposal-scene">
+              <svg viewBox="0 0 640 180" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;">
+                <defs>
+                  <linearGradient id="pvhh_sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#bfdbfe"/><stop offset="100%" stop-color="#d1fae5"/>
+                  </linearGradient>
+                </defs>
+                <rect width="640" height="180" fill="url(#pvhh_sky)"/>
+                <rect y="140" width="640" height="40" fill="#bbf7d0" opacity="0.6"/>
+                {# Sun #}
+                <circle cx="58" cy="40" r="16" fill="#fbbf24" opacity=".9"/>
+                <g style="transform-origin:58px 40px;animation:sun-spin 12s linear infinite;">
+                  <line x1="58" y1="20" x2="58" y2="14" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="71" y1="27" x2="76" y2="22" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="78" y1="40" x2="84" y2="40" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="71" y1="53" x2="76" y2="58" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="58" y1="60" x2="58" y2="66" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="45" y1="53" x2="40" y2="58" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="38" y1="40" x2="32" y2="40" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="45" y1="27" x2="40" y2="22" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                </g>
+                {# Solar panels on roof pitch #}
+                <g transform="translate(148,60) rotate(-18)">
+                  <rect x="0" y="0" width="58" height="38" rx="2" fill="#1e40af" stroke="#334155" stroke-width="1.5"/>
+                  <line x1="19" y1="0" x2="19" y2="38" stroke="#3b82f6" stroke-width="0.7" opacity="0.8"/>
+                  <line x1="38" y1="0" x2="38" y2="38" stroke="#3b82f6" stroke-width="0.7" opacity="0.8"/>
+                  <line x1="0" y1="13" x2="58" y2="13" stroke="#3b82f6" stroke-width="0.7" opacity="0.8"/>
+                  <line x1="0" y1="26" x2="58" y2="26" stroke="#3b82f6" stroke-width="0.7" opacity="0.8"/>
+                  <ellipse cx="12" cy="7" rx="10" ry="4" fill="white" opacity="0.14" transform="rotate(-5 12 7)" class="panel-shimmer"/>
+                </g>
+                {# House silhouette — light mode #}
+                <g transform="translate(310, 60)">
+                  {# Roof #}
+                  <polygon points="-70,-40 70,-40 90,0 -90,0" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+                  <polygon points="-70,-40 0,-80 70,-40" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1.5"/>
+                  {# Walls #}
+                  <rect x="-70" y="0" width="140" height="80" rx="0" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+                  {# Door #}
+                  <rect x="-14" y="38" width="28" height="42" rx="2" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                  {# Windows with glow #}
+                  <rect x="-55" y="12" width="30" height="22" rx="3" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1.5"/>
+                  <rect x="-55" y="12" width="30" height="22" rx="3" fill="#fbbf24" opacity="0.35" style="animation:blink 2s infinite;"/>
+                  <rect x="25" y="12" width="30" height="22" rx="3" fill="#bfdbfe" stroke="#3b82f6" stroke-width="1.5"/>
+                  <rect x="25" y="12" width="30" height="22" rx="3" fill="#fbbf24" opacity="0.35" style="animation:blink 2.4s infinite;"/>
+                  {# Chimney #}
+                  <rect x="38" y="-80" width="12" height="42" fill="#94a3b8" stroke="#cbd5e1" stroke-width="1"/>
+                  {# House label #}
+                  <text y="96" text-anchor="middle" fill="#1e40af" font-size="8" font-weight="bold">HOUSE</text>
+                </g>
+                {# Battery #}
+                <g transform="translate(490, 95)">
+                  <rect x="-20" y="-35" width="40" height="60" rx="5" fill="#1e293b" stroke="#10b981" stroke-width="2"/>
+                  <rect x="-7" y="-40" width="14" height="7" rx="2" fill="#10b981"/>
+                  <rect x="-16" y="-28" width="32" height="46" rx="4" fill="#10b981" opacity="0.5"/>
+                  <text y="36" text-anchor="middle" fill="#34d399" font-size="7.5" font-weight="bold">BATTERY</text>
+                </g>
+                {# Flow lines #}
+                <path d="M 200 80 Q 240 72 242 72" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="4 3" class="flow-line"/>
+                <text x="220" y="68" fill="#fde68a" font-size="7">DC</text>
+                <path d="M 380 95 Q 430 95 470 95" stroke="#10b981" stroke-width="2.5" fill="none" stroke-dasharray="5 3" class="flow-line-slow"/>
+                <path d="M 510 95 Q 550 95 570 95" stroke="#10b981" stroke-width="2.5" fill="none" stroke-dasharray="5 3" class="flow-line-fast"/>
+                {# Grid pole #}
+                <g transform="translate(590, 95)">
+                  <line x1="0" y1="-55" x2="0" y2="55" stroke="#6b7280" stroke-width="3"/>
+                  <line x1="-18" y1="-50" x2="18" y2="-50" stroke="#9ca3af" stroke-width="3"/>
+                  <text y="62" text-anchor="middle" fill="#9ca3af" font-size="7">GRID</text>
+                </g>
+                {# Branding #}
+                <text x="320" y="175" text-anchor="middle" fill="rgba(15,23,42,.4)" font-size="7.5" font-style="italic">Emajinet Energy Intelligence Platform — Client Proposal Visual</text>
+              </svg>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-success btn-sm fw-bold" onclick="generateProposalImage('household')">
+                <i class="bi bi-image me-1"></i>Generate Proposal Image
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="printClientVisual('household')">
+                <i class="bi bi-printer me-1"></i>Print Client Visual
+              </button>
+              <button class="btn btn-outline-primary btn-sm" onclick="openVideoModal('household')">
+                <i class="bi bi-camera-video me-1"></i>Generate Client Video
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -753,12 +1055,25 @@
             <input type="range" id="irr_land" min="0.5" max="20" step="0.5" value="2" oninput="updateIRR()">
           </div>
           <div class="sim-input-group">
-            <label>Total Head (m): <span class="range-val" id="irr_head_val">18</span></label>
-            <input type="range" id="irr_head" min="2" max="80" step="1" value="18" oninput="updateIRR()">
+            <label>Suction Lift (m): <span class="range-val" id="irr_suction_val">3</span>
+              <small style="color:#ef4444;font-size:.7rem;" id="irr_suction_warn_badge" style="display:none;"></small>
+            </label>
+            <input type="range" id="irr_suction_lift" min="0" max="20" step="1" value="3" oninput="updateIRR()">
+            <div style="font-size:.68rem;color:#6b7280;">Vertical distance: water surface → pump (limit ≈ 7 m for surface pumps)</div>
+          </div>
+          <div class="sim-input-group">
+            <label>Discharge Head (m): <span class="range-val" id="irr_discharge_val">15</span></label>
+            <input type="range" id="irr_discharge_head" min="0" max="80" step="1" value="15" oninput="updateIRR()">
+            <div style="font-size:.68rem;color:#6b7280;">Vertical height: pump → field/tank (surface pumps can handle high discharge)</div>
           </div>
           <div class="sim-input-group">
             <label>Distance: Source→Field (m): <span class="range-val" id="irr_dist_val">120</span></label>
             <input type="range" id="irr_dist" min="10" max="500" step="10" value="120" oninput="updateIRR()">
+          </div>
+          <div class="sim-input-group" id="irr_suction_alert_box" style="display:none;">
+            <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:.5rem .75rem;font-size:.75rem;color:#991b1b;">
+              <strong>Surface pump not recommended.</strong> Suction lift exceeds 7 m. Submersible pump required.
+            </div>
           </div>
           <div class="sim-input-group">
             <label>Irrigation Hours/Day: <span class="range-val" id="irr_hrs_val">6</span></label>
@@ -799,6 +1114,14 @@
             <button class="btn btn-warning dl-btn text-dark" onclick="downloadIRRReport()"><i class="bi bi-file-earmark-text me-1"></i>Download Proposal</button>
             <button class="btn btn-outline-secondary dl-btn" onclick="downloadIRRJson()"><i class="bi bi-braces me-1"></i>Export JSON</button>
           </div>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button class="btn btn-outline-primary dl-btn" onclick="openVideoModal('irrigation')">
+              <i class="bi bi-file-earmark-slides me-1"></i>Download Simulation Storyboard
+            </button>
+            <button class="btn btn-outline-secondary dl-btn" onclick="printClientVisual('irrigation')">
+              <i class="bi bi-printer me-1"></i>Print Client Visual
+            </button>
+          </div>
           <div class="mt-2">
             <button class="video-btn-premium w-100" onclick="openVideoModal('irrigation')">
               <i class="bi bi-camera-video-fill"></i>Generate Client Video
@@ -811,145 +1134,444 @@
           <h5><i class="bi bi-droplet-half me-2" style="color:var(--energy-amber);"></i>Water Flow — Adaptive Animation</h5>
           <div class="row g-2 mb-3" id="irr_results"></div>
 
-          {# Adaptive Farm Irrigation SVG #}
+          {# ⭐ REALISTIC Farm Irrigation SVG — Level 1 Upgrade #}
           <div class="anim-box mb-3" style="min-height:270px;" id="irr_anim_box">
             <svg viewBox="0 0 640 270" xmlns="http://www.w3.org/2000/svg" id="irr_svg">
-              <rect width="640" height="270" fill="#0f172a"/>
-              <rect y="145" width="640" height="125" fill="#052e16"/>
+              <defs>
+                <linearGradient id="irr_sky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#bfdbfe"/>
+                  <stop offset="70%" stop-color="#dbeafe"/>
+                  <stop offset="100%" stop-color="#d1fae5"/>
+                </linearGradient>
+                <linearGradient id="irr_field_grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#4ade80"/>
+                  <stop offset="100%" stop-color="#16a34a"/>
+                </linearGradient>
+                <linearGradient id="irr_panel_grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#1e3a8a"/>
+                  <stop offset="45%" stop-color="#1d4ed8"/>
+                  <stop offset="100%" stop-color="#1e40af"/>
+                </linearGradient>
+              </defs>
 
-              {# Sun #}
-              <circle cx="595" cy="40" r="18" fill="#fbbf24" opacity=".9"/>
-              <g style="transform-origin:595px 40px;animation:sun-spin 10s linear infinite;">
-                <line x1="595" y1="15" x2="595" y2="10" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
-                <line x1="612" y1="23" x2="616" y2="19" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
-                <line x1="620" y1="40" x2="625" y2="40" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
-                <line x1="612" y1="57" x2="616" y2="61" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+              {# Sky + ground #}
+              <rect width="640" height="148" fill="url(#irr_sky)"/>
+              <rect y="148" width="640" height="30" fill="#92400e" opacity="0.15"/>
+              {# Field zone #}
+              <rect x="418" y="148" width="222" height="122" fill="url(#irr_field_grad)" opacity=".8"/>
+
+              {# === SUN (top-right, radiating) === #}
+              <g id="irr_sun_g" transform="translate(588, 42)">
+                <circle cx="0" cy="0" r="30" fill="#fbbf24" opacity="0.08" class="pulse-glow"/>
+                <circle cx="0" cy="0" r="20" fill="#fbbf24" opacity="0.15"/>
+                <circle cx="0" cy="0" r="13" fill="#fbbf24" opacity="0.95"/>
+                <g style="transform-origin:0 0;animation:sun-spin 14s linear infinite;">
+                  <line x1="0" y1="-19" x2="0" y2="-26" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="13" y1="-13" x2="18" y2="-18" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="19" y1="0" x2="26" y2="0" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="13" y1="13" x2="18" y2="18" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="0" y1="19" x2="0" y2="26" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="-13" y1="13" x2="-18" y2="18" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="-19" y1="0" x2="-26" y2="0" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="-13" y1="-13" x2="-18" y2="-18" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                </g>
+                <text y="36" text-anchor="middle" fill="#fde68a" font-size="8" font-weight="bold" id="irr_sun_label">5.5 PSH</text>
               </g>
 
-              {# === SOLAR DC PATH (default) === #}
+              {# === SOLAR DC PATH (default, realistic panels) === #}
               <g id="irr_path_solar_dc">
-                {# Solar Panels #}
-                <g transform="translate(55,70)">
-                  <rect x="-42" y="-16" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
-                  <rect x="-42" y="20" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
-                  <text x="0" y="68" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
-                  <text x="0" y="80" text-anchor="middle" fill="#93c5fd" font-size="8" id="irr_solar_dc_label">2.2 kW</text>
+                {# Panel mount poles #}
+                <line x1="46" y1="122" x2="46" y2="148" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                <line x1="98" y1="118" x2="98" y2="148" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                <line x1="46" y1="140" x2="98" y2="140" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round"/>
+                {# Panel 1 — tilted -14° with cell grid + shimmer #}
+                <g transform="translate(20,72) rotate(-14)">
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="url(#irr_panel_grad)" stroke="#334155" stroke-width="1.5"/>
+                  <line x1="20" y1="0" x2="20" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="40" y1="0" x2="40" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="13" x2="60" y2="13" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="27" x2="60" y2="27" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <ellipse cx="13" cy="8" rx="11" ry="4" fill="white" opacity="0.12" transform="rotate(-5 13 8)" class="panel-shimmer"/>
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="white" opacity="0.04"/>
                 </g>
-                {# MPPT Controller #}
-                <g transform="translate(175,80)">
-                  <rect x="-22" y="-16" width="44" height="32" rx="5" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
-                  <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7" font-weight="bold">MPPT</text>
-                  <text x="0" y="8" text-anchor="middle" fill="#34d399" font-size="6.5">Ctrl</text>
-                  <text x="0" y="35" text-anchor="middle" fill="#6ee7b7" font-size="8" id="irr_pump_label">1.5 kW DC</text>
+                {# Panel 2 #}
+                <g transform="translate(82,68) rotate(-14)">
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="url(#irr_panel_grad)" stroke="#334155" stroke-width="1.5"/>
+                  <line x1="20" y1="0" x2="20" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="40" y1="0" x2="40" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="13" x2="60" y2="13" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="27" x2="60" y2="27" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <ellipse cx="13" cy="8" rx="11" ry="4" fill="white" opacity="0.12" transform="rotate(-5 13 8)" class="panel-shimmer"/>
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="white" opacity="0.04"/>
                 </g>
-                {# Solar → MPPT #}
-                <line x1="97" y1="72" x2="153" y2="75" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
-                {# MPPT → Pump (electric) #}
-                <line x1="197" y1="80" x2="250" y2="112" stroke="#10b981" stroke-width="2" class="flow-line"/>
+                {# Sunbeam hint #}
+                <line x1="570" y1="52" x2="145" y2="90" stroke="#fbbf24" stroke-width="1" opacity="0.18" stroke-dasharray="4 5"/>
+                <text x="72" y="163" text-anchor="middle" fill="#1e40af" font-size="8.5" font-weight="bold">SOLAR PANELS</text>
+                <text x="72" y="174" text-anchor="middle" fill="#1e40af" font-size="8" id="irr_solar_dc_label">2.2 kWp</text>
+                {# DC cable: panels → MPPT #}
+                <path d="M 148 96 Q 180 92 210 88" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
+                {# MPPT Controller box #}
+                <g transform="translate(234,84)">
+                  <rect x="-26" y="-22" width="52" height="44" rx="6" fill="#0c1f3a" stroke="#10b981" stroke-width="1.5"/>
+                  <circle cx="18" cy="-13" r="4" fill="#10b981" style="animation:blink 1.6s infinite;"/>
+                  <text x="0" y="-4" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="bold">MPPT</text>
+                  <text x="0" y="7" text-anchor="middle" fill="#34d399" font-size="6.5">Controller</text>
+                  <text x="0" y="18" text-anchor="middle" fill="#6ee7b7" font-size="8" id="irr_pump_label">1.5 kW</text>
+                </g>
+                {# MPPT → pump #}
+                <path d="M 260 84 Q 282 90 300 110" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
               </g>
 
               {# === SOLAR AC PATH === #}
               <g id="irr_path_solar_ac" style="display:none;">
-                <g transform="translate(55,70)">
-                  <rect x="-42" y="-16" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
-                  <rect x="-42" y="20" width="84" height="32" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5" transform="rotate(-15)"/>
-                  <text x="0" y="68" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                <line x1="46" y1="122" x2="46" y2="148" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                <line x1="98" y1="118" x2="98" y2="148" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                <line x1="46" y1="140" x2="98" y2="140" stroke="#6b7280" stroke-width="2.5"/>
+                <g transform="translate(20,72) rotate(-14)">
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="url(#irr_panel_grad)" stroke="#334155" stroke-width="1.5"/>
+                  <line x1="20" y1="0" x2="20" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="40" y1="0" x2="40" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="13" x2="60" y2="13" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="27" x2="60" y2="27" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <ellipse cx="13" cy="8" rx="11" ry="4" fill="white" opacity="0.12" transform="rotate(-5 13 8)" class="panel-shimmer"/>
                 </g>
-                <g transform="translate(175,80)">
-                  <rect x="-26" y="-18" width="52" height="36" rx="5" fill="#1e3a5f" stroke="#8b5cf6" stroke-width="1.5"/>
-                  <text x="0" y="-5" text-anchor="middle" fill="#a78bfa" font-size="7" font-weight="bold">PUMP VFD</text>
-                  <text x="0" y="8" text-anchor="middle" fill="#c4b5fd" font-size="6.5">Solar AC</text>
+                <g transform="translate(82,68) rotate(-14)">
+                  <rect x="0" y="0" width="60" height="40" rx="2" fill="url(#irr_panel_grad)" stroke="#334155" stroke-width="1.5"/>
+                  <line x1="20" y1="0" x2="20" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="40" y1="0" x2="40" y2="40" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="13" x2="60" y2="13" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <line x1="0" y1="27" x2="60" y2="27" stroke="#3b82f6" stroke-width="0.7" opacity="0.75"/>
+                  <ellipse cx="13" cy="8" rx="11" ry="4" fill="white" opacity="0.12" transform="rotate(-5 13 8)" class="panel-shimmer"/>
                 </g>
-                <line x1="97" y1="72" x2="149" y2="75" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
-                <line x1="201" y1="80" x2="250" y2="112" stroke="#8b5cf6" stroke-width="2" class="flow-line"/>
+                <text x="72" y="163" text-anchor="middle" fill="#1e40af" font-size="8.5" font-weight="bold">SOLAR PANELS</text>
+                <path d="M 148 96 Q 180 92 210 88" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
+                <g transform="translate(238,84)">
+                  <rect x="-30" y="-22" width="60" height="44" rx="6" fill="#5b21b6" stroke="#8b5cf6" stroke-width="1.5"/>
+                  <circle cx="20" cy="-13" r="4" fill="#8b5cf6" style="animation:blink 1.6s infinite;"/>
+                  <text x="0" y="-4" text-anchor="middle" fill="#ede9fe" font-size="7" font-weight="bold">PUMP VFD</text>
+                  <text x="0" y="7" text-anchor="middle" fill="#ddd6fe" font-size="6.5">Solar AC</text>
+                </g>
+                <path d="M 268 84 Q 285 90 300 110" stroke="#8b5cf6" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
               </g>
 
               {# === GENERATOR PATH === #}
               <g id="irr_path_generator" style="display:none;">
-                <g transform="translate(75,75)">
-                  <rect x="-35" y="-25" width="70" height="50" rx="8" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.5"/>
+                <g transform="translate(84,82)">
+                  <rect x="-42" y="-28" width="84" height="56" rx="8" fill="#450a0a" stroke="#ef4444" stroke-width="1.5"/>
+                  <rect x="28" y="-38" width="8" height="12" rx="2" fill="#374151"/>
+                  <circle cx="32" cy="-44" r="6" fill="#4b5563" opacity="0.7" style="animation:blink 0.7s infinite;"/>
                   <text x="0" y="-8" text-anchor="middle" fill="#fca5a5" font-size="9" font-weight="bold">GENERATOR</text>
-                  <text x="0" y="8" text-anchor="middle" fill="#fecaca" font-size="8" id="irr_gen_label">10 kW</text>
-                  <circle cx="-15" cy="-2" r="6" fill="#ef4444" style="animation:blink 1s infinite;"/>
+                  <text x="0" y="8" text-anchor="middle" fill="#fecaca" font-size="8.5" id="irr_gen_label">10 kW</text>
+                  <circle cx="-22" cy="2" r="7" fill="#ef4444" opacity="0.8" style="animation:blink 1.1s infinite;"/>
                 </g>
-                <line x1="110" y1="75" x2="240" y2="112" stroke="#ef4444" stroke-width="2" class="flow-line"/>
+                <path d="M 126 82 Q 210 88 300 110" stroke="#ef4444" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
               </g>
 
               {# === HYBRID PATH === #}
               <g id="irr_path_hybrid" style="display:none;">
-                <g transform="translate(45,55)">
-                  <rect x="-35" y="-14" width="70" height="28" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.2" transform="rotate(-12)"/>
-                  <text x="0" y="30" text-anchor="middle" fill="#93c5fd" font-size="8">SOLAR</text>
+                <line x1="46" y1="122" x2="46" y2="148" stroke="#6b7280" stroke-width="3"/>
+                <g transform="translate(34,78) rotate(-12)">
+                  <rect x="-32" y="-20" width="64" height="40" rx="2" fill="url(#irr_panel_grad)" stroke="#334155" stroke-width="1.2"/>
+                  <line x1="-11" y1="-20" x2="-11" y2="20" stroke="#3b82f6" stroke-width="0.7" opacity="0.7"/>
+                  <line x1="11" y1="-20" x2="11" y2="20" stroke="#3b82f6" stroke-width="0.7" opacity="0.7"/>
+                  <line x1="-32" y1="0" x2="32" y2="0" stroke="#3b82f6" stroke-width="0.7" opacity="0.7"/>
+                  <ellipse cx="-10" cy="-6" rx="8" ry="3" fill="white" opacity="0.12" class="panel-shimmer"/>
                 </g>
-                <g transform="translate(120,75)">
-                  <rect x="-20" y="-12" width="40" height="24" rx="4" fill="#7f1d1d" stroke="#ef4444" stroke-width="1.2"/>
-                  <text x="0" y="4" text-anchor="middle" fill="#fca5a5" font-size="7">GEN</text>
-                  <text x="0" y="26" text-anchor="middle" fill="#fca5a5" font-size="7">Backup</text>
+                <text x="34" y="126" text-anchor="middle" fill="#93c5fd" font-size="8">SOLAR</text>
+                <g transform="translate(130,82)">
+                  <rect x="-24" y="-20" width="48" height="40" rx="5" fill="#450a0a" stroke="#ef4444" stroke-width="1.2"/>
+                  <text x="0" y="4" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="bold">GEN</text>
+                  <text x="0" y="18" text-anchor="middle" fill="#fca5a5" font-size="7">Backup</text>
                 </g>
-                <g transform="translate(190,80)">
-                  <rect x="-20" y="-14" width="40" height="28" rx="5" fill="#1e3a5f" stroke="#10b981" stroke-width="1.5"/>
-                  <text x="0" y="-2" text-anchor="middle" fill="#10b981" font-size="6.5" font-weight="bold">CTRL</text>
-                  <text x="0" y="10" text-anchor="middle" fill="#34d399" font-size="6">Hybrid</text>
+                <g transform="translate(210,82)">
+                  <rect x="-24" y="-18" width="48" height="36" rx="5" fill="#0c1f3a" stroke="#10b981" stroke-width="1.5"/>
+                  <text x="0" y="-2" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="bold">CTRL</text>
+                  <text x="0" y="10" text-anchor="middle" fill="#34d399" font-size="7">Hybrid</text>
                 </g>
-                <line x1="80" y1="55" x2="170" y2="78" stroke="#fbbf24" stroke-width="1.5" class="flow-line"/>
-                <line x1="140" y1="75" x2="170" y2="78" stroke="#ef4444" stroke-width="1.5" class="flow-line-slow"/>
-                <line x1="210" y1="80" x2="250" y2="112" stroke="#10b981" stroke-width="2" class="flow-line"/>
+                <path d="M 66 78 Q 100 78 106 82" stroke="#fbbf24" stroke-width="1.5" fill="none" class="flow-line"/>
+                <path d="M 154 82 Q 180 80 186 82" stroke="#ef4444" stroke-width="1.5" fill="none" class="flow-line-slow"/>
+                <path d="M 234 82 Q 270 88 300 110" stroke="#10b981" stroke-width="2" fill="none" stroke-dasharray="5 3" class="flow-line"/>
               </g>
 
-              {# Pump (shared) #}
-              <g transform="translate(270,130)">
-                <rect x="-22" y="-22" width="44" height="44" rx="7" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
-                <circle cx="0" cy="0" r="11" fill="#10b981" opacity=".7"/>
-                <text y="34" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">PUMP</text>
+              {# === REALISTIC PUMP HOUSING (shared) === #}
+              <g transform="translate(313, 120)">
+                {# Base plate #}
+                <rect x="-24" y="20" width="48" height="6" rx="2" fill="#374151"/>
+                {# Pump body (volute casing sides) #}
+                <rect x="-22" y="0" width="44" height="24" rx="0" fill="#1e293b" stroke="#334155" stroke-width="1.5"/>
+                <ellipse cx="0" cy="24" rx="22" ry="8" fill="#0f172a"/>
+                {# Pump face — circular housing #}
+                <circle cx="0" cy="8" r="16" fill="#064e3b" stroke="#10b981" stroke-width="2.2"/>
+                {# Impeller (spinning) #}
+                <g id="irr_pump_impeller" style="transform-origin:313px 128px;animation:blade-spin 2s linear infinite;">
+                  <line x1="0" y1="8" x2="0" y2="-2" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="0" y1="8" x2="9" y2="14" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                  <line x1="0" y1="8" x2="-9" y2="14" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                </g>
+                {# Output flange (right → field pipe) #}
+                <rect x="22" y="3" width="14" height="8" rx="3" fill="#374151" stroke="#475569" stroke-width="1"/>
+                {# Inlet flange (bottom → source pipe) #}
+                <rect x="-4" y="24" width="8" height="12" rx="3" fill="#374151" stroke="#475569" stroke-width="1"/>
+                <text y="50" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">PUMP</text>
+                <text y="61" text-anchor="middle" fill="#6ee7b7" font-size="7.5" id="irr_pump_kw_svg">1.5 kW</text>
               </g>
 
-              {# Water Source #}
-              <g transform="translate(100,218)">
-                <ellipse cx="0" cy="0" rx="55" ry="18" fill="#1e40af" opacity=".65"/>
-                <ellipse cx="12" cy="-6" rx="32" ry="10" fill="#3b82f6" opacity=".5"/>
-                <text y="30" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">WATER SOURCE</text>
-              </g>
-              {# Water source → Pump pipe #}
-              <path d="M 155 215 Q 200 185 248 152" stroke="#3b82f6" stroke-width="5" fill="none" class="flow-line-water"/>
-
-              {# Storage Tank (optional) #}
-              <g id="irr_tank_g" transform="translate(400,130)" style="display:none;">
+              {# Storage Tank (optional, hidden by default) #}
+              <g id="irr_tank_g" transform="translate(390, 120)" style="display:none;">
                 <rect x="-18" y="-35" width="36" height="65" rx="4" fill="#1e3a5f" stroke="#06b6d4" stroke-width="2"/>
                 <rect x="-14" y="-15" width="28" height="40" rx="2" fill="#06b6d4" id="irr_tank_fill" style="opacity:.5;"/>
                 <text y="42" text-anchor="middle" fill="#22d3ee" font-size="8" font-weight="bold">TANK</text>
               </g>
 
-              {# Pump → Field pipe #}
-              <path d="M 292 130 Q 380 115 430 165" stroke="#10b981" stroke-width="5" fill="none" class="flow-line-water"/>
-
-              {# Crop field #}
-              <g transform="translate(440,165)">
-                <rect x="0" y="0" width="185" height="75" rx="5" fill="#065f46"/>
-                {# Crop plants - varied heights suggesting growth #}
-                <g fill="#22c55e">
-                  <ellipse cx="18" cy="35" rx="9" ry="16"/>
-                  <ellipse cx="48" cy="28" rx="9" ry="20"/>
-                  <ellipse cx="78" cy="34" rx="9" ry="16"/>
-                  <ellipse cx="108" cy="24" rx="9" ry="22"/>
-                  <ellipse cx="138" cy="30" rx="9" ry="18"/>
-                  <ellipse cx="168" cy="33" rx="7" ry="15"/>
-                </g>
-                {# Animated water droplets (drip effect) #}
-                <circle cx="18" cy="18" r="3.5" fill="#60a5fa" id="irr_d1" style="animation:blink 1.3s infinite;"/>
-                <circle cx="78" cy="16" r="3.5" fill="#60a5fa" id="irr_d2" style="animation:blink 1.9s infinite;"/>
-                <circle cx="138" cy="14" r="3.5" fill="#60a5fa" id="irr_d3" style="animation:blink 1.5s infinite;"/>
-                <text x="92" y="88" text-anchor="middle" fill="#86efac" font-size="9" font-weight="bold">IRRIGATED FIELD</text>
+              {# === WATER SOURCES (adaptive) === #}
+              {# River (default) #}
+              <g id="irr_src_river" transform="translate(72, 210)">
+                <ellipse cx="0" cy="0" rx="58" ry="20" fill="#1e40af" opacity="0.6"/>
+                <ellipse cx="6" cy="-5" rx="42" ry="13" fill="#2563eb" opacity="0.5"/>
+                <ellipse cx="-8" cy="-8" rx="22" ry="7" fill="#60a5fa" opacity="0.4"/>
+                <path d="M -38 4 Q -18 -4 2 4 Q 22 12 42 4" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.7" stroke-dasharray="4 4" class="flow-line-slow"/>
+                <path d="M -30 10 Q -5 2 20 10 Q 38 16 48 10" stroke="#93c5fd" stroke-width="1" fill="none" opacity="0.4" stroke-dasharray="3 5" class="flow-line-slow"/>
+                <text y="32" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-weight="bold">🌊 RIVER</text>
+              </g>
+              {# Borehole #}
+              <g id="irr_src_borehole" transform="translate(72, 190)" style="display:none;">
+                <circle cx="0" cy="0" r="18" fill="#7c2d12" stroke="#9a3412" stroke-width="2"/>
+                <rect x="-6" y="0" width="12" height="52" fill="#374151" opacity="0.8"/>
+                <rect x="-4" y="20" width="8" height="32" fill="#2563eb" opacity="0.6"/>
+                <rect x="-9" y="46" width="18" height="14" rx="3" fill="#064e3b" stroke="#10b981" stroke-width="1.2"/>
+                <rect x="-24" y="-8" width="48" height="12" rx="3" fill="#9ca3af" opacity="0.6"/>
+                <text y="-14" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="bold">BOREHOLE</text>
+              </g>
+              {# Dam #}
+              <g id="irr_src_dam" transform="translate(72, 205)" style="display:none;">
+                <path d="M -52 2 L -42 -30 L 42 -30 L 52 2 Z" fill="#374151" stroke="#4b5563" stroke-width="1.5"/>
+                <ellipse cx="0" cy="-24" rx="35" ry="12" fill="#1d4ed8" opacity="0.7"/>
+                <ellipse cx="5" cy="-26" rx="22" ry="7" fill="#3b82f6" opacity="0.5"/>
+                <rect x="-4" y="0" width="8" height="15" fill="#1d4ed8" opacity="0.7"/>
+                <text y="20" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-weight="bold">🏞 DAM</text>
+              </g>
+              {# Well #}
+              <g id="irr_src_well" transform="translate(72, 205)" style="display:none;">
+                <circle cx="0" cy="0" r="24" fill="none" stroke="#9ca3af" stroke-width="6"/>
+                <circle cx="0" cy="0" r="18" fill="#1e3a5f" opacity="0.7"/>
+                <ellipse cx="0" cy="3" rx="14" ry="6" fill="#2563eb" opacity="0.8"/>
+                <line x1="-12" y1="-24" x2="-12" y2="-38" stroke="#92400e" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="12" y1="-24" x2="12" y2="-38" stroke="#92400e" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="-12" y1="-38" x2="12" y2="-38" stroke="#92400e" stroke-width="3.5" stroke-linecap="round"/>
+                <text y="36" text-anchor="middle" fill="#93c5fd" font-size="8.5" font-weight="bold">🪣 WELL</text>
               </g>
 
-              {# Pipe from field nozzles #}
-              <line x1="430" y1="165" x2="440" y2="180" stroke="#10b981" stroke-width="3" class="flow-line-water"/>
+              {# Suction pipe: SOURCE → PUMP (thick blue outer, animated inner) #}
+              <path d="M 124 212 Q 188 194 291 150" stroke="#1e3a5f" stroke-width="8" fill="none" stroke-linecap="round"/>
+              <path d="M 124 212 Q 188 194 291 150" stroke="#3b82f6" stroke-width="5" fill="none" class="flow-line-water"/>
 
-              {# Label #}
-              <text x="10" y="264" fill="#475569" font-size="8">🌊 Water flows from source → pump → field. Power: <tspan id="irr_sys_label_svg">Solar DC (no inverter)</tspan></text>
+              {# Pressure pipe: PUMP → FIELD (thick green outer, animated) #}
+              <path d="M 337 126 Q 374 120 415 158" stroke="#064e3b" stroke-width="8" fill="none" stroke-linecap="round"/>
+              <path d="M 337 126 Q 374 120 415 158" stroke="#10b981" stroke-width="4" fill="none" class="flow-line-water"/>
+
+              {# === CROP FIELD (right side, 5 rows with sway) === #}
+              <g transform="translate(418, 148)">
+                {# Soil furrow strips between plant rows #}
+                <rect x="0" y="20" width="222" height="4" fill="#7c2d12" opacity="0.32"/>
+                <rect x="0" y="44" width="222" height="4" fill="#7c2d12" opacity="0.32"/>
+                <rect x="0" y="68" width="222" height="4" fill="#7c2d12" opacity="0.32"/>
+                <rect x="0" y="92" width="222" height="4" fill="#7c2d12" opacity="0.32"/>
+                <rect x="0" y="116" width="222" height="4" fill="#7c2d12" opacity="0.32"/>
+                {# Row 1 — swaying plant silhouettes #}
+                <g class="plant-row" fill="#16a34a">
+                  <ellipse cx="14" cy="10" rx="7" ry="14"/><ellipse cx="40" cy="8" rx="8" ry="16"/>
+                  <ellipse cx="66" cy="11" rx="7" ry="13"/><ellipse cx="92" cy="7" rx="8" ry="17"/>
+                  <ellipse cx="118" cy="10" rx="7" ry="14"/><ellipse cx="144" cy="8" rx="8" ry="15"/>
+                  <ellipse cx="170" cy="11" rx="7" ry="13"/><ellipse cx="196" cy="9" rx="7" ry="14"/>
+                </g>
+                {# Row 2 #}
+                <g class="plant-row" fill="#15803d">
+                  <ellipse cx="22" cy="32" rx="7" ry="12"/><ellipse cx="48" cy="30" rx="8" ry="14"/>
+                  <ellipse cx="74" cy="33" rx="7" ry="11"/><ellipse cx="100" cy="29" rx="8" ry="15"/>
+                  <ellipse cx="126" cy="32" rx="7" ry="12"/><ellipse cx="152" cy="30" rx="7" ry="13"/>
+                  <ellipse cx="178" cy="33" rx="7" ry="11"/><ellipse cx="204" cy="31" rx="7" ry="12"/>
+                </g>
+                {# Row 3 #}
+                <g class="plant-row" fill="#166534">
+                  <ellipse cx="16" cy="54" rx="8" ry="13"/><ellipse cx="42" cy="52" rx="8" ry="15"/>
+                  <ellipse cx="68" cy="55" rx="7" ry="12"/><ellipse cx="94" cy="51" rx="9" ry="16"/>
+                  <ellipse cx="120" cy="54" rx="8" ry="13"/><ellipse cx="146" cy="52" rx="8" ry="14"/>
+                  <ellipse cx="172" cy="55" rx="7" ry="12"/><ellipse cx="198" cy="53" rx="8" ry="13"/>
+                </g>
+                {# Row 4 #}
+                <g class="plant-row" fill="#14532d">
+                  <ellipse cx="20" cy="76" rx="7" ry="12"/><ellipse cx="46" cy="74" rx="8" ry="13"/>
+                  <ellipse cx="72" cy="77" rx="7" ry="11"/><ellipse cx="98" cy="73" rx="8" ry="14"/>
+                  <ellipse cx="124" cy="76" rx="7" ry="12"/><ellipse cx="150" cy="74" rx="8" ry="13"/>
+                  <ellipse cx="176" cy="77" rx="7" ry="11"/><ellipse cx="202" cy="75" rx="7" ry="12"/>
+                </g>
+                {# Row 5 #}
+                <g class="plant-row" fill="#15803d">
+                  <ellipse cx="14" cy="97" rx="8" ry="13"/><ellipse cx="40" cy="95" rx="8" ry="14"/>
+                  <ellipse cx="66" cy="98" rx="7" ry="12"/><ellipse cx="92" cy="94" rx="9" ry="15"/>
+                  <ellipse cx="118" cy="97" rx="8" ry="13"/><ellipse cx="144" cy="95" rx="8" ry="13"/>
+                  <ellipse cx="170" cy="98" rx="7" ry="11"/><ellipse cx="196" cy="96" rx="8" ry="12"/>
+                </g>
+                {# Drip mainline pipe across top of field #}
+                <rect x="0" y="-6" width="222" height="6" rx="3" fill="#1e293b" stroke="#374151" stroke-width="1"/>
+                <path d="M 0 -3 L 222 -3" stroke="#3b82f6" stroke-width="1.5" fill="none" stroke-dasharray="5 3" class="flow-line-water"/>
+                {# === DRIP ANIMATION (default) === #}
+                <g id="irr_drip_anim">
+                  <circle cx="14" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.3s ease-in infinite;"/>
+                  <circle cx="40" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.7s ease-in .35s infinite;"/>
+                  <circle cx="66" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.3s ease-in .65s infinite;"/>
+                  <circle cx="92" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.7s ease-in .95s infinite;"/>
+                  <circle cx="118" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.3s ease-in .45s infinite;"/>
+                  <circle cx="144" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.7s ease-in .75s infinite;"/>
+                  <circle cx="170" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.3s ease-in 1.1s infinite;"/>
+                  <circle cx="196" cy="24" r="3" fill="#60a5fa" style="animation:water-drip 1.7s ease-in .2s infinite;"/>
+                </g>
+                {# === SPRINKLER ANIMATION (hidden, shown for sprinkler method) === #}
+                <g id="irr_sprinkler_anim" style="display:none;">
+                  <circle cx="55" cy="1" r="3.5" fill="#06b6d4" stroke="#22d3ee" stroke-width="1"/>
+                  <circle cx="111" cy="1" r="3.5" fill="#06b6d4" stroke="#22d3ee" stroke-width="1"/>
+                  <circle cx="167" cy="1" r="3.5" fill="#06b6d4" stroke="#22d3ee" stroke-width="1"/>
+                  <path d="M 55 1 Q 32 -17 10 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line-fast"/>
+                  <path d="M 55 1 Q 78 -17 100 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line"/>
+                  <path d="M 111 1 Q 88 -17 66 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line-fast"/>
+                  <path d="M 111 1 Q 134 -17 156 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line"/>
+                  <path d="M 167 1 Q 144 -17 122 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line-fast"/>
+                  <path d="M 167 1 Q 190 -17 212 6" stroke="#93c5fd" stroke-width="1.5" fill="none" opacity="0.8" stroke-dasharray="3 3" class="flow-line"/>
+                </g>
+                {# === FURROW ANIMATION (hidden, shown for furrow method) === #}
+                <g id="irr_furrow_anim" style="display:none;">
+                  <path d="M 0 22 L 222 22" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="8 4" class="flow-line-water"/>
+                  <path d="M 0 46 L 222 46" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="8 4" class="flow-line-slow"/>
+                  <path d="M 0 70 L 222 70" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="8 4" class="flow-line-water"/>
+                  <path d="M 0 94 L 222 94" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="8 4" class="flow-line-slow"/>
+                  <path d="M 0 118 L 222 118" stroke="#3b82f6" stroke-width="3" fill="none" stroke-dasharray="8 4" class="flow-line-water"/>
+                </g>
+                <text x="111" y="118" text-anchor="middle" fill="#86efac" font-size="8.5" font-weight="bold" id="irr_field_label">CROP FIELD</text>
+              </g>
+
+              {# Legend #}
+              <text x="10" y="263" fill="#64748b" font-size="7.5">⚡ <tspan id="irr_sys_label_svg">Solar DC (no inverter)</tspan> &nbsp;|&nbsp; 💧 Source: <tspan id="irr_src_label_svg">River</tspan> → Pump → Field</text>
             </svg>
           </div>
 
           <div id="irr_summary" class="small mt-2"></div>
+
+          {# ⭐ PROPOSAL VISUAL PANEL — Irrigation #}
+          <div class="proposal-visual-panel" data-realistic-visual-container="irrigation">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-2">
+              <div>
+                <div class="proposal-badge"><i class="bi bi-image me-1"></i>Proposal Visual Preview</div>
+                <div class="text-white fw-bold mt-1" style="font-size:.9rem;">Client-Facing Scene</div>
+                <div style="color:rgba(255,255,255,.55);font-size:.75rem;">Client-facing visual generated from scenario inputs</div>
+              </div>
+              <span style="background:rgba(16,185,129,.18);color:#34d399;border:1px solid rgba(16,185,129,.3);border-radius:20px;padding:.15rem .55rem;font-size:.65rem;font-weight:700;">LIVE SVG</span>
+            </div>
+            <div class="proposal-scene">
+              <svg viewBox="0 0 580 170" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="ps_sky" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#0c1a2e"/><stop offset="100%" stop-color="#1a3050"/>
+                  </linearGradient>
+                  <linearGradient id="ps_panel" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#1e3a8a"/><stop offset="100%" stop-color="#1d4ed8"/>
+                  </linearGradient>
+                </defs>
+                <rect width="580" height="170" fill="url(#ps_sky)"/>
+                <rect y="105" width="580" height="65" fill="#052e16"/>
+                <rect x="370" y="105" width="210" height="65" fill="#14532d"/>
+                {# Sun #}
+                <circle cx="530" cy="30" r="14" fill="#fbbf24" opacity=".9"/>
+                <g style="transform-origin:530px 30px;animation:sun-spin 14s linear infinite;">
+                  <line x1="530" y1="12" x2="530" y2="7" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="542" y1="18" x2="546" y2="14" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="548" y1="30" x2="553" y2="30" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="542" y1="42" x2="546" y2="46" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="530" y1="48" x2="530" y2="53" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="518" y1="42" x2="514" y2="46" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="512" y1="30" x2="507" y2="30" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="518" y1="18" x2="514" y2="14" stroke="#fbbf24" stroke-width="1.5" stroke-linecap="round"/>
+                </g>
+                {# Solar panels (tilted) #}
+                <g transform="translate(20,60) rotate(-13)">
+                  <rect x="0" y="0" width="52" height="34" rx="2" fill="url(#ps_panel)" stroke="#334155" stroke-width="1.2"/>
+                  <line x1="17" y1="0" x2="17" y2="34" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="34" y1="0" x2="34" y2="34" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="0" y1="11" x2="52" y2="11" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="0" y1="23" x2="52" y2="23" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <ellipse cx="10" cy="6" rx="9" ry="3" fill="white" opacity="0.12" class="panel-shimmer"/>
+                </g>
+                <g transform="translate(75,56) rotate(-13)">
+                  <rect x="0" y="0" width="52" height="34" rx="2" fill="url(#ps_panel)" stroke="#334155" stroke-width="1.2"/>
+                  <line x1="17" y1="0" x2="17" y2="34" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="34" y1="0" x2="34" y2="34" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="0" y1="11" x2="52" y2="11" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <line x1="0" y1="23" x2="52" y2="23" stroke="#3b82f6" stroke-width="0.6" opacity="0.7"/>
+                  <ellipse cx="10" cy="6" rx="9" ry="3" fill="white" opacity="0.12" class="panel-shimmer"/>
+                </g>
+                <text x="72" y="122" text-anchor="middle" fill="#93c5fd" font-size="7.5" font-weight="bold">SOLAR</text>
+                {# MPPT #}
+                <g transform="translate(192,78)">
+                  <rect x="-22" y="-18" width="44" height="36" rx="5" fill="#0c1f3a" stroke="#10b981" stroke-width="1.5"/>
+                  <circle cx="14" cy="-10" r="3.5" fill="#10b981" style="animation:blink 1.6s infinite;"/>
+                  <text x="0" y="-3" text-anchor="middle" fill="#10b981" font-size="6.5" font-weight="bold">MPPT</text>
+                  <text x="0" y="10" text-anchor="middle" fill="#34d399" font-size="6">Ctrl</text>
+                </g>
+                {# Pump #}
+                <g transform="translate(278,88)">
+                  <circle cx="0" cy="0" r="16" fill="#064e3b" stroke="#10b981" stroke-width="2"/>
+                  <g style="transform-origin:278px 88px;animation:blade-spin 2s linear infinite;">
+                    <line x1="0" y1="0" x2="0" y2="-10" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="0" y1="0" x2="9" y2="6" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                    <line x1="0" y1="0" x2="-9" y2="6" stroke="#34d399" stroke-width="2.5" stroke-linecap="round"/>
+                  </g>
+                  <text y="26" text-anchor="middle" fill="#34d399" font-size="7.5" font-weight="bold">PUMP</text>
+                </g>
+                {# Water source #}
+                <ellipse cx="72" cy="140" rx="50" ry="16" fill="#1e40af" opacity="0.6"/>
+                <ellipse cx="78" cy="134" rx="36" ry="10" fill="#2563eb" opacity="0.5"/>
+                <text x="72" y="158" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="bold">RIVER</text>
+                {# Pipes #}
+                <path d="M 116 140 Q 172 128 262 96" stroke="#1e3a5f" stroke-width="7" fill="none" stroke-linecap="round"/>
+                <path d="M 116 140 Q 172 128 262 96" stroke="#3b82f6" stroke-width="4" fill="none" class="flow-line-water"/>
+                <path d="M 294 88 Q 330 82 368 108" stroke="#064e3b" stroke-width="7" fill="none" stroke-linecap="round"/>
+                <path d="M 294 88 Q 330 82 368 108" stroke="#10b981" stroke-width="4" fill="none" class="flow-line-water"/>
+                {# Flow lines #}
+                <path d="M 128 82 Q 158 78 170 78" stroke="#fbbf24" stroke-width="1.5" fill="none" stroke-dasharray="4 3" class="flow-line"/>
+                <path d="M 214 78 Q 240 82 262 88" stroke="#10b981" stroke-width="1.5" fill="none" stroke-dasharray="4 3" class="flow-line"/>
+                {# Crops #}
+                <g fill="#16a34a">
+                  <ellipse cx="382" cy="113" rx="6" ry="12"/><ellipse cx="406" cy="111" rx="7" ry="14"/>
+                  <ellipse cx="430" cy="114" rx="6" ry="11"/><ellipse cx="454" cy="110" rx="7" ry="15"/>
+                  <ellipse cx="478" cy="113" rx="6" ry="12"/><ellipse cx="502" cy="111" rx="7" ry="13"/>
+                  <ellipse cx="526" cy="114" rx="6" ry="11"/><ellipse cx="550" cy="112" rx="6" ry="12"/>
+                </g>
+                <g fill="#15803d">
+                  <ellipse cx="390" cy="133" rx="6" ry="11"/><ellipse cx="414" cy="131" rx="7" ry="13"/>
+                  <ellipse cx="438" cy="134" rx="6" ry="10"/><ellipse cx="462" cy="130" rx="7" ry="14"/>
+                  <ellipse cx="486" cy="133" rx="6" ry="11"/><ellipse cx="510" cy="131" rx="7" ry="12"/>
+                  <ellipse cx="534" cy="134" rx="6" ry="10"/><ellipse cx="558" cy="132" rx="6" ry="11"/>
+                </g>
+                {# Drip drops #}
+                <circle cx="382" cy="125" r="2.5" fill="#60a5fa" style="animation:blink 1.2s infinite;"/>
+                <circle cx="430" cy="125" r="2.5" fill="#60a5fa" style="animation:blink 1.6s .4s infinite;"/>
+                <circle cx="478" cy="125" r="2.5" fill="#60a5fa" style="animation:blink 1.2s .8s infinite;"/>
+                <circle cx="526" cy="125" r="2.5" fill="#60a5fa" style="animation:blink 1.6s .2s infinite;"/>
+                {# Branding #}
+                <text x="290" y="165" text-anchor="middle" fill="rgba(255,255,255,.28)" font-size="7" font-style="italic">Emajinet Energy Intelligence · Client Proposal Visual</text>
+              </svg>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-success btn-sm fw-bold" onclick="generateProposalImage('irrigation')">
+                <i class="bi bi-image me-1"></i>Generate Proposal Image
+              </button>
+              <button class="btn btn-outline-light btn-sm" onclick="printClientVisual('irrigation')">
+                <i class="bi bi-printer me-1"></i>Print Client Visual
+              </button>
+              <button class="btn btn-outline-light btn-sm" onclick="openVideoModal('irrigation')">
+                <i class="bi bi-camera-video me-1"></i>Generate Client Video
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -997,13 +1619,13 @@
   </div>
 
   {# ============================================================ #}
-  {#   SIM 4: WIND TURBINE                                       #}
+  {#   SIM 4: WIND TURBINE — REDESIGNED                         #}
   {# ============================================================ #}
   <div class="sim-panel" id="sim-wind">
     <div class="row g-3">
       <div class="col-12 col-lg-4">
         <div class="sim-card">
-          <h5><i class="bi bi-wind me-2" style="color:#60a5fa;"></i>Wind Turbine Inputs</h5>
+          <h5><i class="bi bi-wind me-2" style="color:#2563eb;"></i>Wind Turbine Inputs</h5>
           <div class="sim-input-group">
             <label>Turbine Rating (kW): <span class="range-val" id="wind_kw_val">2</span></label>
             <input type="range" id="wind_kw" min="0.5" max="20" step="0.5" value="2" oninput="updateWIND()">
@@ -1020,37 +1642,122 @@
             <label>Hub Height (m): <span class="range-val" id="wind_hub_val">24</span></label>
             <input type="range" id="wind_hub" min="10" max="50" step="2" value="24" oninput="updateWIND()">
           </div>
+          {# Mini output cards #}
+          <div class="row g-2 mt-1" id="wind_mini_cards">
+            <div class="col-6"><div class="result-card blue"><div class="rv" id="wmc_spd">5 m/s</div><div class="rl">Wind Speed</div></div></div>
+            <div class="col-6"><div class="result-card"><div class="rv" id="wmc_out">2.0 kW</div><div class="rl">Est. Output</div></div></div>
+            <div class="col-6"><div class="result-card amber"><div class="rv" id="wmc_daily">48 kWh</div><div class="rl">Daily Gen</div></div></div>
+            <div class="col-6"><div class="result-card purple"><div class="rv" id="wmc_cf">35%</div><div class="rl">Cap. Factor</div></div></div>
+          </div>
+          {# Wind interpretation badge #}
+          <div id="wind_interp_badge" class="wind-interpretation wind-interp-ok mt-3">
+            <i class="bi bi-wind"></i> <span id="wind_interp_text">Good wind — partial generation</span>
+          </div>
         </div>
       </div>
       <div class="col-12 col-lg-8">
         <div class="sim-card">
-          <h5><i class="bi bi-wind me-2" style="color:#60a5fa;"></i>Wind Turbine Results</h5>
+          <h5><i class="bi bi-wind me-2" style="color:#2563eb;"></i>Wind Turbine — Live Animation</h5>
           <div class="row g-2 mb-3" id="wind_results"></div>
-          <div class="anim-box mb-3" style="min-height:220px;">
-            <svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg" id="wind_svg">
+          {# Redesigned animation: full turbine visible, light sky, proper proportions #}
+          <div class="anim-box mb-3" style="min-height:300px;" id="wind_anim_box">
+            <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg" id="wind_svg" style="width:100%;height:100%;">
               <defs>
                 <linearGradient id="skyGradWind" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stop-color="#1e3a5f"/>
-                  <stop offset="100%" stop-color="#064e3b"/>
+                  <stop offset="0%" stop-color="#bfdbfe"/>
+                  <stop offset="65%" stop-color="#dbeafe"/>
+                  <stop offset="100%" stop-color="#d1fae5"/>
                 </linearGradient>
+                <linearGradient id="windTowerGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#94a3b8"/>
+                  <stop offset="50%" stop-color="#e2e8f0"/>
+                  <stop offset="100%" stop-color="#94a3b8"/>
+                </linearGradient>
+                <filter id="windBlur">
+                  <feGaussianBlur stdDeviation="1.5"/>
+                </filter>
               </defs>
-              <rect width="400" height="220" fill="url(#skyGradWind)"/>
-              <rect x="192" y="60" width="10" height="140" fill="#374151"/>
-              <g id="wind_rotor" transform="translate(197,80)" style="transform-origin:0 0;animation:blade-spin 2s linear infinite;">
-                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(0)"/>
-                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(120)"/>
-                <ellipse cx="0" cy="-35" rx="5" ry="32" fill="#e2e8f0" transform="rotate(240)"/>
-                <circle cx="0" cy="0" r="8" fill="#374151" stroke="#6b7280" stroke-width="2"/>
+              {# Sky background #}
+              <rect width="560" height="300" fill="url(#skyGradWind)"/>
+              {# Ground #}
+              <rect y="258" width="560" height="42" fill="#86efac" opacity=".5"/>
+              <rect y="268" width="560" height="32" fill="#4ade80" opacity=".3"/>
+              {# Horizon hills #}
+              <ellipse cx="100" cy="260" rx="130" ry="30" fill="#bbf7d0" opacity=".6"/>
+              <ellipse cx="450" cy="262" rx="150" ry="28" fill="#d1fae5" opacity=".5"/>
+
+              {# === WIND FLOW LINES — left to right === #}
+              <g opacity=".45">
+                <line x1="0" y1="90" x2="180" y2="90" stroke="#3b82f6" stroke-width="2.5" class="flow-line" stroke-dasharray="12 6"/>
+                <line x1="0" y1="115" x2="175" y2="115" stroke="#2563eb" stroke-width="2" class="flow-line-slow" stroke-dasharray="10 7"/>
+                <line x1="0" y1="138" x2="170" y2="138" stroke="#3b82f6" stroke-width="1.5" class="flow-line" stroke-dasharray="8 8"/>
+                <line x1="0" y1="165" x2="172" y2="165" stroke="#1d4ed8" stroke-width="2" class="flow-line-slow" stroke-dasharray="12 5"/>
+                <line x1="0" y1="70" x2="160" y2="70" stroke="#60a5fa" stroke-width="1.5" class="flow-line-fast" stroke-dasharray="7 8"/>
               </g>
-              <rect y="200" width="400" height="20" fill="#065f46"/>
-              <line x1="10" y1="80" x2="80" y2="80" stroke="#60a5fa" stroke-width="2" class="flow-line"/>
-              <line x1="10" y1="100" x2="70" y2="100" stroke="#60a5fa" stroke-width="1.5" class="flow-line-slow"/>
-              <line x1="10" y1="60" x2="60" y2="60" stroke="#60a5fa" stroke-width="1.5" class="flow-line"/>
-              <text x="270" y="90" fill="#34d399" font-size="11" font-weight="bold">Output:</text>
-              <text x="270" y="108" fill="#fbbf24" font-size="14" font-weight="bold" id="wind_kw_label">2 kW</text>
-              <text x="270" y="126" fill="#93c5fd" font-size="10" id="wind_kwh_label">~12 kWh/day</text>
-              <text x="270" y="145" fill="#86efac" font-size="9" id="wind_cf_label">Capacity Factor: 35%</text>
-              <text x="197" y="216" text-anchor="middle" fill="#6b7280" font-size="9">Wind speed controls blade speed and output</text>
+              {# Wind flow labels #}
+              <text x="12" y="86" fill="#1d4ed8" font-size="8" font-weight="600" opacity=".7">→ wind</text>
+
+              {# === TURBINE TOWER — tapered, centered === #}
+              <polygon points="197,258 203,258 215,130 185,130" fill="url(#windTowerGrad)" stroke="#94a3b8" stroke-width="1"/>
+              {# Tower shadow #}
+              <polygon points="200,258 205,258 218,133 188,133" fill="#64748b" opacity=".12"/>
+
+              {# === NACELLE — on top of tower === #}
+              <g transform="translate(200,128)">
+                <rect x="-22" y="-12" width="44" height="22" rx="5" fill="#e2e8f0" stroke="#94a3b8" stroke-width="1.5"/>
+                <rect x="22" y="-6" width="14" height="10" rx="3" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1"/>
+              </g>
+
+              {# === ROTOR + BLADES — clearly visible === #}
+              <g id="wind_rotor" transform="translate(200,128)" style="animation:blade-spin 2.5s linear infinite;">
+                {# Hub #}
+                <circle cx="0" cy="0" r="10" fill="#374151" stroke="#cbd5e1" stroke-width="2"/>
+                {# Blade 1 — pointing up #}
+                <ellipse cx="0" cy="-52" rx="7" ry="48" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.2" transform="rotate(0,0,0)"/>
+                {# Blade 2 — 120° #}
+                <ellipse cx="0" cy="-52" rx="7" ry="48" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.2" transform="rotate(120,0,0)"/>
+                {# Blade 3 — 240° #}
+                <ellipse cx="0" cy="-52" rx="7" ry="48" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.2" transform="rotate(240,0,0)"/>
+                {# Hub cap #}
+                <circle cx="0" cy="0" r="7" fill="#6b7280" stroke="#e2e8f0" stroke-width="1.5"/>
+                <circle cx="0" cy="0" r="3" fill="#9ca3af"/>
+              </g>
+
+              {# === POST-ROTOR FLOW (turbulence after turbine) === #}
+              <g opacity=".3">
+                <line x1="230" y1="100" x2="340" y2="108" stroke="#3b82f6" stroke-width="1.5" class="flow-line-slow" stroke-dasharray="6 8"/>
+                <line x1="230" y1="128" x2="340" y2="130" stroke="#60a5fa" stroke-width="1" class="flow-line-slow" stroke-dasharray="5 9"/>
+                <line x1="230" y1="155" x2="340" y2="150" stroke="#3b82f6" stroke-width="1.5" class="flow-line-slow" stroke-dasharray="6 8"/>
+              </g>
+
+              {# === OUTPUT DISPLAY PANEL (right side) === #}
+              <rect x="360" y="70" width="175" height="165" rx="12" fill="white" fill-opacity=".88" stroke="#e2e8f0" stroke-width="1.5"/>
+              <text x="447" y="94" text-anchor="middle" fill="#1e40af" font-size="10" font-weight="800">⚡ TURBINE OUTPUT</text>
+              <line x1="375" y1="100" x2="520" y2="100" stroke="#e2e8f0" stroke-width="1"/>
+              {# Output value #}
+              <text x="447" y="125" text-anchor="middle" fill="#0f172a" font-size="22" font-weight="800" id="wind_kw_label">2.0 kW</text>
+              <text x="447" y="143" text-anchor="middle" fill="#6b7280" font-size="9">Current Output</text>
+              <line x1="375" y1="151" x2="520" y2="151" stroke="#f1f5f9" stroke-width="1"/>
+              {# Daily gen #}
+              <text x="395" y="168" fill="#374151" font-size="8" font-weight="700">Daily:</text>
+              <text x="395" y="181" fill="#059669" font-size="9" font-weight="800" id="wind_kwh_label">~48 kWh</text>
+              {# Cap factor #}
+              <text x="470" y="168" fill="#374151" font-size="8" font-weight="700">Cap. Factor:</text>
+              <text x="470" y="181" fill="#2563eb" font-size="9" font-weight="800" id="wind_cf_label">35%</text>
+              {# Hub height note #}
+              <text x="395" y="200" fill="#6b7280" font-size="7.5" id="wind_hub_label">Hub: 24m</text>
+              <text x="470" y="200" fill="#6b7280" font-size="7.5" id="wind_cutin_display">Cut-in: 2.5 m/s</text>
+              {# Status indicator #}
+              <circle cx="380" cy="215" r="5" fill="#10b981" id="wind_status_dot" style="animation:blink 1.5s infinite;"/>
+              <text x="391" y="219" fill="#374151" font-size="8" font-weight="600" id="wind_status_text">Generating</text>
+
+              {# Ground rule + turbine base #}
+              <line x1="0" y1="259" x2="560" y2="259" stroke="#86efac" stroke-width="1.5"/>
+              {# Tower base foundation #}
+              <ellipse cx="200" cy="259" rx="20" ry="6" fill="#94a3b8" opacity=".4"/>
+
+              {# Scale label #}
+              <text x="15" y="294" fill="#374151" font-size="7.5">Wind resource simulation — hub height &amp; speed affect output</text>
             </svg>
           </div>
           <div id="wind_summary" class="small"></div>
@@ -1327,14 +2034,20 @@
           {# Borehole animated SVG #}
           <div class="anim-box mb-3" style="min-height:240px;">
             <svg viewBox="0 0 500 240" xmlns="http://www.w3.org/2000/svg" id="bh_svg">
-              <rect width="500" height="240" fill="#0f172a"/>
+              <defs>
+                <linearGradient id="bh_sky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#bfdbfe"/>
+                  <stop offset="100%" stop-color="#d1fae5"/>
+                </linearGradient>
+              </defs>
+              <rect width="500" height="110" fill="url(#bh_sky)"/>
               {# Ground surface #}
-              <rect x="0" y="110" width="500" height="10" fill="#4b5563"/>
+              <rect x="0" y="110" width="500" height="10" fill="#78350f" opacity=".6"/>
               {# Underground soil layers #}
-              <rect x="0" y="120" width="500" height="60" fill="#1c1307"/>
-              <rect x="0" y="180" width="500" height="60" fill="#0f0a04"/>
+              <rect x="0" y="120" width="500" height="60" fill="#92400e" opacity=".25"/>
+              <rect x="0" y="180" width="500" height="60" fill="#78350f" opacity=".3"/>
               {# Sun #}
-              <circle cx="80" cy="50" r="18" fill="#fbbf24" opacity=".9"/>
+              <circle cx="80" cy="50" r="18" fill="#fbbf24" opacity=".95"/>
               {# Solar panels #}
               <g transform="translate(200,55)">
                 <rect x="-55" y="-14" width="110" height="28" rx="3" fill="#1e40af" stroke="#3b82f6" stroke-width="1.5"/>
@@ -1342,8 +2055,8 @@
                 <line x1="-55" y1="5" x2="55" y2="5" stroke="#3b82f6" stroke-width=".7"/>
                 <line x1="-18" y1="-14" x2="-18" y2="14" stroke="#3b82f6" stroke-width=".7"/>
                 <line x1="18" y1="-14" x2="18" y2="14" stroke="#3b82f6" stroke-width=".7"/>
-                <text x="0" y="30" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">SOLAR PANELS</text>
-                <text x="0" y="42" text-anchor="middle" fill="#93c5fd" font-size="8" id="bh_solar_label">3.5 kW</text>
+                <text x="0" y="30" text-anchor="middle" fill="#1e40af" font-size="9" font-weight="bold">SOLAR PANELS</text>
+                <text x="0" y="42" text-anchor="middle" fill="#1e40af" font-size="8" id="bh_solar_label">3.5 kW</text>
               </g>
               {# Sun → Panel #}
               <line x1="98" y1="50" x2="145" y2="50" stroke="#fbbf24" stroke-width="2" class="flow-line"/>
@@ -1379,11 +2092,218 @@
               {# Pump → tank pipe (surface) #}
               <path d="M 270 110 Q 320 75 398 90" stroke="#3b82f6" stroke-width="4" fill="none" class="flow-line-water"/>
               {# Labels #}
-              <text x="10" y="235" fill="#475569" font-size="8">💧 Submersible pump · No inverter needed · Solar DC direct drive · <tspan id="bh_sys_note">45m depth</tspan></text>
+              <text x="10" y="235" fill="#374151" font-size="8">💧 Submersible pump · No inverter needed · Solar DC direct drive · <tspan id="bh_sys_note">45m depth</tspan></text>
             </svg>
           </div>
           <div id="bh_summary" class="small"></div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== ROI IMPROVEMENT GUIDE ===== #}
+  <div class="roi-guide-panel" id="roi-guide-section">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+      <div>
+        <h5 class="mb-0"><i class="bi bi-graph-up-arrow me-2" style="color:#059669;"></i>Improve Your ROI</h5>
+        <div style="font-size:.76rem;color:#6b7280;margin-top:.2rem;">Actionable steps that reduce payback, lower cost, and improve reliability</div>
+      </div>
+      <span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:20px;padding:.2rem .7rem;font-size:.68rem;font-weight:700;">
+        <i class="bi bi-lightbulb me-1"></i>OPTIMIZATION GUIDE
+      </span>
+    </div>
+
+    {# Top move — highlighted #}
+    <div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.8rem;">
+      <div style="font-size:1.5rem;min-width:2rem;">🏆</div>
+      <div>
+        <div style="font-size:.85rem;font-weight:800;color:#0f172a;margin-bottom:.2rem;">Best ROI Move: Pump during solar hours — store water, not electricity</div>
+        <div style="font-size:.75rem;color:#374151;">Scheduling irrigation between 08:00–16:00 eliminates the need for battery storage entirely. Water tanks cost 5–10× less than batteries and never degrade. This single change can cut payback from 7 to 4 years.</div>
+        <div class="d-flex flex-wrap gap-1 mt-2">
+          <span class="roi-move-badge badge-payback">↓ Payback: −3 yrs</span>
+          <span class="roi-move-badge badge-capex">↓ CapEx: −35%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-2">
+      {# Move 1 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">🔋</div>
+          <div>
+            <div class="roi-move-title">Reduce battery bank size</div>
+            <div class="roi-move-desc">Oversized batteries are the #1 payback killer. Right-size to 1.5–2 nights of essential load only.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↓ Payback</span>
+              <span class="roi-move-badge badge-capex">↓ CapEx −20%</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Battery size adjustment: <span class="range-val" id="roi_batt_adj">0%</span></label>
+              <input type="range" id="roi_batt_slider" min="-50" max="50" step="10" value="0" oninput="updateROIGuide()">
+              <div class="roi-slider-impact" id="roi_batt_impact">Neutral — current sizing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 2 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">☀️</div>
+          <div>
+            <div class="roi-move-title">Increase solar array size</div>
+            <div class="roi-move-desc">More panels = more free energy during the day. Panels now cost less than batteries per kWh stored.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↑ Generation</span>
+              <span class="roi-move-badge badge-capex">Moderate CapEx ↑</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Solar array change: <span class="range-val" id="roi_solar_adj">0%</span></label>
+              <input type="range" id="roi_solar_slider" min="-30" max="100" step="10" value="0" oninput="updateROIGuide()">
+              <div class="roi-slider-impact" id="roi_solar_impact">Neutral — current sizing</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 3 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">💧</div>
+          <div>
+            <div class="roi-move-title">Switch to drip irrigation</div>
+            <div class="roi-move-desc">Drip reduces water demand by 40–60% vs flood/sprinkler. Less water = smaller pump = less energy = smaller solar.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↓ Payback −2 yrs</span>
+              <span class="roi-move-badge badge-capex">↓ CapEx −15%</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Irrigation method:</label>
+              <select id="roi_irr_method" onchange="updateROIGuide()" style="width:100%;border-radius:8px;border:1.5px solid #e2e8f0;font-size:.82rem;padding:.3rem .6rem;">
+                <option value="flood">Flood/Furrow (baseline)</option>
+                <option value="sprinkler">Sprinkler (−25%)</option>
+                <option value="drip" selected>Drip (−50%)</option>
+              </select>
+              <div class="roi-slider-impact" id="roi_irr_impact">Drip: pump demand −50%, payback improves</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 4 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">⛽</div>
+          <div>
+            <div class="roi-move-title">Replace diesel run hours</div>
+            <div class="roi-move-desc">Every hour of diesel replaced by solar saves MWK 400–800. Diesel cost is the fastest ROI lever.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↓ Payback −1 yr/hr</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Diesel hours replaced/day: <span class="range-val" id="roi_diesel_hrs">4</span></label>
+              <input type="range" id="roi_diesel_slider" min="0" max="16" step="1" value="4" oninput="updateROIGuide()">
+              <div class="roi-slider-impact" id="roi_diesel_impact">4 hrs replaced → MWK 64K/month savings</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 5 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">🌬️</div>
+          <div>
+            <div class="roi-move-title">Raise wind tower height</div>
+            <div class="roi-move-desc">Wind speed increases ~10–15% per 10m of tower height. Higher tower = exponentially more energy.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↑ Wind output</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Tower height (m): <span class="range-val" id="roi_tower_val">24</span></label>
+              <input type="range" id="roi_tower_slider" min="10" max="60" step="5" value="24" oninput="updateROIGuide()">
+              <div class="roi-slider-impact" id="roi_tower_impact">24m → ~5 m/s effective wind speed</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 6 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">⏰</div>
+          <div>
+            <div class="roi-move-title">Shift loads to daytime</div>
+            <div class="roi-move-desc">Iron, freezer, water heater, grinder, pumps — run these 09:00–15:00 to use direct solar instead of battery.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-capex">↓ Battery need −30%</span>
+              <span class="roi-move-badge badge-payback">↓ Payback</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <label style="font-size:.75rem;display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+                <input type="checkbox" id="roi_shift_loads" onchange="updateROIGuide()" checked>
+                <span>Shift heavy loads to solar hours</span>
+              </label>
+            </div>
+            <div class="roi-slider-impact" id="roi_shift_impact">Enabled: battery need reduces by ~30%</div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 7 #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">🔧</div>
+          <div>
+            <div class="roi-move-title">Reduce pipe head/distance</div>
+            <div class="roi-move-desc">Every 10m of pipe friction head adds ~0.15 kW to pump requirements. Relocate pump closer or use wider pipes.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-capex">↓ Pump sizing</span>
+            </div>
+            <div class="sim-input-group mt-2 mb-0">
+              <label style="font-size:.72rem;">Friction head reduction (%): <span class="range-val" id="roi_head_adj">0</span>%</label>
+              <input type="range" id="roi_head_slider" min="0" max="50" step="5" value="0" oninput="updateROIGuide()">
+              <div class="roi-slider-impact" id="roi_head_impact">0% — current pipe layout</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Move 8 — generator as backup only #}
+      <div class="col-12 col-md-6">
+        <div class="roi-move-card">
+          <div class="roi-move-icon">🏭</div>
+          <div>
+            <div class="roi-move-title">Generator as backup only (&lt; 20% hours)</div>
+            <div class="roi-move-desc">Running generator 2 hrs/day instead of 8 hrs/day saves MWK 400K+ per month. Size solar to cover 80%+ of load.</div>
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              <span class="roi-move-badge badge-payback">↓ Payback −2 yrs</span>
+              <span class="roi-move-badge badge-capex">↓ Diesel spend</span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <label style="font-size:.75rem;display:flex;align-items:center;gap:.4rem;cursor:pointer;">
+                <input type="checkbox" id="roi_gen_backup" onchange="updateROIGuide()">
+                <span>Enable generator-as-backup mode</span>
+              </label>
+            </div>
+            <div class="roi-slider-impact" id="roi_gen_impact">Disabled — generator running full time</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ROI Summary Bar #}
+    <div style="background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:1rem 1.2rem;margin-top:.5rem;">
+      <div style="font-size:.82rem;font-weight:700;color:#0f172a;margin-bottom:.6rem;"><i class="bi bi-speedometer2 me-2" style="color:#059669;"></i>Estimated ROI Impact of Selected Optimizations</div>
+      <div id="roi_guide_summary" style="font-size:.8rem;color:#374151;">
+        Adjust the sliders and toggles above to see how each decision affects your payback period, CapEx, and monthly savings.
+      </div>
+      <div class="row g-2 mt-2" id="roi_guide_metrics">
+        <div class="col-6 col-md-3"><div class="result-card"><div class="rv" id="roi_payback_val">—</div><div class="rl">Est. Payback</div></div></div>
+        <div class="col-6 col-md-3"><div class="result-card blue"><div class="rv" id="roi_capex_val">—</div><div class="rl">CapEx Change</div></div></div>
+        <div class="col-6 col-md-3"><div class="result-card amber"><div class="rv" id="roi_savings_val">—</div><div class="rl">Monthly Savings</div></div></div>
+        <div class="col-6 col-md-3"><div class="result-card purple"><div class="rv" id="roi_reliability_val">—</div><div class="rl">Reliability</div></div></div>
       </div>
     </div>
   </div>
@@ -1424,7 +2344,7 @@ function showSim(name) {
   if (panel) panel.classList.add('active');
   var tabs = document.querySelectorAll('.sim-tab');
   var simMap = {household:0,irrigation:1,solar:2,wind:3,hybrid:4,blackout:5,diesel:6,minigrid:7,coldroom:8,borehole:9};
-  if (simMap[name] !== undefined && tabs[simMap[name]]) tabs[simMap[name]].classList.add('active');
+  if (name in simMap && tabs[simMap[name]]) tabs[simMap[name]].classList.add('active');
   // Scroll to tab bar
   document.getElementById('simTabBar').scrollIntoView({behavior:'smooth', block:'nearest'});
   const updaters = {
@@ -1557,7 +2477,8 @@ function selectIrrSys(sys) {
 
 function updateIRR() {
   const land = parseFloat(document.getElementById('irr_land').value);
-  const head = parseFloat(document.getElementById('irr_head').value);
+  const suctionLift   = parseFloat(document.getElementById('irr_suction_lift').value);
+  const dischargeHead = parseFloat(document.getElementById('irr_discharge_head').value);
   const dist = parseFloat(document.getElementById('irr_dist').value);
   const hrs = parseFloat(document.getElementById('irr_hrs').value);
   const mmDay = parseFloat(document.getElementById('irr_crop_sim').value);
@@ -1565,19 +2486,61 @@ function updateIRR() {
   const method = document.getElementById('irr_method_sim').value;
 
   document.getElementById('irr_land_val').textContent = land;
-  document.getElementById('irr_head_val').textContent = head;
+  document.getElementById('irr_suction_val').textContent = suctionLift;
+  document.getElementById('irr_discharge_val').textContent = dischargeHead;
   document.getElementById('irr_dist_val').textContent = dist;
   document.getElementById('irr_hrs_val').textContent = hrs;
 
+  // Show/hide suction lift alert
+  const suctionAlertBox = document.getElementById('irr_suction_alert_box');
+  const suctionWarnBadge = document.getElementById('irr_suction_warn_badge');
+  const suctionOver = suctionLift > 7;
+  if (suctionAlertBox) suctionAlertBox.style.display = suctionOver ? 'block' : 'none';
+  if (suctionWarnBadge) {
+    suctionWarnBadge.textContent = suctionOver ? ' ⚠️ Exceeds 7 m limit' : '';
+    suctionWarnBadge.style.display = suctionOver ? 'inline' : 'none';
+  }
+
   const landHa = land * 0.4047;
-  // Irrigation efficiency factors
   const effFactor = method === 'drip' ? 0.9 : method === 'sprinkler' ? 0.75 : 0.55;
   const m3Day = (mmDay * landHa * 10) / effFactor;
-  const totalHead = head + (src === 'borehole' ? 12 : 0) + dist * 0.02;
+
+  // Total dynamic head: for borehole use borehole depth (12 m default) instead of suction lift
+  const frictionLoss = dist * 0.02;
+  const boreholeDepth = 12; // default borehole depth used in simulation
+  const totalHead = (src === 'borehole')
+    ? (boreholeDepth + dischargeHead + frictionLoss)
+    : (suctionLift + dischargeHead + frictionLoss);
+
   const flowM3h = m3Day / hrs;
   const pumpW = (flowM3h * totalHead * 2.72) / 0.65;
   const pumpKw = Math.max(0.37, Math.ceil(pumpW / 100) / 10);
-  const pumpType = (src === 'borehole' || head > 25) ? 'Submersible' : 'Surface';
+
+  // Physically correct pump type: borehole → submersible, suction > 7m → submersible,
+  // open surface + suction ≤ 7m → surface pump possible.
+  const isBorehole = src === 'borehole';
+  const isOpenSurface = src === 'river' || src === 'dam' || src === 'well';
+  let pumpType;
+  if (isBorehole) {
+    pumpType = 'Submersible';
+  } else if (suctionOver) {
+    pumpType = 'Submersible';
+  } else if (isOpenSurface && suctionLift <= 7) {
+    pumpType = totalHead <= 40 ? 'Surface' : 'Submersible';
+  } else {
+    pumpType = 'Submersible';
+  }
+
+  let pumpTypeReason;
+  if (isBorehole) {
+    pumpTypeReason = 'Submersible pump required for borehole source.';
+  } else if (suctionOver) {
+    pumpTypeReason = `Suction lift ${suctionLift} m exceeds 7 m limit — surface pump not viable. Use submersible or lower pump near water.`;
+  } else if (pumpType === 'Surface') {
+    pumpTypeReason = `Surface pump — suction lift ${suctionLift} m is within safe limit (≤ 7 m). Discharge head ${dischargeHead} m — pump pushes water uphill efficiently.`;
+  } else {
+    pumpTypeReason = `High total dynamic head (${totalHead.toFixed(0)} m) — submersible pump recommended.`;
+  }
 
   // System-specific solar sizing
   var solarKw = 0;
@@ -1597,7 +2560,40 @@ function updateIRR() {
   }
 
   if (document.getElementById('irr_pump_label')) document.getElementById('irr_pump_label').textContent = pumpKw + ' kW';
+  if (document.getElementById('irr_pump_kw_svg')) document.getElementById('irr_pump_kw_svg').textContent = pumpKw + ' kW';
   if (document.getElementById('irr_solar_dc_label')) document.getElementById('irr_solar_dc_label').textContent = solarKw + ' kWp';
+
+  // ── Realistic visual: adaptive water source ──
+  ['river','borehole','dam','well'].forEach(function(s) {
+    var el = document.getElementById('irr_src_' + s);
+    if (el) el.style.display = (s === src) ? '' : 'none';
+  });
+  var srcLabel = document.getElementById('irr_src_label_svg');
+  var srcNames = {river:'River', borehole:'Borehole', dam:'Dam', well:'Well'};
+  if (srcLabel) srcLabel.textContent = srcNames[src] || src;
+
+  // ── Realistic visual: irrigation method animation ──
+  var dEl = document.getElementById('irr_drip_anim');
+  var sEl = document.getElementById('irr_sprinkler_anim');
+  var fEl = document.getElementById('irr_furrow_anim');
+  if (dEl) dEl.style.display = method === 'drip' ? '' : 'none';
+  if (sEl) sEl.style.display = method === 'sprinkler' ? '' : 'none';
+  if (fEl) fEl.style.display = method === 'furrow' ? '' : 'none';
+
+  // ── Realistic visual: pump impeller speed scales with pump power ──
+  var pumpImp = document.getElementById('irr_pump_impeller');
+  if (pumpImp) {
+    var spd = Math.max(0.3, 2.2 / Math.max(0.4, pumpKw));
+    pumpImp.style.animationDuration = spd.toFixed(1) + 's';
+  }
+
+  // ── Realistic visual: sun pulse scales with solar size ──
+  var sunG = document.getElementById('irr_sun_g');
+  if (sunG && solarKw > 0) {
+    var sc = 0.85 + Math.min(0.4, solarKw / 25);
+    sunG.setAttribute('transform', 'translate(588,42) scale(' + sc.toFixed(2) + ')');
+    if (document.getElementById('irr_sun_label')) document.getElementById('irr_sun_label').textContent = solarKw + ' kWp';
+  }
 
   const dieselSavingYr = pumpKw * hrs * 365 * 3500 / 3;
   const capex = _irrSys !== 'generator' ? (solarKw * 1000 * 650 + pumpKw * 1000 * 280000) : (pumpKw * 1000 * 80000);
@@ -1618,8 +2614,9 @@ function updateIRR() {
     <div class="row g-2">
       <div class="col-12 col-md-6">
         <strong>System Architecture:</strong> ${archNote}<br>
-        <strong>Why ${pumpType}:</strong> ${src === 'borehole' ? 'Submersible pump required for borehole source.' : head < 15 ? 'Surface pump — low head, open water.' : 'Surface/VFD pump for moderate head.'}<br>
-        Total head: ${totalHead.toFixed(0)}m &nbsp;|&nbsp; Flow: ${flowM3h.toFixed(1)} m³/h<br>
+        <strong>Why ${pumpType}:</strong> ${pumpTypeReason}<br>
+        Suction lift: ${suctionLift} m + Discharge: ${dischargeHead} m + Friction: ${frictionLoss.toFixed(1)} m = <strong>TDH ${totalHead.toFixed(0)} m</strong><br>
+        Flow: ${flowM3h.toFixed(1)} m³/h &nbsp;|&nbsp;
         Irrigation method: ${method} (efficiency: ${Math.round(effFactor*100)}%)<br>
         Pipe: ${flowM3h < 5 ? '63mm HDPE' : flowM3h < 10 ? '90mm HDPE' : '110mm HDPE'}
       </div>
@@ -1628,7 +2625,7 @@ function updateIRR() {
         <strong>Expected yield improvement:</strong> +${yieldImprovement}% with ${method} irrigation<br>
         ${_irrSys !== 'generator' ? `<strong>Payback vs diesel:</strong> ~${paybackMonths.toFixed(0)} months<br>` : ''}
         <strong>Water daily:</strong> ${m3Day.toFixed(0)} m³ for ${land} acres<br>
-        <em>${land} acre farm demo — Tomato crop example: MWK ${fmtK(m3Day * 365 * 85)} annual water value</em>
+        <em>Surface pumps are limited by suction lift, not total head — they can push water uphill well.</em>
       </div>
     </div>`;
 }
@@ -1690,25 +2687,83 @@ function updateWIND() {
   const rating = parseFloat(document.getElementById('wind_kw').value);
   const spd = parseFloat(document.getElementById('wind_spd').value);
   const cutin = parseFloat(document.getElementById('wind_cutin').value);
+  const hub = parseFloat(document.getElementById('wind_hub').value);
 
   document.getElementById('wind_kw_val').textContent = rating;
   document.getElementById('wind_spd_val').textContent = spd;
   document.getElementById('wind_cutin_val').textContent = cutin;
-  document.getElementById('wind_hub_val').textContent = document.getElementById('wind_hub').value;
+  document.getElementById('wind_hub_val').textContent = hub;
 
-  const available = spd > cutin ? Math.min(1, Math.pow((spd - cutin) / (12 - cutin), 1.5)) : 0;
+  // Hub height wind speed correction (log law, 10m reference)
+  const hubFactor = Math.pow(hub / 10, 0.143);
+  const effSpd = spd * hubFactor;
+
+  const available = effSpd > cutin ? Math.min(1, Math.pow((effSpd - cutin) / (12 - cutin), 1.5)) : 0;
   const output = rating * available;
   const capFactor = (available * 100).toFixed(0);
   const dailyKwh = output * 24;
   const annualKwh = dailyKwh * 365;
 
-  const bladeSpeed = spd > cutin ? (spd / 8) * 2 : 0.05;
+  // Blade animation speed
+  const bladeSpeed = effSpd > cutin ? (effSpd / 8) * 2 : 0.02;
   const rotor = document.getElementById('wind_rotor');
-  if (rotor) rotor.style.animationDuration = (2 / Math.max(0.05, bladeSpeed)).toFixed(1) + 's';
+  if (rotor) {
+    if (effSpd <= cutin) {
+      rotor.style.animationPlayState = 'paused';
+    } else {
+      rotor.style.animationPlayState = 'running';
+      rotor.style.animationDuration = (2 / Math.max(0.1, bladeSpeed)).toFixed(1) + 's';
+    }
+  }
 
+  // Update SVG output display
   if (document.getElementById('wind_kw_label')) document.getElementById('wind_kw_label').textContent = fmt(output) + ' kW';
-  if (document.getElementById('wind_kwh_label')) document.getElementById('wind_kwh_label').textContent = '~' + fmt(dailyKwh) + ' kWh/day';
-  if (document.getElementById('wind_cf_label')) document.getElementById('wind_cf_label').textContent = 'Capacity Factor: ' + capFactor + '%';
+  if (document.getElementById('wind_kwh_label')) document.getElementById('wind_kwh_label').textContent = '~' + fmt(dailyKwh) + ' kWh';
+  if (document.getElementById('wind_cf_label')) document.getElementById('wind_cf_label').textContent = capFactor + '%';
+  if (document.getElementById('wind_hub_label')) document.getElementById('wind_hub_label').textContent = 'Hub: ' + hub + 'm (eff. ' + fmt(effSpd,1) + ' m/s)';
+  if (document.getElementById('wind_cutin_display')) document.getElementById('wind_cutin_display').textContent = 'Cut-in: ' + cutin + ' m/s';
+
+  // Status dot
+  const dot = document.getElementById('wind_status_dot');
+  const statusTxt = document.getElementById('wind_status_text');
+  if (dot && statusTxt) {
+    if (effSpd <= cutin) {
+      dot.style.fill = '#ef4444';
+      statusTxt.textContent = 'Idle — below cut-in';
+    } else if (available >= 0.9) {
+      dot.style.fill = '#10b981';
+      statusTxt.textContent = 'Full rated output';
+    } else {
+      dot.style.fill = '#f59e0b';
+      statusTxt.textContent = 'Generating';
+    }
+  }
+
+  // Mini cards
+  if (document.getElementById('wmc_spd')) document.getElementById('wmc_spd').textContent = spd + ' m/s';
+  if (document.getElementById('wmc_out')) document.getElementById('wmc_out').textContent = fmt(output) + ' kW';
+  if (document.getElementById('wmc_daily')) document.getElementById('wmc_daily').textContent = fmt(dailyKwh) + ' kWh';
+  if (document.getElementById('wmc_cf')) document.getElementById('wmc_cf').textContent = capFactor + '%';
+
+  // Interpretation badge
+  const badge = document.getElementById('wind_interp_badge');
+  const badgeTxt = document.getElementById('wind_interp_text');
+  if (badge && badgeTxt) {
+    badge.className = 'wind-interpretation';
+    if (effSpd <= cutin) {
+      badge.classList.add('wind-interp-idle');
+      badgeTxt.textContent = 'Below cut-in speed — turbine will not generate. Raise tower or wait for stronger wind.';
+    } else if (effSpd < 5) {
+      badge.classList.add('wind-interp-ok');
+      badgeTxt.textContent = 'Low wind zone: output marginal. Consider taller tower or hybrid with solar.';
+    } else if (effSpd < 9) {
+      badge.classList.add('wind-interp-good');
+      badgeTxt.textContent = 'Good wind zone — output improving. Well-suited for wind generation.';
+    } else {
+      badge.classList.add('wind-interp-high');
+      badgeTxt.textContent = 'High wind — near rated output. Consider tower height, foundation safety margin.';
+    }
+  }
 
   document.getElementById('wind_results').innerHTML =
     resultCard(fmt(output) + ' kW', 'Current Output', 'blue') +
@@ -1716,13 +2771,32 @@ function updateWIND() {
     resultCard(capFactor + '%', 'Capacity Factor') +
     resultCard(fmt(annualKwh/1000, 0) + ' MWh', 'Annual Gen', 'amber');
 
+  const annualSavings = annualKwh * 185;
+  const capex = rating * 1000 * 1200000 + hub * 50000;
+  const payback = capex / Math.max(1, annualSavings);
+
   document.getElementById('wind_summary').innerHTML = `
-    <strong>Wind at ${spd} m/s → ${rating} kW turbine:</strong> Output: ${fmt(output)} kW (${capFactor}% capacity factor)<br>
-    Daily: ${fmt(dailyKwh)} kWh &nbsp;|&nbsp; Annual: ${fmt(annualKwh, 0)} kWh<br>
-    ${spd < cutin ? '<strong class="text-danger">⚠ Wind below cut-in speed — turbine idle.</strong>' :
-      spd >= 12 ? '🌬 Turbine at rated output. Excellent wind resource.' :
-      '💨 Turbine generating at partial capacity.'}
-    <br><strong>Grant note:</strong> Wind data must be from a minimum 12-month met mast measurement. Statement of typical wind resource required for institutional finance.`;
+    <div class="d-flex flex-wrap gap-2 mb-2">
+      <span style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">
+        <i class="bi bi-wind me-1"></i>${spd} m/s at hub → ${fmt(effSpd,1)} m/s effective (${hub}m tower)
+      </span>
+      <span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">
+        Payback: ~${fmt(payback,1)} yrs
+      </span>
+    </div>
+    ${effSpd <= cutin ?
+      '<div class="wind-interpretation wind-interp-idle"><i class="bi bi-exclamation-triangle me-1"></i>⚠ Wind below cut-in speed — turbine idle. Increase wind speed slider or raise tower height.</div>' :
+      effSpd >= 12 ?
+      '<div class="wind-interpretation wind-interp-high"><i class="bi bi-wind me-1"></i>Turbine near rated output. Excellent wind resource — verify structural safety at this tower height.</div>' :
+      '<div class="wind-interpretation wind-interp-good"><i class="bi bi-check-circle me-1"></i>Turbine generating at ' + capFactor + '% capacity. Viable wind resource for hybrid or standalone system.</div>'}
+    <div class="mt-2" style="font-size:.78rem;color:#374151;">
+      <strong>Annual generation:</strong> ${fmt(annualKwh, 0)} kWh &nbsp;|&nbsp;
+      <strong>Annual savings:</strong> MWK ${fmtK(annualSavings)} &nbsp;|&nbsp;
+      <strong>CapEx est.:</strong> MWK ${fmtK(capex)}
+    </div>
+    <div class="mt-1" style="font-size:.74rem;color:#6b7280;">
+      <i class="bi bi-info-circle me-1"></i>Grant note: Wind data must be from ≥12-month met mast measurement for institutional finance.
+    </div>`;
 }
 
 // ============================================================
@@ -2280,6 +3354,68 @@ function downloadClientProposalPDF() {
   <div class="disclaimer">⚠ This proposal is based on simulation inputs and should be verified by a qualified energy engineer before procurement. Site assessment recommended.<br>Emajinet Energy Intelligence Platform</div>
   <script>window.print();<\/script></body></html>`);
 }
+
+// ============================================================
+// PROPOSAL IMAGE GENERATION  (Level 1 — pipeline coming soon)
+// ============================================================
+var _proposalScenario = 'household';
+
+function generateProposalImage(scenario) {
+  _proposalScenario = scenario || 'household';
+  document.getElementById('proposalImgModal').classList.add('open');
+}
+
+function printClientVisual(scenario) {
+  _proposalScenario = scenario || 'household';
+  var svgId = scenario === 'irrigation' ? 'irr_svg' : 'hh_svg';
+  var svgEl = document.getElementById(svgId);
+  if (!svgEl) { alert('Visual not found. Run the simulation first.'); return; }
+  var serializer = new XMLSerializer();
+  var svgStr = serializer.serializeToString(svgEl);
+  var labels = {
+    irrigation: '🌾 Solar Irrigation System — Client Visual',
+    household:  '🏠 Household Energy System — Client Visual'
+  };
+  var win = window.open('', '_blank');
+  if (!win) { alert('Pop-up blocked — please allow pop-ups to print.'); return; }
+  win.document.write('<!DOCTYPE html><html><head><title>Client Visual</title>'
+    + '<style>body{font-family:"Segoe UI",sans-serif;max-width:920px;margin:2rem auto;color:#1f2937;}'
+    + 'h2{color:#10b981;border-bottom:2px solid #10b981;padding-bottom:.5rem;}'
+    + 'svg{width:100%;border-radius:14px;box-shadow:0 4px 20px rgba(0,0,0,.18);}'
+    + '.foot{font-size:.75rem;color:#9ca3af;margin-top:1.5rem;text-align:center;padding-top:.5rem;border-top:1px solid #e5e7eb;}'
+    + '@media print{body{margin:.5rem;}}</style></head><body>'
+    + '<h2>' + (labels[scenario] || '⚡ Energy System — Client Visual') + '</h2>'
+    + '<p style="color:#6b7280;font-size:.85rem;margin-bottom:1rem;">Generated by <strong>Emajinet Energy Intelligence Platform</strong> &nbsp;|&nbsp; ' + new Date().toLocaleDateString() + '</p>'
+    + svgStr
+    + '<div class="foot">⚠ Visual generated from simulation inputs — verify with a qualified engineer before installation.<br><strong>Emajinet Energy Intelligence Platform</strong></div>'
+    + '<script>setTimeout(function(){window.print();},350);<\/script>'
+    + '</body></html>');
+}
+
+function downloadCurrentSceneAsSVG() {
+  var panel = document.querySelector('.sim-panel.active');
+  if (!panel) { alert('No active simulation panel.'); return; }
+  var svg = panel.querySelector('svg');
+  if (!svg) { alert('No SVG visual found in current simulation.'); return; }
+  var ser = new XMLSerializer();
+  var str = ser.serializeToString(svg);
+  var blob = new Blob([str], { type: 'image/svg+xml;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'emajinet_simulation_scene.svg';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+}
+
+// Close proposal modal on backdrop click
+document.addEventListener('DOMContentLoaded', function() {
+  var propModal = document.getElementById('proposalImgModal');
+  if (propModal) {
+    propModal.addEventListener('click', function(e) {
+      if (e.target === this) this.classList.remove('open');
+    });
+  }
+});
 
 // ============================================================
 // INITIALISE
