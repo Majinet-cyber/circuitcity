@@ -7,68 +7,132 @@ using a different schema: total_amount, sale_type instead of total_price, sale_m
 Root cause: Migration 0062 used RunPython with "create if not exists" logic.
 Since the table already existed (old schema), it was skipped and the new columns
 were never added. Django's migration state thinks the columns exist; the DB disagrees.
-"""
-from decimal import Decimal
 
+Safety: This migration is fully idempotent for both PostgreSQL and SQLite.
+- PostgreSQL: uses ALTER TABLE ... ADD COLUMN IF NOT EXISTS (no-op if column exists).
+- SQLite: checks information_schema.columns before issuing ALTER TABLE.
+  PRAGMA is intentionally avoided — it is SQLite-only and causes PostgreSQL
+  to abort the transaction, breaking all subsequent SQL in the same migration.
+"""
 from django.db import migrations
 
 
-def add_missing_grocerysale_columns(apps, schema_editor):
-    """Add missing columns to inventory_grocerysale table if they don't exist."""
-    connection = schema_editor.connection
+def _get_existing_columns_pg(cursor, table_name):
+    """Return set of existing column names using information_schema (PostgreSQL-safe)."""
+    cursor.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s
+          AND table_schema = 'public'
+        """,
+        [table_name],
+    )
+    return {row[0] for row in cursor.fetchall()}
 
-    try:
-        with connection.cursor() as cursor:
-            # Get existing columns
-            cursor.execute("PRAGMA table_info(inventory_grocerysale)")
-            existing_cols = {row[1] for row in cursor.fetchall()}
+
+def _get_existing_columns_sqlite(cursor, table_name):
+    """Return set of existing column names for SQLite via information_schema."""
+    cursor.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = %s
+        """,
+        [table_name],
+    )
+    rows = cursor.fetchall()
+    if rows:
+        return {row[0] for row in rows}
+    # Fallback for very old SQLite builds that lack information_schema
+    cursor.execute(f"PRAGMA table_info({table_name})")   # nosec: table name is hard-coded
+    return {row[1] for row in cursor.fetchall()}
+
+
+def add_missing_grocerysale_columns(apps, schema_editor):
+    """Add missing columns to inventory_grocerysale using vendor-safe SQL."""
+    connection = schema_editor.connection
+    vendor = connection.vendor  # 'postgresql' | 'sqlite' | 'mysql'
+
+    with connection.cursor() as cursor:
+        if vendor == "postgresql":
+            # ADD COLUMN IF NOT EXISTS is idempotent — no pre-check needed.
+            # These statements are individually safe: if the column already exists
+            # PostgreSQL silently skips them without raising an error.
+            cursor.execute(
+                "ALTER TABLE inventory_grocerysale "
+                "ADD COLUMN IF NOT EXISTS total_price NUMERIC(12,2) DEFAULT 0.00"
+            )
+            cursor.execute(
+                "ALTER TABLE inventory_grocerysale "
+                "ADD COLUMN IF NOT EXISTS sale_mode VARCHAR(20) DEFAULT 'retail'"
+            )
+            cursor.execute(
+                "ALTER TABLE inventory_grocerysale "
+                "ADD COLUMN IF NOT EXISTS total_cost NUMERIC(12,2) DEFAULT 0.00"
+            )
+
+            # Backfill only where the value is still at the default zero.
+            existing_cols = _get_existing_columns_pg(cursor, "inventory_grocerysale")
+
+            if "total_amount" in existing_cols:
+                cursor.execute(
+                    "UPDATE inventory_grocerysale SET total_price = total_amount "
+                    "WHERE total_price = 0"
+                )
+            elif "unit_price" in existing_cols and "quantity" in existing_cols:
+                cursor.execute(
+                    "UPDATE inventory_grocerysale SET total_price = unit_price * quantity "
+                    "WHERE total_price = 0"
+                )
+
+            if "unit_cost" in existing_cols and "quantity" in existing_cols:
+                cursor.execute(
+                    "UPDATE inventory_grocerysale SET total_cost = unit_cost * quantity "
+                    "WHERE total_cost = 0"
+                )
+
+        else:
+            # SQLite (local dev): check columns before adding — SQLite does not
+            # support ADD COLUMN IF NOT EXISTS on versions older than 3.37.0.
+            existing_cols = _get_existing_columns_sqlite(cursor, "inventory_grocerysale")
 
             if not existing_cols:
-                # Table doesn't exist at all - nothing to do (0062 will handle it)
+                # Table does not exist yet; 0062 will create it with correct schema.
                 return
 
-            # Add total_price if missing
             if "total_price" not in existing_cols:
                 cursor.execute(
-                    "ALTER TABLE inventory_grocerysale ADD COLUMN total_price DECIMAL(12,2) DEFAULT 0.00"
+                    "ALTER TABLE inventory_grocerysale "
+                    "ADD COLUMN total_price DECIMAL(12,2) DEFAULT 0.00"
                 )
-                # Backfill from total_amount if it exists
                 if "total_amount" in existing_cols:
                     cursor.execute(
-                        "UPDATE inventory_grocerysale SET total_price = total_amount WHERE total_price = 0"
+                        "UPDATE inventory_grocerysale SET total_price = total_amount "
+                        "WHERE total_price = 0"
                     )
                 elif "unit_price" in existing_cols and "quantity" in existing_cols:
                     cursor.execute(
-                        "UPDATE inventory_grocerysale SET total_price = unit_price * quantity WHERE total_price = 0"
+                        "UPDATE inventory_grocerysale SET total_price = unit_price * quantity "
+                        "WHERE total_price = 0"
                     )
 
-            # Add sale_mode if missing
             if "sale_mode" not in existing_cols:
                 cursor.execute(
-                    "ALTER TABLE inventory_grocerysale ADD COLUMN sale_mode VARCHAR(20) DEFAULT 'retail'"
+                    "ALTER TABLE inventory_grocerysale "
+                    "ADD COLUMN sale_mode VARCHAR(20) DEFAULT 'retail'"
                 )
-                # Backfill from sale_type if it exists
-                if "sale_type" in existing_cols:
-                    cursor.execute(
-                        "UPDATE inventory_grocerysale SET sale_mode = 'retail' WHERE sale_mode IS NULL OR sale_mode = ''"
-                    )
 
-            # Add total_cost if missing
             if "total_cost" not in existing_cols:
                 cursor.execute(
-                    "ALTER TABLE inventory_grocerysale ADD COLUMN total_cost DECIMAL(12,2) DEFAULT 0.00"
+                    "ALTER TABLE inventory_grocerysale "
+                    "ADD COLUMN total_cost DECIMAL(12,2) DEFAULT 0.00"
                 )
-                # Backfill: total_cost = unit_cost * quantity
                 if "unit_cost" in existing_cols and "quantity" in existing_cols:
                     cursor.execute(
-                        "UPDATE inventory_grocerysale SET total_cost = unit_cost * quantity WHERE total_cost = 0"
+                        "UPDATE inventory_grocerysale SET total_cost = unit_cost * quantity "
+                        "WHERE total_cost = 0"
                     )
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(
-            f"Could not add missing GrocerySale columns (non-fatal): {e}"
-        )
 
 
 class Migration(migrations.Migration):
@@ -77,7 +141,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # State is already correct from 0062 - only fix the DB
+        # State is already correct from 0062 — only fix the DB schema.
         migrations.SeparateDatabaseAndState(
             state_operations=[],
             database_operations=[

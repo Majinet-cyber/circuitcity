@@ -630,6 +630,174 @@ def dashboard(request):
     ctx["wallet_balance"] = Decimal("0")
     ctx["wallet_currency"] = "MWK"
 
+    # -------------------------------------------------------------------
+    # Wallet incoming / outgoing (WalletTransaction model)
+    # -------------------------------------------------------------------
+    try:
+        from wallet.models import WalletTransaction, TxnType, Ledger
+
+        income_types = [TxnType.COMMISSION, TxnType.REVENUE, TxnType.BONUS, TxnType.ADJUSTMENT]
+        expense_types = [TxnType.DEDUCTION, TxnType.ADVANCE, TxnType.PENALTY, TxnType.PAYSLIP,
+                         TxnType.COST_ONCE_OFF, TxnType.COST_RECURRING]
+
+        wallet_in_agg = WalletTransaction.objects.filter(
+            effective_date__gte=thirty.date(), amount__gt=0,
+        ).aggregate(v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))))
+        ctx["wallet_in_30d"] = wallet_in_agg["v"] or Decimal("0.00")
+
+        wallet_out_agg = WalletTransaction.objects.filter(
+            effective_date__gte=thirty.date(), amount__lt=0,
+        ).aggregate(v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2))))
+        ctx["wallet_out_30d"] = abs(wallet_out_agg["v"] or Decimal("0.00"))
+
+        wallet_bal_agg = WalletTransaction.objects.aggregate(
+            v=Coalesce(Sum("amount"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
+        )
+        ctx["wallet_balance"] = wallet_bal_agg["v"] or Decimal("0.00")
+    except Exception:
+        ctx["wallet_in_30d"] = Decimal("0.00")
+        ctx["wallet_out_30d"] = Decimal("0.00")
+
+    # -------------------------------------------------------------------
+    # Revenue & Gross Profit (last 30d, all time)
+    # -------------------------------------------------------------------
+    sales_30d_qs = Sale.objects.filter(sold_at__gte=thirty)
+    revenue_30d_agg = sales_30d_qs.aggregate(
+        v=Coalesce(Sum("price"), Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)))
+    )
+    ctx["revenue_30d"] = revenue_30d_agg["v"] or Decimal("0.00")
+
+    # Gross profit 30d (price minus order_price cost)
+    zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+    try:
+        from django.db.models import F as _F, ExpressionWrapper as _EW
+        profit_agg = sales_30d_qs.aggregate(
+            v=Coalesce(
+                Sum(_EW(_F("price") - Coalesce(_F("item__order_price"), zero_cost),
+                        output_field=DecimalField(max_digits=18, decimal_places=2))),
+                Value(0, output_field=DecimalField(max_digits=18, decimal_places=2)),
+            )
+        )
+        ctx["gross_profit_30d"] = profit_agg["v"] or Decimal("0.00")
+    except Exception:
+        ctx["gross_profit_30d"] = ctx["revenue_30d"]
+
+    # -------------------------------------------------------------------
+    # Collection Rate
+    # -------------------------------------------------------------------
+    total_invoices = Invoice.objects.count()
+    paid_invoices = Invoice.objects.filter(status__in=["PAID", "SETTLED", "paid"]).count()
+    ctx["collection_rate"] = round(paid_invoices / total_invoices * 100) if total_invoices > 0 else 0
+
+    # -------------------------------------------------------------------
+    # Bug Monitor stats
+    # -------------------------------------------------------------------
+    try:
+        from hq.models_bugmonitor import SystemIssue, IssueStatus, IssueSeverity
+
+        ctx["bug_open"] = SystemIssue.objects.filter(
+            status__in=[IssueStatus.NEW, IssueStatus.INVESTIGATING]
+        ).count()
+        ctx["bug_critical"] = SystemIssue.objects.filter(
+            status__in=[IssueStatus.NEW, IssueStatus.INVESTIGATING],
+            severity=IssueSeverity.CRITICAL,
+        ).count()
+        ctx["bug_cleared_7d"] = SystemIssue.objects.filter(
+            status=IssueStatus.CLEARED,
+            updated_at__gte=seven,
+        ).count()
+        ctx["bug_total"] = SystemIssue.objects.count()
+        ctx["bug_monitor_enabled"] = True
+    except Exception:
+        ctx["bug_open"] = 0
+        ctx["bug_critical"] = 0
+        ctx["bug_cleared_7d"] = 0
+        ctx["bug_total"] = 0
+        ctx["bug_monitor_enabled"] = False
+
+    # -------------------------------------------------------------------
+    # DEMO FALLBACK VALUES
+    # View-level only — never touches the database.
+    # Used when genuine data is zero so the dashboard looks alive.
+    # -------------------------------------------------------------------
+    using_demo = False
+    _D = Decimal
+
+    def _demo_if_zero(ctx_key, demo_val, *, check_key=None):
+        """Replace a ctx value with demo_val if it is falsy/zero. Returns True if demo used."""
+        k = check_key or ctx_key
+        real = ctx.get(k, 0)
+        try:
+            is_zero = not real or _D(str(real)) == _D("0")
+        except Exception:
+            is_zero = not real
+        if is_zero:
+            ctx[ctx_key] = demo_val
+            return True
+        return False
+
+    # Only activate demo mode if we have no real transactions at all
+    total_sales_ever = Sale.objects.count()
+    if total_sales_ever == 0:
+        using_demo = True
+        # Platform Pulse demo values
+        _demo_if_zero("mrr_sum", _D("8700000.00"))
+        _demo_if_zero("revenue_30d", _D("12400000.00"))
+        _demo_if_zero("gross_profit_30d", _D("3200000.00"))
+        _demo_if_zero("sales_count", 386, check_key="sales_count")
+        # Stock
+        _demo_if_zero("stock_in_7d", 248)
+        _demo_if_zero("stock_out_7d", 412)
+        # Agents
+        _demo_if_zero("agents_new_30d", 6)
+        # Invoices
+        if ctx.get("open_invoices", 0) == 0:
+            ctx["open_invoices"] = 14
+            ctx["open_total"] = _D("2100000.00")
+        # Wallet
+        _demo_if_zero("wallet_in_30d", _D("9800000.00"))
+        _demo_if_zero("wallet_out_30d", _D("4300000.00"))
+        # Collection rate demo
+        if ctx.get("collection_rate", 0) == 0:
+            ctx["collection_rate"] = 87
+        # Demo monthly chart data (12 months plausible arc)
+        import json as _json
+        if not any(json.loads(ctx.get("monthly_sales_labels", "[]"))):
+            ctx["monthly_sales_labels"] = _json.dumps(
+                ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            )
+            ctx["monthly_sales_data"] = _json.dumps([12, 19, 31, 27, 42, 38, 55, 48, 61, 53, 72, 68])
+            ctx["monthly_revenue_data"] = _json.dumps([
+                520000, 840000, 1200000, 1050000, 1680000, 1490000,
+                2200000, 1940000, 2480000, 2100000, 2900000, 2740000,
+            ])
+            ctx["sales_ytd_count"] = 526
+            ctx["sales_ytd_revenue"] = 20140000
+            ctx["sales_peak_month_label"] = "November"
+            ctx["sales_peak_month_count"] = 72
+            ctx["sales_peak_month_revenue"] = 2900000
+        # Demo top agents
+        if not ctx.get("top_agents"):
+            ctx["top_agents"] = [
+                {"name": "Takondwa Banda", "sales_count": 87, "revenue": _D("3480000")},
+                {"name": "Chisomo Phiri", "sales_count": 74, "revenue": _D("2960000")},
+                {"name": "Lumbani Mwale", "sales_count": 61, "revenue": _D("2440000")},
+                {"name": "Grace Zimba", "sales_count": 53, "revenue": _D("2120000")},
+                {"name": "Patrick Njobvu", "sales_count": 47, "revenue": _D("1880000")},
+            ]
+
+    ctx["using_demo"] = using_demo
+
+    # -------------------------------------------------------------------
+    # Summary context helpers for template rendering
+    # -------------------------------------------------------------------
+    # Active businesses percentage (of total) — useful for ops health gauge
+    ctx["active_biz_count"] = Business.objects.filter(status__in=["ACTIVE", "active"]).count()
+
+    # Subscription health
+    ctx["trial_subs"] = Subscription.objects.filter(status__in=["TRIAL", "trial"]).count()
+    ctx["expired_subs"] = Subscription.objects.filter(status__in=["EXPIRED", "expired", "CANCELLED", "cancelled"]).count()
+
     return _render_safe(request, "hq/dashboard.html", ctx, _dashboard_inline)
 
 

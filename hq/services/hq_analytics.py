@@ -95,10 +95,9 @@ def _build_sales_queryset(
     if business_id:
         qs = qs.filter(item__business_id=business_id)
 
-    # Filter by vertical (via item.business.vertical/business_kind)
+    # Filter by vertical (via item.business.business_kind)
     if vertical:
-        # Try different field names for vertical
-        qs = qs.filter(Q(item__business__business_kind__iexact=vertical) | Q(item__business__vertical__iexact=vertical))
+        qs = qs.filter(item__business__business_kind__iexact=vertical)
 
     # Filter by agent
     if agent_id:
@@ -163,7 +162,7 @@ def _get_kpis(
     if business_id:
         active_businesses = active_businesses.filter(pk=business_id)
     if vertical:
-        active_businesses = active_businesses.filter(Q(business_kind__iexact=vertical) | Q(vertical__iexact=vertical))
+        active_businesses = active_businesses.filter(business_kind__iexact=vertical)
     total_businesses = active_businesses.count()
 
     active_agents = Membership.objects.filter(role="AGENT")
@@ -182,17 +181,25 @@ def _get_kpis(
         if business_id:
             inv_qs = inv_qs.filter(business_id=business_id)
         if vertical:
-            # Filter by business vertical
-            inv_qs = inv_qs.filter(Q(business__business_kind__iexact=vertical) | Q(business__vertical__iexact=vertical))
+            inv_qs = inv_qs.filter(business__business_kind__iexact=vertical)
 
-        # Stock value (cost basis, using cost_price field)
+        # Stock value (cost basis — InventoryItem phones use order_price)
         stock_value_data = inv_qs.aggregate(
-            total=Coalesce(Sum(Coalesce(F("cost_price"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)))), zero_dec)
+            total=Coalesce(
+                Sum(Coalesce(F("order_price"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)))),
+                zero_dec,
+            )
         )
         stock_value = stock_value_data["total"] or Decimal("0.00")
 
         # Retail value
-        retail_value_data = inv_qs.aggregate(total=Coalesce(Sum("price"), zero_dec))
+        # InventoryItem phones use selling_price for retail value
+        retail_value_data = inv_qs.aggregate(
+            total=Coalesce(
+                Sum(Coalesce(F("selling_price"), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)))),
+                zero_dec,
+            )
+        )
         retail_value = retail_value_data["total"] or Decimal("0.00")
 
         # Expected margin
@@ -362,23 +369,22 @@ def _get_breakdowns(
             }
         )
 
-    # Vertical mix (revenue by vertical)
+    # Vertical mix (revenue by business_kind)
     vertical_mix = []
     if not business_id:  # Only show if not filtering by business
-        # Aggregate by business vertical
         vertical_agg = (
-            sales_qs.values("item__business__business_kind", "item__business__vertical")
+            sales_qs.values("item__business__business_kind")
             .annotate(revenue=Coalesce(Sum("price"), zero_dec), count=Count("id"))
             .order_by("-revenue")
         )
 
         total_vertical_revenue = sum(float(v["revenue"] or 0) for v in vertical_agg)
         for v in vertical_agg:
-            vert = v["item__business__business_kind"] or v["item__business__vertical"] or "Unknown"
+            vert = v["item__business__business_kind"] or "Unknown"
             amount = float(v["revenue"] or 0)
             vertical_mix.append(
                 {
-                    "vertical": vert,
+                    "vertical": vert.title(),
                     "revenue": amount,
                     "count": v["count"],
                     "percentage": (amount / total_vertical_revenue * 100) if total_vertical_revenue > 0 else 0,

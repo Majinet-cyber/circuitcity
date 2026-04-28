@@ -10,7 +10,7 @@ from datetime import date, timedelta
 
 from tenants.models import Business
 from sales.models import Sale
-from inventory.models import InventoryItem, Location
+from inventory.models import InventoryItem, Location, Product
 from hq.services.hq_analytics import get_hq_analytics_data
 
 User = get_user_model()
@@ -35,13 +35,21 @@ class HQAnalyticsTestCase(TestCase):
         # Create agent
         self.agent = User.objects.create_user(username="test_agent", email="agent@test.com", password="testpass123")
 
-        # Create inventory item
+        # Create phone product (InventoryItem requires a Product FK)
+        self.product = Product.objects.create(
+            code="TEST-PHONE-001",
+            model="Test Phone Model",
+            brand="TestBrand",
+        )
+
+        # Create inventory item (phones use order_price for cost, selling_price for retail)
         self.item = InventoryItem.objects.create(
             business=self.business,
-            name="Test Phone",
-            price=Decimal("100000.00"),
-            cost=Decimal("80000.00"),
-            status="AVAILABLE",
+            product=self.product,
+            current_location=self.location,
+            order_price=Decimal("80000.00"),
+            selling_price=Decimal("100000.00"),
+            status="IN_STOCK",
         )
 
         # Create sale
