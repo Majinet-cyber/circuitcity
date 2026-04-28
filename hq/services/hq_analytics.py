@@ -141,24 +141,16 @@ def _get_kpis(
     sales_count = sales_qs.count()
 
     # Profit (revenue - cost of goods)
-    # Try to get cost from item.cost or item.purchase_price
-    profit_annotation = Case(
-        When(item__cost__isnull=False, then=F("price") - F("item__cost")),
-        When(item__purchase_price__isnull=False, then=F("price") - F("item__purchase_price")),
-        default=F("price"),
-        output_field=DecimalField(max_digits=12, decimal_places=2),
-    )
+    # Use cost_price field (the canonical cost field on InventoryItem)
+    zero_cost = Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+    profit_annotation = F("price") - Coalesce(F("item__cost_price"), zero_cost)
     profit_data = sales_qs.annotate(profit=profit_annotation).aggregate(total_profit=Coalesce(Sum("profit"), zero_dec))
     profit = profit_data["total_profit"] or Decimal("0.00")
 
     # Cost of goods
-    cost_annotation = Case(
-        When(item__cost__isnull=False, then=F("item__cost")),
-        When(item__purchase_price__isnull=False, then=F("item__purchase_price")),
-        default=Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
-        output_field=DecimalField(max_digits=12, decimal_places=2),
+    cost_data = sales_qs.aggregate(
+        total_cost=Coalesce(Sum(Coalesce(F("item__cost_price"), zero_cost)), zero_dec)
     )
-    cost_data = sales_qs.annotate(cost=cost_annotation).aggregate(total_cost=Coalesce(Sum("cost"), zero_dec))
     cost_of_goods = cost_data["total_cost"] or Decimal("0.00")
 
     # Additional KPIs based on filters

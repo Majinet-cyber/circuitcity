@@ -7,7 +7,7 @@
  * Sidebar NEVER disappears or transforms offscreen.
  * Loaded LAST to override any conflicting rules.
  * 
- * Cache-buster: ?v=20260211-1
+ * Cache-buster: ?v=20260428-2
  * =============================================================================
  */
 
@@ -24,7 +24,8 @@ body[data-layout="hq"] .hq-layout {
 }
 
 /* ========================================
-   SIDEBAR: sticky, always visible
+   SIDEBAR: base visual & scroll styles
+   (position is set per breakpoint below)
    ======================================== */
 body[data-layout="hq"] #hqSidebar,
 body[data-layout="hq"] .hq-sidebar {
@@ -43,6 +44,48 @@ body[data-layout="hq"] .hq-sidebar {
   opacity: 1 !important;
   transform: none !important;
   left: auto !important;
+}
+
+/* ========================================
+   DESKTOP (≥992px): Fixed sidebar + block layout
+   
+   WHY display:block instead of grid:
+   When a grid item is position:fixed, CSS removes
+   it from the grid's in-flow items. Grid auto-
+   placement then puts .hq-main into column 1 (the
+   260px column) instead of column 2 — content
+   becomes 260px wide and hides behind the sidebar.
+   
+   Solution: switch to display:block on desktop so
+   .hq-main fills the full width, then push it right
+   with margin-left equal to the sidebar width.
+   ======================================== */
+@media (min-width: 992px) {
+  /* Block layout — grid spacer is not needed when
+     sidebar is fixed and .hq-main uses margin-left */
+  body[data-layout="hq"] .hq-layout {
+    display: block;
+    overflow-x: clip;
+  }
+
+  body[data-layout="hq"] #hqSidebar,
+  body[data-layout="hq"] .hq-sidebar {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0;
+    width: 260px;
+    height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1000;
+  }
+
+  /* Push main content to the right of the fixed sidebar */
+  body[data-layout="hq"] .hq-main {
+    margin-left: 260px;
+    width: calc(100% - 260px);
+    min-height: 100vh;
+  }
 }
 
 /* ========================================
@@ -379,8 +422,149 @@ body[data-layout="hq"] .hq-content table {
   width: 100% !important;
 }
 
+/* ========================================
+   PREMIUM CARD SYSTEM
+   ======================================== */
+body[data-layout="hq"] .hq-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  overflow: hidden;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+body[data-layout="hq"] .hq-card:hover {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.10);
+}
+body[data-layout="hq"] .hq-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+}
+body[data-layout="hq"] .hq-card-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+body[data-layout="hq"] .hq-card-body {
+  padding: 20px;
+}
 
+/* ---- Premium tables ---- */
+body[data-layout="hq"] .hq-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+body[data-layout="hq"] .hq-table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #94a3b8;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  text-align: left;
+  background: #fafbfc;
+  white-space: nowrap;
+}
+body[data-layout="hq"] .hq-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f8fafc;
+  font-size: 13.5px;
+  color: #374151;
+  vertical-align: middle;
+}
+body[data-layout="hq"] .hq-table tr:last-child td {
+  border-bottom: none;
+}
+body[data-layout="hq"] .hq-table tr:hover td {
+  background: #f8fafc;
+}
 
+/* ---- Status badges ---- */
+body[data-layout="hq"] .hq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+body[data-layout="hq"] .hq-badge-success  { background: #d1fae5; color: #065f46; }
+body[data-layout="hq"] .hq-badge-warning  { background: #fef3c7; color: #92400e; }
+body[data-layout="hq"] .hq-badge-danger   { background: #fee2e2; color: #991b1b; }
+body[data-layout="hq"] .hq-badge-info     { background: #dbeafe; color: #1e40af; }
+body[data-layout="hq"] .hq-badge-neutral  { background: #f1f5f9; color: #475569; }
+body[data-layout="hq"] .hq-badge-purple   { background: #ede9fe; color: #5b21b6; }
+
+/* ---- Trend chips ---- */
+body[data-layout="hq"] .hq-trend-up   { color: #16a34a; background: #dcfce7; padding: 2px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; }
+body[data-layout="hq"] .hq-trend-down { color: #dc2626; background: #fee2e2; padding: 2px 7px; border-radius: 5px; font-size: 11.5px; font-weight: 700; }
+
+/* ---- Section heading ---- */
+body[data-layout="hq"] .hq-section-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+body[data-layout="hq"] .hq-section-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #f1f5f9;
+}
+
+/* ---- Sidebar: stronger active state ---- */
+body[data-layout="hq"] .cc-nav li.active a {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #a5b4fc !important;
+  font-weight: 700 !important;
+  border-left: 3px solid #6366f1;
+  padding-left: 9px;
+}
+body[data-layout="hq"] .cc-nav li.active a i {
+  color: #a5b4fc !important;
+}
+body[data-layout="hq"] .cc-nav li a:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+/* ---- HQ page base ---- */
+body[data-layout="hq"] .hq-page {
+  background: #f8fafc;
+}
+
+/* ---- Empty state ---- */
+body[data-layout="hq"] .hq-empty-state {
+  text-align: center;
+  padding: 48px 20px;
+  color: #94a3b8;
+}
+body[data-layout="hq"] .hq-empty-state i {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+  display: block;
+  opacity: 0.4;
+}
+body[data-layout="hq"] .hq-empty-state p {
+  margin: 0;
+  font-size: 13.5px;
+}
 
 
 

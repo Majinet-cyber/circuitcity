@@ -153,3 +153,153 @@ class HQAnalyticsTestCase(TestCase):
         self.assertIn("kpis", data)
         self.assertEqual(data["kpis"]["sales_count"], 0)
         self.assertEqual(data["kpis"]["revenue"], 0.0)
+
+
+class HQAnalyticsPageTests(TestCase):
+    """Tests for the /hq/analytics/ page — premium redesign regression suite."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username="hq_page_admin",
+            email="hqpage@test.com",
+            password="testpass123",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client = Client()
+        self.client.force_login(self.staff_user)
+
+    def test_analytics_page_loads(self):
+        """/hq/analytics/ returns HTTP 200 for an HQ admin user."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_analytics_page_contains_kpi_cards(self):
+        """Analytics page contains KPI card elements."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # KPI grid should be present
+        self.assertIn("kpi-command-grid", content)
+        # At least some KPI labels present
+        self.assertIn("Total Revenue", content)
+        self.assertIn("Total Sales", content)
+        self.assertIn("MRR", content)
+
+    def test_analytics_page_contains_chart_containers(self):
+        """Analytics page contains Chart.js canvas elements."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # Must have chart canvas ids
+        self.assertIn("chartRevenueTrend", content)
+        self.assertIn("chartVerticalMix", content)
+        self.assertIn("chartPaymentMix", content)
+        self.assertIn("chartProfitTrend", content)
+
+    def test_analytics_page_does_not_render_raw_json_dump(self):
+        """Analytics page must NOT contain raw pprint JSON dump of analytics_data."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        # pprint dump removed — should not appear
+        self.assertNotIn("analytics_data|pprint", content)
+        # Also ensure raw dict-like dump patterns are absent
+        self.assertNotIn("'kpis': {", content)
+        self.assertNotIn("&quot;kpis&quot;", content)
+
+    def test_analytics_page_has_smart_insights_section(self):
+        """Analytics page contains the insights grid container."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("insightsGrid", content)
+
+    def test_analytics_page_has_filter_presets(self):
+        """Analytics filter bar contains all expected date presets."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("last_7d", content)
+        self.assertIn("last_30d", content)
+        self.assertIn("this_month", content)
+        self.assertIn("last_month", content)
+        self.assertIn("all_time", content)
+
+    def test_analytics_page_preset_last_7d(self):
+        """Analytics page works with last_7d preset."""
+        response = self.client.get("/hq/analytics/?preset=last_7d")
+        self.assertEqual(response.status_code, 200)
+
+    def test_analytics_page_preset_this_month(self):
+        """Analytics page works with this_month preset."""
+        response = self.client.get("/hq/analytics/?preset=this_month")
+        self.assertEqual(response.status_code, 200)
+
+    def test_analytics_page_preset_all_time(self):
+        """Analytics page works with all_time preset."""
+        response = self.client.get("/hq/analytics/?preset=all_time")
+        self.assertEqual(response.status_code, 200)
+
+    def test_analytics_page_has_demo_fallback_logic(self):
+        """Analytics page JS includes demo fallback data (DEMO_REVENUE_TREND)."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("DEMO_REVENUE_TREND", content)
+
+    def test_analytics_page_has_top_tables(self):
+        """Analytics page contains top businesses and top agents table sections."""
+        response = self.client.get("/hq/analytics/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn("Top Performing Businesses", content)
+        self.assertIn("Most Active Agents", content)
+
+    def test_analytics_page_unauthenticated_redirects(self):
+        """Unauthenticated request to /hq/analytics/ should redirect to login."""
+        client = Client()
+        response = client.get("/hq/analytics/")
+        self.assertIn(response.status_code, [302, 403])
+
+
+class HQRouteRegressionTests(TestCase):
+    """Ensure core HQ routes still load after analytics redesign."""
+
+    def setUp(self):
+        self.staff_user = User.objects.create_user(
+            username="hq_regression",
+            email="regression@test.com",
+            password="testpass123",
+            is_staff=True,
+            is_superuser=True,
+        )
+        self.client = Client()
+        self.client.force_login(self.staff_user)
+
+    def test_hq_dashboard_still_loads(self):
+        """HQ dashboard loads after analytics changes."""
+        response = self.client.get("/hq/dashboard/")
+        self.assertIn(response.status_code, [200, 302])
+
+    def test_hq_home_still_loads(self):
+        """HQ home route still resolves."""
+        response = self.client.get("/hq/home/")
+        self.assertIn(response.status_code, [200, 302])
+
+    def test_hq_bug_monitor_still_loads(self):
+        """HQ bug monitor still loads (no regression)."""
+        response = self.client.get("/hq/bugs/")
+        self.assertIn(response.status_code, [200, 302])
+
+    def test_hq_analytics_api_still_works(self):
+        """HQ analytics JSON API still returns 200."""
+        response = self.client.get("/hq/api/analytics/data.json")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("kpis", data)
+
+    def test_hq_analytics_page_no_500(self):
+        """HQ analytics page never returns 500 (hardened view)."""
+        response = self.client.get("/hq/analytics/?preset=invalid_preset&business_id=99999999")
+        self.assertNotEqual(response.status_code, 500)

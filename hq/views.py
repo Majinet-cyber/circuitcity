@@ -1852,6 +1852,12 @@ def hq_analytics(request):
         elif preset == "yesterday":
             start_date = today - timedelta(days=1)
             end_date = start_date
+        elif preset == "last_7d":
+            start_date = today - timedelta(days=6)
+            end_date = today
+        elif preset == "last_30d":
+            start_date = today - timedelta(days=29)
+            end_date = today
         elif preset == "this_month":
             start_date = today.replace(day=1)
             end_date = today
@@ -1860,6 +1866,9 @@ def hq_analytics(request):
             last_day_last_month = first_day_this_month - timedelta(days=1)
             start_date = last_day_last_month.replace(day=1)
             end_date = last_day_last_month
+        elif preset == "all_time":
+            start_date = today.replace(month=1, day=1, year=today.year - 2)
+            end_date = today
         elif start_str or end_str:
             # Custom date range (safe parsing: invalid dates ignored)
             if start_str:
@@ -1947,8 +1956,60 @@ def hq_analytics(request):
             ("gym", "Gym"),
         ]
 
+        # Billing KPIs (safe: all wrapped in try/except)
+        billing_kpis = {}
+        try:
+            active_subs = Subscription.objects.filter(status="active").count()
+            trialing_subs = Subscription.objects.filter(status__in=["trial", "trialing"]).count()
+            churn_risk = Subscription.objects.filter(status__in=["past_due", "grace", "suspended"]).count()
+            canceled_subs = Subscription.objects.filter(status__in=["canceled", "cancelled", "expired"]).count()
+            # MRR: sum of plan amounts for active subscriptions
+            from django.db.models import Sum as _Sum
+            mrr_result = Subscription.objects.filter(status="active").aggregate(
+                mrr=Coalesce(_Sum("plan__amount"), Value(0, output_field=DecimalField()))
+            )
+            mrr = float(mrr_result["mrr"] or 0)
+            # Open invoices
+            open_invoices = Invoice.objects.filter(status__in=["issued", "sent", "overdue"]).count()
+            outstanding_result = Invoice.objects.filter(status__in=["issued", "sent", "overdue"]).aggregate(
+                total=Coalesce(_Sum("total"), Value(0, output_field=DecimalField()))
+            )
+            outstanding_amount = float(outstanding_result["total"] or 0)
+            # Collections rate
+            paid_result = Invoice.objects.filter(status="paid").aggregate(
+                total=Coalesce(_Sum("total"), Value(0, output_field=DecimalField()))
+            )
+            paid_amount = float(paid_result["total"] or 0)
+            total_invoiced = paid_amount + outstanding_amount
+            collections_rate = round((paid_amount / total_invoiced * 100) if total_invoiced > 0 else 0, 1)
+
+            billing_kpis = {
+                "active_subscriptions": active_subs,
+                "trialing_subscriptions": trialing_subs,
+                "churn_risk": churn_risk,
+                "canceled_subscriptions": canceled_subs,
+                "mrr": mrr,
+                "open_invoices": open_invoices,
+                "outstanding_amount": outstanding_amount,
+                "paid_amount": paid_amount,
+                "collections_rate": collections_rate,
+            }
+        except Exception:
+            billing_kpis = {
+                "active_subscriptions": 0,
+                "trialing_subscriptions": 0,
+                "churn_risk": 0,
+                "canceled_subscriptions": 0,
+                "mrr": 0,
+                "open_invoices": 0,
+                "outstanding_amount": 0,
+                "paid_amount": 0,
+                "collections_rate": 0,
+            }
+
         ctx = {
             "analytics_data": analytics_data,
+            "billing_kpis": billing_kpis,
             "start_date": start_date,
             "end_date": end_date,
             "preset": preset,
