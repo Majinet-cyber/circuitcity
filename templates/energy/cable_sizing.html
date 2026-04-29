@@ -1,0 +1,652 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Cable Sizing & Voltage Drop – {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+:root {
+  --cs-blue:   #1d4ed8;
+  --cs-green:  #059669;
+  --cs-amber:  #d97706;
+  --cs-red:    #dc2626;
+  --cs-slate:  #0f172a;
+  --cs-muted:  #64748b;
+  --cs-border: #e2e8f0;
+  --cs-radius: 16px;
+  --cs-shadow: 0 2px 12px rgba(15,23,42,.07);
+}
+.cs-hero {
+  background:linear-gradient(135deg,#0f172a 0%,#1a2744 50%,#1d4ed8 100%);
+  border-radius:var(--cs-radius); padding:2rem 2.25rem 1.6rem;
+  position:relative; overflow:hidden; margin-bottom:1.75rem; color:#fff;
+}
+.cs-hero::before {
+  content:''; position:absolute; top:-60px; right:-60px;
+  width:280px; height:280px;
+  background:radial-gradient(circle,rgba(99,102,241,.18) 0%,transparent 70%);
+}
+.cs-hero-inner { position:relative; z-index:1; }
+.cs-eyebrow {
+  font-size:.68rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:rgba(255,255,255,.5); margin-bottom:.3rem;
+}
+.cs-hero h1 { font-size:1.6rem; font-weight:800; margin-bottom:.2rem; }
+.cs-hero-sub { font-size:.87rem; color:rgba(255,255,255,.65); max-width:540px; }
+.cs-card {
+  background:#fff; border-radius:var(--cs-radius); border:1.5px solid var(--cs-border);
+  box-shadow:var(--cs-shadow); padding:1.5rem; margin-bottom:1.25rem;
+}
+.cs-card-header {
+  display:flex; align-items:center; gap:.6rem; margin-bottom:1rem;
+  padding-bottom:.7rem; border-bottom:1px solid #f1f5f9;
+}
+.cs-card-icon {
+  width:36px; height:36px; border-radius:10px; display:flex;
+  align-items:center; justify-content:center; font-size:1rem; flex-shrink:0;
+}
+.cs-card-title { font-size:.95rem; font-weight:700; color:var(--cs-slate); }
+.cs-card-sub { font-size:.75rem; color:var(--cs-muted); }
+.cs-form-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+@media(max-width:576px) { .cs-form-grid { grid-template-columns:1fr; } }
+.cs-label { font-size:.78rem; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.35rem; display:block; }
+.cs-input {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--cs-border);
+  font-size:.88rem; color:var(--cs-slate); background:#fff;
+  transition:border-color .15s; outline:none;
+}
+.cs-input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+.cs-select {
+  width:100%; padding:.55rem .85rem; border-radius:10px; border:1.5px solid var(--cs-border);
+  font-size:.88rem; color:var(--cs-slate); background:#fff; cursor:pointer;
+}
+
+/* Results */
+.cs-result-hero {
+  border-radius:14px; padding:1.25rem 1.5rem; text-align:center;
+  margin-bottom:1rem; position:relative; overflow:hidden;
+}
+.cs-result-hero.pass { background:linear-gradient(135deg,#f0fdf4,#dcfce7); border:2px solid #86efac; }
+.cs-result-hero.warn { background:linear-gradient(135deg,#fff7ed,#fed7aa); border:2px solid #fb923c; }
+.cs-result-hero.fail { background:linear-gradient(135deg,#fff1f2,#fecaca); border:2px solid #f87171; }
+.cs-result-hero .big-val { font-size:3rem; font-weight:900; line-height:1; }
+.cs-result-hero.pass .big-val { color:#166534; }
+.cs-result-hero.warn .big-val { color:#9a3412; }
+.cs-result-hero.fail .big-val { color:#991b1b; }
+.cs-result-hero .big-label { font-size:.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; margin-top:.3rem; }
+.cs-result-hero.pass .big-label { color:#16a34a; }
+.cs-result-hero.warn .big-label { color:#c2410c; }
+.cs-result-hero.fail .big-label { color:#b91c1c; }
+
+/* Progress bar */
+.vd-bar-wrap { background:#f1f5f9; border-radius:999px; height:14px; overflow:hidden; margin:.5rem 0; }
+.vd-bar { height:100%; border-radius:999px; transition:width .4s; }
+
+.cs-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+.cs-table th { background:#f8fafc; color:#475569; font-weight:700; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; padding:.5rem .75rem; border-bottom:2px solid var(--cs-border); text-align:left; }
+.cs-table td { padding:.5rem .75rem; border-bottom:1px solid #f1f5f9; color:#374151; }
+.cs-table tr:last-child td { border-bottom:none; }
+.cs-table tr:hover td { background:#f8fafc; }
+
+.rec-cable {
+  background:linear-gradient(135deg,#1d4ed8,#4f46e5);
+  color:#fff; border-radius:14px; padding:1.25rem; text-align:center; margin-bottom:1rem;
+}
+.rec-cable .size-label { font-size:2.5rem; font-weight:900; line-height:1.1; }
+.rec-cable .size-sub { font-size:.82rem; color:rgba(255,255,255,.75); margin-top:.2rem; }
+
+.intel-box {
+  border-radius:12px; padding:.9rem 1rem; margin-bottom:.75rem;
+  font-size:.83rem; line-height:1.55;
+}
+.intel-box.info { background:#eff6ff; border:1.5px solid #bfdbfe; color:#1e40af; }
+.intel-box.warn { background:#fff7ed; border:1.5px solid #fed7aa; color:#9a3412; }
+.intel-box.danger { background:#fff1f2; border:1.5px solid #fecaca; color:#991b1b; }
+.intel-box.success { background:#f0fdf4; border:1.5px solid #bbf7d0; color:#166534; }
+.intel-box-title { font-weight:700; margin-bottom:.3rem; }
+
+/* Tabs */
+.cs-tabs { display:flex; gap:.3rem; flex-wrap:wrap; border-bottom:2px solid #e2e8f0; margin-bottom:1.1rem; }
+.cs-tab { padding:.45rem .9rem; border-radius:8px 8px 0 0; font-size:.8rem; font-weight:600; color:var(--cs-muted); cursor:pointer; border:none; background:none; transition:all .15s; position:relative; bottom:-2px; border-bottom:2px solid transparent; }
+.cs-tab.active { color:#1d4ed8; border-bottom-color:#1d4ed8; background:#eff6ff; }
+.cs-tab-content { display:none; }
+.cs-tab-content.active { display:block; }
+
+/* Visual cable cross-section */
+.cable-cross { display:flex; align-items:center; justify-content:center; margin:1rem 0; }
+.cable-outer { background:#1e293b; border-radius:50%; display:flex; align-items:center; justify-content:center; transition:all .4s; }
+.cable-inner { background:#d97706; border-radius:50%; transition:all .4s; }
+</style>
+
+<div class="container-fluid py-4">
+
+  <!-- HERO -->
+  <div class="cs-hero mb-4">
+    <div class="cs-hero-inner">
+      <div class="cs-eyebrow"><i class="bi bi-lightning-charge-fill me-1"></i>Emajinet Engineering Tools</div>
+      <h1>Cable Sizing &amp; Voltage Drop</h1>
+      <div class="cs-hero-sub">
+        Professional DC &amp; AC cable sizing, voltage drop simulation, cross-section selection,
+        and conductor safety analysis — engineering-grade, real-time.
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+
+    <!-- LEFT: INPUTS -->
+    <div class="col-lg-5">
+
+      <!-- Circuit Parameters -->
+      <div class="cs-card">
+        <div class="cs-card-header">
+          <div class="cs-card-icon" style="background:#eff6ff;"><i class="bi bi-plug" style="color:#1d4ed8;"></i></div>
+          <div><div class="cs-card-title">Circuit Parameters</div><div class="cs-card-sub">Define your circuit electrical characteristics</div></div>
+        </div>
+        <div class="cs-form-grid mb-3">
+          <div>
+            <label class="cs-label">Circuit Type</label>
+            <select class="cs-select" id="circuitType" onchange="calculate()">
+              <option value="dc">DC (Solar/Battery)</option>
+              <option value="ac_single">AC Single Phase</option>
+              <option value="ac_three">AC Three Phase</option>
+            </select>
+          </div>
+          <div>
+            <label class="cs-label">System Voltage (V)</label>
+            <input type="number" class="cs-input" id="sysVolt" value="24" min="1" max="1000" oninput="calculate()">
+          </div>
+          <div>
+            <label class="cs-label">Load Current (A)</label>
+            <input type="number" class="cs-input" id="loadAmp" value="30" min="0.1" max="2000" step="0.1" oninput="calculate()">
+          </div>
+          <div>
+            <label class="cs-label">— OR — Load Power (W)</label>
+            <input type="number" class="cs-input" id="loadWatt" value="720" min="0" oninput="powerToAmps()">
+          </div>
+          <div>
+            <label class="cs-label">One-Way Cable Length (m)</label>
+            <input type="number" class="cs-input" id="cableLen" value="5" min="0.1" max="5000" step="0.1" oninput="calculate()">
+          </div>
+          <div>
+            <label class="cs-label">Conductor Material</label>
+            <select class="cs-select" id="material" onchange="calculate()">
+              <option value="copper">Copper (best)</option>
+              <option value="aluminium">Aluminium</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Acceptable Limits -->
+      <div class="cs-card">
+        <div class="cs-card-header">
+          <div class="cs-card-icon" style="background:#fefce8;"><i class="bi bi-sliders" style="color:#d97706;"></i></div>
+          <div><div class="cs-card-title">Design Standards</div><div class="cs-card-sub">Set voltage drop and safety limits</div></div>
+        </div>
+        <div class="cs-form-grid">
+          <div>
+            <label class="cs-label">Max Acceptable Voltage Drop (%)</label>
+            <select class="cs-select" id="maxVD" onchange="calculate()">
+              <option value="1">1% — Critical Loads</option>
+              <option value="2">2% — IEC Standard</option>
+              <option value="3" selected>3% — NEC / Good Practice</option>
+              <option value="5">5% — Acceptable</option>
+              <option value="10">10% — Minimum (power tools)</option>
+            </select>
+          </div>
+          <div>
+            <label class="cs-label">Load Type</label>
+            <select class="cs-select" id="loadType" onchange="calculate()">
+              <option value="resistive">Resistive (heaters, lights)</option>
+              <option value="motor" selected>Motor / Pump (inductive)</option>
+              <option value="inverter">Inverter (sensitive)</option>
+              <option value="ev">EV Charger</option>
+            </select>
+          </div>
+          <div>
+            <label class="cs-label">Ambient Temperature (°C)</label>
+            <select class="cs-select" id="tempAdj" onchange="calculate()">
+              <option value="1.0">≤30°C – No derating</option>
+              <option value="0.91" selected>31–40°C – 9% derating</option>
+              <option value="0.87">41–45°C – 13% derating</option>
+              <option value="0.71">46–50°C – 29% derating</option>
+              <option value="0.58">51–60°C – 42% derating</option>
+            </select>
+          </div>
+          <div>
+            <label class="cs-label">Number of Cables in Conduit</label>
+            <select class="cs-select" id="bundleAdj" onchange="calculate()">
+              <option value="1.0" selected>1 (no bundling)</option>
+              <option value="0.8">2–3 cables (0.8)</option>
+              <option value="0.7">4–6 cables (0.7)</option>
+              <option value="0.6">7–9 cables (0.6)</option>
+              <option value="0.5">10+ cables (0.5)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional: Test specific cable size -->
+      <div class="cs-card">
+        <div class="cs-card-header">
+          <div class="cs-card-icon" style="background:#f0fdf4;"><i class="bi bi-search" style="color:#059669;"></i></div>
+          <div><div class="cs-card-title">Test a Specific Cable Size</div><div class="cs-card-sub">Verify if a specific cable will work</div></div>
+        </div>
+        <div class="d-flex gap-2 align-items-end">
+          <div style="flex:1;">
+            <label class="cs-label">Cable Cross-Section</label>
+            <select class="cs-select" id="testCable" onchange="calculate()">
+              <option value="1.5">1.5 mm²</option>
+              <option value="2.5">2.5 mm²</option>
+              <option value="4">4 mm²</option>
+              <option value="6">6 mm²</option>
+              <option value="10">10 mm²</option>
+              <option value="16" selected>16 mm²</option>
+              <option value="25">25 mm²</option>
+              <option value="35">35 mm²</option>
+              <option value="50">50 mm²</option>
+              <option value="70">70 mm²</option>
+              <option value="95">95 mm²</option>
+              <option value="120">120 mm²</option>
+              <option value="150">150 mm²</option>
+              <option value="185">185 mm²</option>
+            </select>
+          </div>
+        </div>
+        <div id="testCableResult" class="mt-2"></div>
+      </div>
+
+    </div><!-- /col-lg-5 -->
+
+    <!-- RIGHT: RESULTS -->
+    <div class="col-lg-7">
+
+      <!-- Main Result -->
+      <div class="cs-card">
+        <div class="cs-card-header">
+          <div class="cs-card-icon" style="background:#eff6ff;"><i class="bi bi-lightning" style="color:#6366f1;"></i></div>
+          <div><div class="cs-card-title">Cable Recommendation</div><div class="cs-card-sub">Engineering-grade recommendation</div></div>
+        </div>
+        <div id="mainResult"></div>
+      </div>
+
+      <!-- Detailed Analysis -->
+      <div class="cs-card">
+        <div class="cs-tabs">
+          <button class="cs-tab active" onclick="openCsTab('vd_tab')" id="cs-tab-vd_tab">Voltage Drop</button>
+          <button class="cs-tab" onclick="openCsTab('compare_tab')" id="cs-tab-compare_tab">Cable Comparison</button>
+          <button class="cs-tab" onclick="openCsTab('run_tab')" id="cs-tab-run_tab">Long-Run Analysis</button>
+          <button class="cs-tab" onclick="openCsTab('sizing_guide_tab')" id="cs-tab-sizing_guide_tab">Sizing Guide</button>
+        </div>
+
+        <div id="vd_tab" class="cs-tab-content active">
+          <div id="vdAnalysis"></div>
+        </div>
+        <div id="compare_tab" class="cs-tab-content">
+          <div id="compareTable"></div>
+        </div>
+        <div id="run_tab" class="cs-tab-content">
+          <div id="runAnalysis"></div>
+        </div>
+        <div id="sizing_guide_tab" class="cs-tab-content">
+          <div id="sizingGuide"></div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-7 -->
+  </div>
+
+  <!-- Reference Tables -->
+  <div class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="cs-card">
+        <div class="cs-card-header">
+          <div class="cs-card-icon" style="background:#fefce8;"><i class="bi bi-table" style="color:#d97706;"></i></div>
+          <div><div class="cs-card-title">IEC Cable Ampacity Reference Table</div><div class="cs-card-sub">Copper conductors, PVC insulation, 30°C ambient, single circuit in free air</div></div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="cs-table">
+            <thead>
+              <tr>
+                <th>Cross-Section (mm²)</th>
+                <th>Max Current (A)</th>
+                <th>Resistance (Ω/km)</th>
+                <th>Common Use</th>
+                <th>Solar Systems</th>
+              </tr>
+            </thead>
+            <tbody id="cableRefTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   CABLE SIZING ENGINE — Professional Voltage Drop Calculator
+   IEC 60364 / NEC compliant logic
+   ============================================================ */
+
+const COPPER_RESISTIVITY    = 0.0175; // Ω·mm²/m
+const ALUMINIUM_RESISTIVITY = 0.028;  // Ω·mm²/m
+
+const CABLE_DATA = [
+  // [mm2, max_amp_copper, max_amp_aluminium, resistance_per_km_copper, label]
+  [1.5,  18,  14,  12.1,  "1.5 mm²"],
+  [2.5,  26,  20,  7.41,  "2.5 mm²"],
+  [4,    36,  27,  4.61,  "4 mm²"],
+  [6,    46,  36,  3.08,  "6 mm²"],
+  [10,   65,  50,  1.83,  "10 mm²"],
+  [16,   87,  66,  1.15,  "16 mm²"],
+  [25,  114,  87,  0.727, "25 mm²"],
+  [35,  138, 105,  0.524, "35 mm²"],
+  [50,  168, 128,  0.387, "50 mm²"],
+  [70,  213, 162,  0.268, "70 mm²"],
+  [95,  258, 197,  0.193, "95 mm²"],
+  [120, 299, 228,  0.153, "120 mm²"],
+  [150, 344, 263,  0.124, "150 mm²"],
+  [185, 396, 303,  0.0991,"185 mm²"],
+];
+
+const CABLE_USE = {
+  1.5:  "Lighting, signals", 2.5: "Sockets, small loads", 4: "Small inverters, pumps",
+  6:    "Domestic solar (<5kW)", 10: "Medium solar (5–10kW)", 16: "Large solar 10–15kW",
+  25:   "Commercial solar 15–25kW", 35: "Industrial 25–35kW", 50: "Large commercial 35–50kW",
+  70:   "Mini-grid feeder", 95: "Substation feeds", 120: "Power plant distribution",
+  150:  "HV distribution", 185: "Grid-scale systems"
+};
+const SOLAR_USE = {
+  1.5: "Pico solar panel lead", 2.5: "Panel string < 15A", 4: "Panel string 15–25A",
+  6:   "Combiner box output", 10: "Array to CC (≤5kW)", 16: "Array to CC (5–10kW)",
+  25:  "Battery bank to inverter", 35: "Large battery bank", 50: "High-power inverter DC bus",
+  70:  "Mini-grid transformer", 95: "Power plant cables", 120: "Grid interconnect",
+  150: "Utility-scale", 185: "Grid-scale"
+};
+
+function powerToAmps() {
+  const v = parseFloat(document.getElementById('sysVolt').value) || 1;
+  const w = parseFloat(document.getElementById('loadWatt').value) || 0;
+  document.getElementById('loadAmp').value = (w / v).toFixed(1);
+  calculate();
+}
+
+function calculate() {
+  const V      = parseFloat(document.getElementById('sysVolt').value) || 1;
+  const I      = parseFloat(document.getElementById('loadAmp').value) || 0;
+  const L      = parseFloat(document.getElementById('cableLen').value) || 0;
+  const mat    = document.getElementById('material').value;
+  const maxVDP = parseFloat(document.getElementById('maxVD').value);
+  const tempF  = parseFloat(document.getElementById('tempAdj').value);
+  const bundF  = parseFloat(document.getElementById('bundleAdj').value);
+  const cType  = document.getElementById('circuitType').value;
+  const loadT  = document.getElementById('loadType').value;
+  const testMM = parseFloat(document.getElementById('testCable').value);
+
+  const rho = mat === 'copper' ? COPPER_RESISTIVITY : ALUMINIUM_RESISTIVITY;
+  const derating = tempF * bundF;
+
+  // For DC: total conductor length = 2× one-way (there-and-back)
+  // For AC single phase: same
+  // For AC three phase: × √3 factor
+  const conductorFactor = cType === 'ac_three' ? Math.sqrt(3) : 2.0;
+  const effectiveLength = L * conductorFactor;
+
+  // Maximum allowed voltage drop (absolute)
+  const maxVD_V = V * (maxVDP / 100);
+
+  // Required minimum cross-section to meet voltage drop limit
+  // VD = (rho × L_effective × I) / A  → A = (rho × L_effective × I) / VD_max
+  const minMM2_VD = (rho * effectiveLength * I) / maxVD_V;
+
+  // Find minimum cable that meets BOTH ampacity and VD requirements
+  let recommended = null;
+  let recommendedForVD = null;
+  let recommendedForAmp = null;
+
+  for (const row of CABLE_DATA) {
+    const [mm2, ampCu, ampAl] = row;
+    const maxAmp = (mat === 'copper' ? ampCu : ampAl) * derating;
+    if (mm2 >= minMM2_VD && !recommendedForVD) recommendedForVD = row;
+    if (maxAmp >= I * 1.25 && !recommendedForAmp) recommendedForAmp = row;
+    if (mm2 >= minMM2_VD && maxAmp >= I * 1.25 && !recommended) recommended = row;
+  }
+  if (!recommended) recommended = CABLE_DATA[CABLE_DATA.length - 1];
+
+  const recMM2 = recommended[0];
+  const recAmp = (mat === 'copper' ? recommended[1] : recommended[2]) * derating;
+  const recR   = rho / recMM2; // Ω/m
+  const vd     = recR * effectiveLength * I;
+  const vdPct  = (vd / V) * 100;
+
+  // Power loss
+  const powerLoss = I * I * recR * effectiveLength;
+  const effPct = ((1 - powerLoss / (V * I)) * 100);
+
+  // Inductive load start current (motors typically 6× FLA)
+  let startCurrent = I;
+  if (loadT === 'motor') startCurrent = I * 6;
+  const startVD = (recR * effectiveLength * startCurrent / V) * 100;
+
+  // Test cable result
+  const testRow = CABLE_DATA.find(r => r[0] === testMM);
+  let testHtml = '';
+  if (testRow) {
+    const testAmp = (mat === 'copper' ? testRow[1] : testRow[2]) * derating;
+    const testR = rho / testMM;
+    const testVD = (testR * effectiveLength * I / V) * 100;
+    const testOk = testAmp >= I * 1.25 && testVD <= maxVDP;
+    testHtml = `
+      <div class="intel-box ${testOk ? 'success' : 'danger'}">
+        <div class="intel-box-title">${testMM} mm² ${testOk ? '✅ Adequate' : '❌ Insufficient'}</div>
+        Rated: ${testAmp.toFixed(0)}A | Voltage drop: ${testVD.toFixed(2)}% | 
+        ${testVD > maxVDP ? `⚠️ VD exceeds ${maxVDP}% limit` : '✓ VD OK'} | 
+        ${testAmp < I * 1.25 ? `⚠️ Current exceeds rating` : '✓ Current OK'}
+      </div>`;
+  }
+  document.getElementById('testCableResult').innerHTML = testHtml;
+
+  // VD status
+  const status = vdPct <= maxVDP ? 'pass' : vdPct <= maxVDP * 1.5 ? 'warn' : 'fail';
+
+  // Main result
+  document.getElementById('mainResult').innerHTML = `
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="rec-cable">
+          <div style="font-size:.75rem;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.2rem;">Recommended Cable</div>
+          <div class="size-label">${recMM2} mm²</div>
+          <div class="size-sub">${mat.charAt(0).toUpperCase()+mat.slice(1)} · ${recommended[4]}</div>
+          <div class="size-sub mt-1">Rated ${recAmp.toFixed(0)}A with derating</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="cs-result-hero ${status}">
+          <div class="big-val">${vdPct.toFixed(2)}%</div>
+          <div class="big-label">Voltage Drop</div>
+          <div style="font-size:.78rem;margin-top:.3rem;">= ${vd.toFixed(3)}V loss</div>
+          <div style="font-size:.75rem;opacity:.7;">(limit: ${maxVDP}%)</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div style="background:#f8fafc;border-radius:14px;padding:1rem;border:1.5px solid #e2e8f0;height:100%;">
+          <div style="font-size:.75rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem;">Quick Summary</div>
+          <div style="font-size:.83rem;line-height:1.8;color:#374151;">
+            ⚡ Load: <strong>${I.toFixed(1)} A</strong> (${(V*I).toFixed(0)} W)<br>
+            📏 Run: <strong>${L} m</strong> one-way<br>
+            🔌 Total conductor: <strong>${effectiveLength.toFixed(1)} m</strong><br>
+            📉 Power loss: <strong>${powerLoss.toFixed(1)} W</strong><br>
+            ⚙️ Efficiency: <strong>${effPct.toFixed(1)}%</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${status !== 'pass' ? `<div class="intel-box ${status === 'warn' ? 'warn' : 'danger'} mt-2">
+      <div class="intel-box-title">⚠️ ${status === 'warn' ? 'Borderline' : 'Excessive'} Voltage Drop</div>
+      Voltage drop of ${vdPct.toFixed(2)}% exceeds your ${maxVDP}% limit. Use <strong>${(recommendedForVD || CABLE_DATA[CABLE_DATA.length-1])[4]}</strong> to meet the voltage drop requirement.
+    </div>` : `<div class="intel-box success mt-2">
+      <div class="intel-box-title">✅ Design Within Specification</div>
+      ${recMM2} mm² cable meets both ampacity (${recAmp.toFixed(0)}A rated vs ${I.toFixed(1)}A load) and voltage drop (${vdPct.toFixed(2)}% vs ${maxVDP}% limit).
+    </div>`}
+  `;
+
+  // VD analysis tab
+  const barWidth = Math.min(100, (vdPct / (maxVDP * 2)) * 100);
+  const barColor = vdPct <= maxVDP ? '#10b981' : vdPct <= maxVDP * 1.5 ? '#f59e0b' : '#ef4444';
+  document.getElementById('vdAnalysis').innerHTML = `
+    <div style="margin-bottom:1rem;">
+      <div style="display:flex;justify-content:space-between;font-size:.78rem;color:#64748b;margin-bottom:.25rem;">
+        <span>Voltage Drop: <strong style="color:${barColor};">${vdPct.toFixed(2)}%</strong></span>
+        <span>Limit: <strong>${maxVDP}%</strong></span>
+      </div>
+      <div class="vd-bar-wrap">
+        <div class="vd-bar" style="width:${barWidth}%;background:${barColor};"></div>
+      </div>
+    </div>
+    <table class="cs-table">
+      <thead><tr><th>Parameter</th><th>Value</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Cable cross-section</td><td>${recMM2} mm²</td><td>${recommended[4]}</td></tr>
+        <tr><td>Conductor resistance</td><td>${(recR*1000).toFixed(3)} mΩ/m</td><td>at 20°C</td></tr>
+        <tr><td>Total effective length</td><td>${effectiveLength.toFixed(1)} m</td><td>${cType === 'dc' ? 'Return path included' : cType === 'ac_three' ? '× √3 factor' : '2-wire circuit'}</td></tr>
+        <tr><td>Voltage drop</td><td>${vd.toFixed(3)} V</td><td>${vdPct.toFixed(2)}% of ${V}V system</td></tr>
+        <tr><td>End voltage</td><td>${(V - vd).toFixed(2)} V</td><td>at load terminals</td></tr>
+        <tr><td>Power loss in cable</td><td>${powerLoss.toFixed(1)} W</td><td>${((powerLoss/(V*I))*100).toFixed(1)}% of load</td></tr>
+        <tr><td>Cable efficiency</td><td>${effPct.toFixed(1)}%</td><td></td></tr>
+        ${loadT === 'motor' ? `<tr><td>Motor start VD</td><td style="color:${startVD > 15 ? '#dc2626' : '#d97706'};">${startVD.toFixed(1)}%</td><td>At 6× starting current — ${startVD > 15 ? '⚠️ Consider soft starter' : 'OK'}</td></tr>` : ''}
+      </tbody>
+    </table>
+  `;
+
+  // Cable comparison
+  const comparisons = CABLE_DATA.map(row => {
+    const mm2 = row[0];
+    const maxA = (mat === 'copper' ? row[1] : row[2]) * derating;
+    const r = rho / mm2;
+    const rowVD = (r * effectiveLength * I / V) * 100;
+    const ampOk = maxA >= I * 1.25;
+    const vdOk  = rowVD <= maxVDP;
+    return { mm2, maxA, rowVD, ampOk, vdOk, label: row[4] };
+  });
+
+  document.getElementById('compareTable').innerHTML = `
+    <div style="overflow-x:auto;">
+    <table class="cs-table">
+      <thead><tr><th>Cable</th><th>Max Current (A)</th><th>Voltage Drop (%)</th><th>Current OK?</th><th>VD OK?</th><th>Overall</th></tr></thead>
+      <tbody>
+        ${comparisons.map(c => `
+          <tr style="${c.mm2 === recMM2 ? 'background:#eff6ff;font-weight:700;' : ''}">
+            <td>${c.label}${c.mm2 === recMM2 ? ' ← Recommended' : ''}</td>
+            <td>${c.maxA.toFixed(0)}</td>
+            <td style="color:${c.vdOk ? '#059669' : '#dc2626'};">${c.rowVD.toFixed(2)}%</td>
+            <td>${c.ampOk ? '<span style="color:#059669;">✅ Yes</span>' : '<span style="color:#dc2626;">❌ No</span>'}</td>
+            <td>${c.vdOk ? '<span style="color:#059669;">✅ Yes</span>' : '<span style="color:#dc2626;">❌ No</span>'}</td>
+            <td>${c.ampOk && c.vdOk ? '<span style="color:#059669;font-weight:700;">✅ PASS</span>' : c.ampOk || c.vdOk ? '<span style="color:#d97706;font-weight:700;">⚠️ PARTIAL</span>' : '<span style="color:#dc2626;font-weight:700;">❌ FAIL</span>'}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+
+  // Long-run analysis
+  const distances = [1, 5, 10, 15, 20, 30, 50, 75, 100, 150];
+  const recR2 = rho / recMM2;
+  document.getElementById('runAnalysis').innerHTML = `
+    <div style="margin-bottom:.75rem;font-size:.83rem;color:#374151;">
+      Voltage drop for <strong>${recMM2} mm²</strong> cable at ${I.toFixed(1)}A load — varies by distance:
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="cs-table">
+      <thead><tr><th>Distance (m)</th><th>VD (V)</th><th>VD (%)</th><th>End Voltage (V)</th><th>Status</th></tr></thead>
+      <tbody>
+        ${distances.map(d => {
+          const ef = d * conductorFactor;
+          const dv = recR2 * ef * I;
+          const dp = (dv / V) * 100;
+          const ok = dp <= maxVDP;
+          return `<tr style="${d === L ? 'background:#eff6ff;font-weight:700;' : ''}">
+            <td>${d}m${d === L ? ' ← Current' : ''}</td>
+            <td>${dv.toFixed(3)}</td>
+            <td style="color:${dp<=maxVDP?'#059669':dp<=maxVDP*1.5?'#d97706':'#dc2626'};">${dp.toFixed(2)}%</td>
+            <td>${(V-dv).toFixed(2)}</td>
+            <td>${ok ? '✅ OK' : '❌ Upgrade needed'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+
+  // Sizing guide
+  document.getElementById('sizingGuide').innerHTML = `
+    <div class="row g-2">
+      <div class="col-md-6">
+        <div style="background:#f0fdf4;border-radius:12px;padding:1rem;border:1.5px solid #bbf7d0;">
+          <div style="font-size:.82rem;font-weight:700;color:#166534;margin-bottom:.5rem;">✅ Good Practice Rules</div>
+          <ul style="font-size:.8rem;color:#14532d;margin:0;padding-left:1rem;line-height:1.8;">
+            <li>Size for <strong>125% of design current</strong> (NEC continuous load rule)</li>
+            <li>Voltage drop ≤ 3% recommended (≤ 2% for sensitive loads)</li>
+            <li>Apply temperature derating in hot environments</li>
+            <li>Use copper for DC battery/solar systems (less resistance)</li>
+            <li>Keep DC cable runs as short as possible</li>
+            <li>Never upsize fuses to match undersized cable</li>
+          </ul>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div style="background:#fff7ed;border-radius:12px;padding:1rem;border:1.5px solid #fed7aa;">
+          <div style="font-size:.82rem;font-weight:700;color:#9a3412;margin-bottom:.5rem;">⚠️ Common Mistakes</div>
+          <ul style="font-size:.8rem;color:#7c2d12;margin:0;padding-left:1rem;line-height:1.8;">
+            <li>Using wire that "can handle the amps" but ignores VD</li>
+            <li>Forgetting the return conductor in DC calculations</li>
+            <li>Ignoring ambient temperature derating</li>
+            <li>Using aluminium for solar DC connections (oxidation risk)</li>
+            <li>Not accounting for motor starting currents</li>
+            <li>Sharing protective earth with return conductor in DC</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Build reference table
+  const tbody = document.getElementById('cableRefTable');
+  tbody.innerHTML = CABLE_DATA.map(row => {
+    const [mm2, ampCu] = row;
+    const r = COPPER_RESISTIVITY / mm2 * 1000; // Ω/km
+    return `<tr${mm2 === recMM2 ? ' style="background:#eff6ff;font-weight:700;"' : ''}>
+      <td>${row[4]}${mm2 === recMM2 ? ' ★' : ''}</td>
+      <td>${ampCu} A</td>
+      <td>${r.toFixed(3)} Ω/km</td>
+      <td>${CABLE_USE[mm2] || '—'}</td>
+      <td>${SOLAR_USE[mm2] || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function openCsTab(tabId) {
+  document.querySelectorAll('.cs-tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.cs-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  document.getElementById('cs-tab-' + tabId).classList.add('active');
+}
+
+// Sync power ↔ current
+document.getElementById('sysVolt').addEventListener('input', () => {
+  const v = parseFloat(document.getElementById('sysVolt').value) || 1;
+  const i = parseFloat(document.getElementById('loadAmp').value) || 0;
+  document.getElementById('loadWatt').value = (v * i).toFixed(0);
+  calculate();
+});
+document.getElementById('loadAmp').addEventListener('input', () => {
+  const v = parseFloat(document.getElementById('sysVolt').value) || 1;
+  const i = parseFloat(document.getElementById('loadAmp').value) || 0;
+  document.getElementById('loadWatt').value = (v * i).toFixed(0);
+  calculate();
+});
+
+calculate();
+</script>
+{% endblock %}
