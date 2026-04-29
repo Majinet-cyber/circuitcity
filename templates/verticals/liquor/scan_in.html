@@ -936,3 +936,18 @@ function resetForm() {
 
 {% endblock %}
 
+{% block extra_js %}
+<script>
+(function() {
+  {% for message in messages %}
+    {% if 'stocked' in message.message|lower or 'added' in message.message|lower or 'bottle' in message.message|lower %}
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (window.CCSounds) window.CCSounds.playStockAddedSound();
+      }, 200);
+    });
+    {% endif %}
+  {% endfor %}
+})();
+</script>
+{% endblock %}

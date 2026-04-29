@@ -10,6 +10,37 @@
   --lq-green: #059669;
   --lq-amber: #d97706;
   --lq-red: #dc2626;
+  /* Category palette */
+  --cat-beer-bg: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  --cat-beer-accent: #d97706;
+  --cat-beer-text: #92400e;
+  --cat-cider-bg: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  --cat-cider-accent: #059669;
+  --cat-cider-text: #065f46;
+  --cat-wine-bg: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
+  --cat-wine-accent: #be185d;
+  --cat-wine-text: #831843;
+  --cat-spirits-bg: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%);
+  --cat-spirits-accent: #7c3aed;
+  --cat-spirits-text: #4c1d95;
+  --cat-whiskey-bg: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+  --cat-whiskey-accent: #b45309;
+  --cat-whiskey-text: #78350f;
+  --cat-gin-bg: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+  --cat-gin-accent: #0369a1;
+  --cat-gin-text: #0c4a6e;
+  --cat-vodka-bg: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  --cat-vodka-accent: #0284c7;
+  --cat-vodka-text: #0c4a6e;
+  --cat-brandy-bg: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  --cat-brandy-accent: #c2410c;
+  --cat-brandy-text: #7c2d12;
+  --cat-cocktail-bg: linear-gradient(135deg, #fae8ff 0%, #f5d0fe 100%);
+  --cat-cocktail-accent: #a21caf;
+  --cat-cocktail-text: #701a75;
+  --cat-other-bg: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  --cat-other-accent: #475569;
+  --cat-other-text: #1e293b;
 }
 
 .stock-page {
@@ -134,29 +165,51 @@
 
 .product-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(15,23,42,.12);
-  border-color: rgba(124,58,237,.2);
+  box-shadow: 0 12px 32px rgba(15,23,42,.14);
 }
 
-/* Stock level accent strip */
+/* Category-specific card accent strip */
 .product-card::before {
   content: '';
-  position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
   border-radius: 20px 0 0 20px;
 }
 .product-card.status-ok::before { background: var(--lq-green); }
 .product-card.status-low::before { background: var(--lq-amber); }
 .product-card.status-out::before { background: var(--lq-red); }
 
-.product-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
-.product-cat { font-size: .75rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; margin-bottom: 12px; }
+/* Category header band */
+.cat-header-band {
+  margin: -20px -20px 14px -20px;
+  padding: 10px 20px 10px 26px;
+  border-radius: 20px 20px 0 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.card-cat-beer .cat-header-band    { background: var(--cat-beer-bg); }
+.card-cat-cider .cat-header-band   { background: var(--cat-cider-bg); }
+.card-cat-wine .cat-header-band    { background: var(--cat-wine-bg); }
+.card-cat-spirits .cat-header-band { background: var(--cat-spirits-bg); }
+.card-cat-whiskey .cat-header-band { background: var(--cat-whiskey-bg); }
+.card-cat-gin .cat-header-band     { background: var(--cat-gin-bg); }
+.card-cat-vodka .cat-header-band   { background: var(--cat-vodka-bg); }
+.card-cat-brandy .cat-header-band  { background: var(--cat-brandy-bg); }
+.card-cat-cocktail .cat-header-band{ background: var(--cat-cocktail-bg); }
+.card-cat-other .cat-header-band   { background: var(--cat-other-bg); }
 
-/* Category badge colors */
-.cat-beer { color: #92400e; }
-.cat-cider { color: #1e3a8a; }
-.cat-wine { color: #831843; }
-.cat-spirits, .cat-whiskey { color: #3730a3; }
-.cat-other { color: #374151; }
+.product-name { font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+.product-cat { font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+
+/* Category text colours */
+.cat-beer    { color: var(--cat-beer-text); }
+.cat-cider   { color: var(--cat-cider-text); }
+.cat-wine    { color: var(--cat-wine-text); }
+.cat-spirits { color: var(--cat-spirits-text); }
+.cat-whiskey { color: var(--cat-whiskey-text); }
+.cat-gin     { color: var(--cat-gin-text); }
+.cat-vodka   { color: var(--cat-vodka-text); }
+.cat-brandy  { color: var(--cat-brandy-text); }
+.cat-cocktail{ color: var(--cat-cocktail-text); }
+.cat-other   { color: var(--cat-other-text); }
 
 /* Stock progress */
 .stock-bar-wrap { margin: 12px 0; }
@@ -167,14 +220,59 @@
 .fill-low { background: linear-gradient(90deg, #f59e0b, #d97706); }
 .fill-out { background: #dc2626; }
 
-/* Status chip */
+/* Status chips - premium */
 .status-chip {
   display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+  padding: 5px 12px; border-radius: 999px; font-size: .78rem; font-weight: 700;
+  letter-spacing: .02em;
 }
-.chip-ok { background: #dcfce7; color: #15803d; }
-.chip-low { background: #fef3c7; color: #92400e; }
-.chip-out { background: #fee2e2; color: #991b1b; }
+.chip-ok {
+  background: #dcfce7; color: #15803d;
+  box-shadow: 0 0 0 2px rgba(21,128,61,.15);
+}
+.chip-low {
+  background: #fef3c7; color: #92400e;
+  box-shadow: 0 0 0 2px rgba(146,64,14,.15);
+}
+.chip-out {
+  background: #fee2e2; color: #991b1b;
+  box-shadow: 0 0 0 2px rgba(153,27,27,.12);
+}
+.chip-open-bottle {
+  background: linear-gradient(135deg, #ede9fe, #ddd6fe); color: #5b21b6;
+  box-shadow: 0 0 0 2px rgba(91,33,182,.2);
+}
+
+/* Bottle breakdown badge */
+.bottle-breakdown {
+  background: linear-gradient(135deg, #f5f3ff, #ede9fe);
+  border: 1px solid #ddd6fe;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: .8rem;
+  color: #4c1d95;
+}
+.bottle-breakdown .bb-main {
+  font-weight: 700;
+  font-size: .88rem;
+  margin-bottom: 2px;
+}
+.bottle-breakdown .bb-sub {
+  color: #7c3aed;
+  font-weight: 500;
+}
+.glass-breakdown {
+  background: linear-gradient(135deg, #fdf2f8, #fce7f3);
+  border: 1px solid #fbcfe8;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: .8rem;
+  color: #831843;
+}
+.glass-breakdown .bb-main { font-weight: 700; font-size: .88rem; margin-bottom: 2px; }
+.glass-breakdown .bb-sub { color: #be185d; font-weight: 500; }
 
 /* Price row */
 .price-row { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; }
@@ -282,33 +380,42 @@
   {% if products %}
   <div class="products-grid">
     {% for product in products %}
-    {% with qty=product.quantity_in_stock|default:0 %}
+    {% with qty=product.quantity_in_stock|default:0 cat=product.category|default:"other"|lower %}
 
-    <div class="product-card {% if qty == 0 %}status-out{% elif qty <= low_stock_threshold %}status-low{% else %}status-ok{% endif %}">
-      <!-- Category + status row -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <span class="product-cat cat-{{ product.category|default:'other'|lower }}">
-          {% if product.category == "beer" %}🍺{% elif product.category == "cider" %}🥤{% elif product.category == "wine" %}🍷{% elif product.category == "spirits" %}🥃{% elif product.category == "whiskey" %}🥃{% else %}🍶{% endif %}
-          {{ product.category|default:"Other"|title }}
+    <div class="product-card card-cat-{{ cat }} {% if qty == 0 %}status-out{% elif product.is_low_stock %}status-low{% else %}status-ok{% endif %}">
+
+      <!-- Category header band -->
+      <div class="cat-header-band">
+        <span style="font-size:1.3rem">
+          {% if cat == "beer" %}🍺{% elif cat == "cider" %}🥤{% elif cat == "wine" %}🍷{% elif cat == "spirits" or cat == "whiskey" %}🥃{% elif cat == "gin" %}🍸{% elif cat == "vodka" %}🧊{% elif cat == "brandy" %}🥂{% elif cat == "cocktail" %}🍹{% else %}🍶{% endif %}
         </span>
-        <span class="status-chip {% if qty == 0 %}chip-out{% elif qty <= low_stock_threshold %}chip-low{% else %}chip-ok{% endif %}">
-          {% if qty == 0 %}Out of Stock{% elif qty <= low_stock_threshold %}Low Stock{% else %}In Stock{% endif %}
+        <span class="product-cat cat-{{ cat }}">{{ product.category|default:"Other"|title }}</span>
+        <span class="ms-auto status-chip {% if qty == 0 %}chip-out{% elif product.is_low_stock %}chip-low{% elif product.bb_has_open_bottle %}chip-open-bottle{% else %}chip-ok{% endif %}">
+          {% if qty == 0 %}
+            ✕ Out of Stock
+          {% elif product.is_low_stock %}
+            ⚠ Low Stock
+          {% elif product.bb_has_open_bottle and product.has_shots %}
+            🔓 Open Bottle
+          {% elif product.bb_has_open_bottle and product.has_glasses %}
+            🍷 Open Bottle
+          {% else %}
+            ✓ In Stock
+          {% endif %}
         </span>
       </div>
 
       <!-- Product name -->
       <div class="product-name">{{ product.name }}</div>
 
-      <!-- Stock progress bar -->
+      <!-- Stock level display -->
       <div class="stock-bar-wrap">
         <div class="stock-bar-label">
-          <span style="color:#64748b;font-size:.78rem">Stock Level</span>
-          <span style="font-weight:800;font-size:1.1rem;color:{% if qty == 0 %}var(--lq-red){% elif qty <= low_stock_threshold %}var(--lq-amber){% else %}var(--lq-green){% endif %}">
+          <span style="color:#64748b;font-size:.78rem">Stock</span>
+          <span style="font-weight:800;font-size:1.1rem;color:{% if qty == 0 %}var(--lq-red){% elif product.is_low_stock %}var(--lq-amber){% else %}var(--lq-green){% endif %}">
             {% if product.has_shots %}
-              {# For spirits/whisky: quantity_in_stock is already in SHOTS (base units) #}
               {{ qty }} shot{{ qty|pluralize }}
             {% elif product.has_glasses %}
-              {# For wine: quantity_in_stock is already in GLASSES (base units) #}
               {{ qty }} glass{{ qty|pluralize:"es" }}
             {% else %}
               {{ qty }} bottle{{ qty|pluralize }}
@@ -316,19 +423,23 @@
           </span>
         </div>
         <div class="stock-bar">
-          <div class="stock-bar-fill {% if qty == 0 %}fill-out{% elif qty <= low_stock_threshold %}fill-low{% else %}fill-ok{% endif %}"
-               style="width:{% if qty == 0 %}5{% elif qty <= low_stock_threshold %}45{% else %}90{% endif %}%"></div>
+          <div class="stock-bar-fill {% if qty == 0 %}fill-out{% elif product.is_low_stock %}fill-low{% else %}fill-ok{% endif %}"
+               style="width:{% if qty == 0 %}5{% elif product.is_low_stock %}35{% else %}85{% endif %}%"></div>
         </div>
+
+        {# Bottle breakdown for spirits/whisky #}
         {% if product.has_shots and product.shots_per_bottle and qty > 0 %}
-        <div style="margin-top:4px;font-size:.75rem;color:#7c3aed;font-weight:600;">
-          {{ qty }} shots available
-          <span style="font-weight:400;color:#94a3b8">({{ product.shots_per_bottle }} shots/bottle)</span>
+        <div class="bottle-breakdown">
+          <div class="bb-main">{{ product.bb_display_text }}</div>
+          <div class="bb-sub">{{ product.bb_total_label }} · {{ product.shots_per_bottle }} shots/bottle</div>
         </div>
         {% endif %}
+
+        {# Glass breakdown for wine #}
         {% if product.has_glasses and product.glasses_per_bottle and qty > 0 %}
-        <div style="margin-top:4px;font-size:.75rem;color:#2563eb;font-weight:600;">
-          {{ qty }} glasses available
-          <span style="font-weight:400;color:#94a3b8">({{ product.glasses_per_bottle }} glasses/bottle)</span>
+        <div class="glass-breakdown">
+          <div class="bb-main">{{ product.bb_display_text }}</div>
+          <div class="bb-sub">{{ product.bb_total_label }} · {{ product.glasses_per_bottle }} glasses/bottle</div>
         </div>
         {% endif %}
       </div>
@@ -351,7 +462,13 @@
         {% if product.has_shots and product.price_per_shot %}
         <div class="price-item">
           <div class="price-label">Per Shot</div>
-          <div class="price-val">MK {{ product.price_per_shot|floatformat:0 }}</div>
+          <div class="price-val" style="color:var(--cat-spirits-text)">MK {{ product.price_per_shot|floatformat:0 }}</div>
+        </div>
+        {% endif %}
+        {% if product.has_glasses and product.price_per_glass %}
+        <div class="price-item">
+          <div class="price-label">Per Glass</div>
+          <div class="price-val" style="color:var(--cat-wine-text)">MK {{ product.price_per_glass|floatformat:0 }}</div>
         </div>
         {% endif %}
       </div>

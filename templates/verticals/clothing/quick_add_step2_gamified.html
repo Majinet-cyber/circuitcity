@@ -591,26 +591,37 @@
     <div class="stepper">
       <div class="step active" data-step="1">
         <div class="step-indicator">1</div>
-        <div class="step-label">Basics</div>
+        <div class="step-label">Brand</div>
         <div class="step-line"></div>
       </div>
       <div class="step" data-step="2">
         <div class="step-indicator">2</div>
-        <div class="step-label">Details</div>
+        <div class="step-label">Type</div>
         <div class="step-line"></div>
       </div>
       <div class="step" data-step="3">
         <div class="step-indicator">3</div>
-        <div class="step-label">Pricing</div>
+        <div class="step-label">Size</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step" data-step="4">
+        <div class="step-indicator">4</div>
+        <div class="step-label">Color</div>
+        <div class="step-line"></div>
+      </div>
+      <div class="step" data-step="5">
+        <div class="step-indicator">5</div>
+        <div class="step-label">Price</div>
       </div>
     </div>
+
+    <!-- Selection Summary Chips -->
+    <div id="selectionChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;min-height:28px"></div>
   </div>
 
   <!-- Form (hidden inputs for backend compatibility) -->
   <form method="post" id="mainForm">
     {% csrf_token %}
-    
-    <!-- Hidden inputs that match backend expectations -->
     <input type="hidden" name="brand" id="hiddenBrand" value="">
     <input type="hidden" name="name" id="hiddenName" value="">
     <input type="hidden" name="size" id="hiddenSize" value="">
@@ -621,136 +632,138 @@
     <input type="hidden" name="barcode" id="hiddenBarcode" value="">
     <input type="hidden" id="hiddenSubtype" value="">
 
-    <!-- Step 1: Basics (Brand, Type, Size, Color) -->
     <div class="form-steps">
+
+      <!-- STEP 1: Brand -->
       <div class="form-step active" data-step="1">
-        <h2 class="step-title">🏷️ Choose Brand & Type</h2>
-        <p class="step-subtitle">Select the brand and specific type for your product</p>
-
-        <!-- Product Name Preview -->
-        <div class="product-name-preview">
-          <div class="preview-label">Product Name Preview</div>
-          <div class="preview-name empty" id="namePreview">Make your selections...</div>
-          <button type="button" class="regenerate-btn" id="regenerateBtn" style="display: none;">↻ Regenerate Name</button>
+        <h2 class="step-title">🏷️ Choose Brand</h2>
+        <p class="step-subtitle">Tap a brand — or skip to continue without one</p>
+        <div class="search-box" style="margin-bottom:16px">
+          <input type="text" class="search-input" id="brandSearch" placeholder="🔍 Search brands...">
         </div>
-
-        <!-- Brand Selection -->
-        <div class="form-group">
-          <label class="form-label">Brand <span class="optional-badge">Optional</span></label>
-          <div class="search-box">
-            <input type="text" class="search-input" id="brandSearch" placeholder="🔍 Search brands...">
-          </div>
-          <div class="card-grid large" id="brandGrid">
-            {% for brand in brands %}
-            <div class="selection-card" data-value="{{ brand }}" onclick="selectBrand('{{ brand }}')">
-              {{ brand }}
-            </div>
-            {% endfor %}
-          </div>
+        <div class="card-grid large" id="brandGrid">
+          {% for brand in brands %}
+          <div class="selection-card" data-value="{{ brand }}" onclick="selectBrandAndAdvance(this,'{{ brand }}')">{{ brand }}</div>
+          {% endfor %}
         </div>
-
-        <!-- Type/Subtype Selection -->
-        <div class="form-group" id="subtypeGroup" style="display: none;">
-          <label class="form-label">Type <span class="optional-badge">Optional</span></label>
-          <div class="card-grid" id="subtypeGrid">
-            <!-- Populated dynamically based on category -->
-          </div>
+        <!-- Custom brand input (shown when "Other" is tapped or typed) -->
+        <div id="customBrandRow" style="display:none;margin-top:12px">
+          <input type="text" class="form-input" id="customBrandInput" placeholder="Enter brand name…">
+          <button type="button" class="btn btn-primary" style="margin-top:8px;width:100%" onclick="confirmCustomBrand()">Use this brand →</button>
         </div>
-
-        <!-- Size Selection -->
-        <div class="form-group" id="sizeGroup" style="display: none;">
-          <label class="form-label">Size <span class="optional-badge">Optional</span></label>
-          <div class="card-grid small" id="sizeGrid">
-            <!-- Populated dynamically -->
-          </div>
-        </div>
-
-        <!-- Color Selection -->
-        <div class="form-group">
-          <label class="form-label">Color <span class="optional-badge">Optional</span></label>
-          <div class="card-grid small" id="colorGrid">
-            {% for color in colors %}
-            <div class="selection-card small" data-value="{{ color }}" onclick="selectColor('{{ color }}')">
-              {{ color }}
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-
-        <div class="step-navigation">
-          <button type="button" class="btn btn-primary" onclick="nextStep()">
-            Next Step →
-          </button>
+        <div class="step-navigation" style="margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="skipAndAdvance(1,'brand')">Skip Brand →</button>
         </div>
       </div>
 
-      <!-- Step 2: Details (Manual name editing, barcode) -->
+      <!-- STEP 2: Type/Subtype -->
       <div class="form-step" data-step="2">
-        <h2 class="step-title">✏️ Product Details</h2>
-        <p class="step-subtitle">Fine-tune your product name and add optional info</p>
-
-        <div class="form-group">
-          <label class="form-label">Product Name *</label>
-          <input type="text" class="form-input" id="productName" placeholder="e.g., Nike Sneakers Size 40 Black" required>
-          <div class="field-help">Auto-generated from your selections. Edit if needed.</div>
+        <h2 class="step-title">👔 Choose Type</h2>
+        <p class="step-subtitle">What kind of {{ category_display }} is this?</p>
+        <div class="card-grid" id="subtypeGrid">
+          {# Populated by JS from SUBTYPES #}
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Stock Quantity Now <span class="optional-badge">Optional</span></label>
-          <input type="number" class="form-input" id="stockQuantity" min="0" value="0" placeholder="0">
-          <div class="field-help">How many units to add initially (can stock more later)</div>
+        <!-- Custom type input -->
+        <div id="customTypeRow" style="display:none;margin-top:12px">
+          <input type="text" class="form-input" id="customTypeInput" placeholder="Enter type…">
+          <button type="button" class="btn btn-primary" style="margin-top:8px;width:100%" onclick="confirmCustomType()">Use this type →</button>
         </div>
-
-        <div class="form-group">
-          <label class="form-label">Barcode <span class="optional-badge">Optional</span></label>
-          <input type="text" class="form-input" id="barcode" placeholder="Scan or enter barcode (optional)">
-          <div class="field-help">System auto-generates SKU if left blank</div>
-        </div>
-
-        <div class="step-navigation">
-          <button type="button" class="btn btn-secondary" onclick="prevStep()">
-            ← Back
-          </button>
-          <button type="button" class="btn btn-primary" onclick="nextStep()">
-            Next Step →
-          </button>
+        <div class="step-navigation" style="margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="goToStep(1)">← Back</button>
+          <button type="button" class="btn btn-secondary" onclick="skipAndAdvance(2,'subtype')">Skip →</button>
         </div>
       </div>
 
-      <!-- Step 3: Pricing -->
+      <!-- STEP 3: Size -->
       <div class="form-step" data-step="3">
-        <h2 class="step-title">💰 Set Pricing</h2>
-        <p class="step-subtitle">Enter cost and selling prices for this product</p>
+        <h2 class="step-title">📏 Choose Size</h2>
+        <p class="step-subtitle">Select the size — tap to pick</p>
+        <div class="card-grid small" id="sizeGrid">
+          {# Populated by JS from SIZES #}
+        </div>
+        <!-- Custom size input -->
+        <div style="margin-top:14px">
+          <input type="text" class="form-input" id="customSizeInput" placeholder="Other size (type here)…" style="font-size:.95rem">
+          <button type="button" class="btn btn-primary" style="margin-top:8px;width:100%" onclick="confirmCustomSize()">Use this size →</button>
+        </div>
+        <div class="step-navigation" style="margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="goToStep(2)">← Back</button>
+          <button type="button" class="btn btn-secondary" onclick="skipAndAdvance(3,'size')">Skip →</button>
+        </div>
+      </div>
+
+      <!-- STEP 4: Color -->
+      <div class="form-step" data-step="4">
+        <h2 class="step-title">🎨 Choose Color</h2>
+        <p class="step-subtitle">Tap a color — helps customers find their item</p>
+        <div class="card-grid small" id="colorGrid">
+          {% for color in colors %}
+          <div class="selection-card small" data-value="{{ color }}" onclick="selectColorAndAdvance(this,'{{ color }}')">{{ color }}</div>
+          {% endfor %}
+        </div>
+        <!-- Custom color input -->
+        <div id="customColorRow" style="display:none;margin-top:12px">
+          <input type="text" class="form-input" id="customColorInput" placeholder="Enter color…">
+          <button type="button" class="btn btn-primary" style="margin-top:8px;width:100%" onclick="confirmCustomColor()">Use this color →</button>
+        </div>
+        <div class="step-navigation" style="margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="goToStep(3)">← Back</button>
+          <button type="button" class="btn btn-secondary" onclick="skipAndAdvance(4,'color')">Skip →</button>
+        </div>
+      </div>
+
+      <!-- STEP 5: Pricing + Review -->
+      <div class="form-step" data-step="5">
+        <h2 class="step-title">💰 Pricing &amp; Save</h2>
+        <p class="step-subtitle">Set prices and confirm your product</p>
+
+        <!-- Product Name Preview (auto-generated) -->
+        <div class="product-name-preview" style="margin-bottom:20px">
+          <div class="preview-label">Auto-generated Name</div>
+          <div class="preview-name" id="namePreview" style="margin-bottom:6px">—</div>
+          <input type="text" class="form-input" id="productName" placeholder="Edit name if needed" style="font-size:1rem;margin-top:6px">
+          <div class="field-help">Name is auto-built from your selections — edit if needed</div>
+        </div>
 
         <div class="form-row">
           <div class="form-group">
-            <label class="form-label">Cost Price (K) *</label>
-            <input type="number" class="form-input" id="costPrice" step="0.01" min="0" placeholder="0.00" required>
-            <div class="field-help">What you pay for it</div>
+            <label class="form-label">Cost Price (MK) *</label>
+            <input type="number" class="form-input" id="costPrice" step="1" min="0" placeholder="0" required>
+            <div class="field-help">What you paid for it</div>
           </div>
-
           <div class="form-group">
-            <label class="form-label">Selling Price (K) *</label>
-            <input type="number" class="form-input" id="sellingPrice" step="0.01" min="0" placeholder="0.00" required>
-            <div class="field-help">What customers pay</div>
+            <label class="form-label">Selling Price (MK) *</label>
+            <input type="number" class="form-input" id="sellingPrice" step="1" min="0" placeholder="0" required>
+            <div class="field-help">Customer pays this</div>
           </div>
         </div>
 
-        <!-- Profit Margin Preview -->
-        <div class="product-name-preview" id="profitPreview" style="display: none;">
-          <div class="preview-label">Profit Margin</div>
-          <div class="preview-name" id="profitText">—</div>
+        <!-- Profit indicator -->
+        <div id="profitPreview" style="display:none;background:linear-gradient(135deg,#dcfce7,#bbf7d0);border-radius:12px;padding:12px 16px;margin-bottom:16px">
+          <div style="font-size:.8rem;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:.05em">Profit per unit</div>
+          <div id="profitText" style="font-size:1.5rem;font-weight:800;color:#059669">—</div>
         </div>
 
-        <div class="step-navigation">
-          <button type="button" class="btn btn-secondary" onclick="prevStep()">
-            ← Back
-          </button>
-          <button type="submit" class="btn btn-success" id="submitBtn">
-            ✅ Add Product
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Quantity Now <span class="optional-badge">Optional</span></label>
+            <input type="number" class="form-input" id="stockQuantity" min="0" value="0" placeholder="0">
+            <div class="field-help">Can stock more later</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Barcode <span class="optional-badge">Optional</span></label>
+            <input type="text" class="form-input" id="barcode" placeholder="Scan or type">
+          </div>
+        </div>
+
+        <div class="step-navigation" style="margin-top:8px">
+          <button type="button" class="btn btn-secondary" onclick="goToStep(4)">← Back</button>
+          <button type="submit" class="btn btn-success" id="submitBtn" style="font-size:1.1rem;padding:14px 28px">
+            ✅ Save Product
           </button>
         </div>
       </div>
+
     </div>
   </form>
 </div>
@@ -778,392 +791,303 @@ const CATEGORY = '{{ category }}';
 const SUBTYPES = {{ subtypes_json|safe }};
 const SIZES = {{ sizes_json|safe }};
 const ALL_BRANDS = {{ brands_json|safe }};
+const TOTAL_STEPS = 5;
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
-
 document.addEventListener('DOMContentLoaded', function() {
-  // Show subtypes if available
-  if (SUBTYPES && SUBTYPES.length > 0) {
-    populateSubtypes();
-    document.getElementById('subtypeGroup').style.display = 'block';
-  }
-  
-  // Show sizes if available
-  if (SIZES && SIZES.length > 0) {
-    populateSizes();
-    document.getElementById('sizeGroup').style.display = 'block';
-  }
+  populateSubtypes();
+  populateSizes();
 
-  // Brand search
   document.getElementById('brandSearch').addEventListener('input', filterBrands);
-
-  // Product name manual edit tracking
   document.getElementById('productName').addEventListener('input', function() {
     state.userEditedName = true;
   });
-
-  // Profit calculation
   document.getElementById('costPrice').addEventListener('input', calculateProfit);
   document.getElementById('sellingPrice').addEventListener('input', calculateProfit);
-
-  // Regenerate name button
-  document.getElementById('regenerateBtn').addEventListener('click', function() {
-    state.userEditedName = false;
-    updateProductName();
-  });
-
-  // Enter key to advance steps
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
-      e.preventDefault();
-      if (state.currentStep < 3 && canProceedToNextStep()) {
-        nextStep();
-      }
-    }
-  });
 });
 
 // ============================================================================
-// POPULATE DYNAMIC OPTIONS
+// POPULATE GRIDS
 // ============================================================================
-
 function populateSubtypes() {
   const grid = document.getElementById('subtypeGrid');
   grid.innerHTML = '';
-  
+  if (!SUBTYPES || !SUBTYPES.length) {
+    grid.innerHTML = '<p style="color:#94a3b8;font-size:.9rem">No specific types — skip to continue</p>';
+    return;
+  }
   SUBTYPES.forEach(subtype => {
     const card = document.createElement('div');
     card.className = 'selection-card';
     card.setAttribute('data-value', subtype);
     card.textContent = subtype;
-    card.onclick = () => selectSubtype(subtype);
+    card.onclick = () => selectSubtypeAndAdvance(card, subtype);
     grid.appendChild(card);
   });
+  // "Other" option
+  const otherCard = document.createElement('div');
+  otherCard.className = 'selection-card';
+  otherCard.textContent = 'Other…';
+  otherCard.onclick = () => { document.getElementById('customTypeRow').style.display='block'; };
+  grid.appendChild(otherCard);
 }
 
 function populateSizes() {
   const grid = document.getElementById('sizeGrid');
   grid.innerHTML = '';
-  
+  if (!SIZES || !SIZES.length) return;
   SIZES.forEach(size => {
     const card = document.createElement('div');
     card.className = 'selection-card small';
     card.setAttribute('data-value', size);
     card.textContent = size;
-    card.onclick = () => selectSize(size);
+    card.onclick = () => selectSizeAndAdvance(card, size);
     grid.appendChild(card);
   });
 }
 
 // ============================================================================
-// SELECTION HANDLERS
+// SELECTION + AUTO-ADVANCE
 // ============================================================================
-
-function selectBrand(brand) {
-  // Toggle selection
-  const card = event.target;
-  const wasSelected = card.classList.contains('selected');
-  
-  // Clear all brand selections
-  document.querySelectorAll('#brandGrid .selection-card').forEach(c => {
-    c.classList.remove('selected');
-  });
-  
-  if (wasSelected) {
-    state.brand = '';
-  } else {
-    card.classList.add('selected');
-    state.brand = brand;
+function selectBrandAndAdvance(card, brand) {
+  document.querySelectorAll('#brandGrid .selection-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  if (brand === 'Other') {
+    document.getElementById('customBrandRow').style.display = 'block';
+    return; // wait for custom input
   }
-  
-  updateProductName();
+  state.brand = brand;
+  document.getElementById('customBrandRow').style.display = 'none';
+  updateSummaryChips();
+  setTimeout(() => goToStep(2), 250);
 }
 
-function selectSubtype(subtype) {
-  const card = event.target;
-  const wasSelected = card.classList.contains('selected');
-  
-  // Clear all subtype selections
-  document.querySelectorAll('#subtypeGrid .selection-card').forEach(c => {
-    c.classList.remove('selected');
-  });
-  
-  if (wasSelected) {
-    state.subtype = '';
-  } else {
-    card.classList.add('selected');
-    state.subtype = subtype;
-  }
-  
-  updateProductName();
+function confirmCustomBrand() {
+  const val = document.getElementById('customBrandInput').value.trim();
+  if (!val) return;
+  state.brand = val;
+  updateSummaryChips();
+  goToStep(2);
 }
 
-function selectSize(size) {
-  const card = event.target;
-  const wasSelected = card.classList.contains('selected');
-  
-  // Clear all size selections
-  document.querySelectorAll('#sizeGrid .selection-card').forEach(c => {
-    c.classList.remove('selected');
-  });
-  
-  if (wasSelected) {
-    state.size = '';
-  } else {
-    card.classList.add('selected');
-    state.size = size;
-  }
-  
+function selectSubtypeAndAdvance(card, subtype) {
+  document.querySelectorAll('#subtypeGrid .selection-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.subtype = subtype;
+  updateSummaryChips();
   updateProductName();
+  setTimeout(() => goToStep(3), 250);
 }
 
-function selectColor(color) {
-  const card = event.target;
-  const wasSelected = card.classList.contains('selected');
-  
-  // Clear all color selections
-  document.querySelectorAll('#colorGrid .selection-card').forEach(c => {
-    c.classList.remove('selected');
-  });
-  
-  if (wasSelected) {
-    state.color = '';
-  } else {
-    card.classList.add('selected');
-    state.color = color;
-  }
-  
+function confirmCustomType() {
+  const val = document.getElementById('customTypeInput').value.trim();
+  if (!val) return;
+  state.subtype = val;
+  updateSummaryChips();
   updateProductName();
+  goToStep(3);
 }
 
-// ============================================================================
-// PRODUCT NAME AUTO-GENERATION
-// ============================================================================
+function selectSizeAndAdvance(card, size) {
+  document.querySelectorAll('#sizeGrid .selection-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.size = size;
+  updateSummaryChips();
+  updateProductName();
+  setTimeout(() => goToStep(4), 250);
+}
 
-function updateProductName() {
-  if (state.userEditedName) {
-    // Show regenerate button if user has edited name
-    document.getElementById('regenerateBtn').style.display = 'inline-block';
+function confirmCustomSize() {
+  const val = document.getElementById('customSizeInput').value.trim();
+  if (!val) return;
+  state.size = val;
+  updateSummaryChips();
+  updateProductName();
+  goToStep(4);
+}
+
+function selectColorAndAdvance(card, color) {
+  document.querySelectorAll('#colorGrid .selection-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  if (color === 'Other') {
+    document.getElementById('customColorRow').style.display = 'block';
     return;
   }
+  state.color = color;
+  updateSummaryChips();
+  updateProductName();
+  setTimeout(() => goToStep(5), 250);
+}
 
-  const parts = [];
-  
-  // Build name: Brand · Type · Category · Size · Color
-  if (state.brand && state.brand !== 'Other') {
-    parts.push(state.brand);
-  }
-  
-  if (state.subtype) {
-    parts.push(state.subtype);
-  } else {
-    // Use category display name
-    parts.push('{{ category_display }}');
-  }
-  
-  if (state.size) {
-    parts.push('Size ' + state.size);
-  }
-  
-  if (state.color && state.color !== 'Other') {
-    parts.push(state.color);
-  }
-  
-  const generatedName = parts.join(' · ');
-  state.name = generatedName;
-  
-  // Update preview
-  const preview = document.getElementById('namePreview');
-  if (generatedName) {
-    preview.textContent = generatedName;
-    preview.classList.remove('empty');
-  } else {
-    preview.textContent = 'Make your selections...';
-    preview.classList.add('empty');
-  }
-  
-  // Update actual input (on step 2)
-  document.getElementById('productName').value = generatedName;
-  
-  // Hide regenerate button
-  document.getElementById('regenerateBtn').style.display = 'none';
+function confirmCustomColor() {
+  const val = document.getElementById('customColorInput').value.trim();
+  if (!val) return;
+  state.color = val;
+  updateSummaryChips();
+  updateProductName();
+  goToStep(5);
+}
+
+function skipAndAdvance(fromStep, field) {
+  state[field] = '';
+  updateSummaryChips();
+  goToStep(fromStep + 1);
 }
 
 // ============================================================================
-// BRAND SEARCH FILTER
+// NAVIGATION
 // ============================================================================
+function goToStep(targetStep) {
+  if (targetStep < 1 || targetStep > TOTAL_STEPS) return;
 
-function filterBrands() {
-  const searchTerm = document.getElementById('brandSearch').value.toLowerCase();
-  const cards = document.querySelectorAll('#brandGrid .selection-card');
-  
-  cards.forEach(card => {
-    const brandName = card.getAttribute('data-value').toLowerCase();
-    if (brandName.includes(searchTerm)) {
-      card.style.display = 'block';
-    } else {
-      card.style.display = 'none';
-    }
-  });
-}
-
-// ============================================================================
-// PROFIT CALCULATION
-// ============================================================================
-
-function calculateProfit() {
-  const cost = parseFloat(document.getElementById('costPrice').value) || 0;
-  const selling = parseFloat(document.getElementById('sellingPrice').value) || 0;
-  
-  if (cost > 0 && selling > 0) {
-    const profit = selling - cost;
-    const margin = ((profit / selling) * 100).toFixed(1);
-    
-    const preview = document.getElementById('profitPreview');
-    const text = document.getElementById('profitText');
-    
-    preview.style.display = 'block';
-    
-    if (profit > 0) {
-      text.innerHTML = `<span style="color: var(--success);">+K${profit.toFixed(2)} (${margin}% margin)</span>`;
-    } else if (profit < 0) {
-      text.innerHTML = `<span style="color: var(--danger);">-K${Math.abs(profit).toFixed(2)} (LOSS)</span>`;
-    } else {
-      text.textContent = 'No profit';
-    }
-  } else {
-    document.getElementById('profitPreview').style.display = 'none';
+  // Remove active from current
+  const curFormStep = document.querySelector(`.form-step[data-step="${state.currentStep}"]`);
+  const curStepper = document.querySelector(`.step[data-step="${state.currentStep}"]`);
+  if (curFormStep) curFormStep.classList.remove('active');
+  if (curStepper) {
+    curStepper.classList.remove('active');
+    if (targetStep > state.currentStep) curStepper.classList.add('completed');
   }
-}
 
-// ============================================================================
-// STEP NAVIGATION
-// ============================================================================
+  // Activate target
+  state.currentStep = targetStep;
+  const nextFormStep = document.querySelector(`.form-step[data-step="${state.currentStep}"]`);
+  const nextStepper = document.querySelector(`.step[data-step="${state.currentStep}"]`);
+  if (nextFormStep) nextFormStep.classList.add('active');
+  if (nextStepper) {
+    nextStepper.classList.add('active');
+    nextStepper.classList.remove('completed');
+  }
 
-function canProceedToNextStep() {
-  // No hard requirements for step 1 (all optional)
-  return true;
-}
+  // On reaching pricing step, refresh name preview
+  if (targetStep === 5) {
+    updateProductName();
+    triggerConfetti(8);
+  }
 
-function nextStep() {
-  if (state.currentStep >= 3) return;
-  
-  // Confetti on step completion
-  triggerConfetti();
-  
-  // Hide current step
-  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.remove('active');
-  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.add('completed');
-  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('active');
-  
-  // Show next step
-  state.currentStep++;
-  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.add('active');
-  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.add('active');
-  
-  // Scroll to top smoothly
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  
-  // Update hidden inputs
   updateHiddenInputs();
 }
 
-function prevStep() {
-  if (state.currentStep <= 1) return;
-  
-  // Hide current step
-  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.remove('active');
-  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('active');
-  
-  // Show previous step
-  state.currentStep--;
-  document.querySelector(`.form-step[data-step="${state.currentStep}"]`).classList.add('active');
-  document.querySelector(`.step[data-step="${state.currentStep}"]`).classList.remove('completed');
-  
-  // Scroll to top smoothly
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+// ============================================================================
+// PRODUCT NAME
+// ============================================================================
+function updateProductName() {
+  if (state.userEditedName) return;
+  const parts = [];
+  if (state.brand && state.brand !== 'Other') parts.push(state.brand);
+  if (state.subtype) parts.push(state.subtype);
+  else parts.push('{{ category_display }}');
+  if (state.size) parts.push('Size ' + state.size);
+  if (state.color && state.color !== 'Other') parts.push(state.color);
+
+  const generated = parts.join(' ');
+  state.name = generated;
+  const preview = document.getElementById('namePreview');
+  if (preview) preview.textContent = generated || '—';
+  const nameInput = document.getElementById('productName');
+  if (nameInput && !state.userEditedName) nameInput.value = generated;
 }
 
 // ============================================================================
-// FORM SUBMISSION
+// SUMMARY CHIPS
 // ============================================================================
+function updateSummaryChips() {
+  const container = document.getElementById('selectionChips');
+  if (!container) return;
+  container.innerHTML = '';
+  const add = (label, val) => {
+    if (!val) return;
+    const chip = document.createElement('span');
+    chip.style.cssText = 'background:rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:4px 12px;font-size:.8rem;font-weight:600;display:inline-flex;align-items:center;gap:4px';
+    chip.textContent = label + ': ' + val;
+    container.appendChild(chip);
+  };
+  add('Brand', state.brand);
+  add('Type', state.subtype);
+  add('Size', state.size);
+  add('Color', state.color);
+}
 
+// ============================================================================
+// BRAND SEARCH
+// ============================================================================
+function filterBrands() {
+  const q = document.getElementById('brandSearch').value.toLowerCase();
+  document.querySelectorAll('#brandGrid .selection-card').forEach(card => {
+    card.style.display = (card.getAttribute('data-value') || '').toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ============================================================================
+// PROFIT CALC
+// ============================================================================
+function calculateProfit() {
+  const cost = parseFloat(document.getElementById('costPrice').value) || 0;
+  const sell = parseFloat(document.getElementById('sellingPrice').value) || 0;
+  const preview = document.getElementById('profitPreview');
+  const text = document.getElementById('profitText');
+  if (!preview || !text) return;
+  if (cost > 0 && sell > 0) {
+    const profit = sell - cost;
+    const margin = ((profit / sell) * 100).toFixed(1);
+    preview.style.display = 'block';
+    if (profit > 0) text.innerHTML = `MK ${profit.toLocaleString()} <span style="font-size:.75rem;opacity:.75">(${margin}% margin)</span>`;
+    else if (profit < 0) text.innerHTML = `<span style="color:#dc2626">-MK ${Math.abs(profit).toLocaleString()} LOSS</span>`;
+    else text.textContent = 'Break even';
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+// ============================================================================
+// HIDDEN INPUTS + SUBMIT
+// ============================================================================
 function updateHiddenInputs() {
-  document.getElementById('hiddenBrand').value = state.brand;
-  document.getElementById('hiddenSubtype').value = state.subtype;
-  document.getElementById('hiddenSize').value = state.size;
-  document.getElementById('hiddenColor').value = state.color;
-  
-  // Name from input
-  const nameValue = document.getElementById('productName').value;
-  document.getElementById('hiddenName').value = nameValue;
-  
-  // Other fields
-  document.getElementById('hiddenQuantity').value = document.getElementById('stockQuantity').value || '0';
-  document.getElementById('hiddenBarcode').value = document.getElementById('barcode').value || '';
-  document.getElementById('hiddenCostPrice').value = document.getElementById('costPrice').value || '';
-  document.getElementById('hiddenSellingPrice').value = document.getElementById('sellingPrice').value || '';
+  document.getElementById('hiddenBrand').value = state.brand || '';
+  document.getElementById('hiddenSubtype').value = state.subtype || '';
+  document.getElementById('hiddenSize').value = state.size || '';
+  document.getElementById('hiddenColor').value = state.color || '';
+  const nameVal = (document.getElementById('productName') || {}).value || state.name;
+  document.getElementById('hiddenName').value = nameVal;
+  document.getElementById('hiddenQuantity').value = (document.getElementById('stockQuantity') || {}).value || '0';
+  document.getElementById('hiddenBarcode').value = (document.getElementById('barcode') || {}).value || '';
+  document.getElementById('hiddenCostPrice').value = (document.getElementById('costPrice') || {}).value || '';
+  document.getElementById('hiddenSellingPrice').value = (document.getElementById('sellingPrice') || {}).value || '';
 }
 
 document.getElementById('mainForm').addEventListener('submit', function(e) {
-  // Update all hidden inputs before submission
   updateHiddenInputs();
-  
-  // Validate required fields
-  const name = document.getElementById('productName').value.trim();
-  const costPrice = document.getElementById('costPrice').value;
-  const sellingPrice = document.getElementById('sellingPrice').value;
-  
-  if (!name) {
-    e.preventDefault();
-    alert('❌ Please enter a product name');
-    return false;
-  }
-  
-  if (!costPrice || parseFloat(costPrice) < 0) {
-    e.preventDefault();
-    alert('❌ Please enter a valid cost price');
-    return false;
-  }
-  
-  if (!sellingPrice || parseFloat(sellingPrice) <= 0) {
-    e.preventDefault();
-    alert('❌ Please enter a valid selling price');
-    return false;
-  }
-  
-  // Big confetti on successful submission prep
-  triggerConfetti(30);
-  
-  // Disable submit button to prevent double submission
+  const name = document.getElementById('hiddenName').value.trim();
+  const cost = document.getElementById('hiddenCostPrice').value;
+  const sell = document.getElementById('hiddenSellingPrice').value;
+  if (!name) { e.preventDefault(); alert('❌ Please enter a product name'); return false; }
+  if (!cost || parseFloat(cost) < 0) { e.preventDefault(); alert('❌ Please enter a valid cost price'); return false; }
+  if (!sell || parseFloat(sell) <= 0) { e.preventDefault(); alert('❌ Please enter a valid selling price'); return false; }
+  triggerConfetti(25);
   document.getElementById('submitBtn').disabled = true;
-  document.getElementById('submitBtn').textContent = '⏳ Adding Product...';
+  document.getElementById('submitBtn').textContent = '⏳ Saving…';
 });
 
 // ============================================================================
-// CONFETTI ANIMATION
+// CONFETTI
 // ============================================================================
-
-function triggerConfetti(count = 15) {
+function triggerConfetti(count = 12) {
   const container = document.getElementById('confettiContainer');
-  const colors = ['#0ea5e9', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-  
+  if (!container) return;
+  const colors = ['#0ea5e9','#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899'];
   for (let i = 0; i < count; i++) {
     setTimeout(() => {
-      const confetti = document.createElement('div');
-      confetti.className = 'confetti';
-      confetti.style.left = Math.random() * 100 + '%';
-      confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-      confetti.style.animationDelay = Math.random() * 0.3 + 's';
-      confetti.style.animationDuration = (Math.random() * 1 + 1.5) + 's';
-      
-      container.appendChild(confetti);
-      
-      setTimeout(() => {
-        confetti.remove();
-      }, 2500);
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.left = Math.random() * 100 + '%';
+      c.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      c.style.animationDelay = Math.random() * 0.3 + 's';
+      c.style.animationDuration = (Math.random() * 1 + 1.5) + 's';
+      container.appendChild(c);
+      setTimeout(() => c.remove(), 2500);
     }, i * 50);
   }
 }

@@ -979,6 +979,10 @@
                 <a href="{{ url_profile_settings|default:'/accounts/settings/' }}" class="dropdown-item" data-testid="avatar-settings">
                   <i class="bi bi-gear me-2"></i> Profile &amp; Settings
                 </a>
+                <button type="button" class="dropdown-item" id="cc-sound-toggle-btn" onclick="ccToggleSound(this)" style="cursor:pointer;border:0;background:transparent;width:100%;text-align:left">
+                  <i class="bi bi-volume-up me-2" id="cc-sound-icon"></i>
+                  <span id="cc-sound-label">App Sounds: On</span>
+                </button>
                 <a href="{{ url_feedback_form|default:'/feedback/' }}" class="dropdown-item">
                   <i class="bi bi-chat-left-text me-2"></i> Feedback
                 </a>
@@ -1075,6 +1079,7 @@
 
     {# AUTHENTICATION GUARD: Only show bottom nav for authenticated users #}
     {% if request.user.is_authenticated %}
+    <!-- vertical-mobile-nav:{{ PRODUCT_MODE|default:'generic' }} -->
     <!-- Mobile bottom dock - Vertical-aware navigation -->
     <nav class="mobile-tabbar d-flex d-md-none cc-bottom-nav">
       {% for item in MOBILE_NAV_ITEMS|default:'' %}
@@ -1147,6 +1152,7 @@
 
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/app.js' %}?v={{ v }}{% endwith %}" defer></script>
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/mobile.js' %}?v={{ v }}{% endwith %}" defer></script>
+<script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/cc-sounds.js' %}?v={{ v }}{% endwith %}" defer></script>
 
 <!-- EMAJINET UI INITIALIZATION SYSTEM (Feb 2026 - BFCache + Vertical Navigation fix) -->
 <script src="{% with v=BUILD_ID|default:STATIC_VERSION|default:'1' %}{% static 'js/emajinet-ui-init.js' %}?v={{ v }}{% endwith %}" defer></script>
@@ -1877,6 +1883,31 @@
 {% endif %}
 
 {% block extra_js %}{% endblock %}
+
+{# Sound toggle UI — reads localStorage after cc-sounds.js loaded #}
+<script>
+(function() {
+  function _refreshSoundUI() {
+    var btn = document.getElementById('cc-sound-toggle-btn');
+    var icon = document.getElementById('cc-sound-icon');
+    var label = document.getElementById('cc-sound-label');
+    if (!btn || !icon || !label) return;
+    var on = !window.CCSounds || window.CCSounds.isEnabled();
+    icon.className = on ? 'bi bi-volume-up me-2' : 'bi bi-volume-mute me-2';
+    label.textContent = on ? 'App Sounds: On' : 'App Sounds: Off';
+    btn.style.color = on ? '' : '#94a3b8';
+  }
+
+  window.ccToggleSound = function(btn) {
+    var nowEnabled = !window.CCSounds || window.CCSounds.isEnabled();
+    if (window.CCSounds) window.CCSounds.setEnabled(!nowEnabled);
+    _refreshSoundUI();
+    if (!nowEnabled && window.CCSounds) window.CCSounds.playSuccessSound();
+  };
+
+  document.addEventListener('DOMContentLoaded', _refreshSoundUI);
+})();
+</script>
 
 <!-- App Version Check -->
 {% if APP_VERSION %}

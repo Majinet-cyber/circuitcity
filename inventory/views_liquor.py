@@ -307,7 +307,7 @@ def sell_liquor(request):
 
     # GET: Build category-grouped products
     from collections import defaultdict
-    from inventory.helpers_liquor_units import get_liquor_unit_info
+    from inventory.helpers_liquor_units import get_liquor_unit_info, get_bottle_breakdown
 
     products = MerchProduct.objects.filter(
         business=business, kind=BusinessKind.LIQUOR, is_archived=False, is_active=True
@@ -317,18 +317,36 @@ def sell_liquor(request):
     for p in products:
         cat = (p.category or "").lower()
         if cat:
-            # Add stock information to each product
-            p.current_stock = p.quantity_in_stock or 0
-            p.is_in_stock = p.current_stock > 0
-            p.is_low_stock = 0 < p.current_stock <= 5
-            
-            # CRITICAL FIX: Add computed unit pricing info
+            qty = p.quantity_in_stock or 0
+            p.current_stock = qty
+            p.is_in_stock = qty > 0
+
+            # Correct low-stock threshold per unit type
+            if cat in ("spirits", "whiskey") and p.shots_per_bottle:
+                # Low stock = less than 1 bottle worth of shots
+                p.is_low_stock = 0 < qty <= p.shots_per_bottle
+            elif cat == "wine" and p.glasses_per_bottle:
+                p.is_low_stock = 0 < qty <= p.glasses_per_bottle
+            else:
+                p.is_low_stock = 0 < qty <= 5
+
+            # Bottle breakdown for display (spirits/wine)
+            breakdown = get_bottle_breakdown(p)
+            p.bb_full_bottles = breakdown["full_bottles"]
+            p.bb_partial_units = breakdown["partial_units"]
+            p.bb_units_per_bottle = breakdown["units_per_bottle"]
+            p.bb_has_open_bottle = breakdown["has_open_bottle"]
+            p.bb_display_text = breakdown["display_text"]
+            p.bb_total_label = breakdown["total_label"]
+            p.bb_unit_label = breakdown["unit_label"]
+
+            # Computed unit pricing info
             unit_info = get_liquor_unit_info(p)
             p.computed_unit_price = unit_info["unit_price"]
             p.computed_unit_cost = unit_info["unit_cost"]
             p.computed_unit_label = unit_info["label"]
             p.computed_max_quantity = unit_info["max_quantity"]
-            
+
             # Override displayed prices if product-specific prices are not set
             if not p.price_per_bottle and unit_info["sale_unit"] == "bottle":
                 p.price_per_bottle = unit_info["unit_price"]
@@ -339,7 +357,7 @@ def sell_liquor(request):
             if not p.price_per_glass and unit_info["sale_unit"] == "glass":
                 p.price_per_glass = unit_info["unit_price"]
                 p.cost_per_glass = unit_info["unit_cost"]
-            
+
             products_by_category[cat].append(p)
 
     # Build categories list in order, but include only those that have products

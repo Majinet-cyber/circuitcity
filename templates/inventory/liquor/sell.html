@@ -291,8 +291,29 @@
                                     {% endif %}
                                 </div>
                                 <div class="small text-muted">
-                                    <span><i class="bi bi-box"></i> Stock: {{ p.current_stock }} bottles</span>
-                                    <span class="ms-2">Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
+                                    {% if p.has_shots %}
+                                        {# Spirits/Whisky: quantity_in_stock = SHOTS #}
+                                        <span><i class="bi bi-lightning"></i>
+                                            <strong style="color:#7c3aed">{{ p.current_stock }} shot{{ p.current_stock|pluralize }}</strong>
+                                        </span>
+                                        {% if p.bb_display_text %}
+                                            <span class="ms-1" style="color:#94a3b8">({{ p.bb_display_text }})</span>
+                                        {% endif %}
+                                    {% elif p.has_glasses %}
+                                        {# Wine: quantity_in_stock = GLASSES #}
+                                        <span><i class="bi bi-cup"></i>
+                                            <strong style="color:#be185d">{{ p.current_stock }} glass{{ p.current_stock|pluralize:"es" }}</strong>
+                                        </span>
+                                        {% if p.bb_display_text %}
+                                            <span class="ms-1" style="color:#94a3b8">({{ p.bb_display_text }})</span>
+                                        {% endif %}
+                                    {% else %}
+                                        {# Beer/Cider/Other: quantity_in_stock = BOTTLES #}
+                                        <span><i class="bi bi-box"></i> Stock: {{ p.current_stock }} bottle{{ p.current_stock|pluralize }}</span>
+                                    {% endif %}
+                                    {% if p.price_per_bottle %}
+                                        <span class="ms-2">Bottle: MK {{ p.price_per_bottle|floatformat:0 }}</span>
+                                    {% endif %}
                                     {% if p.has_shots and p.price_per_shot %}
                                         <span class="ms-2">Shot: MK {{ p.price_per_shot|floatformat:0 }}</span>
                                     {% endif %}
@@ -944,10 +965,11 @@
         const quantity = parseInt(inputQuantity.value) || 1;
         const mode = inputMode.value;
         
-        // Validate quantity against stock (for bottle mode only)
-        if (mode === 'bottle' && quantity > currentProduct.stock) {
+        // Validate quantity against stock
+        const stockUnit = currentProduct.hasShots ? 'shots' : currentProduct.hasGlasses ? 'glasses' : 'bottles';
+        if (mode === 'bottle' && !currentProduct.hasShots && !currentProduct.hasGlasses && quantity > currentProduct.stock) {
             inputQuantity.value = currentProduct.stock;
-            alert(`⚠️ Only ${currentProduct.stock} bottles available in stock!`);
+            alert(`⚠️ Only ${currentProduct.stock} ${stockUnit} available in stock!`);
         }
         
         // Get canonical price and cost based on mode
@@ -1053,10 +1075,21 @@
         }
     }
     
-    // Form submit (just ensure form submits normally)
-    sellForm.addEventListener('submit', function(e) {
-        // Let form submit naturally to POST endpoint
-    });
+    // Form submit (just ensure form submits naturally to POST endpoint)
+    sellForm.addEventListener('submit', function(e) {});
+})();
+
+// ── Premium Sound: play on successful sale (detected from Django messages) ──
+(function() {
+    {% for message in messages %}
+        {% if 'sold' in message.message|lower or 'sale' in message.message|lower %}
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                if (window.CCSounds) window.CCSounds.playSaleCompleteSound();
+            }, 150);
+        });
+        {% endif %}
+    {% endfor %}
 })();
 </script>
 {% endblock %}

@@ -489,27 +489,63 @@ def liquor_stock_list(request):
     # Sort by name
     products = products.order_by("category", "name")
 
+    # Augment products with bottle breakdown for display
+    from inventory.helpers_liquor_units import get_bottle_breakdown
+    products = list(products)  # evaluate queryset once
+    for p in products:
+        breakdown = get_bottle_breakdown(p)
+        p.bb_full_bottles = breakdown["full_bottles"]
+        p.bb_partial_units = breakdown["partial_units"]
+        p.bb_units_per_bottle = breakdown["units_per_bottle"]
+        p.bb_has_open_bottle = breakdown["has_open_bottle"]
+        p.bb_display_text = breakdown["display_text"]
+        p.bb_total_label = breakdown["total_label"]
+        p.bb_unit_label = breakdown["unit_label"]
+
+        # Per-product low-stock threshold (category-aware)
+        cat = (p.category or "").lower()
+        qty = p.quantity_in_stock or 0
+        if cat in ("spirits", "whiskey") and p.shots_per_bottle:
+            # Low stock = less than 1 bottle worth of shots
+            p.is_low_stock = 0 < qty <= p.shots_per_bottle
+        elif cat == "wine" and p.glasses_per_bottle:
+            p.is_low_stock = 0 < qty <= p.glasses_per_bottle
+        else:
+            p.is_low_stock = 0 < qty <= 10
+
     # Calculate aggregates
-    total_products = products.count()
+    total_products = len(products)
     total_quantity = sum(p.quantity_in_stock or 0 for p in products)
 
-    # Cost and retail calculations
+    # Cost and retail calculations — use correct per-unit cost based on category
     total_cost_value = Decimal("0.00")
     total_retail_value = Decimal("0.00")
 
     for p in products:
         qty = p.quantity_in_stock or 0
-        cost = p.cost_per_bottle or Decimal("0.00")
-        price = p.price_per_bottle or Decimal("0.00")
+        cat = (p.category or "").lower()
+
+        if cat in ("spirits", "whiskey") and p.has_shots:
+            # qty is in shots
+            cost = p.cost_per_shot or Decimal("0.00")
+            price = p.price_per_shot or Decimal("0.00")
+        elif cat == "wine" and p.has_glasses:
+            # qty is in glasses
+            cost = p.cost_per_glass or Decimal("0.00")
+            price = p.price_per_glass or Decimal("0.00")
+        else:
+            # qty is in bottles
+            cost = p.cost_per_bottle or Decimal("0.00")
+            price = p.price_per_bottle or Decimal("0.00")
 
         total_cost_value += qty * cost
         total_retail_value += qty * price
 
     expected_profit = total_retail_value - total_cost_value
 
-    # Low stock and out of stock counts
-    low_stock_threshold = 10
-    low_stock_count = sum(1 for p in products if 0 < (p.quantity_in_stock or 0) <= low_stock_threshold)
+    # Low stock and out of stock counts (using per-product flags set above)
+    low_stock_threshold = 10  # kept for template compatibility (bottles)
+    low_stock_count = sum(1 for p in products if getattr(p, "is_low_stock", False))
     out_of_stock_count = sum(1 for p in products if (p.quantity_in_stock or 0) == 0)
 
     # Get all categories for filter dropdown
