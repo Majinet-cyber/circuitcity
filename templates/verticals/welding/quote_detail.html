@@ -541,328 +541,256 @@
 {% block extra_js %}
 {% if is_editable %}
 <script>
-// ==============================================================================
-// WELDING QUOTE MODAL FIX (Feb 2026) - BULLETPROOF VERSION
-// ==============================================================================
-// PROBLEM: "Add Material" and "Add Cost" buttons only blink/flash, nothing happens
-//
-// ROOT CAUSES:
-// 1. Bootstrap.js loads with 'defer' attribute, creating race condition
-// 2. No error handling when modal opening fails
-// 3. Possible conflict with other page scripts
-//
-// SOLUTION: 
-// - Robust Bootstrap availability polling
-// - Event delegation to survive DOM changes
-// - Comprehensive error handling and logging
-// - Explicit button type="button" enforcement
-// ==============================================================================
-(function() {
+(function () {
   'use strict';
-  
-  // ==============================================================================
-  // PHASE 1: INITIALIZATION GUARD
-  // ==============================================================================
-  if (window.__WELDING_QUOTE_MODALS_INITIALIZED__) {
-    console.log('[Welding Quote] ✓ Modals already initialized, skipping duplicate init');
-    return;
+
+  const quoteId = "{{ quote.id }}";
+  const csrfToken = "{{ csrf_token }}";
+
+  function money(value) {
+    const n = Number(value || 0);
+    return "MWK " + n.toLocaleString();
   }
-  window.__WELDING_QUOTE_MODALS_INITIALIZED__ = true;
-  console.log('[Welding Quote] Starting modal initialization...');
-  
-  // ==============================================================================
-  // PHASE 2: WAIT FOR BOOTSTRAP
-  // ==============================================================================
-  var MAX_RETRIES = 200; // 10 seconds total (50ms * 200)
-  var retryCount = 0;
-  
-  function waitForBootstrap(callback) {
-    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-      console.log('[Welding Quote] ✓ Bootstrap.Modal available (waited ' + (retryCount * 50) + 'ms)');
-      callback();
-    } else if (retryCount < MAX_RETRIES) {
-      retryCount++;
-      setTimeout(function() { waitForBootstrap(callback); }, 50);
-    } else {
-      console.error('[Welding Quote] ✗ CRITICAL: Bootstrap failed to load after ' + (MAX_RETRIES * 50) + 'ms');
-      alert('Error: Page scripts failed to load. Please refresh the page.');
-    }
+
+  function getModal(id) {
+    const el = document.getElementById(id);
+    if (!el || typeof bootstrap === "undefined") return null;
+    return bootstrap.Modal.getOrCreateInstance(el);
   }
-  
-  // ==============================================================================
-  // PHASE 3: INITIALIZE MODAL CLICK HANDLERS
-  // ==============================================================================
-  function initializeModals() {
-    console.log('[Welding Quote] Initializing modal click handlers...');
-    
-    // Verify modals exist in DOM
-    var materialModal = document.getElementById('materialPickerModal');
-    var costModal = document.getElementById('costPickerModal');
-    
-    if (!materialModal) {
-      console.error('[Welding Quote] ✗ Material picker modal not found in DOM');
-    } else {
-      console.log('[Welding Quote] ✓ Material picker modal found');
-    }
-    
-    if (!costModal) {
-      console.error('[Welding Quote] ✗ Cost picker modal not found in DOM');
-    } else {
-      console.log('[Welding Quote] ✓ Cost picker modal found');
-    }
-    
-    // Get all modal trigger buttons
-    var modalTriggers = document.querySelectorAll('[data-bs-toggle="modal"]');
-    console.log('[Welding Quote] Found ' + modalTriggers.length + ' modal trigger buttons');
-    
-    // Ensure all triggers have type="button" (prevent form submission)
-    modalTriggers.forEach(function(trigger) {
-      if (!trigger.hasAttribute('type') && trigger.tagName === 'BUTTON') {
-        trigger.setAttribute('type', 'button');
-        console.log('[Welding Quote] ⚠ Fixed missing type attribute on button');
-      }
+
+  function postForm(url, formData) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken },
+      body: formData
+    }).then(function (response) {
+      return response.json();
     });
-    
-    // ==============================================================================
-    // PHASE 4: EVENT DELEGATION FOR MODAL CLICKS
-    // ==============================================================================
-    // Using event delegation on document.body ensures:
-    // - Survives partial page reloads (HTMX/Turbo/etc)
-    // - Works with dynamically added buttons
-    // - Single listener instead of N listeners
-    // ==============================================================================
-    document.body.addEventListener('click', function(e) {
-      var trigger = e.target.closest('[data-bs-toggle="modal"]');
-      
-      if (!trigger) return; // Not a modal trigger, ignore
-      
-      // CRITICAL: Prevent default behavior (form submission, navigation)
-      e.preventDefault();
-      e.stopPropagation();
-      
-      var targetSelector = trigger.getAttribute('data-bs-target');
-      if (!targetSelector) {
-        console.error('[Welding Quote] ✗ Button missing data-bs-target attribute:', trigger);
-        alert('Error: Modal configuration missing. Please contact support.');
-        return;
-      }
-      
-      var targetModal = document.querySelector(targetSelector);
-      if (!targetModal) {
-        console.error('[Welding Quote] ✗ Modal element not found:', targetSelector);
-        alert('Error: Modal not found on page. Please refresh and try again.');
-        return;
-      }
-      
-      console.log('[Welding Quote] → Opening modal:', targetSelector);
-      
-      try {
-        // Get existing instance or create new one
-        var modalInstance = bootstrap.Modal.getInstance(targetModal);
-        if (!modalInstance) {
-          console.log('[Welding Quote] Creating new Modal instance for', targetSelector);
-          modalInstance = new bootstrap.Modal(targetModal, {
-            backdrop: true,  // Dismiss on backdrop click
-            keyboard: true,  // Dismiss on ESC key
-            focus: true      // Focus modal on open
-          });
-        }
-        
-        // Show the modal
-        modalInstance.show();
-        console.log('[Welding Quote] ✓ Modal opened successfully:', targetSelector);
-        
-      } catch (err) {
-        console.error('[Welding Quote] ✗ CRITICAL ERROR opening modal:', err);
-        console.error('Error details:', {
-          message: err.message,
-          stack: err.stack,
-          targetSelector: targetSelector,
-          bootstrapAvailable: typeof bootstrap !== 'undefined',
-          modalClass: typeof bootstrap !== 'undefined' ? typeof bootstrap.Modal : 'N/A'
-        });
-        alert('Error opening modal: ' + err.message + '\n\nPlease refresh the page and try again.');
-      }
-    }, false); // Use capture=false (bubble phase)
-    
-    console.log('[Welding Quote] ✓ Modal system initialized successfully');
   }
-  
-  // ==============================================================================
-  // PHASE 5: START INITIALIZATION
-  // ==============================================================================
-  waitForBootstrap(function() {
-    // Ensure DOM is ready before initializing
-    if (document.readyState === 'loading') {
-      console.log('[Welding Quote] Waiting for DOMContentLoaded...');
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('[Welding Quote] DOM ready, initializing modals');
-        initializeModals();
-      }, false);
+
+  function openQtyModal(material) {
+    document.getElementById("mqMaterialId").value = material.id || "";
+    document.getElementById("mqUseCustom").value = material.custom ? "1" : "0";
+    document.getElementById("mqQty").value = "1";
+    document.getElementById("mqPrice").value = material.price || "";
+    document.getElementById("mqDiscount").value = "0";
+    document.getElementById("mqWaste").value = "0";
+    document.getElementById("mqNotes").value = "";
+
+    const customWrap = document.getElementById("mqCustomFields");
+    if (material.custom) {
+      customWrap.classList.remove("d-none");
+      document.getElementById("mqCustomName").value = "";
+      document.getElementById("mqCustomUnit").value = "piece";
+      document.getElementById("materialQtySummary").innerHTML =
+        "<strong>Custom material</strong><br><span class='text-muted'>Enter material name, unit, quantity, and price.</span>";
     } else {
-      console.log('[Welding Quote] DOM already ready, initializing modals immediately');
-      initializeModals();
+      customWrap.classList.add("d-none");
+      document.getElementById("materialQtySummary").innerHTML =
+        "<strong>" + material.name + "</strong><br>" +
+        "<span class='text-muted'>Unit: " + (material.unit || "item") + " • Suggested price: " + money(material.price) + "</span>";
     }
+
+    const picker = getModal("materialPickerModal");
+    if (picker) picker.hide();
+
+    const qtyModal = getModal("materialQtyModal");
+    if (qtyModal) qtyModal.show();
+  }
+
+  function bindMaterialCards() {
+    document.querySelectorAll(".pick-material-card").forEach(function (card) {
+      card.addEventListener("click", function () {
+        openQtyModal({
+          id: card.dataset.materialId,
+          name: card.querySelector("h6")?.innerText?.trim() || "Material",
+          unit: card.closest(".material-item")?.querySelector("li")?.innerText || "",
+          price: (card.innerText.match(/MWK\s*([\d,]+)/) || [])[1]?.replace(/,/g, "") || ""
+        });
+      });
+
+      card.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          card.click();
+        }
+      });
+    });
+  }
+
+  function bindSearchAndFilter() {
+    const searchInput = document.getElementById("materialSearch");
+    const categoryFilter = document.getElementById("materialCategoryFilter");
+
+    function applyFilters() {
+      const search = (searchInput?.value || "").toLowerCase();
+      const category = categoryFilter?.value || "";
+
+      document.querySelectorAll(".material-item").forEach(function (item) {
+        const name = item.dataset.name || "";
+        const itemCategory = item.dataset.category || "";
+        const matchesSearch = !search || name.includes(search);
+        const matchesCategory = !category || itemCategory === category;
+        item.style.display = matchesSearch && matchesCategory ? "" : "none";
+      });
+    }
+
+    if (searchInput) searchInput.addEventListener("input", applyFilters);
+    if (categoryFilter) categoryFilter.addEventListener("change", applyFilters);
+  }
+
+  function bindCustomMaterial() {
+    const btn = document.getElementById("openCustomMaterialBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", function () {
+      openQtyModal({ custom: true });
+    });
+  }
+
+  function bindQtySubmit() {
+    const btn = document.getElementById("mqSubmitBtn");
+    if (!btn) return;
+
+    btn.addEventListener("click", function () {
+      const qty = document.getElementById("mqQty").value;
+      const price = document.getElementById("mqPrice").value;
+      const materialId = document.getElementById("mqMaterialId").value;
+      const useCustom = document.getElementById("mqUseCustom").value === "1";
+
+      if (!qty || Number(qty) <= 0) {
+        document.getElementById("mqQty").classList.add("is-invalid");
+        document.getElementById("mqQtyErr").innerText = "Quantity must be greater than zero.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("quantity", qty);
+      if (price) formData.append("unit_price", price);
+      formData.append("discount_percent", document.getElementById("mqDiscount").value || "0");
+      formData.append("waste_percent", document.getElementById("mqWaste").value || "0");
+      formData.append("notes", document.getElementById("mqNotes").value || "");
+
+      if (useCustom) {
+        const customName = document.getElementById("mqCustomName").value.trim();
+        if (!customName) {
+          alert("Enter custom material name.");
+          return;
+        }
+        formData.append("custom_material_name", customName);
+        formData.append("custom_material_unit", document.getElementById("mqCustomUnit").value || "piece");
+      } else {
+        formData.append("material_id", materialId);
+      }
+
+      postForm("{% url 'verticals:welding_quote_add_line_item' quote.id %}", formData)
+        .then(function (data) {
+          if (data.success) {
+            location.reload();
+          } else {
+            alert("Error: " + (data.error || "Could not add material."));
+          }
+        })
+        .catch(function (err) {
+          alert("Error adding material: " + err);
+        });
+    });
+  }
+
+  function bindInlineEditors() {
+    document.querySelectorAll("[data-edit-qty]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const itemId = btn.dataset.editQty;
+        const current = btn.dataset.qty || "1";
+        const newQty = prompt("Enter new quantity:", current);
+        if (!newQty || newQty === current) return;
+        updateLineItem(itemId, { quantity: newQty });
+      });
+    });
+
+    document.querySelectorAll("[data-edit-price]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const itemId = btn.dataset.editPrice;
+        const current = btn.dataset.price || "";
+        const newPrice = prompt("Enter unit price (MWK):", current);
+        if (newPrice === null || newPrice === current) return;
+        updateLineItem(itemId, { unit_price: newPrice });
+      });
+    });
+  }
+
+  window.updateLineItem = function (itemId, data) {
+    const formData = new FormData();
+    Object.keys(data).forEach(function (key) {
+      formData.append(key, data[key]);
+    });
+
+    postForm(`/verticals/welding/quotes/${quoteId}/line-item/${itemId}/update/`, formData)
+      .then(function (data) {
+        if (data.success) location.reload();
+        else alert("Error: " + (data.error || "Could not update line."));
+      })
+      .catch(function (err) {
+        alert("Error updating line item: " + err);
+      });
+  };
+
+  window.deleteLineItem = function (itemId) {
+    if (!confirm("Delete this line item?")) return;
+
+    fetch(`/verticals/welding/quotes/${quoteId}/line-item/${itemId}/delete/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken }
+    })
+      .then(response => response.json())
+      .then(function (data) {
+        if (data.success) location.reload();
+        else alert("Error: " + (data.error || "Could not delete line item."));
+      })
+      .catch(function (err) {
+        alert("Error deleting line item: " + err);
+      });
+  };
+
+  window.addCost = function (event) {
+    event.preventDefault();
+    const formData = new FormData(event.target);
+
+    postForm("{% url 'verticals:welding_quote_add_cost' quote.id %}", formData)
+      .then(function (data) {
+        if (data.success) location.reload();
+        else alert("Error: " + (data.error || "Could not add cost."));
+      })
+      .catch(function (err) {
+        alert("Error adding cost: " + err);
+      });
+  };
+
+  window.deleteCost = function (costId) {
+    if (!confirm("Delete this cost?")) return;
+
+    fetch(`/verticals/welding/quotes/${quoteId}/cost/${costId}/delete/`, {
+      method: "POST",
+      headers: { "X-CSRFToken": csrfToken }
+    })
+      .then(response => response.json())
+      .then(function (data) {
+        if (data.success) location.reload();
+        else alert("Error: " + (data.error || "Could not delete cost."));
+      })
+      .catch(function (err) {
+        alert("Error deleting cost: " + err);
+      });
+  };
+
+  document.addEventListener("DOMContentLoaded", function () {
+    bindMaterialCards();
+    bindSearchAndFilter();
+    bindCustomMaterial();
+    bindQtySubmit();
+    bindInlineEditors();
   });
 })();
-
-// Material search
-document.getElementById('materialSearch')?.addEventListener('input', function(e) {
-    const search = e.target.value.toLowerCase();
-    document.querySelectorAll('.material-item').forEach(item => {
-        const name = item.getAttribute('data-name');
-        if (name.includes(search)) {
-            item.style.display = '';
-        } else {
-            item.style.display = 'none';
-        }
-    });
-});
-
-// Select material and add as line item
-function selectMaterial(materialId, materialName, materialUnit, suggestedPrice) {
-    const quantity = prompt(`Enter quantity for ${materialName}:`, '1');
-    if (!quantity) return;
-    
-    const unitPrice = prompt(`Enter unit price (MWK) for ${materialName}:\n\nSuggested: MWK ${suggestedPrice}\nLeave blank to set later.`, '');
-    
-    addLineItem(materialId, quantity, unitPrice);
-}
-
-function addLineItem(materialId, quantity, unitPrice) {
-    const formData = new FormData();
-    formData.append('material_id', materialId);
-    formData.append('quantity', quantity);
-    if (unitPrice) formData.append('unit_price', unitPrice);
-    
-    fetch('{% url "verticals:welding_quote_add_line_item" quote.id %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error adding line item: ' + error);
-    });
-}
-
-function editQuantity(itemId, currentValue) {
-    const newQty = prompt('Enter new quantity:', currentValue);
-    if (!newQty || newQty === currentValue) return;
-    
-    updateLineItem(itemId, { quantity: newQty });
-}
-
-function editPrice(itemId, currentValue) {
-    const newPrice = prompt('Enter unit price (MWK):', currentValue);
-    if (newPrice === null || newPrice === currentValue) return;
-    
-    updateLineItem(itemId, { unit_price: newPrice });
-}
-
-function updateLineItem(itemId, data) {
-    const formData = new FormData();
-    for (const key in data) {
-        formData.append(key, data[key]);
-    }
-    
-    fetch(`/verticals/welding/quotes/{{ quote.id }}/line-item/${itemId}/update/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error updating line item: ' + error);
-    });
-}
-
-function deleteLineItem(itemId) {
-    if (!confirm('Delete this line item?')) return;
-    
-    fetch(`/verticals/welding/quotes/{{ quote.id }}/line-item/${itemId}/delete/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error deleting line item: ' + error);
-    });
-}
-
-function addCost(event) {
-    event.preventDefault();
-    const form = event.target;
-    const formData = new FormData(form);
-    
-    fetch('{% url "verticals:welding_quote_add_cost" quote.id %}', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error adding cost: ' + error);
-    });
-}
-
-function deleteCost(costId) {
-    if (!confirm('Delete this cost?')) return;
-    
-    fetch(`/verticals/welding/quotes/{{ quote.id }}/cost/${costId}/delete/`, {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': '{{ csrf_token }}'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        } else {
-            alert('Error: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        alert('Error deleting cost: ' + error);
-    });
-}
 </script>
 {% endif %}
 {% endblock %}
