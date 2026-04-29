@@ -108,50 +108,57 @@ def marketplace_home(request: HttpRequest) -> HttpResponse:
     """
     Top-level public marketplace: shows all live listings + live businesses.
     /marketplace/
+    Must never depend on tenant-vertical session — safe when visited from any workspace.
     """
     vertical_filter = request.GET.get("vertical", "").strip()
     search_q = request.GET.get("q", "").strip()
 
-    listings_qs = (
-        MarketplaceListing.objects
-        .filter(status=ListingStatus.LIVE)
-        .select_related("business")
-        .prefetch_related("images")
-    )
-    if vertical_filter:
-        listings_qs = listings_qs.filter(vertical=vertical_filter)
-    if search_q:
-        from django.db.models import Q
-        listings_qs = listings_qs.filter(
-            Q(title__icontains=search_q)
-            | Q(description__icontains=search_q)
-            | Q(business__name__icontains=search_q)
+    try:
+        listings_qs = (
+            MarketplaceListing.objects
+            .filter(status=ListingStatus.LIVE)
+            .select_related("business")
+            .prefetch_related("images")
         )
-    listings_qs = listings_qs.order_by("-created_at")
+        if vertical_filter:
+            listings_qs = listings_qs.filter(vertical=vertical_filter)
+        if search_q:
+            from django.db.models import Q
 
-    paginator = Paginator(listings_qs, 24)
-    page_obj = paginator.get_page(request.GET.get("page", 1))
+            listings_qs = listings_qs.filter(
+                Q(title__icontains=search_q)
+                | Q(description__icontains=search_q)
+                | Q(business__name__icontains=search_q)
+            )
+        listings_qs = listings_qs.order_by("-created_at")
 
-    available_verticals = (
-        MarketplaceListing.objects
-        .filter(status=ListingStatus.LIVE)
-        .exclude(vertical="")
-        .values_list("vertical", flat=True)
-        .distinct()
-        .order_by("vertical")
-    )
+        paginator = Paginator(listings_qs, 24)
+        page_obj = paginator.get_page(request.GET.get("page", 1))
 
-    # Get businesses with live listings (for featured section)
-    from django.db.models import Count
-    featured_businesses = (
-        Business.objects
-        .filter(
-            marketplace_listings__status=ListingStatus.LIVE,
-            status="ACTIVE",
+        available_verticals = (
+            MarketplaceListing.objects.filter(status=ListingStatus.LIVE)
+            .exclude(vertical="")
+            .values_list("vertical", flat=True)
+            .distinct()
+            .order_by("vertical")
         )
-        .annotate(listing_count=Count("marketplace_listings"))
-        .order_by("-listing_count")[:12]
-    )
+
+        from django.db.models import Count
+
+        featured_businesses = (
+            Business.objects.filter(
+                marketplace_listings__status=ListingStatus.LIVE,
+                status="ACTIVE",
+            )
+            .annotate(listing_count=Count("marketplace_listings"))
+            .order_by("-listing_count")[:12]
+        )
+    except Exception as exc:
+        log.exception("marketplace_home query failed: %s", exc)
+        paginator = Paginator([], 24)
+        page_obj = paginator.get_page(1)
+        available_verticals = []
+        featured_businesses = []
 
     return render(
         request,

@@ -344,7 +344,7 @@ class WeldingPhase2ViewTest(TestCase):
 
     def test_clients_view(self):
         try:
-            resp = self.client.get(reverse("verticals:welding_clients"))
+            resp = self.client.get(reverse("verticals:welding_client_management"))
             self.assertIn(resp.status_code, [200, 302])
         except NoReverseMatch:
             self.skipTest("URL not found")
@@ -471,7 +471,7 @@ class Phase2URLRoutingTest(TestCase):
     def test_welding_phase2_urls_resolve(self):
         url_names = [
             "verticals:welding_intelligence",
-            "verticals:welding_clients",
+            "verticals:welding_client_management",
         ]
         for name in url_names:
             try:

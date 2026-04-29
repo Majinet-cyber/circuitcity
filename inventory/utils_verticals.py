@@ -2147,6 +2147,19 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             },
             {
                 "section": "MAIN",
+                "key": "simulations",
+                "url": "verticals:welding_simulations",
+                "label": "Simulations",
+                "icon": "bi-bezier2",
+                "active_prefix": "/verticals/welding/simulations",
+                "active_pattern": "/verticals/welding/simulations",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-simulations",
+            },
+            {
+                "section": "MAIN",
                 "key": "materials",
                 "url": "verticals:welding_materials_list",
                 "label": "Materials",
@@ -2197,7 +2210,7 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             {
                 "section": "MAIN",
                 "key": "clients",
-                "url": "verticals:welding_clients",
+                "url": "verticals:welding_client_management",
                 "label": "Clients",
                 "icon": "bi-people",
                 "active_prefix": "/verticals/welding/clients",

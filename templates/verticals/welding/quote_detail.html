@@ -138,22 +138,25 @@
                                     </td>
                                     <td class="text-center">
                                         {% if is_editable %}
-                                        <span class="editable-field" onclick="editQuantity({{ item.id }}, '{{ item.quantity }}')">
+                                        <button type="button" class="btn btn-link btn-sm p-0 editable-field"
+                                                data-edit-qty="{{ item.id }}" data-qty="{{ item.quantity }}">
                                             {{ item.quantity }}
-                                        </span> <small class="text-muted">{{ item.material_unit }}</small>
+                                        </button> <small class="text-muted">{{ item.material_unit }}</small>
                                         {% else %}
                                         {{ item.quantity }} {{ item.material_unit }}
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
                                         {% if is_editable %}
-                                        <span class="editable-field" onclick="editPrice({{ item.id }}, '{{ item.unit_price|default:'' }}')">
+                                        <button type="button" class="btn btn-link btn-sm p-0 text-end editable-field"
+                                                data-edit-price="{{ item.id }}"
+                                                data-price="{{ item.unit_price|default:'' }}">
                                             {% if item.unit_price %}
                                             MWK {{ item.unit_price|floatformat:0|intcomma }}
                                             {% else %}
                                             <span class="text-muted">Enter price</span>
                                             {% endif %}
-                                        </span>
+                                        </button>
                                         {% else %}
                                         {% if item.unit_price %}
                                         MWK {{ item.unit_price|floatformat:0|intcomma }}
@@ -329,32 +332,148 @@
 
 <!-- Material Picker Modal -->
 {% if is_editable %}
+<script type="application/json" id="welding-materials-json">{{ materials_json }}</script>
 <div class="modal fade" id="materialPickerModal" tabindex="-1" data-testid="welding-action-modal">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-hammer"></i> Pick Material</h5>
+                <h5 class="modal-title"><i class="bi bi-hammer"></i> Materials catalog</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body material-picker-modal">
-                <input type="text" id="materialSearch" class="form-control mb-3" placeholder="Search materials...">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted mb-1">Search</label>
+                        <input type="text" id="materialSearch" class="form-control" placeholder="Search by name…">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted mb-1">Category</label>
+                        <select class="form-select" id="materialCategoryFilter">
+                            <option value="">All categories</option>
+                            {% for val, label in categories %}
+                            <option value="{{ val }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
                 <div class="row g-3" id="materialGrid">
                     {% for material in materials %}
-                    <div class="col-md-6 material-item" data-name="{{ material.name|lower }}" data-category="{{ material.category }}">
-                        <div class="card material-card h-100" onclick="selectMaterial({{ material.id }}, '{{ material.name|escapejs }}', '{{ material.unit }}', '{{ material.price_mwk }}')" data-testid="material-card-{{ material.id }}">
+                    <div class="col-md-6 col-lg-4 material-item"
+                         data-name="{{ material.name|lower }}"
+                         data-category="{{ material.category }}">
+                        <div class="card material-card h-100 shadow-sm border-0 pick-material-card"
+                             role="button"
+                             tabindex="0"
+                             data-material-id="{{ material.id }}"
+                             data-testid="material-card-{{ material.id }}">
                             <div class="card-body">
                                 <h6 class="mb-1">{{ material.name }}</h6>
                                 <p class="text-muted mb-1"><small>{{ material.get_category_display }}</small></p>
-                                <p class="mb-0">
-                                    <small class="text-muted">Stock: {{ material.quantity_in_stock }} {{ material.get_unit_display }}</small>
-                                    <br>
-                                    <small class="text-muted">Last price: MWK {{ material.price_mwk|floatformat:0|intcomma }}</small>
-                                </p>
+                                <ul class="list-unstyled small mb-0 text-muted">
+                                    <li>Stock: <strong class="text-dark">{{ material.quantity_in_stock }}</strong> {{ material.get_unit_display }}</li>
+                                    <li>Unit cost: <strong class="text-dark">MWK {{ material.price_mwk|floatformat:0|intcomma }}</strong></li>
+                                </ul>
                             </div>
                         </div>
                     </div>
                     {% endfor %}
                 </div>
+                <hr class="my-4">
+                <h6 class="text-muted text-uppercase small">Custom material</h6>
+                <p class="small text-muted">Not in catalog? Enter details — added as a manual line.</p>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="openCustomMaterialBtn">
+                    <i class="bi bi-pencil-square"></i> Enter custom material
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quantity / pricing panel for selected material -->
+<div class="modal fade" id="materialQtyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add line item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light border small mb-3" id="materialQtySummary"></div>
+                <input type="hidden" id="mqMaterialId" value="">
+                <input type="hidden" id="mqUseCustom" value="0">
+                <div id="mqCustomFields" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label">Material name</label>
+                        <input type="text" class="form-control" id="mqCustomName" maxlength="150" placeholder="e.g. Gate scrollwork">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Unit label</label>
+                        <select class="form-select" id="mqCustomUnit">
+                            <option value="piece">Piece</option>
+                            <option value="length_6m">6m length</option>
+                            <option value="length_5_8m">5.8m length</option>
+                            <option value="metre">Metre</option>
+                            <option value="kg">kg</option>
+                            <option value="sheet">Sheet</option>
+                            <option value="other">Other / custom</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" step="0.01" min="0.01" class="form-control" id="mqQty" value="1">
+                    <div class="invalid-feedback" id="mqQtyErr"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Unit price (MWK)</label>
+                    <input type="number" step="0.01" min="0" class="form-control" id="mqPrice" placeholder="Leave blank to set later">
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label">Discount %</label>
+                        <input type="number" step="0.1" min="0" max="100" class="form-control" id="mqDiscount" value="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Waste allowance %</label>
+                        <input type="number" step="0.1" min="0" max="200" class="form-control" id="mqWaste" value="0">
+                    </div>
+                </div>
+                <div class="mb-3 mt-2">
+                    <label class="form-label">Notes</label>
+                    <input type="text" class="form-control" id="mqNotes" maxlength="240" placeholder="Optional">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="mqSubmitBtn">Add to quote</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit quantity / unit price -->
+<div class="modal fade" id="lineEditModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit line</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="leItemId" value="">
+                <div class="mb-3" id="leQtyWrap">
+                    <label class="form-label">Quantity</label>
+                    <input type="number" step="0.01" min="0.01" class="form-control" id="leQty">
+                    <div class="invalid-feedback" id="leQtyErr"></div>
+                </div>
+                <div class="mb-3" id="lePriceWrap">
+                    <label class="form-label">Unit price (MWK)</label>
+                    <input type="number" step="0.01" min="0" class="form-control" id="lePrice">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="leSaveBtn">Save</button>
             </div>
         </div>
     </div>
@@ -372,20 +491,39 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Cost Type</label>
-                        <select class="form-select" name="cost_type" required>
+                        <select class="form-select" name="cost_type" id="costTypeSel" required>
                             <option value="labour">Labour</option>
                             <option value="transport">Transport</option>
                             <option value="other">Other</option>
                             <option value="profit">Profit/Markup</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description (optional)</label>
-                        <input type="text" class="form-control" name="description" placeholder="e.g., Delivery to site">
+                    <div class="mb-3 d-none" id="labourModeSection">
+                        <label class="form-label">Labour mode</label>
+                        <select class="form-select" id="labourModeSel" name="labour_mode">
+                            <option value="fixed">Fixed amount</option>
+                            <option value="percent">% of materials subtotal</option>
+                        </select>
+                        <div id="labourPercentWrap" class="mt-2 d-none">
+                            <label class="form-label small">Percent of materials</label>
+                            <input type="number" name="labour_percent" id="labourPercentInput" class="form-control" step="0.1" min="0" max="500" placeholder="e.g. 18">
+                            <small class="text-muted">Uses “Materials” total from the summary panel.</small>
+                        </div>
+                        <div class="mt-2">
+                            <label class="form-label small">Fabrication labour (MWK, optional)</label>
+                            <input type="number" step="0.01" min="0" class="form-control mb-1" name="fab_labour" id="fabLabourInput" placeholder="0">
+                            <label class="form-label small">Installation labour (MWK, optional)</label>
+                            <input type="number" step="0.01" min="0" class="form-control" name="install_labour" id="installLabourInput" placeholder="0">
+                        </div>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Description (optional)</label>
+                        <input type="text" class="form-control" name="description" id="costDescInput" placeholder="e.g., Delivery to site">
+                    </div>
+                    <div class="mb-3" id="costAmountWrap">
                         <label class="form-label">Amount (MWK)</label>
-                        <input type="number" class="form-control" name="amount" step="0.01" required placeholder="0.00">
+                        <input type="number" class="form-control" name="amount" id="costAmountInput" step="0.01" placeholder="0.00">
+                        <div class="invalid-feedback" id="costAmountErr"></div>
                     </div>
                 </div>
                 <div class="modal-footer">

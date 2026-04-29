@@ -698,6 +698,25 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
             is_active=True,
         ).order_by("category", "name")
     
+    materials_json = "[]"
+    if materials:
+        materials_json = json.dumps(
+            [
+                {
+                    "id": m.id,
+                    "name": m.name,
+                    "category": m.category,
+                    "category_label": m.get_category_display(),
+                    "unit": m.unit,
+                    "unit_label": m.get_unit_display(),
+                    "price_mwk": str(m.price_mwk),
+                    "stock": str(m.quantity_in_stock),
+                }
+                for m in materials
+            ],
+            default=str,
+        )
+
     ctx.update({
         "active_tab": "quotes",
         "quote": quote,
@@ -711,6 +730,7 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
         "grand_total": grand_total,
         "is_editable": is_editable,
         "materials": materials,
+        "materials_json": materials_json,
         "categories": WeldingMaterialCategory.choices,
     })
     
@@ -731,28 +751,65 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
         return JsonResponse({"error": "Quote is not editable"}, status=400)
     
     try:
-        material_id = request.POST.get("material_id")
+        material_id_raw = (request.POST.get("material_id") or "").strip()
         quantity = Decimal(request.POST.get("quantity", "1"))
         unit_price = request.POST.get("unit_price")
         notes = request.POST.get("notes", "")
-        
-        # Validation: quantity must be > 0
+        custom_name = (request.POST.get("custom_name") or "").strip()
+        custom_unit = (request.POST.get("custom_unit") or "piece").strip() or "piece"
+
         if quantity <= 0:
             return JsonResponse({"success": False, "error": "Quantity must be greater than 0"}, status=400)
-        
-        # Get material
+
+        from inventory.models_welding import WeldingQuoteLineItem
+
+        # Custom material line — explicit flag avoids accidental overrides when editing catalog SKUs
+        if material_id_raw == "custom" or request.POST.get("use_custom") == "1":
+            if not custom_name:
+                return JsonResponse(
+                    {"success": False, "error": "Enter a material name or pick from catalog"},
+                    status=400,
+                )
+            if len(custom_name) > 150:
+                return JsonResponse({"success": False, "error": "Material name too long"}, status=400)
+            unit_price_decimal = None
+            if unit_price and str(unit_price).strip():
+                unit_price_decimal = Decimal(str(unit_price).strip())
+                if unit_price_decimal < 0:
+                    return JsonResponse({"success": False, "error": "Unit price cannot be negative"}, status=400)
+            line_item = WeldingQuoteLineItem.objects.create(
+                quote=quote,
+                material=None,
+                material_name=custom_name,
+                material_unit=custom_unit[:20],
+                quantity=quantity,
+                unit_price=unit_price_decimal,
+                notes=notes[:255],
+            )
+            return JsonResponse(
+                {
+                    "success": True,
+                    "line_item": {
+                        "id": line_item.id,
+                        "material_name": line_item.material_name,
+                        "quantity": str(line_item.quantity),
+                        "unit": line_item.material_unit,
+                        "unit_price": str(line_item.unit_price) if line_item.unit_price else "",
+                        "line_total": str(line_item.line_total),
+                        "notes": line_item.notes,
+                    },
+                }
+            )
+
+        material_id = material_id_raw
         material = get_object_or_404(WeldingMaterial, id=material_id, business=business)
-        
-        # Unit price is optional (manager can leave blank)
+
         unit_price_decimal = None
-        if unit_price and unit_price.strip():
-            unit_price_decimal = Decimal(unit_price)
-            # Validation: price must be >= 0
+        if unit_price and str(unit_price).strip():
+            unit_price_decimal = Decimal(str(unit_price).strip())
             if unit_price_decimal < 0:
                 return JsonResponse({"success": False, "error": "Unit price cannot be negative"}, status=400)
-        
-        # Create line item
-        from inventory.models_welding import WeldingQuoteLineItem
+
         line_item = WeldingQuoteLineItem.objects.create(
             quote=quote,
             material=material,
@@ -760,9 +817,9 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
             material_unit=material.unit,
             quantity=quantity,
             unit_price=unit_price_decimal,
-            notes=notes,
+            notes=notes[:255],
         )
-        
+
         return JsonResponse({
             "success": True,
             "line_item": {
@@ -1268,6 +1325,16 @@ def job_simulator(request: HttpRequest) -> HttpResponse:
     })
     
     return render(request, "verticals/welding/job_simulator.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def welding_simulations(request: HttpRequest) -> HttpResponse:
+    """Structural estimators hub (bed frames, gates, window frames, etc.)."""
+    ctx = base.base_context(request)
+    ctx.update({"active_tab": "simulations"})
+    return render(request, "verticals/welding/simulations.html", ctx)
 
 
 @login_required

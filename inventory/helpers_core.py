@@ -225,21 +225,34 @@ def product_mode_from_business(business) -> str:
 
 def business_vertical(request) -> str:
     """
-    Single source of truth for vertical from a request:
-      1) Session override (active_business_vertical)
-      2) Active business fields
-      3) Default PHONES
+    Single source of truth for vertical from a request.
+
+    Active business wins over session — fixes stale mobile nav after workspace switch:
+    ``active_business_vertical`` must not override the current tenant's vertical.
     """
+    biz = get_active_business(request)
+    from_biz = product_mode_from_business(biz)
+
+    sess_v = None
     try:
         sess = getattr(request, "session", {}) or {}
-        sess_v = sess.get(_SESS_VERTICAL_KEY)
-        if isinstance(sess_v, str) and sess_v.strip():
-            return _norm_label(sess_v)
+        raw = sess.get(_SESS_VERTICAL_KEY)
+        if isinstance(raw, str) and raw.strip():
+            sess_v = _norm_label(raw)
     except Exception:
         pass
 
-    biz = get_active_business(request)
-    return product_mode_from_business(biz)
+    if biz is not None:
+        if sess_v and sess_v != from_biz:
+            try:
+                request.session[_SESS_VERTICAL_KEY] = from_biz
+            except Exception:
+                pass
+        return from_biz
+
+    if sess_v:
+        return sess_v
+    return from_biz
 
 
 def is_phone_business(obj) -> bool:

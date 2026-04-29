@@ -111,8 +111,18 @@ def _normalize_vertical(v: str | None) -> str:
 def _derive_mode_from_business(biz) -> str:
     if not biz:
         return "generic"
-    # Check a few common attributes (plus their display())
-    for attr in ("vertical", "category", "industry", "type", "kind", "sector", "business_kind", "business_type"):
+    # Keep field order aligned with inventory.helpers_core.product_mode_from_business (template_key first).
+    for attr in (
+        "template_key",
+        "vertical",
+        "category",
+        "industry",
+        "type",
+        "kind",
+        "sector",
+        "business_kind",
+        "business_type",
+    ):
         val = getattr(biz, attr, None)
         if isinstance(val, str) and val.strip():
             return _normalize_vertical(val)
@@ -267,6 +277,21 @@ def tenant_context(request) -> Dict[str, Any]:
     # 5) final default
     if not mode:
         mode = "generic"
+
+    # 6) Active business beats stale middleware/session when switching workspaces (?mode= respected)
+    dev_mode_override = False
+    try:
+        if request.GET.get("mode"):
+            dev_mode_override = True
+    except Exception:
+        pass
+    if biz is not None and not dev_mode_override:
+        try:
+            bd = _derive_mode_from_business(biz)
+            if bd and bd != "generic":
+                mode = bd
+        except Exception:
+            pass
 
     # Persist for consistency with middleware (best effort)
     try:

@@ -312,10 +312,11 @@ urlpatterns = [
     path("welding/invoices/<int:invoice_id>/", welding.invoice_detail, name="welding_invoice_detail"),
     path("welding/reports/", welding.reports, name="welding_reports"),
     path("welding/simulator/", welding.job_simulator, name="welding_job_simulator"),
+    path("welding/simulations/", welding.welding_simulations, name="welding_simulations"),
     path("welding/simulator/to-quote/", welding.simulator_to_quote, name="welding_simulator_to_quote"),
     # Phase 2: Welding intelligence
     path("welding/intelligence/", welding.workshop_intelligence, name="welding_intelligence"),
-    path("welding/clients/", welding.client_management, name="welding_clients"),
+    path("welding/clients/", welding.client_management, name="welding_client_management"),
     
     # ==================== CAR HIRE VERTICAL ====================
     path("car_hire/dashboard/", car_hire.dashboard, name="car_hire_dashboard"),
