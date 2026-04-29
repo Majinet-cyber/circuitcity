@@ -81,25 +81,44 @@ def get_liquor_unit_info(product) -> Dict:
         max_quantity = available_stock
         label = "Shots"
 
-    # Wine: quantity_in_stock = GLASSES
+    # Wine: two modes based on has_glasses
     elif category == "wine":
-        sale_unit = "glass"
-        glasses_per_bottle = product.glasses_per_bottle or 5
-        units_per_item = glasses_per_bottle
+        if product.has_glasses and product.glasses_per_bottle:
+            # Glass-selling wine: base unit = glass, quantity_in_stock = GLASSES
+            sale_unit = "glass"
+            glasses_per_bottle = product.glasses_per_bottle
+            units_per_item = glasses_per_bottle
 
-        if product.price_per_glass:
-            unit_price = product.price_per_glass
-        elif product.price_per_bottle and glasses_per_bottle > 0:
-            unit_price = product.price_per_bottle / Decimal(str(glasses_per_bottle))
+            if product.price_per_glass:
+                unit_price = product.price_per_glass
+            elif product.price_per_bottle and glasses_per_bottle > 0:
+                unit_price = product.price_per_bottle / Decimal(str(glasses_per_bottle))
 
-        if product.cost_per_glass:
-            unit_cost = product.cost_per_glass
-        elif product.cost_per_bottle and glasses_per_bottle > 0:
-            unit_cost = product.cost_per_bottle / Decimal(str(glasses_per_bottle))
+            if product.cost_per_glass:
+                unit_cost = product.cost_per_glass
+            elif product.cost_per_bottle and glasses_per_bottle > 0:
+                unit_cost = product.cost_per_bottle / Decimal(str(glasses_per_bottle))
 
-        # quantity_in_stock IS glasses — use directly (NOT * glasses_per_bottle)
-        max_quantity = available_stock
-        label = "Glasses"
+            # quantity_in_stock IS glasses — use directly (NOT × glasses_per_bottle)
+            max_quantity = available_stock
+            label = "Glasses"
+        else:
+            # Bottle-only wine: base unit = bottle, quantity_in_stock = BOTTLES
+            sale_unit = "bottle"
+            units_per_item = 1
+
+            if product.price_per_bottle:
+                unit_price = product.price_per_bottle
+            elif product.selling_price:
+                unit_price = product.selling_price
+
+            if product.cost_per_bottle:
+                unit_cost = product.cost_per_bottle
+            elif product.cost_price:
+                unit_cost = product.cost_price
+
+            max_quantity = available_stock
+            label = "Bottles"
 
     # Other categories: default to bottle
     else:

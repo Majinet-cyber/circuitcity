@@ -267,8 +267,12 @@ def to_base_units(
     if unit_lower == base_unit.lower():
         return qty
 
-    # Bottle -> Glass conversion (for wine)
+    # Bottle -> Glass conversion (for wine sold by glass)
     if unit_lower == "bottle" and base_unit == LiquorBaseUnit.GLASS:
+        # Bottle-only wine (has_glasses=False): no glass conversion — 1 bottle = 1 stock unit
+        has_glasses = getattr(product, "has_glasses", True)
+        if not has_glasses:
+            return qty
         if not glasses_per_bottle:
             raise ValidationError(
                 f"Cannot convert bottles to glasses - glasses_per_bottle not configured. "

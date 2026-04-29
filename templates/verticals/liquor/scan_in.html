@@ -402,7 +402,7 @@
         </div>
     </div>
     
-    <!-- Step 3: Unit Selection (Bottle, Crate, or Pack) -->
+    <!-- Step 3: Unit Selection (Bottle, Crate, Pack, or Glass+Bottle) -->
     <div id="step-3" class="hidden">
         <h2 class="section-title">
             <span class="step-indicator">Step 3</span>
@@ -420,6 +420,10 @@
             <button class="unit-btn" data-unit="pack" onclick="selectUnit('pack')" id="pack-btn" style="display:none;">
                 <span class="unit-icon">🧃</span>
                 Packs (6-pack)
+            </button>
+            <button class="unit-btn" data-unit="glass_bottle" onclick="selectUnit('glass_bottle')" id="glass-bottle-btn" style="display:none;">
+                <span class="unit-icon">🍷</span>
+                Glass + Bottle
             </button>
         </div>
         <div id="unit-hint" style="margin-top:0.75rem;font-size:0.85rem;color:#64748b;display:none;"></div>
@@ -527,6 +531,7 @@
 
 <script src="{% static 'js/pricing-helpers.js' %}"></script>
 <script>
+var liquorWizardUrl = "{% url 'inventory:liquor_wizard' %}";
 // Liquor Smart Pricing JS — with step progress, smart messages, shot max warning
 
 let selectedCategory = null;
@@ -661,7 +666,7 @@ function selectCategory(category) {
     productList.innerHTML = '';
     
     if (products.length === 0) {
-        productList.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;border:2px dashed #e2e8f0;border-radius:12px">No products in this category yet. <a href="{% url \'inventory:liquor_wizard\' %}" style="color:#7c3aed;font-weight:600">Create one →</a></div>';
+        productList.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;border:2px dashed #e2e8f0;border-radius:12px">No products in this category yet. <a href="' + liquorWizardUrl + '" style="color:#7c3aed;font-weight:600">Create one →</a></div>';
     } else {
         products.forEach(product => {
             const item = document.createElement('div');
@@ -758,6 +763,8 @@ function selectUnit(unit) {
     } else if (unit === 'pack') {
         const packSize = (selectedProductData && selectedProductData.pack_size) ? selectedProductData.pack_size : 6;
         document.getElementById('unit-label').textContent = `Pack (${packSize}-pack)`;
+    } else if (unit === 'glass_bottle') {
+        document.getElementById('unit-label').textContent = 'Bottle';  // Qty still in bottles
     } else {
         document.getElementById('unit-label').textContent = 'Bottle';
     }
@@ -859,6 +866,7 @@ function setupCostPriceHandler() {
 
                 const isSpirits = ['spirits','whiskey','gin','vodka','brandy'].includes(selectedCategory);
                 const isWine = selectedCategory === 'wine';
+                const isWineGlass = isWine && selectedUnit === 'glass_bottle';
 
                 if (isSpirits) {
                     setStep(6);
@@ -868,11 +876,26 @@ function setupCostPriceHandler() {
                     document.getElementById('step-5b-shots').scrollIntoView({ behavior: 'smooth', block: 'start' });
                     setupShotsPreview();
                     document.getElementById('step-7').classList.remove('hidden');
+                } else if (isWineGlass) {
+                    // Wine + Glass+Bottle: show selling price per bottle, glass config, and submit
+                    setStep(6);
+                    setHint('Step 6 — Set selling price per bottle, then configure glass pricing');
+                    const suggestedBottlePrice = costPricePerBottle > 0 ? Math.round(costPricePerBottle * 1.3).toLocaleString() : '—';
+                    showBanner(`🍷 Wine stocked! Set bottle price, then configure glass pricing below. Suggested bottle price (30% margin): MK ${suggestedBottlePrice}`, 'info');
+                    document.getElementById('step-6').classList.remove('hidden');
+                    document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('step-5b-wine').classList.remove('hidden');
+                    document.getElementById('step-7').classList.remove('hidden');
+                    setupSmartPricingFeedback();
+                    setupWineGlassPreview();
                 } else if (isWine) {
+                    // Wine bottle-only: just selling price and submit
                     setStep(6);
                     setHint('Step 6 — Set selling price per bottle');
-                    const marginPct = costPricePerBottle > 0 ? Math.round(((costPricePerBottle * 1.3 - costPricePerBottle) / (costPricePerBottle * 1.3)) * 100) : 30;
-                    showBanner(`🍷 Wine stocked! Suggested selling price at 30% margin: MK ${Math.round(costPricePerBottle * 1.3).toLocaleString()}`, 'info');
+                    if (costPricePerBottle > 0) {
+                        const suggested = Math.round(costPricePerBottle * 1.3);
+                        showBanner(`🍷 Wine (bottle only). Suggested selling price (30% margin): MK ${suggested.toLocaleString()}`, 'info');
+                    }
                     document.getElementById('step-6').classList.remove('hidden');
                     document.getElementById('step-6').scrollIntoView({ behavior: 'smooth', block: 'start' });
                     document.getElementById('step-7').classList.remove('hidden');
@@ -1040,7 +1063,14 @@ async function _doActualSubmit(isSpirits) {
         if (response.ok) {
             setStep(7);
             const bottlesAdded = selectedUnit === 'crate' ? selectedQuantity * 20 : selectedQuantity;
-            showSuccessMessage(`🟢 Stock added 🎉\n${bottlesAdded} bottles of ${selectedProduct.name}\nRedirecting...`);
+            let successText = `🟢 Stock added 🎉\n${bottlesAdded} bottle${bottlesAdded !== 1 ? 's' : ''} of ${selectedProduct.name}`;
+            if (selectedCategory === 'wine' && selectedUnit === 'glass_bottle') {
+                const gpb = parseInt(document.getElementById('glasses-per-bottle').value) || 6;
+                const totalGlasses = bottlesAdded * gpb;
+                successText += `\n${totalGlasses} glasses (${gpb} per bottle)`;
+            }
+            successText += `\nRedirecting...`;
+            showSuccessMessage(successText);
             if (window.CCSounds) window.CCSounds.playStockAddedSound();
             setTimeout(() => {
                 window.location.href = window.location.pathname + '?added=1';
@@ -1123,6 +1153,15 @@ function resetForm() {
     const packBtn = document.getElementById('pack-btn');
     if (crateBtn) crateBtn.style.display = 'block';
     if (packBtn) packBtn.style.display = 'none';
+    // Reset wine glass unit button and fields
+    const glassBottleBtn = document.getElementById('glass-bottle-btn');
+    if (glassBottleBtn) glassBottleBtn.style.display = 'none';
+    const glassesInput = document.getElementById('glasses-per-bottle');
+    if (glassesInput) { glassesInput.value = '6'; delete glassesInput._winePreviewSetup; }
+    const pricePerGlassInput = document.getElementById('price-per-glass');
+    if (pricePerGlassInput) pricePerGlassInput.value = '';
+    const wineCalcPreview = document.getElementById('wine-glass-calc-preview');
+    if (wineCalcPreview) wineCalcPreview.style.display = 'none';
 
     // Hide feedback
     const feedbackContainer = document.getElementById('pricing-feedback');
@@ -1143,6 +1182,38 @@ function resetForm() {
 <div style="max-width:1100px;margin:2rem auto;padding:1rem">
   <details style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;margin-top:24px">
     <summary style="cursor:pointer;font-weight:600;color:#64748b;font-size:0.95rem;user-select:none">
+      Need to create a new product? (Catalog)
+    </summary>
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">
+      <p style="margin:0 0 12px;color:#64748b;font-size:0.9rem">
+        If the product you want to stock doesn't exist yet, create it in the product catalog first.
+      </p>
+      <a href="{% url 'inventory:liquor_wizard' %}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#6366f1;color:white;border-radius:8px;font-weight:600;text-decoration:none;font-size:0.95rem;transition:background 0.2s">
+        <i class="bi bi-plus-circle"></i>
+        <span>Create new product (Catalog)</span>
+      </a>
+    </div>
+  </details>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+  {% for message in messages %}
+    {% if 'stocked' in message.message|lower or 'added' in message.message|lower or 'bottle' in message.message|lower %}
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(function() {
+        if (window.CCSounds) window.CCSounds.playStockAddedSound();
+      }, 200);
+    });
+    {% endif %}
+  {% endfor %}
+})();
+</script>
+{% endblock %}
+ursor:pointer;font-weight:600;color:#64748b;font-size:0.95rem;user-select:none">
       Need to create a new product? (Catalog)
     </summary>
     <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e2e8f0">

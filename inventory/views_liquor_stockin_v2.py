@@ -196,6 +196,9 @@ def liquor_stock_in_calculator_api(request):
             user_inputs = {
                 'number_of_bottles': int(request.GET.get('number_of_bottles', 0)),
                 'cost_per_bottle': request.GET.get('cost_per_bottle', '0'),
+                'glasses_per_bottle': int(request.GET.get('glasses_per_bottle', 5)),
+                'selling_price_per_bottle': request.GET.get('selling_price_per_bottle') or None,
+                'selling_price_per_glass': request.GET.get('selling_price_per_glass') or None,
             }
         elif category in ['spirits', 'whisky']:
             user_inputs = {

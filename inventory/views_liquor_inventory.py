@@ -339,16 +339,45 @@ def liquor_scan_in(request):
                     except Exception:
                         pass
 
-                # CRITICAL FIX: For spirits/whisky with shot-selling enabled,
-                # store stock in SHOTS (base units), not bottles.
-                # This ensures available_shots displays and prevents overselling correctly.
-                # Example: 5 bottles × 28 sellable shots = 140 shots stored in quantity_in_stock.
+                # Wine glass configuration
+                glasses_per_bottle_raw = request.POST.get("glasses_per_bottle", "").strip()
+                price_per_glass_raw = request.POST.get("price_per_glass", "").strip()
+
+                if product.category == "wine" and glasses_per_bottle_raw:
+                    try:
+                        glasses_per_bottle_val = int(glasses_per_bottle_raw)
+                        if glasses_per_bottle_val <= 0:
+                            raise ValueError("Glasses per bottle must be greater than 0")
+                        product.has_glasses = True
+                        product.glasses_per_bottle = glasses_per_bottle_val
+                        if price_per_glass_raw:
+                            price_per_glass_val = Decimal(price_per_glass_raw)
+                            if price_per_glass_val < 0:
+                                raise ValueError("Price per glass cannot be negative")
+                            if price_per_glass_val > 0:
+                                product.price_per_glass = price_per_glass_val
+                        # Recalculate cost_per_glass from current cost_per_bottle
+                        if cost_per_bottle > 0:
+                            product.cost_per_glass = cost_per_bottle / Decimal(glasses_per_bottle_val)
+                    except ValueError as ve:
+                        messages.error(request, f"❌ Wine glass configuration error: {ve}")
+                        return redirect("liquor:scan_in")
+                    except Exception:
+                        pass
+
+                # Calculate stock units to add (stored in base units per category)
+                # Spirits/whisky: base unit = shots (sellable shots per bottle)
+                # Wine with glasses: base unit = glasses
+                # Beer/cider/wine-bottle-only: base unit = bottles
                 if product.has_shots and product.shots_per_bottle and product.category in ["spirits", "whiskey"]:
                     barman_reserved = product.barman_shots_reserved or 2
                     sellable_shots_per_bottle = max(0, product.shots_per_bottle - barman_reserved)
                     units_to_add = bottles_to_add * sellable_shots_per_bottle
+                elif product.category == "wine" and product.has_glasses and product.glasses_per_bottle:
+                    # Wine: track inventory in glasses (base unit = glass)
+                    units_to_add = bottles_to_add * product.glasses_per_bottle
                 else:
-                    # Beer, cider, wine: store in bottles (base unit = bottle)
+                    # Beer, cider, wine (bottle-only mode): store in bottles
                     units_to_add = bottles_to_add
 
                 # Update product stock in base units
@@ -363,6 +392,12 @@ def liquor_scan_in(request):
                     note_str = f"Scan-in: {quantity} pack(s) of {pack_size} ({bottles_to_add} bottles)"
                 elif unit_type == "crate":
                     note_str = f"Scan-in: {quantity} crate(s) ({bottles_to_add} bottles)"
+                elif product.category == "wine" and product.has_glasses and product.glasses_per_bottle:
+                    total_glasses_added = bottles_to_add * product.glasses_per_bottle
+                    note_str = (
+                        f"Scan-in: {bottles_to_add} bottle(s) → {total_glasses_added} glasses "
+                        f"({product.glasses_per_bottle} glasses/bottle)"
+                    )
                 else:
                     note_str = f"Scan-in: {bottles_to_add} bottle(s)"
                 LiquorStockInTransaction.objects.create(
@@ -393,8 +428,22 @@ def liquor_scan_in(request):
             else:
                 success_msg = f"✅ Added: {bottles_to_add} bottle{'s' if bottles_to_add != 1 else ''} — {product.name}"
 
-            # Add shots info if applicable
-            if product.has_shots and product.shots_per_bottle:
+            # Wine glass info
+            if product.category == "wine" and product.has_glasses and product.glasses_per_bottle:
+                total_glasses_added = bottles_to_add * product.glasses_per_bottle
+                total_glasses_now = product.quantity_in_stock or 0
+                full_bottles_now = total_glasses_now // product.glasses_per_bottle
+                open_bottle_glasses = total_glasses_now % product.glasses_per_bottle
+                success_msg += f" ({total_glasses_added} glasses added)"
+                if open_bottle_glasses > 0:
+                    success_msg += (
+                        f" — {full_bottles_now} full bottle(s) + 1 open "
+                        f"({open_bottle_glasses}/{product.glasses_per_bottle} glasses)"
+                    )
+                else:
+                    success_msg += f" — {full_bottles_now} full bottle(s)"
+            # Shots info
+            elif product.has_shots and product.shots_per_bottle:
                 total_shots = bottles_to_add * product.shots_per_bottle
                 success_msg += f" ({total_shots} shots)"
 
@@ -426,6 +475,11 @@ def liquor_scan_in(request):
                     "shots_per_bottle": p.shots_per_bottle,
                     "price_per_shot": float(p.price_per_shot) if p.price_per_shot else None,
                     "category": p.category,
+                    # Wine glass fields
+                    "has_glasses": p.has_glasses,
+                    "glasses_per_bottle": p.glasses_per_bottle,
+                    "price_per_glass": float(p.price_per_glass) if p.price_per_glass else None,
+                    "price_per_bottle": float(p.price_per_bottle) if p.price_per_bottle else None,
                 }
             )
 

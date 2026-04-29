@@ -180,51 +180,88 @@ class CiderStockInAdapter(StockInAdapter):
 
 class WineStockInAdapter(StockInAdapter):
     """
-    Adapter for Wine stock-in (sold by glass, purchased by bottle).
-    
+    Adapter for Wine stock-in (sold by glass and/or bottle, purchased by bottle).
+
     Inputs:
         - number_of_bottles (required)
         - cost_per_bottle (required)
-    
+        - glasses_per_bottle (optional, default 5 — configurable per product)
+        - selling_price_per_bottle (optional)
+        - selling_price_per_glass (optional)
+
     System computes:
-        - glasses = bottles * 5
-        - unit_cost_per_glass = cost_per_bottle / 5
+        - total_glasses = bottles * glasses_per_bottle
+        - cost_per_glass = cost_per_bottle / glasses_per_bottle
+        - gross_profit_per_glass = selling_price_per_glass - cost_per_glass
+        - margin_pct = gross_profit_per_glass / cost_per_glass * 100
+        - revenue_per_bottle_by_glass = selling_price_per_glass * glasses_per_bottle
         - total_cost = bottles * cost_per_bottle
-    
-    Note: Stock is tracked in glasses (sellable unit).
+
+    Note: Stock is tracked in glasses (sellable unit) when has_glasses=True.
     """
-    
-    GLASSES_PER_BOTTLE = 5
-    
+
+    DEFAULT_GLASSES_PER_BOTTLE = 5
+
     @staticmethod
     def adapt(user_inputs: Dict[str, Any]) -> Dict[str, Any]:
         number_of_bottles = int(user_inputs.get('number_of_bottles', 0))
         cost_per_bottle = Decimal(str(user_inputs.get('cost_per_bottle', 0)))
-        
+        glasses_per_bottle = int(
+            user_inputs.get('glasses_per_bottle', WineStockInAdapter.DEFAULT_GLASSES_PER_BOTTLE)
+        )
+
         if number_of_bottles <= 0:
             raise ValueError("Number of bottles must be greater than 0")
         if cost_per_bottle <= 0:
             raise ValueError("Cost per bottle must be greater than 0")
-        
-        # Calculate glasses (sellable unit)
-        total_glasses = number_of_bottles * WineStockInAdapter.GLASSES_PER_BOTTLE
-        
-        # Calculate cost per glass
-        cost_per_glass = quantize_2dp(cost_per_bottle / Decimal(WineStockInAdapter.GLASSES_PER_BOTTLE))
-        
-        # Calculate total cost
+        if glasses_per_bottle <= 0:
+            raise ValueError("Glasses per bottle must be greater than 0")
+
+        total_glasses = number_of_bottles * glasses_per_bottle
+        cost_per_glass = quantize_2dp(cost_per_bottle / Decimal(glasses_per_bottle))
         total_cost = cost_per_bottle * Decimal(number_of_bottles)
-        
+
+        metadata: Dict[str, Any] = {
+            'category': 'wine',
+            'number_of_bottles': number_of_bottles,
+            'glasses_per_bottle': glasses_per_bottle,
+            'total_glasses': total_glasses,
+            'cost_per_bottle': float(cost_per_bottle),
+            'cost_per_glass': float(cost_per_glass),
+        }
+
+        # Optional selling price per glass — calculate margin breakdown
+        selling_price_per_glass = user_inputs.get('selling_price_per_glass')
+        if selling_price_per_glass is not None:
+            spg = Decimal(str(selling_price_per_glass))
+            if spg > 0:
+                gross_profit_per_glass = quantize_2dp(spg - cost_per_glass)
+                margin_pct = (
+                    quantize_2dp(gross_profit_per_glass / cost_per_glass * 100)
+                    if cost_per_glass > 0
+                    else Decimal('0.00')
+                )
+                revenue_per_bottle_by_glass = quantize_2dp(spg * Decimal(glasses_per_bottle))
+                profit_per_bottle_by_glass = quantize_2dp(revenue_per_bottle_by_glass - cost_per_bottle)
+                metadata['selling_price_per_glass'] = float(spg)
+                metadata['gross_profit_per_glass'] = float(gross_profit_per_glass)
+                metadata['glass_margin_pct'] = float(margin_pct)
+                metadata['revenue_per_bottle_by_glass'] = float(revenue_per_bottle_by_glass)
+                metadata['profit_per_bottle_by_glass'] = float(profit_per_bottle_by_glass)
+
+        # Optional selling price per bottle
+        selling_price_per_bottle = user_inputs.get('selling_price_per_bottle')
+        if selling_price_per_bottle is not None:
+            spb = Decimal(str(selling_price_per_bottle))
+            if spb > 0:
+                metadata['selling_price_per_bottle'] = float(spb)
+
         return {
             'quantity_units_added': total_glasses,
             'unit_cost': cost_per_glass,
             'total_cost': quantize_2dp(total_cost),
             'notes': user_inputs.get('notes', ''),
-            'metadata': {
-                'category': 'wine',
-                'number_of_bottles': number_of_bottles,
-                'glasses_per_bottle': WineStockInAdapter.GLASSES_PER_BOTTLE,
-            }
+            'metadata': metadata,
         }
 
 
@@ -414,11 +451,28 @@ def save_stock_in_transaction(product, adapted_data: Dict[str, Any], user, busin
         # Update product stock
         current_stock = product.quantity_in_stock or 0
         product.quantity_in_stock = current_stock + adapted_data['quantity_units_added']
-        
-        # Update cost price
-        product.cost_per_bottle = adapted_data['unit_cost']
-        
-        product.save(update_fields=['quantity_in_stock', 'cost_per_bottle'])
+
+        metadata = adapted_data.get('metadata', {})
+
+        # Wine: unit_cost is cost_per_glass; save wine-specific fields
+        if metadata.get('category') == 'wine' and 'cost_per_bottle' in metadata:
+            product.cost_per_bottle = Decimal(str(metadata['cost_per_bottle']))
+            product.cost_per_glass = adapted_data['unit_cost']
+            product.has_glasses = True
+            if metadata.get('glasses_per_bottle'):
+                product.glasses_per_bottle = int(metadata['glasses_per_bottle'])
+            if metadata.get('selling_price_per_glass'):
+                product.price_per_glass = Decimal(str(metadata['selling_price_per_glass']))
+            if metadata.get('selling_price_per_bottle'):
+                product.price_per_bottle = Decimal(str(metadata['selling_price_per_bottle']))
+            product.save(update_fields=[
+                'quantity_in_stock', 'cost_per_bottle', 'cost_per_glass',
+                'has_glasses', 'glasses_per_bottle', 'price_per_glass', 'price_per_bottle',
+            ])
+        else:
+            # All other categories: unit_cost is cost per base unit (bottle/shot)
+            product.cost_per_bottle = adapted_data['unit_cost']
+            product.save(update_fields=['quantity_in_stock', 'cost_per_bottle'])
         
         # Create stock-in transaction log for COGS tracking (Liquor COGS card is inventory purchases cost when sales COGS is unavailable)
         from inventory.models_verticals import LiquorStockInTransaction
