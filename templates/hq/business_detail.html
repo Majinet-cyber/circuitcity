@@ -1,246 +1,641 @@
+{% extends "hq/base_hq.html" %}
 {% load static %}
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{ biz.name }} · Business Detail · HQ</title>
-<style>
-  body{font:500 15px/1.45 system-ui;background:#f7fbff;margin:0;color:#0b1b3a}
-  .shell{max-width:1200px;margin:20px auto;padding:8px 16px}
-  @media(min-width:768px){.shell{padding:20px 32px}}
-  h1{margin:0 0 8px;font-size:24px}
-  @media(min-width:768px){h1{font-size:28px}}
-  h2{margin:20px 0 10px;font-size:16px}
-  @media(min-width:768px){h2{font-size:18px}}
-  .muted{color:#476aa0}
-  .grid{display:grid;gap:12px;grid-template-columns:1fr}
-  @media(min-width:768px){.grid{grid-template-columns:1fr 1fr}}
-  .card{padding:14px;border:1px solid #d8e4ff;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(12,36,97,.06)}
-  @media(min-width:768px){.card{padding:18px}}
-  .num{font-weight:900;color:#1e40af}
-  ul{margin:8px 0 0;padding-left:20px}
-  canvas{width:100%;height:160px}
-  .list{margin-top:10px}
-  .pill{padding:6px 10px;border-radius:999px;border:1px solid #d8e4ff;background:#eef5ff;color:#2757d8;font-weight:800;font-size:12px}
-  .badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
-  @media(min-width:768px){.badge{font-size:13px}}
-  .badge-success{background:#10b981;color:#fff}
-  .badge-info{background:#06b6d4;color:#fff}
-  .badge-warning{background:#f59e0b;color:#fff}
-  .badge-danger{background:#ef4444;color:#fff}
-  .badge-secondary{background:#6b7280;color:#fff}
-  .btn{padding:8px 16px;border-radius:10px;border:none;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px;transition:all .15s}
-  @media(min-width:768px){.btn{font-size:14px}}
-  .btn-primary{background:#2563eb;color:#fff}
-  .btn-primary:hover{background:#1e40af}
-  .btn-success{background:#10b981;color:#fff}
-  .btn-success:hover{background:#059669}
-  .btn-danger{background:#ef4444;color:#fff}
-  .btn-danger:hover{background:#dc2626}
-  .btn-sm{padding:6px 12px;font-size:12px}
-  .form-group{margin-bottom:12px}
-  .form-label{display:block;font-weight:600;margin-bottom:4px;font-size:14px}
-  .form-control{width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
-  .modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center}
-  .modal.show{display:flex}
-  .modal-content{background:#fff;border-radius:16px;padding:20px;max-width:500px;width:95%;margin:16px}
-  @media(min-width:768px){.modal-content{padding:24px;width:90%}}
-  .modal-header{margin-bottom:16px;font-size:18px;font-weight:700}
-  @media(min-width:768px){.modal-header{font-size:20px}}
-  .modal-footer{margin-top:20px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-  .back-link{display:inline-block;margin-bottom:12px;color:#2563eb;text-decoration:none;font-size:13px}
-  @media(min-width:768px){.back-link{font-size:14px}}
-  .back-link:hover{text-decoration:underline}
-  .status-row{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap}
-  .status-row strong{min-width:120px;flex-shrink:0}
-</style>
-</head><body>
-<div class="shell">
-  <a href="{% url 'hq:businesses' %}" class="back-link">← Back to Businesses</a>
-  <h1>{{ biz.name }}</h1>
-  <div class="muted">Business detail · HQ control panel</div>
+{% load humanize %}
 
-  <div class="grid">
-    <!-- Subscription & Membership Card -->
-    <div class="card">
-      <h2>💳 Membership & Subscription</h2>
-      {% if subscription %}
-        {% with sub=subscription %}
-        <div class="status-row">
-          <strong>Status:</strong>
-          {% if sub.status == 'active' or sub.status == 'ACTIVE' %}
-            <span class="badge badge-success">Active</span>
-          {% elif sub.status == 'trial' or sub.status == 'TRIAL' %}
-            <span class="badge badge-info">Trial</span>
-          {% elif sub.status == 'canceled' or sub.status == 'CANCELED' %}
-            <span class="badge badge-danger">Canceled</span>
-          {% elif sub.status == 'expired' or sub.status == 'EXPIRED' %}
-            <span class="badge badge-secondary">Expired</span>
+{% block title %}{{ biz.name }} · Business Detail · HQ{% endblock %}
+{% block topbar_title %}{{ biz.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ========== PREMIUM HQ BUSINESS DETAIL ========== */
+.biz-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e3a5f 100%);
+  border-radius: 20px;
+  padding: 28px 32px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px rgba(15,23,42,.25);
+}
+.biz-hero::before {
+  content: '';
+  position: absolute;
+  top: -40%; right: -10%;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(99,102,241,.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.biz-hero-title { font-size: 1.8rem; font-weight: 800; margin: 0 0 4px; letter-spacing: -.02em; }
+.biz-hero-sub { font-size: .9rem; color: rgba(255,255,255,.6); margin: 0 0 20px; }
+.biz-hero-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.biz-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .75rem; font-weight: 700; padding: 4px 12px;
+  border-radius: 999px; letter-spacing: .04em;
+}
+.biz-badge-active { background: rgba(16,185,129,.2); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+.biz-badge-trial  { background: rgba(59,130,246,.2); color: #60a5fa; border: 1px solid rgba(59,130,246,.3); }
+.biz-badge-warn   { background: rgba(245,158,11,.2); color: #fbbf24; border: 1px solid rgba(245,158,11,.3); }
+.biz-badge-danger { background: rgba(239,68,68,.2);  color: #f87171; border: 1px solid rgba(239,68,68,.3); }
+.biz-badge-neutral{ background: rgba(148,163,184,.15); color: #94a3b8; border: 1px solid rgba(148,163,184,.2); }
+.biz-badge-kind   { background: rgba(99,102,241,.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,.3); }
+
+.biz-hero-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-hq-sm {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 16px; border-radius: 8px; font-size: .82rem; font-weight: 600;
+  border: none; cursor: pointer; transition: all .15s; text-decoration: none;
+}
+.btn-hq-white { background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.2); }
+.btn-hq-white:hover { background: rgba(255,255,255,.2); color: #fff; }
+.btn-hq-green { background: #10b981; color: #fff; }
+.btn-hq-green:hover { background: #059669; color: #fff; }
+.btn-hq-red { background: rgba(239,68,68,.15); color: #f87171; border: 1px solid rgba(239,68,68,.25); }
+.btn-hq-red:hover { background: rgba(239,68,68,.25); }
+
+/* KPI Row */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+@media (min-width: 768px) { .kpi-row { grid-template-columns: repeat(4, 1fr); } }
+.kpi-card {
+  background: #fff;
+  border: 1px solid #e8ecf2;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(15,23,42,.05);
+}
+.kpi-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: #94a3b8; margin-bottom: 6px; }
+.kpi-value { font-size: 1.6rem; font-weight: 800; color: #0f172a; letter-spacing: -.03em; line-height: 1; }
+.kpi-sub { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
+.kpi-icon { font-size: 1.5rem; margin-bottom: 8px; }
+
+/* Detail Grid */
+.detail-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 1fr;
+  margin-bottom: 24px;
+}
+@media (min-width: 992px) { .detail-grid { grid-template-columns: 1fr 1fr; } }
+.detail-grid-3 { grid-template-columns: 1fr; }
+@media (min-width: 992px) { .detail-grid-3 { grid-template-columns: 1fr 1fr 1fr; } }
+
+/* Info rows */
+.info-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid #f1f5f9; gap: 12px; }
+.info-row:last-child { border-bottom: none; padding-bottom: 0; }
+.info-key { font-size: .8rem; font-weight: 600; color: #94a3b8; flex-shrink: 0; min-width: 120px; }
+.info-val { font-size: .875rem; color: #1e293b; font-weight: 500; text-align: right; }
+
+/* Agent list */
+.agent-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid #f1f5f9;
+}
+.agent-item:last-child { border-bottom: none; }
+.agent-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.agent-name { font-size: .875rem; font-weight: 600; color: #1e293b; }
+.agent-role { font-size: .72rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+
+/* Health bar */
+.health-bar { height: 6px; border-radius: 999px; background: #f1f5f9; overflow: hidden; margin-top: 8px; }
+.health-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
+.health-good { background: linear-gradient(90deg, #10b981, #34d399); }
+.health-warn { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.health-bad  { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+/* Revenue chart area */
+.sparkline-wrap { width: 100%; height: 120px; }
+canvas.sparkline { width: 100% !important; height: 120px !important; }
+
+/* Quick Actions */
+.quick-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+.qaction {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 10px; font-size: .82rem; font-weight: 600;
+  border: 1.5px solid #e2e8f0; background: #fff; color: #374151;
+  cursor: pointer; text-decoration: none; transition: all .15s;
+}
+.qaction:hover { border-color: #6366f1; color: #6366f1; background: rgba(99,102,241,.04); }
+.qaction i { color: #6366f1; }
+
+/* Modal */
+.hq-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 2000; align-items: center; justify-content: center; }
+.hq-modal.open { display: flex; }
+.hq-modal-box { background: #fff; border-radius: 20px; padding: 28px; max-width: 480px; width: calc(100% - 32px); box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+.hq-modal-title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin: 0 0 16px; }
+.hq-modal-footer { margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+/* Section heading */
+.hq-sec-head { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: #94a3b8; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.hq-sec-head::after { content: ''; flex: 1; height: 1px; background: #f1f5f9; }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+
+  <!-- Back link -->
+  <a href="{% url 'hq:businesses' %}" style="display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:#6366f1;text-decoration:none;font-weight:600;margin-bottom:16px;">
+    <i class="bi bi-arrow-left"></i> Back to Businesses
+  </a>
+
+  <!-- HERO SECTION -->
+  <div class="biz-hero">
+    <div style="position:relative;z-index:1;">
+      <div class="biz-hero-title">{{ biz.name }}</div>
+      <div class="biz-hero-sub">{{ biz.business_kind|default:"N/A"|title }} · ID #{{ biz.pk }}</div>
+      <div class="biz-hero-badges">
+        {% if biz.status == "ACTIVE" %}
+          <span class="biz-badge biz-badge-active"><i class="bi bi-check-circle-fill"></i> Active</span>
+        {% elif biz.status == "SUSPENDED" %}
+          <span class="biz-badge biz-badge-danger"><i class="bi bi-x-circle-fill"></i> Suspended</span>
+        {% else %}
+          <span class="biz-badge biz-badge-neutral">{{ biz.status|default:"Unknown" }}</span>
+        {% endif %}
+        {% if subscription %}
+          {% if subscription.status == "active" or subscription.status == "ACTIVE" %}
+            <span class="biz-badge biz-badge-active"><i class="bi bi-credit-card-fill"></i> Subscribed</span>
+          {% elif subscription.status == "trial" or subscription.status == "TRIAL" %}
+            <span class="biz-badge biz-badge-trial"><i class="bi bi-hourglass-split"></i> Trial</span>
+          {% elif subscription.status == "canceled" or subscription.status == "CANCELED" %}
+            <span class="biz-badge biz-badge-danger"><i class="bi bi-x-circle"></i> Cancelled</span>
+          {% elif subscription.status == "expired" or subscription.status == "EXPIRED" %}
+            <span class="biz-badge biz-badge-warn"><i class="bi bi-exclamation-triangle"></i> Expired</span>
+          {% endif %}
+        {% else %}
+          <span class="biz-badge biz-badge-warn"><i class="bi bi-exclamation-circle"></i> No Subscription</span>
+        {% endif %}
+        {% if biz.business_kind %}
+          <span class="biz-badge biz-badge-kind"><i class="bi bi-tag-fill"></i> {{ biz.business_kind|title }}</span>
+        {% endif %}
+      </div>
+      <div class="biz-hero-actions">
+        {% if subscription %}
+          <button class="btn-hq-sm btn-hq-white" onclick="openExtendModal()">
+            <i class="bi bi-plus-circle"></i> Add Days
+          </button>
+          {% if subscription.status in "canceled CANCELED expired EXPIRED" %}
+            <a href="/hq/subscriptions/{{ subscription.pk }}/activate/" class="btn-hq-sm btn-hq-green">
+              <i class="bi bi-check-circle"></i> Re-activate
+            </a>
           {% else %}
-            <span class="badge badge-warning">{{ sub.status }}</span>
+            <a href="/hq/subscriptions/{{ subscription.pk }}/revoke/" class="btn-hq-sm btn-hq-red"
+               onclick="return confirm('Revoke subscription for {{ biz.name }}?')">
+              <i class="bi bi-x-circle"></i> Revoke
+            </a>
           {% endif %}
+        {% else %}
+          <a href="/hq/subscriptions/?business={{ biz.pk }}" class="btn-hq-sm btn-hq-green">
+            <i class="bi bi-plus-circle"></i> Create Subscription
+          </a>
+        {% endif %}
+        <a href="{% url 'hq:businesses' %}" class="btn-hq-sm btn-hq-white">
+          <i class="bi bi-arrow-left"></i> All Businesses
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">Paid Revenue</div>
+      <div class="kpi-value">MWK {{ paid_total|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Total paid invoices</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📋</div>
+      <div class="kpi-label">Open Invoices</div>
+      <div class="kpi-value">MWK {{ open_total|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">{{ total_invoices }} invoice{{ total_invoices|pluralize }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">👥</div>
+      <div class="kpi-label">Team Size</div>
+      <div class="kpi-value">{{ agents_qs|length }}</div>
+      <div class="kpi-sub">
+        Agent{{ agents_qs|length|pluralize }}
+        {% if limits.max_agents and limits.max_agents != -1 %}/ {{ limits.max_agents }} max{% endif %}
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon">📈</div>
+      <div class="kpi-label">MRR</div>
+      <div class="kpi-value">MWK {{ mrr|floatformat:0|intcomma }}</div>
+      <div class="kpi-sub">Monthly recurring</div>
+    </div>
+  </div>
+
+  <!-- DETAIL GRID: Business Info + Subscription + Agents -->
+  <div class="detail-grid">
+
+    <!-- Business Profile -->
+    <div class="hq-card">
+      <div class="hq-card-header">
+        <div class="hq-card-title"><i class="bi bi-building"></i> Business Profile</div>
+      </div>
+      <div class="hq-card-body">
+        <div class="hq-sec-head">Identity</div>
+        <div class="info-row">
+          <span class="info-key">Name</span>
+          <span class="info-val">{{ biz.name }}</span>
         </div>
-        <div class="status-row">
-          <strong>Plan:</strong> {{ sub.plan.name|default:"None" }}
-          {% if sub.plan.amount %}(MWK {{ sub.plan.amount|floatformat:0 }}/month){% endif %}
+        <div class="info-row">
+          <span class="info-key">Vertical</span>
+          <span class="info-val">{{ biz.business_kind|default:"—"|title }}</span>
         </div>
-        {% if sub.trial_end %}
-        <div class="status-row">
-          <strong>Trial ends:</strong> {{ sub.trial_end|date:"Y-m-d" }}
-          {% if sub.days_left_in_trial %}
-            ({{ sub.days_left_in_trial }} day{{ sub.days_left_in_trial|pluralize }} left)
-          {% endif %}
+        <div class="info-row">
+          <span class="info-key">Slug / ID</span>
+          <span class="info-val">{{ biz.slug|default:"—" }} / #{{ biz.pk }}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-key">Status</span>
+          <span class="info-val">{{ biz.status|default:"—" }}</span>
+        </div>
+        {% if biz.created_at %}
+        <div class="info-row">
+          <span class="info-key">Created</span>
+          <span class="info-val">{{ biz.created_at|date:"Y-m-d" }}</span>
         </div>
         {% endif %}
-        {% if sub.current_period_end %}
-        <div class="status-row">
-          <strong>Current period ends:</strong> {{ sub.current_period_end|date:"Y-m-d" }}
+        {% if biz.location %}
+        <div class="info-row">
+          <span class="info-key">Location</span>
+          <span class="info-val">{{ biz.location }}</span>
         </div>
         {% endif %}
-        <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-success btn-sm" onclick="showExtendModal()">➕ Add Days</button>
-          {% if sub.status == 'canceled' or sub.status == 'CANCELED' or sub.status == 'expired' or sub.status == 'EXPIRED' %}
-            <button class="btn btn-primary btn-sm" onclick="activateSubscription('{{ sub.pk }}')">✅ Re-activate</button>
-          {% else %}
-            <button class="btn btn-danger btn-sm" onclick="revokeSubscription('{{ sub.pk }}')">🚫 Revoke/Disable</button>
-          {% endif %}
+        {% if biz.phone %}
+        <div class="info-row">
+          <span class="info-key">Phone</span>
+          <span class="info-val">{{ biz.phone }}</span>
         </div>
-        {% endwith %}
-      {% else %}
-        <div style="text-align:center;padding:32px 24px;background:#f7fafc;border-radius:12px;border:2px dashed #cbd5e0">
-          <div style="font-size:48px;margin-bottom:16px">📋</div>
-          <h3 style="margin:0 0 12px;color:#2d3748;font-size:20px">No Subscription Found</h3>
-          <p style="color:#718096;margin:0 0 24px;font-size:15px">This business does not have an active subscription.</p>
-          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-            <a href="/hq/subscriptions/?business={{ biz.id }}" class="btn btn-primary btn-sm">Create Trial</a>
-            <button class="btn btn-success btn-sm" onclick="alert('Feature coming soon: Create subscription')">Activate Plan</button>
+        {% endif %}
+        {% if biz.email %}
+        <div class="info-row">
+          <span class="info-key">Email</span>
+          <span class="info-val">{{ biz.email }}</span>
+        </div>
+        {% endif %}
+
+        <!-- Quick Actions -->
+        <div class="hq-sec-head" style="margin-top:20px;">Quick Actions</div>
+        <div class="quick-actions">
+          <a href="/hq/subscriptions/?business={{ biz.pk }}" class="qaction"><i class="bi bi-credit-card"></i> Subscriptions</a>
+          <a href="/hq/businesses/?q={{ biz.name|urlencode }}" class="qaction"><i class="bi bi-search"></i> Find Related</a>
+          <a href="/audit/logs/?business={{ biz.pk }}" class="qaction"><i class="bi bi-journal-text"></i> Audit Logs</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subscription -->
+    <div class="hq-card">
+      <div class="hq-card-header">
+        <div class="hq-card-title"><i class="bi bi-credit-card"></i> Subscription & Plan</div>
+      </div>
+      <div class="hq-card-body">
+        {% if subscription %}
+          <div class="hq-sec-head">Current Plan</div>
+          <div class="info-row">
+            <span class="info-key">Status</span>
+            <span class="info-val">
+              {% if subscription.status == 'active' or subscription.status == 'ACTIVE' %}
+                <span class="hq-badge hq-badge-success"><i class="bi bi-check-circle-fill"></i> Active</span>
+              {% elif subscription.status == 'trial' or subscription.status == 'TRIAL' %}
+                <span class="hq-badge hq-badge-info"><i class="bi bi-hourglass-split"></i> Trial</span>
+              {% elif subscription.status == 'canceled' or subscription.status == 'CANCELED' %}
+                <span class="hq-badge hq-badge-danger"><i class="bi bi-x-circle-fill"></i> Cancelled</span>
+              {% elif subscription.status == 'expired' or subscription.status == 'EXPIRED' %}
+                <span class="hq-badge hq-badge-warning"><i class="bi bi-exclamation-triangle-fill"></i> Expired</span>
+              {% else %}
+                <span class="hq-badge hq-badge-neutral">{{ subscription.status }}</span>
+              {% endif %}
+            </span>
+          </div>
+          {% if subscription.plan %}
+          <div class="info-row">
+            <span class="info-key">Plan</span>
+            <span class="info-val">{{ subscription.plan.name|default:"—" }}
+              {% if subscription.plan.amount %}
+                <small style="color:#94a3b8;">(MWK {{ subscription.plan.amount|floatformat:0 }}/mo)</small>
+              {% endif %}
+            </span>
+          </div>
+          {% endif %}
+          {% if subscription.trial_end %}
+          <div class="info-row">
+            <span class="info-key">Trial Ends</span>
+            <span class="info-val">{{ subscription.trial_end|date:"Y-m-d" }}
+              {% if subscription.days_left_in_trial %}
+                <small style="color:#94a3b8;">({{ subscription.days_left_in_trial }}d left)</small>
+              {% endif %}
+            </span>
+          </div>
+          {% endif %}
+          {% if subscription.current_period_end %}
+          <div class="info-row">
+            <span class="info-key">Period Ends</span>
+            <span class="info-val">{{ subscription.current_period_end|date:"Y-m-d" }}</span>
+          </div>
+          {% endif %}
+
+          <!-- Sub health bar -->
+          <div style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;color:#94a3b8;margin-bottom:4px;">
+              <span>Subscription Health</span>
+              <span>{% if subscription.status in "active ACTIVE" %}100%{% elif subscription.status in "trial TRIAL" %}60%{% else %}0%{% endif %}</span>
+            </div>
+            <div class="health-bar">
+              <div class="health-fill {% if subscription.status in 'active ACTIVE' %}health-good{% elif subscription.status in 'trial TRIAL' %}health-warn{% else %}health-bad{% endif %}"
+                   style="width:{% if subscription.status in 'active ACTIVE' %}100{% elif subscription.status in 'trial TRIAL' %}60{% else %}10{% endif %}%">
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-actions" style="margin-top:16px;">
+            <button class="qaction" onclick="openExtendModal()"><i class="bi bi-plus-circle"></i> Add Days</button>
+            {% if subscription.status in "canceled CANCELED expired EXPIRED" %}
+              <a href="/hq/subscriptions/{{ subscription.pk }}/activate/" class="qaction" style="color:#10b981;border-color:#10b981;">
+                <i class="bi bi-check-circle"></i> Re-activate
+              </a>
+            {% else %}
+              <a href="/hq/subscriptions/{{ subscription.pk }}/revoke/" class="qaction" style="color:#ef4444;border-color:#ef4444;"
+                 onclick="return confirm('Revoke subscription?')">
+                <i class="bi bi-x-circle"></i> Revoke
+              </a>
+            {% endif %}
+          </div>
+        {% else %}
+          <div style="text-align:center;padding:32px 16px;">
+            <div style="font-size:3rem;margin-bottom:12px;">📋</div>
+            <div style="font-weight:700;font-size:.95rem;color:#1e293b;margin-bottom:6px;">No Subscription</div>
+            <div style="font-size:.82rem;color:#94a3b8;margin-bottom:16px;">This business does not have an active plan.</div>
+            <a href="/hq/subscriptions/?business={{ biz.pk }}" class="btn-hq-sm btn-hq-green" style="display:inline-flex;">
+              <i class="bi bi-plus-circle"></i> Create Subscription
+            </a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /.detail-grid -->
+
+  <!-- SECOND ROW: Agents + Revenue Chart -->
+  <div class="detail-grid">
+
+    <!-- Agents / Team -->
+    <div class="hq-card">
+      <div class="hq-card-header">
+        <div class="hq-card-title"><i class="bi bi-people"></i> Team & Agents</div>
+        <div class="hq-badge hq-badge-info">{{ agents_qs|length }} agent{{ agents_qs|length|pluralize }}</div>
+      </div>
+      <div class="hq-card-body">
+        {% if agents_qs %}
+          {% for membership in agents_qs %}
+          <div class="agent-item">
+            <div class="agent-avatar">{{ membership.user.get_short_name|default:membership.user.username|slice:":1"|upper }}</div>
+            <div>
+              <div class="agent-name">{{ membership.user.get_full_name|default:membership.user.username }}</div>
+              <div class="agent-role">{{ membership.role|default:"Agent" }}</div>
+            </div>
+            <div style="margin-left:auto;font-size:.72rem;color:#94a3b8;">
+              {{ membership.user.email|default:"—" }}
+            </div>
+          </div>
+          {% endfor %}
+          {% if limits.max_agents and limits.max_agents != -1 %}
+          <div style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;font-size:.75rem;color:#94a3b8;margin-bottom:4px;">
+              <span>Agent Slots Used</span>
+              <span>{{ agents_qs|length }}/{{ limits.max_agents }}</span>
+            </div>
+            <div class="health-bar">
+              <div class="health-fill health-good" style="width:{% widthratio agents_qs|length limits.max_agents 100 %}%"></div>
+            </div>
+          </div>
+          {% endif %}
+        {% else %}
+          <div style="text-align:center;padding:24px 16px;color:#94a3b8;">
+            <i class="bi bi-people" style="font-size:2rem;opacity:.3;display:block;margin-bottom:8px;"></i>
+            <span style="font-size:.85rem;">No agents on this account</span>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Revenue Chart -->
+    <div class="hq-card">
+      <div class="hq-card-header">
+        <div class="hq-card-title"><i class="bi bi-graph-up"></i> Revenue Trajectory</div>
+        <div style="font-size:.75rem;color:#94a3b8;">Paid invoices over time</div>
+      </div>
+      <div class="hq-card-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+          <div>
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:4px;">Total Paid</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#0f172a;">MWK {{ paid_total|floatformat:0|intcomma }}</div>
+          </div>
+          <div>
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:4px;">Outstanding</div>
+            <div style="font-size:1.4rem;font-weight:800;color:#f59e0b;">MWK {{ open_total|floatformat:0|intcomma }}</div>
           </div>
         </div>
-      {% endif %}
-    </div>
-
-    <!-- Financial Overview Card -->
-    <div class="card">
-      <h2>💰 Financial Overview</h2>
-      <div><span class="num">{{ active_subs }}</span> active subscriptions</div>
-      <div>MRR: <span class="num">MWK {{ mrr|floatformat:0 }}</span></div>
-      <div style="margin-top:12px">Paid invoices: <span class="num">MWK {{ paid_total|floatformat:0 }}</span></div>
-      <div>Open invoices: <span class="num">MWK {{ open_total|floatformat:0 }}</span></div>
-    </div>
-  </div>
-
-  <div class="grid" style="margin-top:12px">
-    <!-- Team Info Card -->
-    <div class="card">
-      <h2>👥 Team & Resources</h2>
-      <div class="list">
-        <span class="pill">{{ agents_qs|length }} agent{{ agents_qs|length|pluralize }}</span>
-        {% if limits.max_agents and limits.max_agents != -1 %}
-          <small class="muted">(limit: {{ limits.max_agents }})</small>
-        {% else %}
-          <small class="muted">(unlimited)</small>
-        {% endif %}
+        <div class="sparkline-wrap">
+          <canvas id="revenueChart" class="sparkline"></canvas>
+        </div>
       </div>
-      {% if agents_qs %}
-      <ul style="font-size:13px;margin-top:8px">
-        {% for a in agents_qs|slice:":5" %}
-        <li>{{ a.user.get_full_name|default:a.user.username }}</li>
-        {% endfor %}
-        {% if agents_qs|length > 5 %}<li>+ {{ agents_qs|length|add:"-5" }} more...</li>{% endif %}
-      </ul>
-      {% endif %}
     </div>
 
-    <!-- Trajectory Chart Card -->
-    <div class="card">
-      <h2>📈 Revenue Trajectory</h2>
-      <small class="muted">Paid invoices over time</small>
-      <canvas id="spark"></canvas>
+  </div><!-- /.detail-grid second row -->
+
+  <!-- FINANCIAL SUMMARY + HEALTH INDICATORS -->
+  <div class="detail-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
+    <div class="hq-card">
+      <div class="hq-card-header">
+        <div class="hq-card-title"><i class="bi bi-shield-check"></i> Account Health Indicators</div>
+      </div>
+      <div class="hq-card-body">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+          <!-- Subscription health -->
+          <div>
+            <div style="font-size:.75rem;font-weight:700;color:#94a3b8;margin-bottom:6px;">Subscription</div>
+            <div style="font-size:.875rem;font-weight:600;color:#1e293b;margin-bottom:6px;">
+              {% if subscription and subscription.status in "active ACTIVE trial TRIAL" %}
+                <span style="color:#10b981;">● Healthy</span>
+              {% else %}
+                <span style="color:#ef4444;">● Needs Attention</span>
+              {% endif %}
+            </div>
+            <div class="health-bar">
+              <div class="health-fill {% if subscription and subscription.status in 'active ACTIVE' %}health-good{% elif subscription and subscription.status in 'trial TRIAL' %}health-warn{% else %}health-bad{% endif %}"
+                   style="width:{% if subscription and subscription.status in 'active ACTIVE' %}100{% elif subscription and subscription.status in 'trial TRIAL' %}65{% else %}10{% endif %}%"></div>
+            </div>
+          </div>
+          <!-- Team health -->
+          <div>
+            <div style="font-size:.75rem;font-weight:700;color:#94a3b8;margin-bottom:6px;">Team</div>
+            <div style="font-size:.875rem;font-weight:600;color:#1e293b;margin-bottom:6px;">
+              {% if agents_qs %}
+                <span style="color:#10b981;">● {{ agents_qs|length }} Active Agent{{ agents_qs|length|pluralize }}</span>
+              {% else %}
+                <span style="color:#94a3b8;">● No Agents</span>
+              {% endif %}
+            </div>
+            <div class="health-bar">
+              <div class="health-fill health-good" style="width:{% if agents_qs %}80{% else %}20{% endif %}%"></div>
+            </div>
+          </div>
+          <!-- Revenue health -->
+          <div>
+            <div style="font-size:.75rem;font-weight:700;color:#94a3b8;margin-bottom:6px;">Revenue</div>
+            <div style="font-size:.875rem;font-weight:600;color:#1e293b;margin-bottom:6px;">
+              {% if paid_total > 0 %}
+                <span style="color:#10b981;">● MWK {{ paid_total|floatformat:0|intcomma }} collected</span>
+              {% else %}
+                <span style="color:#94a3b8;">● No revenue yet</span>
+              {% endif %}
+            </div>
+            <div class="health-bar">
+              <div class="health-fill {% if paid_total > 0 %}health-good{% else %}health-bad{% endif %}"
+                   style="width:{% if paid_total > 0 %}70{% else %}5{% endif %}%"></div>
+            </div>
+          </div>
+          <!-- Invoice health -->
+          <div>
+            <div style="font-size:.75rem;font-weight:700;color:#94a3b8;margin-bottom:6px;">Invoices</div>
+            <div style="font-size:.875rem;font-weight:600;color:#1e293b;margin-bottom:6px;">
+              {{ total_invoices }} total invoice{{ total_invoices|pluralize }}
+            </div>
+            <div class="health-bar">
+              <div class="health-fill {% if open_total > 0 %}health-warn{% else %}health-good{% endif %}"
+                   style="width:{% if open_total > 0 %}50{% else %}100{% endif %}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Extend Membership Modal -->
-<div id="extendModal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">Extend Membership</div>
+</div><!-- /.max-width -->
+
+<!-- EXTEND MODAL -->
+<div id="extendModal" class="hq-modal">
+  <div class="hq-modal-box">
+    <div class="hq-modal-title"><i class="bi bi-plus-circle" style="color:#10b981;"></i> Extend Membership</div>
+    <div style="font-size:.875rem;color:#64748b;margin-bottom:16px;">Add days to {{ biz.name }}'s subscription.</div>
     <form id="extendForm">
-      <div class="form-group">
-        <label class="form-label">Number of days to add:</label>
-        <input type="number" class="form-control" id="daysInput" placeholder="e.g., 30" required>
-        <small class="muted">Positive number adds days, negative removes days.</small>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:.82rem;font-weight:600;color:#374151;margin-bottom:6px;">Days to add</label>
+        <input type="number" id="daysInput" min="1" placeholder="e.g. 30"
+               style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;">
+        <div style="font-size:.72rem;color:#94a3b8;margin-top:4px;">Positive number adds days; negative removes days.</div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn" onclick="hideExtendModal()">Cancel</button>
-        <button type="submit" class="btn btn-success">Extend</button>
+      <div class="hq-modal-footer">
+        <button type="button" onclick="closeExtendModal()"
+                style="padding:8px 20px;border-radius:8px;border:1.5px solid #e2e8f0;background:#fff;font-size:.85rem;font-weight:600;cursor:pointer;">
+          Cancel
+        </button>
+        <button type="submit"
+                style="padding:8px 20px;border-radius:8px;border:none;background:#10b981;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer;">
+          Extend
+        </button>
       </div>
     </form>
   </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
-// Chart rendering
+// Revenue sparkline chart
 (function(){
-  const data = {{ series_paid|default:"[]"|safe }};
-  const c = document.getElementById('spark'), ctx=c.getContext('2d');
-  function draw(){
-    const w=c.width=c.clientWidth*devicePixelRatio, h=c.height=c.clientHeight*devicePixelRatio;
-    ctx.clearRect(0,0,w,h);
-    if(!data.length){
-      ctx.fillStyle='#94a3b8';ctx.font='14px system-ui';ctx.textAlign='center';
-      ctx.fillText('No data',w/2,h/2);
+  var data = {{ series_paid|default:"[]"|safe }};
+  var canvas = document.getElementById('revenueChart');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+  function draw() {
+    var w = canvas.width = canvas.clientWidth * devicePixelRatio;
+    var h = canvas.height = canvas.clientHeight * devicePixelRatio;
+    ctx.clearRect(0, 0, w, h);
+    if (!data.length) {
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '13px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('No revenue data yet', w / 2, h / 2);
       return;
     }
-    const pad=10, xw=w-2*pad, yh=h-2*pad;
-    const ys=data.map(d=>d.amount); const max=Math.max(10, Math.max(...ys));
-    data.forEach((d,i)=>{
-      const x = pad + (i/(data.length-1))*xw;
-      const y = pad + yh - (d.amount/max)*yh;
-      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    var pad = 12;
+    var xw = w - 2 * pad, yh = h - 2 * pad;
+    var ys = data.map(function(d){ return d.amount; });
+    var max = Math.max(10, Math.max.apply(null, ys));
+    // Gradient fill
+    var gradient = ctx.createLinearGradient(0, 0, 0, h);
+    gradient.addColorStop(0, 'rgba(99,102,241,.3)');
+    gradient.addColorStop(1, 'rgba(99,102,241,.02)');
+    // Draw fill
+    ctx.beginPath();
+    data.forEach(function(d, i) {
+      var x = pad + (data.length > 1 ? (i / (data.length - 1)) * xw : xw / 2);
+      var y = pad + yh - (d.amount / max) * yh;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
-    ctx.strokeStyle="#2563eb"; ctx.lineWidth=2*devicePixelRatio; ctx.stroke();
+    ctx.lineTo(pad + xw, pad + yh);
+    ctx.lineTo(pad, pad + yh);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    // Draw line
+    ctx.beginPath();
+    data.forEach(function(d, i) {
+      var x = pad + (data.length > 1 ? (i / (data.length - 1)) * xw : xw / 2);
+      var y = pad + yh - (d.amount / max) * yh;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 2 * devicePixelRatio;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    // Dots
+    data.forEach(function(d, i) {
+      var x = pad + (data.length > 1 ? (i / (data.length - 1)) * xw : xw / 2);
+      var y = pad + yh - (d.amount / max) * yh;
+      ctx.beginPath();
+      ctx.arc(x, y, 3 * devicePixelRatio, 0, Math.PI * 2);
+      ctx.fillStyle = '#6366f1';
+      ctx.fill();
+    });
   }
-  draw(); new ResizeObserver(draw).observe(c);
+  draw();
+  new ResizeObserver(draw).observe(canvas);
 })();
 
 // Modal controls
-function showExtendModal(){ document.getElementById('extendModal').classList.add('show'); }
-function hideExtendModal(){ document.getElementById('extendModal').classList.remove('show'); }
-
-// Extend subscription
-document.getElementById('extendForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const days = document.getElementById('daysInput').value;
-  if (!days) return;
-  {% if subscription %}
-  const url = '{% url "hq:sub_extend" subscription.pk %}?days=' + days;
-  try {
-    window.location.href = url; // GET request with redirect
-  } catch(err) {
-    alert('Error extending subscription: ' + err.message);
-  }
-  {% else %}
-  alert('No subscription found for this business.');
-  {% endif %}
+function openExtendModal() { document.getElementById('extendModal').classList.add('open'); }
+function closeExtendModal() { document.getElementById('extendModal').classList.remove('open'); }
+document.getElementById('extendModal').addEventListener('click', function(e) {
+  if (e.target === this) closeExtendModal();
 });
 
-// Revoke subscription
-async function revokeSubscription(pk) {
-  if (!confirm('Are you sure you want to revoke/disable this subscription? The business will lose access.')) return;
-  const url = '/hq/subscriptions/' + pk + '/revoke/';
-  try {
-    window.location.href = url; // GET request with redirect
-  } catch(err) {
-    alert('Error revoking subscription: ' + err.message);
-  }
-}
-
-// Activate subscription
-async function activateSubscription(pk) {
-  if (!confirm('Activate this subscription for 30 days?')) return;
-  const url = '/hq/subscriptions/' + pk + '/activate/';
-  try {
-    window.location.href = url; // GET request with redirect
-  } catch(err) {
-    alert('Error activating subscription: ' + err.message);
-  }
-}
+// Extend form submit
+document.getElementById('extendForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var days = document.getElementById('daysInput').value;
+  if (!days) return;
+  {% if subscription %}
+  window.location.href = '{% url "hq:sub_extend" subscription.pk %}?days=' + days;
+  {% else %}
+  alert('No subscription found — create one first.');
+  {% endif %}
+});
 </script>
-</body></html>
+{% endblock %}

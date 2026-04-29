@@ -132,6 +132,8 @@ def set_active_business(request: "HttpRequest", business: Optional["Business"]) 
         try:
             request.session.pop("active_business_id", None)
             request.session.pop("biz_id", None)  # legacy
+            # Clear cached vertical/product mode so the next request re-derives it
+            request.session.pop("product_mode", None)
             request.session.modified = True
         except Exception:
             pass
@@ -156,9 +158,12 @@ def set_active_business(request: "HttpRequest", business: Optional["Business"]) 
     bid = getattr(business, "id", None) or getattr(business, "pk", None)
     
     # Persist to session (canonical + legacy keys)
+    # Also clear the cached product_mode so the middleware re-derives it
+    # from the new business (prevents stale vertical showing in mobile nav).
     try:
         request.session["active_business_id"] = bid
         request.session["biz_id"] = bid  # legacy compatibility
+        request.session.pop("product_mode", None)  # force re-derivation on next request
         request.session.modified = True
     except Exception:
         pass

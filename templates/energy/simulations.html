@@ -440,10 +440,36 @@
   gap: .4rem;
   margin-top: .4rem;
 }
-.wind-interp-idle { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
-.wind-interp-good { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-.wind-interp-high { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
-.wind-interp-ok { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.wind-interp-idle     { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+.wind-interp-marginal { background: #fff7ed; color: #c2410c; border: 1px solid #fdba74; }
+.wind-interp-ok       { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.wind-interp-good     { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.wind-interp-high     { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+.wind-interp-strong   { background: #ede9fe; color: #4c1d95; border: 1px solid #c4b5fd; }
+
+/* ---- WIND VIABILITY BANNER ---- */
+.wind-viability-banner {
+  border-radius: 12px;
+  padding: .7rem 1rem;
+  font-size: .8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: flex-start;
+  gap: .6rem;
+  margin-top: .5rem;
+  line-height: 1.4;
+}
+.wind-viability-banner .wvb-icon { font-size: 1.1rem; min-width: 1.4rem; }
+.wind-viability-banner .wvb-body { flex: 1; }
+.wind-viability-banner .wvb-detail { font-size: .72rem; font-weight: 400; margin-top: .25rem; opacity: .88; }
+.wvb-not-viable { background: #fef2f2; color: #991b1b; border: 2px solid #fca5a5; }
+.wvb-marginal   { background: #fff7ed; color: #9a3412; border: 2px solid #fb923c; }
+.wvb-moderate   { background: #fffbeb; color: #78350f; border: 2px solid #fbbf24; }
+.wvb-good       { background: #f0fdf4; color: #14532d; border: 2px solid #4ade80; }
+.wvb-strong     { background: #eff6ff; color: #1e3a8a; border: 2px solid #60a5fa; }
+.wvb-payback-warn { background: #fef2f2; color: #7f1d1d; border: 2px solid #ef4444; border-radius: 10px;
+  padding: .55rem .85rem; font-size: .78rem; font-weight: 700; margin-top: .4rem;
+  display: flex; align-items: center; gap: .4rem; }
 
 /* ---- WEBM DOWNLOAD BUTTON ---- */
 .webm-btn {
@@ -2113,15 +2139,17 @@
       </span>
     </div>
 
-    {# Top move — highlighted #}
-    <div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:1rem;display:flex;align-items:flex-start;gap:.8rem;">
-      <div style="font-size:1.5rem;min-width:2rem;">🏆</div>
-      <div>
-        <div style="font-size:.85rem;font-weight:800;color:#0f172a;margin-bottom:.2rem;">Best ROI Move: Pump during solar hours — store water, not electricity</div>
-        <div style="font-size:.75rem;color:#374151;">Scheduling irrigation between 08:00–16:00 eliminates the need for battery storage entirely. Water tanks cost 5–10× less than batteries and never degrade. This single change can cut payback from 7 to 4 years.</div>
-        <div class="d-flex flex-wrap gap-1 mt-2">
-          <span class="roi-move-badge badge-payback">↓ Payback: −3 yrs</span>
-          <span class="roi-move-badge badge-capex">↓ CapEx: −35%</span>
+    {# Top move — scenario-aware, updated by updateROIGuide() #}
+    <div id="roi_top_move" style="margin-bottom:1rem;">
+      <div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;display:flex;align-items:flex-start;gap:.8rem;">
+        <div style="font-size:1.5rem;min-width:2rem;">🏆</div>
+        <div>
+          <div style="font-size:.85rem;font-weight:800;color:#0f172a;margin-bottom:.2rem;">Best ROI Move: Pump during solar hours — store water, not electricity</div>
+          <div style="font-size:.75rem;color:#374151;">Scheduling irrigation between 08:00–16:00 eliminates the need for battery storage entirely. Water tanks cost 5–10× less than batteries and never degrade. This single change can cut payback from 7 to 4 years.</div>
+          <div class="d-flex flex-wrap gap-1 mt-2">
+            <span class="roi-move-badge badge-payback">↓ Payback: −3 yrs</span>
+            <span class="roi-move-badge badge-capex">↓ CapEx: −35%</span>
+          </div>
         </div>
       </div>
     </div>
@@ -2353,6 +2381,8 @@ function showSim(name) {
     minigrid:updateMG, coldroom:updateCR, borehole:updateBH
   };
   if (updaters[name]) updaters[name]();
+  // Update ROI guide to reflect new scenario context
+  if (typeof updateROIGuide === 'function') updateROIGuide();
 }
 
 // ============================================================
@@ -2681,28 +2711,86 @@ function updateSOL() {
 }
 
 // ============================================================
-// SIM 4: WIND TURBINE
+// SIM 4: WIND TURBINE — Engineering-accurate power curve + viability logic
 // ============================================================
-function updateWIND() {
-  const rating = parseFloat(document.getElementById('wind_kw').value);
-  const spd = parseFloat(document.getElementById('wind_spd').value);
-  const cutin = parseFloat(document.getElementById('wind_cutin').value);
-  const hub = parseFloat(document.getElementById('wind_hub').value);
+function windPowerCurve(effSpd, cutIn, ratedSpeed, cutOut, ratedKw) {
+  // IEC 61400-style simplified power curve
+  if (effSpd < cutIn || effSpd > cutOut) return 0;
+  if (effSpd >= ratedSpeed) return ratedKw;
+  // Cubic interpolation between cut-in and rated speed
+  const v3 = Math.pow(effSpd, 3);
+  const cin3 = Math.pow(cutIn, 3);
+  const rat3 = Math.pow(ratedSpeed, 3);
+  return ratedKw * Math.max(0, Math.min(1, (v3 - cin3) / (rat3 - cin3)));
+}
 
-  document.getElementById('wind_kw_val').textContent = rating;
-  document.getElementById('wind_spd_val').textContent = spd;
+function windViabilityBand(effSpd, cutIn) {
+  // Returns {cls, label, badge, detail, rec, standalone}
+  const MIN_VIABLE    = 4.5;
+  const GOOD_WIND     = 5.5;
+  const STRONG_WIND   = 6.5;
+  if (effSpd < cutIn) return {
+    cls: 'wvb-not-viable', badge: 'wind-interp-idle', label: 'Not viable — below cut-in',
+    badgeTxt: '⛔ Below cut-in speed — turbine not generating',
+    detail: 'Wind speed is below turbine cut-in. Output is zero. Do not present this as a generation asset.',
+    rec: 'Use solar as primary system. Measure wind for ≥12 months at mast height before considering any turbine investment.',
+    standalone: false
+  };
+  if (effSpd < MIN_VIABLE) return {
+    cls: 'wvb-marginal', badge: 'wind-interp-marginal', label: 'Marginal — weak wind',
+    badgeTxt: '⚠ Marginal wind — not suitable as primary system',
+    detail: 'Wind is above cut-in but too weak for reliable generation. Output is low and intermittent.',
+    rec: 'Solar-first is strongly preferred. Consider wind only after verified 12-month site measurements show average ≥ 4.5 m/s.',
+    standalone: false
+  };
+  if (effSpd < GOOD_WIND) return {
+    cls: 'wvb-moderate', badge: 'wind-interp-ok', label: 'Moderate wind — hybrid support only',
+    badgeTxt: '🔶 Moderate wind — hybrid support possible, not standalone',
+    detail: 'Wind resource can contribute to a hybrid solar+wind system but is insufficient as a standalone source.',
+    rec: 'Verify with 12-month mast data. Pair with solar. Do not size standalone wind below 5.5 m/s average.',
+    standalone: false
+  };
+  if (effSpd < STRONG_WIND) return {
+    cls: 'wvb-good', badge: 'wind-interp-good', label: 'Good wind — hybrid viable',
+    badgeTxt: '✅ Good wind — viable for hybrid system',
+    detail: 'Wind resource is adequate for a hybrid system contribution. Standalone wind requires confirmed 12-month data.',
+    rec: 'Hybrid solar+wind is viable here. Confirm with site survey and met-mast before standalone wind investment.',
+    standalone: false
+  };
+  return {
+    cls: 'wvb-strong', badge: 'wind-interp-strong', label: 'Strong wind — promising resource',
+    badgeTxt: '🌬️ Strong wind — promising resource, pending site survey',
+    detail: 'Wind resource appears strong. Subject to 12-month met-mast verification and structural site assessment.',
+    rec: 'Wind or hybrid system is a strong candidate. Commission site survey, wind shear analysis, and mast data before procurement.',
+    standalone: true
+  };
+}
+
+function updateWIND() {
+  const rating    = parseFloat(document.getElementById('wind_kw').value);
+  const spd       = parseFloat(document.getElementById('wind_spd').value);
+  const cutin     = parseFloat(document.getElementById('wind_cutin').value);
+  const hub       = parseFloat(document.getElementById('wind_hub').value);
+  const RATED_SPD = 12.0;  // m/s typical rated speed
+  const CUT_OUT   = 25.0;  // m/s cut-out speed
+
+  document.getElementById('wind_kw_val').textContent   = rating;
+  document.getElementById('wind_spd_val').textContent  = spd;
   document.getElementById('wind_cutin_val').textContent = cutin;
-  document.getElementById('wind_hub_val').textContent = hub;
+  document.getElementById('wind_hub_val').textContent  = hub;
 
   // Hub height wind speed correction (log law, 10m reference)
   const hubFactor = Math.pow(hub / 10, 0.143);
-  const effSpd = spd * hubFactor;
+  const effSpd    = spd * hubFactor;
 
-  const available = effSpd > cutin ? Math.min(1, Math.pow((effSpd - cutin) / (12 - cutin), 1.5)) : 0;
-  const output = rating * available;
-  const capFactor = (available * 100).toFixed(0);
-  const dailyKwh = output * 24;
+  // Proper IEC power curve — clamp to [0, rating]
+  const output    = Math.max(0, Math.min(rating, windPowerCurve(effSpd, cutin, RATED_SPD, CUT_OUT, rating)));
+  const capFactor = rating > 0 ? Math.round((output / rating) * 100) : 0;
+  const dailyKwh  = output * 24;
   const annualKwh = dailyKwh * 365;
+
+  // Viability assessment
+  const vib = windViabilityBand(effSpd, cutin);
 
   // Blade animation speed
   const bladeSpeed = effSpd > cutin ? (effSpd / 8) * 2 : 0.02;
@@ -2717,10 +2805,10 @@ function updateWIND() {
   }
 
   // Update SVG output display
-  if (document.getElementById('wind_kw_label')) document.getElementById('wind_kw_label').textContent = fmt(output) + ' kW';
-  if (document.getElementById('wind_kwh_label')) document.getElementById('wind_kwh_label').textContent = '~' + fmt(dailyKwh) + ' kWh';
-  if (document.getElementById('wind_cf_label')) document.getElementById('wind_cf_label').textContent = capFactor + '%';
-  if (document.getElementById('wind_hub_label')) document.getElementById('wind_hub_label').textContent = 'Hub: ' + hub + 'm (eff. ' + fmt(effSpd,1) + ' m/s)';
+  if (document.getElementById('wind_kw_label'))      document.getElementById('wind_kw_label').textContent      = fmt(output) + ' kW';
+  if (document.getElementById('wind_kwh_label'))     document.getElementById('wind_kwh_label').textContent     = '~' + fmt(dailyKwh) + ' kWh';
+  if (document.getElementById('wind_cf_label'))      document.getElementById('wind_cf_label').textContent      = capFactor + '%';
+  if (document.getElementById('wind_hub_label'))     document.getElementById('wind_hub_label').textContent     = 'Hub: ' + hub + 'm (eff. ' + fmt(effSpd,1) + ' m/s)';
   if (document.getElementById('wind_cutin_display')) document.getElementById('wind_cutin_display').textContent = 'Cut-in: ' + cutin + ' m/s';
 
   // Status dot
@@ -2730,72 +2818,80 @@ function updateWIND() {
     if (effSpd <= cutin) {
       dot.style.fill = '#ef4444';
       statusTxt.textContent = 'Idle — below cut-in';
-    } else if (available >= 0.9) {
+    } else if (output >= rating * 0.9) {
       dot.style.fill = '#10b981';
-      statusTxt.textContent = 'Full rated output';
+      statusTxt.textContent = 'Near rated output';
     } else {
       dot.style.fill = '#f59e0b';
-      statusTxt.textContent = 'Generating';
+      statusTxt.textContent = 'Partial generation';
     }
   }
 
   // Mini cards
-  if (document.getElementById('wmc_spd')) document.getElementById('wmc_spd').textContent = spd + ' m/s';
-  if (document.getElementById('wmc_out')) document.getElementById('wmc_out').textContent = fmt(output) + ' kW';
+  if (document.getElementById('wmc_spd'))   document.getElementById('wmc_spd').textContent   = spd + ' m/s';
+  if (document.getElementById('wmc_out'))   document.getElementById('wmc_out').textContent   = fmt(output) + ' kW';
   if (document.getElementById('wmc_daily')) document.getElementById('wmc_daily').textContent = fmt(dailyKwh) + ' kWh';
-  if (document.getElementById('wmc_cf')) document.getElementById('wmc_cf').textContent = capFactor + '%';
+  if (document.getElementById('wmc_cf'))   document.getElementById('wmc_cf').textContent     = capFactor + '%';
 
-  // Interpretation badge
-  const badge = document.getElementById('wind_interp_badge');
+  // Interpretation badge (mini — in left panel)
+  const badge    = document.getElementById('wind_interp_badge');
   const badgeTxt = document.getElementById('wind_interp_text');
   if (badge && badgeTxt) {
-    badge.className = 'wind-interpretation';
-    if (effSpd <= cutin) {
-      badge.classList.add('wind-interp-idle');
-      badgeTxt.textContent = 'Below cut-in speed — turbine will not generate. Raise tower or wait for stronger wind.';
-    } else if (effSpd < 5) {
-      badge.classList.add('wind-interp-ok');
-      badgeTxt.textContent = 'Low wind zone: output marginal. Consider taller tower or hybrid with solar.';
-    } else if (effSpd < 9) {
-      badge.classList.add('wind-interp-good');
-      badgeTxt.textContent = 'Good wind zone — output improving. Well-suited for wind generation.';
-    } else {
-      badge.classList.add('wind-interp-high');
-      badgeTxt.textContent = 'High wind — near rated output. Consider tower height, foundation safety margin.';
-    }
+    badge.className = 'wind-interpretation ' + vib.badge;
+    badgeTxt.textContent = vib.badgeTxt;
   }
 
+  // Result cards — show 0 honestly when below cut-in
   document.getElementById('wind_results').innerHTML =
     resultCard(fmt(output) + ' kW', 'Current Output', 'blue') +
     resultCard(fmt(dailyKwh) + ' kWh', 'Daily Generation') +
     resultCard(capFactor + '%', 'Capacity Factor') +
     resultCard(fmt(annualKwh/1000, 0) + ' MWh', 'Annual Gen', 'amber');
 
+  // Payback + sanity check
   const annualSavings = annualKwh * 185;
-  const capex = rating * 1000 * 1200000 + hub * 50000;
-  const payback = capex / Math.max(1, annualSavings);
+  const capex         = rating * 1000 * 1200000 + hub * 50000;
+  const payback       = annualSavings > 0 ? capex / annualSavings : Infinity;
+  const paybackDisplay = isFinite(payback) && payback <= 9999 ? '~' + fmt(payback, 1) + ' yrs' : 'N/A';
+
+  // Payback sanity assessment
+  let paybackSanityHtml = '';
+  if (output <= 0 || !isFinite(payback)) {
+    paybackSanityHtml = `<div class="wvb-payback-warn"><i class="bi bi-x-circle-fill me-1"></i>
+      <strong>Payback N/A:</strong> Generation is zero — no financial return can be calculated. Do not invest without verified wind resource.</div>`;
+  } else if (payback > 25) {
+    paybackSanityHtml = `<div class="wvb-payback-warn"><i class="bi bi-exclamation-triangle-fill me-1"></i>
+      <strong>Not financially viable:</strong> Payback of ${fmt(payback,0)} years exceeds 25-year system life. Wind investment is not justified under current conditions.</div>`;
+  }
+
+  // Payback tag (only show if meaningful)
+  const paybackTagHtml = (isFinite(payback) && payback <= 25 && output > 0)
+    ? `<span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">Payback: ${paybackDisplay}</span>`
+    : `<span style="background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">Payback: ${paybackDisplay}</span>`;
 
   document.getElementById('wind_summary').innerHTML = `
     <div class="d-flex flex-wrap gap-2 mb-2">
       <span style="background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">
-        <i class="bi bi-wind me-1"></i>${spd} m/s at hub → ${fmt(effSpd,1)} m/s effective (${hub}m tower)
+        <i class="bi bi-wind me-1"></i>${spd} m/s at site → ${fmt(effSpd,1)} m/s effective (${hub}m tower)
       </span>
-      <span style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:8px;padding:.2rem .6rem;font-size:.76rem;font-weight:700;">
-        Payback: ~${fmt(payback,1)} yrs
-      </span>
+      ${paybackTagHtml}
     </div>
-    ${effSpd <= cutin ?
-      '<div class="wind-interpretation wind-interp-idle"><i class="bi bi-exclamation-triangle me-1"></i>⚠ Wind below cut-in speed — turbine idle. Increase wind speed slider or raise tower height.</div>' :
-      effSpd >= 12 ?
-      '<div class="wind-interpretation wind-interp-high"><i class="bi bi-wind me-1"></i>Turbine near rated output. Excellent wind resource — verify structural safety at this tower height.</div>' :
-      '<div class="wind-interpretation wind-interp-good"><i class="bi bi-check-circle me-1"></i>Turbine generating at ' + capFactor + '% capacity. Viable wind resource for hybrid or standalone system.</div>'}
+    <div class="wind-viability-banner ${vib.cls}">
+      <div class="wvb-icon"><i class="bi bi-wind"></i></div>
+      <div class="wvb-body">
+        <div>${vib.label}</div>
+        <div class="wvb-detail">${vib.detail}</div>
+        <div class="wvb-detail mt-1"><strong>Recommendation:</strong> ${vib.rec}</div>
+      </div>
+    </div>
+    ${paybackSanityHtml}
     <div class="mt-2" style="font-size:.78rem;color:#374151;">
       <strong>Annual generation:</strong> ${fmt(annualKwh, 0)} kWh &nbsp;|&nbsp;
       <strong>Annual savings:</strong> MWK ${fmtK(annualSavings)} &nbsp;|&nbsp;
       <strong>CapEx est.:</strong> MWK ${fmtK(capex)}
     </div>
     <div class="mt-1" style="font-size:.74rem;color:#6b7280;">
-      <i class="bi bi-info-circle me-1"></i>Grant note: Wind data must be from ≥12-month met mast measurement for institutional finance.
+      <i class="bi bi-info-circle me-1"></i>Grant note: Wind data must be from ≥12-month met mast measurement for institutional finance. Never accept a single-day measurement.
     </div>`;
 }
 
@@ -2818,7 +2914,8 @@ function updateHYB() {
   document.getElementById('hyb_wind_spd_val').textContent = windSpd;
 
   const solarGen = solar * 5.5 * 0.85;
-  const windAvail = windSpd > 2.5 ? Math.min(1, Math.pow((windSpd-2.5)/9.5, 1.5)) : 0;
+  // Use engineering-accurate power curve (cut-in 3.0, rated 12.0 m/s)
+  const windAvail = windPowerCurve(windSpd, 3.0, 12.0, 25.0, 1.0);
   const windGen = wind * windAvail * 24;
   const totalRenew = solarGen + windGen;
   const genNeeded = Math.max(0, load - totalRenew);
@@ -3407,6 +3504,156 @@ function downloadCurrentSceneAsSVG() {
   setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
 }
 
+// ============================================================
+// ROI GUIDE — scenario-aware recommendations
+// ============================================================
+function updateROIGuide() {
+  var sim = _currentSim || 'household';
+
+  // Read shared sliders
+  var battAdj      = parseInt((document.getElementById('roi_batt_slider')  || {value:0}).value);
+  var solarAdj     = parseInt((document.getElementById('roi_solar_slider') || {value:0}).value);
+  var dieselHrs    = parseInt((document.getElementById('roi_diesel_slider')|| {value:4}).value);
+  var towerH       = parseInt((document.getElementById('roi_tower_slider') || {value:24}).value);
+  var shiftLoads   = (document.getElementById('roi_shift_loads')  || {checked:true}).checked;
+  var genBackup    = (document.getElementById('roi_gen_backup')   || {checked:false}).checked;
+  var irrMethod    = (document.getElementById('roi_irr_method')   || {value:'drip'}).value;
+  var headRed      = parseInt((document.getElementById('roi_head_slider')  || {value:0}).value);
+
+  // Update display values
+  var set = function(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  set('roi_batt_adj',   (battAdj >= 0 ? '+' : '') + battAdj + '%');
+  set('roi_solar_adj',  (solarAdj >= 0 ? '+' : '') + solarAdj + '%');
+  set('roi_diesel_hrs', dieselHrs);
+  set('roi_tower_val',  towerH + 'm');
+  set('roi_head_adj',   headRed);
+
+  // ---- Wind speed at tower height for ROI tower card ----
+  var windBase = 0;
+  var windCutin = 3.0;
+  var windSpdEl = document.getElementById('wind_spd');
+  if (windSpdEl) windBase = parseFloat(windSpdEl.value) || 0;
+  var effAtTower = windBase * Math.pow(towerH / 10, 0.143);
+  var towerViab  = windViabilityBand(effAtTower, windCutin);
+  set('roi_tower_impact', towerH + 'm tower → ' + effAtTower.toFixed(1) + ' m/s effective — ' + towerViab.label);
+
+  // Slider impacts
+  var irrImpactMap = {flood:'Flood: baseline — highest pump demand', sprinkler:'Sprinkler: −25% pump demand vs flood', drip:'Drip: −50% pump demand — recommended'};
+  set('roi_irr_impact',    irrImpactMap[irrMethod] || 'Select irrigation method');
+  set('roi_batt_impact',   battAdj < 0 ? 'Reduced: CapEx savings ~' + Math.abs(battAdj*0.4).toFixed(0) + '%' : battAdj > 0 ? 'Increased: more autonomy, higher CapEx' : 'Neutral — current sizing');
+  set('roi_solar_impact',  solarAdj > 0 ? '+' + solarAdj + '% solar → ~' + (solarAdj * 0.9).toFixed(0) + '% more daily generation' : solarAdj < 0 ? 'Reduced array — lower CapEx, less generation' : 'Neutral — current sizing');
+  set('roi_diesel_impact', dieselHrs + ' hrs replaced → MWK ' + (dieselHrs * 16000 / 1000).toFixed(0) + 'K/month savings');
+  set('roi_shift_impact',  shiftLoads ? 'Enabled: battery need reduces by ~30%' : 'Disabled — batteries carry full evening load');
+  set('roi_gen_impact',    genBackup ? 'Generator as backup only: saves MWK 300–500K/month' : 'Disabled — generator running as primary source');
+  set('roi_head_impact',   headRed > 0 ? headRed + '% friction reduction → smaller pump, ~' + (headRed * 0.4).toFixed(0) + '% energy saving' : '0% — current pipe layout');
+
+  // ---- Scenario-aware top-move and summary ----
+  var topMove = '', summaryText = '', relPay = '—', relCapex = '—', relSavings = '—', relRel = '—';
+
+  if (sim === 'wind') {
+    // Wind scenario: check current wind speed viability first
+    var currentWindSpd = windBase;
+    var currentHubH    = parseFloat((document.getElementById('wind_hub') || {value:24}).value) || 24;
+    var currentEff     = currentWindSpd * Math.pow(currentHubH / 10, 0.143);
+    var currentViab    = windViabilityBand(currentEff, windCutin);
+    var effAtNewTower  = currentWindSpd * Math.pow(towerH / 10, 0.143);
+    var newViab        = windViabilityBand(effAtNewTower, windCutin);
+    var towerHelps     = (effAtNewTower >= 5.5 && currentEff < 5.5);
+
+    if (currentEff < windCutin) {
+      topMove = '<div class="wvb-not-viable" style="border-radius:12px;padding:.7rem 1rem;margin-bottom:.5rem;">' +
+        '<strong>⛔ Priority Action:</strong> Wind speed is below cut-in. Output is zero. ' +
+        'Do NOT invest in a wind turbine under these conditions. ' +
+        'Switch to solar or commission 12-month wind measurements before any wind decision.</div>';
+      summaryText = 'Wind speed is below turbine cut-in — no generation is possible. Solar is the correct primary choice here.';
+      relPay = 'N/A'; relCapex = 'Avoid wind'; relSavings = 'MWK 0'; relRel = 'Low';
+    } else if (currentEff < 4.5) {
+      topMove = '<div class="wvb-marginal" style="border-radius:12px;padding:.7rem 1rem;margin-bottom:.5rem;">' +
+        '<strong>⚠ Priority Action:</strong> Wind is marginal (' + currentEff.toFixed(1) + ' m/s effective). ' +
+        (towerHelps ? 'Raising to ' + towerH + 'm tower improves wind to ' + effAtNewTower.toFixed(1) + ' m/s — check if this crosses 4.5 m/s viability threshold.' : 'Raising tower height alone will not make this site viable. ') +
+        ' Measure wind for 12 months before any turbine investment. Solar-first is better here.</div>';
+      summaryText = 'Marginal wind: solar-first is the best ROI move. Only consider wind after verified site measurements.';
+      relPay = '>25 yrs'; relCapex = 'High risk'; relSavings = 'Very low'; relRel = 'Low';
+    } else if (currentEff < 5.5) {
+      topMove = '<div class="wvb-moderate" style="border-radius:12px;padding:.7rem 1rem;margin-bottom:.5rem;">' +
+        '<strong>🔶 Best ROI Move: Verify wind data before committing to wind investment</strong><br>' +
+        'Current effective wind (' + currentEff.toFixed(1) + ' m/s) is moderate. Hybrid solar+wind may work but verify with 12-month mast data. ' +
+        'Standalone wind is not justified below 5.5 m/s average.</div>';
+      summaryText = 'Moderate wind — pair with solar in hybrid configuration. Get mast data before standalone wind sizing.';
+      relPay = '12–20 yrs est.'; relCapex = 'Moderate'; relSavings = 'Partial'; relRel = 'Medium';
+    } else if (currentEff < 6.5) {
+      topMove = '<div class="wvb-good" style="border-radius:12px;padding:.7rem 1rem;margin-bottom:.5rem;">' +
+        '<strong>✅ Best ROI Move: Hybrid solar+wind with verified site data</strong><br>' +
+        'Good wind at ' + currentEff.toFixed(1) + ' m/s. Hybrid is viable. Get 12-month mast measurement and structural site survey before procurement.</div>';
+      summaryText = 'Good wind resource — hybrid system is viable pending site survey. Commission wind mast data.';
+      relPay = '8–14 yrs est.'; relCapex = 'Moderate'; relSavings = 'Good'; relRel = 'Medium-High';
+    } else {
+      topMove = '<div class="wvb-strong" style="border-radius:12px;padding:.7rem 1rem;margin-bottom:.5rem;">' +
+        '<strong>🌬️ Best ROI Move: Wind or hybrid — subject to site survey and mast data</strong><br>' +
+        'Strong wind at ' + currentEff.toFixed(1) + ' m/s. This is a promising wind site. Commission structural survey and 12-month met mast before procurement.</div>';
+      summaryText = 'Strong wind resource — wind or hybrid is a strong candidate. Site survey and mast data required.';
+      relPay = '6–10 yrs est.'; relCapex = 'Moderate-High'; relSavings = 'Strong'; relRel = 'High (post-survey)';
+    }
+
+  } else if (sim === 'irrigation') {
+    var irrSaving = irrMethod === 'drip' ? 50 : irrMethod === 'sprinkler' ? 25 : 0;
+    var headSaving = headRed * 0.4;
+    var battSaving = battAdj < 0 ? Math.abs(battAdj) * 0.4 : 0;
+    topMove = '<div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:.5rem;">' +
+      '<strong>🏆 Best ROI Move: Pump during solar hours — store water, not electricity</strong><br>' +
+      '<span style="font-size:.75rem;">Scheduling irrigation 08:00–16:00 eliminates battery storage entirely. Water tanks cost 5–10× less than batteries and never degrade. ' +
+      (irrMethod === 'drip' ? 'With drip irrigation, pump demand is 50% lower — even smaller solar array needed.' : 'Switch to drip irrigation to cut pump demand by 50%.') +
+      '</span></div>';
+    summaryText = 'Solar irrigation ROI is best improved by daytime pumping + drip irrigation. Batteries should be last resort for irrigation.';
+    relPay     = '4–7 yrs'; relCapex = battAdj < 0 ? '−' + battSaving.toFixed(0) + '%' : 'Baseline';
+    relSavings = 'MWK 80–200K/mo'; relRel = shiftLoads ? 'High' : 'Medium';
+
+  } else if (sim === 'coldroom') {
+    topMove = '<div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:.5rem;">' +
+      '<strong>🏆 Best ROI Move: Improve insulation + pre-cool during solar hours</strong><br>' +
+      '<span style="font-size:.75rem;">Better insulation reduces compressor runtime by 20–35%. Pre-cooling during peak solar hours stores thermal energy instead of electrical energy. ' +
+      'Reduce door openings and right-size the compressor for the actual load — oversized compressors cycle inefficiently.</span></div>';
+    summaryText = 'Cold room ROI is driven by insulation quality, correct compressor sizing, and pre-cooling strategy during solar hours.';
+    relPay = '3–6 yrs'; relCapex = 'Moderate'; relSavings = 'MWK 150–400K/mo'; relRel = 'High';
+
+  } else if (sim === 'diesel') {
+    topMove = '<div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:.5rem;">' +
+      '<strong>🏆 Best ROI Move: Displace expensive peak runtime hours first</strong><br>' +
+      '<span style="font-size:.75rem;">Every hour of diesel replaced by solar saves MWK 400–800. Target the most expensive runtime hours first (07:00–18:00). ' +
+      (genBackup ? 'Generator-as-backup mode enabled — this is the correct strategy. Size solar to cover 80%+ of daytime load.' :
+       'Enable generator-as-backup mode to maximise solar displacement and savings.') +
+      '</span></div>';
+    summaryText = 'Diesel ROI is fastest by targeting daytime run hours with solar. Avoid oversized batteries — displace runtime first.';
+    relPay = '3–5 yrs'; relCapex = 'Moderate'; relSavings = 'MWK ' + (dieselHrs * 16).toFixed(0) + 'K/day'; relRel = 'High';
+
+  } else {
+    // Household / default
+    topMove = '<div style="background:linear-gradient(90deg,#f0fdf4,#dbeafe);border:2px solid #10b981;border-radius:14px;padding:1rem 1.1rem;margin-bottom:.5rem;">' +
+      '<strong>🏆 Best ROI Move: Shift heavy loads to daytime + right-size battery</strong><br>' +
+      '<span style="font-size:.75rem;">Moving iron, kettle, grinder, and water heater to 09:00–15:00 reduces battery requirement by 30–40%. ' +
+      'Separate critical loads (lights, phone, fan) from heavy loads to enable a smaller, cheaper battery bank. ' +
+      (shiftLoads ? 'Load shifting enabled — battery need is already reduced.' : 'Enable load shifting to reduce battery CapEx by ~30%.') +
+      '</span></div>';
+    summaryText = 'Household ROI is best improved by load shifting to solar hours and right-sizing the battery for critical loads only.';
+    relPay = '5–9 yrs'; relCapex = battAdj < 0 ? '−' + Math.abs(battAdj*0.4).toFixed(0) + '%' : 'Baseline';
+    relSavings = 'MWK 40–120K/mo'; relRel = shiftLoads ? 'High' : 'Medium';
+  }
+
+  // Update top-move card
+  var topMoveEl = document.getElementById('roi_top_move');
+  if (topMoveEl) topMoveEl.innerHTML = topMove;
+
+  // Update summary
+  var sumEl = document.getElementById('roi_guide_summary');
+  if (sumEl) sumEl.textContent = summaryText;
+
+  // Update metrics
+  set('roi_payback_val',     relPay);
+  set('roi_capex_val',       relCapex);
+  set('roi_savings_val',     relSavings);
+  set('roi_reliability_val', relRel);
+}
+
 // Close proposal modal on backdrop click
 document.addEventListener('DOMContentLoaded', function() {
   var propModal = document.getElementById('proposalImgModal');
@@ -3431,6 +3678,7 @@ document.addEventListener('DOMContentLoaded', function() {
   updateMG();
   updateCR();
   updateBH();
+  updateROIGuide();
 });
 </script>
 {% endblock %}

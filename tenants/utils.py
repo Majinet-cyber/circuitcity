@@ -250,11 +250,14 @@ def set_active_business(request: "HttpRequest", business) -> None:
             return
 
         # Persist selection (write both canonical and legacy keys to be safe)
+        # Clear cached product_mode so the middleware re-derives it from the
+        # new business on the next request — prevents stale vertical in mobile nav.
         bid = getattr(business, "pk", None)
         try:
             request.session[TENANT_SESSION_KEY] = bid
             request.session["active_business_id"] = bid
             request.session["biz_id"] = bid  # legacy compatibility
+            request.session.pop("product_mode", None)
             request.session.modified = True
         except Exception:
             pass

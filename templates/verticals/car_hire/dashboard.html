@@ -354,6 +354,10 @@
     position: relative;
     overflow: hidden;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    /* BUG FIX: Prevent content overflow */
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .kpi-card:hover {
@@ -380,6 +384,8 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 0.75rem;
+    min-width: 0;
+    flex-shrink: 0;
 }
 
 .kpi-label {
@@ -388,6 +394,11 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--muted);
+    /* BUG FIX: Ensure label wraps on small cards */
+    overflow-wrap: break-word;
+    word-break: break-word;
+    max-width: 100%;
+    line-height: 1.3;
 }
 
 .kpi-icon {
@@ -408,14 +419,29 @@
 .kpi-icon.profit { background: var(--hire-green-light); color: var(--hire-green); }
 
 .kpi-value {
-    font-size: 1.5rem;
+    font-size: clamp(1.1rem, 2.2vw, 1.5rem);
     font-weight: 800;
     color: var(--ink);
     line-height: 1.2;
+    /* BUG FIX: Ensure values never overflow card boundaries */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    white-space: normal;
+    max-width: 100%;
+    min-width: 0;
+    display: block;
 }
 
 @media (min-width: 768px) {
-    .kpi-value { font-size: 1.75rem; }
+    .kpi-value { 
+        font-size: clamp(1.25rem, 2.5vw, 1.75rem); 
+    }
+}
+
+@media (min-width: 1024px) {
+    .kpi-value { 
+        font-size: clamp(1.3rem, 2.2vw, 2rem); 
+    }
 }
 
 .kpi-trend {
@@ -472,11 +498,22 @@
 
 .chart-card-body {
     padding: 1rem 1.25rem;
+    /* BUG FIX: Remove unwanted scrollbars */
+    overflow: visible;
+    min-height: 200px;
 }
 
 .chart-container {
     position: relative;
-    height: 200px;
+    height: 260px;
+    /* BUG FIX: Ensure canvas renders properly */
+    width: 100%;
+    min-height: 200px;
+}
+
+.chart-container canvas {
+    max-width: 100%;
+    max-height: 100%;
 }
 
 .chart-empty {
@@ -1605,6 +1642,53 @@
     </div>
     {% endif %}
     
+    <!-- ===== SMART RECOMMENDATIONS ===== -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border-radius:20px;padding:1.5rem;margin-top:1.5rem;color:#fff;position:relative;overflow:hidden;" data-testid="car-hire-recommendations">
+      <div style="position:absolute;top:-30%;right:-5%;width:250px;height:250px;background:radial-gradient(circle,rgba(14,165,233,.12) 0%,transparent 70%);pointer-events:none;"></div>
+      <div style="position:relative;z-index:1;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px;">
+          <h3 style="margin:0;font-size:1.1rem;font-weight:800;" data-testid="recommendations-title">💡 Smart Fleet Recommendations</h3>
+          <span style="background:rgba(14,165,233,.2);border:1px solid rgba(14,165,233,.3);color:#38bdf8;border-radius:999px;padding:3px 12px;font-size:.72rem;font-weight:700;">AI Assist</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;" data-testid="recommendations-grid">
+          {% if total_vehicles == 0 %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #6366f1;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Get Started</div>
+            <div style="font-weight:700;margin-bottom:4px;">Add your first vehicle</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Start by registering your fleet vehicles to unlock booking management and revenue tracking.</div>
+          </div>
+          {% else %}
+          {% if utilization_rate < 50 %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #f59e0b;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Low Utilization</div>
+            <div style="font-weight:700;margin-bottom:4px;">{{ utilization_rate }}% fleet utilization</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Consider promotional pricing or partnerships to increase bookings.</div>
+          </div>
+          {% endif %}
+          {% if overdue_count > 0 %}
+          <div style="background:rgba(239,68,68,.1);border-radius:12px;padding:14px;border-left:3px solid #ef4444;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Urgent</div>
+            <div style="font-weight:700;margin-bottom:4px;">{{ overdue_count }} maintenance overdue</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Schedule service now to prevent breakdowns and protect your fleet.</div>
+          </div>
+          {% endif %}
+          {% if available_count == total_vehicles %}
+          <div style="background:rgba(16,185,129,.1);border-radius:12px;padding:14px;border-left:3px solid #10b981;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Opportunity</div>
+            <div style="font-weight:700;margin-bottom:4px;">All {{ total_vehicles }} vehicles available</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Your full fleet is ready. Consider reaching out to customers for weekend bookings.</div>
+          </div>
+          {% endif %}
+          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:14px;border-left:3px solid #6366f1;">
+            <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.5);margin-bottom:6px;">Revenue Tip</div>
+            <div style="font-weight:700;margin-bottom:4px;">Track all income sources</div>
+            <div style="font-size:.82rem;color:rgba(255,255,255,.6);">Add fuel costs, driver payments and insurance to get accurate profit reports.</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <!-- Main Dashboard Cards -->
     <div class="dashboard-cards" style="margin-top: 1.5rem;">
         <!-- Upcoming Trips -->
@@ -1723,26 +1807,49 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Parse data from Django template
-    const chartLabels = {{ chart_labels|safe }};
-    const chartBookings = {{ chart_bookings|safe }};
-    const chartRevenue = {{ chart_revenue|safe }};
-    const chartCosts = {{ chart_costs|safe }};
-    const fleetStatusData = {{ fleet_status_data|safe }};
-    const fleetStatusLabels = {{ fleet_status_labels|safe }};
-    
-    // Common chart options
-    const commonOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false }
+    // BUG FIX: Wrap in try-catch to prevent silent failures
+    try {
+        // Parse data from Django template
+        const chartLabels = {{ chart_labels|safe }};
+        const chartBookings = {{ chart_bookings|safe }};
+        const chartRevenue = {{ chart_revenue|safe }};
+        const chartCosts = {{ chart_costs|safe }};
+        const fleetStatusData = {{ fleet_status_data|safe }};
+        const fleetStatusLabels = {{ fleet_status_labels|safe }};
+        
+        // BUG FIX: Verify Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js failed to load');
+            return;
         }
-    };
-    
-    // Bookings & Revenue Chart (Dual Axis)
-    const bookingsCtx = document.getElementById('bookingsRevenueChart');
-    if (bookingsCtx) {
+        
+        // BUG FIX: Validate data arrays
+        if (!Array.isArray(chartLabels) || chartLabels.length === 0) {
+            console.warn('Chart data is empty or invalid');
+        }
+        
+        // Common chart options
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            }
+        };
+        
+        // Bookings & Revenue Chart (Dual Axis)
+        const bookingsCtx = document.getElementById('bookingsRevenueChart');
+        if (bookingsCtx) {
+            // BUG FIX: Check if we have valid data arrays
+            const hasBookingsData = Array.isArray(chartLabels) && chartLabels.length > 0;
+            
+            if (!hasBookingsData) {
+                // Show empty state
+                const parent = bookingsCtx.parentElement;
+                if (parent) {
+                    parent.innerHTML = '<div class="chart-empty"><i class="fas fa-chart-line"></i><p>No bookings data in this period yet</p><a href="/verticals/car_hire/trips/new/" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;"><i class="fas fa-plus"></i> Book Trip</a></div>';
+                }
+            } else {
         new Chart(bookingsCtx, {
             type: 'bar',
             data: {
@@ -1820,7 +1927,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
-    }
+            }
+        }
     
     // Finance Chart (Revenue vs Costs)
     const financeCtx = document.getElementById('financeChart');
@@ -1890,8 +1998,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fleet Status Donut Chart
     const fleetCtx = document.getElementById('fleetStatusChart');
-    if (fleetCtx && fleetStatusData.some(v => v > 0)) {
-        new Chart(fleetCtx, {
+    // BUG FIX: Render chart even with zero values, but check for valid data
+    if (fleetCtx) {
+        const hasFleetData = Array.isArray(fleetStatusData) && fleetStatusData.some(v => v > 0);
+        
+        if (hasFleetData) {
+            new Chart(fleetCtx, {
             type: 'doughnut',
             data: {
                 labels: fleetStatusLabels,
@@ -1929,6 +2041,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+        } else {
+            // BUG FIX: Show empty state message when no fleet data
+            const parent = fleetCtx.parentElement;
+            if (parent) {
+                parent.innerHTML = '<div class="chart-empty"><i class="fas fa-car"></i><p>No fleet status data available</p><a href="/verticals/car_hire/vehicles/new/" class="btn-action btn-primary" style="margin-top: 0.75rem; display: inline-flex; padding: 0.5rem 1rem; font-size: 0.875rem;"><i class="fas fa-plus"></i> Add Vehicle</a></div>';
+            }
+        }
     }
     
     // ===== FILTER PANEL FUNCTIONALITY (PORTAL PATTERN - Jan 2026) =====
@@ -2103,6 +2222,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 positionPanel();
             }
         }, { passive: true });
+    }
+    
+    // BUG FIX: Close try-catch block for chart initialization
+    } catch (error) {
+        console.error('Error initializing charts:', error);
+        // Show user-friendly message in console
+        console.log('Charts failed to render. Please check browser console for details.');
     }
 });
 </script>

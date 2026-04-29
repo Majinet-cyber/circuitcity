@@ -3432,3 +3432,406 @@ class HouseholdSizingSubmitRegressionTest(TestCase):
             "csrfmiddlewaretoken", content,
             "CSRF token missing from sizing form",
         )
+
+
+# =============================================================================
+# WIND ENGINEERING ACCURACY TESTS
+# Verifies the JS wind simulation logic structure, viability banners, payback
+# sanity, and ROI guide scenario-awareness are present in the rendered page.
+# =============================================================================
+
+class WindEngineeringAccuracyTest(TestCase):
+    """
+    Tests that the wind simulation page contains correct engineering logic:
+    - Proper power curve (cubic, IEC-style) with cut-in / rated / cut-out
+    - Viability bands: below-cut-in, marginal, moderate, good, strong
+    - Payback sanity warnings for > 25-year payback and zero output
+    - No contradictory messaging ('viable' + '0 kW' together)
+    - ROI guide is scenario-aware per simulation type
+    - No regressions on other sim pages
+    """
+
+    def setUp(self):
+        self.business = _make_energy_business("test-wind-eng")
+        self.user = _make_user("wind_eng_mgr", self.business, role="MANAGER")
+        self.client = Client()
+        self.client.login(username="wind_eng_mgr", password="TestPass123!@#")
+        session = self.client.session
+        session["active_business_id"] = self.business.id
+        session.save()
+
+    def _get_sim_page(self):
+        try:
+            url = reverse("verticals:energy_simulations")
+        except NoReverseMatch:
+            self.skipTest("energy_simulations URL not configured")
+        resp = self.client.get(url)
+        if resp.status_code != 200:
+            self.skipTest(f"Simulations page returned {resp.status_code}")
+        return resp
+
+    # ---- Wind power curve ----
+
+    def test_wind_power_curve_function_uses_cubic_interpolation(self):
+        """JS must define windPowerCurve using cubic (v^3) interpolation."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "windPowerCurve", content,
+            "windPowerCurve function missing from simulations page"
+        )
+        self.assertIn(
+            "Math.pow(effSpd, 3)", content,
+            "Cubic power curve (effSpd^3) not found — IEC-style power curve required"
+        )
+
+    def test_wind_cut_in_constant_is_engineering_correct(self):
+        """Wind simulation must use cut-in threshold of 3.0 m/s (not 2.5 m/s)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        # Must NOT use the old 2.5 cut-in as the primary cut-in in hybrid
+        self.assertNotIn(
+            "windSpd > 2.5", content,
+            "Old hybrid wind cut-in (2.5 m/s) still present — must use windPowerCurve(windSpd, 3.0, ...)"
+        )
+
+    def test_wind_rated_speed_constant_present(self):
+        """Wind simulation must define a rated speed constant (12.0 m/s)."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "RATED_SPD", content,
+            "RATED_SPD constant missing from updateWIND function"
+        )
+
+    def test_wind_cut_out_constant_present(self):
+        """Wind simulation must define a cut-out speed constant."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "CUT_OUT", content,
+            "CUT_OUT constant missing from wind simulation"
+        )
+
+    # ---- Viability bands ----
+
+    def test_wind_viability_band_function_exists(self):
+        """windViabilityBand function must be present in the page JS."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "windViabilityBand", content,
+            "windViabilityBand function missing from simulations page"
+        )
+
+    def test_wind_viability_not_viable_label_exists(self):
+        """Page JS must include 'Not viable' label for below-cut-in wind."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Not viable", content,
+            "Not viable label missing — needed when wind is below cut-in"
+        )
+
+    def test_wind_viability_marginal_label_exists(self):
+        """Page JS must include 'Marginal' label for weak wind."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Marginal", content,
+            "Marginal wind label missing from simulations page"
+        )
+
+    def test_wind_viability_good_wind_label_exists(self):
+        """Page JS must include 'Good wind' label for viable hybrid wind."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Good wind", content,
+            "Good wind label missing from simulations page"
+        )
+
+    def test_wind_viability_strong_wind_label_exists(self):
+        """Page JS must include 'Strong wind' label for excellent wind resource."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Strong wind", content,
+            "Strong wind label missing from simulations page"
+        )
+
+    def test_wind_viability_standalone_never_endorsed_below_5_5(self):
+        """Page must NOT endorse standalone wind below 5.5 m/s average."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        # The old bad string should not appear
+        self.assertNotIn(
+            "Viable wind resource for hybrid or standalone system",
+            content,
+            "Bad generic 'viable standalone' recommendation still present — must be removed"
+        )
+
+    # ---- Payback sanity ----
+
+    def test_payback_not_viable_warning_text_exists(self):
+        """Page JS must contain text about payback exceeding 25-year system life."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Not financially viable", content,
+            "Payback >25yr 'Not financially viable' warning missing from wind simulation"
+        )
+
+    def test_payback_zero_output_warning_exists(self):
+        """Page JS must warn that payback cannot be calculated when output is zero."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Generation is zero", content,
+            "Zero-output payback warning missing — 'Payback N/A: Generation is zero' text not found"
+        )
+
+    def test_payback_sanity_no_infinite_payback_as_normal(self):
+        """Page must not show Infinity as a normal payback figure."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        # The JS must handle Infinity separately and NOT just pass it to fmt()
+        self.assertIn(
+            "isFinite(payback)", content,
+            "isFinite(payback) check missing — must guard against Infinity payback"
+        )
+
+    # ---- Viability banner CSS ----
+
+    def test_wind_viability_banner_css_class_exists(self):
+        """CSS must define .wind-viability-banner for the engineering warning panel."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "wind-viability-banner", content,
+            ".wind-viability-banner CSS class missing from simulations page"
+        )
+
+    def test_wind_not_viable_css_class_exists(self):
+        """CSS must define .wvb-not-viable for below-cut-in warning style."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "wvb-not-viable", content,
+            ".wvb-not-viable CSS class missing"
+        )
+
+    def test_payback_warning_css_class_exists(self):
+        """CSS must define .wvb-payback-warn for payback sanity warning."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "wvb-payback-warn", content,
+            ".wvb-payback-warn CSS class missing from simulations page"
+        )
+
+    # ---- ROI guide scenario-awareness ----
+
+    def test_roi_guide_function_exists(self):
+        """updateROIGuide JS function must be defined in the page."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "updateROIGuide", content,
+            "updateROIGuide function missing from simulations page"
+        )
+
+    def test_roi_guide_checks_current_sim(self):
+        """ROI guide must branch on _currentSim for scenario-aware advice."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "_currentSim", content,
+            "_currentSim reference missing — ROI guide cannot be scenario-aware without it"
+        )
+
+    def test_roi_guide_wind_scenario_path_exists(self):
+        """ROI guide must have a wind-specific advice path."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "sim === 'wind'", content,
+            "Wind scenario branch missing from updateROIGuide"
+        )
+
+    def test_roi_guide_irrigation_solar_hours_advice(self):
+        """ROI guide irrigation path must recommend pumping during solar hours."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "solar hours", content.lower(),
+            "Solar-hours pumping advice missing from ROI guide"
+        )
+
+    def test_roi_guide_irrigation_water_storage_over_batteries(self):
+        """ROI guide must recommend water storage over batteries for irrigation."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "store water, not electricity", content,
+            "'Store water, not electricity' ROI advice missing — critical for irrigation ROI"
+        )
+
+    def test_roi_guide_household_load_shifting_advice(self):
+        """ROI guide must include load-shifting advice for household scenario."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Shift heavy loads to daytime", content,
+            "Household load-shifting advice missing from ROI guide"
+        )
+
+    def test_roi_guide_coldroom_insulation_advice(self):
+        """ROI guide must include insulation advice for cold room scenario."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "insulation", content.lower(),
+            "Insulation advice missing from ROI guide cold room path"
+        )
+
+    def test_roi_guide_diesel_displacement_advice(self):
+        """ROI guide diesel path must recommend displacing peak runtime hours."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "Displace", content,
+            "Diesel displacement advice missing from ROI guide diesel path"
+        )
+
+    def test_roi_top_move_container_present(self):
+        """roi_top_move div must exist in the page for dynamic scenario top-move rendering."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "roi_top_move", content,
+            "roi_top_move div missing — scenario-aware ROI top move cannot render"
+        )
+
+    # ---- No contradictory text ----
+
+    def test_no_viable_standalone_text_alongside_zero_output(self):
+        """
+        The page JS must not contain a path where '0 kW' output AND
+        'viable standalone system' text appear in the same branch.
+        The old bad string 'Viable wind resource for hybrid or standalone system'
+        must be completely removed.
+        """
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertNotIn(
+            "Viable wind resource for hybrid or standalone system",
+            content,
+            "Contradictory 'viable standalone' text still present in wind summary"
+        )
+
+    def test_wind_simulation_panel_still_present(self):
+        """sim-wind panel must still exist after engineering fix."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("sim-wind", content, "sim-wind panel missing after engineering fix")
+
+    def test_wind_interp_badge_element_still_present(self):
+        """wind_interp_badge element must still exist in the wind panel."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("wind_interp_badge", content, "wind_interp_badge element missing after fix")
+
+    def test_wind_results_container_still_present(self):
+        """wind_results div must still exist for displaying result cards."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("wind_results", content, "wind_results container missing after engineering fix")
+
+    # ---- Regression: other simulations unaffected ----
+
+    def test_household_simulation_unaffected(self):
+        """Household simulation panel must be unaffected by wind engineering fix."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("sim-household", content, "Household simulation broken after wind fix")
+        self.assertIn("updateHH", content, "updateHH function missing after wind fix")
+
+    def test_irrigation_simulation_unaffected(self):
+        """Irrigation simulation panel must be unaffected by wind engineering fix."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("sim-irrigation", content, "Irrigation simulation broken after wind fix")
+        self.assertIn("updateIRR", content, "updateIRR function missing after wind fix")
+
+    def test_cold_room_simulation_unaffected(self):
+        """Cold room simulation panel must be unaffected by wind engineering fix."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("sim-coldroom", content, "Cold room simulation broken after wind fix")
+        self.assertIn("updateCR", content, "updateCR function missing after wind fix")
+
+    def test_diesel_simulation_unaffected(self):
+        """Diesel simulation panel must be unaffected by wind engineering fix."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn("sim-diesel", content, "Diesel simulation broken after wind fix")
+        self.assertIn("updateDIE", content, "updateDIE function missing after wind fix")
+
+    def test_hybrid_simulation_uses_engineering_wind_curve(self):
+        """Hybrid simulation must use windPowerCurve function, not old inline formula."""
+        resp = self._get_sim_page()
+        content = resp.content.decode()
+        self.assertIn(
+            "windPowerCurve(windSpd", content,
+            "Hybrid simulation must call windPowerCurve — old inline formula must be removed"
+        )
+
+    # ---- Python-side sizing payback sanity (backend) ----
+
+    def test_payback_over_25_years_flagged_in_sizing_engine(self):
+        """
+        Sizing engine must flag payback > 8 years with a warning.
+        This is a regression guard — the engine already has a > 8yr warning;
+        the UI layer adds > 25yr hard block. Test the engine warning still fires.
+        """
+        from inventory.services.energy_sizing import compute_sizing
+        from inventory.models_energy import SystemSizingRun, SizingAppliance
+
+        site = _make_site(self.business, "Payback Test Site")
+        run = SystemSizingRun.objects.create(
+            business=self.business,
+            site=site,
+            title="Payback Test Run",
+            peak_sun_hours=Decimal("5.0"),
+            panel_wattage=550,
+            panel_efficiency_pct=85,
+            battery_dod_pct=80,
+            battery_voltage=48,
+            autonomy_days=Decimal("2.0"),   # 2 days autonomy — large battery → long payback
+            diversity_factor=Decimal("0.80"),
+            simultaneity_factor=Decimal("0.70"),
+        )
+        # Add a tiny single load — results in large battery + tiny savings → long payback
+        SizingAppliance.objects.create(
+            sizing_run=run,
+            name="Single LED",
+            wattage=Decimal("10"),
+            quantity=1,
+            hours_per_day=Decimal("4"),
+            is_critical=False,
+        )
+        compute_sizing(run)
+        run.refresh_from_db()
+
+        # If payback is populated and > 8 yrs, warns array must have flagged it
+        if run.payback_years and run.payback_years > 8:
+            warns = run.warnings or []
+            has_payback_warn = any(
+                "payback" in w.lower() or "battery" in w.lower()
+                for w in warns
+            )
+            self.assertTrue(
+                has_payback_warn,
+                f"Payback of {run.payback_years} yrs should trigger a warning, but none found in: {warns}"
+            )

@@ -360,9 +360,22 @@ def create_listing(request: HttpRequest) -> HttpResponse:
     except Exception:
         vertical_config = {}
 
-    # form_data is ALWAYS a plain dict so template access via form_data.key is safe.
-    # GET → empty dict; POST → copy of submitted data; never a raw QueryDict.
-    form_data: dict = {}
+    # form_data is ALWAYS a plain dict pre-populated with ALL expected template keys.
+    # Django template filter args (e.g. form_data.title) raise VariableDoesNotExist
+    # when the key is missing from a dict — pre-populated defaults prevent that 500.
+    # GET → defaults dict; POST → copy of submitted data merged with defaults.
+    _FORM_DEFAULTS: dict = {
+        "title": "",
+        "description": "",
+        "price": "",
+        "contact_phone": "",
+        "contact_email": "",
+        "location_text": "",
+        "address": "",
+        "status": ListingStatus.DRAFT,
+        "vertical": getattr(business, "business_kind", "") or "",
+    }
+    form_data: dict = dict(_FORM_DEFAULTS)
 
     def _re_render(extra_form_data: dict | None = None):
         """Helper: re-render the create form, merging any extra POST data."""
@@ -381,7 +394,8 @@ def create_listing(request: HttpRequest) -> HttpResponse:
         )
 
     if request.method == "POST":
-        form_data = request.POST.dict()  # plain dict — safe for template .key access
+        # Merge POST data with defaults so ALL template keys are always present
+        form_data = {**_FORM_DEFAULTS, **request.POST.dict()}
 
         title = form_data.get("title", "").strip()
         description = form_data.get("description", "").strip()
@@ -437,8 +451,8 @@ def create_listing(request: HttpRequest) -> HttpResponse:
             messages.error(request, f"Could not create listing: {e}")
             return _re_render(form_data)
 
-    # GET — always render with empty form_data so template never sees a missing variable.
-    return _re_render({})
+    # GET — render with default form_data so ALL template keys are present.
+    return _re_render(dict(_FORM_DEFAULTS))
 
 
 @login_required
@@ -455,8 +469,21 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
     except Exception:
         vertical_config = {}
 
+    # Pre-populate form_data with listing values so all template keys are always present.
+    _edit_defaults: dict = {
+        "title": listing.title or "",
+        "description": listing.description or "",
+        "price": str(listing.price) if listing.price is not None else "",
+        "contact_phone": listing.contact_phone or "",
+        "contact_email": listing.contact_email or "",
+        "location_text": listing.location_text or "",
+        "address": listing.address or "",
+        "status": listing.status or ListingStatus.DRAFT,
+        "vertical": listing.vertical or getattr(business, "business_kind", "") or "",
+    }
+
     def _re_render(fd: dict | None = None):
-        merged_fd = fd or {}
+        merged_fd = {**_edit_defaults, **(fd or {})}
         return render(
             request,
             "marketplace/manage/create_edit.html",
@@ -474,7 +501,7 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
         )
 
     if request.method == "POST":
-        form_data = request.POST.dict()
+        form_data = {**_edit_defaults, **request.POST.dict()}
         title = form_data.get("title", "").strip()
         description = form_data.get("description", "").strip()
         price_raw = form_data.get("price", "").strip()
@@ -531,7 +558,8 @@ def edit_listing(request: HttpRequest, listing_id: int) -> HttpResponse:
             messages.error(request, f"Could not update listing: {e}")
             return _re_render(form_data)
 
-    return _re_render({})
+    # GET — render with listing defaults
+    return _re_render(dict(_edit_defaults))
 
 
 @login_required

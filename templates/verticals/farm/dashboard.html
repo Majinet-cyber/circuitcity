@@ -693,6 +693,125 @@
     </div>
     {% endif %}
 
+    <!-- ===== FARM HEALTH PULSE + HARVEST FORECAST ===== -->
+    <div data-testid="farm-health-pulse" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem;">
+
+      <!-- Livestock Health Card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="livestock-health-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;">Livestock Health</div>
+          <span style="background:#dcfce7;color:#16a34a;font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:999px;">
+            {% if is_demo %}87%{% elif total_livestock_count > 0 %}Good{% else %}—{% endif %}
+          </span>
+        </div>
+        <div style="font-size:2rem;font-weight:900;color:#0f172a;margin-bottom:0.5rem;">
+          {% if is_demo %}87%{% elif total_livestock_count > 0 %}{{ total_livestock_count }}{% else %}—{% endif %}
+        </div>
+        <div style="height:8px;background:#f1f5f9;border-radius:999px;overflow:hidden;margin-bottom:0.5rem;">
+          <div style="height:100%;width:{% if is_demo %}87{% elif total_livestock_count > 0 %}75{% else %}0{% endif %}%;background:linear-gradient(90deg,#16a34a,#4ade80);border-radius:999px;"></div>
+        </div>
+        <div style="font-size:.78rem;color:#64748b;">
+          {% if is_demo %}25 pigs · 20 chickens · all vaccinated{% else %}{{ total_livestock_count }} animals across batches{% endif %}
+        </div>
+      </div>
+
+      <!-- Harvest Forecast Card -->
+      <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border:1px solid #bbf7d0;border-radius:20px;padding:1.25rem;" data-testid="harvest-forecast-card">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#16a34a;margin-bottom:0.75rem;">🌾 Harvest Forecast</div>
+        <div style="font-size:1.6rem;font-weight:900;color:#14532d;margin-bottom:0.25rem;">
+          {% if is_demo %}MWK 420,000{% elif snapshot.projected_crop_income %}MWK {{ snapshot.projected_crop_income|floatformat:0|intcomma }}{% else %}Add crops →{% endif %}
+        </div>
+        <div style="font-size:.82rem;color:#166534;margin-bottom:0.75rem;">
+          {% if is_demo %}Estimated harvest value · 3 active fields{% else %}Projected income from active seasons{% endif %}
+        </div>
+        {% if is_demo %}
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🌽 Maize (2ha)</span><span style="font-weight:700;color:#14532d;">~MWK 240,000</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🥜 Groundnuts (1.5ha)</span><span style="font-weight:700;color:#14532d;">~MWK 120,000</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.78rem;">
+            <span style="color:#166534;">🫘 Soya (1ha)</span><span style="font-weight:700;color:#14532d;">~MWK 60,000</span>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Feed Planning Alert Card -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="feed-planning-card">
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.75rem;">🌾 Feed Planning</div>
+        {% if is_demo %}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fef9c3;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#92400e;font-weight:600;">Pig feed stock</span>
+            <span style="background:#ca8a04;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">7 days left</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#dcfce7;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#166534;font-weight:600;">Poultry feed</span>
+            <span style="background:#16a34a;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">21 days</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;background:#fee2e2;border-radius:10px;padding:8px 10px;">
+            <span style="font-size:.8rem;color:#991b1b;font-weight:600;">Fertilizer (basal)</span>
+            <span style="background:#dc2626;color:#fff;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Order now</span>
+          </div>
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:1rem;color:#94a3b8;">
+          <div style="font-size:1.5rem;margin-bottom:6px;">📋</div>
+          <div style="font-size:.8rem;">Track feed expenses to see planning alerts</div>
+          <a href="{% url 'verticals:farm_expenses' %}" style="display:inline-block;margin-top:8px;font-size:.78rem;color:#2563eb;font-weight:700;text-decoration:none;">Add Feed Expense →</a>
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <!-- ===== UPCOMING FARM TASKS ===== -->
+    {% if is_demo %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;margin-bottom:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="upcoming-farm-tasks">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;">📅 Upcoming Farm Tasks</h3>
+        <span style="font-size:.72rem;color:#64748b;">Demo preview</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#fef2f2;border-radius:12px;border-left:3px solid #dc2626;">
+          <span style="font-size:1.25rem;">💧</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Irrigation — Maize Field A</div>
+            <div style="font-size:.75rem;color:#64748b;">Due in 2 days · 2 hectares</div>
+          </div>
+          <span style="background:#fecaca;color:#dc2626;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Urgent</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#fef9c3;border-radius:12px;border-left:3px solid #ca8a04;">
+          <span style="font-size:1.25rem;">💉</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Vaccination — Pig Batch 1</div>
+            <div style="font-size:.75rem;color:#64748b;">Due in 5 days · 25 pigs</div>
+          </div>
+          <span style="background:#fde68a;color:#92400e;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Soon</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#f0fdf4;border-radius:12px;border-left:3px solid #16a34a;">
+          <span style="font-size:1.25rem;">🌿</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Top-dress fertilizer — Groundnuts B</div>
+            <div style="font-size:.75rem;color:#64748b;">Week 6 · 1.5 hectares</div>
+          </div>
+          <span style="background:#dcfce7;color:#16a34a;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Planned</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#f8fafc;border-radius:12px;border-left:3px solid #94a3b8;">
+          <span style="font-size:1.25rem;">🛒</span>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:.85rem;color:#0f172a;">Market day — sell 8 pigs</div>
+            <div style="font-size:.75rem;color:#64748b;">Next Saturday · estimated MWK 72,000</div>
+          </div>
+          <span style="background:#e2e8f0;color:#475569;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;">Upcoming</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Charts Row -->
     <div class="charts-row">
         <!-- Profit Trend Chart -->

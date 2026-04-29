@@ -3,6 +3,11 @@
  * Handles expand/collapse of the slim sidebar on mobile.
  * The sidebar is ALWAYS visible (slim 56 px on mobile, full 260 px on desktop).
  * This script only expands the slim sidebar to full-width overlay on mobile.
+ *
+ * FIX (2026-04-29): Replaced two separate click listeners with a single unified
+ * handler. The old dual-listener pattern had a race condition: the first listener
+ * removed the 'hq-expanded' class, then the second listener saw it was gone and
+ * called e.preventDefault() + expandSidebar() again — preventing navigation.
  */
 (function() {
   'use strict';
@@ -65,25 +70,46 @@
     }
   });
 
-  // Clicking a nav link collapses back to slim (mobile only)
+  /**
+   * UNIFIED sidebar click handler (replaces the old dual-listener pattern).
+   *
+   * Old bug: Two separate listeners fired in sequence. The first collapsed the
+   * sidebar (removed hq-expanded), then the second saw the class was gone and
+   * prevented navigation + re-expanded — creating an infinite toggle loop that
+   * made all nav links unclickable.
+   *
+   * Fix: Capture the expanded state BEFORE any mutation, then decide once:
+   *  - If sidebar WAS expanded → let the link navigate (no preventDefault);
+   *    collapse after the navigation starts.
+   *  - If sidebar WAS slim (not expanded) → prevent navigation and expand it so
+   *    the user can see the full labels, then click the link again.
+   */
   sidebar.addEventListener('click', function(e) {
-    if (window.innerWidth >= 992) return;
-    var link = e.target.closest('a');
-    if (link && link.href && !link.href.includes('#') && sidebar.classList.contains('hq-expanded')) {
-      collapseSidebar();
-    }
-  });
+    if (window.innerWidth >= 992) return; // Desktop: no-op
 
-  // Clicking the slim sidebar icon strip expands it (mobile only)
-  sidebar.addEventListener('click', function(e) {
-    if (window.innerWidth >= 992) return;
-    if (sidebar.classList.contains('hq-expanded')) return;
-    // Only expand when clicking the sidebar itself (icons)
+    var wasExpanded = sidebar.classList.contains('hq-expanded');
     var link = e.target.closest('a');
     var icon = e.target.closest('i');
-    if (link || icon) {
-      e.preventDefault();
-      expandSidebar();
+
+    if (wasExpanded) {
+      // Sidebar was open when clicked.
+      // If a real navigation link was clicked: collapse the sidebar and let
+      // the browser follow the link (do NOT call preventDefault).
+      if (link && link.href && !link.href.endsWith('#') && link.href !== window.location.href + '#') {
+        collapseSidebar();
+        // href navigation proceeds normally (no preventDefault)
+      }
+      // If a non-link area (icon only) was clicked, just collapse.
+      else if (!link && icon) {
+        collapseSidebar();
+      }
+    } else {
+      // Sidebar is slim. Expand it on any icon or link click so the user
+      // can see the full labels before navigating.
+      if (link || icon) {
+        e.preventDefault();
+        expandSidebar();
+      }
     }
   });
 
