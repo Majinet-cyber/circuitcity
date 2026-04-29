@@ -73,6 +73,7 @@ urlpatterns = [
     path("credits/record/", views_liquor.record_credit_sale, name="record_credit_sale"),
     path("credit/<int:credit_id>/", views_liquor.credit_detail, name="credit_detail"),
     path("credit/<int:credit_id>/clear/", views_liquor.clear_credit, name="clear_credit"),
+    path("credit/<int:credit_id>/statement/", views_liquor.credit_statement_print, name="credit_statement_print"),
     path("sale/<int:sale_id>/convert-to-credit/", views_liquor.convert_sale_to_credit, name="convert_to_credit"),
     path("credit/<int:credit_id>/submit-payment/", views_liquor.submit_credit_payment, name="submit_payment"),
     # Payments (Manager approval)

@@ -83,6 +83,13 @@
   .success-actions a:hover{transform:translateY(-2px)}
   
   @keyframes slideDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes slideInDown{from{opacity:0;transform:translate(-50%,-30px)}to{opacity:1;transform:translate(-50%,0)}}
+  @keyframes slideOutUp{from{opacity:1;transform:translate(-50%,0)}to{opacity:0;transform:translate(-50%,-30px)}}
+  
+  /* Button-as-card fixes */
+  button.option-card{border:none;font-family:inherit;text-align:center;width:100%}
+  button.option-card:focus{outline:2px solid #10b981;outline-offset:2px}
+  button.option-card:active{transform:scale(0.98)}
   
   /* Mobile Responsive */
   @media (max-width:768px){
@@ -174,10 +181,10 @@
       <h2 class="wizard-section-title">Choose Product Type</h2>
       <div class="card-grid" style="max-width: 600px; margin: 0 auto;">
         {% for mode in mode_options %}
-        <div class="option-card mode-card" data-mode="{{ mode.key }}" onclick="selectMode('{{ mode.key }}')" style="min-height:160px; padding: 32px 24px;">
+        <button type="button" class="option-card mode-card cc-mode-card" data-mode="{{ mode.key }}" style="min-height:160px; padding: 32px 24px;">
           <div class="card-label" style="font-size:1.4rem; font-weight: 800;">{{ mode.label }}</div>
           <small style="color:#64748b; font-size:0.9rem; margin-top: 8px;">{{ mode.description }}</small>
-        </div>
+        </button>
         {% endfor %}
       </div>
     </div>
@@ -191,28 +198,39 @@
     <!-- STEP 1: Select Top Category -->
     {% if step == 1 %}
     <div class="wizard-panel">
-      <h2 class="wizard-section-title">Select Category</h2>
+      <h2 class="wizard-section-title">What are you adding?</h2>
+      <p style="color:#64748b;font-size:.9rem;margin:-8px 0 20px">
+        Select the type of product. <em>All categories accept custom names — suggestions are optional guides.</em>
+      </p>
       <div class="card-grid">
         {% for cat in top_categories %}
-        <div class="option-card premium-category-card" data-category="{{ cat.key }}" onclick="selectCategory('{{ cat.key }}')" style="background:linear-gradient(135deg,{{ cat.color|default:'#f1f5f9' }}15,{{ cat.color|default:'#f1f5f9' }}05);border-left:4px solid {{ cat.color|default:'#94a3b8' }}">
+        <button type="button" class="option-card premium-category-card cc-category-card" data-category="{{ cat.key }}" data-label="{{ cat.label }}" style="background:linear-gradient(135deg,{{ cat.color|default:'#f1f5f9' }}15,{{ cat.color|default:'#f1f5f9' }}05);border-left:4px solid {{ cat.color|default:'#94a3b8' }}">
+          {% if cat.icon %}<div style="font-size:1.4rem;margin-bottom:4px">{{ cat.icon }}</div>{% endif %}
           <div class="card-label">{{ cat.label }}</div>
+          {% if cat.description %}<small style="color:#64748b;font-size:.72rem;margin-top:3px;display:block;line-height:1.3">{{ cat.description }}</small>{% endif %}
           {% if cat.product_count is not None %}
           <small class="product-count-badge">{{ cat.product_count }} product{{ cat.product_count|pluralize }}</small>
           {% endif %}
-        </div>
+        </button>
         {% endfor %}
+      </div>
+      
+      <div style="text-align:center;margin-top:16px;">
+        <p class="text-muted small" id="ccStep1Hint" style="margin:0;font-size:0.9rem;">
+          <i class="bi bi-info-circle"></i> Select a category to continue
+        </p>
       </div>
     </div>
 
     <div class="wizard-actions">
       <button type="submit" name="action" value="back" class="btn-wizard btn-back">← Back</button>
-      <button type="submit" class="btn-wizard btn-next" id="btnNext" disabled>Next →</button>
+      <button type="submit" class="btn-wizard btn-next" id="ccStep1Next" disabled>Next →</button>
     </div>
     {% endif %}
 
     <!-- STEP 2: Select Subcategory/Item -->
     {% if step == 2 %}
-    <div class="wizard-panel">
+    <div class="wizard-panel" id="cc-step-2">
       <h2 class="wizard-section-title">Select Product</h2>
       <p style="color:#64748b;margin:0 0 20px;"><strong>Category:</strong> {{ selected_category_label }}</p>
       
@@ -220,19 +238,19 @@
       <!-- Show subcategories for Medicines or Cosmetics -->
       <div class="card-grid">
         {% for subcat in subcategories %}
-        <div class="option-card" data-subcategory="{{ subcat.key }}" onclick="selectSubcategory('{{ subcat.key }}')">
+        <button type="button" class="option-card cc-subcategory-card" data-subcategory="{{ subcat.key }}">
           <div class="card-label">{{ subcat.label }}</div>
-        </div>
+        </button>
         {% endfor %}
       </div>
       {% elif items %}
       <!-- Direct items for top-level categories (First Aid, Chronic, etc.) OR Cosmetics products -->
       <div class="card-grid">
         {% for item in items %}
-        <div class="option-card" data-item="{{ item.name }}" onclick="selectItem('{{ item.name }}')">
+        <button type="button" class="option-card cc-item-card" data-item="{{ item.name }}">
           {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
           <div class="card-label">{{ item.name }}</div>
-        </div>
+        </button>
         {% endfor %}
       </div>
       {% else %}
@@ -242,10 +260,10 @@
         <p style="color:#92400e;margin:0;">You can add a custom product by clicking below.</p>
       </div>
       <div class="card-grid" style="max-width:300px;margin:0 auto;">
-        <div class="option-card" data-item="+ Add Custom Product" onclick="selectItem('+ Add Custom Product')">
+        <button type="button" class="option-card cc-item-card" data-item="+ Add Custom Product">
           <span class="card-icon">📝</span>
           <div class="card-label">+ Add Custom Product</div>
-        </div>
+        </button>
       </div>
       {% endif %}
     </div>
@@ -273,10 +291,10 @@
       {% if items %}
       <div class="card-grid">
         {% for item in items %}
-        <div class="option-card" data-item="{{ item.name }}" onclick="selectItem('{{ item.name }}')">
+        <button type="button" class="option-card cc-item-card" data-item="{{ item.name }}">
           {% if item.icon %}<span class="card-icon">{{ item.icon }}</span>{% endif %}
           <div class="card-label">{{ item.name }}</div>
-        </div>
+        </button>
         {% endfor %}
       </div>
       {% else %}
@@ -286,10 +304,10 @@
         <p style="color:#92400e;margin:0;">Add a custom product below.</p>
       </div>
       <div class="card-grid" style="max-width:300px;margin:0 auto;">
-        <div class="option-card" data-item="+ Add Custom Product" onclick="selectItem('+ Add Custom Product')">
+        <button type="button" class="option-card cc-item-card" data-item="+ Add Custom Product">
           <span class="card-icon">📝</span>
           <div class="card-label">+ Add Custom Product</div>
-        </div>
+        </button>
       </div>
       {% endif %}
     </div>
@@ -385,9 +403,205 @@
 </div>
 
 <script>
+console.log('✅ Pharmacy stock-in wizard loaded');
+
 document.addEventListener('DOMContentLoaded', function() {
-  // Back to start - reset wizard to step 0
+  console.log('✅ DOM ready, initializing wizard');
+  
+  // ========== VISUAL FEEDBACK HELPER ==========
+  function showFeedback(message, type = 'success') {
+    const existing = document.getElementById('cc-wizard-toast');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.id = 'cc-wizard-toast';
+    toast.style.cssText = `
+      position: fixed;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: ${type === 'success' ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #ef4444, #dc2626)'};
+      color: #fff;
+      padding: 16px 32px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 1rem;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      z-index: 10000;
+      animation: slideInDown 0.3s ease;
+    `;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideOutUp 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 2000);
+  }
+  
+  // ========== BULLETPROOF EVENT DELEGATION ==========
+  document.addEventListener('click', function(e) {
+    // Mode card (Step 0)
+    const modeCard = e.target.closest('.cc-mode-card');
+    if (modeCard) {
+      e.preventDefault();
+      const mode = modeCard.dataset.mode;
+      console.log('🎯 Mode clicked:', mode);
+      
+      document.querySelectorAll('.cc-mode-card').forEach(el => el.classList.remove('selected'));
+      modeCard.classList.add('selected');
+      
+      const modeInput = document.getElementById('selected_mode');
+      if (modeInput) {
+        modeInput.value = mode;
+        console.log('✅ Mode input set:', mode);
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Mode selected: ' + (modeCard.querySelector('.card-label')?.textContent || mode));
+      return;
+    }
+    
+    // Category card (Step 1) - THE CRITICAL FIX
+    const categoryCard = e.target.closest('.cc-category-card');
+    if (categoryCard) {
+      e.preventDefault();
+      const category = categoryCard.dataset.category;
+      const categoryLabel = categoryCard.dataset.label || categoryCard.querySelector('.card-label')?.textContent || category;
+      console.log('🎯 Category clicked:', category);
+      
+      document.querySelectorAll('.cc-category-card').forEach(el => el.classList.remove('selected'));
+      categoryCard.classList.add('selected');
+      
+      const categoryInput = document.getElementById('selected_category');
+      if (categoryInput) {
+        categoryInput.value = category;
+        categoryInput.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log('✅ Category input set:', category);
+      } else {
+        console.warn('⚠️ Category input not found, but continuing anyway');
+      }
+      
+      // Enable Next button (Step 1 specific)
+      const btnNext = document.getElementById('ccStep1Next');
+      if (btnNext) {
+        btnNext.disabled = false;
+        console.log('✅ Next button enabled');
+      }
+      
+      // Update hint text
+      const hint = document.getElementById('ccStep1Hint');
+      if (hint) {
+        hint.innerHTML = '<i class="bi bi-check-circle-fill" style="color:#10b981;"></i> Selected: <strong>' + categoryLabel + '</strong>. Click Next to continue.';
+      }
+      
+      showFeedback('Category selected: ' + categoryLabel);
+      return;
+    }
+    
+    // Subcategory card (Step 2)
+    const subcategoryCard = e.target.closest('.cc-subcategory-card');
+    if (subcategoryCard) {
+      e.preventDefault();
+      const subcategory = subcategoryCard.dataset.subcategory;
+      console.log('🎯 Subcategory clicked:', subcategory);
+      
+      document.querySelectorAll('.cc-subcategory-card').forEach(el => el.classList.remove('selected'));
+      subcategoryCard.classList.add('selected');
+      
+      const subcategoryInput = document.getElementById('selected_subcategory');
+      if (subcategoryInput) {
+        subcategoryInput.value = subcategory;
+        console.log('✅ Subcategory input set:', subcategory);
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Subcategory selected: ' + (subcategoryCard.querySelector('.card-label')?.textContent || subcategory));
+      return;
+    }
+    
+    // Item card (Step 2/3)
+    const itemCard = e.target.closest('.cc-item-card');
+    if (itemCard) {
+      e.preventDefault();
+      const item = itemCard.dataset.item;
+      console.log('🎯 Item clicked:', item);
+      
+      document.querySelectorAll('.cc-item-card').forEach(el => el.classList.remove('selected'));
+      itemCard.classList.add('selected');
+      
+      const itemInput = document.getElementById('selected_item');
+      if (itemInput) {
+        itemInput.value = item;
+        console.log('✅ Item input set:', item);
+      }
+      
+      // Auto-fill product name if available
+      const productNameInput = document.getElementById('product_name');
+      if (productNameInput && item) {
+        if (item.toLowerCase().includes('other') || 
+            item.toLowerCase().includes('custom') || 
+            item.toLowerCase().includes('create new') ||
+            item.toLowerCase().includes('add custom')) {
+          productNameInput.value = '';
+          productNameInput.placeholder = 'Enter custom product name';
+          productNameInput.focus();
+        } else {
+          productNameInput.value = item;
+        }
+      }
+      
+      const btnNext = document.getElementById('btnNext');
+      if (btnNext) btnNext.disabled = false;
+      
+      showFeedback('Product selected: ' + item);
+      return;
+    }
+  });
+  
+  // ========== STEP 1 NEXT BUTTON (Category Selection) ==========
+  const ccStep1Next = document.getElementById('ccStep1Next');
+  if (ccStep1Next) {
+    ccStep1Next.addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      const categoryInput = document.getElementById('selected_category');
+      const selectedCategory = categoryInput ? categoryInput.value : null;
+      
+      if (!selectedCategory) {
+        showFeedback('Please select a category first', 'error');
+        console.warn('⚠️ Next clicked but no category selected');
+        return;
+      }
+      
+      console.log('🚀 Next button clicked, advancing to Step 2...');
+      console.log('📦 Selected category:', selectedCategory);
+      
+      // Submit form to advance to Step 2
+      const form = document.getElementById('wizardForm');
+      if (form) {
+        form.submit();
+        console.log('✅ Form submitted');
+      } else {
+        console.error('❌ Form not found!');
+        // Fallback: scroll to step 2 anchor if it exists
+        const step2 = document.getElementById('cc-step-2');
+        if (step2) {
+          step2.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          console.log('⚠️ Fallback: scrolled to step 2 anchor');
+        }
+      }
+    });
+    console.log('✅ Step 1 Next button handler registered');
+  }
+  
+  // ========== BACK TO START ==========
   window.backToStart = function() {
+    console.log('🔄 Back to start');
     const form = document.getElementById('wizardForm');
     const input = document.createElement('input');
     input.type = 'hidden';
@@ -404,8 +618,9 @@ document.addEventListener('DOMContentLoaded', function() {
     form.submit();
   };
 
-  // Jump to previous step (clickable breadcrumb navigation)
+  // ========== JUMP TO STEP ==========
   window.jumpToStep = function(targetStep) {
+    console.log('🔄 Jump to step:', targetStep);
     const form = document.getElementById('wizardForm');
     const input = document.createElement('input');
     input.type = 'hidden';
@@ -422,57 +637,7 @@ document.addEventListener('DOMContentLoaded', function() {
     form.submit();
   };
 
-  // Mode selection (Step 0)
-  window.selectMode = function(key) {
-    document.querySelectorAll('[data-mode]').forEach(el => el.classList.remove('selected'));
-    event.target.closest('[data-mode]').classList.add('selected');
-    document.getElementById('selected_mode').value = key;
-    document.getElementById('btnNext').disabled = false;
-  };
-
-  // Category selection
-  window.selectCategory = function(key) {
-    document.querySelectorAll('[data-category]').forEach(el => el.classList.remove('selected'));
-    event.target.closest('[data-category]').classList.add('selected');
-    document.getElementById('selected_category').value = key;
-    document.getElementById('btnNext').disabled = false;
-  };
-
-  // Subcategory selection
-  window.selectSubcategory = function(key) {
-    document.querySelectorAll('[data-subcategory]').forEach(el => el.classList.remove('selected'));
-    event.target.closest('[data-subcategory]').classList.add('selected');
-    document.getElementById('selected_subcategory').value = key;
-    document.getElementById('btnNext').disabled = false;
-  };
-
-  // Item selection
-  window.selectItem = function(name) {
-    document.querySelectorAll('[data-item]').forEach(el => el.classList.remove('selected'));
-    event.target.closest('[data-item]').classList.add('selected');
-    document.getElementById('selected_item').value = name;
-    
-    // Auto-fill product name if available
-    const productNameInput = document.getElementById('product_name');
-    if (productNameInput && name) {
-      // Clear the field if "Other", "Custom", or "Create new" is selected
-      if (name.toLowerCase().includes('other') || 
-          name.toLowerCase().includes('custom') || 
-          name.toLowerCase().includes('create new') ||
-          name.toLowerCase().includes('add custom')) {
-        productNameInput.value = '';
-        productNameInput.placeholder = 'Enter custom product name';
-        productNameInput.focus();
-      } else {
-        // Auto-fill with the selected product name
-        productNameInput.value = name;
-      }
-    }
-    
-    document.getElementById('btnNext').disabled = false;
-  };
-
-  // Barcode toggle
+  // ========== BARCODE TOGGLE ==========
   function toggleBarcodeField() {
     const hasBarcodeYes = document.querySelector('input[name="has_barcode"][value="yes"]');
     const barcodeField = document.getElementById('barcode-field');
@@ -496,32 +661,44 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   toggleBarcodeField();
 
-  // Pre-select if values exist
-  const selectedMode = document.getElementById('selected_mode').value;
+  // ========== PRE-SELECT IF VALUES EXIST ==========
+  const selectedMode = document.getElementById('selected_mode')?.value;
   if (selectedMode) {
     const card = document.querySelector(`[data-mode="${selectedMode}"]`);
-    if (card) card.classList.add('selected');
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected mode:', selectedMode);
+    }
   }
 
-  const selectedCategory = document.getElementById('selected_category').value;
+  const selectedCategory = document.getElementById('selected_category')?.value;
   if (selectedCategory) {
     const card = document.querySelector(`[data-category="${selectedCategory}"]`);
-    if (card) card.classList.add('selected');
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected category:', selectedCategory);
+    }
   }
 
-  const selectedSubcategory = document.getElementById('selected_subcategory').value;
+  const selectedSubcategory = document.getElementById('selected_subcategory')?.value;
   if (selectedSubcategory) {
     const card = document.querySelector(`[data-subcategory="${selectedSubcategory}"]`);
-    if (card) card.classList.add('selected');
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected subcategory:', selectedSubcategory);
+    }
   }
 
-  const selectedItem = document.getElementById('selected_item').value;
+  const selectedItem = document.getElementById('selected_item')?.value;
   if (selectedItem) {
     const card = document.querySelector(`[data-item="${selectedItem}"]`);
-    if (card) card.classList.add('selected');
+    if (card) {
+      card.classList.add('selected');
+      console.log('✅ Pre-selected item:', selectedItem);
+    }
   }
 
-  // ===== BARCODE SCANNER INTEGRATION =====
+  // ========== BARCODE SCANNER INTEGRATION ==========
   let barcodeScanner = null;
   const scanBtn = document.getElementById('scan-barcode-btn');
   const barcodeInput = document.getElementById('barcode-input');
@@ -532,16 +709,18 @@ document.addEventListener('DOMContentLoaded', function() {
         barcodeScanner = new RearCameraBarcodeScanner({
           onScan: function(barcode) {
             barcodeInput.value = barcode;
-            console.log('Barcode scanned:', barcode);
+            console.log('📷 Barcode scanned:', barcode);
           },
           onError: function(error) {
-            console.error('Scanner error:', error);
+            console.error('❌ Scanner error:', error);
           }
         });
       }
       barcodeScanner.open();
     });
   }
+  
+  console.log('✅ Wizard initialization complete');
 });
 </script>
 

@@ -720,6 +720,25 @@ def credit_detail(request, credit_id):
 @login_required
 @require_business
 @require_business_kind(BusinessKind.LIQUOR)
+def credit_statement_print(request, credit_id):
+    """Print-friendly credit statement — also used for WhatsApp/PDF share."""
+    business = get_active_business(request)
+    credit = get_object_or_404(LiquorCredit, pk=credit_id, business=business)
+    payments = credit.payments.select_related("paid_by").order_by("created_at")
+    return render(
+        request,
+        "inventory/liquor/credit_statement_print.html",
+        {
+            "credit": credit,
+            "payments": payments,
+            "business": business,
+        },
+    )
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.LIQUOR)
 @manager_required
 @require_POST
 def clear_credit(request, credit_id):

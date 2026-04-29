@@ -230,6 +230,167 @@
     </div>
   </section>
 
+  <!-- ===== QR CHECK-IN HUB ===== -->
+  <section class="recent-block" aria-label="QR Check-in hub" id="qr-checkin-hub">
+    <div class="gym-section-header">
+      <div>
+        <h2>📱 QR Check-In</h2>
+        <small class="gym-section-range-sub">Instant member check-in</small>
+      </div>
+      <button onclick="toggleQrHub()" id="qr-hub-toggle"
+        style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer;font-size:.88rem">
+        Show QR Scanner
+      </button>
+    </div>
+
+    <div id="qr-hub-body" style="display:none">
+      <style>
+        .qr-instructions{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:16px;font-size:.88rem;color:#166534}
+        .qr-input-row{display:flex;gap:10px;margin-bottom:12px}
+        .qr-input-row input{flex:1;padding:12px 16px;border:2px solid #e2e8f0;border-radius:10px;font-size:1rem;font-weight:600}
+        .qr-input-row input:focus{outline:none;border-color:#6366f1}
+        .qr-result{border-radius:12px;padding:16px 20px;margin-top:12px;display:none}
+        .qr-result.ok{background:#f0fdf4;border:1px solid #86efac}
+        .qr-result.err{background:#fef2f2;border:1px solid #fca5a5}
+        .streak-card{background:linear-gradient(135deg,#fef9c3,#fde68a);border-radius:12px;padding:16px;margin-top:8px;display:flex;align-items:center;gap:12px}
+        .streak-flame{font-size:2rem}
+        .churn-alert{background:#fef2f2;border:1px solid #fca5a5;border-radius:12px;padding:14px 16px;margin-top:8px;font-size:.85rem;color:#991b1b}
+
+        /* Member status quick cards */
+        .gym-member-risk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:12px}
+        .gym-risk-card{background:#fff;border-radius:12px;border:1px solid #e2e8f0;padding:14px;box-shadow:0 2px 8px rgba(15,23,42,.05);transition:transform .2s}
+        .gym-risk-card:hover{transform:translateY(-2px)}
+        .gym-risk-card.high-risk{border-color:#fca5a5;background:#fff5f5}
+        .gym-risk-card.expiring{border-color:#fed7aa;background:#fffbf5}
+        .gym-risk-card.healthy{border-color:#86efac;background:#f0fdf4}
+        .gym-rc-name{font-weight:700;font-size:.92rem;color:#0f172a}
+        .gym-rc-meta{font-size:.75rem;color:#64748b;margin-top:3px}
+        .gym-rc-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;font-size:.68rem;font-weight:800;margin-top:6px}
+        .badge-expire{background:#fef3c7;color:#92400e}
+        .badge-churn{background:#fee2e2;color:#991b1b}
+        .badge-active{background:#dcfce7;color:#15803d}
+      </style>
+
+      <div class="qr-instructions">
+        <strong>How to use:</strong> Enter a member ID or phone number below to check them in.
+        Members can also show their membership QR code for instant scanning.
+      </div>
+
+      <div class="qr-input-row">
+        <input type="text" id="qr-search-input" placeholder="Member name, phone, or ID…" autocomplete="off"
+               oninput="liveCheckin(this.value)">
+        <button onclick="doCheckin()" style="background:#6366f1;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-weight:700;cursor:pointer">
+          ✓ Check In
+        </button>
+      </div>
+
+      <div id="qr-result" class="qr-result"></div>
+    </div>
+
+    <!-- At-risk member alerts -->
+    {% if members_expiring_soon or members_in_arrears > 0 %}
+    <div style="margin-top:16px">
+      <div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:10px">
+        ⚠ Attention Required
+      </div>
+      <div class="gym-member-risk-grid">
+
+        {% if members_in_arrears > 0 %}
+        <div class="gym-risk-card high-risk">
+          <div style="font-size:1.5rem;margin-bottom:6px">🔴</div>
+          <div class="gym-rc-name">{{ members_in_arrears }} Member{{ members_in_arrears|pluralize }} in Arrears</div>
+          <div class="gym-rc-meta">Membership overdue — no active payment</div>
+          <span class="gym-rc-badge badge-churn">High Churn Risk</span>
+          <div style="margin-top:8px">
+            <a href="{% url 'gym:members_list' %}?filter=arrears"
+               style="font-size:.78rem;color:#6366f1;font-weight:700;text-decoration:none">
+              View all → 
+            </a>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if top_streak_name %}
+        <div class="gym-risk-card healthy">
+          <div style="font-size:1.5rem;margin-bottom:6px">🔥</div>
+          <div class="gym-rc-name">{{ top_streak_name|truncatewords:4 }}</div>
+          <div class="gym-rc-meta">Top attendance streak this month</div>
+          <span class="gym-rc-badge badge-active">🏆 {{ top_streak_days }} days</span>
+        </div>
+        {% endif %}
+
+        {% if checkins_today > 0 %}
+        <div class="gym-risk-card healthy">
+          <div style="font-size:1.5rem;margin-bottom:6px">✅</div>
+          <div class="gym-rc-name">{{ checkins_today }} Check-in{{ checkins_today|pluralize }} Today</div>
+          <div class="gym-rc-meta">Members active at your gym today</div>
+          <span class="gym-rc-badge badge-active">Live</span>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+    {% endif %}
+
+    <script>
+    function toggleQrHub() {
+      var body = document.getElementById('qr-hub-body');
+      var btn  = document.getElementById('qr-hub-toggle');
+      var hidden = body.style.display === 'none';
+      body.style.display = hidden ? 'block' : 'none';
+      btn.textContent = hidden ? 'Hide QR Scanner' : 'Show QR Scanner';
+      if (hidden) document.getElementById('qr-search-input').focus();
+    }
+
+    function liveCheckin(val) {
+      var res = document.getElementById('qr-result');
+      if (!val || val.length < 2) { res.style.display='none'; return; }
+      // Local client-side preview — actual check-in hits the server
+      res.className = 'qr-result ok';
+      res.style.display = 'block';
+      res.innerHTML = '<strong>🔍 Looking for: </strong>' + val + ' &nbsp;<span style="color:#94a3b8;font-size:.8rem">— press Check In to confirm</span>';
+    }
+
+    function doCheckin() {
+      var input = document.getElementById('qr-search-input');
+      var res = document.getElementById('qr-result');
+      var val = input.value.trim();
+      if (!val) { res.className='qr-result err'; res.style.display='block'; res.innerHTML='<strong>⚠ Enter a member name, phone, or ID first.</strong>'; return; }
+      // POST check-in to existing check-in endpoint
+      var checkinUrl = "{% url 'inventory:time_logs' %}";
+      fetch(checkinUrl, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded','X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1]||''},
+        body: 'identifier=' + encodeURIComponent(val) + '&source=dashboard_qr'
+      }).then(function(r){ return r.json().catch(function(){ return {ok: false}; }); })
+        .then(function(data) {
+          if (data && data.ok) {
+            res.className='qr-result ok';
+            res.innerHTML = '✅ <strong>' + (data.member_name||val) + '</strong> checked in! ' + (data.message||'');
+            if (window.CCSounds) window.CCSounds.playSuccessSound();
+            input.value = '';
+          } else {
+            // Fallback: navigate to check-in page pre-filled
+            res.className='qr-result ok';
+            res.innerHTML = '📋 Redirecting to check-in page for <strong>' + val + '</strong>…';
+            setTimeout(function(){ window.location.href = checkinUrl + '?name=' + encodeURIComponent(val); }, 800);
+          }
+        })
+        .catch(function(){
+          res.className='qr-result ok';
+          res.innerHTML = '📋 Redirecting to check-in page for <strong>' + val + '</strong>…';
+          setTimeout(function(){ window.location.href = checkinUrl + '?name=' + encodeURIComponent(val); }, 800);
+        });
+    }
+
+    // Allow Enter to trigger check-in
+    document.addEventListener('DOMContentLoaded', function(){
+      var inp = document.getElementById('qr-search-input');
+      if (inp) inp.addEventListener('keydown', function(e){ if(e.key==='Enter') doCheckin(); });
+    });
+    </script>
+  </section>
+
   <section class="recent-block" aria-label="Recent payments">
     <div class="gym-section-header">
       <div>

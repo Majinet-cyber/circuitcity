@@ -26,6 +26,7 @@ class ClothingItemType:
     FOOTWEAR = "footwear"
     ACCESSORY = "accessory"
     FRAGRANCE = "fragrance"
+    HOME = "home"
     OTHER = "other"
 
     CHOICES = [
@@ -33,39 +34,66 @@ class ClothingItemType:
         (FOOTWEAR, "Footwear"),
         (ACCESSORY, "Accessory"),
         (FRAGRANCE, "Fragrance"),
+        (HOME, "Home & Linen"),
         (OTHER, "Other"),
     ]
 
 
 # Category definitions: (value, display_name, icon, item_type)
 CLOTHING_CATEGORIES: List[Tuple[str, str, str, str]] = [
-    # Apparel
+    # Apparel — tops
     ("shirt", "Shirt", "👔", ClothingItemType.APPAREL),
     ("t-shirt", "T-Shirt", "👕", ClothingItemType.APPAREL),
+    ("blouse", "Blouse", "👚", ClothingItemType.APPAREL),
+    # Apparel — bottoms
     ("trouser", "Trouser", "👖", ClothingItemType.APPAREL),
     ("jeans", "Jeans", "👖", ClothingItemType.APPAREL),
-    ("dress", "Dress", "👗", ClothingItemType.APPAREL),
-    ("jacket", "Jacket", "🧥", ClothingItemType.APPAREL),
-    ("suit", "Suit", "🤵", ClothingItemType.APPAREL),
     ("shorts", "Shorts", "🩳", ClothingItemType.APPAREL),
-    ("skirt", "Skirt", "🩱", ClothingItemType.APPAREL),
+    ("skirt", "Skirt", "👗", ClothingItemType.APPAREL),
+    ("leggings", "Leggings", "🩱", ClothingItemType.APPAREL),
+    # Apparel — full outfits
+    ("dress", "Dress", "👗", ClothingItemType.APPAREL),
+    ("suit", "Suit", "🤵", ClothingItemType.APPAREL),
+    ("jumpsuit", "Jumpsuit", "🧥", ClothingItemType.APPAREL),
+    # Apparel — outerwear
+    ("jacket", "Jacket", "🧥", ClothingItemType.APPAREL),
+    ("hoodie", "Hoodie", "🧥", ClothingItemType.APPAREL),
+    ("coat", "Coat", "🧥", ClothingItemType.APPAREL),
+    # Apparel — other
     ("jersey", "Jersey", "⚽", ClothingItemType.APPAREL),
+    ("underwear", "Underwear", "🩲", ClothingItemType.APPAREL),
     # Footwear
-    ("sneaker", "Sneaker", "👟", ClothingItemType.FOOTWEAR),
-    ("boot", "Boot", "🥾", ClothingItemType.FOOTWEAR),
-    ("office-shoe", "Office Shoe", "👞", ClothingItemType.FOOTWEAR),
-    ("sports-shoe", "Sports Shoe", "⚽", ClothingItemType.FOOTWEAR),
+    ("sneaker", "Sneakers", "👟", ClothingItemType.FOOTWEAR),
+    ("boot", "Boots", "🥾", ClothingItemType.FOOTWEAR),
+    ("office-shoe", "Office Shoes", "👞", ClothingItemType.FOOTWEAR),
+    ("sports-shoe", "Sports Shoes", "👟", ClothingItemType.FOOTWEAR),
+    ("sandal", "Sandals", "👡", ClothingItemType.FOOTWEAR),
+    ("slides", "Slides", "🩴", ClothingItemType.FOOTWEAR),
+    ("heels", "Heels", "👠", ClothingItemType.FOOTWEAR),
     # Accessories
     ("belt", "Belt", "🔗", ClothingItemType.ACCESSORY),
     ("bag", "Bag", "👜", ClothingItemType.ACCESSORY),
     ("handbag", "Handbag", "👜", ClothingItemType.ACCESSORY),
     ("schoolbag", "School Bag", "🎒", ClothingItemType.ACCESSORY),
-    ("hat", "Hat", "🧢", ClothingItemType.ACCESSORY),
+    ("cap", "Cap / Hat", "🧢", ClothingItemType.ACCESSORY),
     ("socks", "Socks", "🧦", ClothingItemType.ACCESSORY),
+    ("sunglasses", "Sunglasses", "🕶️", ClothingItemType.ACCESSORY),
+    ("watch", "Watch", "⌚", ClothingItemType.ACCESSORY),
+    ("luxury-watch", "Luxury Watch", "⌚", ClothingItemType.ACCESSORY),
+    ("tie", "Tie / Necktie", "👔", ClothingItemType.ACCESSORY),
+    ("wallet", "Wallet", "👛", ClothingItemType.ACCESSORY),
+    ("scarf", "Scarf", "🧣", ClothingItemType.ACCESSORY),
     # Fragrance
     ("perfume", "Perfume", "🌸", ClothingItemType.FRAGRANCE),
+    ("deodorant", "Deodorant", "🌿", ClothingItemType.FRAGRANCE),
+    # Home & Linen
+    ("bedsheet", "Bedsheet", "🛏️", ClothingItemType.HOME),
+    ("pillowcase", "Pillow Case", "🛏️", ClothingItemType.HOME),
+    ("duvet", "Duvet / Blanket", "🛏️", ClothingItemType.HOME),
+    ("towel", "Towel", "🛁", ClothingItemType.HOME),
+    ("curtain", "Curtain", "🏠", ClothingItemType.HOME),
     # Other
-    ("other", "Other", "👕", ClothingItemType.OTHER),
+    ("other", "Other", "🛍️", ClothingItemType.OTHER),
 ]
 
 
@@ -114,9 +142,11 @@ def get_sizes_for_category(category_value: str) -> List[str]:
     """Get appropriate size list for a category"""
     item_type = get_item_type_for_category(category_value)
 
+    if item_type in (ClothingItemType.HOME, ClothingItemType.FRAGRANCE):
+        return []
     if item_type == ClothingItemType.FOOTWEAR:
         return FOOTWEAR_SIZES
-    elif category_value in ("trouser", "jeans"):
+    elif category_value in ("trouser", "jeans", "shorts", "leggings"):
         return TROUSER_SIZES
     elif item_type == ClothingItemType.APPAREL:
         return APPAREL_SIZES

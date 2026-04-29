@@ -70,6 +70,176 @@
     </div>
   </div>
 
+  <!-- ===== SMART LIVESTOCK ASSISTANT ===== -->
+  <div class="card border-0 shadow-sm mb-4" id="smart-livestock-panel">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+      <h6 class="mb-0">
+        🧠 Smart Livestock Assistant
+        <span style="background:#dbeafe;color:#1d4ed8;font-size:.6rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;margin-left:6px">AI Guide</span>
+      </h6>
+      <button type="button" onclick="toggleLivestockGuide()" id="livestock-guide-toggle"
+        style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:.8rem">
+        Show Guide
+      </button>
+    </div>
+    <div id="livestock-guide-body" style="display:none">
+      <div class="card-body">
+        <style>
+          .ls-timeline{border-left:3px solid #e2e8f0;padding-left:16px}
+          .ls-phase{margin-bottom:16px;position:relative}
+          .ls-phase-dot{width:10px;height:10px;border-radius:50%;background:#94a3b8;position:absolute;left:-21px;top:5px}
+          .ls-phase.current .ls-phase-dot{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.2)}
+          .ls-phase-week{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;font-weight:700}
+          .ls-phase.current .ls-phase-week{color:#059669}
+          .ls-phase-title{font-size:.9rem;font-weight:800;color:#0f172a}
+          .ls-phase-list{list-style:none;padding:0;margin:4px 0 0}
+          .ls-phase-list li{font-size:.8rem;color:#475569;padding:2px 0;padding-left:12px;position:relative}
+          .ls-phase-list li::before{content:'▸';position:absolute;left:0;color:#10b981}
+          .ls-alert-box{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.78rem;color:#92400e;margin-top:6px}
+          .ls-guide-banner{background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+        </style>
+        <div id="livestock-guide-content">
+          <!-- Filled by JS based on animal_type and age -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var animalType = "{{ batch.animal_type|lower|default:'' }}";
+    var ageMonths  = parseInt("{{ batch.age_months|default:0 }}", 10) || 0;
+    var batchCount = parseInt("{{ snapshot.count_current|default:0 }}", 10) || 0;
+    var batchName  = "{{ batch.name|escapejs }}";
+
+    var GUIDES = {
+      chicken: {
+        label: "Broiler / Layers",
+        phases: [
+          { weeks: [0,1], label: "Day 1–7 (Brooding)", title: "Brooding & Early Growth",
+            tasks: ["Maintain brooder temperature 32–35°C", "Provide starter feed ad libitum (chick mash)", "Ensure clean water access at all times",
+                    "Dip chicks' beaks in water on arrival", "Provide 24h light for first 3 days"],
+            feed_per_bird_g: 15, alert: "⚠ Chick mortality risk is highest in week 1. Monitor temperature and water closely." },
+          { weeks: [2,3], label: "Week 2–3", title: "Fast Growth Phase",
+            tasks: ["Reduce brooder temperature by 3°C/week", "Continue starter feed", "Monitor for respiratory signs",
+                    "Deworm at Day 14 if on deep litter", "Vaccinate against Newcastle Disease (if not done)"],
+            feed_per_bird_g: 45, alert: null },
+          { weeks: [4,5], label: "Week 4–5", title: "Grower Phase",
+            tasks: ["Switch from starter to grower feed at Week 4", "Increase ventilation as birds grow", "Vaccinate against Gumboro at Day 21",
+                    "Monitor water intake (x2 feed intake is normal)", "Check for footpad dermatitis"],
+            feed_per_bird_g: 90, alert: null },
+          { weeks: [6,7], label: "Week 6–7", title: "Finisher / Harvest Prep",
+            tasks: ["Switch to finisher feed at Week 6", "Target market weight: 1.8–2.5kg by Week 7", "Withdraw anti-coccidial 5 days before slaughter",
+                    "Arrange transport and market", "Calculate profit per bird"],
+            feed_per_bird_g: 130, alert: "🌾 Optimal slaughter window is Day 42–49. Delay reduces feed efficiency significantly." },
+        ]
+      },
+      pig: {
+        label: "Pigs / Swine",
+        phases: [
+          { weeks: [0,4], label: "Weaning (0–4 wks)", title: "Piglet Care",
+            tasks: ["Maintain farrowing house at 28–32°C for piglets", "Ensure each piglet suckles within 2 hours of birth",
+                    "Clip needle teeth", "Iron injection Day 3 to prevent anaemia", "Castrate male piglets at 5–7 days if needed"],
+            feed_per_bird_g: null, alert: "⚠ Scour (diarrhoea) is major killer in first 2 weeks. Keep pen dry and warm." },
+          { weeks: [5,12], label: "Grower (5–12 wks)", title: "Growing Phase",
+            tasks: ["Starter creep feed from Day 7 onwards", "Deworm at 6 weeks", "Vaccinate as per local schedule",
+                    "Target 250–300g/day weight gain", "Monitor for respiratory disease"],
+            feed_per_bird_g: null, alert: null },
+          { weeks: [13,24], label: "Finisher (13–24 wks)", title: "Finishing for Market",
+            tasks: ["Switch to finisher ration at 50kg bodyweight", "Target 500–700g/day gain", "Maintain pen hygiene daily",
+                    "Weigh weekly to track progress", "Plan market sale at 90–100kg liveweight"],
+            feed_per_bird_g: null, alert: "🔥 Overcrowding reduces growth rate by 10–20%. Maintain 0.65m² per pig minimum." },
+        ]
+      },
+      cattle: {
+        label: "Cattle",
+        phases: [
+          { weeks: [0,4], label: "Calf (0–4 wks)", title: "Colostrum & Early Nutrition",
+            tasks: ["Feed colostrum within 2 hours of birth (min 2L)", "Watch for scours — treat promptly with electrolytes",
+                    "Ear tag and record birth weight", "Vaccinate against brucellosis if breeding herd", "Begin calf starter pellets at 1 week"],
+            feed_per_bird_g: null, alert: "⚠ Failure to get colostrum in first 6 hours leads to very high mortality." },
+          { weeks: [5,26], label: "Growing", title: "Growth & Weaning",
+            tasks: ["Wean at 3–4 months (90–100kg)", "Supplement with calf starter + hay", "Deworm at 6 weeks then monthly",
+                    "Monitor for pneumonia — treat early", "Record monthly weight gains"],
+            feed_per_bird_g: null, alert: null },
+          { weeks: [27,100], label: "Finishing", title: "Feedlot / Market Prep",
+            tasks: ["High-energy ration for finishing (grain + silage)", "Target 0.8–1.2kg/day weight gain", "Weigh monthly",
+                    "Arrange veterinary check before sale", "Document health records for buyer"],
+            feed_per_bird_g: null, alert: null },
+        ]
+      },
+    };
+
+    var guideData = GUIDES[animalType] || null;
+    var ageWeeks = ageMonths * 4;
+
+    function getCurrentPhase(phases) {
+      for (var i = 0; i < phases.length; i++) {
+        var p = phases[i];
+        if (ageWeeks >= p.weeks[0] && ageWeeks <= p.weeks[1]) return i;
+      }
+      return phases.length - 1;
+    }
+
+    function renderGuide() {
+      var container = document.getElementById('livestock-guide-content');
+      if (!container) return;
+      if (!guideData) {
+        container.innerHTML = '<p class="text-muted small">No specific guide available for this animal type. Record health events and feed costs using the form below.</p>';
+        return;
+      }
+
+      var phases = guideData.phases;
+      var currentIdx = getCurrentPhase(phases);
+      var cp = phases[currentIdx];
+      var totalFeedDay = cp.feed_per_bird_g ? (cp.feed_per_bird_g * batchCount / 1000).toFixed(1) : null;
+
+      var html = '<div class="ls-guide-banner">' +
+        '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1d4ed8;margin-bottom:4px">📍 Current Phase — Age ' + ageMonths + ' months</div>' +
+        '<div style="font-weight:800;font-size:1rem;color:#1e3a5f">' + cp.title + '</div>' +
+        (totalFeedDay ? '<div style="font-size:.82rem;color:#2563eb;margin-top:6px">🍽 Estimated daily feed: <strong>' + totalFeedDay + ' kg/day</strong> for ' + batchCount + ' birds</div>' : '') +
+        '</div>';
+
+      html += '<div class="ls-timeline">';
+      for (var i = 0; i < phases.length; i++) {
+        var phase = phases[i];
+        var isCurrent = (i === currentIdx);
+        html += '<div class="ls-phase' + (isCurrent ? ' current' : '') + '">' +
+          '<div class="ls-phase-dot"></div>' +
+          '<div class="ls-phase-week">' + phase.label + (isCurrent ? ' ← NOW' : '') + '</div>' +
+          '<div class="ls-phase-title">' + phase.title + '</div>' +
+          '<ul class="ls-phase-list">' +
+          phase.tasks.map(function(t){ return '<li>' + t + '</li>'; }).join('') +
+          '</ul>' +
+          (phase.alert ? '<div class="ls-alert-box">' + phase.alert + '</div>' : '') +
+          '</div>';
+      }
+      html += '</div>';
+
+      // Vaccination reminder
+      html += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:12px 14px;margin-top:14px">' +
+        '<div style="font-weight:700;font-size:.82rem;color:#166534;margin-bottom:6px">💉 Vaccination Reminder</div>' +
+        '<div style="font-size:.8rem;color:#15803d">' +
+        (animalType === 'chicken' ? 'Newcastle Day 7 (eye drop), Gumboro Day 21, Newcastle Booster Day 28' :
+         animalType === 'pig'     ? 'Swine Fever at 6–8 weeks, Foot & Mouth every 6 months' :
+         animalType === 'cattle'  ? 'FMD every 6 months, BQ (Black Quarter) annually, ECF vaccine if applicable' :
+         'Check with local veterinarian for recommended vaccination schedule.') +
+        '</div></div>';
+
+      container.innerHTML = html;
+    }
+
+    window.toggleLivestockGuide = function() {
+      var body = document.getElementById('livestock-guide-body');
+      var btn  = document.getElementById('livestock-guide-toggle');
+      var show = body.style.display === 'none';
+      body.style.display = show ? 'block' : 'none';
+      btn.textContent = show ? 'Hide Guide' : 'Show Guide';
+      if (show) renderGuide();
+    };
+  })();
+  </script>
+
   <form method="post" enctype="multipart/form-data" class="mb-4">
     {% csrf_token %}
     <div class="card border-0 shadow-sm mb-3">

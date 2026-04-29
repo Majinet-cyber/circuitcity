@@ -169,6 +169,158 @@
         </div>
     </div>
 
+    <!-- ===== SMART FARM CALENDAR ===== -->
+    {% if season.planting_date %}
+    <div class="card border-0 shadow-sm mb-4" id="smart-farm-calendar">
+      <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">
+          🌱 Smart Farm Calendar
+          <span style="background:#d1fae5;color:#065f46;font-size:.6rem;padding:2px 7px;border-radius:99px;font-weight:700;text-transform:uppercase;margin-left:6px">AI Guide</span>
+        </h6>
+        <button onclick="toggleCalendar()" id="cal-toggle-btn"
+          style="background:#f1f5f9;color:#475569;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:.8rem">
+          Show Calendar
+        </button>
+      </div>
+      <div id="smart-calendar-body" style="display:none">
+        <div class="card-body pb-0 pt-3">
+          <style>
+            .cal-week{border-left:3px solid #e2e8f0;padding:0 0 16px 16px;margin-bottom:4px;position:relative;transition:border-color .3s}
+            .cal-week.active{border-color:#10b981}
+            .cal-week.past{border-color:#cbd5e1;opacity:.75}
+            .cal-week.future{opacity:.9}
+            .cal-week-dot{width:12px;height:12px;border-radius:50%;background:#e2e8f0;position:absolute;left:-7.5px;top:4px}
+            .cal-week.active .cal-week-dot{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.25)}
+            .cal-week.past .cal-week-dot{background:#94a3b8}
+            .cal-week-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:4px}
+            .cal-week.active .cal-week-label{color:#059669}
+            .cal-week-title{font-size:.92rem;font-weight:800;color:#0f172a;margin-bottom:4px}
+            .cal-week-tasks{list-style:none;padding:0;margin:0}
+            .cal-week-tasks li{font-size:.82rem;color:#475569;padding:3px 0;display:flex;align-items:flex-start;gap:6px}
+            .cal-week-tasks li::before{content:'•';color:#10b981;font-weight:900;flex-shrink:0}
+            .cal-week.past .cal-week-tasks li::before{color:#94a3b8}
+            .cal-alert{background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#92400e;margin-top:6px}
+          </style>
+          <p class="text-muted small mb-3">
+            Planting date: <strong>{{ season.planting_date|date:"d M Y" }}</strong> ·
+            Crop: <strong>{{ season.get_crop_type_display }}</strong>
+          </p>
+        </div>
+        <div class="card-body pt-0" id="crop-calendar-content">
+          <!-- Populated by JS based on planting date + crop type -->
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function() {
+      var plantingDateStr = "{{ season.planting_date|date:'Y-m-d' }}";
+      var cropType = "{{ season.crop_type|lower }}";
+
+      var CROP_CALENDARS = {
+        default: [
+          { week: 1, title: "Land Preparation", tasks: ["Clear the land of weeds and debris", "Plow and till the soil to 20–30cm depth", "Apply basal fertilizer if soil test recommends it", "Mark out planting rows"], alert: null },
+          { week: 2, title: "Planting & Germination", tasks: ["Plant seeds at recommended spacing", "Ensure adequate soil moisture at planting", "Watch for early germination signs (Days 5–10)", "Set up pest deterrents if needed"], alert: null },
+          { week: 3, title: "Early Weeding", tasks: ["First weeding round — remove all competing weeds", "Check germination percentage", "Fill gaps where seeds did not germinate", "Begin light irrigation if rainfall insufficient"], alert: "⚠ Early weeding is critical — weeds at this stage compete directly with young seedlings." },
+          { week: 4, title: "Establishment & Thinning", tasks: ["Thin overcrowded seedlings to recommended spacing", "Apply top dressing fertilizer (Urea/CAN)", "Check for early pest damage — treat promptly", "Record crop health observations"], alert: null },
+          { week: 6, title: "Active Growth — Fertilizer Round 2", tasks: ["Apply second round of top dressing if recommended", "Monitor for common pests (aphids, stalk borers)", "Second weeding if weed pressure is high", "Ensure consistent moisture supply"], alert: null },
+          { week: 8, title: "Mid-Season Check", tasks: ["Assess crop health visually — look for yellowing, stunting", "Check pest/disease pressure", "Remove diseased plants to prevent spread", "Update yield projections based on crop stand"], alert: "🔥 Peak growth phase — any nutrient deficiency now will directly affect final yield." },
+          { week: 10, title: "Late Growth & Pest Alert", tasks: ["Final weeding if needed", "Monitor for late-season pests and diseases", "Assess plant population and health", "Prepare harvest equipment and storage"], alert: null },
+          { week: 12, title: "Pre-Harvest Preparation", tasks: ["Confirm crop maturity indicators", "Arrange harvest labor", "Prepare drying and storage areas", "Check market prices and plan sales timing"], alert: null },
+          { week: 14, title: "Harvest Window", tasks: ["Harvest at peak maturity — avoid delays", "Dry properly before storage (target <14% moisture for grain)", "Record total yield vs projection", "Calculate season profitability"], alert: "🌾 Timely harvest prevents losses from weather, pests, or quality degradation." },
+          { week: 16, title: "Post-Harvest", tasks: ["Store or sell harvested crop", "Record all season expenses and income", "Conduct soil test for next season planning", "Document lessons learned and yields achieved"], alert: null },
+        ],
+        maize: [
+          { week: 1, title: "Land Prep & Planting", tasks: ["Plow to 25cm depth", "Apply basal fertilizer (D-Compound 200kg/ha)", "Plant at 75cm × 25cm spacing", "Cover seeds to 5cm depth"], alert: null },
+          { week: 2, title: "Germination Watch", tasks: ["Monitor for germination (5–7 days)", "Watch for soil crust that blocks emergence", "First irrigation if dry conditions", "Check for cutworm damage at stem base"], alert: null },
+          { week: 3, title: "First Weeding", tasks: ["Remove all weeds by hand or herbicide", "Fill gaps with spare seedlings", "Scout for stalk borers early"], alert: "⚠ Weeds at this stage reduce maize yield by up to 50%. Act now." },
+          { week: 4, title: "Top Dressing Round 1", tasks: ["Apply CAN or Urea (100–150kg/ha)", "Thin to one plant per station", "Monitor for fall armyworm", "Irrigate if rainfall below 20mm/week"], alert: null },
+          { week: 6, title: "Vegetative Growth", tasks: ["Second weeding", "Apply insecticide if armyworm present", "Note any signs of nutrient deficiency"], alert: "🔥 Fall armyworm peak season. Inspect whorls of plants daily." },
+          { week: 8, title: "Tasselling & Silking", tasks: ["Ensure sufficient water during this critical stage", "Avoid any stress (drought or nutrient deficiency)", "Apply top dressing Round 2 if needed"], alert: "⚠ Water stress during tasselling/silking reduces yield by 30–50%." },
+          { week: 12, title: "Grain Filling", tasks: ["Maintain moisture if irrigation is available", "Monitor for late-season diseases", "Begin harvest preparation"], alert: null },
+          { week: 14, title: "Harvest", tasks: ["Harvest when husks are dry and grains are hard", "Dry cobs to safe moisture before shelling", "Target 12–13% moisture for safe storage"], alert: "🌾 Maize harvested too early or stored wet will spoil rapidly." },
+        ],
+        groundnut: [
+          { week: 1, title: "Land Prep & Planting", tasks: ["Deep plow (30cm) for pod formation zone", "Apply single superphosphate basal (200kg/ha)", "Plant at 45cm × 15cm spacing", "Shell seeds just before planting to avoid disease"], alert: null },
+          { week: 3, title: "Early Weeding & Thinning", tasks: ["Weed thoroughly before canopy closure", "Thin to single plants if needed", "Scout for aphids and leafminer"], alert: null },
+          { week: 5, title: "Pegging Stage", tasks: ["Avoid disturbing soil around plants — pegs are forming", "Light hilling of soil around plant base", "Apply gypsum if available (helps pod fill)"], alert: "⚠ Do not cultivate near groundnut plants after pegs enter soil — this damages pod formation." },
+          { week: 8, title: "Pod Development", tasks: ["Monitor for rosette virus — remove infected plants", "Ensure moisture during pod fill", "Avoid flooding"], alert: null },
+          { week: 12, title: "Maturity Check & Harvest", tasks: ["Check pod maturity by sampling (inner skin should show colour)", "Harvest before excessive rains cause aflatoxin risk", "Dry promptly to below 9% moisture"], alert: "🔥 Aflatoxin risk is high if groundnuts are harvested wet or stored damp. Test and dry immediately." },
+        ],
+        tobacco: [
+          { week: 1, title: "Nursery Preparation", tasks: ["Prepare raised seedbeds (1m wide)", "Apply fumigant or sterilize soil", "Sow seeds thinly in nursery", "Cover lightly with fine soil or grass mulch"], alert: null },
+          { week: 4, title: "Seedling Management", tasks: ["Thin seedlings if overcrowded", "Water daily in dry weather", "Apply nursery fertilizer (top dress lightly)", "Control damping-off disease"], alert: null },
+          { week: 8, title: "Transplanting", tasks: ["Transplant seedlings at 6–8 weeks old", "Space at 1m × 0.5m", "Water immediately after transplanting", "Apply starter fertilizer"], alert: null },
+          { week: 10, title: "Topping", tasks: ["Top plants at 10–12 leaves for fluecured", "Remove suckers weekly after topping", "Apply sucker control chemical if available"], alert: "⚠ Topping and sucker control are critical for quality — don't skip this step." },
+          { week: 14, title: "Harvesting (Priming)", tasks: ["Prime lower leaves first when they turn yellow-green", "Harvest 2–3 leaves per priming", "Grade leaves by size and quality", "Cure promptly after harvest"], alert: null },
+        ],
+      };
+
+      var calendar = CROP_CALENDARS[cropType] || CROP_CALENDARS['default'];
+      var plantDate = new Date(plantingDateStr);
+      var today = new Date();
+      var msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      var currentWeek = Math.floor((today - plantDate) / msPerWeek) + 1;
+
+      function renderCalendar() {
+        var container = document.getElementById('crop-calendar-content');
+        if (!container) return;
+        var html = '<div>';
+
+        // Current phase banner
+        if (currentWeek > 0) {
+          var activeEntry = null;
+          for (var i = 0; i < calendar.length; i++) {
+            if (currentWeek >= calendar[i].week && (i === calendar.length - 1 || currentWeek < calendar[i+1].week)) {
+              activeEntry = calendar[i];
+              break;
+            }
+          }
+          if (activeEntry) {
+            html += '<div style="background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid #6ee7b7;border-radius:12px;padding:14px 16px;margin-bottom:16px">' +
+              '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#059669;margin-bottom:4px">📍 Currently: Week ' + currentWeek + '</div>' +
+              '<div style="font-weight:800;font-size:1rem;color:#065f46">' + activeEntry.title + '</div>' +
+              '<ul style="margin:8px 0 0;padding-left:16px;font-size:.82rem;color:#166534">' +
+              activeEntry.tasks.map(function(t){ return '<li>' + t + '</li>'; }).join('') +
+              '</ul>' +
+              (activeEntry.alert ? '<div style="background:#fef3c7;border-radius:6px;padding:8px 10px;font-size:.78rem;color:#92400e;margin-top:8px">' + activeEntry.alert + '</div>' : '') +
+              '</div>';
+          }
+        }
+
+        // Full timeline
+        html += '<div class="mt-2">';
+        for (var j = 0; j < calendar.length; j++) {
+          var entry = calendar[j];
+          var state = (currentWeek >= entry.week && (j === calendar.length - 1 || currentWeek < calendar[j+1].week)) ? 'active'
+                    : (currentWeek > (j < calendar.length - 1 ? calendar[j+1].week : 9999)) ? 'past'
+                    : currentWeek >= entry.week ? 'past' : 'future';
+          html += '<div class="cal-week ' + state + '">' +
+            '<div class="cal-week-dot"></div>' +
+            '<div class="cal-week-label">Week ' + entry.week + (state === 'past' ? ' ✓' : state === 'active' ? ' ← NOW' : '') + '</div>' +
+            '<div class="cal-week-title">' + entry.title + '</div>' +
+            '<ul class="cal-week-tasks">' +
+            entry.tasks.map(function(t){ return '<li>' + t + '</li>'; }).join('') +
+            '</ul>' +
+            (entry.alert ? '<div class="cal-alert">' + entry.alert + '</div>' : '') +
+            '</div>';
+        }
+        html += '</div></div>';
+        container.innerHTML = html;
+      }
+
+      window.toggleCalendar = function() {
+        var body = document.getElementById('smart-calendar-body');
+        var btn = document.getElementById('cal-toggle-btn');
+        var show = body.style.display === 'none';
+        body.style.display = show ? 'block' : 'none';
+        btn.textContent = show ? 'Hide Calendar' : 'Show Calendar';
+        if (show) renderCalendar();
+      };
+    })();
+    </script>
+    {% endif %}
+
     <!-- Linked Ledger Entries -->
     <div class="card border-0 shadow-sm">
         <div class="card-header bg-transparent d-flex justify-content-between align-items-center">

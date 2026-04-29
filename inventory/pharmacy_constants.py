@@ -14,16 +14,39 @@ from django.db import models
 # ==============================================================================
 
 PHARMACY_TOP_CATEGORIES = [
-    {"key": "medicines", "label": "Medicines", "icon": "💊", "color": "#3b82f6"},
-    {"key": "first_aid", "label": "First Aid", "icon": "🩹", "color": "#ef4444"},
-    {"key": "chronic", "label": "Chronic / BP & Diabetes", "icon": "❤️", "color": "#dc2626"},
-    {"key": "cold_flu", "label": "Cold & Flu", "icon": "🤧", "color": "#06b6d4"},
-    {"key": "stomach", "label": "Stomach / Digestive", "icon": "🩺", "color": "#8b5cf6"},
-    {"key": "allergy", "label": "Allergy", "icon": "🌸", "color": "#ec4899"},
-    {"key": "womens_health", "label": "Women's Health", "icon": "💝", "color": "#f472b6"},
-    {"key": "child_health", "label": "Child Health", "icon": "👶", "color": "#fbbf24"},
-    {"key": "vitamins", "label": "Vitamins & Supplements", "icon": "💪", "color": "#10b981"},
-    {"key": "cosmetics", "label": "Cosmetics & Personal Care", "icon": "✨", "color": "#a855f7"},
+    # ── Core Medicines ──
+    {"key": "medicines", "label": "Medicines", "icon": "💊", "color": "#3b82f6",
+     "description": "Prescription & common medicines"},
+    {"key": "otc", "label": "OTC Products", "icon": "🛒", "color": "#0ea5e9",
+     "description": "Over-the-counter — no prescription needed"},
+    {"key": "first_aid", "label": "First Aid", "icon": "🩹", "color": "#ef4444",
+     "description": "Bandages, antiseptics, wound care"},
+    {"key": "chronic", "label": "Chronic Care", "icon": "❤️", "color": "#dc2626",
+     "description": "BP, diabetes, long-term treatments"},
+    {"key": "cold_flu", "label": "Cold & Flu", "icon": "🤧", "color": "#06b6d4",
+     "description": "Cough, flu, sore throat"},
+    {"key": "stomach", "label": "Stomach / Digestive", "icon": "🩺", "color": "#8b5cf6",
+     "description": "Antacids, ORS, digestive health"},
+    {"key": "vitamins", "label": "Vitamins & Supplements", "icon": "💪", "color": "#10b981",
+     "description": "Vitamins C, D, multivitamins"},
+    {"key": "womens_health", "label": "Women's Health", "icon": "💝", "color": "#f472b6",
+     "description": "Contraception, maternity, pads"},
+    {"key": "child_health", "label": "Child & Baby Care", "icon": "👶", "color": "#fbbf24",
+     "description": "Paediatric syrups, baby products"},
+    # ── Beauty & Personal Care ──
+    {"key": "skincare", "label": "Skincare", "icon": "✨", "color": "#14b8a6",
+     "description": "Lotions, creams, lip care, sunscreen"},
+    {"key": "cosmetics", "label": "Cosmetics & Makeup", "icon": "💄", "color": "#a855f7",
+     "description": "Perfumes, makeup, beauty products"},
+    {"key": "personal_care", "label": "Personal Care", "icon": "🧴", "color": "#f59e0b",
+     "description": "Soap, deodorant, toothpaste, shampoo"},
+    {"key": "hygiene", "label": "Hygiene Products", "icon": "🧼", "color": "#6366f1",
+     "description": "Sanitizers, feminine hygiene, wipes"},
+    # ── Other ──
+    {"key": "allergy", "label": "Allergy", "icon": "🌸", "color": "#ec4899",
+     "description": "Antihistamines, allergy relief"},
+    {"key": "other", "label": "Other / Custom", "icon": "📦", "color": "#94a3b8",
+     "description": "Anything not listed above — enter custom name"},
 ]
 
 # Medicine Subcategories (when user selects "Medicines")
@@ -158,6 +181,60 @@ CHILD_HEALTH_ITEMS = [
     {"name": "ORS", "icon": "💧"},
     {"name": "Zinc", "icon": "⚡"},
     {"name": "Other", "icon": "📝"},
+]
+
+OTC_ITEMS = [
+    {"name": "Paracetamol / Panado", "icon": "💊"},
+    {"name": "Ibuprofen", "icon": "💊"},
+    {"name": "Antacid (Gaviscon, Mylanta)", "icon": "💊"},
+    {"name": "ORS (Oral Rehydration Salts)", "icon": "💧"},
+    {"name": "Antihistamine (Cetirizine)", "icon": "💊"},
+    {"name": "Cough syrup", "icon": "🍯"},
+    {"name": "Loperamide (anti-diarrhoea)", "icon": "💊"},
+    {"name": "Antifungal cream", "icon": "🧴"},
+    {"name": "Eye drops", "icon": "👁️"},
+    {"name": "Deworming tablet", "icon": "💊"},
+    {"name": "Other OTC product", "icon": "📝"},
+]
+
+SKINCARE_ITEMS = [
+    {"name": "Vaseline / Petroleum Jelly", "icon": "🧴"},
+    {"name": "Body lotion", "icon": "🧴"},
+    {"name": "Face moisturiser", "icon": "✨"},
+    {"name": "Sunscreen / SPF lotion", "icon": "☀️"},
+    {"name": "Lip balm / Lip therapy", "icon": "💋"},
+    {"name": "Hydrocortisone cream", "icon": "🧴"},
+    {"name": "Glycerine", "icon": "💧"},
+    {"name": "Palmer's Cocoa Butter", "icon": "🧴"},
+    {"name": "Fair & Lovely / glow lotion", "icon": "✨"},
+    {"name": "Baby lotion / Johnsons", "icon": "👶"},
+    {"name": "Other skincare product", "icon": "📝"},
+]
+
+PERSONAL_CARE_ITEMS = [
+    {"name": "Soap (bar or liquid)", "icon": "🧼"},
+    {"name": "Shampoo", "icon": "🧴"},
+    {"name": "Conditioner", "icon": "🧴"},
+    {"name": "Deodorant / Roll-on", "icon": "🌿"},
+    {"name": "Toothpaste", "icon": "🦷"},
+    {"name": "Toothbrush", "icon": "🪥"},
+    {"name": "Mouthwash", "icon": "💧"},
+    {"name": "Razor / shaving kit", "icon": "🪒"},
+    {"name": "Hair oil / cream", "icon": "💇"},
+    {"name": "Other personal care", "icon": "📝"},
+]
+
+HYGIENE_ITEMS = [
+    {"name": "Hand sanitizer", "icon": "🧼"},
+    {"name": "Antiseptic soap", "icon": "🧴"},
+    {"name": "Alcohol wipes", "icon": "🩹"},
+    {"name": "Surgical masks", "icon": "😷"},
+    {"name": "Gloves", "icon": "🧤"},
+    {"name": "Sanitary pads", "icon": "🩸"},
+    {"name": "Tampons", "icon": "🩸"},
+    {"name": "Toilet paper / tissue", "icon": "🧻"},
+    {"name": "Wet wipes / baby wipes", "icon": "🧻"},
+    {"name": "Other hygiene product", "icon": "📝"},
 ]
 
 VITAMINS_ITEMS = [
@@ -524,6 +601,12 @@ def get_items_for_top_category(category_key: str):
         "womens_health": WOMENS_HEALTH_ITEMS,
         "child_health": CHILD_HEALTH_ITEMS,
         "vitamins": VITAMINS_ITEMS,
+        # New expanded categories
+        "otc": OTC_ITEMS,
+        "skincare": SKINCARE_ITEMS,
+        "personal_care": PERSONAL_CARE_ITEMS,
+        "hygiene": HYGIENE_ITEMS,
+        "other": [{"name": "Custom product", "icon": "📝"}],
     }
     return items_map.get(category_key, [])
 
