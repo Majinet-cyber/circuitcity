@@ -257,24 +257,232 @@
 </style>
 
 <div class="vertical-page">
+
+  <!-- ===== PREMIUM HERO COMMAND CENTER ===== -->
   <header class="vertical-hero">
     <div>
-      <p style="margin:0;opacity:.8;text-transform:uppercase;letter-spacing:.08em;font-size:.8rem">{{ business.name }} · {{ location_label }}</p>
-      <h1>{{ hero_title }}</h1>
-      <p>{{ hero_blurb }}</p>
+      <p style="margin:0;opacity:.75;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem">{{ business.name }} · {{ location_label }}</p>
+      <h1 style="font-size:clamp(1.6rem,4vw,2.4rem);margin:4px 0">{{ hero_title }}</h1>
+      <p style="margin:0;opacity:.85;font-size:.95rem">{{ hero_blurb }}</p>
     </div>
     <div class="hero-actions">
-      <a class="primary" href="{% url 'liquor:sell' %}" style="background:#fff;color:#7c3aed;font-size:1.1rem;padding:14px 28px;border-radius:999px;font-weight:800;box-shadow:0 4px 16px rgba(0,0,0,.15);display:inline-flex;align-items:center;gap:8px">
+      <a href="{% url 'liquor:sell' %}" style="background:#fff;color:#7c3aed;font-size:1.05rem;padding:14px 26px;border-radius:999px;font-weight:800;box-shadow:0 6px 20px rgba(0,0,0,.2);display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s" onmouseenter="this.style.transform='translateY(-2px)'" onmouseleave="this.style.transform=''">
         <i class="bi bi-cart-check-fill"></i> Sell Now
       </a>
-      <a class="primary" href="{% url 'liquor:scan_in' %}" style="background:rgba(255,255,255,.18);color:#fff;border:2px solid rgba(255,255,255,.7);font-size:1rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px">
-        <i class="bi bi-upc-scan"></i> Scan In Stock
+      <a href="{% url 'liquor:scan_in' %}" style="background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.8);font-size:.95rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s" onmouseenter="this.style.background='rgba(255,255,255,.25)'" onmouseleave="this.style.background='rgba(255,255,255,.15)'">
+        <i class="bi bi-upc-scan"></i> Scan In
       </a>
-      <a class="ghost" href="{% url 'liquor:stock_list' %}">My Stock</a>
-      <a class="ghost" href="{% url 'liquor:credits_list' %}">Credits</a>
+      <a href="{% url 'liquor:credits_list' %}" style="background:rgba(239,68,68,.3);color:#fff;border:2px solid rgba(239,68,68,.7);font-size:.95rem;padding:12px 22px;border-radius:999px;font-weight:700;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:all 0.2s">
+        <i class="bi bi-person-credit-card"></i> Credit
+      </a>
       {% include "partials/vertical_more_dropdown.html" %}
     </div>
   </header>
+
+  <!-- ===== TODAY AT A GLANCE — 8 KPI Command Cards ===== -->
+  <section id="today-kpi-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:.08em">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#10b981;margin-right:8px;animation:pulse-dot 2s infinite"></span>
+        Today at a Glance
+      </h2>
+      <span id="today-kpi-ts" style="font-size:.75rem;color:#94a3b8"></span>
+    </div>
+    <style>
+      @keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.4)}}
+      .kpi-cmd{
+        background:#fff;
+        border-radius:16px;
+        padding:18px 20px;
+        border:1px solid #e2e8f0;
+        box-shadow:0 2px 12px rgba(15,23,42,.06);
+        transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
+        cursor:default;
+        position:relative;
+        overflow:hidden;
+      }
+      .kpi-cmd::after{
+        content:'';
+        position:absolute;
+        top:0;left:0;right:0;height:3px;
+        background:var(--kpi-accent,#a855f7);
+        border-radius:16px 16px 0 0;
+      }
+      .kpi-cmd:hover{transform:translateY(-4px);box-shadow:0 8px 28px rgba(15,23,42,.13);border-color:rgba(168,85,247,.25)}
+      .kpi-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:6px}
+      .kpi-val{font-size:clamp(1.4rem,4vw,1.9rem);font-weight:900;color:#0f172a;line-height:1}
+      .kpi-sub{font-size:.75rem;color:#94a3b8;margin-top:4px}
+      .kpi-icon{position:absolute;top:14px;right:14px;font-size:1.4rem;opacity:.18}
+      .kpi-grid-today{
+        display:grid;
+        grid-template-columns:repeat(2,1fr);
+        gap:12px;
+      }
+      @media(min-width:600px){.kpi-grid-today{grid-template-columns:repeat(4,1fr)}}
+      @media(min-width:1100px){.kpi-grid-today{grid-template-columns:repeat(4,1fr)}}
+      /* Alert panel */
+      .alert-panel{background:#fff;border-radius:16px;padding:20px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(15,23,42,.06)}
+      .alert-row{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #f1f5f9}
+      .alert-row:last-child{border-bottom:none;padding-bottom:0}
+      .alert-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+      .alert-dot.danger{background:#ef4444}
+      .alert-dot.warn{background:#f59e0b}
+      .alert-dot.success{background:#10b981}
+      .alert-dot.info{background:#3b82f6}
+      .alert-title{font-weight:700;font-size:.9rem;color:#0f172a}
+      .alert-desc{font-size:.8rem;color:#64748b;margin-top:2px}
+      .alert-time{font-size:.7rem;color:#94a3b8;white-space:nowrap;margin-left:auto;flex-shrink:0}
+    </style>
+    <div class="kpi-grid-today" id="today-kpi-grid">
+      <!-- Skeleton placeholders -->
+      {% for _ in "12345678" %}
+      <div class="kpi-cmd" style="opacity:.5">
+        <div class="kpi-label" style="background:#f1f5f9;height:10px;border-radius:6px;width:60%">&nbsp;</div>
+        <div class="kpi-val" style="background:#f1f5f9;height:28px;border-radius:6px;width:80%;margin-top:8px">&nbsp;</div>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ===== SMART ALERTS PANEL ===== -->
+  <section id="smart-alerts-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0;font-size:1rem;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:.08em">
+        <i class="bi bi-bell-fill" style="color:#f59e0b;margin-right:6px"></i>Smart Alerts
+      </h2>
+      <button onclick="document.getElementById('smart-alerts-section').style.display='none'"
+              style="border:0;background:none;color:#94a3b8;font-size:.8rem;cursor:pointer">Dismiss all</button>
+    </div>
+    <div class="alert-panel" id="smart-alerts-panel">
+      <div style="text-align:center;padding:20px;color:#94a3b8;font-size:.9rem" id="alerts-loading">
+        <i class="bi bi-hourglass-split"></i> Loading alerts...
+      </div>
+      <div id="alerts-content" style="display:none"></div>
+      <div id="alerts-empty" style="display:none;text-align:center;padding:16px;color:#94a3b8;font-size:.9rem">
+        <i class="bi bi-check-circle" style="color:#10b981;font-size:1.5rem"></i>
+        <div style="margin-top:6px;font-weight:600;color:#059669">All clear! No active alerts.</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+  (function() {
+    function fmtMK(v) {
+      var n = Math.round(parseFloat(v || 0));
+      return 'MK ' + n.toLocaleString();
+    }
+    function fmtNum(v) { return Math.round(parseFloat(v || 0)).toLocaleString(); }
+    function ago(d) {
+      if (!d) return '';
+      var diff = Math.floor((Date.now() - new Date(d)) / 60000);
+      if (diff < 1) return 'just now';
+      if (diff < 60) return diff + 'm ago';
+      if (diff < 1440) return Math.floor(diff / 60) + 'h ago';
+      return Math.floor(diff / 1440) + 'd ago';
+    }
+
+    function renderTodayKPIs(data) {
+      var grid = document.getElementById('today-kpi-grid');
+      if (!grid) return;
+      var ts = document.getElementById('today-kpi-ts');
+      if (ts) ts.textContent = 'Updated ' + ago(new Date().toISOString());
+
+      var todaySales = parseFloat(data.today_revenue || 0);
+      var todayCash = parseFloat(data.today_cash || 0);
+      var todayCredit = parseFloat(data.today_credit_issued || 0);
+      var outstandingCredit = parseFloat(data.outstanding_credit || 0);
+      var lowStockCount = parseInt(data.low_stock_count || 0);
+      var outOfStockCount = parseInt(data.out_of_stock_count || 0);
+      var todayProfit = parseFloat(data.today_profit || 0);
+      var bestSeller = data.today_best_seller || '—';
+      var repeatDebtors = parseInt(data.repeat_debtors || 0);
+      var totalSalesCount = parseInt(data.today_sales_count || 0);
+
+      var kpis = [
+        {label:'Today\'s Sales', val: fmtMK(todaySales), sub: totalSalesCount + ' transactions', icon:'bi-bag-check-fill', accent:'#7c3aed', good: todaySales > 0},
+        {label:'Cash Today', val: fmtMK(todayCash), sub: 'Direct payments', icon:'bi-cash-stack', accent:'#059669', good: todayCash > 0},
+        {label:'Credit Issued Today', val: fmtMK(todayCredit), sub: 'New credit sales', icon:'bi-person-credit-card', accent:'#dc2626', good: false},
+        {label:'Outstanding Credit', val: fmtMK(outstandingCredit), sub: 'Total owed to you', icon:'bi-exclamation-circle-fill', accent: outstandingCredit > 0 ? '#dc2626' : '#059669', good: outstandingCredit === 0},
+        {label:'Low Stock Alerts', val: lowStockCount + (outOfStockCount > 0 ? ' (+' + outOfStockCount + ' out)' : ''), sub: 'Products need restocking', icon:'bi-exclamation-triangle-fill', accent: lowStockCount > 0 ? '#f59e0b' : '#059669', good: lowStockCount === 0},
+        {label:'Best Seller Today', val: bestSeller, sub: 'Top product', icon:'bi-trophy-fill', accent:'#d97706', good: bestSeller !== '—'},
+        {label:'Profit Today', val: fmtMK(todayProfit), sub: todayProfit >= 0 ? 'Revenue minus costs' : 'Review pricing', icon:'bi-graph-up-arrow', accent: todayProfit >= 0 ? '#059669' : '#dc2626', good: todayProfit >= 0},
+        {label:'Repeat Debtor Risk', val: repeatDebtors > 0 ? repeatDebtors + ' flagged' : 'None', sub: 'Customers overdue 2+ times', icon:'bi-shield-exclamation', accent: repeatDebtors > 0 ? '#dc2626' : '#059669', good: repeatDebtors === 0},
+      ];
+
+      grid.innerHTML = kpis.map(function(k) {
+        return '<div class="kpi-cmd" style="--kpi-accent:' + k.accent + '">' +
+          '<i class="bi ' + k.icon + ' kpi-icon"></i>' +
+          '<div class="kpi-label">' + k.label + '</div>' +
+          '<div class="kpi-val" style="color:' + k.accent + '">' + k.val + '</div>' +
+          '<div class="kpi-sub">' + k.sub + '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    function renderAlerts(data) {
+      var loading = document.getElementById('alerts-loading');
+      var content = document.getElementById('alerts-content');
+      var empty = document.getElementById('alerts-empty');
+      if (!loading || !content || !empty) return;
+
+      var alerts = [];
+
+      if (data.low_stock_items && data.low_stock_items.length > 0) {
+        data.low_stock_items.slice(0, 3).forEach(function(item) {
+          alerts.push({type:'warn', title:'⚠ ' + item.name + ' — Low Stock', desc: item.stock_display || 'Running low'});
+        });
+      }
+      if (data.out_of_stock_items && data.out_of_stock_items.length > 0) {
+        data.out_of_stock_items.slice(0, 2).forEach(function(item) {
+          alerts.push({type:'danger', title:'✕ ' + item.name + ' — Out of Stock', desc: 'Cannot be sold until restocked'});
+        });
+      }
+      if (parseFloat(data.outstanding_credit || 0) > 0) {
+        alerts.push({type:'warn', title:'💳 Outstanding Credit: MK ' + Math.round(data.outstanding_credit).toLocaleString(), desc: (data.open_credits_count || 0) + ' customers owe you money — collect today'});
+      }
+      if (parseInt(data.repeat_debtors || 0) > 0) {
+        alerts.push({type:'danger', title:'🔴 ' + data.repeat_debtors + ' Repeat Late Payer' + (data.repeat_debtors > 1 ? 's' : ''), desc: 'Review before extending more credit'});
+      }
+      if (data.top_items && data.top_items.length > 0) {
+        alerts.push({type:'success', title:'🔥 ' + data.top_items[0].name + ' — Highest Seller', desc: 'MK ' + Math.round(data.top_items[0].revenue || 0).toLocaleString() + ' revenue — great margin product'});
+      }
+      if (parseInt(data.low_stock_count || 0) === 0 && parseInt(data.out_of_stock_count || 0) === 0) {
+        alerts.push({type:'success', title:'✅ Stock levels healthy', desc: 'All products have sufficient stock'});
+      }
+
+      loading.style.display = 'none';
+      if (alerts.length === 0) {
+        empty.style.display = 'block';
+      } else {
+        content.style.display = 'block';
+        content.innerHTML = alerts.map(function(a) {
+          var dotColor = {danger:'#ef4444', warn:'#f59e0b', success:'#10b981', info:'#3b82f6'}[a.type] || '#94a3b8';
+          return '<div class="alert-row">' +
+            '<div class="alert-dot" style="background:' + dotColor + '"></div>' +
+            '<div><div class="alert-title">' + a.title + '</div><div class="alert-desc">' + a.desc + '</div></div>' +
+            '</div>';
+        }).join('');
+      }
+    }
+
+    function loadTodayData() {
+      fetch('/liquor/api/business-insights/?days=1')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function(data) {
+          renderTodayKPIs(data);
+          renderAlerts(data);
+        })
+        .catch(function() {
+          var grid = document.getElementById('today-kpi-grid');
+          if (grid) grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8">Could not load today\'s data. <button onclick="loadTodayData()" style="border:0;background:none;color:#7c3aed;text-decoration:underline;cursor:pointer">Retry</button></div>';
+          var loading = document.getElementById('alerts-loading');
+          if (loading) loading.textContent = 'Could not load alerts.';
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadTodayData);
+  })();
+  </script>
 
   <!-- Financial KPIs: Enhanced with cost breakdown -->
   <section class="metrics-grid">

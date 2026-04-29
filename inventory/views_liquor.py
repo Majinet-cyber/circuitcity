@@ -1769,12 +1769,55 @@ def business_insights_api(request):
         if product.cost_per_bottle:
             total_stock_value += product.quantity_in_stock * product.cost_per_bottle
     
-    # Total revenue for period
-    total_revenue = sales.aggregate(total=Sum('total_price'))['total'] or Decimal("0.00")
-    
-    # Total sales count
+    # Total revenue / count for period
+    total_revenue = sales.exclude(is_free=True).aggregate(total=Sum('total_price'))['total'] or Decimal("0.00")
     total_sales_count = sales.count()
-    
+
+    # Cash today (payment method breakdown for period)
+    from inventory.models_verticals import PaymentMethod as _PM
+    today_cash = sales.filter(payment_method=_PM.CASH, is_credit=False, is_free=False).aggregate(
+        t=Sum('total_price'))['t'] or Decimal("0.00")
+
+    # Credit issued in period
+    today_credit_issued = sales.filter(is_credit=True).aggregate(
+        t=Sum('total_price'))['t'] or Decimal("0.00")
+
+    # Outstanding credit (total balance owed across all time)
+    outstanding_credit_data = LiquorCredit.objects.filter(
+        business=business, status__in=['open', 'partial']
+    ).aggregate(
+        total=Sum('amount'),
+        paid=Sum('amount_paid'),
+        cnt=Count('id')
+    )
+    outstanding_credit_bal = (outstanding_credit_data['total'] or Decimal("0.00")) - \
+                              (outstanding_credit_data['paid'] or Decimal("0.00"))
+    open_credits_count = outstanding_credit_data['cnt'] or 0
+
+    # Repeat debtors: customers with 2+ credits still open
+    repeat_debtors = LiquorCredit.objects.filter(
+        business=business, status__in=['open', 'partial']
+    ).values('customer_name').annotate(cnt=Count('id')).filter(cnt__gte=2).count()
+
+    # Today's profit estimate (revenue - cost of goods sold for period)
+    period_cogs = sales.exclude(is_credit=True).aggregate(t=Sum('total_cost'))['t'] or Decimal("0.00")
+    today_profit = total_revenue - period_cogs
+
+    # Best seller today (by revenue)
+    today_best_seller = top_items_list[0]['name'] if top_items_list else None
+
+    # Low stock items list (for alerts panel)
+    low_stock_items_list = [
+        {'name': p.name, 'stock_display': f'{p.quantity_in_stock} units'}
+        for p in low_stock_products[:4]
+    ]
+    out_of_stock_items_list = [
+        {'name': p.name}
+        for p in MerchProduct.objects.filter(
+            business=business, kind=BusinessKind.LIQUOR, is_active=True, quantity_in_stock=0
+        )[:3]
+    ]
+
     return JsonResponse({
         'ok': True,
         'period_days': days,
@@ -1783,8 +1826,20 @@ def business_insights_api(request):
         'revenue_trend': revenue_trend,
         'top_items': top_items_list,
         'low_stock_count': low_stock_count,
+        'low_stock_items': low_stock_items_list,
         'out_of_stock_count': out_of_stock_count,
+        'out_of_stock_items': out_of_stock_items_list,
         'total_stock_value': float(total_stock_value),
         'total_revenue': float(total_revenue),
         'total_sales_count': total_sales_count,
+        # Today-specific fields (meaningful when days=1, useful anytime)
+        'today_revenue': float(total_revenue),
+        'today_cash': float(today_cash),
+        'today_credit_issued': float(today_credit_issued),
+        'outstanding_credit': float(outstanding_credit_bal),
+        'open_credits_count': open_credits_count,
+        'today_profit': float(today_profit),
+        'today_best_seller': today_best_seller,
+        'today_sales_count': total_sales_count,
+        'repeat_debtors': repeat_debtors,
     })

@@ -473,6 +473,34 @@
         {% endif %}
       </div>
 
+      <!-- Profit margin badge -->
+      {% if product.price_per_bottle and product.cost_per_bottle and product.cost_per_bottle > 0 %}
+      {% with sell=product.price_per_bottle cost=product.cost_per_bottle %}
+      <div style="margin-bottom:10px">
+        {% if sell >= cost %}
+          {% widthratio sell cost 100 as gross_pct %}
+          {% if gross_pct >= 140 %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:linear-gradient(135deg,#d1fae5,#6ee7b7);color:#065f46;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:800;border:1px solid #6ee7b7">
+              🔥 High Margin
+            </span>
+          {% elif gross_pct >= 120 %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;color:#15803d;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #bbf7d0">
+              ✓ Good Margin
+            </span>
+          {% else %}
+            <span style="display:inline-flex;align-items:center;gap:5px;background:#fff7ed;color:#c2410c;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #fed7aa">
+              ⚠ Low Margin
+            </span>
+          {% endif %}
+        {% else %}
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#fef2f2;color:#dc2626;padding:4px 10px;border-radius:99px;font-size:.72rem;font-weight:700;border:1px solid #fecaca">
+            ⚠ Selling Below Cost
+          </span>
+        {% endif %}
+      </div>
+      {% endwith %}
+      {% endif %}
+
       <!-- Quick Actions -->
       <div class="quick-actions">
         <a href="{% url 'liquor:scan_in' %}?product={{ product.id }}"
