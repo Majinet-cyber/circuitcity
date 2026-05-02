@@ -13,7 +13,8 @@ from django.utils import timezone
 
 from tenants.models import Business, Membership
 from inventory.models import Location
-from timelogs.models import AgentWorkLog
+from timelogs.models import AgentWorkLog, LocationPing
+from timelogs.services_presence import reliability_score
 
 User = get_user_model()
 
@@ -218,4 +219,99 @@ class TestTimelogsAgentList:
         assert response.status_code == 200
         # Should show empty/no data message
         # Exact text depends on template
+
+    def test_manager_csv_export_includes_all_agents(self, business, manager_user, agent1, agent2, location, client: Client):
+        """Managers can export all business agents; export remains tenant-scoped."""
+        client.force_login(manager_user)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+
+        today = timezone.localdate()
+        AgentWorkLog.objects.create(
+            agent=agent1,
+            business=business,
+            location=location,
+            work_date=today,
+            total_on_site_minutes=120,
+        )
+        AgentWorkLog.objects.create(
+            agent=agent2,
+            business=business,
+            location=location,
+            work_date=today,
+            total_on_site_minutes=90,
+        )
+
+        response = client.get(
+            reverse('timelogs:export_csv'),
+            {"from_date": today.isoformat(), "to_date": today.isoformat(), "agent": "all"},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "agent1" in content
+        assert "agent2" in content
+        assert "Reliability Score" in content
+
+    def test_agent_csv_export_only_own_logs(self, business, agent1, agent2, location, client: Client):
+        """Agents cannot export another user's logs by passing query params."""
+        client.force_login(agent1)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+
+        today = timezone.localdate()
+        AgentWorkLog.objects.create(
+            agent=agent1,
+            business=business,
+            location=location,
+            work_date=today,
+            total_on_site_minutes=120,
+        )
+        AgentWorkLog.objects.create(
+            agent=agent2,
+            business=business,
+            location=location,
+            work_date=today,
+            total_on_site_minutes=90,
+        )
+
+        response = client.get(
+            reverse('timelogs:export_csv'),
+            {"from_date": today.isoformat(), "to_date": today.isoformat(), "agent": agent2.id},
+        )
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "agent1" in content
+        assert "agent2" not in content
+
+    def test_reliability_score_uses_lateness_and_geofence(self, business, agent1, location):
+        """Reliability scoring should degrade for late and currently outside agents."""
+        now = timezone.now()
+        work_log = AgentWorkLog.objects.create(
+            agent=agent1,
+            business=business,
+            location=location,
+            work_date=timezone.localdate(),
+            first_seen_at=now - timedelta(hours=3),
+            last_seen_at=now,
+            scheduled_start=(now - timedelta(hours=4)).time(),
+            scheduled_end=(now + timedelta(hours=4)).time(),
+            arrived_late_minutes=30,
+            total_on_site_minutes=120,
+            total_idle_minutes=30,
+        )
+        AgentWorkLog.objects.filter(pk=work_log.pk).update(arrived_late_minutes=30)
+        work_log.refresh_from_db()
+        LocationPing.objects.create(
+            work_log=work_log,
+            timestamp=now,
+            latitude=Decimal("0"),
+            longitude=Decimal("0"),
+            is_inside_geofence=False,
+        )
+
+        assert reliability_score(work_log) == 49
 

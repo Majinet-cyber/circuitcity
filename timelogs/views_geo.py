@@ -20,6 +20,7 @@ from tenants.scope import get_membership
 from .models import AgentWorkLog, LocationPing, WorkingHours
 from .utils_geo import is_within_geofence
 from .constants import WORK_START, WORK_END, EARLY_BONUS_PER_30, LATE_PENALTY_PER_30
+from .services_presence import parse_iso_timestamp, presence_summary, reliability_score
 
 
 def _get_location_model():
@@ -84,10 +85,7 @@ def ping_location(request):
         
         # Optional timestamp (defaults to now)
         timestamp_str = data.get("timestamp")
-        if timestamp_str:
-            ping_timestamp = timezone.make_aware(datetime.fromisoformat(timestamp_str.replace("Z", "+00:00")))
-        else:
-            ping_timestamp = timezone.now()
+        ping_timestamp = parse_iso_timestamp(timestamp_str)
     except (ValueError, TypeError, json.JSONDecodeError, KeyError) as e:
         return JsonResponse({"ok": False, "error": f"Invalid request data: {e}"}, status=400)
     
@@ -153,15 +151,21 @@ def ping_location(request):
         "last_location_update"
     ])
     
+    summary = presence_summary(work_log)
     return JsonResponse({
         "ok": True,
         "is_inside": is_inside,
+        "geofence_status": summary["geofence_status"],
         "distance_m": round(distance, 2),
         "work_log_id": work_log.id,
         "on_site_minutes": work_log.total_on_site_minutes,
         "idle_minutes": work_log.total_idle_minutes,
         "first_seen": work_log.first_seen_at.isoformat() if work_log.first_seen_at else None,
         "last_seen": work_log.last_seen_at.isoformat() if work_log.last_seen_at else None,
+        "checked_in": summary["checked_in"],
+        "checked_out": summary["checked_out"],
+        "lateness_status": summary["lateness_status"],
+        "reliability_score": reliability_score(work_log),
         "bonus_amount": str(work_log.bonus_amount),
         "penalty_amount": str(work_log.penalty_amount),
         "arrived_early_minutes": work_log.arrived_early_minutes,
@@ -207,7 +211,10 @@ def _is_within_working_hours(work_log: AgentWorkLog, dt) -> bool:
         work_log.scheduled_start = WORK_START
         work_log.scheduled_end = WORK_END
     
-    time_only = dt.time() if hasattr(dt, "time") else dt
+    if hasattr(dt, "time"):
+        time_only = timezone.localtime(dt).time() if timezone.is_aware(dt) else dt.time()
+    else:
+        time_only = dt
     return work_log.scheduled_start <= time_only <= work_log.scheduled_end
 
 

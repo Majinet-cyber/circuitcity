@@ -345,6 +345,41 @@ class TestWeldingDashboardIntegration:
         assert response.status_code == 200
         # Just verify it doesn't crash with filter param
 
+    def test_invoice_payment_feeds_dashboard_revenue(self, client, welding_manager, welding_business):
+        """Recorded invoice payments should be included in dashboard revenue totals."""
+        from inventory.models_welding import WeldingInvoice, WeldingInvoiceStatus
+
+        client.force_login(welding_manager)
+        session = client.session
+        session['active_business_id'] = welding_business.id
+        session.save()
+
+        invoice = WeldingInvoice.objects.create(
+            business=welding_business,
+            customer_name="Paid Customer",
+            line_items=[],
+            subtotal=Decimal("50000.00"),
+            total=Decimal("50000.00"),
+            status=WeldingInvoiceStatus.SENT,
+            issue_date=date.today(),
+            created_by=welding_manager,
+        )
+
+        response = client.post(
+            f"/verticals/welding/invoices/{invoice.id}/",
+            {"payment_amount": "50000", "paid_on": date.today().isoformat()},
+        )
+        assert response.status_code == 302
+
+        invoice.refresh_from_db()
+        assert invoice.status == WeldingInvoiceStatus.PAID
+        assert invoice.amount_paid == Decimal("50000.00")
+
+        response = client.get('/verticals/welding/dashboard/?range=mtd')
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert '50,000' in content or '50000' in content
+
 
 @pytest.mark.django_db
 class TestWeldingRegression:

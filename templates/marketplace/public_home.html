@@ -6,7 +6,7 @@
 <title>Emajinet Marketplace – Discover Local Businesses Across Africa</title>
 <meta name="description" content="Discover quality products and services from verified local African businesses on Emajinet Marketplace. From phones to farms, find trusted sellers near you.">
 <link rel="icon" href="/static/favicon.ico">
-{% load static %}
+{% load static marketplace_media %}
 <style>
   :root {
     --primary: #4f46e5;
@@ -353,19 +353,21 @@
     transform:translateY(-5px);
     color:inherit; text-decoration:none;
   }
-  .listing-img-wrap { position:relative; flex-shrink:0; overflow:hidden; }
-  .listing-img {
-    width:100%; height:210px; object-fit:cover;
+  .listing-img-wrap { position:relative; flex-shrink:0; overflow:hidden; height:210px; background:var(--bg-light); }
+  .listing-img, .listing-video {
+    width:100%; height:100%; object-fit:cover; object-position:center;
     background:var(--bg-light); display:block;
     transition:transform .35s ease;
   }
   .listing-card:hover .listing-img { transform:scale(1.04); }
   .listing-img-placeholder {
-    width:100%; height:210px;
+    width:100%; height:100%;
     background:linear-gradient(135deg,rgba(79,70,229,.07) 0%,rgba(16,185,129,.05) 100%);
     display:flex; align-items:center; justify-content:center; font-size:3.5rem;
     flex-shrink:0;
   }
+  .listing-img-fallback { display:none; position:absolute; inset:0; }
+  .listing-img-wrap.media-failed .listing-img-fallback { display:flex; }
   .listing-vertical-badge {
     position:absolute; top:.65rem; left:.65rem;
     font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
@@ -527,7 +529,7 @@
     .trust-item-value { font-size:1.1rem; }
     .categories-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
     .listings-grid { grid-template-columns:repeat(2,1fr); gap:.75rem; }
-    .listing-img, .listing-img-placeholder { height:160px; }
+    .listing-img-wrap { height:160px; }
     .biz-grid { grid-template-columns:repeat(3,1fr); }
     .footer-brand-row { flex-direction:column; }
     .footer-bottom { flex-direction:column; text-align:center; }
@@ -816,20 +818,17 @@
     {% for listing in page_obj %}
     <a href="/marketplace/{{ listing.business.slug }}/{{ listing.listing_slug }}/" class="listing-card">
       <div class="listing-img-wrap">
-        {% with primary=listing.primary_image %}
-        {% if primary %}
-          <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
-        {% elif listing.media_file %}
-          <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
+        {% with media=listing|listing_card_media %}
+        {% if media.kind == "image" %}
+          <img src="{{ media.url }}" alt="{{ media.alt }}" class="listing-img" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('media-failed');this.remove();">
+          <div class="listing-img-placeholder listing-img-fallback">{{ media.placeholder_icon }}</div>
+        {% elif media.kind == "video" %}
+          <video class="listing-video" muted playsinline preload="metadata" aria-label="{{ media.alt }}">
+            <source src="{{ media.url }}">
+          </video>
         {% else %}
           <div class="listing-img-placeholder">
-            {% if listing.vertical == "phones" %}📱
-            {% elif listing.vertical == "car_dealer" %}🏎️
-            {% elif listing.vertical == "clothing" %}👕
-            {% elif listing.vertical == "farm" %}🌾
-            {% elif listing.vertical == "gym" %}🏋️
-            {% elif listing.vertical == "pharmacy" %}💊
-            {% else %}📦{% endif %}
+            {{ media.placeholder_icon }}
           </div>
         {% endif %}
         {% endwith %}

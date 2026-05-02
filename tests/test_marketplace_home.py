@@ -14,10 +14,13 @@ Verifies:
 - landing page includes farm in marketplace messaging
 """
 import pytest
+import tempfile
+from django.core.files.base import ContentFile
+from django.test import override_settings
 from django.test import TestCase, Client
 from django.urls import reverse, resolve, NoReverseMatch
 
-from inventory.models_marketplace import MarketplaceListing, ListingStatus
+from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
 from tenants.models import Business
 
 
@@ -562,3 +565,76 @@ class MarketplaceListingCardUpgradeTests(TestCase):
             content,
             "Listing card must link to the listing detail URL.",
         )
+
+
+@pytest.mark.django_db
+class MarketplaceListingMediaRenderingTests(TestCase):
+    """Marketplace cards should never render broken media URLs."""
+
+    def setUp(self):
+        self.media_root = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root.name)
+        self.settings_override.enable()
+        self.biz = Business.objects.create(
+            name="Media Test Shop",
+            slug="media-test-shop",
+            business_kind="phones",
+        )
+        self.client = Client()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media_root.cleanup()
+
+    def test_missing_legacy_media_uses_placeholder_not_broken_img(self):
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Missing Legacy Image",
+            status="live",
+            vertical="phones",
+            media_file="marketplace/missing-image.jpg",
+        )
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Missing Legacy Image", content)
+        self.assertIn("listing-img-placeholder", content)
+        self.assertNotIn("missing-image.jpg", content)
+
+    def test_existing_video_media_renders_as_video_not_img(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Video Listing",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("demo.mp4", ContentFile(b"video"), save=True)
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("<video", content)
+        self.assertIn("demo.mp4", content)
+
+    def test_missing_gallery_image_falls_back_to_placeholder(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Missing Gallery Image",
+            status="live",
+            vertical="phones",
+        )
+        MarketplaceListingImage.objects.create(
+            listing=listing,
+            image="marketplace/missing-primary.jpg",
+        )
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Missing Gallery Image", content)
+        self.assertIn("listing-img-placeholder", content)
+        self.assertNotIn("missing-primary.jpg", content)

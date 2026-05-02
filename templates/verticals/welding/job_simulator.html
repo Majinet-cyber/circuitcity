@@ -165,6 +165,101 @@
   border-color: var(--weld-primary);
 }
 
+.mode-switch {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  border-radius: 14px;
+  margin-bottom: 1.25rem;
+}
+
+.mode-switch a {
+  color: var(--weld-muted);
+  text-decoration: none;
+  font-weight: 700;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+}
+
+.mode-switch a.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--weld-primary), var(--weld-accent));
+}
+
+.material-table-wrap {
+  overflow-x: auto;
+}
+
+.material-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.65rem;
+}
+
+.material-table th {
+  color: var(--weld-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  padding: 0 0.5rem;
+}
+
+.material-table td {
+  padding: 0 0.35rem;
+  vertical-align: top;
+}
+
+.material-table .form-control {
+  min-width: 105px;
+  padding: 0.7rem 0.75rem;
+  border-radius: 10px;
+}
+
+.material-table .material-name {
+  min-width: 190px;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--weld-border);
+  background: var(--weld-surface);
+  color: var(--weld-text);
+  cursor: pointer;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.summary-card {
+  background: var(--weld-surface);
+  border: 1px solid var(--weld-border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.summary-label {
+  color: var(--weld-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+
+.summary-value {
+  color: var(--weld-text);
+  font-size: 1.12rem;
+  font-weight: 800;
+}
+
 /* Buttons */
 .btn {
   padding: 0.875rem 1.5rem;
@@ -322,6 +417,15 @@
   .template-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .mode-switch {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .material-table {
+    min-width: 760px;
+  }
 }
 </style>
 {% endblock %}
@@ -335,14 +439,20 @@
       <p class="page-subtitle">Estimate materials and costs for any job. The "brain" that helps you price accurately.</p>
     </div>
     
+    <div class="mode-switch" aria-label="Simulator mode">
+      <a href="#templateEstimator" class="{% if simulator_mode != 'general' %}active{% endif %}">Template estimator</a>
+      <a href="#workshopEstimator" class="{% if simulator_mode == 'general' %}active{% endif %}">Workshop simulator</a>
+    </div>
+
     <!-- Template Selection -->
     <form method="post" id="simulatorForm">
       {% csrf_token %}
+      <input type="hidden" name="simulator_mode" value="template">
       
-      <div class="section-card">
+      <div class="section-card" id="templateEstimator">
         <div class="section-header">
           <div class="section-icon">📋</div>
-          <div class="section-title">Step 1: Select Job Template</div>
+          <div class="section-title">Template Estimator</div>
         </div>
         <div class="section-body">
           <div class="template-grid" data-testid="welding-simulator-templates">
@@ -373,7 +483,7 @@
       <div class="section-card">
         <div class="section-header">
           <div class="section-icon">⚙️</div>
-          <div class="section-title">Step 2: Configuration</div>
+          <div class="section-title">Template Configuration</div>
         </div>
         <div class="section-body">
           <div class="form-row">
@@ -389,6 +499,94 @@
           
           <button type="submit" class="btn btn-primary" data-testid="welding-simulator-calculate">
             <i class="bi bi-calculator"></i> Calculate Costs
+          </button>
+        </div>
+      </div>
+    </form>
+
+    <form method="post" id="workshopEstimator">
+      {% csrf_token %}
+      <input type="hidden" name="simulator_mode" value="general">
+
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-icon">🧰</div>
+          <div class="section-title">General Workshop / Material Simulator</div>
+        </div>
+        <div class="section-body">
+          <div class="material-table-wrap">
+            <table class="material-table" id="materialRows">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Material / Cost</th>
+                  <th>Qty</th>
+                  <th>Unit</th>
+                  <th>Unit Cost</th>
+                  <th>Waste %</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in default_workshop_rows %}
+                <tr>
+                  <td>
+                    <select class="form-control" name="material_category">
+                      {% for code, label in material_categories %}
+                      <option value="{{ code }}" {% if row.category == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td><input class="form-control material-name" type="text" name="material_name" value="{{ row.name }}"></td>
+                  <td><input class="form-control" type="number" name="quantity" min="0" step="0.01" value="{{ row.quantity }}"></td>
+                  <td>
+                    <select class="form-control" name="unit">
+                      {% for code, label in unit_choices %}
+                      <option value="{{ code }}" {% if row.unit == code %}selected{% endif %}>{{ label }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td><input class="form-control" type="number" name="unit_cost" min="0" step="0.01" value="{{ row.unit_cost }}"></td>
+                  <td><input class="form-control" type="number" name="waste_percent" min="0" max="100" step="0.1" value="{{ row.waste_percent }}"></td>
+                  <td><button type="button" class="icon-btn" onclick="removeMaterialRow(this)" aria-label="Remove row">×</button></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <button type="button" class="btn btn-secondary" onclick="addMaterialRow()" style="margin-bottom: 1rem;">
+            <i class="bi bi-plus-lg"></i> Add material row
+          </button>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Labour Hours</label>
+              <input type="number" class="form-control" name="labour_hours" value="8" min="0" step="0.25">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Labour Rate (MWK/hr)</label>
+              <input type="number" class="form-control" name="workshop_labour_rate" value="5000" min="0" step="100">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Transport (MWK)</label>
+              <input type="number" class="form-control" name="transport_cost" value="0" min="0" step="100">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Overhead %</label>
+              <input type="number" class="form-control" name="overhead_percent" value="10" min="0" max="100" step="0.1">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Profit %</label>
+              <input type="number" class="form-control" name="profit_percent" value="25" min="0" max="100" step="0.1">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" data-testid="welding-workshop-calculate">
+            <i class="bi bi-calculator"></i> Calculate Custom Estimate
           </button>
         </div>
       </div>
@@ -495,6 +693,107 @@
       </div>
     </div>
     {% endif %}
+
+    {% if workshop_result %}
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">📊</div>
+        <div class="section-title">Workshop Estimate Results</div>
+      </div>
+      <div class="section-body">
+        <div class="summary-cards">
+          <div class="summary-card">
+            <div class="summary-label">Materials + Waste</div>
+            <div class="summary-value">MWK {{ workshop_result.materials_total|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Labour</div>
+            <div class="summary-value">MWK {{ workshop_result.labour_cost|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Overhead</div>
+            <div class="summary-value">MWK {{ workshop_result.overhead_cost|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Profit</div>
+            <div class="summary-value">MWK {{ workshop_result.profit_amount|floatformat:0|intcomma }}</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Final Estimate</div>
+            <div class="summary-value">MWK {{ workshop_result.final_estimate|floatformat:0|intcomma }}</div>
+          </div>
+        </div>
+
+        <div class="results-grid">
+          <div>
+            <h4 style="margin-bottom: 1rem;">Material Rows</h4>
+            <div class="material-table-wrap">
+              <table class="bom-table">
+                <thead>
+                  <tr>
+                    <th>Material</th>
+                    <th>Qty</th>
+                    <th>Base</th>
+                    <th>Waste</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in workshop_result.rows %}
+                  <tr>
+                    <td>{{ row.name }}</td>
+                    <td>{{ row.quantity }} {{ row.unit }}</td>
+                    <td>MWK {{ row.base_cost|floatformat:0|intcomma }}</td>
+                    <td>{{ row.waste_percent|floatformat:1 }}% / MWK {{ row.waste_cost|floatformat:0|intcomma }}</td>
+                    <td>MWK {{ row.line_total|floatformat:0|intcomma }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="5">No material rows were entered.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div class="cost-summary">
+              <h4 style="margin-bottom: 1rem;">Cost Build-up</h4>
+              <div class="cost-row">
+                <span class="cost-label">Material subtotal</span>
+                <span class="cost-value">MWK {{ workshop_result.materials_subtotal|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Waste allowance</span>
+                <span class="cost-value">MWK {{ workshop_result.waste_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Labour</span>
+                <span class="cost-value">MWK {{ workshop_result.labour_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Transport</span>
+                <span class="cost-value">MWK {{ workshop_result.transport_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Overhead</span>
+                <span class="cost-value">MWK {{ workshop_result.overhead_cost|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row">
+                <span class="cost-label">Profit</span>
+                <span class="cost-value">MWK {{ workshop_result.profit_amount|floatformat:0|intcomma }}</span>
+              </div>
+              <div class="cost-row total">
+                <span class="cost-label"><strong>Final Estimate</strong></span>
+                <span class="cost-value">MWK {{ workshop_result.final_estimate|floatformat:0|intcomma }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
     
     <!-- Back Link -->
     <div style="margin-top: 1rem;">
@@ -510,6 +809,28 @@ function selectTemplate(card, code) {
   document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
   card.querySelector('input[type="radio"]').checked = true;
+}
+
+function addMaterialRow() {
+  const tbody = document.querySelector('#materialRows tbody');
+  const source = tbody.querySelector('tr:last-child');
+  if (!source) return;
+  const clone = source.cloneNode(true);
+  clone.querySelectorAll('input').forEach(input => {
+    if (input.name === 'quantity') input.value = '1';
+    else if (input.name === 'waste_percent') input.value = '10';
+    else input.value = '';
+  });
+  clone.querySelectorAll('select').forEach(select => {
+    select.selectedIndex = 0;
+  });
+  tbody.appendChild(clone);
+}
+
+function removeMaterialRow(button) {
+  const rows = document.querySelectorAll('#materialRows tbody tr');
+  if (rows.length <= 1) return;
+  button.closest('tr').remove();
 }
 </script>
 {% endblock %}

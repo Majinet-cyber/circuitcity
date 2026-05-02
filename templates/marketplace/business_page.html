@@ -6,6 +6,7 @@
 <title>{{ business.name }} – Emajinet Marketplace</title>
 <meta name="description" content="Browse products and services from {{ business.name }} on Emajinet Marketplace.">
 <link rel="icon" href="/static/favicon.ico">
+{% load marketplace_media %}
 <style>
   :root {
     --primary: #4f46e5;
@@ -278,18 +279,28 @@
 
   .listing-card-link:hover { color: inherit; text-decoration: none; }
 
-  .listing-img {
+  .listing-img-wrap {
     width: 100%;
     height: 200px;
+    background: var(--bg-light);
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .listing-img,
+  .listing-video {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
+    object-position: center;
     background: var(--bg-light);
     display: block;
-    flex-shrink: 0;
   }
 
   .listing-img-placeholder {
     width: 100%;
-    height: 200px;
+    height: 100%;
     background: linear-gradient(135deg, rgba(79, 70, 229, 0.07) 0%, rgba(16, 185, 129, 0.05) 100%);
     display: flex;
     align-items: center;
@@ -297,6 +308,8 @@
     font-size: 3.2rem;
     flex-shrink: 0;
   }
+  .listing-img-fallback { display: none; position: absolute; inset: 0; }
+  .listing-img-wrap.media-failed .listing-img-fallback { display: flex; }
 
   .listing-body {
     padding: 1rem 1rem 0.75rem;
@@ -524,7 +537,7 @@
     .biz-hero-layout { flex-direction: column; align-items: center; text-align: center; }
     .biz-meta-row { justify-content: center; }
     .listings-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-    .listing-img, .listing-img-placeholder { height: 160px; }
+    .listing-img-wrap { height: 160px; }
   }
 </style>
 </head>
@@ -608,23 +621,20 @@
     {% for listing in page_obj %}
     <div class="listing-card">
       <a href="/marketplace/{{ business.slug }}/{{ listing.listing_slug }}/" class="listing-card-link">
-        {% with primary=listing.primary_image %}
-        {% if primary %}
-          <img src="{{ primary.image.url }}" alt="{{ listing.title }}" class="listing-img">
-        {% elif listing.media_file %}
-          <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-img">
-        {% else %}
-          <div class="listing-img-placeholder">
-            {% if listing.vertical == "phones" %}📱
-            {% elif listing.vertical == "car_dealer" %}🏎️
-            {% elif listing.vertical == "farm" %}🌾
-            {% elif listing.vertical == "clothing" %}👕
-            {% elif listing.vertical == "gym" %}🏋️
-            {% elif listing.vertical == "pharmacy" %}💊
-            {% else %}📦{% endif %}
-          </div>
-        {% endif %}
-        {% endwith %}
+        <div class="listing-img-wrap">
+          {% with media=listing|listing_card_media %}
+          {% if media.kind == "image" %}
+            <img src="{{ media.url }}" alt="{{ media.alt }}" class="listing-img" loading="lazy" decoding="async" onerror="this.parentElement.classList.add('media-failed');this.remove();">
+            <div class="listing-img-placeholder listing-img-fallback">{{ media.placeholder_icon }}</div>
+          {% elif media.kind == "video" %}
+            <video class="listing-video" muted playsinline preload="metadata" aria-label="{{ media.alt }}">
+              <source src="{{ media.url }}">
+            </video>
+          {% else %}
+            <div class="listing-img-placeholder">{{ media.placeholder_icon }}</div>
+          {% endif %}
+          {% endwith %}
+        </div>
         <div class="listing-body">
           <div class="listing-title">{{ listing.title }}</div>
           {% if listing.price %}

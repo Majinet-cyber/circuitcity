@@ -176,7 +176,41 @@
       <input type="date" name="date" value="{{ selected_date|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required>
       <button type="submit" class="btn btn-primary btn-sm">View</button>
       <a href="?" class="btn btn-outline-secondary btn-sm">Today</a>
+      <a href="{% url 'timelogs:export_csv' %}?from_date={{ selected_date|date:'Y-m-d' }}&to_date={{ selected_date|date:'Y-m-d' }}{% if selected_agent %}&agent={{ selected_agent.id }}{% elif selected_agent_id %}&agent={{ selected_agent_id }}{% endif %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-download"></i> CSV
+      </a>
     </form>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="stat-card">
+        <div class="stat-label">Checked In</div>
+        <div class="stat-value">{{ kpis.present_count }}</div>
+        <div class="stat-label">Agents</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card" style="background: linear-gradient(135deg, #10b981 0%, #047857 100%);">
+        <div class="stat-label">Inside Geofence</div>
+        <div class="stat-value">{{ kpis.inside_count }}</div>
+        <div class="stat-label">Now</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%);">
+        <div class="stat-label">Late</div>
+        <div class="stat-value">{{ kpis.late_count }}</div>
+        <div class="stat-label">Agents</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="stat-card" style="background: linear-gradient(135deg, #475569 0%, #1f2937 100%);">
+        <div class="stat-label">Reliability</div>
+        <div class="stat-value">{{ kpis.average_reliability_score }}</div>
+        <div class="stat-label">Score</div>
+      </div>
+    </div>
   </div>
   
   <!-- All Agents View (Managers Only) -->
@@ -201,6 +235,10 @@
             <div style="font-size: 1.5rem; font-weight: 700;">{{ log.total_idle_minutes }}</div>
             <div style="font-size: 0.75rem; opacity: 0.8;">minutes</div>
           </div>
+        </div>
+        <div style="margin-top: 12px; display: flex; justify-content: space-between; font-size: 0.75rem;">
+          <span>{{ log.presence.geofence_status|title }}</span>
+          <span>{{ log.presence.reliability_score }} reliability</span>
         </div>
         <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.2); font-size: 0.75rem;">
           {% if log.first_seen_at %}
@@ -312,6 +350,34 @@
       <h5 class="mb-3">Details</h5>
       
       <div class="row g-3">
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Check-In:</span>
+            <strong>{{ presence.check_in_at|date:"H:i"|default:"--:--" }}</strong>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Check-Out:</span>
+            <strong>{{ presence.check_out_at|date:"H:i"|default:"--:--" }}</strong>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Geofence:</span>
+            <strong>{{ presence.geofence_status|title }}</strong>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="d-flex justify-content-between border-bottom pb-2">
+            <span class="text-muted">Reliability Score:</span>
+            <strong>{{ presence.reliability_score }}</strong>
+          </div>
+        </div>
+
         <div class="col-md-6">
           <div class="d-flex justify-content-between border-bottom pb-2">
             <span class="text-muted">Scheduled Start:</span>

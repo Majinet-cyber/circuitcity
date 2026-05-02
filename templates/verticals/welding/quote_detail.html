@@ -783,6 +783,11 @@
       });
   };
 
+  document.body.addEventListener("click", function (event) {
+    var modalTrigger = event.target.closest('[data-bs-toggle="modal"]');
+    if (!modalTrigger) return;
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     bindMaterialCards();
     bindSearchAndFilter();

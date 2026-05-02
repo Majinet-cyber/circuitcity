@@ -713,6 +713,7 @@ urlpatterns += [
     path("sales/", include_or_raise("sales.urls", "sales")),
     path("tenants/", include_or_raise("tenants.urls", "tenants")),
     path("dashboard/", include_or_raise("dashboard.urls", "dashboard")),
+    path("timelogs/", include(("timelogs.urls", "timelogs"), namespace="timelogs")),
     # Layby app include
     path("layby/", include_or_raise("layby.urls", "layby")),
     # Support & Audit

@@ -6,6 +6,7 @@
 <title>{{ listing.title }} – {{ business.name }} | Emajinet Marketplace</title>
 <meta name="description" content="{{ listing.description|truncatewords:25 }}">
 <link rel="icon" href="/static/favicon.ico">
+{% load marketplace_media %}
 <style>
   :root {
     --primary: #4f46e5;
@@ -176,10 +177,12 @@
   }
 
   /* ── GALLERY ── */
-  .gallery-main {
+  .gallery-main,
+  .gallery-video {
     width: 100%;
     height: 400px;
     object-fit: cover;
+    object-position: center;
     border-radius: var(--radius-card);
     background: var(--bg-light);
     display: block;
@@ -460,10 +463,12 @@
     text-decoration: none;
   }
 
-  .more-img {
+  .more-img,
+  .more-video {
     width: 100%;
     height: 120px;
     object-fit: cover;
+    object-position: center;
     background: var(--bg-light);
     display: block;
   }
@@ -544,13 +549,13 @@
   @media (max-width: 768px) {
     .mkt-navbar-inner { padding: 0.8rem 1.25rem; }
     .listing-page-wrap { padding: 2rem 1.25rem 4rem; }
-    .gallery-main, .gallery-main-placeholder { height: 300px; }
+    .gallery-main, .gallery-video, .gallery-main-placeholder { height: 300px; }
     .mkt-footer-inner { flex-direction: column; text-align: center; }
     .more-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
   }
 
   @media (max-width: 480px) {
-    .gallery-main, .gallery-main-placeholder { height: 240px; border-radius: 14px; }
+    .gallery-main, .gallery-video, .gallery-main-placeholder { height: 240px; border-radius: 14px; }
     .price-display { font-size: 1.75rem; }
     .listing-title-big { font-size: 1.15rem; }
     .more-grid { grid-template-columns: repeat(2, 1fr); }
@@ -612,32 +617,33 @@
     <!-- Left: gallery + details -->
     <div>
       <!-- Gallery -->
-      {% if images %}
-        {% with first=images.0 %}
-          <img id="mainImg" src="{{ first.image.url }}" alt="{{ listing.title }}" class="gallery-main">
-        {% endwith %}
+      {% with media=listing|listing_card_media %}
+      {% if media.kind == "image" %}
+        <img id="mainImg" src="{{ media.url }}" alt="{{ media.alt }}" class="gallery-main" decoding="async" onerror="this.replaceWith(document.getElementById('galleryFallback').content.cloneNode(true));">
         {% if images|length > 1 %}
         <div class="gallery-thumbs">
           {% for img in images %}
-            <img src="{{ img.image.url }}" alt="{{ listing.title }} {{ forloop.counter }}"
+            {% with thumb_url=img|marketplace_image_src %}
+            {% if thumb_url %}
+            <img src="{{ thumb_url }}" alt="{{ listing.title }} {{ forloop.counter }}"
                  class="thumb-img {% if forloop.first %}active{% endif %}"
                  onclick="setMain(this)">
+            {% endif %}
+            {% endwith %}
           {% endfor %}
         </div>
         {% endif %}
-      {% elif listing.media_file %}
-        <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="gallery-main">
+      {% elif media.kind == "video" %}
+        <video class="gallery-video" controls preload="metadata" aria-label="{{ media.alt }}">
+          <source src="{{ media.url }}">
+        </video>
       {% else %}
         <div class="gallery-main-placeholder">
-          {% if listing.vertical == "phones" %}📱
-          {% elif listing.vertical == "car_dealer" %}🏎️
-          {% elif listing.vertical == "clothing" %}👕
-          {% elif listing.vertical == "farm" %}🌾
-          {% elif listing.vertical == "gym" %}🏋️
-          {% elif listing.vertical == "pharmacy" %}💊
-          {% else %}📦{% endif %}
+          {{ media.placeholder_icon }}
         </div>
       {% endif %}
+      <template id="galleryFallback"><div class="gallery-main-placeholder">{{ media.placeholder_icon }}</div></template>
+      {% endwith %}
 
       <!-- Vertical metadata -->
       {% if listing.vertical_metadata %}
@@ -756,13 +762,17 @@
     <div class="more-grid">
       {% for other in other_listings %}
       <a href="/marketplace/{{ business.slug }}/{{ other.listing_slug }}/" class="more-card">
-        {% if other.primary_image %}
-          <img src="{{ other.primary_image.image.url }}" alt="{{ other.title }}" class="more-img">
-        {% elif other.media_file %}
-          <img src="{{ other.media_file.url }}" alt="{{ other.title }}" class="more-img">
+        {% with media=other|listing_card_media %}
+        {% if media.kind == "image" %}
+          <img src="{{ media.url }}" alt="{{ media.alt }}" class="more-img" loading="lazy" decoding="async" onerror="this.replaceWith(document.createTextNode('{{ media.placeholder_icon }}'));">
+        {% elif media.kind == "video" %}
+          <video class="more-video" muted playsinline preload="metadata" aria-label="{{ media.alt }}">
+            <source src="{{ media.url }}">
+          </video>
         {% else %}
-          <div class="more-img-placeholder">📦</div>
+          <div class="more-img-placeholder">{{ media.placeholder_icon }}</div>
         {% endif %}
+        {% endwith %}
         <div class="more-body">
           <div class="more-title">{{ other.title }}</div>
           {% if other.price %}

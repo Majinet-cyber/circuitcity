@@ -26,6 +26,8 @@ from inventory.services.welding_estimator import (
     BOMItem,
     TuningData,
 )
+from inventory.services.welding_finance import format_percent, normalize_payment_milestones
+from inventory.services.welding_workshop_simulator import compute_workshop_estimate
 
 
 # ==============================================================================
@@ -668,4 +670,57 @@ class TestGenerateQuoteFromTemplate:
         
         # Tuned should be more expensive
         assert tuned.recommended_price > baseline.recommended_price
+
+
+class TestWeldingFinanceFormatting:
+    def test_payment_milestones_never_use_scientific_notation(self):
+        milestones = normalize_payment_milestones(
+            [
+                {"key": "deposit", "label": "Deposit", "percent": "50.00"},
+                {"key": "progress", "label": "Progress", "percent": "25.00"},
+                {"key": "completion", "label": "Completion", "percent": "25.00"},
+            ]
+        )
+
+        assert [item["percent"] for item in milestones] == ["50", "25", "25"]
+        assert format_percent("12.50") == "12.5"
+
+
+class TestWorkshopSimulator:
+    def test_general_workshop_estimate_includes_waste_labour_transport_overhead_and_profit(self):
+        class PostData(dict):
+            def getlist(self, key):
+                return self.get(key, [])
+
+            def get(self, key, default=None):
+                value = super().get(key, default)
+                if isinstance(value, list):
+                    return value[0] if value else default
+                return value
+
+        post = PostData(
+            {
+                "material_category": ["metal", "plywood"],
+                "material_name": ["Steel tube", "Plywood"],
+                "quantity": ["2", "1"],
+                "unit": ["length", "sheet"],
+                "unit_cost": ["10000", "15000"],
+                "waste_percent": ["10", "5"],
+                "labour_hours": "4",
+                "workshop_labour_rate": "5000",
+                "transport_cost": "5000",
+                "overhead_percent": "10",
+                "profit_percent": "20",
+            }
+        )
+
+        result = compute_workshop_estimate(post)
+
+        assert result["materials_subtotal"] == Decimal("35000.00")
+        assert result["waste_cost"] == Decimal("2750.00")
+        assert result["labour_cost"] == Decimal("20000.00")
+        assert result["transport_cost"] == Decimal("5000.00")
+        assert result["overhead_cost"] == Decimal("6275.00")
+        assert result["profit_amount"] == Decimal("13805.00")
+        assert result["final_estimate"] == Decimal("82830.00")
 

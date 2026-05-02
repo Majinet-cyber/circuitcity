@@ -119,6 +119,30 @@
         </div>
     </div>
 
+    {% if invoice.status != 'paid' and not printable %}
+    <div class="card border-0 shadow-sm mt-4">
+        <div class="card-body p-4">
+            <h6 class="mb-3"><i class="bi bi-cash-coin"></i> Record Payment</h6>
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-5">
+                    <label for="payment_amount" class="form-label">Amount Paid</label>
+                    <input type="number" min="0.01" step="0.01" class="form-control" id="payment_amount" name="payment_amount" max="{{ invoice.balance_due }}" required>
+                </div>
+                <div class="col-md-4">
+                    <label for="paid_on" class="form-label">Payment Date</label>
+                    <input type="date" class="form-control" id="paid_on" name="paid_on">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-check-circle"></i> Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Actions -->
     <div class="d-flex gap-2 mt-4">
         <a href="/verticals/welding/invoices/{{ invoice.id }}/?print=1" class="btn btn-primary" target="_blank">

@@ -151,6 +151,11 @@ DEFAULT_MATERIALS: List[Dict[str, Any]] = [
     {"code": "BOARD_MDF_PLAIN", "name": "MDF Board Plain (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("35000")},
     {"code": "BOARD_PLY_12MM", "name": "Plywood 12mm (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("42000")},
     {"code": "BOARD_PLY_18MM", "name": "Plywood 18mm (8x4ft)", "category": "board", "unit": "board", "default_price": Decimal("55000")},
+    {"code": "WOOD_PINE_PLANK", "name": "Pine Wood Plank (3m)", "category": "board", "unit": "piece", "default_price": Decimal("8500")},
+    {"code": "WOOD_HARDWOOD_PLANK", "name": "Hardwood Plank (3m)", "category": "board", "unit": "piece", "default_price": Decimal("18000")},
+    {"code": "LEATHER_UPHOLSTERY", "name": "Upholstery Leather / Vinyl (per metre)", "category": "other", "unit": "metre", "default_price": Decimal("12000")},
+    {"code": "FABRIC_UPHOLSTERY", "name": "Upholstery Fabric (per metre)", "category": "other", "unit": "metre", "default_price": Decimal("6500")},
+    {"code": "FOAM_50MM", "name": "Cushion Foam 50mm (sheet)", "category": "other", "unit": "sheet", "default_price": Decimal("18000")},
     
     # ===========================================================================
     # ALUMINUM PROFILES/FRAMES - NEW

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 from decimal import Decimal
 from typing import Optional
 
@@ -118,6 +119,7 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
     business_phone = _safe_str(getattr(business, 'phone', None))
     business_email = _safe_str(getattr(business, 'email', None))
     business_address = _safe_str(getattr(business, 'address', None))
+    business_logo = getattr(business, 'logo', None) or getattr(business, 'logo_image', None)
     
     # Quote info
     quote_number = _safe_str(getattr(quote, 'quote_number', None), f"WQ-{timezone.now().strftime('%Y%m%d')}")
@@ -128,6 +130,12 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
     customer_name = _safe_str(getattr(quote, 'customer_name', None), "Customer")
     customer_phone = _safe_str(getattr(quote, 'customer_phone', None))
     customer_email = _safe_str(getattr(quote, 'customer_email', None))
+    quote_specs = getattr(quote, "specs", None) or {}
+    quote_cost_breakdown = getattr(quote, "cost_breakdown", None) or {}
+    customer_address = _safe_str(quote_specs.get("customer_address", ""))
+    payment_details = _safe_str(
+        quote_specs.get("payment_details") or quote_cost_breakdown.get("payment_details", "")
+    )
     
     # Get line items from related models (NEW APPROACH)
     line_items = quote.line_items.all()
@@ -198,8 +206,18 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
     # HEADER - Business name with centered initials badge (professional)
     # ===========================================================================
     
-    # Create centered header with initials badge
-    initials = _get_initials(business_name)
+    # Create centered header with logo when available.
+    logo_path = _safe_str(getattr(business_logo, "path", ""))
+    logo_rendered = False
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo = Image(logo_path, width=2.2 * cm, height=2.2 * cm)
+            logo.hAlign = "CENTER"
+            story.append(logo)
+            story.append(Spacer(1, 0.2 * cm))
+            logo_rendered = True
+        except Exception as e:
+            logger.warning("Could not render business logo for quote PDF: %s", e)
     
     # Centered business name
     centered_title_style = ParagraphStyle(
@@ -208,7 +226,16 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
         alignment=TA_CENTER,
     )
     
-    story.append(Paragraph(f"<b>{business_name}</b>", centered_title_style))
+    if logo_rendered:
+        business_title_style = ParagraphStyle(
+            "LogoBusinessName",
+            parent=centered_title_style,
+            fontSize=14,
+        )
+    else:
+        business_title_style = centered_title_style
+
+    story.append(Paragraph(f"<b>{business_name}</b>", business_title_style))
     story.append(Spacer(1, 0.3 * cm))
     
     # Quotation header centered
@@ -280,6 +307,8 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
         story.append(Paragraph(f"Phone: {customer_phone}", normal_style))
     if customer_email:
         story.append(Paragraph(f"Email: {customer_email}", normal_style))
+    if customer_address:
+        story.append(Paragraph(f"Address: {customer_address}", normal_style))
     
     story.append(Spacer(1, 0.5 * cm))
     
@@ -387,6 +416,43 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
     
     story.append(totals_table)
     story.append(Spacer(1, 1 * cm))
+
+    try:
+        from inventory.services.welding_finance import format_percent, quote_payment_milestones
+
+        milestones = quote_payment_milestones(quote)
+    except Exception:
+        format_percent = lambda value: format(_safe_decimal(value), "f").rstrip("0").rstrip(".") or "0"
+        milestones = []
+
+    if milestones:
+        story.append(Paragraph("<b>Payment Milestones</b>", heading_style))
+        milestone_data = [["Milestone", "Percent", "Amount"]]
+        for milestone in milestones:
+            percent = _safe_decimal(milestone.get("percent"))
+            amount = (total * percent / Decimal("100")).quantize(Decimal("0.01"))
+            milestone_data.append([
+                _safe_str(milestone.get("label"), "Payment"),
+                f"{format_percent(percent)}%",
+                f"MWK {amount:,.0f}",
+            ])
+        milestone_table = Table(milestone_data, colWidths=[9 * cm, 3 * cm, 5 * cm])
+        milestone_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), BRAND_LIGHT),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e5e5")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(milestone_table)
+        story.append(Spacer(1, 0.5 * cm))
+
+    if payment_details:
+        story.append(Paragraph("<b>Payment Details</b>", heading_style))
+        story.append(Paragraph(payment_details, small_style))
+        story.append(Spacer(1, 0.5 * cm))
     
     # ===========================================================================
     # TERMS & FOOTER
@@ -403,6 +469,7 @@ def _generate_quote_pdf_internal(quote, business=None) -> bytes:
     • Prices include materials and labour as specified.
     • Additional work or changes may incur extra charges.
     """
+    terms_text = _safe_str(getattr(quote, "terms", ""), "") or terms_text
     story.append(Paragraph(terms_text, small_style))
     
     story.append(Spacer(1, 1 * cm))

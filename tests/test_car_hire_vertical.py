@@ -29,6 +29,7 @@ from inventory.models_car_hire import (
     TripType,
     VehicleMake,
 )
+from inventory.models_marketplace import ListingStatus, MarketplaceListing
 from tenants.models import Business, Membership
 
 
@@ -308,6 +309,44 @@ class TestCarHireURLs:
         url = reverse("verticals:car_hire_vehicle_add")
         response = client.get(url)
         assert response.status_code in [200, 302]
+
+    def test_vehicle_detail_loads_with_empty_gallery(self, client, car_hire_business, sample_vehicle):
+        """Regression: vehicle detail must not crash when no gallery images exist."""
+        business, user = car_hire_business
+        client.force_login(user)
+
+        session = client.session
+        session["active_business_id"] = business.pk
+        session.save()
+
+        url = reverse("verticals:car_hire_vehicle_detail", kwargs={"vehicle_id": sample_vehicle.pk})
+        response = client.get(url)
+
+        assert response.status_code == 200
+        assert list(response.context["gallery_images"]) == []
+
+    def test_publish_vehicle_to_marketplace_creates_live_listing(self, client, car_hire_business, sample_vehicle):
+        """Regression: publishing a hire vehicle must create an active marketplace listing."""
+        business, user = car_hire_business
+        client.force_login(user)
+
+        session = client.session
+        session["active_business_id"] = business.pk
+        session.save()
+
+        url = reverse("verticals:car_hire_vehicle_detail", kwargs={"vehicle_id": sample_vehicle.pk})
+        response = client.post(url, {"_action": "publish_marketplace", "mp_action": "publish"}, follow=True)
+
+        assert response.status_code == 200
+        sample_vehicle.refresh_from_db()
+        assert sample_vehicle.marketplace_listing_id is not None
+
+        listing = MarketplaceListing.objects.get(pk=sample_vehicle.marketplace_listing_id)
+        assert listing.business == business
+        assert listing.vertical == "car_hire"
+        assert listing.status == ListingStatus.LIVE
+        assert listing.is_active is True
+        assert "Could not publish" not in response.content.decode("utf-8")
 
     def test_trips_list_url_resolves(self, client, car_hire_business):
         """Test trips list URL is accessible."""

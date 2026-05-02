@@ -6,7 +6,7 @@ Provides dashboard, quotes, jobs, materials, and invoice generation.
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Dict
 
@@ -45,7 +45,27 @@ from inventory.services.welding_estimator import (
     seed_default_materials,
     tuning_to_data,
 )
+from inventory.services.welding_finance import (
+    append_adjustment_notes,
+    apply_line_adjustments,
+    build_invoice_line_items_from_quote,
+    default_payment_milestones,
+    payment_milestones_from_post,
+    quote_bom_snapshot,
+    quote_finance_metadata,
+    quote_specs_with_customer_details,
+    quote_totals,
+    record_invoice_payment,
+    sync_quote_totals,
+    to_decimal,
+)
 from inventory.services.welding_pdf import generate_quote_pdf
+from inventory.services.welding_workshop_simulator import (
+    DEFAULT_WORKSHOP_ROWS,
+    MATERIAL_CATEGORIES,
+    UNIT_CHOICES,
+    compute_workshop_estimate,
+)
 from inventory.verticals import base
 from tenants.utils import require_business
 
@@ -182,8 +202,21 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         delivered_at__lt=end_dt,
     )
     
-    # Revenue in range (from delivered jobs)
-    job_revenue_in_range = jobs_completed_in_range.aggregate(
+    # Revenue in range. Paid invoices are the primary source; delivered jobs without
+    # invoice payments remain as a fallback so existing delivered-job workflows keep reporting.
+    invoice_payments_in_range = WeldingInvoice.objects.filter(
+        business=business,
+        status__in=[WeldingInvoiceStatus.PAID, WeldingInvoiceStatus.PARTIAL],
+        paid_date__gte=start_date,
+        paid_date__lt=end_date,
+    ).aggregate(
+        total=Coalesce(Sum("amount_paid"), Decimal("0"))
+    )["total"]
+
+    unbilled_jobs_completed_in_range = jobs_completed_in_range.exclude(
+        invoices__amount_paid__gt=0
+    ).distinct()
+    job_revenue_in_range = unbilled_jobs_completed_in_range.aggregate(
         total=Coalesce(Sum("final_price"), Decimal("0"))
     )["total"]
     
@@ -196,8 +229,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         total=Coalesce(Sum("amount"), Decimal("0"))
     )["total"]
     
-    # Total revenue = job revenue + additional revenue
-    total_revenue_in_range = job_revenue_in_range + additional_revenue
+    # Total revenue = payments + unbilled delivered jobs + additional revenue
+    total_revenue_in_range = invoice_payments_in_range + job_revenue_in_range + additional_revenue
     
     # Costs in range from WeldingCost entries
     total_costs_in_range = WeldingCost.objects.filter(
@@ -358,6 +391,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "jobs_active": jobs_active.count(),
         "jobs_ready": jobs_ready.count(),
         "revenue_this_month": total_revenue_in_range,
+        "invoice_payments_this_month": invoice_payments_in_range,
         "costs_this_month": total_costs_in_range,
         "profit_this_month": profit_in_range,
         "total_outstanding": total_outstanding.get("total", Decimal("0")),
@@ -607,6 +641,7 @@ def quote_create(request: HttpRequest) -> HttpResponse:
             customer_name = request.POST.get("customer_name", "").strip()
             customer_phone = request.POST.get("customer_phone", "").strip()
             customer_email = request.POST.get("customer_email", "").strip()
+            terms = request.POST.get("terms", "").strip()
             
             if not customer_name:
                 messages.error(request, "Customer name is required.")
@@ -625,6 +660,9 @@ def quote_create(request: HttpRequest) -> HttpResponse:
                 customer_phone=customer_phone,
                 customer_email=customer_email,
                 template=template,
+                specs=quote_specs_with_customer_details(request.POST),
+                cost_breakdown=quote_finance_metadata(request.POST),
+                terms=terms,
                 status=WeldingQuoteStatus.DRAFT,
                 created_by=request.user,
                 # Start with zero totals - manager will build it
@@ -647,6 +685,7 @@ def quote_create(request: HttpRequest) -> HttpResponse:
         "templates": templates,
         "materials": materials,
         "categories": WeldingMaterialCategory.choices,
+        "default_payment_milestones": default_payment_milestones(),
     })
     
     return render(request, "verticals/welding/quote_create.html", ctx)
@@ -670,22 +709,8 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
     line_items = quote.line_items.all()
     costs = quote.costs.all()
     
-    # Calculate totals dynamically
-    materials_total = sum((item.line_total for item in line_items), Decimal("0"))
-    labour_total = costs.filter(cost_type="labour").aggregate(
-        total=models.Sum("amount")
-    )["total"] or Decimal("0")
-    transport_total = costs.filter(cost_type="transport").aggregate(
-        total=models.Sum("amount")
-    )["total"] or Decimal("0")
-    other_total = costs.filter(cost_type="other").aggregate(
-        total=models.Sum("amount")
-    )["total"] or Decimal("0")
-    profit_total = costs.filter(cost_type="profit").aggregate(
-        total=models.Sum("amount")
-    )["total"] or Decimal("0")
-    
-    grand_total = materials_total + labour_total + transport_total + other_total + profit_total
+    # Calculate totals dynamically from the service layer.
+    totals = quote_totals(quote)
     
     # Check if editable
     is_editable = quote.status == WeldingQuoteStatus.DRAFT
@@ -722,12 +747,12 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
         "quote": quote,
         "line_items": line_items,
         "costs": costs,
-        "materials_total": materials_total,
-        "labour_total": labour_total,
-        "transport_total": transport_total,
-        "other_total": other_total,
-        "profit_total": profit_total,
-        "grand_total": grand_total,
+        "materials_total": totals["materials_total"],
+        "labour_total": totals["labour_total"],
+        "transport_total": totals["transport_total"],
+        "other_total": totals["other_total"],
+        "profit_total": totals["profit_total"],
+        "grand_total": totals["grand_total"],
         "is_editable": is_editable,
         "materials": materials,
         "materials_json": materials_json,
@@ -755,8 +780,18 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
         quantity = Decimal(request.POST.get("quantity", "1"))
         unit_price = request.POST.get("unit_price")
         notes = request.POST.get("notes", "")
-        custom_name = (request.POST.get("custom_name") or "").strip()
-        custom_unit = (request.POST.get("custom_unit") or "piece").strip() or "piece"
+        custom_name = (
+            request.POST.get("custom_material_name")
+            or request.POST.get("custom_name")
+            or ""
+        ).strip()
+        custom_unit = (
+            request.POST.get("custom_material_unit")
+            or request.POST.get("custom_unit")
+            or "piece"
+        ).strip() or "piece"
+        waste_percent = request.POST.get("waste_percent", "0")
+        discount_percent = request.POST.get("discount_percent", "0")
 
         if quantity <= 0:
             return JsonResponse({"success": False, "error": "Quantity must be greater than 0"}, status=400)
@@ -777,15 +812,22 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
                 unit_price_decimal = Decimal(str(unit_price).strip())
                 if unit_price_decimal < 0:
                     return JsonResponse({"success": False, "error": "Unit price cannot be negative"}, status=400)
+            adjusted_quantity, adjusted_unit_price, adjustment_notes = apply_line_adjustments(
+                quantity,
+                unit_price_decimal,
+                waste_percent=waste_percent,
+                discount_percent=discount_percent,
+            )
             line_item = WeldingQuoteLineItem.objects.create(
                 quote=quote,
                 material=None,
                 material_name=custom_name,
                 material_unit=custom_unit[:20],
-                quantity=quantity,
-                unit_price=unit_price_decimal,
-                notes=notes[:255],
+                quantity=adjusted_quantity,
+                unit_price=adjusted_unit_price,
+                notes=append_adjustment_notes(notes, adjustment_notes),
             )
+            sync_quote_totals(quote)
             return JsonResponse(
                 {
                     "success": True,
@@ -809,16 +851,23 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
             unit_price_decimal = Decimal(str(unit_price).strip())
             if unit_price_decimal < 0:
                 return JsonResponse({"success": False, "error": "Unit price cannot be negative"}, status=400)
+        adjusted_quantity, adjusted_unit_price, adjustment_notes = apply_line_adjustments(
+            quantity,
+            unit_price_decimal,
+            waste_percent=waste_percent,
+            discount_percent=discount_percent,
+        )
 
         line_item = WeldingQuoteLineItem.objects.create(
             quote=quote,
             material=material,
             material_name=material.name,
             material_unit=material.unit,
-            quantity=quantity,
-            unit_price=unit_price_decimal,
-            notes=notes[:255],
+            quantity=adjusted_quantity,
+            unit_price=adjusted_unit_price,
+            notes=append_adjustment_notes(notes, adjustment_notes),
         )
+        sync_quote_totals(quote)
 
         return JsonResponse({
             "success": True,
@@ -862,6 +911,7 @@ def quote_update_line_item(request: HttpRequest, quote_id: int, item_id: int) ->
             line_item.notes = request.POST["notes"]
         
         line_item.save()
+        sync_quote_totals(quote)
         
         return JsonResponse({
             "success": True,
@@ -893,6 +943,7 @@ def quote_delete_line_item(request: HttpRequest, quote_id: int, item_id: int) ->
         from inventory.models_welding import WeldingQuoteLineItem
         line_item = get_object_or_404(WeldingQuoteLineItem, id=item_id, quote=quote)
         line_item.delete()
+        sync_quote_totals(quote)
         
         return JsonResponse({"success": True})
     except Exception as e:
@@ -916,6 +967,8 @@ def quote_add_cost(request: HttpRequest, quote_id: int) -> JsonResponse:
         description = request.POST.get("description", "")
         amount = Decimal(request.POST.get("amount", "0"))
         notes = request.POST.get("notes", "")
+        if cost_type not in {"labour", "transport", "other", "profit"}:
+            return JsonResponse({"success": False, "error": "Invalid cost type"}, status=400)
         
         # Validation: amount must be >= 0
         if amount < 0:
@@ -929,6 +982,7 @@ def quote_add_cost(request: HttpRequest, quote_id: int) -> JsonResponse:
             amount=amount,
             notes=notes,
         )
+        sync_quote_totals(quote)
         
         return JsonResponse({
             "success": True,
@@ -969,6 +1023,7 @@ def quote_update_cost(request: HttpRequest, quote_id: int, cost_id: int) -> Json
             cost.notes = request.POST["notes"]
         
         cost.save()
+        sync_quote_totals(quote)
         
         return JsonResponse({
             "success": True,
@@ -999,6 +1054,7 @@ def quote_delete_cost(request: HttpRequest, quote_id: int, cost_id: int) -> Json
         from inventory.models_welding import WeldingQuoteCost
         cost = get_object_or_404(WeldingQuoteCost, id=cost_id, quote=quote)
         cost.delete()
+        sync_quote_totals(quote)
         
         return JsonResponse({"success": True})
     except Exception as e:
@@ -1013,6 +1069,7 @@ def quote_pdf(request: HttpRequest, quote_id: int) -> HttpResponse:
     """Generate and download PDF for a quote."""
     business = request.active_business
     quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
+    sync_quote_totals(quote)
     
     # Generate PDF
     pdf_bytes = generate_quote_pdf(quote, business)
@@ -1038,8 +1095,10 @@ def quote_accept(request: HttpRequest, quote_id: int) -> HttpResponse:
     quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
     
     if quote.status != WeldingQuoteStatus.ACCEPTED:
+        sync_quote_totals(quote)
+        quote.bom = quote_bom_snapshot(quote)
         quote.status = WeldingQuoteStatus.ACCEPTED
-        quote.save(update_fields=["status"])
+        quote.save(update_fields=["bom", "status", "updated_at"])
         
         # Create job from quote
         job = WeldingJob.objects.create(
@@ -1120,6 +1179,17 @@ def job_update_status(request: HttpRequest, job_id: int) -> HttpResponse:
     
     new_status = request.POST.get("status")
     if new_status in dict(WeldingJobStatus.choices):
+        allowed_transitions = {
+            WeldingJobStatus.PENDING: {WeldingJobStatus.IN_PROGRESS, WeldingJobStatus.CANCELLED},
+            WeldingJobStatus.IN_PROGRESS: {WeldingJobStatus.READY, WeldingJobStatus.CANCELLED},
+            WeldingJobStatus.READY: {WeldingJobStatus.DELIVERED, WeldingJobStatus.IN_PROGRESS, WeldingJobStatus.CANCELLED},
+            WeldingJobStatus.DELIVERED: set(),
+            WeldingJobStatus.CANCELLED: set(),
+        }
+        if new_status != job.status and new_status not in allowed_transitions.get(job.status, set()):
+            messages.error(request, "That job status transition is not allowed.")
+            return redirect(f"/verticals/welding/jobs/{job_id}/")
+
         job.status = new_status
         
         if new_status == WeldingJobStatus.IN_PROGRESS and not job.started_at:
@@ -1128,6 +1198,8 @@ def job_update_status(request: HttpRequest, job_id: int) -> HttpResponse:
             job.completed_at = timezone.now()
         elif new_status == WeldingJobStatus.DELIVERED and not job.delivered_at:
             job.delivered_at = timezone.now()
+            if not job.completed_at:
+                job.completed_at = job.delivered_at
             if not job.final_price:
                 job.final_price = job.quoted_price
         
@@ -1169,36 +1241,23 @@ def invoice_from_quote(request: HttpRequest, quote_id: int) -> HttpResponse:
     """Generate invoice from a quote."""
     business = request.active_business
     quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
-    
-    # Build line items from BOM
-    line_items = []
-    for item in quote.bom:
-        line_items.append({
-            "description": item.get("material_name", "Item"),
-            "quantity": item.get("quantity", "1"),
-            "unit_price": item.get("unit_price_mwk", "0"),
-            "total": item.get("line_total_mwk", "0"),
-        })
-    
-    # Add labour line
-    if quote.labour_cost > 0:
-        line_items.append({
-            "description": "Labour",
-            "quantity": "1",
-            "unit_price": str(quote.labour_cost),
-            "total": str(quote.labour_cost),
-        })
+    sync_quote_totals(quote)
+    line_items = build_invoice_line_items_from_quote(quote)
+    quote_specs = quote.specs or {}
     
     invoice = WeldingInvoice.objects.create(
         business=business,
         quote=quote,
         customer_name=quote.customer_name,
         customer_phone=quote.customer_phone,
+        customer_email=quote.customer_email,
+        customer_address=quote_specs.get("customer_address", ""),
         line_items=line_items,
         subtotal=quote.subtotal,
         total=quote.total,
         status=WeldingInvoiceStatus.DRAFT,
         issue_date=timezone.now().date(),
+        terms=quote.terms,
         created_by=request.user,
     )
     
@@ -1209,12 +1268,23 @@ def invoice_from_quote(request: HttpRequest, quote_id: int) -> HttpResponse:
 @login_required
 @require_business
 @require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
 def invoice_detail(request: HttpRequest, invoice_id: int) -> HttpResponse:
     """View invoice details (printable)."""
     ctx = base.base_context(request)
     business = ctx.get("business")
     
     invoice = get_object_or_404(WeldingInvoice, id=invoice_id, business=business)
+
+    if request.method == "POST":
+        try:
+            paid_on_raw = request.POST.get("paid_on")
+            paid_on = date.fromisoformat(paid_on_raw) if paid_on_raw else None
+            record_invoice_payment(invoice, request.POST.get("payment_amount"), paid_on=paid_on)
+            messages.success(request, "Payment recorded.")
+            return redirect(f"/verticals/welding/invoices/{invoice.id}/")
+        except Exception as e:
+            messages.error(request, f"Payment could not be recorded: {e}")
     
     ctx.update({
         "active_tab": "invoices",
@@ -1276,52 +1346,62 @@ def job_simulator(request: HttpRequest) -> HttpResponse:
     materials_catalog = {m.code: material_to_data(m) for m in materials_qs}
     
     simulation_result = None
+    workshop_result = None
     selected_template = None
+    simulator_mode = request.POST.get("simulator_mode", "template") if request.method == "POST" else "template"
     
     if request.method == "POST":
-        template_code = request.POST.get("template_code", "")
-        wastage_pct = Decimal(request.POST.get("wastage_pct", "10"))
-        labour_rate = Decimal(request.POST.get("labour_rate", "5000"))
-        
-        selected_template = templates.filter(code=template_code).first()
-        
-        if selected_template:
-            # Get tuning if exists
-            tuning = None
-            tuning_obj = WeldingEstimatorTuning.objects.filter(
-                business=business,
-                template=selected_template,
-            ).first()
-            if tuning_obj:
-                tuning = tuning_to_data(tuning_obj)
-            
-            # Generate quote/estimate
-            result = generate_quote_from_template(
-                template_code=template_code,
-                specs={},
-                materials_catalog=materials_catalog,
-                tuning=tuning,
-                labour_rate_per_hour=labour_rate,
-                overhead_pct=wastage_pct,
-                margin_pct=Decimal("0"),  # No margin for simulator - just costs
-            )
-            
-            simulation_result = {
-                "template": selected_template,
-                "bom": result.bom,
-                "materials_cost": result.cost_breakdown["materials_cost"],
-                "labour_cost": result.cost_breakdown["labour_cost"],
-                "overhead_cost": result.cost_breakdown["overhead_cost"],
-                "total_cost": result.cost_breakdown["subtotal_before_margin"],
-                "recommended_price_25": result.cost_breakdown["subtotal_before_margin"] * Decimal("1.25"),
-                "recommended_price_30": result.cost_breakdown["subtotal_before_margin"] * Decimal("1.30"),
-            }
+        if simulator_mode == "general":
+            workshop_result = compute_workshop_estimate(request.POST)
+        else:
+            template_code = request.POST.get("template_code", "")
+            wastage_pct = to_decimal(request.POST.get("wastage_pct"), Decimal("10"))
+            labour_rate = to_decimal(request.POST.get("labour_rate"), Decimal("5000"))
+
+            selected_template = templates.filter(code=template_code).first()
+
+            if selected_template:
+                # Get tuning if exists
+                tuning = None
+                tuning_obj = WeldingEstimatorTuning.objects.filter(
+                    business=business,
+                    template=selected_template,
+                ).first()
+                if tuning_obj:
+                    tuning = tuning_to_data(tuning_obj)
+
+                # Generate quote/estimate
+                result = generate_quote_from_template(
+                    template_code=template_code,
+                    specs={},
+                    materials_catalog=materials_catalog,
+                    tuning=tuning,
+                    labour_rate_per_hour=labour_rate,
+                    overhead_pct=wastage_pct,
+                    margin_pct=Decimal("0"),  # No margin for simulator - just costs
+                )
+
+                simulation_result = {
+                    "template": selected_template,
+                    "bom": result.bom,
+                    "materials_cost": result.cost_breakdown["materials_cost"],
+                    "labour_cost": result.cost_breakdown["labour_cost"],
+                    "overhead_cost": result.cost_breakdown["overhead_cost"],
+                    "total_cost": result.cost_breakdown["subtotal_before_margin"],
+                    "recommended_price_25": result.cost_breakdown["subtotal_before_margin"] * Decimal("1.25"),
+                    "recommended_price_30": result.cost_breakdown["subtotal_before_margin"] * Decimal("1.30"),
+                }
     
     ctx.update({
         "active_tab": "simulator",
         "templates": templates,
         "selected_template": selected_template,
         "simulation_result": simulation_result,
+        "workshop_result": workshop_result,
+        "simulator_mode": simulator_mode,
+        "material_categories": MATERIAL_CATEGORIES,
+        "unit_choices": UNIT_CHOICES,
+        "default_workshop_rows": DEFAULT_WORKSHOP_ROWS,
     })
     
     return render(request, "verticals/welding/job_simulator.html", ctx)

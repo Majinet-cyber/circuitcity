@@ -44,6 +44,11 @@
                         <label for="customer_email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="customer_email" name="customer_email" placeholder="customer@example.com">
                     </div>
+
+                    <div class="mb-3">
+                        <label for="customer_address" class="form-label">Address</label>
+                        <textarea class="form-control" id="customer_address" name="customer_address" rows="2" placeholder="Customer address"></textarea>
+                    </div>
                 </div>
 
                 <!-- Optional Template Selection -->
@@ -67,6 +72,42 @@
                             {% endfor %}
                         </select>
                         <small class="form-text text-muted">This is for labeling only. You'll pick materials manually.</small>
+                    </div>
+                </div>
+
+                <!-- Quote Terms -->
+                <div class="mb-4">
+                    <h6 class="text-muted mb-3"><i class="bi bi-receipt"></i> Terms & Payment</h6>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-4">
+                            <label for="milestone_1_percent" class="form-label">Deposit %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_1_percent" name="milestone_1_percent" value="50">
+                            <input type="hidden" name="milestone_1_label" value="Deposit">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="milestone_2_percent" class="form-label">Progress %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_2_percent" name="milestone_2_percent" value="25">
+                            <input type="hidden" name="milestone_2_label" value="Fabrication progress">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="milestone_3_percent" class="form-label">Completion %</label>
+                            <input type="number" min="0" max="100" step="0.01" class="form-control" id="milestone_3_percent" name="milestone_3_percent" value="25">
+                            <input type="hidden" name="milestone_3_label" value="Completion / delivery">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="payment_details" class="form-label">Payment Details</label>
+                        <textarea class="form-control" id="payment_details" name="payment_details" rows="2" placeholder="Bank, mobile money, or cash instructions"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="terms" class="form-label">Terms & Conditions</label>
+                        <textarea class="form-control" id="terms" name="terms" rows="4">This quotation is valid for 30 days from the date of issue.
+Work starts after deposit confirmation.
+Final payment is due on completion before delivery.
+Changes outside the quoted scope may be billed separately.</textarea>
                     </div>
                 </div>
 

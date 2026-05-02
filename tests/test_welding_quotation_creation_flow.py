@@ -287,6 +287,42 @@ class TestWeldingQuotationCreationFlow:
         expected_total = Decimal("2.5") * Decimal("4999.99")
         assert item.line_total == expected_total
 
+    def test_custom_material_waste_discount_and_quote_totals_sync(self, authenticated_client, welding_business):
+        """Custom material posts from the modal should calculate waste/discount and persist quote totals."""
+        from inventory.models_welding import WeldingQuote, WeldingQuoteLineItem
+
+        quote = WeldingQuote.objects.create(
+            business=welding_business,
+            customer_name="Mixed Material Test",
+            status="draft",
+        )
+
+        response = authenticated_client.post(
+            f"/verticals/welding/quotes/{quote.id}/add-line-item/",
+            {
+                "material_id": "custom",
+                "custom_material_name": "Upholstery Fabric",
+                "custom_material_unit": "metre",
+                "quantity": "10",
+                "unit_price": "1000",
+                "waste_percent": "10",
+                "discount_percent": "5",
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        item = WeldingQuoteLineItem.objects.get(quote=quote)
+        assert item.quantity == Decimal("11.00")
+        assert item.unit_price == Decimal("950.00")
+        assert item.line_total == Decimal("10450.0000")
+        assert "Waste allowance" in item.notes
+
+        quote.refresh_from_db()
+        assert quote.materials_cost == Decimal("10450.00")
+        assert quote.total == Decimal("10450.00")
+
     def test_quotation_only_editable_in_draft_status(self, authenticated_client, welding_business, materials):
         """Test that quotes can only be edited when status is DRAFT."""
         from inventory.models_welding import WeldingQuote, WeldingQuoteStatus
