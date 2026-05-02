@@ -1909,6 +1909,43 @@
 })();
 </script>
 
+{# Global Django-message-based sound triggers (form-based sales / page-load) #}
+{% if messages %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!window.CCSounds) return;
+  var messages = [
+    {% for m in messages %}"{{ m.message|escapejs }}",{% endfor %}
+  ];
+  var SALE_KEYWORDS   = ['sold', 'sale', 'transaction', 'purchase'];
+  var CREDIT_KEYWORDS = ['credit', 'layby', 'on account'];
+  var STOCK_KEYWORDS  = ['stocked', 'added', 'stock in', 'restocked', 'bottle'];
+  var PAY_KEYWORDS    = ['payment', 'paid', 'collected', 'received'];
+  function matchAny(msg, kws) {
+    var lower = msg.toLowerCase();
+    return kws.some(function(k) { return lower.indexOf(k) !== -1; });
+  }
+  var played = false;
+  messages.forEach(function(msg) {
+    if (played) return;
+    if (matchAny(msg, CREDIT_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:credit_sale')); }, 300);
+      played = true;
+    } else if (matchAny(msg, SALE_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:sale_success')); }, 300);
+      played = true;
+    } else if (matchAny(msg, STOCK_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:stock_added')); }, 300);
+      played = true;
+    } else if (matchAny(msg, PAY_KEYWORDS)) {
+      setTimeout(function() { document.dispatchEvent(new CustomEvent('cc:payment_success')); }, 300);
+      played = true;
+    }
+  });
+});
+</script>
+{% endif %}
+
 <!-- App Version Check -->
 {% if APP_VERSION %}
 <script>
@@ -2045,6 +2082,9 @@
   });
 })();
 </script>
+
+{# ===== Global Premium Sound System ===== #}
+<script src="{% static 'js/cc-sounds.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>
 
 {# ===== Sidebar More Features Toggle ===== #}
 <script src="{% static 'js/sidebar-more-features.js' %}?v={{ BUILD_ID|default:STATIC_VERSION|default:'1' }}"></script>

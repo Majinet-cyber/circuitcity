@@ -603,10 +603,29 @@
     
     <!-- Insights Content (Hidden initially) -->
     <div id="insights-content" style="display:none">
-      <!-- Revenue Trend Chart -->
-      <div style="margin-bottom:24px">
-        <h3 style="font-size:0.95rem;color:#64748b;text-transform:uppercase;margin-bottom:12px">Revenue Trend (Last 30 Days)</h3>
-        <canvas id="revenueTrendChart" style="max-height:250px"></canvas>
+      <!-- Revenue Trend Chart — Premium -->
+      <div id="revenue-trend-card" style="margin-bottom:24px;background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);border-radius:20px;padding:24px;box-shadow:0 20px 60px rgba(124,58,237,0.2);position:relative;overflow:hidden">
+        <!-- Decorative glow -->
+        <div style="position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(168,85,247,0.3) 0%,transparent 70%);pointer-events:none"></div>
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;position:relative;z-index:1">
+          <div>
+            <div style="font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:#a78bfa;font-weight:700;margin-bottom:4px">Revenue Trend</div>
+            <div style="font-size:1.5rem;font-weight:800;color:#fff" id="trend-total-display">Loading...</div>
+            <div style="font-size:.8rem;color:#94a3b8;margin-top:2px" id="trend-period-display">Last 30 days</div>
+          </div>
+          <div id="trend-change-badge" style="display:none;padding:6px 12px;border-radius:999px;font-size:.8rem;font-weight:700"></div>
+        </div>
+        <!-- Chart area -->
+        <div id="revenue-chart-wrap" style="position:relative;z-index:1">
+          <canvas id="revenueTrendChart" style="max-height:220px"></canvas>
+        </div>
+        <!-- Single data point message -->
+        <div id="single-point-msg" style="display:none;text-align:center;padding:24px 16px;position:relative;z-index:1">
+          <div style="font-size:2.5rem;margin-bottom:10px">📈</div>
+          <div style="color:#e2e8f0;font-weight:700;font-size:1rem;margin-bottom:6px">Only one sale recorded so far.</div>
+          <div style="color:#94a3b8;font-size:.875rem">Keep selling to build a stronger trend.</div>
+        </div>
       </div>
       
       <!-- Quick Stats Grid -->
@@ -699,62 +718,154 @@
     
     function renderRevenueChart(trend) {
       const ctx = document.getElementById('revenueTrendChart');
+      const chartWrap = document.getElementById('revenue-chart-wrap');
+      const singleMsg = document.getElementById('single-point-msg');
+      const totalDisplay = document.getElementById('trend-total-display');
+      const changeBadge = document.getElementById('trend-change-badge');
       if (!ctx) return;
-      
+
       // Destroy existing chart
-      if (revenueChart) {
-        revenueChart.destroy();
+      if (revenueChart) { revenueChart.destroy(); revenueChart = null; }
+
+      // Build fallback demo data if none
+      const DEMO = trend && trend.length >= 2;
+      let data = trend && trend.length > 0 ? trend : (() => {
+        const base = [2800, 3400, 2900, 4200, 3100, 5600, 4800, 6200, 5100, 7400, 6300, 8200,
+                      7100, 9500, 8400, 7800, 9100, 10200, 8900, 11400, 9800, 12100, 10500, 11800,
+                      10200, 13500, 11900, 12800, 14200, 15600];
+        const today = new Date();
+        return base.map((rev, i) => {
+          const d = new Date(today); d.setDate(today.getDate() - (29 - i));
+          return { date: d.toISOString().slice(0, 10), revenue: rev };
+        });
+      })();
+
+      // Single data point — special state
+      if (data.length === 1) {
+        if (chartWrap) chartWrap.style.display = 'none';
+        if (singleMsg) singleMsg.style.display = 'block';
+        const rev = parseFloat(data[0].revenue || 0);
+        if (totalDisplay) totalDisplay.textContent = 'MK ' + Math.round(rev).toLocaleString();
+        return;
       }
-      
-      // Prepare data
-      const labels = trend.map(d => new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
-      const revenues = trend.map(d => d.revenue);
-      
-      // Create chart
+
+      // Show chart, hide single-point msg
+      if (chartWrap) chartWrap.style.display = 'block';
+      if (singleMsg) singleMsg.style.display = 'none';
+
+      const revenues = data.map(d => parseFloat(d.revenue || 0));
+      const totalRev = revenues.reduce((a, b) => a + b, 0);
+      const labels = data.map(d => {
+        const dt = new Date(d.date + 'T00:00:00');
+        return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      });
+
+      // Compute period-on-period change (first half vs second half)
+      let changePct = null;
+      if (revenues.length >= 4) {
+        const mid = Math.floor(revenues.length / 2);
+        const firstHalf = revenues.slice(0, mid).reduce((a,b)=>a+b,0);
+        const secondHalf = revenues.slice(mid).reduce((a,b)=>a+b,0);
+        if (firstHalf > 0) changePct = ((secondHalf - firstHalf) / firstHalf * 100).toFixed(1);
+      }
+
+      if (totalDisplay) {
+        totalDisplay.textContent = 'MK ' + Math.round(totalRev).toLocaleString();
+        if (!DEMO) totalDisplay.style.color = '#fff';
+      }
+      if (changeBadge && changePct !== null) {
+        const up = parseFloat(changePct) >= 0;
+        changeBadge.style.display = 'block';
+        changeBadge.style.background = up ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)';
+        changeBadge.style.color = up ? '#6ee7b7' : '#fca5a5';
+        changeBadge.textContent = (up ? '▲' : '▼') + ' ' + Math.abs(changePct) + '%';
+      }
+
+      // Gradient fill plugin using canvas gradient
+      const gradient = ctx.getContext('2d').createLinearGradient(0, 0, 0, 220);
+      gradient.addColorStop(0, 'rgba(168,85,247,0.45)');
+      gradient.addColorStop(0.5, 'rgba(168,85,247,0.12)');
+      gradient.addColorStop(1, 'rgba(168,85,247,0)');
+
       revenueChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: labels,
           datasets: [{
-            label: 'Revenue (MK)',
+            label: 'Revenue',
             data: revenues,
             borderColor: '#a855f7',
-            backgroundColor: 'rgba(168, 85, 247, 0.1)',
-            tension: 0.3,
+            borderWidth: 2.5,
+            backgroundColor: gradient,
+            tension: 0.45,
             fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5
+            pointRadius: revenues.length <= 14 ? 4 : 2,
+            pointHoverRadius: 7,
+            pointBackgroundColor: '#a855f7',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: '#a855f7',
+            pointHoverBorderWidth: 2,
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: {
-              display: false
-            },
+            legend: { display: false },
             tooltip: {
+              backgroundColor: 'rgba(15,23,42,0.95)',
+              borderColor: 'rgba(168,85,247,0.4)',
+              borderWidth: 1,
+              titleColor: '#e2e8f0',
+              bodyColor: '#a78bfa',
+              padding: 12,
               callbacks: {
-                label: function(context) {
-                  return 'MK ' + Math.round(context.parsed.y).toLocaleString();
-                }
+                title: ctx => ctx[0].label,
+                label: ctx => '  Revenue: MK ' + Math.round(ctx.parsed.y).toLocaleString(),
               }
             }
           },
           scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                maxTicksLimit: 8,
+                maxRotation: 0,
+              },
+              border: { display: false },
+            },
             y: {
               beginAtZero: true,
+              grid: { color: 'rgba(255,255,255,0.05)' },
               ticks: {
-                callback: function(value) {
-                  return 'MK ' + Math.round(value).toLocaleString();
+                color: '#64748b',
+                font: { size: 11 },
+                callback: v => {
+                  if (v >= 1000000) return 'MK ' + (v/1000000).toFixed(1) + 'M';
+                  if (v >= 1000) return 'MK ' + (v/1000).toFixed(0) + 'k';
+                  return 'MK ' + v;
                 },
-                maxTicksLimit: 6,
-                stepSize: undefined
-              }
+                maxTicksLimit: 5,
+              },
+              border: { display: false },
             }
-          }
+          },
+          animation: { duration: 800, easing: 'easeInOutQuart' },
         }
       });
+      
+      // Demo data watermark
+      if (!DEMO && (!trend || trend.length === 0)) {
+        const note = document.createElement('div');
+        note.style.cssText = 'text-align:center;margin-top:10px;font-size:.75rem;color:#475569;font-style:italic;position:relative;z-index:1';
+        note.textContent = 'Sample trend — start selling to see real data';
+        ctx.parentElement.appendChild(note);
+      }
     }
     
     function renderTopItems(items) {

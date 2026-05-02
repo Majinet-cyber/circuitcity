@@ -540,6 +540,11 @@ async function completeSale() {
         
         if (data.ok) {
             showToast('✅ ' + data.message, 'success');
+            if (payload.payment_method === 'credit') {
+                document.dispatchEvent(new CustomEvent('cc:credit_sale'));
+            } else {
+                document.dispatchEvent(new CustomEvent('cc:sale_success'));
+            }
             refreshKPIs();
             resetForNextSale();
         } else {

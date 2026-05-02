@@ -404,4 +404,11 @@ if _HAS_ENERGY and _energy_module:
         path("energy/seed/",       _energy_module.energy_seed_catalog, name="energy_seed_catalog"),
         # Simulations — interactive scenario engine
         path("energy/simulations/", _energy_module.energy_simulations, name="energy_simulations"),
+        # ── NEW FLAGSHIP ENGINEERING TOOLS ──
+        # Wiring Intelligence: 12V/24V/48V system design, series/parallel logic
+        path("energy/wiring-intelligence/", _energy_module.wiring_intelligence, name="energy_wiring_intelligence"),
+        # Cable Sizing & Voltage Drop: professional IEC-based calculator
+        path("energy/cable-sizing/", _energy_module.cable_sizing, name="energy_cable_sizing"),
+        # Smart Grid & Mini-Grid Planner: feeder analysis, reliability, distribution
+        path("energy/smart-grid/", _energy_module.smart_grid, name="energy_smart_grid"),
     ]

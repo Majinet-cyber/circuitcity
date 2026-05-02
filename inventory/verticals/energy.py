@@ -1475,21 +1475,70 @@ def monitoring(request: HttpRequest) -> HttpResponse:
                 "capacity_kw": site.installed_capacity_kw or 0,
             })
 
+    # ── Enrich sites_data with alerts, assets_summary, insights ──
+    if m:
+        from inventory.models_energy import EnergyAlert as _EAlert, CopilotInsight as _CInsight
+        for sd in sites_data:
+            site = sd["site"]
+            # Top alerts for the site
+            top_alerts = list(
+                _EAlert.objects.filter(site=site, is_resolved=False)
+                .order_by("-severity", "-created_at")[:3]
+            )
+            sd["top_alerts"] = top_alerts
+            # Asset summary (type, status, health)
+            from inventory.models_energy import EnergyAsset as _EAsset
+            assets_summary = list(
+                _EAsset.objects.filter(site=site).order_by("asset_type")[:6]
+            )
+            sd["assets_summary"] = assets_summary
+            # Copilot insights
+            predictive_insights = list(
+                _CInsight.objects.filter(site=site, is_dismissed=False)
+                .order_by("-created_at")[:2]
+            )
+            sd["predictive_insights"] = predictive_insights
+
+    # ── Portfolio-level KPIs for hero bar ──────────────────────────────────
+    total_sites_count = len(sites_data)
+    open_alerts_count = sum(sd["active_alerts"] for sd in sites_data)
+    avg_portfolio_health = (
+        round(sum(sd["avg_health"] for sd in sites_data) / total_sites_count)
+        if total_sites_count > 0 else 0
+    )
+    total_capacity_kw = sum(
+        float(sd["site"].installed_capacity_kw or 0) for sd in sites_data
+    )
+    total_gen_today_kwh = None
+
+    # Count assets across all sites
+    operational_asset_count = 0
+    degraded_asset_count = 0
+    critical_alert_count = 0
+    maintenance_overdue_count = 0
+    if m:
+        from inventory.models_energy import EnergyAsset as _EA2, EnergyAlert as _EA3
+        operational_asset_count = _EA2.objects.filter(business=biz, status="operational").count()
+        degraded_asset_count    = _EA2.objects.filter(business=biz, status="degraded").count()
+        critical_alert_count    = _EA3.objects.filter(business=biz, is_resolved=False, severity="critical").count()
+        overdue_assets = [a for a in _EA2.objects.filter(business=biz) if a.is_maintenance_overdue]
+        maintenance_overdue_count = len(overdue_assets)
+
     is_demo_monitoring = (len(sites_data) == 0)
     monitoring_recs = []
     if not is_demo_monitoring:
-        # Real-data recommendations
         for sd in sites_data:
             if sd["avg_health"] < 60:
-                monitoring_recs.append({"type": "warning", "text": f"{sd['site'].name}: Battery reaches low state by 22:00; reduce evening loads."})
+                monitoring_recs.append({"type": "warning", "text": f"{sd['site'].name}: Asset health below 60% — schedule maintenance."})
             if sd["active_alerts"] > 0:
-                monitoring_recs.append({"type": "risk", "text": f"{sd['site'].name}: {sd['active_alerts']} alert(s) require attention before adding more loads."})
+                monitoring_recs.append({"type": "risk", "text": f"{sd['site'].name}: {sd['active_alerts']} alert(s) require immediate attention."})
         if not monitoring_recs:
             monitoring_recs.append({"type": "info", "text": "All monitored sites are within normal operating parameters."})
 
     demo_monitoring_sites = [
-        {"name": "Solar Demo Site", "type": "Residential", "assets": 4, "gen_7d": 43.4, "cons_7d": 33.6, "capacity": 5.2, "health": 94, "alert": None},
-        {"name": "Backup Office System", "type": "Commercial", "assets": 2, "gen_7d": 18.2, "cons_7d": 21.0, "capacity": 2.5, "health": 78, "alert": "Battery health below 80% — schedule inspection"},
+        {"name": "Mzuzu Solar Farm", "type": "Commercial", "assets": 6, "gen_7d": 312.4, "cons_7d": 248.8, "capacity": 15.0, "health": 91, "alert": None},
+        {"name": "Lilongwe Residential Estate", "type": "Household", "assets": 3, "gen_7d": 43.4, "cons_7d": 33.6, "capacity": 5.0, "health": 74, "alert": "Battery health below 80% — schedule inspection"},
+        {"name": "Blantyre Health Clinic", "type": "Community", "assets": 5, "gen_7d": 485.2, "cons_7d": 412.6, "capacity": 20.0, "health": 87, "alert": None},
     ] if is_demo_monitoring else []
 
     return render(request, "energy/monitoring.html", {
@@ -1499,6 +1548,16 @@ def monitoring(request: HttpRequest) -> HttpResponse:
         "is_demo_monitoring": is_demo_monitoring,
         "demo_monitoring_sites": demo_monitoring_sites,
         "monitoring_recs": monitoring_recs,
+        # Hero bar KPIs
+        "total_sites": total_sites_count,
+        "total_gen_today": total_gen_today_kwh,
+        "open_alerts_count": open_alerts_count,
+        "avg_portfolio_health": avg_portfolio_health,
+        "total_capacity_kw": f"{total_capacity_kw:.1f}" if total_capacity_kw else "–",
+        "critical_alert_count": critical_alert_count,
+        "degraded_asset_count": degraded_asset_count,
+        "maintenance_overdue_count": maintenance_overdue_count,
+        "operational_asset_count": operational_asset_count,
     })
 
 
@@ -2548,3 +2607,64 @@ def energy_seed_catalog(request: HttpRequest) -> HttpResponse:
         messages.info(request, "Catalog already up to date — no new products added.")
 
     return redirect("verticals:energy_catalog")
+
+
+# ---------------------------------------------------------------------------
+# Wiring Intelligence  (12V / 24V / 48V System Intelligence)
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def wiring_intelligence(request: HttpRequest) -> HttpResponse:
+    """
+    Wiring Intelligence tool — engineering-grade 12V/24V/48V system design.
+    Pure frontend calculations: series/parallel battery logic, panel array
+    configuration, cable sizing, fuse recommendations, and SVG wiring diagrams.
+    """
+    biz = get_active_business(request)
+    return render(request, "energy/wiring_intelligence.html", {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "page_title": "Wiring Intelligence — 12V / 24V / 48V",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Cable Sizing & Voltage Drop Calculator
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def cable_sizing(request: HttpRequest) -> HttpResponse:
+    """
+    Professional cable sizing and voltage drop calculator.
+    Supports DC and AC circuits, IEC ampacity tables, temperature derating,
+    bundle derating, and comparison across all standard cable sizes.
+    Pure frontend calculations — no server roundtrip.
+    """
+    biz = get_active_business(request)
+    return render(request, "energy/cable_sizing.html", {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "page_title": "Cable Sizing & Voltage Drop",
+    })
+
+
+# ---------------------------------------------------------------------------
+# Smart Grid & Mini-Grid Planner
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def smart_grid(request: HttpRequest) -> HttpResponse:
+    """
+    Smart Grid and Mini-Grid planning tool.
+    Supports community grids, feeder analysis, reliability scoring, transformer
+    sizing, demand profiling, and productive-use planning.
+    """
+    biz = get_active_business(request)
+    return render(request, "energy/smart_grid.html", {
+        "business": biz,
+        "BUSINESS_VERTICAL": "energy",
+        "page_title": "Smart Grid & Mini-Grid Planner",
+    })

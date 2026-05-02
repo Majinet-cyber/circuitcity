@@ -888,6 +888,48 @@
     </div>
   </div>
 
+  {# ── FLAGSHIP ENGINEERING TOOLS ── #}
+  <div class="en-card mb-4" style="border:2px solid #c4b5fd;background:linear-gradient(135deg,#faf5ff 0%,#eff6ff 100%);">
+    <div class="en-section-hdr" style="border-bottom-color:#ddd6fe;">
+      <div>
+        <p class="en-section-title mb-0" style="color:#6d28d9;">⚡ Flagship Engineering Tools</p>
+        <div style="font-size:.78rem;color:#7c3aed;margin-top:.15rem;">University-grade · Industry-standard · Real-time calculations</div>
+      </div>
+    </div>
+    <div class="stock-in-grid">
+      <a href="{% url 'verticals:energy_wiring_intelligence' %}" class="stock-card" style="border-color:#ddd6fe;background:#fff;">
+        <span class="stock-card-icon">⚡</span>
+        <span class="stock-card-label" style="color:#6d28d9;">Wiring Intelligence</span>
+        <span class="stock-card-sub">12V · 24V · 48V · Series/Parallel</span>
+      </a>
+      <a href="{% url 'verticals:energy_cable_sizing' %}" class="stock-card" style="border-color:#ddd6fe;background:#fff;">
+        <span class="stock-card-icon">📐</span>
+        <span class="stock-card-label" style="color:#6d28d9;">Cable Sizing</span>
+        <span class="stock-card-sub">Voltage drop · IEC standard</span>
+      </a>
+      <a href="{% url 'verticals:energy_smart_grid' %}" class="stock-card" style="border-color:#ddd6fe;background:#fff;">
+        <span class="stock-card-icon">🔋</span>
+        <span class="stock-card-label" style="color:#6d28d9;">Smart Grid Planner</span>
+        <span class="stock-card-sub">Mini-grid · Feeder · Reliability</span>
+      </a>
+      <a href="{% url 'verticals:energy_simulations' %}" class="stock-card" style="border-color:#ddd6fe;background:#fff;">
+        <span class="stock-card-icon">🧪</span>
+        <span class="stock-card-label" style="color:#6d28d9;">Simulation Center</span>
+        <span class="stock-card-sub">What-if scenarios · Forecasting</span>
+      </a>
+      <a href="{% url 'verticals:energy_sizing_create' %}" class="stock-card primary" style="background:linear-gradient(135deg,#6d28d9,#4f46e5);">
+        <span class="stock-card-icon">🏗️</span>
+        <span class="stock-card-label" style="color:#fff;">System Sizing</span>
+        <span class="stock-card-sub" style="color:rgba(255,255,255,.75);">New engineering proposal</span>
+      </a>
+      <a href="{% url 'verticals:energy_copilot' %}" class="stock-card" style="border-color:#ddd6fe;background:#fff;">
+        <span class="stock-card-icon">🤖</span>
+        <span class="stock-card-label" style="color:#6d28d9;">AI Copilot</span>
+        <span class="stock-card-sub">Intelligence insights</span>
+      </a>
+    </div>
+  </div>
+
   {# ── RECENT ENERGY SALES ── #}
   {% if recent_energy_sales %}
   <div class="en-card mb-4">
