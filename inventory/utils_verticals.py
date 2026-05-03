@@ -2139,6 +2139,19 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
                 "is_header": False,
                 "testid": "nav-welding-sales",
             },
+            {
+                "section": "MAIN",
+                "key": "marketplace",
+                "url": "inventory:manage_listings",
+                "label": "Marketplace",
+                "icon": "bi-shop-window",
+                "active_prefix": "/inventory/marketplace",
+                "active_pattern": "/inventory/marketplace",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "testid": "nav-welding-marketplace",
+            },
             # MORE section — everything else
             {
                 "section": "MORE",

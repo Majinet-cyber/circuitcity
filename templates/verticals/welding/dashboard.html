@@ -13,7 +13,7 @@
 /* ===== Welding Dashboard Light Workshop Theme ===== */
 
 .welding-page {
-  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 36%, #ffffff 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 36%, #ffffff 100%);
   min-height: 100vh;
   color: var(--ink, #0f172a);
   overflow-x: hidden;
@@ -26,7 +26,7 @@
 }
 
 .vertical-hero {
-  background: linear-gradient(135deg, #f97316 0%, #fb923c 52%, #fbbf24 100%);
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 52%, #0ea5e9 100%);
   padding: 28px;
   border-radius: 24px;
   color: #fff;
@@ -174,7 +174,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.45), transparent);
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.45), transparent);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -205,7 +205,7 @@
 }
 
 .kpi-value.success { color: #16a34a; }
-.kpi-value.primary { color: #f97316; }
+.kpi-value.primary { color: #2563eb; }
 .kpi-value.info { color: #2563eb; }
 .kpi-value.warning { color: #eab308; }
 
@@ -666,8 +666,8 @@
             <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">In Progress</div>
           </div>
           <!-- Fabrication -->
-          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;text-align:center;position:relative;">
-            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#f97316;border-radius:12px 12px 0 0;"></div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;text-align:center;position:relative;">
+            <div style="position:absolute;top:-1px;left:0;right:0;height:3px;background:#2563eb;border-radius:12px 12px 0 0;"></div>
             <div style="font-size:1.5rem;margin-bottom:6px;">🔧</div>
             <div style="font-size:1.5rem;font-weight:800;color:#0f172a;">{% if jobs_active > 0 %}{{ jobs_active|add:"-1" }}{% else %}0{% endif %}</div>
             <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Fabrication</div>
@@ -714,8 +714,8 @@
             <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px;">Workshop Productivity</div>
             <h3 style="margin:0;font-size:1.25rem;font-weight:800;color:#0f172a;" data-testid="workshop-productivity-title">🏆 Workshop Score</h3>
           </div>
-          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:8px 16px;text-align:center;">
-            <div style="font-size:1.75rem;font-weight:900;color:#f97316;">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:8px 16px;text-align:center;">
+            <div style="font-size:1.75rem;font-weight:900;color:#2563eb;">
               {% with total=jobs_completed_in_range|add:quotes_this_month %}
                 {% if total > 30 %}🥇 Level 5{% elif total > 20 %}🥈 Level 4{% elif total > 10 %}🥉 Level 3{% elif total > 5 %}⭐ Level 2{% else %}🔰 Level 1{% endif %}
               {% endwith %}
@@ -757,12 +757,12 @@
         <div data-testid="revenue-target-progress">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;">
             <span style="color:#475569;font-weight:600;">Revenue Target Progress</span>
-            <span style="color:#f97316;font-weight:700;">
+            <span style="color:#2563eb;font-weight:700;">
               MWK {{ revenue_this_month|floatformat:0|intcomma }} / MWK 500,000
             </span>
           </div>
-          <div style="height:8px;background:#ffedd5;border-radius:999px;overflow:hidden;">
-            <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#f97316,#fbbf24);
+          <div style="height:8px;background:#dbeafe;border-radius:999px;overflow:hidden;">
+            <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#2563eb,#0ea5e9);
                         width:{% widthratio revenue_this_month 500000 100 %}%;max-width:100%;transition:width .5s ease;">
             </div>
           </div>
@@ -1046,8 +1046,8 @@ document.addEventListener('DOMContentLoaded', function() {
           {
             label: 'Quotes',
             data: quotesJobsData.map(d => d.quotes),
-            backgroundColor: 'rgba(249, 115, 22, 0.8)',
-            borderColor: '#f97316',
+            backgroundColor: 'rgba(37, 99, 235, 0.8)',
+            borderColor: '#2563eb',
             borderWidth: 1,
             borderRadius: 4,
           },

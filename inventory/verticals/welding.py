@@ -2295,5 +2295,6 @@ def marketplace_publish(request: HttpRequest) -> HttpResponse:
         "source": source,
         "source_type": source_type,
         "category_choices": WELDING_MARKETPLACE_CATEGORIES,
+        "show_search": False,
     })
     return render(request, "verticals/welding/marketplace_publish.html", ctx)

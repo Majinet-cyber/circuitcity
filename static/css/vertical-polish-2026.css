@@ -73,9 +73,9 @@ body[data-vertical="liquor"] .kpi-value {
    ======================================================================== */
 
 body[data-vertical="welding"] {
-  --welding-primary: #ea580c;
-  --welding-accent: #fb923c;
-  --welding-bg: #fff7ed;
+  --welding-primary: #2563eb;
+  --welding-accent: #0ea5e9;
+  --welding-bg: #eff6ff;
 }
 
 body[data-vertical="welding"] .dashboard-grid,
@@ -89,25 +89,25 @@ body[data-vertical="welding"] .quote-cards {
 body[data-vertical="welding"] .kpi-card,
 body[data-vertical="welding"] .quote-card,
 body[data-vertical="welding"] .glass-card {
-  background: linear-gradient(135deg, #ffffff 0%, #fff7ed 100%);
-  border: 1px solid rgba(234, 88, 12, 0.15);
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+  border: 1px solid rgba(37, 99, 235, 0.15);
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.08);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 body[data-vertical="welding"] .kpi-card:hover,
 body[data-vertical="welding"] .quote-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(234, 88, 12, 0.15);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
 }
 
 body[data-vertical="welding"] .kpi-label,
 body[data-vertical="welding"] .quote-label {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #78350f;
+  color: #1e3a8a;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 8px;

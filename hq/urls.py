@@ -37,6 +37,11 @@ try:
 except ImportError:
     views_account_support = None
 
+try:
+    from . import views_marketplace_leads
+except ImportError:
+    views_marketplace_leads = None
+
 # All URLs are namespaced as 'hq:<name>'
 app_name = "hq"
 
@@ -70,6 +75,7 @@ urlpatterns = [
     path("api/wallet/income/", views.api_wallet_income, name="hq_wallet_income_api"),
     path("api/analytics/data.json", views.api_analytics_data, name="hq_analytics_data"),
     path("analytics/", views.hq_analytics, name="hq_analytics"),
+    path("marketplace/leads/", views_marketplace_leads.marketplace_leads_dashboard, name="marketplace_leads") if views_marketplace_leads else path("marketplace/leads/", views.dashboard, name="marketplace_leads"),
     # Notifications API (support both slash and no-slash)
     path("api/notifications", views.hq_notifications_api, name="hq_notifications_api_noslash"),
     path("api/notifications/", views.hq_notifications_api, name="hq_notifications_api"),
@@ -117,6 +123,14 @@ urlpatterns = [
     path("api/business-search/", v.business_search_api, name="business_search_api"),
     path("businesses/<int:business_id>/quick-action/", v.quick_action, name="quick_action"),
 ]
+
+if views_marketplace_leads is not None:
+    urlpatterns.extend([
+        path("marketplace/leads/<int:lead_id>/", views_marketplace_leads.marketplace_lead_detail, name="marketplace_lead_detail"),
+        path("marketplace/leads/<int:lead_id>/update/", views_marketplace_leads.marketplace_lead_update, name="marketplace_lead_update"),
+        path("marketplace/leads/<int:lead_id>/mark-paid/", views_marketplace_leads.marketplace_lead_mark_paid, name="marketplace_lead_mark_paid"),
+        path("marketplace/leads/<int:lead_id>/mark-waived/", views_marketplace_leads.marketplace_lead_mark_waived, name="marketplace_lead_mark_waived"),
+    ])
 
 # =========================
 # Bug Monitor routes

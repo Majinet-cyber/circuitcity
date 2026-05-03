@@ -44,6 +44,31 @@ class ListingStatus(models.TextChoices):
     OUT_OF_STOCK = "out_of_stock", "Out of Stock"
 
 
+class MarketplaceLeadSource(models.TextChoices):
+    QUOTE_REQUEST = "quote_request", "Quote Request"
+    WHATSAPP_CLICK = "whatsapp_click", "WhatsApp Click"
+    PHONE_CLICK = "phone_click", "Phone Click"
+    EMAIL_CLICK = "email_click", "Email Click"
+    MARKETPLACE_FORM = "marketplace_form", "Marketplace Form"
+
+
+class MarketplaceLeadStatus(models.TextChoices):
+    NEW = "new", "New"
+    CONTACTED = "contacted", "Contacted"
+    NEGOTIATING = "negotiating", "Negotiating"
+    WON = "won", "Won"
+    LOST = "lost", "Lost"
+    INVALID = "invalid", "Invalid"
+
+
+class MarketplaceCommissionStatus(models.TextChoices):
+    NOT_APPLICABLE = "not_applicable", "Not Applicable"
+    PENDING = "pending", "Pending"
+    DUE = "due", "Due"
+    PAID = "paid", "Paid"
+    WAIVED = "waived", "Waived"
+
+
 # ---------------------------------------------------------------------------
 # Validators
 # ---------------------------------------------------------------------------
@@ -384,3 +409,161 @@ class MarketplaceEnquiry(models.Model):
             self.is_read = True
             self.read_at = timezone.now()
             self.save(update_fields=["is_read", "read_at"])
+
+
+class MarketplaceLead(models.Model):
+    """
+    Conversion-tracking record for marketplace enquiries and contact clicks.
+
+    MarketplaceEnquiry remains the legacy public enquiry record. This model is
+    the measurable sales/commission layer used by sellers and HQ.
+    """
+
+    listing = models.ForeignKey(
+        MarketplaceListing,
+        on_delete=models.CASCADE,
+        related_name="leads",
+        db_index=True,
+    )
+    seller_business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="marketplace_leads",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+
+    customer_name = models.CharField(max_length=200, blank=True, default="")
+    customer_phone = models.CharField(max_length=40, blank=True, default="")
+    customer_email = models.EmailField(blank=True, default="")
+    customer_message = models.TextField(blank=True, default="")
+
+    source_type = models.CharField(
+        max_length=30,
+        choices=MarketplaceLeadSource.choices,
+        default=MarketplaceLeadSource.MARKETPLACE_FORM,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=MarketplaceLeadStatus.choices,
+        default=MarketplaceLeadStatus.NEW,
+        db_index=True,
+    )
+
+    deal_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    commission_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    commission_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    commission_amount_overridden = models.BooleanField(default=False)
+    commission_status = models.CharField(
+        max_length=24,
+        choices=MarketplaceCommissionStatus.choices,
+        default=MarketplaceCommissionStatus.NOT_APPLICABLE,
+        db_index=True,
+    )
+
+    converted_at = models.DateTimeField(null=True, blank=True)
+    commission_paid_at = models.DateTimeField(null=True, blank=True)
+    commission_paid_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_commissions_paid",
+    )
+    commission_waived_at = models.DateTimeField(null=True, blank=True)
+    commission_waived_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_commissions_waived",
+    )
+    notes = models.TextField(blank=True, default="")
+    hq_notes = models.TextField(blank=True, default="")
+
+    welding_quote = models.ForeignKey(
+        "inventory.WeldingQuote",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_leads",
+    )
+    welding_job = models.ForeignKey(
+        "inventory.WeldingJob",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_leads",
+    )
+    welding_notebook_entry = models.ForeignKey(
+        "inventory.WeldingNotebookEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_leads",
+    )
+
+    visitor_session_key = models.CharField(max_length=80, blank=True, default="", db_index=True)
+    visitor_ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True, default="")
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["seller_business", "status"]),
+            models.Index(fields=["seller_business", "commission_status"]),
+            models.Index(fields=["source_type", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_source_type_display()} lead for {self.listing.title}"
+
+    @property
+    def is_won(self) -> bool:
+        return self.status == MarketplaceLeadStatus.WON
+
+    def calculate_commission_amount(self) -> Decimal:
+        if self.status != MarketplaceLeadStatus.WON or not self.deal_amount:
+            return Decimal("0.00")
+        amount = Decimal(self.deal_amount) * Decimal(self.commission_percentage) / Decimal("100")
+        return amount.quantize(Decimal("0.01"))
+
+    def save(self, *args, **kwargs):
+        now = timezone.now()
+        if self.status == MarketplaceLeadStatus.WON:
+            if not self.converted_at:
+                self.converted_at = now
+            if not self.commission_status or self.commission_status == MarketplaceCommissionStatus.NOT_APPLICABLE:
+                self.commission_status = MarketplaceCommissionStatus.DUE
+            if not self.commission_amount_overridden:
+                self.commission_amount = self.calculate_commission_amount()
+        else:
+            self.converted_at = None
+            self.commission_amount = Decimal("0.00")
+            self.commission_amount_overridden = False
+            self.commission_status = MarketplaceCommissionStatus.NOT_APPLICABLE
+        super().save(*args, **kwargs)

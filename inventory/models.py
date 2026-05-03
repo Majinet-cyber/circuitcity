@@ -1916,7 +1916,11 @@ try:
         MarketplaceListing,
         MarketplaceListingImage,
         MarketplaceEnquiry,
+        MarketplaceLead,
         ListingStatus,
+        MarketplaceLeadSource,
+        MarketplaceLeadStatus,
+        MarketplaceCommissionStatus,
     )
 except ImportError:
     pass

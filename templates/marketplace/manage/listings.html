@@ -16,18 +16,28 @@
   .listing-thumb img,.listing-thumb video{width:72px;height:72px;border-radius:10px;object-fit:cover;object-position:center;}
   .listing-info{flex:1;min-width:0;}
   .listing-actions{display:flex;gap:.5rem;align-items:center;flex-shrink:0;}
+  .marketplace-manage-shell{background:linear-gradient(135deg,#eff6ff 0%,#fff 52%,#f8fafc 100%);border-radius:22px;padding:1rem;}
   .tab-bar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;}
   .tab-item{padding:.35rem .8rem;border-radius:999px;border:1.5px solid #e2e8f0;background:#fff;font-size:.8rem;font-weight:600;cursor:pointer;color:#64748b;text-decoration:none;}
-  .tab-item.active{background:#4f46e5;border-color:#4f46e5;color:#fff;}
+  .tab-item.active{background:#2563eb;border-color:#2563eb;color:#fff;}
+  .lead-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem;}
+  .lead-card{background:#fff;border:1.5px solid #e2e8f0;border-radius:14px;padding:1rem;text-decoration:none;color:#0f172a;box-shadow:0 4px 16px rgba(15,23,42,.05);}
+  .lead-card:hover{border-color:#2563eb;color:#0f172a;}
+  .lead-card .label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;font-weight:800;}
+  .lead-card .value{font-size:1.35rem;font-weight:900;margin-top:.15rem;}
 </style>
 
-<div class="container py-4">
+<div class="container py-4 marketplace-manage-shell">
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div>
       <h4 class="fw-bold mb-0"><i class="bi bi-shop me-2 text-primary"></i>Marketplace Listings</h4>
       <div class="text-muted small">Manage your public listings</div>
     </div>
     <div class="d-flex gap-2">
+      <a href="{% url 'inventory:marketplace_leads' %}" class="btn btn-outline-primary btn-sm rounded-pill">
+        <i class="bi bi-funnel me-1"></i>Marketplace Leads
+        {% if new_lead_count %}<span class="badge bg-danger ms-1">{{ new_lead_count }}</span>{% endif %}
+      </a>
       <a href="{% url 'inventory:view_enquiries' %}" class="btn btn-outline-secondary btn-sm rounded-pill">
         <i class="bi bi-chat-dots me-1"></i>Enquiries
         {% if unread_count %}<span class="badge bg-danger ms-1">{{ unread_count }}</span>{% endif %}
@@ -39,6 +49,21 @@
   </div>
 
   {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} rounded-3 mb-3">{{ m }}</div>{% endfor %}{% endif %}
+
+  <div class="lead-summary">
+    <a class="lead-card" href="{% url 'inventory:marketplace_leads' %}">
+      <div class="label">Total Leads</div>
+      <div class="value">{{ lead_count }}</div>
+    </a>
+    <a class="lead-card" href="{% url 'inventory:marketplace_leads' %}?status=new">
+      <div class="label">New Leads</div>
+      <div class="value">{{ new_lead_count }}</div>
+    </a>
+    <a class="lead-card" href="{% url 'inventory:marketplace_leads' %}?status=won">
+      <div class="label">Won Conversions</div>
+      <div class="value">{{ won_lead_count }}</div>
+    </a>
+  </div>
 
   {# Status tab bar #}
   <div class="tab-bar">

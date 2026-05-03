@@ -10,6 +10,7 @@
 {% url 'hq:subscriptions' as url_hq_subscriptions %}
 {% url 'billing:invoices' as url_hq_invoices %}
 {% url 'hq:agents' as url_hq_agents %}
+{% url 'hq:marketplace_leads' as url_hq_marketplace_leads %}
 {% url 'support:hq_ticket_list' as url_hq_tickets %}
 {% url 'audit:log_list' as url_audit_logs %}
 {% url 'admin:index' as url_django_admin %}
@@ -49,6 +50,9 @@
     </li>
     <li class="{% if '/hq/agents' in request.path %}active{% endif %}">
       <a href="{{ url_hq_agents|default:'/hq/agents/' }}"><i class="bi bi-people"></i><span>Agents</span></a>
+    </li>
+    <li class="{% if '/hq/marketplace/leads' in request.path %}active{% endif %}">
+      <a href="{{ url_hq_marketplace_leads|default:'/hq/marketplace/leads/' }}"><i class="bi bi-shop-window"></i><span>Marketplace Leads</span></a>
     </li>
   </ul>
 

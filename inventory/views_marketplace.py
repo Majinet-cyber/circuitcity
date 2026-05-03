@@ -26,16 +26,29 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.db.models import Count
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_http_methods, require_POST
 
 from inventory.models_marketplace import (
     ListingStatus,
+    MarketplaceCommissionStatus,
     MarketplaceEnquiry,
+    MarketplaceLead,
+    MarketplaceLeadSource,
+    MarketplaceLeadStatus,
     MarketplaceListing,
     MarketplaceListingImage,
+)
+from inventory.services.marketplace_leads import (
+    contact_redirect_url,
+    create_quote_request_lead,
+    mark_lead_outcome,
+    money_decimal,
+    record_contact_click_lead,
+    source_from_click_kind,
 )
 from tenants.decorators import require_business
 from tenants.models import Business
@@ -286,6 +299,13 @@ def submit_enquiry(request: HttpRequest, listing_id: int) -> HttpResponse:
             name=name,
             message=msg,
         )
+        create_quote_request_lead(
+            listing=listing,
+            name=name,
+            phone=phone,
+            email=email,
+            message=msg,
+        )
         messages.success(
             request,
             f"Your enquiry has been sent to {listing.business.name}. They will contact you soon!",
@@ -295,6 +315,27 @@ def submit_enquiry(request: HttpRequest, listing_id: int) -> HttpResponse:
         messages.error(request, "Could not submit enquiry. Please try again.")
 
     return redirect(request.META.get("HTTP_REFERER", "/marketplace/"))
+
+
+@never_cache
+def track_listing_contact(request: HttpRequest, listing_id: int, kind: str) -> HttpResponse:
+    """
+    Public contact-click tracker. Records a deduped lead and redirects to the
+    intended contact target.
+    """
+    listing = get_object_or_404(MarketplaceListing, pk=listing_id, status=ListingStatus.LIVE)
+    source_type = source_from_click_kind(kind)
+    if not source_type:
+        raise Http404("Unknown contact type")
+
+    try:
+        record_contact_click_lead(request, listing, source_type)
+    except Exception as exc:
+        log.warning("Marketplace contact click tracking failed for listing %s: %s", listing.pk, exc)
+
+    response = HttpResponse(status=302)
+    response["Location"] = contact_redirect_url(listing, kind)
+    return response
 
 
 # =============================================================================
@@ -329,6 +370,10 @@ def manage_listings(request: HttpRequest) -> HttpResponse:
     page_obj = paginator.get_page(request.GET.get("page", 1))
 
     unread_count = MarketplaceEnquiry.objects.filter(business=business, is_read=False).count()
+    lead_qs = MarketplaceLead.objects.filter(seller_business=business)
+    lead_count = lead_qs.count()
+    new_lead_count = lead_qs.filter(status=MarketplaceLeadStatus.NEW).count()
+    won_lead_count = lead_qs.filter(status=MarketplaceLeadStatus.WON).count()
 
     try:
         from inventory.marketplace_vertical_config import get_vertical_config
@@ -347,6 +392,11 @@ def manage_listings(request: HttpRequest) -> HttpResponse:
             "business": business,
             "vertical_config": vertical_config,
             "ListingStatus": ListingStatus,
+            "lead_count": lead_count,
+            "new_lead_count": new_lead_count,
+            "won_lead_count": won_lead_count,
+            "show_search": False,
+            "active_tab": "marketplace",
         },
     )
 
@@ -654,3 +704,94 @@ def mark_enquiry_read(request: HttpRequest, enquiry_id: int) -> HttpResponse:
     enquiry = get_object_or_404(MarketplaceEnquiry, pk=enquiry_id, business=business)
     enquiry.mark_as_read()
     return JsonResponse({"ok": True})
+
+
+@login_required
+@require_business
+def marketplace_leads(request: HttpRequest) -> HttpResponse:
+    """Seller-side lead management for the active business."""
+    business = _biz(request)
+    status_filter = request.GET.get("status", "").strip()
+    source_filter = request.GET.get("source", "").strip()
+    commission_filter = request.GET.get("commission_status", "").strip()
+
+    leads_qs = (
+        MarketplaceLead.objects
+        .filter(seller_business=business)
+        .select_related("listing", "seller_business")
+        .order_by("-created_at")
+    )
+    if status_filter:
+        leads_qs = leads_qs.filter(status=status_filter)
+    if source_filter:
+        leads_qs = leads_qs.filter(source_type=source_filter)
+    if commission_filter:
+        leads_qs = leads_qs.filter(commission_status=commission_filter)
+
+    base_qs = MarketplaceLead.objects.filter(seller_business=business)
+    counts = {
+        "all": base_qs.count(),
+        "new": base_qs.filter(status=MarketplaceLeadStatus.NEW).count(),
+        "contacted": base_qs.filter(status=MarketplaceLeadStatus.CONTACTED).count(),
+        "negotiating": base_qs.filter(status=MarketplaceLeadStatus.NEGOTIATING).count(),
+        "won": base_qs.filter(status=MarketplaceLeadStatus.WON).count(),
+        "lost": base_qs.filter(status=MarketplaceLeadStatus.LOST).count(),
+    }
+
+    paginator = Paginator(leads_qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+    return render(
+        request,
+        "marketplace/manage/leads.html",
+        {
+            "business": business,
+            "page_obj": page_obj,
+            "counts": counts,
+            "status_filter": status_filter,
+            "source_filter": source_filter,
+            "commission_filter": commission_filter,
+            "lead_statuses": MarketplaceLeadStatus.choices,
+            "source_types": MarketplaceLeadSource.choices,
+            "commission_statuses": MarketplaceCommissionStatus.choices,
+            "show_search": False,
+            "active_tab": "marketplace_leads",
+        },
+    )
+
+
+@login_required
+@require_business
+@require_POST
+def update_marketplace_lead(request: HttpRequest, lead_id: int) -> HttpResponse:
+    """Seller action to update status, notes, and initial won deal amount."""
+    business = _biz(request)
+    lead = get_object_or_404(MarketplaceLead, pk=lead_id, seller_business=business)
+    status = request.POST.get("status", lead.status)
+    requested_deal_amount = request.POST.get("deal_amount")
+    deal_amount_for_update = requested_deal_amount
+    requested_amount = money_decimal(requested_deal_amount) if requested_deal_amount not in (None, "") else None
+    if (
+        lead.status == MarketplaceLeadStatus.WON
+        and status == MarketplaceLeadStatus.WON
+        and lead.deal_amount
+        and requested_amount is not None
+        and requested_amount != lead.deal_amount
+    ):
+        messages.error(request, "Only HQ can override the deal amount after a lead is won.")
+        return redirect(request.META.get("HTTP_REFERER", "inventory:marketplace_leads"))
+    if status != MarketplaceLeadStatus.WON:
+        deal_amount_for_update = None
+    try:
+        mark_lead_outcome(
+            lead,
+            status=status,
+            deal_amount=deal_amount_for_update,
+            notes=request.POST.get("notes", lead.notes),
+        )
+        messages.success(request, "Marketplace lead updated.")
+    except ValueError as exc:
+        messages.error(request, str(exc))
+    except Exception as exc:
+        log.exception("Lead update failed for %s: %s", lead.pk, exc)
+        messages.error(request, "Could not update marketplace lead.")
+    return redirect(request.META.get("HTTP_REFERER", "inventory:marketplace_leads"))

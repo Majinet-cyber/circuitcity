@@ -2024,6 +2024,7 @@ try:
         path("marketplace/", views_marketplace.marketplace_public, name="marketplace_public"),
         path("public/<slug:business_slug>/", views_marketplace.business_public_page, name="business_public_page"),
         path("marketplace/enquiry/<int:listing_id>/", views_marketplace.submit_enquiry, name="submit_enquiry"),
+        path("marketplace/contact/<int:listing_id>/<str:kind>/", views_marketplace.track_listing_contact, name="marketplace_contact_click"),
     ]
     
     # Manager routes (login + business required)
@@ -2036,6 +2037,8 @@ try:
         path("marketplace/image/upload/<int:listing_id>/", manager_required(_need_biz(views_marketplace.upload_listing_image)), name="marketplace_upload_image"),
         path("marketplace/enquiries/", manager_required(_need_biz(views_marketplace.view_enquiries)), name="view_enquiries"),
         path("marketplace/enquiry/<int:enquiry_id>/read/", manager_required(_need_biz(views_marketplace.mark_enquiry_read)), name="mark_enquiry_read"),
+        path("marketplace/leads/", manager_required(_need_biz(views_marketplace.marketplace_leads)), name="marketplace_leads"),
+        path("marketplace/leads/<int:lead_id>/update/", manager_required(_need_biz(views_marketplace.update_marketplace_lead)), name="marketplace_lead_update"),
     ]
 except ImportError:
     pass  # Marketplace views not available

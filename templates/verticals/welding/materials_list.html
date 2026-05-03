@@ -6,8 +6,8 @@
 {% block extra_css %}
 <style>
 :root {
-  --weld-primary: #f97316;
-  --weld-accent: #ea580c;
+  --weld-primary: #2563eb;
+  --weld-accent: #0ea5e9;
   --weld-dark: #ffffff;
   --weld-surface: #f8fafc;
   --weld-card: #ffffff;
@@ -20,7 +20,7 @@
 }
 
 .welding-page {
-  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 38%, #ffffff 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fafc 38%, #ffffff 100%);
   min-height: 100vh;
   color: var(--weld-text);
   overflow-x: hidden;
@@ -169,7 +169,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--weld-primary), #fbbf24);
+  background: linear-gradient(90deg, var(--weld-primary), var(--weld-accent));
   opacity: 0;
   transition: opacity 0.3s;
 }
