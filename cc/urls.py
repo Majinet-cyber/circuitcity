@@ -13,6 +13,7 @@ from django.template.loader import get_template
 from django.templatetags.static import static as static_build  # may raise with Manifest storage
 from django.urls import NoReverseMatch, include, path, re_path, reverse
 from django.views.generic import RedirectView
+from django.views.static import serve as static_serve
 
 from billing import views_admin as billing_admin_views  # HQ Subscriptions view
 from cc import views as core_views
@@ -1074,9 +1075,18 @@ except Exception:
 if not _patterns_have_name(urlpatterns, "home"):
     urlpatterns += [path("home/", core_views.home, name="home")]
 
-# Static / media in DEBUG
+# Static / media
+if getattr(settings, "SERVE_MEDIA_FILES", settings.DEBUG) and settings.MEDIA_URL.startswith("/"):
+    media_prefix = settings.MEDIA_URL.lstrip("/")
+    urlpatterns += [
+        re_path(
+            rf"^{re.escape(media_prefix)}(?P<path>.*)$",
+            static_serve,
+            {"document_root": settings.MEDIA_ROOT},
+            name="media",
+        )
+    ]
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 # ======================================================================================

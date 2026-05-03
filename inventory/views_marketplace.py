@@ -25,6 +25,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
@@ -398,6 +399,65 @@ def manage_listings(request: HttpRequest) -> HttpResponse:
             "show_search": False,
             "active_tab": "marketplace",
         },
+    )
+
+
+@login_required
+def marketplace_media_diagnostics(request: HttpRequest, listing_id: int) -> JsonResponse:
+    """Staff-only media diagnostics for production upload troubleshooting."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        raise PermissionDenied
+
+    listing = get_object_or_404(
+        MarketplaceListing.objects.select_related("business").prefetch_related("images"),
+        pk=listing_id,
+    )
+
+    def inspect_field(field_file):
+        name = getattr(field_file, "name", "") or ""
+        storage = getattr(field_file, "storage", None)
+        data = {
+            "name": name,
+            "url": "",
+            "storage_backend": f"{storage.__class__.__module__}.{storage.__class__.__name__}" if storage else "",
+            "exists": None,
+            "can_open": False,
+            "error": "",
+        }
+        if not name:
+            return data
+        try:
+            data["url"] = field_file.url
+        except Exception as exc:
+            data["error"] = f"url_error: {exc}"
+        try:
+            data["exists"] = bool(storage.exists(name)) if storage else None
+        except Exception as exc:
+            data["error"] = f"{data['error']} exists_error: {exc}".strip()
+        try:
+            with storage.open(name, "rb") as fh:
+                fh.read(1)
+            data["can_open"] = True
+        except Exception as exc:
+            data["error"] = f"{data['error']} open_error: {exc}".strip()
+        return data
+
+    return JsonResponse(
+        {
+            "listing_id": listing.id,
+            "title": listing.title,
+            "business_id": listing.business_id,
+            "business_name": getattr(listing.business, "name", ""),
+            "media_file": inspect_field(listing.media_file),
+            "gallery_images": [
+                {
+                    "id": image.id,
+                    "image": inspect_field(image.image),
+                    "sort_order": image.sort_order,
+                }
+                for image in listing.images.all()
+            ],
+        }
     )
 
 

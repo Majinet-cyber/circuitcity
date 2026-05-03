@@ -2032,6 +2032,7 @@ try:
         path("marketplace/manage/", manager_required(_need_biz(views_marketplace.manage_listings)), name="manage_listings"),
         path("marketplace/create/", manager_required(_need_biz(views_marketplace.create_listing)), name="create_listing"),
         path("marketplace/edit/<int:listing_id>/", manager_required(_need_biz(views_marketplace.edit_listing)), name="edit_listing"),
+        path("marketplace/media-diagnostics/<int:listing_id>/", views_marketplace.marketplace_media_diagnostics, name="marketplace_media_diagnostics"),
         path("marketplace/delete/<int:listing_id>/", manager_required(_need_biz(views_marketplace.delete_listing)), name="delete_listing"),
         path("marketplace/toggle-status/<int:listing_id>/", manager_required(_need_biz(views_marketplace.toggle_listing_status)), name="marketplace_toggle_status"),
         path("marketplace/image/upload/<int:listing_id>/", manager_required(_need_biz(views_marketplace.upload_listing_image)), name="marketplace_upload_image"),

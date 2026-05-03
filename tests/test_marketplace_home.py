@@ -786,6 +786,11 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         listing = MarketplaceListing.objects.get(title="Uploaded Primary Product")
+        self.assertTrue(listing.media_file.name)
+        self.assertIn("uploaded-primary", listing.media_file.name)
+        self.assertIn("uploaded-primary", listing.media_file.url)
+        self.assertTrue(listing.media_file.storage.exists(listing.media_file.name))
+        self.assertIn("uploaded-primary", listing_media(listing)["url"])
 
         public_card = self.client.get(reverse("marketplace:home"))
         detail = self.client.get(f"/marketplace/{self.biz.slug}/{listing.listing_slug}/")
@@ -796,6 +801,35 @@ class MarketplaceListingMediaRenderingTests(TestCase):
             content = response.content.decode("utf-8")
             self.assertIn("uploaded-primary", content)
             self.assertIn("<img", content)
+
+    def test_media_diagnostics_is_staff_only_and_reports_storage(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Diagnostic Image",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("diagnostic-primary.jpg", ContentFile(b"primary"), save=True)
+        user = User.objects.create_user("media_diag_user", "diag@example.com", "testpass123")
+        staff = User.objects.create_user(
+            "media_diag_staff",
+            "diag-staff@example.com",
+            "testpass123",
+            is_staff=True,
+        )
+
+        self.client.force_login(user)
+        response = self.client.get(reverse("inventory:marketplace_media_diagnostics", args=[listing.pk]))
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_login(staff)
+        response = self.client.get(reverse("inventory:marketplace_media_diagnostics", args=[listing.pk]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["listing_id"], listing.pk)
+        self.assertIn("diagnostic-primary", data["media_file"]["name"])
+        self.assertIn("diagnostic-primary", data["media_file"]["url"])
+        self.assertTrue(data["media_file"]["can_open"])
 
     def test_backfill_command_sets_primary_image_from_gallery(self):
         listing = MarketplaceListing.objects.create(

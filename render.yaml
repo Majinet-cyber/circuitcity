@@ -38,6 +38,11 @@ services:
 
     healthCheckPath: /healthz/
 
+    disk:
+      name: media
+      mountPath: /var/data
+      sizeGB: 1
+
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.5
@@ -63,6 +68,12 @@ services:
       # Gunicorn never serves the MP4.  The URL matches the static service name.
       - key: VIDEO_BASE_URL
         value: "https://emajinet-videos.onrender.com"
+      - key: MEDIA_ROOT
+        value: "/var/data/media"
+      - key: MEDIA_URL
+        value: "/media/"
+      - key: SERVE_MEDIA_FILES
+        value: "1"
 
       - key: DATABASE_URL
         fromDatabase:

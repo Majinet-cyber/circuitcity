@@ -754,8 +754,19 @@ STATICFILES_DIRS = [
         if p.exists()
     )
 ]
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = os.environ.get("MEDIA_URL", "/media/").strip() or "/media/"
+if not MEDIA_URL.endswith("/"):
+    MEDIA_URL = f"{MEDIA_URL}/"
+
+_media_root_env = (
+    os.environ.get("MEDIA_ROOT")
+    or os.environ.get("DJANGO_MEDIA_ROOT")
+    or os.environ.get("RENDER_MEDIA_ROOT")
+)
+if not _media_root_env and IS_RENDER:
+    _media_root_env = "/var/data/media"
+MEDIA_ROOT = Path(_media_root_env) if _media_root_env else BASE_DIR / "media"
+SERVE_MEDIA_FILES = env_bool("SERVE_MEDIA_FILES", default=DEBUG or IS_RENDER)
 
 # Django 4.2+ STORAGES API
 _force_plain_static = os.environ.get("DJANGO_TEST_FORCE_PLAIN_STATIC") == "1"
