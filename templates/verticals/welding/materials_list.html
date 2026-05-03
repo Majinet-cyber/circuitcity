@@ -8,47 +8,47 @@
 :root {
   --weld-primary: #f97316;
   --weld-accent: #ea580c;
-  --weld-dark: #0c0a09;
-  --weld-surface: #1c1917;
-  --weld-card: #292524;
-  --weld-border: #44403c;
-  --weld-text: #fafaf9;
-  --weld-muted: #a8a29e;
+  --weld-dark: #ffffff;
+  --weld-surface: #f8fafc;
+  --weld-card: #ffffff;
+  --weld-border: #e2e8f0;
+  --weld-text: #111827;
+  --weld-muted: #64748b;
   --weld-success: #22c55e;
   --weld-warning: #eab308;
   --weld-danger: #ef4444;
 }
 
 .welding-page {
-  background: linear-gradient(135deg, var(--weld-dark) 0%, #1c1917 100%);
+  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 38%, #ffffff 100%);
   min-height: 100vh;
   color: var(--weld-text);
+  overflow-x: hidden;
 }
 
 .welding-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: 1.5rem;
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 /* Search Header */
 .search-header {
-  background: linear-gradient(135deg, var(--weld-surface) 0%, var(--weld-card) 100%);
+  background: #ffffff;
   border: 1px solid var(--weld-border);
   border-radius: 20px;
   padding: 1.5rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
 }
 
 .search-title {
   font-size: 1.75rem;
   font-weight: 800;
   margin-bottom: 1rem;
-  background: linear-gradient(135deg, var(--weld-primary), #fbbf24);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #111827;
 }
 
 .search-box {
@@ -59,7 +59,7 @@
   width: 100%;
   padding: 1rem 1.25rem 1rem 3.5rem;
   font-size: 1.1rem;
-  background: var(--weld-dark);
+  background: #ffffff;
   border: 2px solid var(--weld-border);
   border-radius: 16px;
   color: var(--weld-text);
@@ -100,7 +100,7 @@
   border-radius: 100px;
   font-size: 0.85rem;
   font-weight: 600;
-  background: var(--weld-dark);
+  background: #ffffff;
   border: 1px solid var(--weld-border);
   color: var(--weld-muted);
   text-decoration: none;
@@ -116,7 +116,7 @@
 .category-chip.active {
   background: var(--weld-primary);
   border-color: var(--weld-primary);
-  color: var(--weld-dark);
+  color: #ffffff;
 }
 
 /* Stats bar */
@@ -146,6 +146,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 1rem;
+  min-width: 0;
 }
 
 /* Material Card - Premium Design */
@@ -157,6 +158,8 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  min-width: 0;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
 .material-card::before {
@@ -174,7 +177,7 @@
 .material-card:hover {
   transform: translateY(-4px);
   border-color: var(--weld-primary);
-  box-shadow: 0 12px 32px rgba(249, 115, 22, 0.15);
+  box-shadow: 0 16px 36px rgba(249, 115, 22, 0.14);
 }
 
 .material-card:hover::before {
@@ -205,7 +208,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  background: var(--weld-surface);
+  background: #f1f5f9;
   color: var(--weld-muted);
   border-radius: 4px;
 }
@@ -223,7 +226,7 @@
   align-items: center;
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
-  background: var(--weld-dark);
+  background: #f8fafc;
   color: var(--weld-muted);
   border-radius: 6px;
 }
@@ -245,6 +248,7 @@
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--weld-primary);
+  overflow-wrap: anywhere;
 }
 
 .price-unit {
@@ -288,7 +292,7 @@
   padding: 0.75rem 1rem;
   font-size: 0.875rem;
   font-weight: 600;
-  background: var(--weld-surface);
+  background: #ffffff;
   border: 1px solid var(--weld-border);
   border-radius: 10px;
   color: var(--weld-text);
@@ -299,7 +303,7 @@
 .btn-edit:hover {
   background: var(--weld-primary);
   border-color: var(--weld-primary);
-  color: var(--weld-dark);
+  color: #ffffff;
 }
 
 .btn-edit i {
@@ -339,7 +343,7 @@
 }
 
 .action-btn.secondary {
-  background: var(--weld-surface);
+  background: #ffffff;
   border: 1px solid var(--weld-border);
   box-shadow: none;
   color: var(--weld-text);
@@ -358,6 +362,7 @@
   background: var(--weld-card);
   border: 1px solid var(--weld-border);
   border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
 .empty-icon {
@@ -380,6 +385,7 @@
 @media (max-width: 768px) {
   .welding-container {
     padding: 1rem;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
   
   .materials-grid {
@@ -399,10 +405,36 @@
     overflow-x: auto;
     flex-wrap: nowrap;
     padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
   }
   
   .category-chip {
     flex-shrink: 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .search-header,
+  .material-card,
+  .empty-state {
+    border-radius: 14px;
+  }
+
+  .search-title {
+    font-size: 1.45rem;
+  }
+
+  .search-input {
+    font-size: 1rem;
+  }
+
+  .materials-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .material-pricing,
+  .material-header {
+    gap: 0.75rem;
   }
 }
 </style>

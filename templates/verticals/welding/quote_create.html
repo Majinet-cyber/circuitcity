@@ -31,8 +31,13 @@
                     <h6 class="text-muted mb-3"><i class="bi bi-person"></i> Customer Information</h6>
                     
                     <div class="mb-3">
-                        <label for="customer_name" class="form-label">Customer Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="customer_name" name="customer_name" required placeholder="John Doe">
+                        <label for="customer_name" class="form-label">Customer / Company Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="customer_name" name="customer_name" required placeholder="Customer or company name">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_contact_person" class="form-label">Contact Person</label>
+                        <input type="text" class="form-control" id="customer_contact_person" name="customer_contact_person" placeholder="Person to contact">
                     </div>
 
                     <div class="mb-3">
@@ -46,8 +51,13 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="customer_address" class="form-label">Address</label>
-                        <textarea class="form-control" id="customer_address" name="customer_address" rows="2" placeholder="Customer address"></textarea>
+                        <label for="customer_address" class="form-label">Address / Location</label>
+                        <textarea class="form-control" id="customer_address" name="customer_address" rows="2" placeholder="Customer address or site location"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="customer_notes" class="form-label">Customer Notes</label>
+                        <textarea class="form-control" id="customer_notes" name="customer_notes" rows="2" placeholder="Measurements, access notes, delivery notes, or special requests"></textarea>
                     </div>
                 </div>
 
@@ -77,7 +87,12 @@
 
                 <!-- Quote Terms -->
                 <div class="mb-4">
-                    <h6 class="text-muted mb-3"><i class="bi bi-receipt"></i> Terms & Payment</h6>
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                        <h6 class="text-muted mb-0"><i class="bi bi-receipt"></i> Terms & Payment</h6>
+                        <a href="{% url 'verticals:welding_branding_settings' %}" class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-patch-check"></i> Quotation Branding
+                        </a>
+                    </div>
 
                     <div class="row g-2 mb-3">
                         <div class="col-md-4">
@@ -99,15 +114,12 @@
 
                     <div class="mb-3">
                         <label for="payment_details" class="form-label">Payment Details</label>
-                        <textarea class="form-control" id="payment_details" name="payment_details" rows="2" placeholder="Bank, mobile money, or cash instructions"></textarea>
+                        <textarea class="form-control" id="payment_details" name="payment_details" rows="2" placeholder="Bank, mobile money, or cash instructions">{% if branding_profile.payment_instructions %}{{ branding_profile.payment_instructions }}{% endif %}</textarea>
                     </div>
 
                     <div class="mb-3">
                         <label for="terms" class="form-label">Terms & Conditions</label>
-                        <textarea class="form-control" id="terms" name="terms" rows="4">This quotation is valid for 30 days from the date of issue.
-Work starts after deposit confirmation.
-Final payment is due on completion before delivery.
-Changes outside the quoted scope may be billed separately.</textarea>
+                        <textarea class="form-control" id="terms" name="terms" rows="4">{{ branding_profile.terms }}</textarea>
                     </div>
                 </div>
 

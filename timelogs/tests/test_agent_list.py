@@ -3,7 +3,7 @@
 Tests for timelogs agent list and work/idle time metrics.
 """
 import pytest
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -186,6 +186,82 @@ class TestTimelogsAgentList:
         # Check that metrics are present
         assert b'300' in response.content  # Work minutes
         assert b'90' in response.content   # Idle minutes
+
+    def test_attendance_summary_cards_and_badges_render(self, business, manager_user, agent1, location, client: Client):
+        """Dashboard should present attendance intelligence, not just raw ping columns."""
+        client.force_login(manager_user)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+
+        today = timezone.localdate()
+        check_in = timezone.make_aware(datetime.combine(today, time(8, 35)))
+        last_seen = check_in + timedelta(hours=8)
+        work_log = AgentWorkLog.objects.create(
+            agent=agent1,
+            business=business,
+            location=location,
+            work_date=today,
+            first_seen_at=check_in,
+            last_seen_at=last_seen,
+            scheduled_start=time(8, 0),
+            scheduled_end=time(17, 0),
+            total_on_site_minutes=420,
+            total_idle_minutes=30,
+        )
+        LocationPing.objects.create(
+            work_log=work_log,
+            timestamp=last_seen,
+            latitude=Decimal("0"),
+            longitude=Decimal("0"),
+            is_inside_geofence=True,
+        )
+
+        response = client.get(reverse('timelogs:dashboard'))
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert 'data-testid="timelog-kpi-cards"' in content
+        assert 'data-testid="timelog-attendance-summary"' in content
+        assert "Present Today" in content
+        assert "Active Shifts" in content
+        assert "Late 20m" in content
+        assert "Inside Zone" in content
+        assert "7h" in content or "420 minutes" in content
+
+    def test_agent_dashboard_does_not_render_other_staff_name(self, business, agent1, agent2, location, client: Client):
+        """Staff users see only their own attendance row."""
+        client.force_login(agent1)
+        session = client.session
+        session['active_business_id'] = business.id
+        session.save()
+
+        today = timezone.localdate()
+        AgentWorkLog.objects.create(
+            agent=agent1,
+            business=business,
+            location=location,
+            work_date=today,
+            first_seen_at=timezone.now() - timedelta(hours=2),
+            last_seen_at=timezone.now(),
+            total_on_site_minutes=120,
+        )
+        AgentWorkLog.objects.create(
+            agent=agent2,
+            business=business,
+            location=location,
+            work_date=today,
+            first_seen_at=timezone.now() - timedelta(hours=1),
+            last_seen_at=timezone.now(),
+            total_on_site_minutes=60,
+        )
+
+        response = client.get(reverse('timelogs:dashboard'))
+
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "agent1" in content
+        assert "agent2" not in content
     
     def test_agent_selector_available_for_managers(self, business, manager_user, agent1, agent2, client: Client):
         """Test that agent selector is available for managers."""

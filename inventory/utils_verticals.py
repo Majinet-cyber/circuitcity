@@ -2208,6 +2208,32 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
             },
             {
                 "section": "MORE",
+                "key": "notebook",
+                "url": "verticals:welding_notebook_list",
+                "label": "Notebook",
+                "icon": "bi-journal-text",
+                "active_prefix": "/verticals/welding/notebook",
+                "active_pattern": "/verticals/welding/notebook",
+                "require_manager": False,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
+                "key": "branding",
+                "url": "verticals:welding_branding_settings",
+                "label": "Quotation Branding",
+                "icon": "bi-patch-check",
+                "active_prefix": "/verticals/welding/branding",
+                "active_pattern": "/verticals/welding/branding",
+                "require_manager": True,
+                "is_menu": False,
+                "is_header": False,
+                "group": "more",
+            },
+            {
+                "section": "MORE",
                 "key": "intelligence",
                 "url": "verticals:welding_intelligence",
                 "label": "Intelligence",
@@ -3123,4 +3149,3 @@ __all__ = [
     "get_vertical_display_name",
     "get_vertical_sidebar_items",
 ]
-

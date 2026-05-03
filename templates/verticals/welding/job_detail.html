@@ -119,6 +119,9 @@
             <i class="bi bi-receipt"></i> Generate Invoice
         </a>
         {% endif %}
+        <a href="{% url 'verticals:welding_marketplace_publish' %}?source=job&id={{ job.id }}" class="btn btn-outline-warning">
+            <i class="bi bi-shop"></i> Post to Marketplace
+        </a>
         <a href="/verticals/welding/jobs/" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Back to Jobs
         </a>

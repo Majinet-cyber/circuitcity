@@ -295,6 +295,7 @@ urlpatterns = [
     path("welding/quotes/", welding.quotes_list, name="welding_quotes_list"),
     path("welding/quotes/create/", welding.quote_create, name="welding_quote_create"),
     path("welding/quotes/<int:quote_id>/", welding.quote_detail, name="welding_quote_detail"),
+    path("welding/quotes/<int:quote_id>/print/", welding.quote_print, name="welding_quote_print"),
     path("welding/quotes/<int:quote_id>/pdf/", welding.quote_pdf, name="welding_quote_pdf"),
     path("welding/quotes/<int:quote_id>/accept/", welding.quote_accept, name="welding_quote_accept"),
     path("welding/quotes/<int:quote_id>/invoice/", welding.invoice_from_quote, name="welding_invoice_from_quote"),
@@ -317,6 +318,13 @@ urlpatterns = [
     # Phase 2: Welding intelligence
     path("welding/intelligence/", welding.workshop_intelligence, name="welding_intelligence"),
     path("welding/clients/", welding.client_management, name="welding_client_management"),
+    path("welding/branding/", welding.branding_settings, name="welding_branding_settings"),
+    path("welding/notebook/", welding.notebook_list, name="welding_notebook_list"),
+    path("welding/notebook/create/", welding.notebook_create, name="welding_notebook_create"),
+    path("welding/notebook/<int:entry_id>/", welding.notebook_detail, name="welding_notebook_detail"),
+    path("welding/notebook/<int:entry_id>/edit/", welding.notebook_edit, name="welding_notebook_edit"),
+    path("welding/notebook/<int:entry_id>/delete/", welding.notebook_delete, name="welding_notebook_delete"),
+    path("welding/marketplace/publish/", welding.marketplace_publish, name="welding_marketplace_publish"),
     
     # ==================== CAR HIRE VERTICAL ====================
     path("car_hire/dashboard/", car_hire.dashboard, name="car_hire_dashboard"),

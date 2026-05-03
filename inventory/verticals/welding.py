@@ -12,6 +12,7 @@ from typing import Dict
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, F, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.http import HttpRequest, HttpResponse, JsonResponse
@@ -31,9 +32,18 @@ from inventory.models_welding import (
     WeldingMaterialCategory,
     WeldingMaterialStockMove,
     WeldingMaterialUnit,
+    WeldingNotebookEntry,
+    WeldingNotebookJobType,
+    WeldingNotebookStatus,
     WeldingQuote,
     WeldingQuoteStatus,
     WeldingTemplate,
+)
+from inventory.services.welding_branding import (
+    branding_profile_for_business,
+    branding_profile_for_quote,
+    branding_snapshot_for_business,
+    get_or_create_branding_settings,
 )
 from inventory.services.welding_estimator import (
     bom_items_to_json,
@@ -66,8 +76,14 @@ from inventory.services.welding_workshop_simulator import (
     UNIT_CHOICES,
     compute_workshop_estimate,
 )
+from inventory.services.welding_marketplace import (
+    WELDING_MARKETPLACE_CATEGORIES,
+    build_welding_listing_defaults,
+    create_welding_marketplace_listing,
+)
 from inventory.verticals import base
 from tenants.utils import require_business
+from tenants.utils_roles import is_manager
 
 
 # ==============================================================================
@@ -121,6 +137,32 @@ def ensure_templates_seeded():
             )
 
 
+def _welding_manager_required(request, business) -> bool:
+    return bool(is_manager(request.user, business))
+
+
+def _quote_customer_post_data(post) -> dict[str, str]:
+    return {
+        "customer_name": (post.get("customer_name") or "").strip(),
+        "customer_contact_person": (post.get("customer_contact_person") or "").strip(),
+        "customer_phone": (post.get("customer_phone") or "").strip(),
+        "customer_email": (post.get("customer_email") or "").strip(),
+        "customer_address": (post.get("customer_address") or "").strip(),
+        "customer_notes": (post.get("customer_notes") or "").strip(),
+    }
+
+
+def _normalize_range_key(active_range: str) -> str:
+    return {"last7": "7d", "last30": "30d"}.get(active_range, active_range)
+
+
+def _decimal_display(value) -> str:
+    value = Decimal(str(value or "0"))
+    if value == value.to_integral_value():
+        return str(int(value))
+    return format(value.normalize(), "f")
+
+
 # ==============================================================================
 # DASHBOARD
 # ==============================================================================
@@ -153,7 +195,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     # Parse date range from request
     from inventory.verticals.base import parse_date_range_from_request
     date_range = parse_date_range_from_request(request)
-    active_range = date_range["active_range"]
+    active_range = _normalize_range_key(date_range["active_range"])
     start_date = date_range["start_date"]
     end_date = date_range["end_date"]
     
@@ -638,10 +680,10 @@ def quote_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         try:
             # Basic quote info
-            customer_name = request.POST.get("customer_name", "").strip()
-            customer_phone = request.POST.get("customer_phone", "").strip()
-            customer_email = request.POST.get("customer_email", "").strip()
-            terms = request.POST.get("terms", "").strip()
+            customer_data = _quote_customer_post_data(request.POST)
+            customer_name = customer_data["customer_name"]
+            branding_profile = branding_profile_for_business(business)
+            terms = (request.POST.get("terms", "").strip() or branding_profile.terms)
             
             if not customer_name:
                 messages.error(request, "Customer name is required.")
@@ -657,11 +699,15 @@ def quote_create(request: HttpRequest) -> HttpResponse:
             quote = WeldingQuote.objects.create(
                 business=business,
                 customer_name=customer_name,
-                customer_phone=customer_phone,
-                customer_email=customer_email,
+                customer_contact_person=customer_data["customer_contact_person"],
+                customer_phone=customer_data["customer_phone"],
+                customer_email=customer_data["customer_email"],
+                customer_address=customer_data["customer_address"],
+                customer_notes=customer_data["customer_notes"],
                 template=template,
                 specs=quote_specs_with_customer_details(request.POST),
                 cost_breakdown=quote_finance_metadata(request.POST),
+                branding_snapshot=branding_snapshot_for_business(business),
                 terms=terms,
                 status=WeldingQuoteStatus.DRAFT,
                 created_by=request.user,
@@ -686,6 +732,7 @@ def quote_create(request: HttpRequest) -> HttpResponse:
         "materials": materials,
         "categories": WeldingMaterialCategory.choices,
         "default_payment_milestones": default_payment_milestones(),
+        "branding_profile": branding_profile_for_business(business),
     })
     
     return render(request, "verticals/welding/quote_create.html", ctx)
@@ -704,6 +751,35 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
     business = ctx.get("business")
     
     quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
+
+    if request.method == "POST" and request.POST.get("action") == "update_customer":
+        if quote.status != WeldingQuoteStatus.DRAFT:
+            messages.error(request, "Only draft quotes can be edited.")
+            return redirect(f"/verticals/welding/quotes/{quote.id}/")
+        customer_data = _quote_customer_post_data(request.POST)
+        if not customer_data["customer_name"]:
+            messages.error(request, "Customer name is required.")
+            return redirect(f"/verticals/welding/quotes/{quote.id}/")
+        for field, value in customer_data.items():
+            setattr(quote, field, value)
+        specs = dict(quote.specs or {})
+        specs["customer_address"] = customer_data["customer_address"]
+        specs["customer_notes"] = customer_data["customer_notes"]
+        quote.specs = specs
+        quote.save(
+            update_fields=[
+                "customer_name",
+                "customer_contact_person",
+                "customer_phone",
+                "customer_email",
+                "customer_address",
+                "customer_notes",
+                "specs",
+                "updated_at",
+            ]
+        )
+        messages.success(request, "Customer details updated.")
+        return redirect(f"/verticals/welding/quotes/{quote.id}/")
     
     # Get line items and costs
     line_items = quote.line_items.all()
@@ -757,6 +833,7 @@ def quote_detail(request: HttpRequest, quote_id: int) -> HttpResponse:
         "materials": materials,
         "materials_json": materials_json,
         "categories": WeldingMaterialCategory.choices,
+        "branding_profile": branding_profile_for_quote(quote, business),
     })
     
     return render(request, "verticals/welding/quote_detail.html", ctx)
@@ -834,7 +911,7 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
                     "line_item": {
                         "id": line_item.id,
                         "material_name": line_item.material_name,
-                        "quantity": str(line_item.quantity),
+                        "quantity": _decimal_display(line_item.quantity),
                         "unit": line_item.material_unit,
                         "unit_price": str(line_item.unit_price) if line_item.unit_price else "",
                         "line_total": str(line_item.line_total),
@@ -874,7 +951,7 @@ def quote_add_line_item(request: HttpRequest, quote_id: int) -> JsonResponse:
             "line_item": {
                 "id": line_item.id,
                 "material_name": line_item.material_name,
-                "quantity": str(line_item.quantity),
+                "quantity": _decimal_display(line_item.quantity),
                 "unit": line_item.material_unit,
                 "unit_price": str(line_item.unit_price) if line_item.unit_price else "",
                 "line_total": str(line_item.line_total),
@@ -917,7 +994,7 @@ def quote_update_line_item(request: HttpRequest, quote_id: int, item_id: int) ->
             "success": True,
             "line_item": {
                 "id": line_item.id,
-                "quantity": str(line_item.quantity),
+                "quantity": _decimal_display(line_item.quantity),
                 "unit_price": str(line_item.unit_price) if line_item.unit_price else "",
                 "line_total": str(line_item.line_total),
                 "notes": line_item.notes,
@@ -1067,7 +1144,8 @@ def quote_delete_cost(request: HttpRequest, quote_id: int, cost_id: int) -> Json
 @require_GET
 def quote_pdf(request: HttpRequest, quote_id: int) -> HttpResponse:
     """Generate and download PDF for a quote."""
-    business = request.active_business
+    ctx = base.base_context(request)
+    business = ctx.get("business")
     quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
     sync_quote_totals(quote)
     
@@ -1426,8 +1504,8 @@ def simulator_to_quote(request: HttpRequest) -> HttpResponse:
     business = request.active_business
     
     template_code = request.POST.get("template_code", "")
-    customer_name = request.POST.get("customer_name", "Customer")
-    customer_phone = request.POST.get("customer_phone", "")
+    customer_data = _quote_customer_post_data(request.POST)
+    customer_name = customer_data["customer_name"] or "Customer"
     margin_pct = Decimal(request.POST.get("margin_pct", "25"))
     
     # Get template
@@ -1469,11 +1547,16 @@ def simulator_to_quote(request: HttpRequest) -> HttpResponse:
     quote = WeldingQuote.objects.create(
         business=business,
         customer_name=customer_name,
-        customer_phone=customer_phone,
+        customer_contact_person=customer_data["customer_contact_person"],
+        customer_phone=customer_data["customer_phone"],
+        customer_email=customer_data["customer_email"],
+        customer_address=customer_data["customer_address"],
+        customer_notes=customer_data["customer_notes"],
         template=template,
-        specs={},
+        specs=quote_specs_with_customer_details(request.POST),
         bom=bom_items_to_json(result.bom),
         cost_breakdown=cost_breakdown_to_json(result.cost_breakdown),
+        branding_snapshot=branding_snapshot_for_business(business),
         materials_cost=result.cost_breakdown["materials_cost"],
         labour_cost=result.cost_breakdown["labour_cost"],
         overhead_cost=result.cost_breakdown["overhead_cost"],
@@ -1659,7 +1742,7 @@ def revenue_list(request: HttpRequest) -> HttpResponse:
     # Parse date range from request
     from inventory.verticals.base import parse_date_range_from_request
     date_range = parse_date_range_from_request(request)
-    active_range = date_range["active_range"]
+    active_range = _normalize_range_key(date_range["active_range"])
     start_date = date_range["start_date"]
     end_date = date_range["end_date"]
     
@@ -1788,7 +1871,7 @@ def costs_list(request: HttpRequest) -> HttpResponse:
     # Parse date range from request
     from inventory.verticals.base import parse_date_range_from_request
     date_range = parse_date_range_from_request(request)
-    active_range = date_range["active_range"]
+    active_range = _normalize_range_key(date_range["active_range"])
     start_date = date_range["start_date"]
     end_date = date_range["end_date"]
     
@@ -1947,3 +2030,270 @@ def client_management(request):
         "clients": client_data,
     })
     return render(request, "verticals/welding/client_management.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def branding_settings(request: HttpRequest) -> HttpResponse:
+    """Manage per-business quotation branding for welding documents."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    if not _welding_manager_required(request, business):
+        messages.error(request, "Only owners and managers can update quotation branding.")
+        return redirect("/verticals/welding/dashboard/")
+
+    settings = get_or_create_branding_settings(business)
+    if request.method == "POST":
+        settings.company_name = (request.POST.get("company_name") or "").strip()
+        settings.business_phone = (request.POST.get("business_phone") or "").strip()
+        settings.business_email = (request.POST.get("business_email") or "").strip()
+        settings.business_address = (request.POST.get("business_address") or "").strip()
+        settings.city = (request.POST.get("city") or "").strip()
+        settings.payment_instructions = (request.POST.get("payment_instructions") or "").strip()
+        settings.default_terms = (request.POST.get("default_terms") or "").strip()
+        settings.authorized_signature_name = (request.POST.get("authorized_signature_name") or "").strip()
+        if request.FILES.get("company_logo"):
+            settings.company_logo = request.FILES["company_logo"]
+        if request.FILES.get("signature_image"):
+            settings.signature_image = request.FILES["signature_image"]
+        settings.save()
+        messages.success(request, "Welding quotation branding saved.")
+        return redirect("/verticals/welding/branding/")
+
+    ctx.update({
+        "active_tab": "branding",
+        "settings": settings,
+        "branding_profile": branding_profile_for_business(business),
+    })
+    return render(request, "verticals/welding/branding_settings.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_GET
+def quote_print(request: HttpRequest, quote_id: int) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    quote = get_object_or_404(WeldingQuote, id=quote_id, business=business)
+    totals = quote_totals(quote)
+    ctx.update({
+        "quote": quote,
+        "line_items": quote.line_items.all(),
+        "costs": quote.costs.all(),
+        "totals": totals,
+        "branding_profile": branding_profile_for_quote(quote, business),
+    })
+    return render(request, "verticals/welding/quote_print.html", ctx)
+
+
+def _parse_visit_at(raw: str):
+    if not raw:
+        return timezone.now()
+    try:
+        parsed = timezone.datetime.fromisoformat(raw)
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed)
+        return parsed
+    except Exception:
+        return timezone.now()
+
+
+def _notebook_post_data(request) -> dict[str, object]:
+    budget_raw = (request.POST.get("estimated_budget") or "").strip()
+    budget = to_decimal(budget_raw) if budget_raw else None
+    follow_up_raw = (request.POST.get("follow_up_date") or "").strip()
+    follow_up = None
+    if follow_up_raw:
+        try:
+            follow_up = date.fromisoformat(follow_up_raw)
+        except ValueError:
+            follow_up = None
+    return {
+        "site_customer_name": (request.POST.get("site_customer_name") or "").strip(),
+        "customer_phone": (request.POST.get("customer_phone") or "").strip(),
+        "customer_address": (request.POST.get("customer_address") or "").strip(),
+        "visit_at": _parse_visit_at((request.POST.get("visit_at") or "").strip()),
+        "job_type": request.POST.get("job_type") or WeldingNotebookJobType.CUSTOM,
+        "measurements": (request.POST.get("measurements") or "").strip(),
+        "materials_needed": (request.POST.get("materials_needed") or "").strip(),
+        "estimated_budget": budget,
+        "follow_up_date": follow_up,
+        "status": request.POST.get("status") or WeldingNotebookStatus.DRAFT,
+        "notes": (request.POST.get("notes") or "").strip(),
+    }
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def notebook_list(request: HttpRequest) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    entries = WeldingNotebookEntry.objects.filter(business=business)
+    q = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    if q:
+        entries = entries.filter(
+            models.Q(site_customer_name__icontains=q)
+            | models.Q(customer_phone__icontains=q)
+            | models.Q(customer_address__icontains=q)
+            | models.Q(measurements__icontains=q)
+            | models.Q(materials_needed__icontains=q)
+        )
+    if status in dict(WeldingNotebookStatus.choices):
+        entries = entries.filter(status=status)
+    page_obj = Paginator(entries, 20).get_page(request.GET.get("page", 1))
+    ctx.update({
+        "active_tab": "notebook",
+        "page_obj": page_obj,
+        "entries": page_obj.object_list,
+        "q": q,
+        "status": status,
+        "status_choices": WeldingNotebookStatus.choices,
+    })
+    return render(request, "verticals/welding/notebook_list.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def notebook_create(request: HttpRequest) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    if request.method == "POST":
+        data = _notebook_post_data(request)
+        if not data["site_customer_name"]:
+            messages.error(request, "Site or customer name is required.")
+        else:
+            entry = WeldingNotebookEntry.objects.create(
+                business=business,
+                location=getattr(request, "location", None),
+                created_by=request.user,
+                **data,
+            )
+            if request.FILES.get("image"):
+                entry.image = request.FILES["image"]
+                entry.save(update_fields=["image", "updated_at"])
+            messages.success(request, "Notebook entry saved.")
+            return redirect(f"/verticals/welding/notebook/{entry.id}/")
+    ctx.update({
+        "active_tab": "notebook",
+        "entry": None,
+        "job_type_choices": WeldingNotebookJobType.choices,
+        "status_choices": WeldingNotebookStatus.choices,
+    })
+    return render(request, "verticals/welding/notebook_form.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+def notebook_detail(request: HttpRequest, entry_id: int) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    entry = get_object_or_404(WeldingNotebookEntry, id=entry_id, business=business)
+    ctx.update({"active_tab": "notebook", "entry": entry})
+    return render(request, "verticals/welding/notebook_detail.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def notebook_edit(request: HttpRequest, entry_id: int) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    entry = get_object_or_404(WeldingNotebookEntry, id=entry_id, business=business)
+    if request.method == "POST":
+        data = _notebook_post_data(request)
+        if not data["site_customer_name"]:
+            messages.error(request, "Site or customer name is required.")
+        else:
+            for field, value in data.items():
+                setattr(entry, field, value)
+            if request.FILES.get("image"):
+                entry.image = request.FILES["image"]
+            entry.save()
+            messages.success(request, "Notebook entry updated.")
+            return redirect(f"/verticals/welding/notebook/{entry.id}/")
+    ctx.update({
+        "active_tab": "notebook",
+        "entry": entry,
+        "job_type_choices": WeldingNotebookJobType.choices,
+        "status_choices": WeldingNotebookStatus.choices,
+    })
+    return render(request, "verticals/welding/notebook_form.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_POST
+def notebook_delete(request: HttpRequest, entry_id: int) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    entry = get_object_or_404(WeldingNotebookEntry, id=entry_id, business=business)
+    entry.delete()
+    messages.success(request, "Notebook entry deleted.")
+    return redirect("/verticals/welding/notebook/")
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.WELDING)
+@require_http_methods(["GET", "POST"])
+def marketplace_publish(request: HttpRequest) -> HttpResponse:
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    if not _welding_manager_required(request, business):
+        messages.error(request, "Only owners and managers can publish marketplace listings.")
+        return redirect("/verticals/welding/dashboard/")
+
+    source_type = (request.GET.get("source") or request.POST.get("source_type") or "").strip()
+    source_id = request.GET.get("id") or request.POST.get("source_id")
+    source = None
+    if source_type == "quote" and source_id:
+        source = get_object_or_404(WeldingQuote, id=source_id, business=business)
+    elif source_type == "job" and source_id:
+        source = get_object_or_404(WeldingJob, id=source_id, business=business)
+    elif source_type == "notebook" and source_id:
+        source = get_object_or_404(WeldingNotebookEntry, id=source_id, business=business)
+    else:
+        source_type = ""
+
+    defaults = build_welding_listing_defaults(business, source, source_type)
+    if request.method == "POST":
+        media_file = request.FILES.get("media_file")
+        if not media_file and source_type == "notebook" and getattr(source, "image", None):
+            media_file = source.image
+        listing = create_welding_marketplace_listing(
+            business=business,
+            user=request.user,
+            title=request.POST.get("title") or defaults["title"],
+            description=request.POST.get("description") or defaults["description"],
+            price=request.POST.get("price") or defaults["price"],
+            category=request.POST.get("category") or defaults["category"],
+            location_text=request.POST.get("location_text") or defaults["location_text"],
+            contact_phone=request.POST.get("contact_phone") or defaults["contact_phone"],
+            contact_email=request.POST.get("contact_email") or defaults["contact_email"],
+            status=request.POST.get("status") or "draft",
+            media_file=media_file,
+            images=request.FILES.getlist("images"),
+            source_type=source_type,
+            source_id=getattr(source, "pk", None),
+        )
+        messages.success(request, f"Marketplace listing saved as '{listing.title}'.")
+        return redirect("/inventory/marketplace/manage/")
+
+    ctx.update({
+        "active_tab": "marketplace",
+        "form_data": defaults,
+        "source": source,
+        "source_type": source_type,
+        "category_choices": WELDING_MARKETPLACE_CATEGORIES,
+    })
+    return render(request, "verticals/welding/marketplace_publish.html", ctx)

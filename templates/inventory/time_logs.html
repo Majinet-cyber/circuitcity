@@ -1,308 +1,580 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Time Logs · Emajinet{% endblock %}
+{% block title %}Time Logs - Emajinet{% endblock %}
 {% block header_title %}{% endblock %}
 
 {% block content %}
 <style>
   header.page-header,.page-header,.app-header,.dashboard-header,.dashboard-banner,.header-cloud,.page-head{display:none!important}
   main,.page,.content{padding-top:12px!important}
-
-  .tl-wrap{max-width:1100px;margin-inline:auto}
-  .glass{background:color-mix(in oklab,#ffffff 78%,transparent);border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;box-shadow:0 12px 40px rgba(2,6,23,.08);backdrop-filter:blur(14px) saturate(140%)}
-  .pill{display:inline-flex;gap:.35rem;align-items:center;border-radius:999px;padding:.18rem .5rem;font-weight:800}
-  .pill-ok{background:#eafff7;border:1px solid #88e0c1;color:#065f46}
-  .pill-warn{background:#fff1f2;border:1px solid #fecdd3;color:#7f1d1d}
-  .pill-info{background:#e7efff;border:1px solid #c8dcff;color:#0b132b}
-  .muted{color:var(--cc-muted)}
-  .mono{font-variant-numeric:tabular-nums}
-  .tl-toolbar{gap:.6rem;margin:.5rem 0 1rem;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
-  .tl-filters{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-  .tl-scroller{overflow:auto;border-radius:12px}
-  table.tl{width:100%;border-collapse:collapse;min-width:900px}
-  table.tl th,table.tl td{padding:.55rem .5rem;border-bottom:1px solid var(--cc-border);text-align:left;vertical-align:middle}
-  table.tl thead th{background:#f6f9ff;font-weight:900;border-bottom:2px solid #c7d2fe;position:sticky;top:0}
-  @media (prefers-color-scheme: dark){table.tl thead th{background:#1a2233;border-color:#223049}}
-  .bar{height:8px;border-radius:999px;background:#e2e8f0;position:relative}
-  .bar>span{position:absolute;left:0;top:0;height:8px;border-radius:999px}
-  .bar-success>span{background:#16a34a}
-  .bar-primary>span{background:#2563eb}
-  .bar-warning>span{background:#f59f00}
-  .bar-danger>span{background:#e03131}
-  .small-muted{font-size:.8rem;color:var(--cc-muted)}
-  tr.agent:hover{background:#f8fafc}
-  tr.details td{background:#fbfdff}
+  .tl-shell{max-width:1220px;margin:0 auto;padding:0 12px 28px;color:#0f172a}
+  .tl-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin:4px 0 16px}
+  .tl-title{margin:0;font-size:1.65rem;font-weight:900;letter-spacing:0}
+  .tl-subtitle{margin:.25rem 0 0;color:#64748b;font-size:.92rem}
+  .tl-toolbar{display:flex;gap:.55rem;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+  .tl-toolbar label{font-size:.78rem;color:#64748b;font-weight:800}
+  .tl-toolbar input{min-width:112px}
+  .tl-action{display:grid;grid-template-columns:minmax(240px,380px) 1fr;gap:16px;align-items:stretch;background:linear-gradient(135deg,#ffffff 0%,#f8fbff 100%);border:1px solid #dbeafe;border-radius:18px;box-shadow:0 18px 42px rgba(15,23,42,.1);padding:18px;margin-bottom:16px}
+  .tl-action-btn{width:100%;min-height:104px;border:0;border-radius:16px;background:#16a34a;color:#fff;font-size:1.6rem;font-weight:950;box-shadow:0 16px 30px rgba(22,163,74,.25);transition:transform .15s ease,box-shadow .15s ease,background .15s ease}
+  .tl-action-btn:hover{transform:translateY(-1px);box-shadow:0 20px 36px rgba(22,163,74,.3)}
+  .tl-action-btn.checkout{background:#f97316;box-shadow:0 16px 30px rgba(249,115,22,.24)}
+  .tl-action-btn:disabled{background:#94a3b8;box-shadow:none;cursor:wait}
+  .tl-action-meta{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-content:center}
+  .tl-action-meta div{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px}
+  .tl-action-meta span{display:block;color:#64748b;font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+  .tl-action-meta strong{display:block;margin-top:5px;font-size:.95rem}
+  .tl-action-status{font-size:.96rem;color:#334155;font-weight:800;margin-top:10px}
+  .tl-gps-warning{display:none;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-weight:800}
+  .tl-gps-warning.show{display:block}
+  .tl-panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 16px 38px rgba(15,23,42,.08);padding:16px;margin-bottom:16px}
+  .tl-kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;margin-bottom:16px}
+  .tl-kpi{background:#fff;border:1px solid #e7edf6;border-radius:14px;box-shadow:0 12px 28px rgba(15,23,42,.07);padding:14px;min-height:92px}
+  .tl-kpi span{display:block;color:#64748b;font-size:.74rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+  .tl-kpi strong{display:block;margin-top:8px;font-size:1.45rem;line-height:1;font-weight:950;color:#111827}
+  .tl-kpi small{display:block;margin-top:7px;color:#94a3b8;font-size:.78rem}
+  .tl-kpi.accent-green{border-top:4px solid #16a34a}
+  .tl-kpi.accent-blue{border-top:4px solid #2563eb}
+  .tl-kpi.accent-orange{border-top:4px solid #f59e0b}
+  .tl-kpi.accent-red{border-top:4px solid #ef4444}
+  .tl-section-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+  .tl-section-head h2{font-size:1.05rem;margin:0;font-weight:900}
+  .tl-section-head p{margin:.2rem 0 0;color:#64748b;font-size:.86rem}
+  .tl-scroll{overflow-x:auto;border-radius:12px}
+  .tl-table{width:100%;border-collapse:separate;border-spacing:0 .55rem;min-width:980px}
+  .tl-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;text-align:left;padding:0 .7rem;font-weight:900}
+  .tl-table td{background:#fff;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb;padding:.8rem .7rem;vertical-align:middle;font-size:.9rem}
+  .tl-table td:first-child{border-left:1px solid #e5e7eb;border-radius:12px 0 0 12px}
+  .tl-table td:last-child{border-right:1px solid #e5e7eb;border-radius:0 12px 12px 0}
+  .tl-name{font-weight:900;color:#111827}
+  .tl-muted{color:#64748b}
+  .tl-mono{font-variant-numeric:tabular-nums}
+  .tl-badge{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.24rem .58rem;font-size:.75rem;font-weight:900;white-space:nowrap;border:1px solid transparent}
+  .tl-badge.ok{background:#eafaf1;color:#166534;border-color:#bbf7d0}
+  .tl-badge.info{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .tl-badge.warn{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+  .tl-badge.bad{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+  .tl-badge.muted{background:#f8fafc;color:#64748b;border-color:#e2e8f0}
+  .tl-cards{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+  .tl-card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 10px 24px rgba(15,23,42,.07);padding:14px}
+  .tl-card-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+  .tl-card-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .tl-card-grid span{display:block;color:#64748b;font-size:.72rem;font-weight:900;text-transform:uppercase}
+  .tl-card-grid strong{display:block;margin-top:2px;font-size:.9rem}
+  .tl-insights{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-bottom:16px}
+  .tl-progress{height:12px;border-radius:999px;background:#e2e8f0;overflow:hidden}
+  .tl-progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#2563eb,#16a34a);border-radius:999px;transition:width .25s ease}
+  .tl-chart{display:flex;align-items:end;gap:8px;height:96px;padding-top:10px}
+  .tl-chart-bar{flex:1;min-width:12px;border-radius:8px 8px 2px 2px;background:linear-gradient(180deg,#60a5fa,#2563eb);height:8px}
+  .tl-timeline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .tl-dot{width:12px;height:12px;border-radius:50%;background:#94a3b8}
+  .tl-dot.ok{background:#16a34a}.tl-dot.info{background:#2563eb}.tl-dot.warn{background:#f97316}
+  .tl-line{height:3px;width:54px;background:#dbeafe;border-radius:999px}
+  .tl-empty{text-align:center;color:#64748b;padding:1rem}
+  @media (max-width:1100px){.tl-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+  @media (max-width:760px){
+    .tl-shell{padding-inline:8px}
+    .tl-top{display:block}
+    .tl-toolbar{justify-content:flex-start;margin-top:12px}
+    .tl-action{grid-template-columns:1fr}
+    .tl-action-meta{grid-template-columns:1fr}
+    .tl-insights{grid-template-columns:1fr}
+    .tl-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .tl-kpi{min-height:84px;padding:12px}
+    .tl-kpi strong{font-size:1.2rem}
+    .tl-cards{display:grid;grid-template-columns:1fr}
+    .tl-summary-table{display:none}
+  }
 </style>
 
-{# CSRF token to ensure cookie exists for any POSTs triggered from this page #}
 <form id="csrf-form" style="display:none">{% csrf_token %}</form>
 
-{# expose values to JS #}
 <div id="page-data"
      data-business-id="{{ active_business_id|default:'' }}"
-     data-api-url="{% url 'inventory:time_logs_api' %}"></div>
+     data-api-url="{% url 'inventory:time_logs_api' %}"
+     data-action-url="{% url 'inventory:time_attendance_action' %}"
+     data-export-url="{% url 'inventory:time_logs_export_csv' %}"></div>
 
-<div class="tl-wrap">
-  <div class="tl-toolbar">
-    <h1 class="m-0">Time Logs</h1>
-
-    <div class="tl-filters">
-      <label class="small-muted">Day</label>
-      <input type="date" id="fDay" class="form-control form-control-sm" value="{{ window_start|date:'Y-m-d'|default:'' }}">
-
-      <label class="small-muted">Shift (hrs)</label>
+<div class="tl-shell">
+  <div class="tl-top">
+    <div>
+      <h1 class="tl-title">Time Logs</h1>
+      <p class="tl-subtitle">Attendance, shift status, lateness, idle time, and GPS signals for the selected day.</p>
+    </div>
+    <div class="tl-toolbar">
+      <label for="fDay">Date</label>
+      <input type="date" id="fDay" class="form-control form-control-sm" value="{{ window_start|default:''|slice:':10' }}">
+      <label for="fShift">Shift hours</label>
       {% with sh=expected_shift_seconds|default:28800 %}
         {% widthratio sh 3600 1 as shift_hours %}
         <input type="number" id="fShift" class="form-control form-control-sm" min="0" max="24" step="1" value="{{ shift_hours }}">
       {% endwith %}
-
-      <button id="btnApply" class="btn btn-sm btn-primary">Apply</button>
-      <a id="btnCSV" class="btn btn-sm btn-outline" href="#">Export CSV</a>
-
-      <span class="text-muted small">Local time: <b id="nowClock" class="mono">—:—:—</b></span>
+      <button id="btnApply" type="button" class="btn btn-sm btn-primary">Apply</button>
+      <a id="btnCSV" class="btn btn-sm btn-outline-primary" href="#">Export CSV</a>
+      <button id="btnRefresh" type="button" class="btn btn-sm btn-outline-secondary">Refresh</button>
       <div class="form-check form-switch m-0">
         <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
-        <label class="form-check-label small" for="autoRefresh">Auto-refresh</label>
+        <label class="form-check-label small" for="autoRefresh">Auto refresh</label>
       </div>
-      <button id="btnRefresh" class="btn btn-sm btn-outline">Refresh now</button>
     </div>
-    <p class="text-muted small mb-0">Track when agents start and end their shifts. Monitor location accuracy and geofence compliance.</p>
   </div>
 
-  <div class="glass">
-    <div class="tl-scroller" aria-live="polite">
-      <table class="tl" aria-label="Recent time logs" id="tl">
+  <section class="tl-action" data-testid="attendance-action-panel">
+    <div>
+      <button id="attendanceActionBtn"
+              type="button"
+              class="tl-action-btn {% if attendance_status.is_checked_in %}checkout{% endif %}"
+              data-checked-in="{% if attendance_status.is_checked_in %}1{% else %}0{% endif %}">
+        {% if attendance_status.is_checked_in %}Check Out{% else %}Check In{% endif %}
+      </button>
+      <div id="attendanceStatusText" class="tl-action-status">{{ attendance_status.status_text|default:"You are not checked in yet" }}</div>
+      <div id="liveDuration" class="tl-action-status tl-mono">Worked today: 0m</div>
+    </div>
+    <div class="tl-action-meta">
+      <div>
+        <span>Attendance Location</span>
+        <strong id="attendanceLocationName">{{ attendance_location.name|default:"No location configured" }}</strong>
+      </div>
+      <div>
+        <span>Allowed Radius</span>
+        <strong id="attendanceLocationRadius">{% if attendance_location.radius_m %}{{ attendance_location.radius_m }}m{% else %}-{% endif %}</strong>
+      </div>
+      <div>
+        <span>Last GPS Result</span>
+        <strong id="lastGeoResult">Ready</strong>
+      </div>
+    </div>
+  </section>
+
+  <div id="gpsWarning" class="tl-gps-warning">Enable location to verify attendance zone.</div>
+
+  <section class="tl-kpis" id="kpiCards" data-testid="inventory-timelog-kpis">
+    <article class="tl-kpi accent-green"><span>Present Today</span><strong id="kPresent">{{ kpis.present_today|default:0 }}</strong><small>Checked in</small></article>
+    <article class="tl-kpi accent-orange"><span>Late Today</span><strong id="kLate">{{ kpis.late_today|default:0 }}</strong><small>After 08:15</small></article>
+    <article class="tl-kpi accent-blue"><span>Active Shifts</span><strong id="kActive">{{ kpis.active_shifts|default:0 }}</strong><small>Still checked in</small></article>
+    <article class="tl-kpi accent-blue"><span>Completed Shifts</span><strong id="kCompleted">{{ kpis.completed_shifts|default:0 }}</strong><small>Checked out</small></article>
+    <article class="tl-kpi accent-red"><span>No Checkout</span><strong id="kNoCheckout">{{ kpis.no_checkout|default:0 }}</strong><small>Needs review</small></article>
+    <article class="tl-kpi accent-green"><span>Total Hours Worked</span><strong id="kWorked">{{ kpis.total_hours_worked|default:"0m" }}</strong><small>Selected date</small></article>
+    <article class="tl-kpi accent-orange"><span>Total Idle Time</span><strong id="kIdle">{{ kpis.total_idle_time|default:"0m" }}</strong><small>Not on shift</small></article>
+  </section>
+
+  <section class="tl-insights">
+    <div class="tl-panel">
+      <div class="tl-section-head">
+        <div>
+          <h2>Today at a Glance</h2>
+          <p>Progress uses worked hours against the selected shift target.</p>
+        </div>
+        <span class="tl-badge info" id="workedProgressLabel">0%</span>
+      </div>
+      <div class="tl-progress"><span id="workedProgressBar"></span></div>
+      <div class="tl-timeline" id="shiftTimeline">
+        <span class="tl-dot"></span><span class="tl-line"></span><span class="tl-dot"></span>
+      </div>
+    </div>
+    <div class="tl-panel">
+      <div class="tl-section-head">
+        <div>
+          <h2>Attendance Trend</h2>
+          <p>Check-ins by hour for the selected day.</p>
+        </div>
+      </div>
+      <div class="tl-chart" id="attendanceChart" aria-label="Attendance trend chart"></div>
+    </div>
+  </section>
+
+  <section class="tl-panel">
+    <div class="tl-section-head">
+      <div>
+        <h2>Staff Attendance Summary</h2>
+        <p>Basic attendance remains valid without GPS; missing location appears as No GPS.</p>
+      </div>
+      <span class="tl-badge info" id="nowClock">--:--:--</span>
+    </div>
+
+    <div class="tl-scroll tl-summary-table">
+      <table class="tl-table" aria-label="Staff attendance summary">
         <thead>
           <tr>
-            <th>User</th><th>Logged at</th><th>Type</th><th>Location</th>
-            <th>Lat</th><th>Lon</th><th>Accuracy (m)</th><th>Distance (m)</th>
-            <th>Geofence</th><th>Note</th><th>Work</th><th>Idle</th>
+            <th>Staff</th>
+            <th>Check In</th>
+            <th>Check Out</th>
+            <th>Worked</th>
+            <th>Idle</th>
+            <th>Late By</th>
+            <th>Status</th>
+            <th>GPS/Zone</th>
+            <th>Distance</th>
+            <th>Notes</th>
           </tr>
         </thead>
-        <tbody id="tl-body">
-          <tr><td colspan="12" style="text-align:center;color:var(--cc-muted);padding:1rem;">Loading…</td></tr>
+        <tbody id="attendanceBody">
+          {% for row in attendance_rows %}
+            <tr>
+              <td><div class="tl-name">{{ row.staff }}</div><div class="tl-muted">{{ row.email }}</div></td>
+              <td class="tl-mono">{{ row.check_in|default:"-"|slice:":16"|cut:"T" }}</td>
+              <td class="tl-mono">{{ row.check_out|default:"-"|slice:":16"|cut:"T" }}</td>
+              <td class="tl-mono">{{ row.worked_label }}</td>
+              <td class="tl-mono">{{ row.idle_label }}</td>
+              <td><span class="tl-badge {{ row.late_tone }}">{{ row.late_label }}</span></td>
+              <td><span class="tl-badge {{ row.status_tone }}">{{ row.status }}</span></td>
+              <td><span class="tl-badge {{ row.gps_tone }}">{{ row.gps_zone }}</span></td>
+              <td class="tl-mono">{{ row.distance_label|default:"-" }}</td>
+              <td>{{ row.notes|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="10" class="tl-empty">No attendance records for this date.</td></tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>
-  </div>
+    <div class="tl-cards" id="attendanceCards"></div>
+  </section>
+
+  <section class="tl-panel">
+    <div class="tl-section-head">
+      <div>
+        <h2>Raw Event Logs / Audit Trail</h2>
+        <p>Original check-in and check-out events are kept for audit and CSV export.</p>
+      </div>
+    </div>
+    <div class="tl-scroll">
+      <table class="tl-table" aria-label="Raw event logs">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Logged at</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Lat</th>
+            <th>Lon</th>
+            <th>Accuracy</th>
+            <th>Distance</th>
+            <th>Geofence</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody id="rawBody">
+          {% for log in raw_logs %}
+            <tr>
+              <td>{{ log.user|default:"-" }}</td>
+              <td class="tl-mono">{{ log.ts|default:"-"|slice:":16"|cut:"T" }}</td>
+              <td><span class="tl-badge info">{{ log.kind|default:"-" }}</span></td>
+              <td>{{ log.location|default:"-" }}</td>
+              <td class="tl-mono">{{ log.lat|default:"-" }}</td>
+              <td class="tl-mono">{{ log.lon|default:"-" }}</td>
+              <td class="tl-mono">{{ log.accuracy_m|default:"-" }}</td>
+              <td class="tl-mono">{{ log.distance_m|default:"-" }}</td>
+              <td>{{ log.geofence|default:"No GPS" }}</td>
+              <td>{{ log.note|default:"-" }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="10" class="tl-empty">No raw event logs for this date.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  // ---------- Clock
-  (function(){
-    const el=document.getElementById('nowClock'), pad=n=>n<10?'0'+n:n;
-    function tick(){ const d=new Date(); if(el) el.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
-    tick(); setInterval(tick,1000);
-  })();
-
-  // ---------- CSRF fetch shim
-  (function(){
-    function getCookie(name){
-      const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-      return m ? m.pop() : '';
-    }
-    const csrf = (function(){
-      const f = document.getElementById('csrf-form');
-      const i = f ? f.querySelector('input[name="csrfmiddlewaretoken"]') : null;
-      return (i && i.value) || getCookie('csrftoken') || getCookie('CSRF-TOKEN') || '';
-    })();
-
-    const _fetch = window.fetch;
-    window.fetch = function(resource, options){
-      options = options || {};
-      const url = (typeof resource === 'string') ? resource : (resource.url || '');
-      const isSameOrigin = !/^https?:\/\//i.test(url);
-      const method = (options.method || 'GET').toUpperCase();
-      const needsCsrf = isSameOrigin && ['POST','PUT','PATCH','DELETE'].includes(method);
-      if(needsCsrf){
-        options.headers = Object.assign({'X-CSRFToken': csrf}, options.headers || {});
-        options.credentials = options.credentials || 'same-origin';
-      }
-      return _fetch(resource, options);
-    };
-  })();
-
-  // ---------- Utils
+  const esc=s=>(s==null?'':String(s)).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
   const pad=n=>n<10?'0'+n:n;
   const todayYMD=()=>{const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;};
-  const esc=s=>(s==null?'':String(s)).replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+  const fmt=iso=>iso ? iso.slice(0,16).replace('T',' ') : '-';
+  const badge=(text,tone='muted')=>`<span class="tl-badge ${esc(tone)}">${esc(text||'-')}</span>`;
+  const root=document.getElementById('page-data');
+  const apiUrl=(root?.dataset.apiUrl||'/inventory/api/time-logs/').trim();
+  const actionUrl=(root?.dataset.actionUrl||'/inventory/api/time-attendance/').trim();
+  const exportUrl=(root?.dataset.exportUrl||'/inventory/api/time-logs/export/').trim();
+  const bizId=(root?.dataset.businessId||'').trim();
+  const fDay=document.getElementById('fDay');
+  const fShift=document.getElementById('fShift');
+  const csrf=document.querySelector('#csrf-form input[name="csrfmiddlewaretoken"]')?.value||'';
+  let liveState={checkedIn:false,checkedInSince:null,baseWorkedSeconds:0,syncedAt:Date.now()};
+  if(fDay && !fDay.value){ fDay.value=todayYMD(); }
 
-  const root    = document.getElementById('page-data');
-  const apiUrl  = (root?.dataset.apiUrl||'/inventory/api/time-logs/').trim();
-  const bizId   = (root?.dataset.businessId||'').trim();   // from context
-
-  const fDay    = document.getElementById('fDay');
-  const fShift  = document.getElementById('fShift');
-  const btnApply= document.getElementById('btnApply');
-  const btnCSV  = document.getElementById('btnCSV');
-
-  if(fDay && !fDay.value){ fDay.value = todayYMD(); }
-
-  // includeBiz=true -> includes business_id param, false -> omits
-  function qp(includeBiz=true){
-    const day   = (fDay && fDay.value) ? fDay.value : todayYMD();
-    const shift = (fShift && fShift.value) ? String(parseInt(fShift.value||'8',10)) : '8';
-    const p = new URLSearchParams({ day, shift_hours: shift });
+  function query(includeBiz=true){
+    const p=new URLSearchParams({
+      day:(fDay&&fDay.value)||todayYMD(),
+      shift_hours:(fShift&&fShift.value)||'8'
+    });
     if(includeBiz && bizId) p.set('business_id', bizId);
     return p.toString();
   }
 
-  function errorRow(msg){
-    const body=document.getElementById('tl-body');
-    body.innerHTML = `<tr><td colspan="12" style="text-align:center;color:#b42318;padding:1rem;">${esc(msg)}</td></tr>`;
+  function updateCsv(){
+    const btn=document.getElementById('btnCSV');
+    if(btn) btn.href=`${exportUrl}?${query(true)}`;
   }
 
-  // ----- timeago for <time> tags
-  function refreshTimeago(){
-    const now=Date.now();
-    document.querySelectorAll('time.timeago').forEach(t=>{
-      const iso=t.getAttribute('datetime'); const when=iso?Date.parse(iso):NaN;
-      if(!isNaN(when)){
-        const abs=t.getAttribute('title')||t.textContent.trim();
-        const s=Math.floor((now-when)/1000), m=Math.floor(s/60), h=Math.floor(m/60), d=Math.floor(h/24);
-        let rel='just now'; if(s>=5&&s<60) rel=`${s}s ago`; else if(m<60) rel=`${m}m ago`; else if(h<24) rel=`${h}h ago`; else rel=`${d}d ago`;
-        t.innerHTML=`${abs} <span class="text-muted">(${rel})</span>`;
-      }
+  function renderKpis(k={}){
+    const set=(id,val)=>{const el=document.getElementById(id); if(el) el.textContent=val ?? '0';};
+    set('kPresent',k.present_today);
+    set('kLate',k.late_today);
+    set('kActive',k.active_shifts);
+    set('kCompleted',k.completed_shifts);
+    set('kNoCheckout',k.no_checkout);
+    set('kWorked',k.total_hours_worked||'0m');
+    set('kIdle',k.total_idle_time||'0m');
+  }
+
+  function renderActionStatus(status={}, location={}){
+    const btn=document.getElementById('attendanceActionBtn');
+    const text=document.getElementById('attendanceStatusText');
+    const loc=document.getElementById('attendanceLocationName');
+    const radius=document.getElementById('attendanceLocationRadius');
+    if(btn){
+      const checked=!!status.is_checked_in;
+      btn.dataset.checkedIn=checked?'1':'0';
+      btn.dataset.checkedInSince=status.checked_in_since||'';
+      btn.textContent=checked?'Check Out':'Check In';
+      btn.classList.toggle('checkout', checked);
+      liveState.checkedIn=checked;
+      liveState.checkedInSince=status.checked_in_since||null;
+      liveState.baseWorkedSeconds=parseInt(status.active_work_seconds||0,10)||0;
+      liveState.syncedAt=status.server_now?Date.parse(status.server_now):Date.now();
+    }
+    if(text) text.textContent=status.status_text||'You are not checked in yet';
+    if(loc) loc.textContent=location.name||'No location configured';
+    if(radius) radius.textContent=location.radius_m?`${location.radius_m}m`:'-';
+    updateLiveDuration();
+  }
+
+  function formatDuration(totalSeconds){
+    const s=Math.max(parseInt(totalSeconds||0,10),0);
+    const h=Math.floor(s/3600);
+    const m=Math.floor((s%3600)/60);
+    const sec=s%60;
+    if(h) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+    return `${m}m ${String(sec).padStart(2,'0')}s`;
+  }
+
+  function currentLiveSeconds(){
+    if(!liveState.checkedIn) return liveState.baseWorkedSeconds||0;
+    const synced=Number.isNaN(liveState.syncedAt)?Date.now():liveState.syncedAt;
+    return Math.max(0,(liveState.baseWorkedSeconds||0)+Math.floor((Date.now()-synced)/1000));
+  }
+
+  function updateLiveDuration(){
+    const el=document.getElementById('liveDuration');
+    if(!el) return;
+    const seconds=currentLiveSeconds();
+    el.textContent=liveState.checkedIn?`Live worked time: ${formatDuration(seconds)}`:`Worked today: ${formatDuration(seconds)}`;
+  }
+
+  function renderInsights(data={}){
+    const k=data.kpis||{};
+    const expected=Math.max(parseInt(data.expected_shift_seconds||0,10),0);
+    const worked=Math.max(parseInt(k.total_work_seconds||0,10),0);
+    const pct=expected>0?Math.min(100,Math.round((worked/expected)*100)):0;
+    const bar=document.getElementById('workedProgressBar');
+    const label=document.getElementById('workedProgressLabel');
+    if(bar) bar.style.width=`${pct}%`;
+    if(label) label.textContent=`${pct}%`;
+
+    const rows=data.attendance_rows||[];
+    const mine=rows[0]||{};
+    const timeline=document.getElementById('shiftTimeline');
+    if(timeline){
+      const checkedIn=mine.check_in?`Check in ${fmt(mine.check_in).slice(11)}`:'No check in';
+      const checkedOut=mine.check_out?`Check out ${fmt(mine.check_out).slice(11)}`:'No checkout yet';
+      timeline.innerHTML=`<span class="tl-dot ${mine.check_in?'ok':''}"></span><strong>${esc(checkedIn)}</strong><span class="tl-line"></span><span class="tl-dot ${mine.check_out?'info':'warn'}"></span><strong>${esc(checkedOut)}</strong>`;
+    }
+
+    const hours=Array.from({length:12},(_,i)=>({hour:i+7,count:0}));
+    rows.forEach(r=>{ if(r.check_in){ const h=parseInt(r.check_in.slice(11,13),10); const item=hours.find(x=>x.hour===h); if(item)item.count++; } });
+    const max=Math.max(...hours.map(h=>h.count),1);
+    const chart=document.getElementById('attendanceChart');
+    if(chart){
+      chart.innerHTML=hours.map(h=>`<div class="tl-chart-bar" title="${h.hour}:00 - ${h.count}" style="height:${Math.max(8,Math.round((h.count/max)*96))}px"></div>`).join('');
+    }
+  }
+
+  function renderAttendance(rows=[]){
+    const body=document.getElementById('attendanceBody');
+    const cards=document.getElementById('attendanceCards');
+    if(!Array.isArray(rows) || rows.length===0){
+      body.innerHTML='<tr><td colspan="10" class="tl-empty">No attendance records for this date.</td></tr>';
+      cards.innerHTML='<div class="tl-card tl-muted">No attendance records for this date.</div>';
+      return;
+    }
+    body.innerHTML=rows.map(r=>`<tr>
+      <td><div class="tl-name">${esc(r.staff)}</div><div class="tl-muted">${esc(r.email||'')}</div></td>
+      <td class="tl-mono">${esc(fmt(r.check_in))}</td>
+      <td class="tl-mono">${esc(fmt(r.check_out))}</td>
+      <td class="tl-mono">${esc(r.worked_label||'0m')}</td>
+      <td class="tl-mono">${esc(r.idle_label||'0m')}</td>
+      <td>${badge(r.late_label||'On Time',r.late_tone||'ok')}</td>
+      <td>${badge(r.status,r.status_tone)}</td>
+      <td>${badge(r.gps_zone||'No GPS',r.gps_tone||'muted')}</td>
+      <td class="tl-mono">${esc(r.distance_label||'-')}</td>
+      <td>${esc(r.notes||'-')}</td>
+    </tr>`).join('');
+    cards.innerHTML=rows.map(r=>`<article class="tl-card">
+      <div class="tl-card-head"><div><div class="tl-name">${esc(r.staff)}</div><div class="tl-muted">${esc(r.email||'')}</div></div>${badge(r.status,r.status_tone)}</div>
+      <div class="tl-card-grid">
+        <div><span>Check In</span><strong>${esc(fmt(r.check_in))}</strong></div>
+        <div><span>Check Out</span><strong>${esc(fmt(r.check_out))}</strong></div>
+        <div><span>Worked</span><strong>${esc(r.worked_label||'0m')}</strong></div>
+        <div><span>Idle</span><strong>${esc(r.idle_label||'0m')}</strong></div>
+        <div><span>Late</span><strong>${esc(r.late_label||'On Time')}</strong></div>
+        <div><span>GPS/Zone</span><strong>${esc(r.gps_zone||'No GPS')}</strong></div>
+        <div><span>Distance</span><strong>${esc(r.distance_label||'-')}</strong></div>
+      </div>
+    </article>`).join('');
+  }
+
+  function renderRaw(logs=[]){
+    const body=document.getElementById('rawBody');
+    if(!Array.isArray(logs) || logs.length===0){
+      body.innerHTML='<tr><td colspan="10" class="tl-empty">No raw event logs for this date.</td></tr>';
+      return;
+    }
+    body.innerHTML=logs.map(l=>`<tr>
+      <td>${esc(l.user||'-')}</td>
+      <td class="tl-mono">${esc(fmt(l.ts||l.logged_at))}</td>
+      <td>${badge(l.kind||l.type||'-','info')}</td>
+      <td>${esc(l.location||'-')}</td>
+      <td class="tl-mono">${esc(l.lat||'-')}</td>
+      <td class="tl-mono">${esc(l.lon||'-')}</td>
+      <td class="tl-mono">${esc(l.accuracy_m||'-')}</td>
+      <td class="tl-mono">${esc(l.distance_m||'-')}</td>
+      <td>${esc(l.geofence||'No GPS')}</td>
+      <td>${esc(l.note||'-')}</td>
+    </tr>`).join('');
+  }
+
+  async function fetchOverview(){
+    updateCsv();
+    try{
+      const res=await fetch(`${apiUrl}?${query(true)}`,{headers:{'X-Requested-With':'XMLHttpRequest'},credentials:'same-origin'});
+      const data=await res.json();
+      if(!res.ok || data.ok===false){ throw new Error(data.error||`status ${res.status}`); }
+      renderKpis(data.kpis||{});
+      renderActionStatus(data.attendance_status||{}, data.attendance_location||{});
+      renderInsights(data);
+      renderAttendance(data.attendance_rows||[]);
+      renderRaw(data.raw_logs||data.logs||data.rows||[]);
+    }catch(err){
+      const msg=esc(err.message||'Failed to load time logs.');
+      document.getElementById('attendanceBody').innerHTML=`<tr><td colspan="10" class="tl-empty">${msg}</td></tr>`;
+      document.getElementById('rawBody').innerHTML=`<tr><td colspan="10" class="tl-empty">${msg}</td></tr>`;
+    }
+  }
+
+  function captureGps(){
+    return new Promise(resolve=>{
+      if(!navigator.geolocation){ resolve({gps_denied:true}); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos=>resolve({
+          latitude:pos.coords.latitude,
+          longitude:pos.coords.longitude,
+          accuracy_m:pos.coords.accuracy
+        }),
+        ()=>resolve({gps_denied:true}),
+        {enableHighAccuracy:true,timeout:9000,maximumAge:30000}
+      );
     });
   }
 
-  function rowMarkup(a){
-    const pct = Math.max(0, Math.min(100, typeof a.pct==='number'?a.pct:0));
-    const latestTs = a.latest_ts ? a.latest_ts.slice(0,19).replace('T',' ') : '—';
-    const kind = a.latest_kind || '—';
-    const kindPill = (kind==='ARRIVAL') ? `<span class="pill pill-ok">Arrival</span>`
-      : (kind==='DEPARTURE' ? `<span class="pill pill-warn">Departure</span>` : `<span class="pill pill-info">${esc(kind)}</span>`);
-    const geofence = a.latest_geofence ? `<span class="pill pill-ok" title="${esc(a.latest_geofence)}">${esc(a.latest_geofence)}</span>` : `<span class="pill pill-warn">Outside</span>`;
-    const color = a.color || 'primary';
-    const workSecs = Math.max(0, Math.round(a.work_secs||0));
-    const idleSecs = Math.max(0, Math.round(a.idle_secs||0));
-    return `
-      <tr class="agent" data-user-id="${a.user_id}">
-        <td>${esc(a.name)}</td>
-        <td class="mono">${a.latest_ts ? `<time class="timeago" datetime="${esc(a.latest_ts)}" title="${esc(latestTs)}">${esc(latestTs)}</time>` : '<span class="muted">—</span>'}</td>
-        <td>${kindPill}</td>
-        <td>${esc(a.latest_location)||'—'}</td>
-        <td class="mono">${esc(a.latest_lat||'')}</td>
-        <td class="mono">${esc(a.latest_lon||'')}</td>
-        <td class="mono">${esc(a.latest_accuracy_m||'')}</td>
-        <td class="mono">${esc(a.latest_distance_m||'')}</td>
-        <td>${geofence}</td>
-        <td class="text-wrap">${esc(a.latest_note||'')}</td>
-        <td style="min-width:180px">
-          <div class="bar bar-${esc(color)}" title="${pct}% • ${workSecs}s"><span style="width:${pct}%"></span></div>
-          <div class="small-muted mono">${pct}% (${workSecs.toLocaleString()}s)</div>
-        </td>
-        <td style="min-width:180px">
-          <div class="bar bar-warning" title="Idle • ${idleSecs}s"><span style="width: calc(100% - ${pct}%)"></span></div>
-          <div class="small-muted mono">Idle (${idleSecs.toLocaleString()}s)</div>
-        </td>
-      </tr>
-      <tr class="details" data-details-for="${a.user_id}" style="display:none">
-        <td colspan="12">
-          <div class="small-muted">Last 30 logs</div>
-          <div class="table-responsive">
-            <table class="table table-sm mono" style="font-size:.86rem">
-              <thead><tr><th>When</th><th>Type</th><th>Location</th><th>Lat</th><th>Lon</th><th>Acc</th><th>Dist</th><th>Geofence</th><th>Note</th></tr></thead>
-              <tbody class="detail-body"><tr><td colspan="9" class="text-muted">Loading…</td></tr></tbody>
-            </table>
-          </div>
-        </td>
-      </tr>`;
+  function setGpsWarning(show,message='Enable location to verify attendance zone.'){
+    const box=document.getElementById('gpsWarning');
+    if(!box) return;
+    box.textContent=message;
+    box.classList.toggle('show',!!show);
   }
 
-  function renderAgents(list){
-    const body=document.getElementById('tl-body');
-    if(!Array.isArray(list) || list.length===0){
-      body.innerHTML = `<tr><td colspan="12" style="text-align:center;color:var(--cc-muted);padding:1rem;">No logs yet.</td></tr>`;
+  async function submitAttendance(){
+    const btn=document.getElementById('attendanceActionBtn');
+    const geoText=document.getElementById('lastGeoResult');
+    if(!btn) return;
+    const checked=btn.dataset.checkedIn==='1';
+    const action=checked?'CHECK_OUT':'CHECK_IN';
+    btn.disabled=true;
+    btn.textContent=checked?'Checking out...':'Checking in...';
+    if(geoText) geoText.textContent='Requesting GPS...';
+    const gps=await captureGps();
+    setGpsWarning(!!gps.gps_denied);
+    if(geoText) geoText.textContent=gps.latitude?'GPS captured':'No GPS';
+    try{
+      const res=await fetch(actionUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},
+        credentials:'same-origin',
+        body:JSON.stringify({action,...gps})
+      });
+      const data=await res.json();
+      if(!res.ok || data.ok===false){ throw new Error(data.error||`status ${res.status}`); }
+      if(geoText) geoText.textContent=data.geofence?.status||'Recorded';
+      if(data.geofence?.distance_m!=null && geoText) geoText.textContent=`${data.geofence.status} (${data.geofence.distance_m}m)`;
+      renderActionStatus(data.status||{}, data.location||{});
+      await fetchOverview();
+    }catch(err){
+      if(geoText) geoText.textContent=err.message==='already_checked_in'?'Already checked in':(err.message==='not_checked_in'?'Not checked in':'Failed');
+      setGpsWarning(false);
+      await fetchOverview();
+    }finally{
+      btn.disabled=false;
+    }
+  }
+
+  async function checkActiveGeofence(){
+    const btn=document.getElementById('attendanceActionBtn');
+    const geoText=document.getElementById('lastGeoResult');
+    if(!btn || btn.dataset.checkedIn!=='1') return;
+    const gps=await captureGps();
+    if(gps.gps_denied){
+      setGpsWarning(true);
+      if(geoText) geoText.textContent='No GPS';
       return;
     }
-    body.innerHTML = list.map(rowMarkup).join('');
-    refreshTimeago();
-  }
-
-  // ---------- Load overview with fallback:
-  // Try WITH ?business_id=..., if 400 then retry WITHOUT it.
-  async function fetchOverview(){
-    const urlWith = `${apiUrl}?${qp(true)}`;
-    const urlSans = `${apiUrl}?${qp(false)}`;
+    setGpsWarning(false);
     try{
-      let res = await fetch(urlWith, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
-      let txt = await res.text();
-
-      if(res.status === 400 && /no_active_business/.test(txt||'')){
-        // Retry without the param (session-only)
-        res = await fetch(urlSans, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
-        txt = await res.text();
+      const res=await fetch(actionUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-CSRFToken':csrf,'X-Requested-With':'XMLHttpRequest'},
+        credentials:'same-origin',
+        body:JSON.stringify({action:'GPS_CHECK',...gps})
+      });
+      const data=await res.json();
+      if(!res.ok || data.ok===false) return;
+      if(geoText){
+        geoText.textContent=data.geofence?.distance_m!=null?`${data.geofence.status} (${data.geofence.distance_m}m)`:data.geofence?.status||'No GPS';
       }
-
-      if(!res.ok){
-        errorRow(`Failed to load (status ${res.status}). ${txt || 'Check server logs.'}`);
-        return;
-      }
-
-      let data={}; try{ data = JSON.parse(txt); }catch(_){}
-      if(data && data.ok === false){
-        errorRow(data.error || 'Server returned an error.');
-        return;
-      }
-      const list = data.agents || data.rows || [];
-      renderAgents(list);
-    }catch(err){
-      errorRow('Network error loading time logs.');
-      console.error(err);
-    }
+      if(data.warning) setGpsWarning(true,data.warning);
+      renderActionStatus(data.status||{}, data.location||{});
+      if(data.auto_checked_out) await fetchOverview();
+    }catch(_){}
   }
 
-  // CSV link uses the same qp(true) so it carries business_id when present
-  if(btnCSV){
-    btnCSV.href = apiUrl.replace('/api/time-logs/','/api/time-logs/export/') + '?' + qp(true);
-  }
-  if(btnApply){ btnApply.addEventListener('click', fetchOverview); }
+  (function clock(){
+    const el=document.getElementById('nowClock');
+    function tick(){const d=new Date(); if(el) el.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;}
+    tick(); setInterval(tick,1000);
+  })();
 
-  // initial load
+  document.getElementById('btnApply')?.addEventListener('click',fetchOverview);
+  document.getElementById('btnRefresh')?.addEventListener('click',fetchOverview);
+  document.getElementById('attendanceActionBtn')?.addEventListener('click',submitAttendance);
+  fDay?.addEventListener('change',updateCsv);
+  fShift?.addEventListener('change',updateCsv);
+  updateCsv();
   fetchOverview();
+  setInterval(updateLiveDuration,1000);
 
-  // auto/Manual refresh
-  (function autoreload(){
-    const chk=document.getElementById('autoRefresh'); const btn=document.getElementById('btnRefresh');
-    let timer=null; function stop(){ if(timer){clearInterval(timer); timer=null;} }
-    function start(){ stop(); timer=setInterval(fetchOverview, 30000); }
-    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ start(); } else { stop(); } });
-    chk && chk.addEventListener('change', ()=> chk.checked?start():stop());
-    btn && btn.addEventListener('click', fetchOverview);
+  (function autoRefresh(){
+    const chk=document.getElementById('autoRefresh');
+    let timer=null;
+    function stop(){if(timer){clearInterval(timer);timer=null;}}
+    function start(){stop();timer=setInterval(fetchOverview,30000);}
+    chk?.addEventListener('change',()=>chk.checked?start():stop());
+    document.addEventListener('visibilitychange',()=>document.visibilityState==='visible'?start():stop());
     start();
   })();
 
-  // drill-down (honors same includeBiz behavior for consistency: we send with param)
-  document.getElementById('tl').addEventListener('click', async (e)=>{
-    const tr = e.target.closest('tr.agent'); if(!tr) return;
-    const uid = tr.getAttribute('data-user-id');
-    const details = document.querySelector(`tr.details[data-details-for="${uid}"]`);
-    if(!details) return;
-    const box = details.querySelector('.detail-body');
-    details.style.display = details.style.display==='none' ? '' : 'none';
-    if(!box || box.getAttribute('data-loaded')==='1') return;
-    try{
-      const url = `${apiUrl}?${qp(true)}&user_id=${encodeURIComponent(uid)}`;
-      const res = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' }, credentials:'same-origin' });
-      if(!res.ok){ box.innerHTML = `<tr><td colspan="9" class="text-muted">Failed to load.</td></tr>`; return; }
-      const data = await res.json();
-      if((data.logs||[]).length===0){ box.innerHTML = `<tr><td colspan="9" class="text-muted">No logs.</td></tr>`; box.setAttribute('data-loaded','1'); return; }
-      box.innerHTML = data.logs.map(l=>{
-        const when = l.ts ? l.ts.slice(0,19).replace('T',' ') : '—';
-        return `<tr>
-          <td>${when}</td><td>${esc(l.kind)||'—'}</td><td>${esc(l.location)||'—'}</td>
-          <td>${esc(l.lat||'')}</td><td>${esc(l.lon||'')}</td><td>${esc(l.accuracy_m||'')}</td>
-          <td>${esc(l.distance_m||'')}</td><td>${esc(l.geofence||'—')}</td><td>${esc(l.note||'')}</td>
-        </tr>`;
-      }).join('');
-      box.setAttribute('data-loaded','1');
-    }catch(_){
-      box.innerHTML = `<tr><td colspan="9" class="text-muted">Network error.</td></tr>`;
-    }
-  });
+  setInterval(checkActiveGeofence,60000);
 </script>
 {% endblock %}

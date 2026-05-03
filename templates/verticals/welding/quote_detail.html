@@ -92,12 +92,57 @@
                     <h6 class="mb-0"><i class="bi bi-person"></i> Customer</h6>
                 </div>
                 <div class="card-body">
+                    {% if is_editable %}
+                    <form method="post" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_customer">
+                        <div class="col-md-6">
+                            <label class="form-label">Customer / Company</label>
+                            <input type="text" class="form-control" name="customer_name" value="{{ quote.customer_name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Contact Person</label>
+                            <input type="text" class="form-control" name="customer_contact_person" value="{{ quote.customer_contact_person }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" name="customer_phone" value="{{ quote.customer_phone }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="customer_email" value="{{ quote.customer_email }}">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address / Location</label>
+                            <textarea class="form-control" name="customer_address" rows="2">{{ quote.customer_address }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="customer_notes" rows="2">{{ quote.customer_notes }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-save"></i> Save Customer Details
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
                     <p class="mb-1"><strong>{{ quote.customer_name }}</strong></p>
+                    {% if quote.customer_contact_person %}
+                    <p class="mb-1"><i class="bi bi-person-badge"></i> {{ quote.customer_contact_person }}</p>
+                    {% endif %}
                     {% if quote.customer_phone %}
                     <p class="mb-1"><i class="bi bi-phone"></i> {{ quote.customer_phone }}</p>
                     {% endif %}
                     {% if quote.customer_email %}
-                    <p class="mb-0"><i class="bi bi-envelope"></i> {{ quote.customer_email }}</p>
+                    <p class="mb-1"><i class="bi bi-envelope"></i> {{ quote.customer_email }}</p>
+                    {% endif %}
+                    {% if quote.customer_address %}
+                    <p class="mb-1"><i class="bi bi-geo-alt"></i> {{ quote.customer_address|linebreaksbr }}</p>
+                    {% endif %}
+                    {% if quote.customer_notes %}
+                    <p class="mb-0 text-muted"><i class="bi bi-journal-text"></i> {{ quote.customer_notes|linebreaksbr }}</p>
+                    {% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -310,6 +355,14 @@
                             
                             <a href="{% url 'verticals:welding_quote_pdf' quote.id %}" class="btn btn-primary" target="_blank">
                                 <i class="bi bi-file-pdf"></i> Download PDF
+                            </a>
+
+                            <a href="{% url 'verticals:welding_quote_print' quote.id %}" class="btn btn-outline-primary" target="_blank">
+                                <i class="bi bi-printer"></i> Print View
+                            </a>
+
+                            <a href="{% url 'verticals:welding_marketplace_publish' %}?source=quote&id={{ quote.id }}" class="btn btn-outline-warning">
+                                <i class="bi bi-shop"></i> Post to Marketplace
                             </a>
                             
                             <form method="post" action="/verticals/welding/quotes/{{ quote.id }}/invoice/">
@@ -789,6 +842,18 @@
   });
 
   document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll('[data-bs-toggle="modal"]').forEach(function (trigger) {
+      trigger.addEventListener("click", function () {
+        var target = trigger.getAttribute("data-bs-target");
+        if (target && typeof bootstrap !== "undefined") {
+          var modalEl = document.querySelector(target);
+          if (modalEl) {
+            var modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modalInstance.show();
+          }
+        }
+      });
+    });
     bindMaterialCards();
     bindSearchAndFilter();
     bindCustomMaterial();

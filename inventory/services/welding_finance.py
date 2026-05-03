@@ -91,6 +91,8 @@ def payment_milestones_from_post(post) -> list[dict[str, str]]:
 def quote_specs_with_customer_details(post) -> dict:
     return {
         "customer_address": (post.get("customer_address") or "").strip(),
+        "customer_contact_person": (post.get("customer_contact_person") or "").strip(),
+        "customer_notes": (post.get("customer_notes") or "").strip(),
         "payment_details": (post.get("payment_details") or "").strip(),
     }
 

@@ -21,6 +21,7 @@ from django.test import TestCase, Client
 from django.urls import reverse, resolve, NoReverseMatch
 
 from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
+from inventory.services.marketplace_media import listing_media
 from tenants.models import Business
 
 
@@ -619,6 +620,24 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         self.assertIn("<video", content)
         self.assertIn("demo.mp4", content)
 
+    def test_uploaded_gallery_image_renders_image_url(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Uploaded Gallery Image",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("uploaded-card.jpg", ContentFile(b"image"), save=True)
+
+        response = self.client.get(reverse("marketplace:home"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+
+        self.assertIn("Uploaded Gallery Image", content)
+        self.assertIn("uploaded-card.jpg", content)
+        self.assertIn("<img", content)
+
     def test_missing_gallery_image_falls_back_to_placeholder(self):
         listing = MarketplaceListing.objects.create(
             business=self.biz,
@@ -638,3 +657,30 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         self.assertIn("Missing Gallery Image", content)
         self.assertIn("listing-img-placeholder", content)
         self.assertNotIn("missing-primary.jpg", content)
+
+    def test_remote_storage_url_renders_without_exists_check(self):
+        class RemoteStorage:
+            def exists(self, name):
+                raise AssertionError("remote exists() should not be required for rendering")
+
+        class RemoteField:
+            name = "marketplace/remote-card.jpg"
+            storage = RemoteStorage()
+
+            @property
+            def url(self):
+                return "https://cdn.example.test/marketplace/remote-card.jpg"
+
+        class RemoteImage:
+            image = RemoteField()
+
+        class RemoteListing:
+            title = "Remote Image Listing"
+            vertical = "phones"
+            primary_image = RemoteImage()
+            media_file = None
+
+        media = listing_media(RemoteListing())
+
+        self.assertEqual(media["kind"], "image")
+        self.assertEqual(media["url"], "https://cdn.example.test/marketplace/remote-card.jpg")

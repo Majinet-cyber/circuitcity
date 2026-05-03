@@ -432,11 +432,11 @@ def get_mobile_nav_items(request: HttpRequest) -> List[Dict[str, Any]]:
                 "is_menu": False,
             },
             {
-                "key": "revenue",
-                "label": "Revenue",
-                "icon_class": "bi-cash-coin",
-                "url": _safe_reverse_any(["verticals:welding_revenue"], "/verticals/welding/revenue/"),
-                "active_prefix": "/verticals/welding/revenue",
+                "key": "notebook",
+                "label": "Notebook",
+                "icon_class": "bi-journal-text",
+                "url": _safe_reverse_any(["verticals:welding_notebook_list"], "/verticals/welding/notebook/"),
+                "active_prefix": "/verticals/welding/notebook",
                 "is_menu": False,
             },
             {

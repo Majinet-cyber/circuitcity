@@ -10,13 +10,13 @@
 
 {% block extra_css %}
 <style>
-/* ===== Welding Dashboard Premium Styles ===== */
-/* PREMIUM BLUE THEME (Jan 2026) - matches Clothing/Cement premium feel */
+/* ===== Welding Dashboard Light Workshop Theme ===== */
 
 .welding-page {
-  background: var(--surface, #f8fafc);
+  background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 36%, #ffffff 100%);
   min-height: 100vh;
   color: var(--ink, #0f172a);
+  overflow-x: hidden;
 }
 
 .welding-container {
@@ -25,9 +25,8 @@
   padding: 1.5rem;
 }
 
-/* Premium Blue Hero Card (like Clothing) */
 .vertical-hero {
-  background: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 50%, #60a5fa 100%);
+  background: linear-gradient(135deg, #f97316 0%, #fb923c 52%, #fbbf24 100%);
   padding: 28px;
   border-radius: 24px;
   color: #fff;
@@ -36,7 +35,7 @@
   gap: 20px;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 20px 60px rgba(14, 165, 233, 0.2);
+  box-shadow: 0 20px 60px rgba(249, 115, 22, 0.2);
   position: relative;
   overflow: hidden;
   margin-bottom: 1.5rem;
@@ -175,7 +174,7 @@
   left: 0;
   right: 0;
   height: 4px;
-  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.45), transparent);
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -187,7 +186,7 @@
 .kpi-card:hover {
   transform: translateY(-6px);
   box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
-  border-color: rgba(59, 130, 246, 0.2);
+  border-color: rgba(249, 115, 22, 0.22);
 }
 
 .kpi-label {
@@ -468,6 +467,7 @@
 @media (max-width: 768px) {
   .welding-container {
     padding: 1rem;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
   }
   
   .vertical-hero {
@@ -495,13 +495,34 @@
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+@media (max-width: 430px) {
+  .welding-container {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vertical-hero,
+  .section-card,
+  .chart-card {
+    border-radius: 16px;
+  }
+
+  .hero-actions a {
+    width: 100%;
+  }
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="welding-page" data-testid="welding-dashboard">
   <div class="welding-container">
-    <!-- Premium Blue Hero Card (like Clothing) -->
+    <!-- Welding Hero Card -->
     <header class="vertical-hero" data-testid="welding-hero-card">
       <div>
         <p class="eyebrow">{% if business %}{{ business.name }}{% else %}Welding Workshop{% endif %}</p>
@@ -511,6 +532,15 @@
       <div class="hero-actions">
         <a class="primary" href="{{ url_create_quote }}" data-testid="welding-create-quote">
           <i class="bi bi-plus-circle"></i> New Quote
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_notebook_list' %}">
+          <i class="bi bi-journal-text"></i> Notebook
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_marketplace_publish' %}">
+          <i class="bi bi-shop"></i> Post to Marketplace
+        </a>
+        <a class="ghost" href="{% url 'verticals:welding_branding_settings' %}">
+          <i class="bi bi-patch-check"></i> Branding
         </a>
         <a class="ghost" href="{% url 'verticals:welding_sales' %}">Sales</a>
       </div>
@@ -676,67 +706,67 @@
     </div>
 
     <!-- ===== GAMIFICATION PANEL ===== -->
-    <div data-testid="welding-gamification" style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:20px;padding:1.5rem;margin-bottom:1.5rem;color:#fff;position:relative;overflow:hidden;">
-      <div style="position:absolute;top:-40%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(99,102,241,.15) 0%,transparent 70%);pointer-events:none;"></div>
+    <div data-testid="welding-gamification" style="background:#fff;border:1px solid #e2e8f0;box-shadow:0 14px 36px rgba(15,23,42,.08);border-radius:20px;padding:1.5rem;margin-bottom:1.5rem;color:#0f172a;position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-40%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(249,115,22,.12) 0%,transparent 70%);pointer-events:none;"></div>
       <div style="position:relative;z-index:1;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.5);margin-bottom:4px;">Workshop Productivity</div>
-            <h3 style="margin:0;font-size:1.25rem;font-weight:800;" data-testid="workshop-productivity-title">🏆 Workshop Score</h3>
+            <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:4px;">Workshop Productivity</div>
+            <h3 style="margin:0;font-size:1.25rem;font-weight:800;color:#0f172a;" data-testid="workshop-productivity-title">🏆 Workshop Score</h3>
           </div>
-          <div style="background:rgba(99,102,241,.25);border:1px solid rgba(99,102,241,.4);border-radius:12px;padding:8px 16px;text-align:center;">
-            <div style="font-size:1.75rem;font-weight:900;color:#a5b4fc;">
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:8px 16px;text-align:center;">
+            <div style="font-size:1.75rem;font-weight:900;color:#f97316;">
               {% with total=jobs_completed_in_range|add:quotes_this_month %}
                 {% if total > 30 %}🥇 Level 5{% elif total > 20 %}🥈 Level 4{% elif total > 10 %}🥉 Level 3{% elif total > 5 %}⭐ Level 2{% else %}🔰 Level 1{% endif %}
               {% endwith %}
             </div>
-            <div style="font-size:.7rem;color:rgba(255,255,255,.5);margin-top:2px;">Workshop Level</div>
+            <div style="font-size:.7rem;color:#64748b;margin-top:2px;">Workshop Level</div>
           </div>
         </div>
 
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.25rem;" data-testid="gamification-widgets">
           <!-- Jobs Completed -->
-          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:12px;">
-            <div style="font-size:.7rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Jobs Completed</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Jobs Completed</div>
             <div style="font-size:1.5rem;font-weight:800;color:#34d399;">{{ jobs_completed_in_range }}</div>
-            <div style="font-size:.72rem;color:rgba(255,255,255,.4);">{{ range_label|default:"This period" }}</div>
+            <div style="font-size:.72rem;color:#64748b;">{{ range_label|default:"This period" }}</div>
           </div>
           <!-- Profit -->
-          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:12px;">
-            <div style="font-size:.7rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Profit Earned</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Profit Earned</div>
             <div style="font-size:1.2rem;font-weight:800;color:{% if profit_this_month >= 0 %}#34d399{% else %}#f87171{% endif %};">MWK {{ profit_this_month|floatformat:0|intcomma }}</div>
-            <div style="font-size:.72rem;color:rgba(255,255,255,.4);">{{ range_label|default:"This period" }}</div>
+            <div style="font-size:.72rem;color:#64748b;">{{ range_label|default:"This period" }}</div>
           </div>
           <!-- Material Efficiency -->
-          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:12px;">
-            <div style="font-size:.7rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Material Alerts</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Material Alerts</div>
             <div style="font-size:1.5rem;font-weight:800;color:{% if low_stock_count > 0 %}#fbbf24{% else %}#34d399{% endif %};">{{ low_stock_count }}</div>
-            <div style="font-size:.72rem;color:rgba(255,255,255,.4);">Low stock items</div>
+            <div style="font-size:.72rem;color:#64748b;">Low stock items</div>
           </div>
           <!-- On-Time Badge -->
-          <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:12px;">
-            <div style="font-size:.7rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">On-Time Delivery</div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">On-Time Delivery</div>
             <div style="font-size:1.5rem;font-weight:800;color:{% if delayed_jobs == 0 %}#34d399{% else %}#f87171{% endif %};">
               {% if delayed_jobs == 0 %}🎯 Perfect{% else %}{{ delayed_jobs }} Late{% endif %}
             </div>
-            <div style="font-size:.72rem;color:rgba(255,255,255,.4);">Active job delays</div>
+            <div style="font-size:.72rem;color:#64748b;">Active job delays</div>
           </div>
         </div>
 
         <!-- Revenue Target Progress -->
         <div data-testid="revenue-target-progress">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:.8rem;">
-            <span style="color:rgba(255,255,255,.7);font-weight:600;">Revenue Target Progress</span>
-            <span style="color:#a5b4fc;font-weight:700;">
+            <span style="color:#475569;font-weight:600;">Revenue Target Progress</span>
+            <span style="color:#f97316;font-weight:700;">
               MWK {{ revenue_this_month|floatformat:0|intcomma }} / MWK 500,000
             </span>
           </div>
-          <div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;overflow:hidden;">
-            <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#6366f1,#8b5cf6);
+          <div style="height:8px;background:#ffedd5;border-radius:999px;overflow:hidden;">
+            <div style="height:100%;border-radius:999px;background:linear-gradient(90deg,#f97316,#fbbf24);
                         width:{% widthratio revenue_this_month 500000 100 %}%;max-width:100%;transition:width .5s ease;">
             </div>
           </div>
-          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:rgba(255,255,255,.4);margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;font-size:.68rem;color:#64748b;margin-top:4px;">
             <span>0</span>
             <span>Target: MWK 500,000</span>
           </div>

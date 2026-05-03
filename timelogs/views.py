@@ -24,6 +24,8 @@ from tenants.scope import get_membership, resolve_location_for_user
 from .models import AgentWorkLog, LocationPing, WorkingHours, TimeLog, TimeLogSegment
 from .utils import haversine_m
 from .services_presence import (
+    attendance_kpis,
+    attendance_rows_for_agents,
     attach_presence_summaries,
     available_business_agents,
     dashboard_kpis,
@@ -445,6 +447,7 @@ def time_logs_dashboard(request):
 
     if user_is_manager:
         agent_memberships = available_business_agents(business)
+        dashboard_agents = [m.user for m in agent_memberships]
         available_agents = [
             {
                 'id': m.user.id,
@@ -455,6 +458,7 @@ def time_logs_dashboard(request):
         ]
     else:
         available_agents = []
+        dashboard_agents = [request.user]
     
     # Get work logs
     if selected_agent:
@@ -484,6 +488,7 @@ def time_logs_dashboard(request):
                 ]
         
         agent_work_logs = [work_log] if work_log else []
+        attendance_rows = attendance_rows_for_agents([selected_agent], agent_work_logs, selected_date)
     else:
         # All agents view (managers only)
         agent_work_logs = AgentWorkLog.objects.filter(
@@ -491,12 +496,13 @@ def time_logs_dashboard(request):
             work_date=selected_date,
         ).select_related('agent', 'location').order_by('-total_on_site_minutes')
         agent_work_logs = attach_presence_summaries(agent_work_logs.prefetch_related("pings"))
+        attendance_rows = attendance_rows_for_agents(dashboard_agents, agent_work_logs, selected_date)
         
         work_log = None
         pings = []
         battery_segments = []
 
-    kpis = dashboard_kpis(agent_work_logs)
+    kpis = attendance_kpis(attendance_rows)
     
     context = {
         "selected_date": selected_date,
@@ -510,6 +516,7 @@ def time_logs_dashboard(request):
         "selected_agent": selected_agent,
         "selected_agent_id": selected_agent_id,
         "agent_work_logs": agent_work_logs,
+        "attendance_rows": attendance_rows,
         "kpis": kpis,
         "presence": presence_summary(work_log) if work_log else None,
     }

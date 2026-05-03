@@ -20,6 +20,18 @@ from tenants.models import Business
 User = settings.AUTH_USER_MODEL
 
 
+def welding_brand_logo_upload_path(instance, filename):
+    return f"welding/{instance.business_id}/branding/logos/{filename}"
+
+
+def welding_signature_upload_path(instance, filename):
+    return f"welding/{instance.business_id}/branding/signatures/{filename}"
+
+
+def welding_notebook_image_upload_path(instance, filename):
+    return f"welding/{instance.business_id}/notebook/{filename}"
+
+
 # ==============================================================================
 # WELDING MATERIALS CATALOG
 # ==============================================================================
@@ -342,6 +354,42 @@ class WeldingQuoteStatus(models.TextChoices):
     EXPIRED = "expired", "Expired"
 
 
+class WeldingBrandingSettings(models.Model):
+    """Per-business defaults used on welding quotation documents."""
+
+    business = models.OneToOneField(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="welding_branding",
+    )
+    company_logo = models.ImageField(
+        upload_to=welding_brand_logo_upload_path,
+        null=True,
+        blank=True,
+    )
+    company_name = models.CharField(max_length=180, blank=True, default="")
+    business_phone = models.CharField(max_length=40, blank=True, default="")
+    business_email = models.EmailField(blank=True, default="")
+    business_address = models.TextField(blank=True, default="")
+    city = models.CharField(max_length=120, blank=True, default="")
+    payment_instructions = models.TextField(blank=True, default="")
+    default_terms = models.TextField(blank=True, default="")
+    authorized_signature_name = models.CharField(max_length=150, blank=True, default="")
+    signature_image = models.ImageField(
+        upload_to=welding_signature_upload_path,
+        null=True,
+        blank=True,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Welding Branding Settings"
+        verbose_name_plural = "Welding Branding Settings"
+
+    def __str__(self):
+        return f"Welding branding for {self.business.name}"
+
+
 class WeldingQuote(models.Model):
     """
     Quote/estimate for a welding job.
@@ -370,8 +418,11 @@ class WeldingQuote(models.Model):
     
     # Customer
     customer_name = models.CharField(max_length=150)
+    customer_contact_person = models.CharField(max_length=150, blank=True, default="")
     customer_phone = models.CharField(max_length=30, blank=True, default="")
     customer_email = models.CharField(max_length=254, blank=True, default="")
+    customer_address = models.TextField(blank=True, default="")
+    customer_notes = models.TextField(blank=True, default="")
     
     # Template reference (may be null for custom quotes)
     template = models.ForeignKey(
@@ -398,6 +449,11 @@ class WeldingQuote(models.Model):
     cost_breakdown = models.JSONField(
         default=dict,
         help_text="Detailed cost breakdown",
+    )
+    branding_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Business branding snapshot used when the quote was created",
     )
     
     # Totals
@@ -633,6 +689,96 @@ class WeldingJobStatus(models.TextChoices):
     READY = "ready", "Ready for Pickup"
     DELIVERED = "delivered", "Delivered"
     CANCELLED = "cancelled", "Cancelled"
+
+
+class WeldingNotebookJobType(models.TextChoices):
+    TRELLIDOR = "trellidor", "Trellidor"
+    GATE = "gate", "Gate"
+    WINDOW = "window", "Window"
+    TABLE = "table", "Table"
+    BED = "bed", "Bed"
+    ROOFING = "roofing", "Roofing"
+    CUSTOM = "custom", "Custom"
+
+
+class WeldingNotebookStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    QUOTED = "quoted", "Quoted"
+    IN_PROGRESS = "in_progress", "In Progress"
+    COMPLETED = "completed", "Completed"
+    LOST = "lost", "Lost"
+
+
+class WeldingNotebookEntry(models.Model):
+    """Site diary entry for welding customer visits and measurements."""
+
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="welding_notebook_entries",
+        db_index=True,
+    )
+    location = models.ForeignKey(
+        "inventory.Location",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="welding_notebook_entries",
+    )
+    site_customer_name = models.CharField(max_length=180)
+    customer_phone = models.CharField(max_length=40, blank=True, default="")
+    customer_address = models.TextField(blank=True, default="")
+    visit_at = models.DateTimeField(default=timezone.now, db_index=True)
+    job_type = models.CharField(
+        max_length=30,
+        choices=WeldingNotebookJobType.choices,
+        default=WeldingNotebookJobType.CUSTOM,
+        db_index=True,
+    )
+    measurements = models.TextField(blank=True, default="")
+    materials_needed = models.TextField(blank=True, default="")
+    estimated_budget = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    follow_up_date = models.DateField(null=True, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=30,
+        choices=WeldingNotebookStatus.choices,
+        default=WeldingNotebookStatus.DRAFT,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    image = models.ImageField(
+        upload_to=welding_notebook_image_upload_path,
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="welding_notebook_entries_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-visit_at", "-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-visit_at"]),
+            models.Index(fields=["business", "status"]),
+            models.Index(fields=["business", "job_type"]),
+        ]
+        verbose_name = "Welding Notebook Entry"
+        verbose_name_plural = "Welding Notebook Entries"
+
+    def __str__(self):
+        return f"{self.site_customer_name} - {self.get_job_type_display()}"
 
 
 class WeldingJob(models.Model):

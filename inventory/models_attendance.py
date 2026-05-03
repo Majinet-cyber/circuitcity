@@ -69,6 +69,10 @@ class TimeLog(models.Model):
     # optional geo snapshot at check-in (renamed fields)
     lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     lon = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    accuracy_m = models.PositiveIntegerField(null=True, blank=True)
+    distance_m = models.PositiveIntegerField(null=True, blank=True)
+    geofence_status = models.CharField(max_length=32, blank=True, default="")
+    note = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ("-ts",)

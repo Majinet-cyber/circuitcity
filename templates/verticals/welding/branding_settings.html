@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Welding Branding Settings{% endblock %}
+
+{% block extra_css %}
+<style>
+  .welding-branding-page {
+    background: linear-gradient(135deg, #fff7ed 0%, #f8fafc 38%, #ffffff 100%);
+    min-height: 100vh;
+    color: #111827;
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .branding-shell {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 1.5rem);
+  }
+
+  .branding-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+  }
+
+  .branding-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, #ffffff, #fff7ed);
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .branding-eyebrow {
+    margin: 0 0 0.25rem;
+    color: #f97316;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .branding-header h1 {
+    margin: 0;
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .branding-helper {
+    margin: 0.4rem 0 0;
+    color: #64748b;
+  }
+
+  .branding-body {
+    padding: 1.5rem;
+  }
+
+  .preview-box {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 14px;
+    padding: 0.9rem;
+    margin-top: 0.75rem;
+    min-height: 92px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview-box img {
+    max-height: 76px;
+    max-width: 220px;
+    object-fit: contain;
+  }
+
+  .preview-fallback {
+    color: #64748b;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .form-label {
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .form-control {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #111827;
+  }
+
+  .form-control:focus {
+    border-color: #f97316;
+    box-shadow: 0 0 0 0.2rem rgba(249, 115, 22, 0.14);
+  }
+
+  .btn-weld {
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    border: 0;
+    color: #ffffff;
+    font-weight: 800;
+  }
+
+  .btn-weld:hover {
+    color: #ffffff;
+    filter: brightness(0.98);
+  }
+
+  @media (max-width: 640px) {
+    .branding-header {
+      flex-direction: column;
+    }
+
+    .branding-body {
+      padding: 1rem;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="welding-branding-page">
+<div class="branding-shell">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item active">Quotation Branding</li>
+    </ol>
+  </nav>
+
+  <div class="branding-card">
+    <div class="branding-header">
+      <div>
+        <p class="branding-eyebrow">Welding Settings</p>
+        <h1><i class="bi bi-patch-check"></i> Quotation Branding</h1>
+        <p class="branding-helper">These details will automatically appear on new welding quotations.</p>
+      </div>
+      <a href="/verticals/welding/quotes/create/" class="btn btn-outline-secondary btn-sm">New Quote</a>
+    </div>
+    <div class="branding-body">
+      <form method="post" enctype="multipart/form-data" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-6">
+          <label class="form-label">Company Logo</label>
+          <input type="file" name="company_logo" class="form-control" accept="image/*">
+          <div class="preview-box">
+            {% if settings.company_logo %}
+            <img src="{{ settings.company_logo.url }}" alt="{{ branding_profile.company_name }} logo">
+            {% else %}
+            <div class="preview-fallback">No logo uploaded yet</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Company Name</label>
+          <input type="text" name="company_name" class="form-control" value="{{ settings.company_name|default:business.name }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Business Phone</label>
+          <input type="tel" name="business_phone" class="form-control" value="{{ settings.business_phone }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Business Email</label>
+          <input type="email" name="business_email" class="form-control" value="{{ settings.business_email }}">
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Business Address / Location</label>
+          <textarea name="business_address" class="form-control" rows="3">{{ settings.business_address }}</textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">City</label>
+          <input type="text" name="city" class="form-control" value="{{ settings.city }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Payment Instructions / Bank Details</label>
+          <textarea name="payment_instructions" class="form-control" rows="4" placeholder="Bank account, mobile money, cash instructions">{{ settings.payment_instructions }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Default Terms and Conditions</label>
+          <textarea name="default_terms" class="form-control" rows="5">{{ branding_profile.terms }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Authorized Signature Name</label>
+          <input type="text" name="authorized_signature_name" class="form-control" value="{{ settings.authorized_signature_name }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Signature Image</label>
+          <input type="file" name="signature_image" class="form-control" accept="image/*">
+          <div class="preview-box">
+            {% if settings.signature_image %}
+            <img src="{{ settings.signature_image.url }}" alt="Authorized signature">
+            {% else %}
+            <div class="preview-fallback">Optional signature image</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-12 d-grid d-md-flex gap-2">
+          <button type="submit" class="btn btn-weld btn-lg"><i class="bi bi-save"></i> Save Default Branding</button>
+          <a href="/verticals/welding/dashboard/" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

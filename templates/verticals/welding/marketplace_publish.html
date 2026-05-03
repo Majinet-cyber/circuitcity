@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Post Welding Job to Marketplace{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 920px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item active">Post to Marketplace</li>
+    </ol>
+  </nav>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-dark text-white d-flex justify-content-between flex-wrap gap-2">
+      <h5 class="mb-0"><i class="bi bi-shop"></i> Upload Welding Job to Marketplace</h5>
+      {% if source %}<span class="badge bg-warning text-dark">From {{ source_type|title }} #{{ source.id }}</span>{% endif %}
+    </div>
+    <div class="card-body p-4">
+      <form method="post" enctype="multipart/form-data" class="row g-3">
+        {% csrf_token %}
+        <input type="hidden" name="source_type" value="{{ source_type }}">
+        <input type="hidden" name="source_id" value="{{ form_data.source_id }}">
+        <div class="col-md-8">
+          <label class="form-label">Title</label>
+          <input type="text" name="title" class="form-control" maxlength="200" value="{{ form_data.title }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="draft">Draft</option>
+            <option value="live">Published</option>
+            <option value="offline">Hidden</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Category / Job Type</label>
+          <select name="category" class="form-select">
+            {% for value,label in category_choices %}
+            <option value="{{ value }}" {% if form_data.category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Price / Estimated Price</label>
+          <input type="number" min="0" step="0.01" name="price" class="form-control" value="{{ form_data.price|default:'' }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="6" required>{{ form_data.description }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Location</label>
+          <input type="text" name="location_text" class="form-control" value="{{ form_data.location_text }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Contact Phone</label>
+          <input type="tel" name="contact_phone" class="form-control" value="{{ form_data.contact_phone }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Contact Email</label>
+          <input type="email" name="contact_email" class="form-control" value="{{ form_data.contact_email }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Primary Image</label>
+          <input type="file" name="media_file" class="form-control" accept="image/*,video/mp4,video/webm">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">More Job Photos</label>
+          <input type="file" name="images" class="form-control" accept="image/*" multiple>
+        </div>
+        <div class="col-12 d-grid d-md-flex gap-2">
+          <button type="submit" class="btn btn-warning btn-lg"><i class="bi bi-shop"></i> Save Marketplace Listing</button>
+          <a href="/verticals/welding/dashboard/" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

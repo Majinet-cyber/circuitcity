@@ -41,9 +41,17 @@ DEFAULT_WORKSHOP_ROWS = (
 
 
 def _post_list(post, key: str) -> list[str]:
+    if isinstance(post, dict):
+        raw = dict.get(post, key, [])
+        if isinstance(raw, list):
+            return raw
+        if raw not in (None, ""):
+            return [raw]
     values = post.getlist(key)
+    if isinstance(values, str):
+        return [values] if values not in (None, "") else []
     if values:
-        return values
+        return list(values)
     value = post.get(key)
     return [value] if value not in (None, "") else []
 

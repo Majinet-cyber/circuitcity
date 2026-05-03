@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+from django.core.files.storage import FileSystemStorage
+
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
@@ -25,15 +27,19 @@ def _field_url(field_file):
     if not field_file or not getattr(field_file, "name", ""):
         return ""
     try:
-        storage = field_file.storage
-        if storage and not storage.exists(field_file.name):
-            return ""
-    except Exception:
-        pass
-    try:
-        return field_file.url
+        url = field_file.url
     except Exception:
         return ""
+
+    storage = getattr(field_file, "storage", None)
+    if isinstance(storage, FileSystemStorage):
+        try:
+            if not storage.exists(field_file.name):
+                return ""
+        except Exception:
+            return ""
+
+    return url
 
 
 def _media_kind(name: str, fallback_is_image: bool = False) -> str:
@@ -46,7 +52,13 @@ def _media_kind(name: str, fallback_is_image: bool = False) -> str:
 
 
 def marketplace_image_url(image_obj) -> str:
-    return _field_url(getattr(image_obj, "image", None))
+    image_field = getattr(image_obj, "image", None)
+    url = _field_url(image_field)
+    if not url:
+        return ""
+    if _media_kind(getattr(image_field, "name", ""), fallback_is_image=True) != "image":
+        return ""
+    return url
 
 
 def listing_media(listing) -> dict[str, str]:
@@ -64,8 +76,16 @@ def listing_media(listing) -> dict[str, str]:
     media_file = getattr(listing, "media_file", None)
     media_url = _field_url(media_file)
     if media_url:
+        media_kind = _media_kind(getattr(media_file, "name", ""))
+        if media_kind == "placeholder":
+            return {
+                "kind": "placeholder",
+                "url": "",
+                "placeholder_icon": icon,
+                "alt": getattr(listing, "title", "Marketplace listing"),
+            }
         return {
-            "kind": _media_kind(getattr(media_file, "name", "")),
+            "kind": media_kind,
             "url": media_url,
             "placeholder_icon": icon,
             "alt": getattr(listing, "title", "Marketplace listing"),

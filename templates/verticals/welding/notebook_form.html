@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}{% if entry %}Edit{% else %}New{% endif %} Welding Note{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/verticals/welding/dashboard/">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="/verticals/welding/notebook/">Notebook</a></li>
+      <li class="breadcrumb-item active">{% if entry %}Edit{% else %}New Note{% endif %}</li>
+    </ol>
+  </nav>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-dark text-white">
+      <h5 class="mb-0"><i class="bi bi-journal-plus"></i> {% if entry %}Edit Site Note{% else %}New Site Note{% endif %}</h5>
+    </div>
+    <div class="card-body p-4">
+      <form method="post" enctype="multipart/form-data" class="row g-3">
+        {% csrf_token %}
+        <div class="col-md-7">
+          <label class="form-label">Site / Customer Name <span class="text-danger">*</span></label>
+          <input type="text" name="site_customer_name" class="form-control" value="{{ entry.site_customer_name }}" required>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Customer Phone</label>
+          <input type="tel" name="customer_phone" class="form-control" value="{{ entry.customer_phone }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Address / Location</label>
+          <textarea name="customer_address" class="form-control" rows="2">{{ entry.customer_address }}</textarea>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Visit Date & Time</label>
+          <input type="datetime-local" name="visit_at" class="form-control" value="{% if entry %}{{ entry.visit_at|date:'Y-m-d\\TH:i' }}{% endif %}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Job Type</label>
+          <select name="job_type" class="form-select">
+            {% for value,label in job_type_choices %}
+            <option value="{{ value }}" {% if entry.job_type == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for value,label in status_choices %}
+            <option value="{{ value }}" {% if entry.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Measurements / Observations</label>
+          <textarea name="measurements" class="form-control" rows="5" placeholder="Measurements, opening sizes, steel sizes, site constraints">{{ entry.measurements }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Materials Needed</label>
+          <textarea name="materials_needed" class="form-control" rows="4" placeholder="Steel, wood, plywood, paint, rods, discs, screws, transport notes">{{ entry.materials_needed }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Quoted Amount / Estimated Budget</label>
+          <input type="number" min="0" step="0.01" name="estimated_budget" class="form-control" value="{{ entry.estimated_budget|default:'' }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Follow-up Date</label>
+          <input type="date" name="follow_up_date" class="form-control" value="{% if entry.follow_up_date %}{{ entry.follow_up_date|date:'Y-m-d' }}{% endif %}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">General Notes</label>
+          <textarea name="notes" class="form-control" rows="4">{{ entry.notes }}</textarea>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Site Photo / Sketch</label>
+          <input type="file" name="image" class="form-control" accept="image/*">
+        </div>
+        {% if entry.image %}
+        <div class="col-md-4">
+          <img src="{{ entry.image.url }}" alt="Site image" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;">
+        </div>
+        {% endif %}
+        <div class="col-12 d-grid d-md-flex gap-2">
+          <button type="submit" class="btn btn-warning btn-lg"><i class="bi bi-save"></i> Save Note</button>
+          <a href="/verticals/welding/notebook/" class="btn btn-outline-secondary btn-lg">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -478,6 +478,8 @@ try:
         _time_checkin_page as __time_checkin_page_raw,
         _time_logs_page as __time_logs_page_raw,
         _time_logs_api,
+        _time_logs_export_csv,
+        time_attendance_action as _time_attendance_action,
         _mgr_time_overview_page as __mgr_time_overview_page_raw,
         _mgr_time_overview_api,
         my_time_logs_page as __my_time_logs_page_raw,
@@ -491,6 +493,8 @@ except Exception:
     _time_checkin_page = TemplateView.as_view(template_name="inventory/time_checkin.html")
     _time_logs_page = TemplateView.as_view(template_name="inventory/time_logs.html")
     _time_logs_api = _stub("time_logs_api not implemented")
+    _time_logs_export_csv = _stub("time_logs_export_csv not implemented")
+    _time_attendance_action = _stub("time_attendance_action not implemented")
 
     def _mgr_time_overview_page(request, *a, **k):
         return render(request, "inventory/time_overview.html", {"agents": []})
@@ -576,8 +580,9 @@ _scan_sold_submit_view = getattr(views, "scan_sold_submit", None) or _stub("scan
 _time_checkin_view = _get_any(("api_time_checkin",), _api_v2, _api_legacy, msg="api_timecheckin not implemented")
 _geo_ping_view = _get_any(("api_geo_ping", "geo_ping"), _api_v2, _api_legacy, msg="api_geo_ping not implemented")
 
-# NEW: FORCE wire api_views.api_time_logs when present; fall back otherwise
+# Prefer the service-backed Time Logs API used by the manager dashboard.
 _api_time_logs_view = (
+    _time_logs_api or
     getattr(_api_v2_primary, "api_time_logs", None)  # ✅ primary, exact
     or getattr(_api_v2_primary, "time_logs_api", None)  # legacy name inside api_views
     or _get_any(("api_time_logs", "time_logs_api"), _api_v2, _api_legacy, msg="time_logs_api not implemented")
@@ -1399,6 +1404,8 @@ urlpatterns += [
     # ✅ Prefer api_views.api_time_logs; keep legacy name too
     path("api/time-logs/", _ensure_response(_api_time_logs_view), name="time_logs_api"),
     path("api/time-logs/", _ensure_response(_api_time_logs_view), name="api_time_logs"),  # reverse alias
+    path("api/time-logs/export/", _need_biz(_ensure_response(_time_logs_export_csv)), name="time_logs_export_csv"),
+    path("api/time-attendance/", _need_biz(_ensure_response(_time_attendance_action)), name="time_attendance_action"),
 ]
 
 # ---------------------------------------------------------------------
