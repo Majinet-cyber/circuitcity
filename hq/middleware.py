@@ -53,6 +53,8 @@ class BugCaptureMiddleware(MiddlewareMixin):
 
         # Extract request context
         path = getattr(request, "path", "/") or "/"
+        if status_code == 404 and path.startswith("/media/"):
+            return
         method = getattr(request, "method", "GET") or "GET"
         view_name = self._get_view_name(request)
         user_agent = (request.META.get("HTTP_USER_AGENT", "") or "")[:1000]

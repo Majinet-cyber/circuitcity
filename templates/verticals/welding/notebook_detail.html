@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize marketplace_media %}
 
 {% block title %}{{ entry.site_customer_name }} - Welding Notebook{% endblock %}
 
@@ -62,10 +62,16 @@
     </div>
     <div class="col-lg-4">
       {% if entry.image %}
+      {% with entry_image_url=entry.image|safe_media_url %}
+      {% if entry_image_url %}
       <div class="card border-0 shadow-sm">
-        <img src="{{ entry.image.url }}" alt="Site photo" style="width:100%;max-height:420px;object-fit:cover;border-radius:8px 8px 0 0;">
+        <img src="{{ entry_image_url }}" alt="Site photo" style="width:100%;max-height:420px;object-fit:cover;border-radius:8px 8px 0 0;">
         <div class="card-body small text-muted">Site photo / sketch</div>
       </div>
+      {% else %}
+      <div class="card border-0 shadow-sm"><div class="card-body text-muted">Site image is unavailable.</div></div>
+      {% endif %}
+      {% endwith %}
       {% else %}
       <div class="card border-0 shadow-sm"><div class="card-body text-muted">No site image uploaded.</div></div>
       {% endif %}

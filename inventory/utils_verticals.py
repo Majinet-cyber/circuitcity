@@ -3126,6 +3126,63 @@ def get_vertical_sidebar_items(business_kind: str) -> list[dict]:
         return _inject_data_correction_into_sidebar(items, "phones")
 
 
+def _marketplace_sidebar_item(vertical: str) -> dict:
+    return {
+        "section": "MAIN",
+        "key": "marketplace",
+        "url": "inventory:manage_listings",
+        "label": "Marketplace",
+        "icon": "bi-shop",
+        "active_prefix": "/inventory/marketplace",
+        "active_pattern": "/inventory/marketplace",
+        "require_manager": True,
+        "is_menu": False,
+        "is_header": False,
+        "testid": f"nav-{vertical}-marketplace",
+    }
+
+
+def _inject_marketplace_into_sidebar(items: list[dict], vertical: str) -> list[dict]:
+    """
+    Ensure every vertical sidebar has one seller-side Marketplace entry.
+
+    Existing entries are normalized instead of duplicated so vertical-specific
+    sidebars keep their placement while pointing to the tenant-scoped seller
+    management page.
+    """
+    marketplace_item = _marketplace_sidebar_item(vertical)
+    for item in items:
+        if item.get("key") == "marketplace":
+            item.update(marketplace_item)
+            return items
+
+    preferred_after_keys = {
+        "sales",
+        "revenue",
+        "sell",
+        "jobs",
+        "vehicles",
+        "products",
+        "stock",
+        "stock_list",
+        "inventory",
+    }
+    insert_idx = None
+    for idx, item in enumerate(items):
+        if item.get("section") == "MAIN" and item.get("key") in preferred_after_keys:
+            insert_idx = idx + 1
+    if insert_idx is None:
+        main_items = [i for i in items if i.get("section") == "MAIN"]
+        if main_items:
+            insert_idx = len(items) - 1 - items[::-1].index(main_items[-1]) + 1
+
+    if insert_idx is None:
+        items.append(marketplace_item)
+    else:
+        items.insert(insert_idx, marketplace_item)
+    return items
+
+
 def _inject_data_correction_into_sidebar(items: list[dict], vertical: str) -> list[dict]:
     """
     Helper function to inject Data Correction menu item into any vertical's sidebar.
@@ -3139,6 +3196,7 @@ def _inject_data_correction_into_sidebar(items: list[dict], vertical: str) -> li
     Returns:
         Updated list with Data Correction item injected (if vertical is registered)
     """
+    items = _inject_marketplace_into_sidebar(items, vertical)
     correction_item = _get_data_correction_menu_item(vertical)
     if correction_item:
         # Insert after the last MAIN section item, before MORE section

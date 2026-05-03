@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods, require_POST
 
+from inventory.services.media_safety import object_image_url
 from tenants.utils import require_business, get_active_business
 from tenants.utils_roles import is_manager
 
@@ -451,7 +452,15 @@ def vehicle_detail(request: HttpRequest, pk: int) -> HttpResponse:
         messages.success(request, "Vehicle updated.")
         return redirect("car_dealer:vehicle_detail", pk=pk)
 
-    gallery_images = vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at") if hasattr(vehicle, "gallery_images") else []
+    gallery_images = (
+        [
+            image
+            for image in vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at")
+            if object_image_url(image)
+        ]
+        if hasattr(vehicle, "gallery_images")
+        else []
+    )
     try:
         marketplace_listing = vehicle.marketplace_listing
     except Exception:

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load marketplace_media %}
 
 {% block title %}Edit Listing{% endblock %}
 
@@ -33,15 +34,15 @@
 
         <div class="mb-3">
           <label class="form-label">Current Media</label>
-          {% if listing.media_file %}
-            {% if listing.is_image %}
-              <div><img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" style="max-width: 200px; border-radius: 8px;"></div>
-            {% elif listing.is_video %}
-              <div><video src="{{ listing.media_file.url }}" controls style="max-width: 200px; border-radius: 8px;"></video></div>
-            {% endif %}
+          {% with media=listing|listing_card_media %}
+          {% if media.kind == "image" %}
+            <div><img src="{{ media.url }}" alt="{{ listing.title }}" style="max-width: 200px; border-radius: 8px;"></div>
+          {% elif media.kind == "video" %}
+            <div><video src="{{ media.url }}" controls style="max-width: 200px; border-radius: 8px;"></video></div>
           {% else %}
             <p class="text-muted">No media uploaded</p>
           {% endif %}
+          {% endwith %}
         </div>
 
         <div class="mb-3">

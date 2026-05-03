@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static marketplace_media %}
 
 {% block title %}Vehicle Inventory – {{ business.name }}{% endblock %}
 
@@ -136,7 +136,13 @@
         <div class="veh-card-img">
           {% with cover=vehicle.cover_image %}
           {% if cover %}
-            <img class="thumb" src="{{ cover.image.url }}" alt="{{ vehicle.display_name }}">
+            {% with cover_url=cover.image|safe_media_url %}
+            {% if cover_url %}
+              <img class="thumb" src="{{ cover_url }}" alt="{{ vehicle.display_name }}">
+            {% else %}
+              <img class="placeholder" src="{% static 'img/car-dealer/car-green.svg' %}" alt="">
+            {% endif %}
+            {% endwith %}
           {% else %}
             <img class="placeholder" src="{% static 'img/car-dealer/car-green.svg' %}" alt="">
           {% endif %}

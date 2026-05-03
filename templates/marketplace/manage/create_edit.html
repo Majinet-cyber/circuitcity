@@ -98,7 +98,11 @@
         {% if listing.all_images|length > 1 %}
         <div class="img-preview-wrap">
           {% for img in listing.all_images %}
-          {% if not forloop.first %}<img src="{{ img.image.url }}" alt="img{{ forloop.counter }}" class="img-preview">{% endif %}
+          {% if not forloop.first %}
+            {% with extra_url=img.image|safe_media_url %}
+            {% if extra_url %}<img src="{{ extra_url }}" alt="img{{ forloop.counter }}" class="img-preview">{% endif %}
+            {% endwith %}
+          {% endif %}
           {% endfor %}
         </div>
         {% endif %}

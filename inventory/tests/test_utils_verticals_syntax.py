@@ -109,7 +109,11 @@ class UtilsVerticalsSyntaxTest(TestCase):
         """Test that there are no duplicate sidebar items based on 'key'."""
         from inventory.utils_verticals import get_vertical_sidebar_items
         
-        verticals = ['phones', 'gym', 'clothing', 'farm', 'welding', 'hardware', 'car_hire']
+        verticals = [
+            'phones', 'gym', 'clothing', 'liquor', 'pharmacy', 'grocery',
+            'cement', 'hardware', 'farm', 'welding', 'car_hire',
+            'car_dealer', 'energy',
+        ]
         
         for vertical in verticals:
             items = get_vertical_sidebar_items(vertical)
@@ -127,6 +131,31 @@ class UtilsVerticalsSyntaxTest(TestCase):
                 len(duplicates), 0,
                 f"Found duplicate keys in {vertical} sidebar: {duplicates}"
             )
+
+    def test_every_vertical_sidebar_has_seller_marketplace_link(self):
+        """Every vertical sidebar should link to seller-side marketplace management."""
+        from inventory.utils_verticals import get_vertical_sidebar_items
+
+        verticals = [
+            'phones', 'gym', 'clothing', 'liquor', 'pharmacy', 'grocery',
+            'cement', 'hardware', 'farm', 'welding', 'car_hire',
+            'car_dealer', 'energy',
+        ]
+
+        for vertical in verticals:
+            items = get_vertical_sidebar_items(vertical)
+            marketplace_items = [i for i in items if i.get('key') == 'marketplace']
+
+            self.assertEqual(
+                len(marketplace_items), 1,
+                f"Expected exactly one Marketplace sidebar item for {vertical}",
+            )
+            item = marketplace_items[0]
+            self.assertEqual(item.get('label'), 'Marketplace')
+            self.assertEqual(item.get('url'), 'inventory:manage_listings')
+            self.assertEqual(item.get('icon'), 'bi-shop')
+            self.assertTrue(item.get('require_manager'))
+            self.assertEqual(item.get('active_prefix'), '/inventory/marketplace')
 
     def test_sidebar_items_structure_integrity(self):
         """Test that all sidebar items have proper structure (no malformed dicts)."""

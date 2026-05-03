@@ -1,5 +1,5 @@
 {% extends "staticpages/base_public.html" %}
-{% load static %}
+{% load static marketplace_media %}
 
 {% block title %}Marketplace – Emajinet{% endblock %}
 {% block meta_description %}Browse products and services from businesses across Malawi. Find what you need from verified local businesses.{% endblock %}
@@ -214,17 +214,17 @@
     <div class="listings-grid">
       {% for listing in page_obj %}
         <div class="listing-card">
-          {% if listing.media_file %}
-            {% if listing.is_image %}
-              <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-media">
-            {% elif listing.is_video %}
-              <video src="{{ listing.media_file.url }}" class="listing-media" controls></video>
-            {% endif %}
+          {% with media=listing|listing_card_media %}
+          {% if media.kind == "image" %}
+            <img src="{{ media.url }}" alt="{{ listing.title }}" class="listing-media">
+          {% elif media.kind == "video" %}
+            <video src="{{ media.url }}" class="listing-media" controls></video>
           {% else %}
             <div class="listing-media" style="display: flex; align-items: center; justify-content: center; font-size: 3rem;">
               📦
             </div>
           {% endif %}
+          {% endwith %}
 
           <div class="listing-content">
             <h3 class="listing-title">{{ listing.title }}</h3>

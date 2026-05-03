@@ -33,6 +33,7 @@ from inventory.models_car_hire import (
     VehicleMake,
     VehicleStatus,
 )
+from inventory.services.media_safety import object_image_url
 from inventory.verticals import base
 from inventory.verticals.base import parse_date_range_from_request
 from tenants.models import Membership
@@ -778,7 +779,15 @@ def vehicle_detail(request: HttpRequest, vehicle_id: int) -> HttpResponse:
             return redirect("verticals:car_hire_vehicle_detail", vehicle_id=vehicle_id)
     
     # Get gallery images
-    gallery_images = vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at") if hasattr(vehicle, "gallery_images") else []
+    gallery_images = (
+        [
+            image
+            for image in vehicle.gallery_images.order_by("-is_cover", "sort_order", "uploaded_at")
+            if object_image_url(image)
+        ]
+        if hasattr(vehicle, "gallery_images")
+        else []
+    )
 
     # Get trip history
     trips = Trip.objects.filter(vehicle=vehicle).order_by("-start_datetime")[:20]

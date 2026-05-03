@@ -94,6 +94,9 @@ def create_welding_marketplace_listing(
 
     status = status if status in dict(ListingStatus.choices) else ListingStatus.DRAFT
     category = category if category in dict(WELDING_MARKETPLACE_CATEGORIES) else "custom"
+    image_files = list(images or [])
+    if not media_file and image_files:
+        media_file = image_files[0]
     listing = MarketplaceListing.objects.create(
         business=business,
         vertical="welding",
@@ -114,6 +117,16 @@ def create_welding_marketplace_listing(
         },
         created_by=user,
     )
-    for image in images or []:
-        MarketplaceListingImage.objects.create(listing=listing, image=image)
+    if image_files and hasattr(image_files[0], "seek"):
+        try:
+            image_files[0].seek(0)
+        except Exception:
+            pass
+    for index, image in enumerate(image_files):
+        if hasattr(image, "seek"):
+            try:
+                image.seek(0)
+            except Exception:
+                pass
+        MarketplaceListingImage.objects.create(listing=listing, image=image, sort_order=index)
     return listing

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 
+from inventory.services.media_safety import safe_field_url
+
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov"}
@@ -23,12 +25,7 @@ def placeholder_icon(vertical: str | None) -> str:
 
 
 def _field_url(field_file):
-    if not field_file or not getattr(field_file, "name", ""):
-        return ""
-    try:
-        return field_file.url
-    except Exception:
-        return ""
+    return safe_field_url(field_file)
 
 
 def _media_kind(name: str, fallback_is_image: bool = False) -> str:
@@ -97,11 +94,15 @@ def _media_file_candidate(listing) -> dict[str, str] | None:
 
     media_kind = _media_kind(getattr(media_file, "name", ""))
     if media_kind == "placeholder":
-        return None
+        # Primary uploaded media wins whenever storage can generate a URL.
+        # Some production upload paths can be extensionless or otherwise hard
+        # to classify, but browsers can still render them correctly.
+        media_kind = "image"
     return {
         "kind": media_kind,
         "url": media_url,
         "alt": getattr(listing, "title", "Marketplace listing"),
+        "source": "primary",
     }
 
 
@@ -114,6 +115,7 @@ def _related_image_candidate(listing) -> dict[str, str] | None:
         "kind": "image",
         "url": primary_url,
         "alt": getattr(listing, "title", "Marketplace listing"),
+        "source": "gallery",
     }
 
 

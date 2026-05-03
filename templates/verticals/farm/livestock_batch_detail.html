@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize marketplace_media %}
 
 {% block title %}{{ batch.name }} — Livestock{% endblock %}
 
@@ -387,7 +387,11 @@
         <div class="col-md-6">
           <label class="form-label">Primary image</label>
           {% if batch.primary_image %}
-          <div class="mb-2"><img src="{{ batch.primary_image.url }}" alt="" class="rounded border" style="max-height:120px;"></div>
+          {% with primary_url=batch.primary_image|safe_media_url %}
+          {% if primary_url %}
+          <div class="mb-2"><img src="{{ primary_url }}" alt="" class="rounded border" style="max-height:120px;"></div>
+          {% endif %}
+          {% endwith %}
           {% endif %}
           <input class="form-control" type="file" name="primary_image" accept="image/*">
         </div>
@@ -427,9 +431,13 @@
     <div class="card-body">
       <div class="row g-2 mb-3">
         {% for gi in batch.gallery_images.all %}
+        {% with gallery_url=gi.image|safe_media_url %}
+        {% if gallery_url %}
         <div class="col-6 col-md-3">
-          <img src="{{ gi.image.url }}" class="img-fluid rounded border" alt="">
+          <img src="{{ gallery_url }}" class="img-fluid rounded border" alt="">
         </div>
+        {% endif %}
+        {% endwith %}
         {% empty %}
         <p class="text-muted small mb-0">No extra photos yet.</p>
         {% endfor %}
