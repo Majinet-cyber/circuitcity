@@ -529,6 +529,18 @@ class HQPremiumDashboardTest(TestCase):
         self.assertIn("MRR", content)
         self.assertIn("Revenue", content)
 
+    def test_hq_home_hides_template_comments(self):
+        """/hq/home/ must not expose template comments or developer section labels."""
+        response = self.client.get("/hq/home/")
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertNotIn("{#", content)
+        self.assertNotIn("#}", content)
+        self.assertNotIn("SECTION A", content)
+        self.assertNotIn("SECTION B", content)
+        self.assertNotIn("PLATFORM PULSE (KPI Cards)", content)
+        self.assertNotIn("REVENUE & SALES OVERVIEW", content)
+
     # ------------------------------------------------------------------
     # Test 3: /hq/home/ does not show raw empty zero-only dashboard
     # ------------------------------------------------------------------

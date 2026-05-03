@@ -435,7 +435,7 @@
 {% block content %}
 <div class="dash-page">
 
-  {# ---- DEMO BANNER ---- #}
+
   {% if using_demo %}
   <div class="demo-banner">
     <i class="bi bi-info-circle-fill"></i>
@@ -446,7 +446,7 @@
   </div>
   {% endif %}
 
-  {# ---- PAGE HEADER ---- #}
+
   <div class="dash-header">
     <div class="dash-header-text">
       <h1>
@@ -468,7 +468,7 @@
     </div>
   </div>
 
-  {# ---- QUICK FILTER BAR ---- #}
+
   <form method="GET" id="dashFilterForm">
     <div class="dash-filter-bar">
       <div class="filter-preset-group">
@@ -496,13 +496,11 @@
     </div>
   </form>
 
-  {# ====================================================
-     SECTION A — PLATFORM PULSE (KPI Cards)
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-activity"></i> Platform Pulse</div>
   <div class="kpi-grid" id="platform-pulse-grid">
 
-    {# Total Businesses #}
+
     <div class="kpi-card acc-blue">
       <div class="kpi-icon bg-blue"><i class="bi bi-building"></i></div>
       <div class="kpi-label">Total Businesses</div>
@@ -514,7 +512,7 @@
       <div class="kpi-period">All time registered</div>
     </div>
 
-    {# Active Subscriptions #}
+
     <div class="kpi-card acc-green">
       <div class="kpi-icon bg-green"><i class="bi bi-check-circle"></i></div>
       <div class="kpi-label">Active Subscriptions</div>
@@ -527,7 +525,7 @@
       <div class="kpi-period">Platform subscriptions</div>
     </div>
 
-    {# MRR #}
+
     <div class="kpi-card acc-purple">
       {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% elif mrr_awaiting %}<span class="kpi-demo-badge">SETUP</span>{% endif %}
       <div class="kpi-icon bg-purple"><i class="bi bi-currency-exchange"></i></div>
@@ -547,7 +545,7 @@
       <div class="kpi-period">Monthly recurring revenue</div>
     </div>
 
-    {# Revenue 30d #}
+
     <div class="kpi-card acc-sky">
       {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
       <div class="kpi-icon bg-sky"><i class="bi bi-graph-up-arrow"></i></div>
@@ -561,7 +559,7 @@
       <div class="kpi-period">Total sales revenue</div>
     </div>
 
-    {# Gross Profit 30d #}
+
     <div class="kpi-card acc-teal">
       {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
       <div class="kpi-icon bg-teal"><i class="bi bi-cash-stack"></i></div>
@@ -575,7 +573,7 @@
       <div class="kpi-period">Revenue minus COGS</div>
     </div>
 
-    {# Open Invoices #}
+
     <div class="kpi-card {% if open_invoices > 10 %}acc-red{% elif open_invoices > 0 %}acc-amber{% else %}acc-green{% endif %}">
       {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
       <div class="kpi-icon {% if open_invoices > 10 %}bg-red{% elif open_invoices > 0 %}bg-amber{% else %}bg-green{% endif %}">
@@ -593,7 +591,7 @@
       <div class="kpi-period">Awaiting payment</div>
     </div>
 
-    {# Agents #}
+
     <div class="kpi-card acc-indigo">
       <div class="kpi-icon bg-indigo"><i class="bi bi-people"></i></div>
       <div class="kpi-label">Agents Active</div>
@@ -605,7 +603,7 @@
       <div class="kpi-period">Total field agents & managers</div>
     </div>
 
-    {# Stock Movement #}
+
     <div class="kpi-card acc-amber">
       {% if using_demo %}<span class="kpi-demo-badge">DEMO</span>{% endif %}
       <div class="kpi-icon bg-amber"><i class="bi bi-box-seam"></i></div>
@@ -626,17 +624,15 @@
       <div class="kpi-period">Items in / sold out</div>
     </div>
 
-  </div>{# /kpi-grid #}
+  </div>
 
 
-  {# ====================================================
-     SECTION B — REVENUE & SALES OVERVIEW (Charts)
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-bar-chart-line"></i> Revenue &amp; Sales Overview</div>
 
   <div class="charts-grid-2" style="margin-bottom:1.75rem;">
 
-    {# Monthly Sales Chart #}
+
     <div class="chart-card">
       <div class="chart-card-header">
         <div>
@@ -676,7 +672,7 @@
       </div>
     </div>
 
-    {# Revenue Trend + Onboardings #}
+
     <div style="display:flex;flex-direction:column;gap:18px;">
       <div class="chart-card">
         <div class="chart-card-header">
@@ -720,16 +716,14 @@
       </div>
     </div>
 
-  </div>{# /charts-grid-2 #}
+  </div>
 
 
-  {# ====================================================
-     SECTION C — OPERATIONS HEALTH
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-heart-pulse"></i> Operations Health</div>
   <div class="ops-grid">
 
-    {# Onboarding Pipeline #}
+
     <div class="ops-card">
       <div class="ops-card-head">
         <span class="ops-card-title"><i class="bi bi-person-badge me-2 text-primary"></i>Onboarding Pipeline</span>
@@ -743,7 +737,7 @@
       <div class="ops-stat-row"><span class="ops-stat-label">New Agents (30d)</span><span class="ops-stat-value">{{ agents_new_30d }}</span></div>
     </div>
 
-    {# Subscription Health #}
+
     <div class="ops-card">
       <div class="ops-card-head">
         <span class="ops-card-title"><i class="bi bi-check2-circle me-2 text-success"></i>Subscription Health</span>
@@ -757,7 +751,7 @@
       <div class="ops-stat-row"><span class="ops-stat-label">MRR</span><span class="ops-stat-value">MWK {{ mrr_sum|floatformat:0|default:"0" }}</span></div>
     </div>
 
-    {# Invoice Health #}
+
     <div class="ops-card">
       <div class="ops-card-head">
         <span class="ops-card-title"><i class="bi bi-receipt me-2 text-warning"></i>Invoice Health</span>
@@ -774,7 +768,7 @@
       </div>
     </div>
 
-    {# Stock Movement Health #}
+
     <div class="ops-card">
       <div class="ops-card-head">
         <span class="ops-card-title"><i class="bi bi-box me-2 text-info"></i>Stock Movement</span>
@@ -792,7 +786,7 @@
       </div>
     </div>
 
-    {# Agent Activity #}
+
     <div class="ops-card">
       <div class="ops-card-head">
         <span class="ops-card-title"><i class="bi bi-person-lines-fill me-2 text-purple"></i>Agent Activity</span>
@@ -809,12 +803,10 @@
       </div>
     </div>
 
-  </div>{# /ops-grid #}
+  </div>
 
 
-  {# ====================================================
-     SECTION D — PAYMENT INTELLIGENCE
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-credit-card-2-front"></i> Payment Intelligence</div>
   <div class="charts-grid-2" style="margin-bottom:1.75rem;">
 
@@ -828,7 +820,7 @@
       </div>
       <div class="chart-card-body">
         <div id="paymentMixContainer">
-          {# Rendered by JS below — or demo fallback #}
+
         </div>
         <div class="chart-wrap" id="paymentMixChartWrap" style="margin-top:12px;">
           <canvas id="paymentMixChart"></canvas>
@@ -855,9 +847,7 @@
   </div>
 
 
-  {# ====================================================
-     SECTION E — TOP PERFORMERS
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-trophy"></i> Top Performers</div>
   <div class="charts-grid-2" style="margin-bottom:1.75rem;">
 
@@ -926,9 +916,7 @@
   </div>
 
 
-  {# ====================================================
-     SECTION F — AI INSIGHTS & RECOMMENDATIONS
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-lightbulb"></i> AI Insights &amp; Recommendations</div>
   <div class="chart-card" style="margin-bottom:1.75rem;">
     <div class="chart-card-header">
@@ -940,15 +928,13 @@
     </div>
     <div class="chart-card-body">
       <div class="insights-grid" id="insightsGrid">
-        {# Rendered by JS #}
+
       </div>
     </div>
   </div>
 
 
-  {# ====================================================
-     SECTION G — BUG / SYSTEM HEALTH
-     ==================================================== #}
+
   {% if bug_monitor_enabled %}
   <div class="section-label"><i class="bi bi-shield-check"></i> System Health</div>
   <div class="chart-card" style="margin-bottom:1.75rem;">
@@ -992,9 +978,7 @@
   {% endif %}
 
 
-  {# ====================================================
-     PERIOD METRICS SUMMARY
-     ==================================================== #}
+
   <div class="section-label"><i class="bi bi-clock-history"></i> Period Metrics</div>
   <div class="charts-grid-3" style="margin-bottom:1.75rem;">
     <div class="chart-card">
@@ -1056,9 +1040,9 @@
     </div>
   </div>
 
-</div>{# /dash-page #}
+</div>
 
-{# Hidden metrics for JS #}
+
 <div id="dashMetrics"
      data-biz-total="{{ total_biz|default:'0' }}"
      data-active-subs="{{ active_subs|default:'0' }}"

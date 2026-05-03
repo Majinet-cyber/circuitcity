@@ -22,7 +22,7 @@
   <button id="hqSidebarClose" class="sidebar-close" aria-label="Close sidebar">
     <i class="bi bi-x-lg"></i>
   </button>
-  
+
   <a class="cc-brand" href="{{ url_hq_home|default:'/hq/' }}">
     <span class="logo"><img src="{% static 'img/logo-32.png' %}" width="20" height="20" alt=""></span>
     <span>Emajinet HQ</span>
@@ -36,7 +36,7 @@
     <li class="{% if '/hq/businesses' in request.path %}active{% endif %}">
       <a href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
     </li>
-    {# Only show Contracts link if the module is actually available (check views_contracts in context) #}
+
     {% if contracts_enabled|default:False %}
     <li class="{% if '/hq/contracts' in request.path %}active{% endif %}">
       <a href="{% url 'hq:contracts_list' %}"><i class="bi bi-file-earmark-text"></i><span>Contracts</span></a>

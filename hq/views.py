@@ -1914,6 +1914,7 @@ def hq_notifications_api(request):
 
         return JsonResponse(
             {
+                "since": since,
                 "items": items,
                 "unread_count": unread_count,
             }
@@ -1924,6 +1925,7 @@ def hq_notifications_api(request):
         logger.error(f"hq_notifications_api error: {e}", exc_info=True)
         return JsonResponse(
             {
+                "since": request.GET.get("since", "").strip(),
                 "items": [],
                 "unread_count": 0,
             }

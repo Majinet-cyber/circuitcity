@@ -13,16 +13,25 @@ Verifies:
 - farm sale page renders with expected content
 - landing page includes farm in marketplace messaging
 """
-import pytest
 import tempfile
+from io import BytesIO
+from io import StringIO
+
+import pytest
+from PIL import Image
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import override_settings
 from django.test import TestCase, Client
 from django.urls import reverse, resolve, NoReverseMatch
 
 from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
 from inventory.services.marketplace_media import listing_media
-from tenants.models import Business
+from tenants.models import Business, Membership
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 def _make_biz(slug, kind="phones"):
@@ -601,8 +610,8 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         content = response.content.decode("utf-8")
 
         self.assertIn("Missing Legacy Image", content)
-        self.assertIn("listing-img-placeholder", content)
-        self.assertNotIn("missing-image.jpg", content)
+        self.assertIn("missing-image.jpg", content)
+        self.assertIn("listing-img-fallback", content)
 
     def test_existing_video_media_renders_as_video_not_img(self):
         listing = MarketplaceListing.objects.create(
@@ -638,6 +647,19 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         self.assertIn("uploaded-card.jpg", content)
         self.assertIn("<img", content)
 
+    def test_listing_with_no_image_uses_placeholder(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="No Image Listing",
+            status="live",
+            vertical="phones",
+        )
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "placeholder")
+        self.assertEqual(media["url"], "")
+
     def test_missing_gallery_image_falls_back_to_placeholder(self):
         listing = MarketplaceListing.objects.create(
             business=self.biz,
@@ -655,8 +677,8 @@ class MarketplaceListingMediaRenderingTests(TestCase):
         content = response.content.decode("utf-8")
 
         self.assertIn("Missing Gallery Image", content)
-        self.assertIn("listing-img-placeholder", content)
-        self.assertNotIn("missing-primary.jpg", content)
+        self.assertIn("missing-primary.jpg", content)
+        self.assertIn("listing-img-fallback", content)
 
     def test_remote_storage_url_renders_without_exists_check(self):
         class RemoteStorage:
@@ -684,3 +706,127 @@ class MarketplaceListingMediaRenderingTests(TestCase):
 
         self.assertEqual(media["kind"], "image")
         self.assertEqual(media["url"], "https://cdn.example.test/marketplace/remote-card.jpg")
+
+    def test_listing_with_primary_image_shows_primary_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Primary Image Listing",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("primary-card.jpg", ContentFile(b"primary"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("primary-card", media["url"])
+
+    def test_listing_with_no_primary_uses_gallery_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Gallery Fallback Listing",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("gallery-fallback.jpg", ContentFile(b"gallery"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("gallery-fallback", media["url"])
+
+    def test_primary_upload_wins_over_related_gallery_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Primary Upload Preferred",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("cover-primary.jpg", ContentFile(b"primary"), save=True)
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("extra-angle.jpg", ContentFile(b"extra"), save=True)
+
+        media = listing_media(listing)
+
+        self.assertEqual(media["kind"], "image")
+        self.assertIn("cover-primary", media["url"])
+        self.assertNotIn("extra-angle", media["url"])
+
+    def test_uploaded_primary_image_renders_on_card_detail_and_manage(self):
+        user = User.objects.create_user("media_manager", "media@example.com", "testpass123")
+        Membership.objects.create(
+            user=user,
+            business=self.biz,
+            role="manager",
+            status="ACTIVE",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        buf = BytesIO()
+        Image.new("RGB", (24, 24), "blue").save(buf, format="PNG")
+        primary = SimpleUploadedFile(
+            "uploaded-primary.png",
+            buf.getvalue(),
+            content_type="image/png",
+        )
+
+        response = self.client.post(
+            reverse("inventory:create_listing"),
+            {
+                "title": "Uploaded Primary Product",
+                "description": "Has a real uploaded cover.",
+                "status": "live",
+                "price": "123",
+                "media_file": primary,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        listing = MarketplaceListing.objects.get(title="Uploaded Primary Product")
+
+        public_card = self.client.get(reverse("marketplace:home"))
+        detail = self.client.get(f"/marketplace/{self.biz.slug}/{listing.listing_slug}/")
+        manage = self.client.get(reverse("inventory:manage_listings"))
+
+        for response in (public_card, detail, manage):
+            self.assertEqual(response.status_code, 200)
+            content = response.content.decode("utf-8")
+            self.assertIn("uploaded-primary", content)
+            self.assertIn("<img", content)
+
+    def test_backfill_command_sets_primary_image_from_gallery(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Backfill From Gallery",
+            status="live",
+            vertical="phones",
+        )
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("backfill-gallery.jpg", ContentFile(b"gallery"), save=True)
+        out = StringIO()
+
+        call_command("backfill_marketplace_primary_images", stdout=out)
+
+        listing.refresh_from_db()
+        self.assertIn("backfill-gallery", listing.media_file.name)
+        self.assertIn("Listings repaired: 1", out.getvalue())
+
+    def test_backfill_command_does_not_overwrite_valid_primary_image(self):
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Backfill Keeps Primary",
+            status="live",
+            vertical="phones",
+        )
+        listing.media_file.save("keep-primary.jpg", ContentFile(b"primary"), save=True)
+        image = MarketplaceListingImage.objects.create(listing=listing)
+        image.image.save("should-not-win.jpg", ContentFile(b"gallery"), save=True)
+
+        call_command("backfill_marketplace_primary_images")
+
+        listing.refresh_from_db()
+        self.assertIn("keep-primary", listing.media_file.name)
+        self.assertNotIn("should-not-win", listing.media_file.name)

@@ -592,7 +592,7 @@
 {% block content %}
 {% load static %}
 
-{# — Serialize chart series data to JSON for JS — #}
+
 {% with revenue_trend=analytics_data.series.revenue_trend sales_trend=analytics_data.series.sales_count_trend profit_trend=analytics_data.series.profit_trend cash_mix=analytics_data.breakdowns.cash_mix vertical_mix=analytics_data.breakdowns.vertical_mix top_biz=analytics_data.top_lists.top_businesses top_agents=analytics_data.top_lists.top_agents kpis=analytics_data.kpis %}
 
 <!-- ===================== PAGE HEADER ===================== -->
@@ -634,7 +634,7 @@
 <!-- ===================== KPI COMMAND CARDS ===================== -->
 <div class="kpi-command-grid" id="kpiGrid">
 
-  {# Revenue #}
+
   <div class="kpi-cmd-card accent-blue" id="kpiRevenue">
     <div class="kpi-cmd-icon bg-blue"><i class="bi bi-currency-dollar"></i></div>
     <div class="kpi-cmd-label">Total Revenue</div>
@@ -646,7 +646,7 @@
     {% if not kpis.revenue %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Sales Count #}
+
   <div class="kpi-cmd-card accent-green" id="kpiSales">
     <div class="kpi-cmd-icon bg-green"><i class="bi bi-bag-check"></i></div>
     <div class="kpi-cmd-label">Total Sales</div>
@@ -658,7 +658,7 @@
     {% if not kpis.sales_count %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Profit #}
+
   <div class="kpi-cmd-card accent-purple" id="kpiProfit">
     <div class="kpi-cmd-icon bg-purple"><i class="bi bi-graph-up"></i></div>
     <div class="kpi-cmd-label">Total Profit</div>
@@ -670,7 +670,7 @@
     {% if not kpis.profit %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Active Businesses #}
+
   <div class="kpi-cmd-card accent-sky" id="kpiBiz">
     <div class="kpi-cmd-icon bg-sky"><i class="bi bi-buildings"></i></div>
     <div class="kpi-cmd-label">Active Businesses</div>
@@ -682,7 +682,7 @@
     {% if not kpis.total_businesses %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# MRR #}
+
   <div class="kpi-cmd-card accent-indigo" id="kpiMRR">
     <div class="kpi-cmd-icon bg-indigo"><i class="bi bi-repeat"></i></div>
     <div class="kpi-cmd-label">MRR</div>
@@ -694,7 +694,7 @@
     {% if not billing_kpis.mrr %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Active Subscriptions #}
+
   <div class="kpi-cmd-card accent-teal" id="kpiSubs">
     <div class="kpi-cmd-icon bg-teal"><i class="bi bi-shield-check"></i></div>
     <div class="kpi-cmd-label">Active Subscriptions</div>
@@ -708,7 +708,7 @@
     {% if not billing_kpis.active_subscriptions %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Collections Rate #}
+
   <div class="kpi-cmd-card accent-lime" id="kpiCollect">
     <div class="kpi-cmd-icon bg-lime"><i class="bi bi-percent"></i></div>
     <div class="kpi-cmd-label">Collections Rate</div>
@@ -721,7 +721,7 @@
     {% if not billing_kpis.collections_rate %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Open Invoices #}
+
   <div class="kpi-cmd-card accent-amber" id="kpiInvoices">
     <div class="kpi-cmd-icon bg-amber"><i class="bi bi-receipt"></i></div>
     <div class="kpi-cmd-label">Open Invoices</div>
@@ -735,7 +735,7 @@
     {% if not billing_kpis.open_invoices %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Churn Risk #}
+
   <div class="kpi-cmd-card accent-rose" id="kpiChurn">
     <div class="kpi-cmd-icon bg-rose"><i class="bi bi-exclamation-triangle"></i></div>
     <div class="kpi-cmd-label">Churn Risk</div>
@@ -748,7 +748,7 @@
     {% if not billing_kpis.churn_risk %}<span class="kpi-cmd-demo-badge">DEMO</span>{% endif %}
   </div>
 
-  {# Agents #}
+
   <div class="kpi-cmd-card accent-amber" id="kpiAgents">
     <div class="kpi-cmd-icon bg-amber"><i class="bi bi-person-badge"></i></div>
     <div class="kpi-cmd-label">Active Agents</div>

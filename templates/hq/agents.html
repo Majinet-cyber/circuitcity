@@ -118,7 +118,7 @@
       </li>
     {% endif %}
 
-    {# windowed pager #}
+
     {% for p in page_obj.paginator.page_range %}
       {% if p == 1 or p == page_obj.paginator.num_pages or p >= page_obj.number|add:-2 and p <= page_obj.number|add:2 %}
         <li class="page-item {% if p == page_obj.number %}active{% endif %}">

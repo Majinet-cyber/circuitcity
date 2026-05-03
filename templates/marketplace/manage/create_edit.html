@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static marketplace_media %}
 
 {% block title %}{% if editing %}Edit Listing{% else %}New Listing{% endif %} – {{ business.name }}{% endblock %}
 
@@ -88,11 +88,13 @@
       {% if listing.primary_image or listing.media_file %}
       <div class="mb-2">
         <div class="text-muted small mb-1">Current primary image:</div>
-        {% if listing.primary_image %}
-          <img src="{{ listing.primary_image.image.url }}" alt="Primary" class="img-preview">
-        {% elif listing.media_file %}
-          <img src="{{ listing.media_file.url }}" alt="Primary" class="img-preview">
+        {% with media=listing|listing_card_media %}
+        {% if media.kind == "image" %}
+          <img src="{{ media.url }}" alt="Primary" class="img-preview">
+        {% elif media.kind == "video" %}
+          <video class="img-preview" muted playsinline preload="metadata"><source src="{{ media.url }}"></video>
         {% endif %}
+        {% endwith %}
         {% if listing.all_images|length > 1 %}
         <div class="img-preview-wrap">
           {% for img in listing.all_images %}
