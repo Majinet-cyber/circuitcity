@@ -9,18 +9,22 @@
 {% load static marketplace_media %}
 <style>
   :root {
-    --primary: #4f46e5;
-    --primary-dark: #4338ca;
+    --primary: #059669;
+    --primary-dark: #047857;
+    --primary-light: #ecfdf5;
+    --primary-glow: rgba(5,150,105,.15);
     --secondary: #10b981;
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
-    --bg-light: #f9fafb;
+    --accent: #0891b2;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --bg-light: #f8fafc;
     --white: #ffffff;
-    --border: #e5e7eb;
-    --shadow: 0 10px 30px rgba(0,0,0,.08);
-    --shadow-lg: 0 20px 50px rgba(0,0,0,.13);
-    --shadow-sm: 0 2px 10px rgba(0,0,0,.05);
-    --radius-card: 20px;
+    --border: #e2e8f0;
+    --shadow: 0 4px 20px rgba(0,0,0,.07), 0 1px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.06);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.05);
+    --shadow-brand: 0 8px 32px rgba(5,150,105,.2);
+    --radius-card: 18px;
     --radius-btn: 100px;
   }
 
@@ -770,8 +774,12 @@
   <div class="biz-grid" style="margin-bottom:3.5rem;">
     {% for biz in featured_businesses %}
     <a href="/marketplace/{{ biz.slug }}/" class="biz-card">
-      {% if biz.logo %}
-        <img src="{{ biz.logo.url }}" alt="{{ biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
+      {% with storefront=biz.safe_storefront %}
+      {% with store_logo=storefront.logo|safe_media_url business_logo=biz.logo|safe_media_url %}
+      {% if store_logo %}
+        <img src="{{ store_logo }}" alt="{{ storefront.display_name|default:biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
+      {% elif business_logo %}
+        <img src="{{ business_logo }}" alt="{{ biz.name }}" style="width:52px;height:52px;border-radius:14px;object-fit:cover;">
       {% else %}
         <div class="biz-card-icon">
           {% if biz.business_kind == "phones" %}📱
@@ -784,7 +792,9 @@
           {% else %}🏪{% endif %}
         </div>
       {% endif %}
-      <div class="biz-card-name">{{ biz.name }}</div>
+      {% endwith %}
+      <div class="biz-card-name">{{ storefront.display_name|default:biz.name }}</div>
+      {% endwith %}
       <div class="biz-card-count">{{ biz.listing_count }} listing{{ biz.listing_count|pluralize }}</div>
     </a>
     {% endfor %}
@@ -839,6 +849,9 @@
           {% else %}{{ listing.vertical|capfirst }}{% endif %}
         </span>
         {% endif %}
+        {% if listing.verification_status == 'verified' %}
+        <span style="position:absolute;top:.6rem;left:.6rem;background:rgba(5,150,105,.9);color:#fff;font-size:.65rem;font-weight:800;padding:.2rem .55rem;border-radius:999px;letter-spacing:.03em;backdrop-filter:blur(4px);">✓ Verified</span>
+        {% endif %}
       </div>
       <div class="listing-body">
         <div class="listing-biz-tag">{{ listing.business.name }}</div>
@@ -867,6 +880,27 @@
     </a>
     {% endfor %}
   </div>
+
+  <!-- List Your Business CTA -->
+  {% if not search_q and page_obj.number == 1 %}
+  <div style="background:linear-gradient(135deg,#ecfdf5 0%,#f0fdf4 100%);border:1.5px solid #bbf7d0;border-radius:20px;padding:2rem 2rem;margin:2.5rem 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.25rem;">
+    <div>
+      <div style="font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#059669;margin-bottom:.4rem;">For Merchants</div>
+      <div style="font-size:1.2rem;font-weight:900;color:#0f172a;margin-bottom:.35rem;">List Your Business on Emajinet Marketplace</div>
+      <div style="font-size:.875rem;color:#475569;max-width:480px;line-height:1.5;">
+        Reach customers across Africa. Get a verified storefront, accept payments, and grow with Emajinet's business tools.
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;align-items:center;">
+      <a href="{% url 'accounts:signup_manager' %}?source=marketplace_cta"
+         style="display:inline-flex;align-items:center;gap:.45rem;background:#059669;color:#fff;font-weight:700;font-size:.875rem;padding:.7rem 1.5rem;border-radius:999px;text-decoration:none;transition:background .15s;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        List Your Business Free
+      </a>
+      <span style="font-size:.78rem;color:#64748b;">30-day trial &middot; No credit card</span>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- Pagination -->
   {% if page_obj.has_other_pages %}

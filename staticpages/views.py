@@ -7,6 +7,13 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.views.decorators.cache import never_cache
 
+from staticpages.pricing_config import (
+    PRICING_TIERS,
+    INDUSTRY_SOLUTIONS,
+    WHATSAPP_BENEFITS,
+    TESTIMONIALS,
+)
+
 
 def get_cfo_message(total_profit):
     """
@@ -287,6 +294,13 @@ def home(request):
     # ── Live platform metrics: real aggregated data, never fake ──
     live_metrics = get_platform_live_metrics()
 
+    # Billing plans for pricing snapshot (billing.pricing is SSOT for amounts)
+    try:
+        from billing.pricing import get_all_plans as _get_billing_plans
+        billing_plans = _get_billing_plans()
+    except Exception:
+        billing_plans = []
+
     return render(request, 'staticpages/home.html', {
         'hide_nav': True,
         'total_merchants': total_merchants,
@@ -297,6 +311,13 @@ def home(request):
         'story_metrics': story_metrics_data,
         'story_metrics_json': story_metrics_json,
         'live_metrics': live_metrics,
+        # Pricing — billing.pricing is source of truth
+        'PRICING_PLANS': billing_plans,
+        # Legacy / static sections
+        'pricing_tiers': PRICING_TIERS,
+        'industry_solutions': INDUSTRY_SOLUTIONS,
+        'whatsapp_benefits': WHATSAPP_BENEFITS,
+        'testimonials': TESTIMONIALS,
     })
 
 
@@ -365,6 +386,7 @@ def pricing(request):
     """
     return render(request, 'staticpages/pricing.html', {
         'hide_nav': True,
+        'pricing_tiers': PRICING_TIERS,
     })
 
 
@@ -1016,3 +1038,64 @@ def sitemap_xml(request):
     xml_content.append('</urlset>')
     
     return HttpResponse('\n'.join(xml_content), content_type='application/xml')
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# External Credit Scoring — Lender / Partner Page (no business data exposed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def credit_score_lander(request):
+    """
+    Public-facing page explaining Emajinet Credit Score for lenders/partners.
+    No business data is exposed. Consent-based lead capture only.
+    """
+    from django.contrib import messages as _messages
+    submitted = request.session.pop("credit_interest_submitted", False)
+    return render(request, "staticpages/credit_score_lander.html", {
+        "hide_nav": False,
+        "submitted": submitted,
+    })
+
+
+def credit_score_interest(request):
+    """
+    Handle "Express Interest" form submission from lenders/partners.
+    Stores a simple lead record (no business data exposed).
+    """
+    if request.method != "POST":
+        from django.shortcuts import redirect
+        return redirect("staticpages:credit_score_lander")
+
+    name = request.POST.get("name", "").strip()
+    org = request.POST.get("organisation", "").strip()
+    email = request.POST.get("email", "").strip()
+    purpose = request.POST.get("purpose", "").strip()
+    consent = request.POST.get("consent", "")
+
+    # Validate
+    from django.contrib import messages as _messages
+    if not (name and email and consent):
+        _messages.error(request, "Please fill in all required fields and give consent.")
+        return redirect("staticpages:credit_score_lander")
+
+    # Store a lightweight record — use MarketplaceLead or a simple model if available
+    try:
+        from inventory.models_marketplace import MarketplaceLead, MarketplaceLeadSource, MarketplaceLeadStatus
+        MarketplaceLead.objects.create(
+            source_type=MarketplaceLeadSource.MARKETPLACE_FORM,
+            status=MarketplaceLeadStatus.NEW,
+            buyer_name=name,
+            buyer_email=email,
+            buyer_phone="",
+            notes=f"[Credit Score Lender Interest]\nOrganisation: {org}\nPurpose: {purpose}",
+        )
+    except Exception:
+        # If model doesn't fit exactly, just log it
+        import logging
+        logging.getLogger(__name__).info(
+            "Credit score interest from %s (%s) — %s", name, email, org
+        )
+
+    request.session["credit_interest_submitted"] = True
+    from django.shortcuts import redirect
+    return redirect("staticpages:credit_score_lander")

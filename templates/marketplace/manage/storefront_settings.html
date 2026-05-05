@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load marketplace_media %}
+
+{% block title %}Storefront Settings - {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .store-settings{max-width:980px;margin:0 auto;padding:1.5rem;}
+  .settings-card{background:#fff;border:1px solid #dbeafe;border-radius:18px;box-shadow:0 18px 44px rgba(37,99,235,.08);padding:1.25rem;}
+  .settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;}
+  .full{grid-column:1/-1;}
+  .preview-logo{width:86px;height:86px;border-radius:18px;object-fit:cover;background:#eff6ff;border:1px solid #bfdbfe;}
+  .preview-banner{width:100%;height:150px;border-radius:16px;object-fit:cover;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;}
+  .banner-placeholder{height:150px;border-radius:16px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:center;color:#2563eb;font-weight:800;}
+  @media(max-width:720px){.store-settings{padding:.85rem}.settings-grid{grid-template-columns:1fr}}
+</style>
+
+<div class="store-settings">
+  <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+    <div>
+      <h3 class="fw-bold mb-1">Storefront Settings</h3>
+      <div class="text-muted">These details appear on your public marketplace storefront.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'marketplace:storefront' business.slug %}" target="_blank" class="btn btn-outline-primary rounded-pill">View Storefront</a>
+      <a href="{% url 'inventory:manage_listings' %}" class="btn btn-outline-secondary rounded-pill">Back</a>
+    </div>
+  </div>
+
+  {% if messages %}{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }}">{{ m }}</div>{% endfor %}{% endif %}
+  {% if storefront_settings_unavailable %}
+    <div class="alert alert-warning">Storefront settings storage is being prepared. Your marketplace listings are still available.</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="settings-card">
+    {% csrf_token %}
+    <div class="mb-3">
+      {% with banner_url=profile.banner_image|safe_media_url %}
+        {% if banner_url %}
+          <img src="{{ banner_url }}" class="preview-banner" alt="Store banner">
+        {% else %}
+          <div class="banner-placeholder">Store banner preview</div>
+        {% endif %}
+      {% endwith %}
+    </div>
+    <div class="d-flex gap-3 align-items-center mb-3">
+      {% with logo_url=profile.logo|safe_media_url %}
+        {% if logo_url %}
+          <img src="{{ logo_url }}" class="preview-logo" alt="Store logo">
+        {% elif business.logo %}
+          <img src="{{ business.logo|safe_media_url }}" class="preview-logo" alt="Business logo">
+        {% else %}
+          <div class="preview-logo d-flex align-items-center justify-content-center fw-bold text-primary">{{ business.name|slice:":2"|upper }}</div>
+        {% endif %}
+      {% endwith %}
+      <div>
+        <label class="form-label fw-semibold">Store logo</label>
+        <input type="file" name="logo" class="form-control" accept="image/jpeg,image/png,image/webp" {% if storefront_settings_unavailable %}disabled{% endif %}>
+      </div>
+    </div>
+
+    <div class="settings-grid">
+      <div>
+        <label class="form-label fw-semibold">Store name</label>
+        <input name="store_name" class="form-control" value="{{ profile.store_name|default:business.name }}" {% if storefront_settings_unavailable %}disabled{% endif %}>
+      </div>
+      <div>
+        <label class="form-label fw-semibold">Currency</label>
+        <select name="currency" class="form-select" {% if storefront_settings_unavailable %}disabled{% endif %}>
+          {% for code in currency_choices %}
+            <option value="{{ code }}" {% if selected_currency == code %}selected{% endif %}>{{ code }}{% if code == "MWK" %} - Malawi Kwacha{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="form-label fw-semibold">Banner image</label>
+        <input type="file" name="banner_image" class="form-control" accept="image/jpeg,image/png,image/webp" {% if storefront_settings_unavailable %}disabled{% endif %}>
+      </div>
+      <div class="full">
+        <label class="form-label fw-semibold">Company description</label>
+        <textarea name="description" class="form-control" rows="4" {% if storefront_settings_unavailable %}disabled{% endif %}>{{ profile.description }}</textarea>
+      </div>
+      <div><label class="form-label fw-semibold">Phone</label><input name="phone" class="form-control" value="{{ profile.phone }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div><label class="form-label fw-semibold">WhatsApp number</label><input name="whatsapp_number" class="form-control" value="{{ profile.whatsapp_number }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div><label class="form-label fw-semibold">Email</label><input type="email" name="email" class="form-control" value="{{ profile.email }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div><label class="form-label fw-semibold">Opening hours</label><input name="opening_hours" class="form-control" value="{{ profile.opening_hours }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div class="full"><label class="form-label fw-semibold">Location / address</label><input name="address" class="form-control" value="{{ profile.address }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div class="full"><label class="form-label fw-semibold">Store categories / verticals</label><input name="categories" class="form-control" value="{{ profile.categories }}" placeholder="phones, accessories, repairs" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div class="full"><label class="form-label fw-semibold">Trust badges</label><input name="trust_badges" class="form-control" value="{{ profile.badge_list|join:', ' }}" placeholder="Verified seller, Fast delivery" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div><label class="form-label fw-semibold">Facebook</label><input name="facebook" class="form-control" value="{{ social_links.facebook }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div><label class="form-label fw-semibold">Instagram</label><input name="instagram" class="form-control" value="{{ social_links.instagram }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+      <div class="full"><label class="form-label fw-semibold">Website</label><input name="website" class="form-control" value="{{ social_links.website }}" {% if storefront_settings_unavailable %}disabled{% endif %}></div>
+    </div>
+    <button class="btn btn-primary rounded-pill mt-3" {% if storefront_settings_unavailable %}disabled{% endif %}>Save Storefront</button>
+  </form>
+</div>
+{% endblock %}

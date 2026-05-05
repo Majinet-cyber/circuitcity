@@ -70,6 +70,19 @@ urlpatterns = [
     path("api/cash-overview/", cash_overview_v2, name="cash_overview"),
     # ==== Business OS Dashboard (Phase 2 — Cross-Vertical) ====
     path("business-os/", views.business_os_dashboard, name="business_os"),
+    # ==== Business Health Score ====
+    path("business-health/", views.business_health_view, name="business_health"),
+    path("api/business-health/", views.business_health_api, name="business_health_api"),
+    # ==== Credit Score Engine ====
+    path("credit-scores/", views.credit_scores_list, name="credit_scores"),
+    path("credit-score/<str:customer_phone>/", views.credit_score_detail, name="credit_score_detail"),
+    path("api/credit-score/<str:customer_phone>/", views.credit_score_api, name="credit_score_api"),
+    # ==== Recurring Costs ====
+    path("recurring-costs/", views.recurring_costs_list, name="recurring_costs"),
+    path("recurring-costs/add/", views.recurring_cost_add, name="recurring_cost_add"),
+    path("recurring-costs/<int:pk>/edit/", views.recurring_cost_edit, name="recurring_cost_edit"),
+    path("recurring-costs/<int:pk>/toggle/", views.recurring_cost_toggle, name="recurring_cost_toggle"),
+    path("recurring-costs/<int:pk>/delete/", views.recurring_cost_delete, name="recurring_cost_delete"),
     # ==== Soft redirects & health ====
     path("inventory/", admin_dash_proxy, name="inventory_dashboard_redirect"),
     path("proxy/agent/", agent_dash_proxy, name="agent_dashboard_redirect"),

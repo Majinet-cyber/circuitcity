@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load static humanize %}
+
+{% block title %}Recurring Costs — {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .rc-page { max-width: 1100px; margin: 0 auto; padding: 0 1rem 3rem; }
+  .rc-header { margin-bottom: 1.75rem; }
+
+  .rc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .rc-stat { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 10px rgba(0,0,0,.05); }
+  .rc-stat .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; margin-bottom: .25rem; }
+  .rc-stat .value { font-size: 1.6rem; font-weight: 900; color: #0f172a; }
+
+  .rc-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.06); border: 1.5px solid #e2e8f0; }
+  .rc-table th, .rc-table td { padding: .875rem 1rem; border-bottom: 1px solid #f1f5f9; font-size: .9rem; vertical-align: middle; }
+  .rc-table th { background: #f8fafc; color: #64748b; text-transform: uppercase; font-size: .72rem; letter-spacing: .05em; font-weight: 800; border-bottom: 1.5px solid #e2e8f0; }
+  .rc-table tbody tr:hover { background: #fafafa; }
+  .rc-table tbody tr:last-child td { border-bottom: none; }
+
+  .freq-badge { display: inline-flex; padding: .2rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 700; background: #f1f5f9; color: #475569; }
+  .active-badge   { background: #dcfce7; color: #166534; }
+  .inactive-badge { background: #fef9c3; color: #854d0e; }
+
+  .cat-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .4rem; }
+  .cat-bar-wrap { display: flex; flex-direction: column; gap: .5rem; margin-top: 1.25rem; }
+  .cat-bar-row { display: flex; align-items: center; gap: .75rem; font-size: .85rem; }
+  .cat-bar-label { width: 140px; color: #1e293b; font-weight: 600; flex-shrink: 0; }
+  .cat-bar-bg { flex: 1; height: 8px; background: #f1f5f9; border-radius: 99px; overflow: hidden; }
+  .cat-bar-fill { height: 100%; border-radius: 99px; background: #2563eb; }
+  .cat-bar-val { font-size: .8rem; font-weight: 700; color: #64748b; white-space: nowrap; }
+
+  .warning-card { background: #fffbeb; border: 1.5px solid #fde68a; border-radius: 14px; padding: 1rem 1.25rem; margin-bottom: 1rem; font-size: .9rem; }
+</style>
+
+<div class="rc-page">
+  <div class="rc-header d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0" style="font-size:.85rem;">
+          <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+          <li class="breadcrumb-item active">Recurring Costs</li>
+        </ol>
+      </nav>
+      <h1 style="font-size:1.6rem;font-weight:900;color:#0f172a;margin:.35rem 0 .2rem;">Recurring Costs</h1>
+      <p class="text-muted mb-0" style="font-size:.9rem;">Manage monthly and periodic operating expenses for {{ business.name }}.</p>
+    </div>
+    <a href="{% url 'dashboard:recurring_cost_add' %}" class="btn btn-primary rounded-pill">
+      <i class="bi bi-plus-lg me-1"></i>Add Recurring Cost
+    </a>
+  </div>
+
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="alert alert-{{ msg.tags|default:'info' }} rounded-3 mb-3">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+
+  <!-- Monthly summary stats -->
+  <div class="rc-stats">
+    <div class="rc-stat">
+      <div class="label">Active Recurring Costs</div>
+      <div class="value">{{ active_count }}</div>
+    </div>
+    <div class="rc-stat">
+      <div class="label">Est. Monthly Total</div>
+      <div class="value" style="font-size:1.3rem;">{{ business.currency }} {{ monthly_total|floatformat:0|intcomma }}</div>
+    </div>
+    <div class="rc-stat">
+      <div class="label">Total Costs Listed</div>
+      <div class="value">{{ costs.count }}</div>
+    </div>
+  </div>
+
+  {% if monthly_total > 0 %}
+  <!-- Category breakdown -->
+  <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+    <h6 class="fw-bold mb-1" style="color:#0f172a;">Monthly Cost Breakdown by Category</h6>
+    <p class="text-muted small mb-0">Estimated monthly equivalent of all active recurring costs.</p>
+    <div class="cat-bar-wrap">
+      {% for cat_code, cat_total in by_category.items %}
+      <div class="cat-bar-row">
+        <span class="cat-bar-label">{{ cat_code|title }}</span>
+        <div class="cat-bar-bg">
+          <div class="cat-bar-fill" style="width:{% widthratio cat_total monthly_total 100 %}%;"></div>
+        </div>
+        <span class="cat-bar-val">{{ business.currency }} {{ cat_total|floatformat:0|intcomma }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Cost table -->
+  {% if costs %}
+  <div class="scroll-x" style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+    <table class="rc-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Frequency</th>
+          <th>Next Run</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cost in costs %}
+        <tr>
+          <td class="fw-bold" style="color:#0f172a;">
+            {{ cost.name }}
+            {% if cost.notes %}<div class="text-muted small">{{ cost.notes|truncatechars:50 }}</div>{% endif %}
+          </td>
+          <td>{{ cost.get_category_display }}</td>
+          <td class="fw-bold">{{ business.currency }} {{ cost.amount|floatformat:0|intcomma }}</td>
+          <td><span class="freq-badge">{{ cost.get_frequency_display }}</span></td>
+          <td class="text-muted small">
+            {% if cost.next_run_date %}{{ cost.next_run_date|date:"d M Y" }}{% else %}—{% endif %}
+          </td>
+          <td>
+            <span class="freq-badge {% if cost.is_active %}active-badge{% else %}inactive-badge{% endif %}">
+              {% if cost.is_active %}Active{% else %}Paused{% endif %}
+            </span>
+          </td>
+          <td>
+            <div class="d-flex gap-1 flex-wrap">
+              <a href="{% url 'dashboard:recurring_cost_edit' cost.pk %}" class="btn btn-xs btn-outline-primary" style="font-size:.78rem;padding:.25rem .6rem;">Edit</a>
+              <form method="post" action="{% url 'dashboard:recurring_cost_toggle' cost.pk %}" style="display:inline;">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-secondary" style="font-size:.78rem;padding:.25rem .6rem;">
+                  {% if cost.is_active %}Pause{% else %}Resume{% endif %}
+                </button>
+              </form>
+              <form method="post" action="{% url 'dashboard:recurring_cost_delete' cost.pk %}" style="display:inline;"
+                    onsubmit="return confirm('Delete \'{{ cost.name|escapejs }}\'? This cannot be undone.');">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-outline-danger" style="font-size:.78rem;padding:.25rem .6rem;">Delete</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:3.5rem 1rem;color:#64748b;">
+    <div style="font-size:3rem;margin-bottom:.75rem;">📋</div>
+    <h4 style="font-weight:800;">No recurring costs yet</h4>
+    <p>Add rent, salaries, utilities, and other fixed operating costs to track them automatically each month.</p>
+    <a href="{% url 'dashboard:recurring_cost_add' %}" class="btn btn-primary rounded-pill mt-2">
+      <i class="bi bi-plus-lg me-1"></i>Add First Recurring Cost
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="mt-4 p-3 rounded-3" style="background:#f0fdf4;border:1.5px solid #bbf7d0;font-size:.875rem;color:#065f46;">
+    <strong>💡 Tip:</strong> Recurring costs are tracked monthly. They appear in your P&amp;L and Business Health Score as expense control data. Use the <strong>pause</strong> option to temporarily stop a cost without deleting it.
+  </div>
+</div>
+{% endblock %}

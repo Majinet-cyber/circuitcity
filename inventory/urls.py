@@ -2030,6 +2030,8 @@ try:
     # Manager routes (login + business required)
     urlpatterns += [
         path("marketplace/manage/", manager_required(_need_biz(views_marketplace.manage_listings)), name="manage_listings"),
+        path("marketplace/storefront/", manager_required(_need_biz(views_marketplace.storefront_settings)), name="marketplace_storefront_settings"),
+        path("marketplace/orders/", manager_required(_need_biz(views_marketplace.marketplace_orders)), name="marketplace_orders"),
         path("marketplace/create/", manager_required(_need_biz(views_marketplace.create_listing)), name="create_listing"),
         path("marketplace/edit/<int:listing_id>/", manager_required(_need_biz(views_marketplace.edit_listing)), name="edit_listing"),
         path("marketplace/media-diagnostics/<int:listing_id>/", views_marketplace.marketplace_media_diagnostics, name="marketplace_media_diagnostics"),

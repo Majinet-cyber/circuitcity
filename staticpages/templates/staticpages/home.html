@@ -2456,190 +2456,97 @@
     }
 
     /* ============================================================
-       TRUSTED INFRASTRUCTURE SECTION
+       PARTNERS / TRUST STRIP
     ============================================================ */
-    .trusted-infra {
-      padding: 5rem 0 4rem;
+    .partners-strip {
+      padding: 2.5rem 0;
       background: var(--bg-subtle);
       border-top: 1px solid var(--border);
+      overflow: hidden;
     }
-    .trusted-infra-header {
-      text-align: center;
-      margin-bottom: 2.75rem;
-    }
-    .trusted-infra-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
+    .partners-strip-label {
       font-size: 0.75rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      color: var(--brand);
-      background: rgba(79, 70, 229, 0.07);
-      border: 1px solid rgba(79, 70, 229, 0.15);
-      padding: 0.35rem 0.9rem;
-      border-radius: 2rem;
-      margin-bottom: 1.1rem;
-    }
-    .trusted-infra-title {
-      font-size: clamp(1.5rem, 3vw, 2rem);
-      font-weight: 800;
-      color: var(--text-primary);
-      margin: 0 0 0.75rem;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
-    }
-    .trusted-infra-subtitle {
-      font-size: 1.0625rem;
-      color: var(--text-muted);
-      max-width: 560px;
-      margin: 0 auto 1.25rem;
-      line-height: 1.7;
-    }
-    .trusted-infra-microcopy {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.45rem;
-      font-size: 0.8125rem;
-      font-weight: 600;
       color: var(--text-light);
+      text-align: center;
+      margin-bottom: 1.25rem;
     }
-    .trusted-infra-microcopy::before {
-      content: '';
-      display: inline-block;
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.18);
-      flex-shrink: 0;
-    }
-    .trusted-infra-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.5rem;
-      max-width: 960px;
-      margin: 0 auto 2.5rem;
-    }
-    .trusted-infra-card {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 2rem 1.75rem 1.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.65rem;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-      position: relative;
+    .partners-marquee-wrapper {
       overflow: hidden;
+      position: relative;
+      /* fade edges */
+      -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
+      mask-image: linear-gradient(to right, transparent 0%, #000 8%, #000 92%, transparent 100%);
     }
-    .trusted-infra-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      border-radius: 18px 18px 0 0;
-      background: linear-gradient(90deg, transparent, var(--card-accent, var(--brand)), transparent);
-      opacity: 0;
-      transition: opacity 0.22s;
-    }
-    .trusted-infra-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.09);
-      border-color: var(--card-accent, var(--brand));
-    }
-    .trusted-infra-card:hover::before {
-      opacity: 1;
-    }
-    .trusted-infra-logo-wrap {
+    .partners-marquee-track {
       display: flex;
       align-items: center;
-      gap: 0.65rem;
-      margin-bottom: 0.2rem;
+      gap: 0;
+      width: max-content;
+      animation: partnersMarquee 28s linear infinite;
     }
-    .trusted-infra-logo-badge {
-      width: 44px; height: 44px;
-      border-radius: 12px;
+    .partners-marquee-track:hover {
+      animation-play-state: paused;
+    }
+    @keyframes partnersMarquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .partners-marquee-track {
+        animation: none;
+        flex-wrap: wrap;
+        justify-content: center;
+        width: auto;
+        gap: 2rem;
+      }
+      .partners-marquee-track .partner-logo-set:last-child { display: none; }
+      .partners-marquee-wrapper { -webkit-mask-image: none; mask-image: none; }
+    }
+    .partner-logo-set {
       display: flex;
       align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
+      gap: 0;
+      padding: 0;
+    }
+    .partner-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-light);
       filter: grayscale(100%);
-      opacity: 0.6;
-      transition: filter 0.25s, opacity 0.25s;
+      opacity: 0.5;
+      transition: filter 0.2s, opacity 0.2s, color 0.2s;
+      text-decoration: none;
+      white-space: nowrap;
+      padding: 0 2.5rem;
     }
-    .trusted-infra-card:hover .trusted-infra-logo-badge {
+    .partner-logo:hover {
       filter: grayscale(0%);
       opacity: 1;
     }
-    .trusted-infra-logo-name {
-      font-size: 1.0625rem;
-      font-weight: 800;
-      color: var(--text-primary);
-      letter-spacing: -0.01em;
-    }
-    .trusted-infra-card-headline {
-      font-size: 0.9375rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin: 0;
-      line-height: 1.4;
-    }
-    .trusted-infra-card-body {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      line-height: 1.65;
-      margin: 0;
-      flex: 1;
-    }
-    .trusted-infra-footer {
-      text-align: center;
-      border-top: 1px solid var(--border);
-      padding-top: 2rem;
-      max-width: 960px;
-      margin: 0 auto;
-    }
-    .trusted-infra-statement {
-      font-size: 0.9375rem;
-      color: var(--text-secondary);
-      margin: 0 0 1.25rem;
+    .partner-logo--paychangu:hover { color: #2563eb; }
+    .partner-logo--airtel:hover    { color: #e11d48; }
+    .partner-logo--tnm:hover       { color: #0ea5e9; }
+    .partner-logo--twilio:hover    { color: #f22f46; }
+    .partner-logo--sendgrid:hover  { color: #1a82e2; }
+    .partner-logo-icon {
+      width: 28px; height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
+      border-radius: 7px;
+      flex-shrink: 0;
     }
-    .trusted-infra-cta {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      background: var(--bg-surface, #fff);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 0.6rem 1.4rem;
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: var(--brand);
-      text-decoration: none;
-      transition: background 0.18s, border-color 0.18s, color 0.18s, transform 0.15s;
-    }
-    .trusted-infra-cta:hover {
-      background: var(--brand);
-      color: #fff;
-      border-color: var(--brand);
-      transform: translateY(-1px);
-    }
-    @media (max-width: 768px) {
-      .trusted-infra-grid {
-        grid-template-columns: 1fr;
-      }
-      .trusted-infra {
-        padding: 3.5rem 0 3rem;
-      }
-    }
-    @media (min-width: 769px) and (max-width: 900px) {
-      .trusted-infra-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    .partner-sep {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      flex-shrink: 0;
     }
 
     /* ============================================================
@@ -3440,9 +3347,9 @@
   <section class="hero" id="hero">
     <div class="hero-content">
       <div class="hero-text">
-        <div class="hero-tag">Africa's Business Intelligence Platform</div>
+        <div class="hero-tag">Africa's Business Operating System</div>
         <h1 class="hero-title">
-          African businesses don't fail for lack of effort—<br><span class="highlight">they operate blind.</span>
+          Stop losing money blindly.<br><span class="highlight">Know your real profit every day.</span>
         </h1>
         <p class="hero-subtitle">
           Businesses should not run on notebooks, guesswork, and Excel sheets that can disappear tomorrow.
@@ -3454,11 +3361,11 @@
         <div class="hero-buttons" style="margin-top: 2rem;">
           <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary btn-lg">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Start Free
+            Get Started Free
           </a>
           <a href="#how-it-works" class="btn btn-secondary btn-lg">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16"/></svg>
-            Watch Demo
+            See How It Works
           </a>
         </div>
 
@@ -3830,358 +3737,144 @@
   <!-- ============================================================
        VIDEO SECTION — credibility anchor near top
   ============================================================ -->
-  <section class="video-section" id="product-demo">
-    <div class="video-section-inner">
-      <div class="video-wrap" id="product-demo-video-wrap">
-        <video
-          id="product-demo-video"
-          {% if VIDEO_BASE_URL %}
-          src="{{ VIDEO_BASE_URL }}/emajinet-farm.mp4"
-          {% else %}
-          src="{% static 'videos/emajinet-farm.mp4' %}"
-          {% endif %}
-          poster="{% static 'img/majn.png' %}"
-          preload="none"
-          controls
-          playsinline
-          muted
-          aria-label="Emajinet product demo: fast account setup, Farm Manager, data entry, smart prompts, and dashboards"
-        >
-          <img src="{% static 'img/majn.png' %}" alt="Emajinet product demo" style="width:100%;display:block;border-radius:inherit;">
-        </video>
-      </div>
-      <div class="video-content">
-        <span class="eyebrow">See it live</span>
-        <h2>Watch Emajinet in action</h2>
-        <p class="video-subtitle">A quick walkthrough showing account setup, data entry, smart prompts, and real-time dashboards.</p>
-        <ul class="video-features-list">
-          <li>Create an account in seconds</li>
-          <li>Fast data entry for daily operations</li>
-          <li>Smart prompts and recommendations</li>
-          <li>Dashboards that show real performance</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
+  
   <!-- ============================================================
-       PROBLEM SECTION
+       MARKETPLACE — Operations + Marketplace = Unfair Advantage
   ============================================================ -->
-  <section class="section section--light" id="problem">
+  <section id="marketplace" style="padding: 4.5rem 0; background: var(--bg); border-top: 1px solid var(--border);">
     <div class="container">
-      <div class="section-header animate-in">
-        <span class="eyebrow">The Problem</span>
-        <h2 class="section-title">Most businesses operate blind.</h2>
-        <p class="section-subtitle">They don't know real demand. They don't know their fastest-moving products. They can't state their actual margin. And money leaks from places they cannot see without the right system.</p>
-      </div>
-      <div class="problem-grid">
-        <div class="problem-card">
-          <div class="problem-card-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><line x1="3.27" y1="6.96" x2="12" y2="12.01"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-          </div>
-          <div class="problem-card-number">1.6%</div>
-          <h3 class="problem-card-title">Inventory shrinkage</h3>
-          <p class="problem-card-body">Average retail loss from untracked stock and internal theft — invisible without a system.</p>
-        </div>
-        <div class="problem-card">
-          <div class="problem-card-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-          </div>
-          <div class="problem-card-number">~60%</div>
-          <h3 class="problem-card-title">No sales tracking system</h3>
-          <p class="problem-card-body">Notebooks and memory replace records. No visibility on who sold what, at what price, or at what margin.</p>
-        </div>
-        <div class="problem-card">
-          <div class="problem-card-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          </div>
-          <div class="problem-card-number">~70%</div>
-          <h3 class="problem-card-title">Margin blindness</h3>
-          <p class="problem-card-body">Without cost tracking and live margin data, owners can't tell if they're profitable until it's too late.</p>
-        </div>
-        <div class="problem-card">
-          <div class="problem-card-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          </div>
-          <div class="problem-card-number">—</div>
-          <h3 class="problem-card-title">Demand blindness</h3>
-          <p class="problem-card-body">No system means no data on what's selling fast, what's slow, or what to restock — decisions made on gut, not fact.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       REALITY STAT — single compelling callout (condensed from carousel)
-  ============================================================ -->
-  <section id="reality-stats" style="background: var(--bg-section); padding: 3.5rem 0;">
-    <div class="container">
-      <div style="max-width: 760px; margin: 0 auto; text-align: center;">
-        <span class="eyebrow">The Reality</span>
-        <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Only 2% of MSMEs in Malawi use the internet for business.</h2>
-        <p style="font-size: 1.0625rem; color: var(--text-muted); margin: 1rem auto 1.75rem; max-width: 600px; line-height: 1.7;">
-          Among medium enterprises, just 9% use computerised record keeping. Without a system, owners lose track of inventory, sales, and profits — often for months before noticing.
-          <br><span style="font-size: 0.8rem; color: var(--text-light); margin-top: 0.5rem; display: inline-block;">Source: <a href="https://imanidevelopment.com/wp-content/uploads/2020/07/Finscope-MSME-2019-survey-Full-Report.pdf" target="_blank" rel="noopener" style="color: var(--text-light);">FinScope MSME Malawi 2019</a></span>
-        </p>
-        <a href="#how-it-works" class="btn btn-primary">See how Emajinet fixes this &rarr;</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       FEATURES SECTION
-  ============================================================ -->
-  <section class="section" id="features">
-    <div class="container">
-      <div class="section-header section-header--center animate-in">
-        <span class="eyebrow">Core Platform</span>
-        <h2 class="section-title">Visibility. Intelligence. Control.</h2>
-        <p class="section-subtitle">Six tightly integrated capabilities that eliminate blind spots across your entire operation.</p>
-      </div>
-      <div class="features-grid">
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-          </div>
-          <h3 class="feature-title">Inventory Control</h3>
-          <p class="feature-description">Track stock quantities, record goods received, and get alerts when items fall below reorder levels. Every unit accounted for.</p>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-          </div>
-          <h3 class="feature-title">Sales Tracking</h3>
-          <p class="feature-description">Record every sale with the selling price, cost, and agent responsible. Get instant margin feedback per transaction.</p>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
-          </div>
-          <h3 class="feature-title">Profit Visibility</h3>
-          <p class="feature-description">See your gross profit, cost of goods sold, and margins at a glance — daily, weekly, or monthly. Know your real position at all times.</p>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          </div>
-          <h3 class="feature-title">Staff Accountability</h3>
-          <p class="feature-description">Assign roles and track performance per agent. See who's selling what, flag irregular activity, and maintain a full audit trail.</p>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-          </div>
-          <h3 class="feature-title">Smart Alerts</h3>
-          <p class="feature-description">Get notified of low stock, below-cost sales, unusual movement patterns, and margin warnings before they become losses.</p>
-        </div>
-        <div class="feature-item">
-          <div class="feature-icon" aria-hidden="true">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
-          </div>
-          <h3 class="feature-title">Reporting</h3>
-          <p class="feature-description">Generate reports on sales performance, stock movement, and agent activity. Share clean summaries with your team or accountant.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       TRUSTED INFRASTRUCTURE
-  ============================================================ -->
-  <section class="trusted-infra" id="trusted-infrastructure" aria-label="Trusted Infrastructure">
-    <div class="container">
-      <div class="trusted-infra-header animate-in">
-        <span class="trusted-infra-eyebrow">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Infrastructure
-        </span>
-        <h2 class="trusted-infra-title">Trusted Infrastructure</h2>
-        <p class="trusted-infra-subtitle">Powered by global and African technology leaders to keep your business secure, connected, and running smoothly.</p>
-        <span class="trusted-infra-microcopy">Trusted by modern businesses</span>
-      </div>
-
-      <div class="trusted-infra-grid">
-        {# PayChangu #}
-        <div class="trusted-infra-card" style="--card-accent: #2563eb;">
-          <div class="trusted-infra-logo-wrap">
-            <a href="https://paychangu.com" target="_blank" rel="noopener noreferrer" class="trusted-infra-logo-badge" style="background: #eff6ff;" aria-label="PayChangu — payment infrastructure">
-              <img src="{% static 'img/partners/paychangu-logo.svg' %}" alt="PayChangu logo" width="28" height="28" style="object-fit:contain;border-radius:6px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-              <span style="display:none;align-items:center;justify-content:center;width:28px;height:28px;background:#2563eb;border-radius:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
-            </a>
-            <span class="trusted-infra-logo-name">PayChangu</span>
-          </div>
-          <h3 class="trusted-infra-card-headline">Seamless Local Payments</h3>
-          <p class="trusted-infra-card-body">Accept and process payments with reliable African payment infrastructure.</p>
-        </div>
-
-        {# Twilio #}
-        <div class="trusted-infra-card" style="--card-accent: #f22f46;">
-          <div class="trusted-infra-logo-wrap">
-            <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" class="trusted-infra-logo-badge" style="background: #fff1f2;" aria-label="Twilio — SMS and messaging">
-              <svg width="28" height="28" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="30" cy="30" r="30" fill="#F22F46"/><circle cx="20" cy="20" r="6" fill="white"/><circle cx="40" cy="20" r="6" fill="white"/><circle cx="20" cy="40" r="6" fill="white"/><circle cx="40" cy="40" r="6" fill="white"/></svg>
-            </a>
-            <span class="trusted-infra-logo-name">Twilio</span>
-          </div>
-          <h3 class="trusted-infra-card-headline">Secure OTP &amp; Alerts</h3>
-          <p class="trusted-infra-card-body">Protect your business with instant verification and real-time SMS notifications.</p>
-        </div>
-
-        {# SendGrid #}
-        <div class="trusted-infra-card" style="--card-accent: #1a82e2;">
-          <div class="trusted-infra-logo-wrap">
-            <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" class="trusted-infra-logo-badge" style="background: #e0f2fe;" aria-label="SendGrid — email delivery">
-              <svg width="28" height="28" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="60" height="60" rx="10" fill="#1A82E2"/><path d="M10 10h20v20H10zM30 30h20v20H30z" fill="white"/><path d="M30 10h20v20H30z" fill="rgba(255,255,255,0.4)"/><path d="M10 30h20v20H10z" fill="rgba(255,255,255,0.4)"/></svg>
-            </a>
-            <span class="trusted-infra-logo-name">SendGrid</span>
-          </div>
-          <h3 class="trusted-infra-card-headline">Reliable Email Delivery</h3>
-          <p class="trusted-infra-card-body">Ensure invoices, reports, and alerts always reach your customers.</p>
-        </div>
-      </div>
-
-      <div class="trusted-infra-footer">
-        <p class="trusted-infra-statement">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          Built on infrastructure trusted by millions of businesses worldwide.
-        </p>
-        <a href="{% url 'accounts:signup_manager' %}" class="trusted-infra-cta">
-          Start tracking your business with confidence
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- Daily Reporting section removed -->
-  <section class="section section--light" id="product-depth" style="display:none;">
-    <div class="container">
-      <div class="product-depth">
-        <div class="product-depth-text">
-          <span class="eyebrow">Daily Reporting</span>
-          <h2 class="product-depth-title">Know your exact position at the end of every day.</h2>
-          <p class="product-depth-subtitle">
-            Prediction beats reaction. Emajinet generates a clean daily summary of revenue, cost, gross profit, and margin — per product, per agent, and across every location.
+      <div class="marketplace-callout animate-in">
+        <div>
+          <p class="marketplace-callout-eyebrow eyebrow">Africa's Business Marketplace</p>
+          <h2 class="marketplace-callout-title">Operations + Marketplace.<br>The unfair advantage.</h2>
+          <p class="marketplace-callout-body">
+            While competitors run two separate apps, Emajinet is one intelligence layer.
+            List products, receive orders, and track fulfilment — all connected to live inventory.
+            Your storefront never goes out of sync.
           </p>
-          <div class="product-depth-checks">
-            <div class="product-depth-check">
-              <div class="product-depth-check-icon" aria-hidden="true">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <span>Revenue and gross profit broken down by product and category</span>
-            </div>
-            <div class="product-depth-check">
-              <div class="product-depth-check-icon" aria-hidden="true">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <span>Agent-level performance — sales count, value, and average margin</span>
-            </div>
-            <div class="product-depth-check">
-              <div class="product-depth-check-icon" aria-hidden="true">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <span>Automatic flags on below-cost sales and unusual stock movements</span>
-            </div>
-            <div class="product-depth-check">
-              <div class="product-depth-check-icon" aria-hidden="true">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <span>Exportable reports you can share with your accountant or partners</span>
-            </div>
-          </div>
         </div>
-
-        <div class="report-mock" aria-label="Emajinet daily report preview" role="img">
-          <div class="report-mock-header">
-            <span class="report-mock-title">Daily Report &mdash; 2 Apr 2026</span>
-            <span class="report-mock-badge">Auto-generated</span>
-          </div>
-          <div class="report-mock-body">
-            <div class="report-summary-row">
-              <div class="report-summary-card">
-                <div class="report-summary-label">Revenue</div>
-                <div class="report-summary-value">MWK 127,400</div>
-              </div>
-              <div class="report-summary-card">
-                <div class="report-summary-label">Gross Profit</div>
-                <div class="report-summary-value report-summary-value--green">MWK 44,190</div>
-              </div>
-              <div class="report-summary-card">
-                <div class="report-summary-label">Avg Margin</div>
-                <div class="report-summary-value">34.7%</div>
-              </div>
-            </div>
-            <div class="report-table">
-              <div class="report-table-header">
-                <span>Product</span>
-                <span>Units</span>
-                <span>Revenue</span>
-                <span>Margin</span>
-              </div>
-              <div class="report-table-row">
-                <span class="item-name">Samsung A05</span>
-                <span>8</span>
-                <span>MWK 48,000</span>
-                <span class="report-margin-pill report-margin-pill--good">38%</span>
-              </div>
-              <div class="report-table-row">
-                <span class="item-name">iPhone 15 Pro</span>
-                <span>2</span>
-                <span>MWK 36,000</span>
-                <span class="report-margin-pill report-margin-pill--good">31%</span>
-              </div>
-              <div class="report-table-row">
-                <span class="item-name">USB-C Charger</span>
-                <span>14</span>
-                <span>MWK 21,000</span>
-                <span class="report-margin-pill report-margin-pill--warn">22%</span>
-              </div>
-              <div class="report-table-row">
-                <span class="item-name">Airpods Pro</span>
-                <span>3</span>
-                <span>MWK 22,400</span>
-                <span class="report-margin-pill report-margin-pill--low">11% ⚠</span>
-              </div>
-            </div>
-          </div>
+        <div class="marketplace-callout-actions">
+          <a href="{% url 'marketplace:home' %}" class="btn btn-primary">Browse Marketplace</a>
+          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-secondary">List Your Business</a>
         </div>
       </div>
     </div>
   </section>
 
-  <section class="section how-it-works-section" id="how-it-works">
+  <!-- ============================================================
+       BUSINESS HEALTH SCORE
+  ============================================================ -->
+  <section id="business-health" style="padding: 4.5rem 0; background: var(--bg-subtle); border-top: 1px solid var(--border);">
     <div class="container">
-      <div class="section-header section-header--center animate-in">
-        <span class="eyebrow">Getting Started</span>
-        <h2 class="section-title">How It Works</h2>
-        <p class="section-subtitle">From signup to full operational visibility — in minutes, not months.</p>
+      <div class="section-header section-header--center animate-in" style="margin-bottom: 2.75rem;">
+        <span class="eyebrow">Know before it hurts</span>
+        <h2 class="section-title" style="font-size: clamp(1.75rem, 3.5vw, 2.5rem);">Your Business Health Score.</h2>
+        <p class="section-subtitle" style="max-width: 580px; margin: 0 auto;">
+          A real-time composite score across profit trend, cash flow, stock risk, sales consistency,
+          expense control, and credit exposure — so you see problems before they cost you.
+        </p>
       </div>
-      <div class="steps-grid">
-        <div class="step-card animate-in">
-          <div class="step-number">1</div>
-          <h3 class="step-title">Sign Up &amp; Set Up</h3>
-          <p class="step-description">Create your business in seconds. Add your locations and team members — works for any business type.</p>
+
+      <!-- Premium Health Score Preview Card -->
+      <div style="max-width: 900px; margin: 0 auto; background: #fff; border-radius: 20px; border: 1.5px solid #e2e8f0; box-shadow: 0 8px 32px rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-wrap: wrap;">
+
+        <!-- Left: circular score + label -->
+        <div style="flex: 0 0 240px; background: linear-gradient(145deg, #f0fdf4 0%, #ecfdf5 100%); padding: 2.5rem 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #e2e8f0;">
+          <div style="position: relative; width: 130px; height: 130px; margin-bottom: 1.25rem;">
+            <svg width="130" height="130" viewBox="0 0 130 130" style="transform: rotate(-90deg);" aria-hidden="true">
+              <circle cx="65" cy="65" r="56" fill="none" stroke="#d1fae5" stroke-width="11"/>
+              <circle cx="65" cy="65" r="56" fill="none" stroke="#059669" stroke-width="11"
+                stroke-dasharray="247 352" stroke-linecap="round"/>
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <div style="font-size: 2.4rem; font-weight: 900; color: #0f172a; line-height: 1;">87</div>
+              <div style="font-size: 0.7rem; color: #64748b; font-weight: 600; letter-spacing: 0.03em;">/ 100</div>
+            </div>
+          </div>
+          <div style="font-size: 1.1rem; font-weight: 800; color: #059669; margin-bottom: 0.25rem;">Excellent</div>
+          <div style="font-size: 0.8rem; color: #64748b; text-align: center;">Overall Business Health</div>
         </div>
-        <div class="step-card animate-in">
-          <div class="step-number">2</div>
-          <h3 class="step-title">Add Your Records</h3>
-          <p class="step-description">Track inventory, seasons, or members depending on your business. Shops add products, farms add crops, gyms add members.</p>
-        </div>
-        <div class="step-card animate-in">
-          <div class="step-number">3</div>
-          <h3 class="step-title">Run Daily Operations</h3>
-          <p class="step-description">Record sales, expenses, and payments. Track team performance with built-in wallet and layby features.</p>
-        </div>
-        <div class="step-card animate-in">
-          <div class="step-number">4</div>
-          <h3 class="step-title">Get Recommendations</h3>
-          <p class="step-description">Receive smart prompts: restock alerts, margin warnings, renewal reminders, and season timing — so you always know what to do next.</p>
+
+        <!-- Right: key indicators + CTA -->
+        <div style="flex: 1; min-width: 280px; padding: 2rem 2rem 1.75rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #94a3b8; margin-bottom: 1.125rem;">Key Indicators</div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.875rem; margin-bottom: 1.5rem;">
+
+            <!-- Profit Trend -->
+            <div style="padding: 0.875rem 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">Profit Trend</span>
+              </div>
+              <div style="height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 0.3rem;">
+                <div style="width: 87%; height: 100%; background: #059669; border-radius: 99px;"></div>
+              </div>
+              <div style="font-size: 0.72rem; color: #059669; font-weight: 700;">Strong — 87/100</div>
+            </div>
+
+            <!-- Cash Flow -->
+            <div style="padding: 0.875rem 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">Cash Flow</span>
+              </div>
+              <div style="height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 0.3rem;">
+                <div style="width: 81%; height: 100%; background: #2563eb; border-radius: 99px;"></div>
+              </div>
+              <div style="font-size: 0.72rem; color: #2563eb; font-weight: 700;">Stable — 81/100</div>
+            </div>
+
+            <!-- Stock Risk -->
+            <div style="padding: 0.875rem 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">Stock Risk</span>
+              </div>
+              <div style="height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 0.3rem;">
+                <div style="width: 72%; height: 100%; background: #d97706; border-radius: 99px;"></div>
+              </div>
+              <div style="font-size: 0.72rem; color: #d97706; font-weight: 700;">Watch — 72/100</div>
+            </div>
+
+            <!-- Credit Exposure -->
+            <div style="padding: 0.875rem 1rem; background: #f8fafc; border-radius: 12px; border: 1px solid #e2e8f0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="font-size: 0.75rem; font-weight: 700; color: #1e293b;">Credit Exposure</span>
+              </div>
+              <div style="height: 5px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-bottom: 0.3rem;">
+                <div style="width: 90%; height: 100%; background: #7c3aed; border-radius: 99px;"></div>
+              </div>
+              <div style="font-size: 0.72rem; color: #7c3aed; font-weight: 700;">Low Exposure — 90/100</div>
+            </div>
+          </div>
+
+          <div style="background: #f0fdf4; border-radius: 10px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; border-left: 3px solid #059669;">
+            <p style="font-size: 0.825rem; color: #065f46; margin: 0; font-style: italic;">
+              "Your business is in excellent health. Focus on restocking fast-moving items to maintain momentum."
+            </p>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary" style="font-size: 0.875rem; padding: 0.625rem 1.375rem;">
+              See Your Score Free
+            </a>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">No credit card &middot; 30-day trial</span>
+          </div>
         </div>
       </div>
-      <p class="how-it-works-note"><strong>Emajinet adapts to your business type</strong> — shop, farm, gym, pharmacy, car dealer, and more.</p>
+
+      <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1.25rem;">
+        Score updates in real-time as you record sales, manage inventory, and track layby customers.
+      </p>
     </div>
   </section>
 
-  <section id="renewable-energy" class="section section--light" style="border-top: 1px solid #e5e7eb;">
+  <!-- Anchor for nav link -->
+  <div id="how-it-works" aria-hidden="true" style="height:0;overflow:hidden;"></div>
+
+<section id="renewable-energy" class="section section--light" style="border-top: 1px solid #e5e7eb;">
     <div class="container">
 
       {# Header #}
@@ -4450,7 +4143,7 @@
             <span style="color:#6b7280;"> kWh shortfall</span>
           </div>
           <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:9px;padding:0.45rem 0.25rem;">
-            <span id="demoSimSavedMWK" style="font-weight:800;color:#d97706;">MWK 0</span>
+            <span id="demoSimSavedMWK" style="font-weight:800;color:#d97706;">MWK —</span>
             <span style="color:#6b7280;"> saved</span>
           </div>
         </div>
@@ -4459,7 +4152,7 @@
         <div style="position:relative;height:175px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:1rem;">
           <canvas id="demoSimChart" aria-label="Energy flow chart" role="img" style="width:100%;height:100%;display:block;"></canvas>
           <div aria-hidden="true" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:0.6rem;color:#94a3b8;white-space:nowrap;">
-            ☀ Solar (amber) · ⚡ Load (indigo) · 🔋 Battery % (green) · 📍 Current Time Marker (cyan)
+            ☀ Solar (amber) · ⚡ Load (indigo) · 🔋 Battery % (green) · cursor (cyan)
           </div>
         </div>
 
@@ -4840,7 +4533,21 @@
   </script>
 
   <!-- ============================================================
-       BUSINESS SIMULATOR
+       SMART RECOMMENDATIONS — compact summary
+  ============================================================ -->
+  <section id="smart-recommendations" style="padding: 3rem 0; background: var(--bg-subtle); border-top: 1px solid var(--border);">
+    <div class="container" style="max-width: 860px; text-align: center;">
+      <span class="eyebrow">AI-powered insights</span>
+      <h2 class="section-title" style="font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 1rem;">Emajinet spots the issues before you do.</h2>
+      <p style="font-size: 1rem; color: var(--text-muted); max-width: 560px; margin: 0 auto 1.5rem;">
+        From slow-moving stock to at-risk layby accounts — Emajinet surfaces smart, prioritised recommendations so you always know what to act on next.
+      </p>
+      <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">See Recommendations in Action</a>
+    </div>
+  </section>
+
+  <!-- ============================================================
+       BUSINESS SIMULATOR (Financial Modelling)
   ============================================================ -->
   <section class="simulator-section" id="business-simulator">
     <div class="simulator-container">
@@ -4896,626 +4603,232 @@
   </section>
 
   <!-- ============================================================
-       SMART RECOMMENDATIONS — compact summary
+       INDUSTRY VERTICALS — PREMIUM ROTATING STRIP
   ============================================================ -->
-  <section id="smart-recommendations" style="background: var(--bg-subtle); padding: 4rem 0;">
-    <div class="container">
-      <div class="sr-grid">
-        <div class="sr-copy">
-          <span class="eyebrow">Built-in Intelligence</span>
-          <h2 class="section-title" style="font-size: clamp(1.5rem, 3vw, 2.1rem);">Smart recommendations, automatically.</h2>
-          <p style="font-size: 0.9375rem; color: var(--text-muted); line-height: 1.65; margin-bottom: 1.25rem;">
-            Emajinet surfaces the right insight at the right time — restock before you run out, margin warnings before profit erodes, seasonal alerts before demand spikes.
-          </p>
-          <a href="{% url 'accounts:signup_manager' %}" class="btn btn-primary">Try it free</a>
-        </div>
-        <div class="sr-alerts">
-          <div class="sr-alert sr-alert--warn">
-            <span class="sr-alert-icon">⚠</span>
-            <span>Samsung A05 — 3 units left. Reorder at current velocity.</span>
-          </div>
-          <div class="sr-alert sr-alert--danger">
-            <span class="sr-alert-icon">🚨</span>
-            <span>Sale below cost on USB-C Charger — review immediately.</span>
-          </div>
-          <div class="sr-alert sr-alert--info">
-            <span class="sr-alert-icon">📅</span>
-            <span>Back-to-school in 3 weeks — increase stationery stock ~34%.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <style>
-      .sr-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 2.5rem;
-        align-items: center;
-        max-width: 960px;
-        margin: 0 auto;
-      }
-      .sr-alerts { display: flex; flex-direction: column; gap: 0.625rem; }
-      .sr-alert {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.625rem;
-        border-radius: 10px;
-        padding: 0.75rem 1rem;
-        font-size: 0.875rem;
-        line-height: 1.45;
-      }
-      .sr-alert-icon { flex-shrink: 0; margin-top: 0.05rem; }
-      .sr-alert--warn   { background: #fff7ed; border: 1px solid #fed7aa; color: #92400e; }
-      .sr-alert--danger { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-      .sr-alert--info   { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
-      @media (max-width: 640px) {
-        .sr-grid { grid-template-columns: 1fr; gap: 1.75rem; }
-        .sr-copy { text-align: center; }
-        .sr-copy .btn { width: 100%; max-width: 280px; }
-      }
-      @media (max-width: 400px) {
-        .sr-alert { font-size: 0.8125rem; padding: 0.625rem 0.875rem; }
-      }
-    </style>
-  </section>
 
-  <!-- Available Verticals Section — top 6 shown, rest on features page -->
-  <section class="landing-container" style="padding: 4.5rem 0; background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);">
-    <div style="text-align: center; margin-bottom: 2.5rem; max-width: 1200px; margin-left: auto; margin-right: auto; padding: 0 2rem;">
-      <span class="eyebrow">Built for your industry</span>
-      <h2 style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); font-weight: 800; color: var(--text-primary); margin-bottom: 1rem; letter-spacing: -0.02em;">
-        Specialised for your business.
-      </h2>
-      <p style="font-size: 1.0625rem; color: var(--text-secondary); max-width: 620px; margin: 0 auto;">
-        Purpose-built workflows for serious operators. Built around how your business actually runs.
-      </p>
-    </div>
+<section id="industry-solutions" style="padding: 3.5rem 0 3rem; background: #fff; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; overflow: hidden;">
+  <div style="text-align: center; margin-bottom: 2rem; padding: 0 2rem;">
+    <span class="eyebrow">Industry Solutions</span>
+    <h2 style="font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; letter-spacing: -0.02em;">
+      Built for your industry.
+    </h2>
+    <p style="font-size: 0.9375rem; color: var(--text-secondary); max-width: 520px; margin: 0 auto;">
+      Purpose-built workflows. 13 verticals. One platform.
+    </p>
+  </div>
 
-    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.25rem; max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
-      {% for vertical in verticals|slice:":6" %}
-      <div style="background: white; border-radius: 14px; padding: 1.5rem; box-shadow: 0 4px 16px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.04); border: 1.5px solid #e2e8f0;">
-        <div style="font-size: 2rem; margin-bottom: 0.75rem;">{{ vertical.icon }}</div>
-        <h3 style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 0.375rem; line-height: 1.3;">
-          {{ vertical.name }}
-        </h3>
-        <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; margin: 0;">
-          {{ vertical.description }}
-        </p>
-      </div>
+  <!-- Scrolling strip -->
+  <div class="vstrip-outer" aria-label="Business verticals carousel">
+    <div class="vstrip-track" id="vStripTrack">
+      <!-- First set -->
+      {% for vertical in verticals %}
+      <a href="{% url 'staticpages:pricing' %}" class="vstrip-item" title="{{ vertical.description }}">
+        <span class="vstrip-icon" aria-hidden="true">{{ vertical.icon }}</span>
+        <span class="vstrip-name">{{ vertical.name }}</span>
+        <span class="vstrip-cta">View Solution</span>
+      </a>
+      {% endfor %}
+      <!-- Duplicate set for seamless loop -->
+      {% for vertical in verticals %}
+      <a href="{% url 'staticpages:pricing' %}" class="vstrip-item" aria-hidden="true" tabindex="-1" title="{{ vertical.description }}">
+        <span class="vstrip-icon">{{ vertical.icon }}</span>
+        <span class="vstrip-name">{{ vertical.name }}</span>
+        <span class="vstrip-cta">View Solution</span>
+      </a>
       {% endfor %}
     </div>
+  </div>
 
-    <div style="text-align: center; margin-top: 2rem; padding: 0 2rem;">
-      <p style="font-size: 0.9375rem; color: var(--text-secondary);">
-        Plus pharmacies, farms, hardware stores, cement dealers, car dealers &amp; more.
-        <a href="{% url 'staticpages:pricing' %}" style="color: var(--brand); font-weight: 600; margin-left: 0.25rem;">See all verticals &rarr;</a>
-      </p>
-    </div>
-  </section>
+  <div style="text-align: center; margin-top: 1.75rem;">
+    <a href="{% url 'staticpages:pricing' %}" style="display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; font-weight: 600; color: var(--brand); text-decoration: none;">
+      See all verticals &amp; pricing
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+    </a>
+    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">
+      Market insight sourced from <strong>FinScope</strong> MSME Malawi surveys.
+    </p>
+  </div>
+</section>
+
+<style>
+/* ── Vertical strip ── */
+.vstrip-outer {
+  width: 100%;
+  overflow: hidden;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+}
+.vstrip-outer::before,
+.vstrip-outer::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 80px;
+  z-index: 2;
+  pointer-events: none;
+}
+.vstrip-outer::before { left: 0;  background: linear-gradient(to right,  #fff 0%, transparent 100%); }
+.vstrip-outer::after  { right: 0; background: linear-gradient(to left,   #fff 0%, transparent 100%); }
+
+.vstrip-track {
+  display: flex;
+  gap: 0.75rem;
+  width: max-content;
+  animation: vstrip-scroll 35s linear infinite;
+  padding: 0.5rem 0;
+}
+.vstrip-outer:hover .vstrip-track,
+.vstrip-outer:focus-within .vstrip-track {
+  animation-play-state: paused;
+}
+
+@keyframes vstrip-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.vstrip-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1rem 1.25rem;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  text-decoration: none;
+  min-width: 140px;
+  flex-shrink: 0;
+  transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  cursor: pointer;
+}
+.vstrip-item:hover {
+  background: #fff;
+  border-color: var(--brand, #2563eb);
+  box-shadow: 0 4px 18px rgba(37,99,235,0.10);
+  transform: translateY(-2px);
+}
+
+.vstrip-icon {
+  font-size: 1.625rem;
+  line-height: 1;
+}
+.vstrip-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e293b;
+  text-align: center;
+  white-space: nowrap;
+}
+.vstrip-cta {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand, #2563eb);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Mobile: allow touch-drag, no animation overrides needed (marquee still works) */
+@media (max-width: 640px) {
+  .vstrip-track { animation-duration: 28s; }
+  .vstrip-item  { min-width: 120px; padding: 0.875rem 1rem; }
+  .vstrip-icon  { font-size: 1.375rem; }
+}
+</style>
+
+<script>
+/* Touch-drag for mobile on the vstrip */
+(function () {
+  var outer = document.querySelector('.vstrip-outer');
+  var track = document.getElementById('vStripTrack');
+  if (!outer || !track) return;
+
+  var isDragging = false, startX = 0, scrollLeft = 0;
+
+  outer.addEventListener('mousedown', function (e) {
+    isDragging = true;
+    startX = e.pageX - outer.offsetLeft;
+    scrollLeft = outer.scrollLeft;
+    track.style.animationPlayState = 'paused';
+  });
+  outer.addEventListener('mouseleave', function () { isDragging = false; });
+  outer.addEventListener('mouseup',    function () { isDragging = false; });
+  outer.addEventListener('mousemove',  function (e) {
+    if (!isDragging) return;
+    e.preventDefault();
+    var x = e.pageX - outer.offsetLeft;
+    outer.scrollLeft = scrollLeft - (x - startX);
+  });
+
+  /* Touch */
+  outer.addEventListener('touchstart', function (e) {
+    startX = e.touches[0].pageX;
+    scrollLeft = outer.scrollLeft;
+    track.style.animationPlayState = 'paused';
+  }, { passive: true });
+  outer.addEventListener('touchmove',  function (e) {
+    var x = e.touches[0].pageX;
+    outer.scrollLeft = scrollLeft - (x - startX);
+  }, { passive: true });
+  outer.addEventListener('touchend',   function () {
+    track.style.animationPlayState = 'running';
+  });
+})();
+</script>
 
 
   <!-- ============================================================
        IMPACT / REAL STORIES — ROTATING CAROUSEL
   ============================================================ -->
-  <section class="section impact-stories-section" id="impact-stories">
+  
+<section id="pricing-snapshot" style="padding: 4.5rem 0; background: var(--bg-subtle);">
     <div class="container">
-
-      <div class="section-header section-header--center animate-in">
-        <span class="eyebrow">Real businesses. Real proof.</span>
-        <h2 class="section-title">From operating blind to operating smart.</h2>
-        <p class="section-subtitle">See how businesses across Malawi are moving from paper records and guesswork to real-time dashboards and data-driven decisions.</p>
+      <div style="text-align: center; margin-bottom: 2.5rem;">
+        <span class="eyebrow">Simple, transparent pricing</span>
+        <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Try Emajinet free for 30 days.</h2>
+        <p style="font-size: 1rem; color: var(--text-muted); margin: 0 auto;">No credit card required. Cancel anytime.</p>
       </div>
 
-      <!-- CAROUSEL WRAPPER -->
-      <div class="sc-wrap animate-in" id="storyCarousel">
-
-        <!-- Tab selector -->
-        <div class="sc-tabs">
-          <button class="sc-tab sc-tab--active" data-story="0">
-            <span class="sc-tab-icon">🏋️</span>
-            <span class="sc-tab-label">Fitness &amp; Gym</span>
-          </button>
-          <button class="sc-tab" data-story="1">
-            <span class="sc-tab-icon">💊</span>
-            <span class="sc-tab-label">Pharmacy &amp; Retail</span>
-          </button>
-        </div>
-
-        <!-- Progress bar -->
-        <div class="sc-progress-track" aria-hidden="true">
-          <div class="sc-progress-fill" id="scProgressBar"></div>
-        </div>
-
-        <!-- Slides -->
-        <div class="sc-slides">
-
-          <!-- ── SLIDE 0: GYM ── -->
-          <div class="sc-slide sc-slide--active" data-index="0">
-            <div class="sc-slide-inner">
-
-              <!-- Left: text -->
-              <div class="sc-slide-text">
-                <span class="story-badge story-badge--gym">Fitness &amp; Gym</span>
-                <h3 class="sc-slide-title">Promise Fitness &amp; Gym moved from paper records to real-time member visibility.</h3>
-                <p class="sc-slide-lead">Member records that once lived in notebooks are now digital, searchable, and visible in real time. Payments, arrears, QR identity, and member status tracked instantly.</p>
-
-                <div class="sc-phases">
-                  <div class="sc-phase">
-                    <div class="sc-phase-label sc-phase-label--before">
-                      <span class="phase-pip phase-pip--before"></span>
-                      Before Emajinet
-                    </div>
-                    <div class="story-points">
-                      <div class="story-point story-point--pain">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
-                        Member records in notebooks — hard to search, easy to lose
-                      </div>
-                      <div class="story-point story-point--pain">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
-                        No clear view of who owed payments or was overdue
-                      </div>
-                    </div>
-                  </div>
-                  <div class="sc-phase">
-                    <div class="sc-phase-label sc-phase-label--after">
-                      <span class="phase-pip phase-pip--after"></span>
-                      Now — visible in real time
-                    </div>
-                    <div class="story-points">
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        QR identity for every member — digital, no disputes
-                      </div>
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Payment status visible immediately — active, overdue, arrears
-                      </div>
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Full gym dashboard — members, revenue, operations
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="story-proof-strip">
-                  <span class="story-proof-pill">QR member tracking</span>
-                  <span class="story-proof-pill">Real-time payment status</span>
-                  <span class="story-proof-pill">Digital member profiles</span>
-                  <span class="story-proof-pill">Mobile-first ops</span>
-                </div>
-              </div>
-
-              <!-- Right: image grid -->
-              <div class="sc-slide-gallery">
-                <div class="sc-gallery-grid">
-                  <div class="sc-img-card" data-label="Before" data-label-type="before"
-                       data-lb-src="{% static 'landing/stories/manual-gym-entry.jpg' %}"
-                       data-lb-alt="Manual gym entry" data-lb-cap="Before Emajinet — manual entry in a notebook">
-                    <img src="{% static 'landing/stories/manual-gym-entry.jpg' %}" alt="Manual gym entry" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card" data-label="Before" data-label-type="before"
-                       data-lb-src="{% static 'landing/stories/manual-gym-records.jpg' %}"
-                       data-lb-alt="Paper gym records" data-lb-cap="Before Emajinet — paper-based member records">
-                    <img src="{% static 'landing/stories/manual-gym-records.jpg' %}" alt="Paper gym records" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card" data-label="QR" data-label-type="qr"
-                       data-lb-src="{% static 'landing/stories/gym-qr-code.jpg' %}"
-                       data-lb-alt="Gym QR code sticker" data-lb-cap="Each gym now has a unique QR code for member identity">
-                    <img src="{% static 'landing/stories/gym-qr-code.jpg' %}" alt="Gym QR code" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card" data-label="Member QR" data-label-type="qr"
-                       data-lb-src="{% static 'landing/stories/gym-member-qr-code.png' %}"
-                       data-lb-alt="Member QR code" data-lb-cap="Every member gets their own scannable QR identity">
-                    <img src="{% static 'landing/stories/gym-member-qr-code.png' %}" alt="Member QR code" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card sc-img-card--wide" data-label="Live dashboard" data-label-type="now"
-                       data-lb-src="{% static 'landing/stories/gym-dashboard.png' %}"
-                       data-lb-alt="Gym management dashboard" data-lb-cap="Full gym dashboard — members, payments, and operations in real time">
-                    <img src="{% static 'landing/stories/gym-dashboard.png' %}" alt="Gym dashboard" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card sc-img-card--wide" data-label="Payment status" data-label-type="now"
-                       data-lb-src="{% static 'landing/stories/members-payment-status.png' %}"
-                       data-lb-alt="Members payment status" data-lb-cap="See who's paid, who's active, and who's overdue — instantly">
-                    <img src="{% static 'landing/stories/members-payment-status.png' %}" alt="Members payment status" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div><!-- /slide 0 -->
-
-          <!-- ── SLIDE 1: PHARMACY ── -->
-          <div class="sc-slide" data-index="1">
-            <div class="sc-slide-inner">
-
-              <!-- Left: text -->
-              <div class="sc-slide-text">
-                <span class="story-badge story-badge--pharmacy">Pharmacy &amp; Retail</span>
-                <h3 class="sc-slide-title">Pharmacy teams can now track sales and stock from the phone.</h3>
-                <p class="sc-slide-lead">From shelves to sales desk to live mobile insights — see what's selling, what needs restocking, and what's happening on the ground. In real time.</p>
-
-                <div class="sc-phases">
-                  <div class="sc-phase">
-                    <div class="sc-phase-label sc-phase-label--after">
-                      <span class="phase-pip phase-pip--after"></span>
-                      What changed
-                    </div>
-                    <div class="story-points">
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Sales visible on mobile — every transaction tracked
-                      </div>
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Stock levels visible — know what to reorder before it runs out
-                      </div>
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Staff accountability — who sold what, and how much
-                      </div>
-                      <div class="story-point story-point--win">
-                        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                        Faster decisions — the information is already there
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="story-proof-strip">
-                  <span class="story-proof-pill">Mobile sales visibility</span>
-                  <span class="story-proof-pill">Live stock tracking</span>
-                  <span class="story-proof-pill">Staff accountability</span>
-                  <span class="story-proof-pill">Faster decisions</span>
-                </div>
-              </div>
-
-              <!-- Right: pharmacy images -->
-              <div class="sc-slide-gallery">
-                <div class="sc-gallery-grid sc-gallery-grid--pharmacy">
-                  <div class="sc-img-card sc-img-card--tall" data-label="Stock" data-label-type="now"
-                       data-lb-src="{% static 'landing/stories/pharmacy-stock.jpg' %}"
-                       data-lb-alt="Pharmacy stock management" data-lb-cap="Stock levels tracked — know what to reorder before it runs out">
-                    <img src="{% static 'landing/stories/pharmacy-stock.jpg' %}" alt="Pharmacy stock" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card sc-img-card--tall" data-label="In use" data-label-type="now"
-                       data-lb-src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}"
-                       data-lb-alt="Pharmacy sales agent using Emajinet" data-lb-cap="Sales agent tracking transactions on the ground">
-                    <img src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}" alt="Pharmacy sales agent" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                  <div class="sc-img-card sc-img-card--wide" data-label="Mobile sales" data-label-type="now"
-                       data-lb-src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}"
-                       data-lb-alt="Pharmacy mobile sales view" data-lb-cap="Live mobile sales view — every transaction visible in real time">
-                    <img src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}" alt="Pharmacy mobile sales" loading="lazy" onerror="this.parentElement.classList.add('sc-img--missing')">
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div><!-- /slide 1 -->
-
-        </div><!-- /sc-slides -->
-
-        <!-- Dot navigation -->
-        <div class="sc-dots">
-          <button class="sc-dot sc-dot--active" data-story="0" aria-label="Gym story" title="Fitness &amp; Gym"></button>
-          <button class="sc-dot" data-story="1" aria-label="Pharmacy story" title="Pharmacy &amp; Retail"></button>
-        </div>
-
-        <!-- ── Story Metrics: live vertical proof data ─────────────── -->
-        <div class="sc-metrics-wrap" id="scMetricsWrap" aria-live="polite">
-
-          {% comment %}Story 0 — Gym{% endcomment %}
-          <div class="sc-metrics sc-metrics--gym sc-metrics--active" data-metrics-story="0">
-            {% with metrics=story_metrics.gym.metrics %}
-            {% for m in metrics %}
-            <div class="sc-metric-chip metric--{{ m.status }}">
-              <span class="sc-metric-value">{{ m.value }}</span>
-              <span class="sc-metric-label">{{ m.label }}</span>
-              {% if m.sublabel %}<span class="sc-metric-sublabel">{{ m.sublabel }}</span>{% endif %}
-            </div>
-            {% empty %}
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Members tracked</span></div>
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Paid &amp; active</span></div>
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">In arrears</span></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; max-width: 900px; margin: 0 auto 2rem;">
+        {% for tier in pricing_tiers %}
+        <div style="background: {% if tier.highlight %}var(--brand){% else %}#fff{% endif %}; border-radius: 14px; padding: 1.75rem; border: {% if tier.highlight %}none{% else %}1.5px solid var(--border){% endif %}; box-shadow: {% if tier.highlight %}var(--shadow-brand){% else %}var(--shadow-sm){% endif %}; position: relative;">
+          {% if tier.highlight %}
+          <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;">MOST POPULAR</span>
+          {% endif %}
+          <div style="font-size: 1rem; font-weight: 700; color: {% if tier.highlight %}rgba(255,255,255,0.9){% else %}var(--text){% endif %}; margin-bottom: 0.25rem;">{{ tier.name }}</div>
+          <div style="font-size: 1.75rem; font-weight: 800; color: {% if tier.highlight %}#fff{% else %}var(--brand){% endif %}; line-height: 1.15;">{{ tier.price_display }}</div>
+          <div style="font-size: 0.75rem; color: {% if tier.highlight %}rgba(255,255,255,0.65){% else %}var(--text-muted){% endif %}; margin-bottom: 0.15rem;">/month</div>
+          <div style="font-size: 0.72rem; color: {% if tier.highlight %}rgba(255,255,255,0.5){% else %}#94a3b8{% endif %}; margin-bottom: 1rem;">≈ USD {{ tier.price_usd|default:'' }} / month</div>
+          <ul style="list-style: none; padding: 0; margin: 0 0 1.25rem; font-size: 0.875rem; color: {% if tier.highlight %}rgba(255,255,255,0.85){% else %}var(--text-muted){% endif %}; display: flex; flex-direction: column; gap: 0.4rem;">
+            {% for feature in tier.features|slice:":4" %}
+            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
+              <span style="color: {% if tier.highlight %}#a7f3d0{% else %}var(--green){% endif %}; flex-shrink: 0; margin-top: 1px;">✓</span>
+              {{ feature }}
+            </li>
             {% endfor %}
-            {% endwith %}
-          </div>
-
-          {% comment %}Story 1 — Pharmacy{% endcomment %}
-          <div class="sc-metrics sc-metrics--pharmacy" data-metrics-story="1">
-            {% with metrics=story_metrics.pharmacy.metrics %}
-            {% for m in metrics %}
-            <div class="sc-metric-chip metric--{{ m.status }}">
-              <span class="sc-metric-value">{{ m.value }}</span>
-              <span class="sc-metric-label">{{ m.label }}</span>
-              {% if m.sublabel %}<span class="sc-metric-sublabel">{{ m.sublabel }}</span>{% endif %}
-            </div>
-            {% empty %}
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Sales recorded</span></div>
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Stock value</span></div>
-            <div class="sc-metric-chip"><span class="sc-metric-value">—</span><span class="sc-metric-label">Revenue tracked</span></div>
-            {% endfor %}
-            {% endwith %}
-          </div>
-
-        </div><!-- /sc-metrics-wrap -->
-
-      </div><!-- /sc-wrap -->
-
-    </div>
-  </section>
-
-  <section style="display:none">
-    <div class="story-module animate-in">
-        <div class="story-module-header">
-          <span class="story-badge story-badge--gym">Fitness &amp; Gym</span>
-          <h3 class="story-module-title">Promise Fitness &amp; Gym moved from paper records to real-time member visibility.</h3>
-          <p class="story-module-lead">Member records that once lived in notebooks are now digital, searchable, and visible in real time. Payments, arrears, QR identity, and member status are tracked instantly — giving the gym owner more control and less guesswork.</p>
+          </ul>
+          <a href="{% url 'accounts:signup_manager' %}" style="display: block; text-align: center; padding: 0.625rem 1rem; border-radius: var(--radius); font-size: 0.875rem; font-weight: 600; text-decoration: none; background: {% if tier.highlight %}#fff{% else %}var(--brand-light){% endif %}; color: var(--brand); border: 1.5px solid {% if tier.highlight %}#fff{% else %}transparent{% endif %};">
+            Start free trial
+          </a>
         </div>
-
-        <div class="story-body-split">
-
-          <!-- Left: narrative -->
-          <div class="story-narrative">
-
-            <div class="story-phase-block">
-              <div class="story-phase-tag story-phase-tag--before">
-                <span class="phase-pip phase-pip--before"></span>
-                Before Emajinet
-              </div>
-              <div class="story-points">
-                <div class="story-point story-point--pain">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
-                  Member records tracked in notebooks — hard to search, easy to lose
-                </div>
-                <div class="story-point story-point--pain">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
-                  Payments missed — no clear view of who was overdue
-                </div>
-                <div class="story-point story-point--pain">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 3.5v4h1v-4h-1zm0 5v1h1v-1h-1z"/></svg>
-                  Arguments with members over records — no proof, no system
-                </div>
-              </div>
-            </div>
-
-            <div class="story-phase-block">
-              <div class="story-phase-tag story-phase-tag--during">
-                <span class="phase-pip phase-pip--during"></span>
-                Digitised with Emajinet
-              </div>
-              <div class="story-points">
-                <div class="story-point">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 5L7 11 4.5 8.5l.7-.7L7 9.6l4-4 .7.7z"/></svg>
-                  Every member issued a personal QR code for digital identity
-                </div>
-                <div class="story-point">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm3.5 5L7 11 4.5 8.5l.7-.7L7 9.6l4-4 .7.7z"/></svg>
-                  Member can view their own profile and status — no disputes
-                </div>
-              </div>
-            </div>
-
-            <div class="story-phase-block">
-              <div class="story-phase-tag story-phase-tag--after">
-                <span class="phase-pip phase-pip--after"></span>
-                Now — visible in real time
-              </div>
-              <div class="story-points">
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Full gym dashboard — members, payments, activity
-                </div>
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Payment status visible immediately — who's active, who's overdue
-                </div>
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Trainer workflow, check-in, and operations all digital
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- Right: image mosaic -->
-          <div class="story-gallery">
-
-            <!-- Row 1: Before images -->
-            <div class="story-gallery-row story-gallery-row--2col">
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/manual-gym-entry.jpg' %}" alt="Manual gym entry book" loading="lazy">
-                <span class="story-img-label story-img-label--before">Before</span>
-                <div class="story-img-caption-bar">Manual entry</div>
-              </div>
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/manual-gym-records.jpg' %}" alt="Paper gym records" loading="lazy">
-                <span class="story-img-label story-img-label--before">Before</span>
-                <div class="story-img-caption-bar">Paper records</div>
-              </div>
-            </div>
-
-            <!-- Row 2: QR / digitised -->
-            <div class="story-gallery-row story-gallery-row--2col">
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/gym-qr-code.jpg' %}" alt="GYM QR code sticker" loading="lazy">
-                <span class="story-img-label story-img-label--qr">QR identity</span>
-                <div class="story-img-caption-bar">Gym QR sticker</div>
-              </div>
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/gym-member-qr-code.png' %}" alt="Member QR code" loading="lazy">
-                <span class="story-img-label story-img-label--qr">Member QR</span>
-                <div class="story-img-caption-bar">Member identity</div>
-              </div>
-            </div>
-
-            <!-- Row 3: After — dashboard + member + payment -->
-            <div class="story-gallery-row story-gallery-row--2col">
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/gym-dashboard.png' %}" alt="Gym management dashboard" loading="lazy">
-                <span class="story-img-label story-img-label--now">Live dashboard</span>
-                <div class="story-img-caption-bar">Gym dashboard</div>
-              </div>
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/members-payment-status.png' %}" alt="Members payment status" loading="lazy">
-                <span class="story-img-label story-img-label--now">Payment status</span>
-                <div class="story-img-caption-bar">Who's paid &amp; who's due</div>
-              </div>
-            </div>
-
-            <!-- Row 4: Member public view + training -->
-            <div class="story-gallery-row story-gallery-row--2col">
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/gym-member-public-view.png' %}" alt="Member public profile" loading="lazy">
-                <span class="story-img-label story-img-label--now">Member profile</span>
-                <div class="story-img-caption-bar">Public member view</div>
-              </div>
-              <div class="story-img-wrap">
-                <img src="{% static 'landing/stories/gym-training.jpg' %}" alt="Gym training in session" loading="lazy">
-                <span class="story-img-label story-img-label--now">Operations</span>
-                <div class="story-img-caption-bar">Professional ops</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Proof pills -->
-        <div class="story-proof-strip">
-          <span class="story-proof-pill">QR-based member tracking</span>
-          <span class="story-proof-pill">Real-time payment status</span>
-          <span class="story-proof-pill">Overdue members visible instantly</span>
-          <span class="story-proof-pill">Digital member profiles</span>
-          <span class="story-proof-pill">Mobile-first operations</span>
-        </div>
+        {% endfor %}
       </div>
 
-      <!-- ── STORY 2: PHARMACY ── -->
-      <div class="story-module animate-in">
-        <div class="story-module-header">
-          <span class="story-badge story-badge--pharmacy">Pharmacy &amp; Retail</span>
-          <h3 class="story-module-title">Pharmacy teams can now track sales and stock from the phone.</h3>
-          <p class="story-module-lead">From shelves to sales desk to live mobile insights, Emajinet helps pharmacy teams see what is selling, what needs restocking, and what is happening on the ground — in real time.</p>
-        </div>
-
-        <div class="story-pharmacy-body">
-
-          <!-- Left: narrative -->
-          <div class="story-pharmacy-text">
-            <div class="story-phase-block">
-              <div class="story-phase-tag story-phase-tag--after">
-                <span class="phase-pip phase-pip--after"></span>
-                What changed
-              </div>
-              <div class="story-points">
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Sales visible on mobile — every transaction tracked
-                </div>
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Stock levels visible — know what to reorder before it runs out
-                </div>
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Staff accountability — who sold what, when, and how much
-                </div>
-                <div class="story-point story-point--win">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M13.854 3.646a.5.5 0 0 1 0 .708l-7 7a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L6.5 10.293l6.646-6.647a.5.5 0 0 1 .708 0z"/></svg>
-                  Faster decisions — information is already there when you need it
-                </div>
-              </div>
-            </div>
-            <div class="story-proof-strip" style="margin-top: 0.5rem;">
-              <span class="story-proof-pill">Sales visibility on mobile</span>
-              <span class="story-proof-pill">Stock visibility</span>
-              <span class="story-proof-pill">Faster decisions</span>
-              <span class="story-proof-pill">Daily accountability</span>
-            </div>
-          </div>
-
-          <!-- Right: pharmacy images -->
-          <div class="story-pharmacy-images">
-            <div class="story-img-wrap">
-              <img src="{% static 'landing/stories/pharmacy-stock.jpg' %}" alt="Pharmacy stock management" loading="lazy">
-              <span class="story-img-label story-img-label--now">Stock</span>
-              <div class="story-img-caption-bar">Stock tracked digitally</div>
-            </div>
-            <div class="story-img-wrap">
-              <img src="{% static 'landing/stories/pharmacy-sales-agent.jpg' %}" alt="Pharmacy sales agent using Emajinet" loading="lazy">
-              <span class="story-img-label story-img-label--now">In use</span>
-              <div class="story-img-caption-bar">Sales agent on the floor</div>
-            </div>
-            <div class="story-img-wrap">
-              <img src="{% static 'landing/stories/pharmacy-app-sales.jpg' %}" alt="Pharmacy app sales view" loading="lazy">
-              <span class="story-img-label story-img-label--now">Live</span>
-              <div class="story-img-caption-bar">Mobile sales view</div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============================================================
-       TESTIMONIALS — real people, real words
-  ============================================================ -->
-  <section class="section section--alt" id="testimonials">
-    <div class="container">
-      <div class="section-header section-header--center animate-in">
-        <span class="eyebrow">From the field</span>
-        <h2 class="section-title">Real people. Real operations. Real results.</h2>
-      </div>
-      <div class="testimonials-grid testimonials-grid--2col">
-
-        <!-- Yohane Kajanga — gym owner -->
-        <div class="testimonial-card testimonial-card--featured animate-in">
-          <p class="testimonial-quote">Before Emajinet, everything ran on memory and notebooks — and too much fell through the cracks. Now my members can check their own dates themselves, I get real-time notifications, and the system tracks what matters without the confusion. It has brought real order to how I run the gym.</p>
-          <div class="testimonial-author">
-            <div class="testimonial-photo-wrap"
-                 data-lb-src="{% static 'landing/stories/yohane-kajanga.jpg' %}"
-                 data-lb-alt="Yohane Kajanga"
-                 data-lb-cap="Yohane Kajanga — Gym Owner, Lilongwe, Malawi">
-              <img src="{% static 'landing/stories/yohane-kajanga.jpg' %}" alt="Yohane Kajanga" class="testimonial-photo" loading="lazy"
-                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>YK</span>'">
-            </div>
-            <div>
-              <div class="testimonial-name">Yohane Kajanga</div>
-              <div class="testimonial-role">Gym Owner &mdash; Lilongwe, Malawi</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Zaina — business operator -->
-        <div class="testimonial-card testimonial-card--featured animate-in">
-          <p class="testimonial-quote">Because I am often moving, I need to know fast what is selling and what needs restocking. Emajinet gives me stock alerts and shows me the fast-moving products quickly so I can make supply decisions without waiting. The marketplace is also promising — marketing only through WhatsApp was limiting us.</p>
-          <div class="testimonial-author">
-            <div class="testimonial-photo-wrap"
-                 data-lb-src="{% static 'landing/stories/zaina.jpg' %}"
-                 data-lb-alt="Zaina"
-                 data-lb-cap="Zaina — Business Operator, Lilongwe, Malawi">
-              <img src="{% static 'landing/stories/zaina.jpg' %}" alt="Zaina" class="testimonial-photo" loading="lazy"
-                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>Z</span>'">
-            </div>
-            <div>
-              <div class="testimonial-name">Zaina</div>
-              <div class="testimonial-role">Business Operator &mdash; Lilongwe, Malawi</div>
-            </div>
-          </div>
-        </div>
-
+      <div style="text-align: center;">
+        <a href="{% url 'staticpages:pricing' %}" class="btn btn-secondary" style="display: inline-flex;">See full pricing &rarr;</a>
+        <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.75rem;">
+          {{ PRICING_USD_RATE_NOTE|default:"USD equivalent is approximate and may vary with exchange rate." }}
+        </p>
       </div>
     </div>
   </section>
 
   <!-- ============================================================
-       TEAM (with qualifications — required by test_homepage_team_section)
+       FINAL CTA
   ============================================================ -->
-  <section class="team-section" id="team">
+  
+<section class="team-section" id="team">
     <div class="container">
       <div class="team-section-header">
         <span class="eyebrow">Team</span>
@@ -5650,89 +4963,60 @@
   <!-- ============================================================
        MISSION
   ============================================================ -->
-  <section class="mission-section">
+  
+<section class="section section--alt" id="testimonials">
     <div class="container">
-      <div class="section-header section-header--center">
-        <span class="eyebrow">Our Mission</span>
-        <h2 class="section-title" style="font-size: clamp(2.25rem, 4vw, 3rem); font-weight: 800; margin-top: 0.5rem; letter-spacing: -0.025em;">Emajinet is the operating system for African business.</h2>
+      <div class="section-header section-header--center animate-in">
+        <span class="eyebrow">From the field</span>
+        <h2 class="section-title">Real people. Real operations. Real results.</h2>
       </div>
-      <p class="mission-text">
-        We give every shop, farm, and workshop a <strong>digital intelligence layer</strong> — real-time inventory, sales visibility, and predictive insight — so owners stop operating blind and start making informed decisions.
-      </p>
-    </div>
-  </section>
+      <div class="testimonials-grid testimonials-grid--2col">
 
-  <!-- ============================================================
-       T.S. ELIOT QUOTE
-  ============================================================ -->
-  <section class="quote-section">
-    <div class="container">
-      <div class="quote-card">
-        <div class="quote-mark">&ldquo;</div>
-        <blockquote>
-          <p class="quote-text">
-            We shall not cease from exploration<br>
-            And the end of all our exploring<br>
-            Will be to arrive where we started<br>
-            And know the place for the first time.
-          </p>
-          <footer class="quote-attribution">
-            &mdash; T.S. Eliot, <em>Four Quartets</em>
-          </footer>
-        </blockquote>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================
-       PRICING SNAPSHOT — real prices from billing/pricing.py via context
-  ============================================================ -->
-  <section id="pricing-snapshot" style="padding: 4.5rem 0; background: var(--bg-subtle);">
-    <div class="container">
-      <div style="text-align: center; margin-bottom: 2.5rem;">
-        <span class="eyebrow">Simple, transparent pricing</span>
-        <h2 class="section-title" style="font-size: clamp(1.6rem, 3vw, 2.25rem);">Try Emajinet free for {{ PRICING_TRIAL_DAYS|default:30 }} days.</h2>
-        <p style="font-size: 1rem; color: var(--text-muted); margin: 0 auto;">No credit card required. Cancel anytime.</p>
-      </div>
-
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.25rem; max-width: 900px; margin: 0 auto 2rem;">
-        {% for plan in PRICING_PLANS %}
-        <div style="background: {% if plan.code == 'growth' %}var(--brand){% else %}#fff{% endif %}; border-radius: 14px; padding: 1.75rem; border: {% if plan.code == 'growth' %}none{% else %}1.5px solid var(--border){% endif %}; box-shadow: {% if plan.code == 'growth' %}var(--shadow-brand){% else %}var(--shadow-sm){% endif %}; position: relative;">
-          {% if plan.code == 'growth' %}
-          <span style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background: var(--green); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 0.25rem 0.75rem; border-radius: 20px; letter-spacing: 0.05em; white-space: nowrap;">MOST POPULAR</span>
-          {% endif %}
-          <div style="font-size: 1rem; font-weight: 700; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.9){% else %}var(--text){% endif %}; margin-bottom: 0.25rem;">{{ plan.name }}</div>
-          <div style="font-size: 1.75rem; font-weight: 800; color: {% if plan.code == 'growth' %}#fff{% else %}var(--brand){% endif %}; line-height: 1.15;">MWK {{ plan.amount|floatformat:0 }}</div>
-          <div style="font-size: 0.75rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.65){% else %}var(--text-muted){% endif %}; margin-bottom: 0.15rem;">/month</div>
-          <div style="font-size: 0.72rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.5){% else %}#94a3b8{% endif %}; margin-bottom: 1rem;">≈ USD {{ plan.amount_usd }} / month</div>
-          <ul style="list-style: none; padding: 0; margin: 0 0 1.25rem; font-size: 0.875rem; color: {% if plan.code == 'growth' %}rgba(255,255,255,0.85){% else %}var(--text-muted){% endif %}; display: flex; flex-direction: column; gap: 0.4rem;">
-            {% for feature in plan.features|slice:":4" %}
-            <li style="display: flex; gap: 0.5rem; align-items: flex-start;">
-              <span style="color: {% if plan.code == 'growth' %}#a7f3d0{% else %}var(--green){% endif %}; flex-shrink: 0; margin-top: 1px;">✓</span>
-              {{ feature }}
-            </li>
-            {% endfor %}
-          </ul>
-          <a href="{% url 'accounts:signup_manager' %}" style="display: block; text-align: center; padding: 0.625rem 1rem; border-radius: var(--radius); font-size: 0.875rem; font-weight: 600; text-decoration: none; background: {% if plan.code == 'growth' %}#fff{% else %}var(--brand-light){% endif %}; color: var(--brand); border: 1.5px solid {% if plan.code == 'growth' %}#fff{% else %}transparent{% endif %};">
-            Start free trial
-          </a>
+        <!-- Yohane Kajanga — gym owner -->
+        <div class="testimonial-card testimonial-card--featured animate-in">
+          <p class="testimonial-quote">Before Emajinet, everything ran on memory and notebooks — and too much fell through the cracks. Now my members can check their own dates themselves, I get real-time notifications, and the system tracks what matters without the confusion. It has brought real order to how I run the gym.</p>
+          <div class="testimonial-author">
+            <div class="testimonial-photo-wrap"
+                 data-lb-src="{% static 'landing/stories/yohane-kajanga.jpg' %}"
+                 data-lb-alt="Yohane Kajanga"
+                 data-lb-cap="Yohane Kajanga — Gym Owner, Lilongwe, Malawi">
+              <img src="{% static 'landing/stories/yohane-kajanga.jpg' %}" alt="Yohane Kajanga" class="testimonial-photo" loading="lazy"
+                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>YK</span>'">
+            </div>
+            <div>
+              <div class="testimonial-name">Yohane Kajanga</div>
+              <div class="testimonial-role">Gym Owner &mdash; Lilongwe, Malawi</div>
+            </div>
+          </div>
         </div>
-        {% endfor %}
-      </div>
 
-      <div style="text-align: center;">
-        <a href="{% url 'staticpages:pricing' %}" class="btn btn-secondary" style="display: inline-flex;">See full pricing &rarr;</a>
-        <p style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.75rem;">
-          {{ PRICING_USD_RATE_NOTE|default:"USD equivalent is approximate and may vary with exchange rate." }}
-        </p>
+        <!-- Zaina — business operator -->
+        <div class="testimonial-card testimonial-card--featured animate-in">
+          <p class="testimonial-quote">Because I am often moving, I need to know fast what is selling and what needs restocking. Emajinet gives me stock alerts and shows me the fast-moving products quickly so I can make supply decisions without waiting. The marketplace is also promising — marketing only through WhatsApp was limiting us.</p>
+          <div class="testimonial-author">
+            <div class="testimonial-photo-wrap"
+                 data-lb-src="{% static 'landing/stories/zaina.jpg' %}"
+                 data-lb-alt="Zaina"
+                 data-lb-cap="Zaina — Business Operator, Lilongwe, Malawi">
+              <img src="{% static 'landing/stories/zaina.jpg' %}" alt="Zaina" class="testimonial-photo" loading="lazy"
+                   onerror="this.closest('.testimonial-photo-wrap').style.background='var(--brand-light)';this.closest('.testimonial-photo-wrap').innerHTML='<span style=\'display:flex;align-items:center;justify-content:center;height:100%;font-weight:700;color:var(--brand);font-size:1.1rem;\'>Z</span>'">
+            </div>
+            <div>
+              <div class="testimonial-name">Zaina</div>
+              <div class="testimonial-role">Business Operator &mdash; Lilongwe, Malawi</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
 
   <!-- ============================================================
-       FINAL CTA
+       TEAM (with qualifications — required by test_homepage_team_section)
   ============================================================ -->
-  <section class="cta-section" id="cta">
+  
+<section class="cta-section" id="cta">
     <div class="container">
       <h2 class="cta-title">Stop operating blind. Start running with visibility.</h2>
       <p class="cta-subtitle">Know demand before it costs you. Track margins in real time. Make every decision from data. 30-day free trial — no credit card required.</p>
@@ -5742,6 +5026,97 @@
       </p>
     </div>
   </section>
+
+  <!-- ============================================================
+       PARTNERS
+  ============================================================ -->
+  <div class="partners-strip" role="complementary" aria-label="Partners and integrations">
+    <div class="partners-strip-label">Partners &amp; Integrations</div>
+    <div class="partners-marquee-wrapper">
+      <div class="partners-marquee-track" aria-hidden="false">
+        {# First copy #}
+        <div class="partner-logo-set">
+          <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" aria-label="PayChangu payments">
+            <span class="partner-logo-icon" style="background:#eff6ff;">
+              <img src="{% static 'img/partners/paychangu-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#2563eb;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+            </span>
+            PayChangu
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" aria-label="Airtel Money">
+            <span class="partner-logo-icon" style="background:#fff0f3;">
+              <img src="{% static 'img/partners/airtel-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#e11d48;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+            </span>
+            Airtel Money
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" aria-label="TNM Mpamba">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <img src="{% static 'img/partners/tnm-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#0ea5e9;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg></span>
+            </span>
+            TNM Mpamba
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--twilio" aria-label="Twilio SMS & messaging">
+            <span class="partner-logo-icon" style="background:#fff1f2;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#F22F46"/><circle cx="20" cy="20" r="6" fill="white"/><circle cx="40" cy="20" r="6" fill="white"/><circle cx="20" cy="40" r="6" fill="white"/><circle cx="40" cy="40" r="6" fill="white"/></svg>
+            </span>
+            Twilio
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--sendgrid" aria-label="SendGrid email delivery">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" rx="10" fill="#1A82E2"/><path d="M10 10h20v20H10zM30 30h20v20H30z" fill="white"/><path d="M30 10h20v20H30z" fill="rgba(255,255,255,0.4)"/><path d="M10 30h20v20H10z" fill="rgba(255,255,255,0.4)"/></svg>
+            </span>
+            SendGrid
+          </a>
+        </div>
+        {# Duplicate for seamless loop #}
+        <div class="partner-logo-set" aria-hidden="true">
+          <a href="https://paychangu.com" target="_blank" rel="noopener" class="partner-logo partner-logo--paychangu" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#eff6ff;">
+              <img src="{% static 'img/partners/paychangu-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#2563eb;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+            </span>
+            PayChangu
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.airtel.mw/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--airtel" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#fff0f3;">
+              <img src="{% static 'img/partners/airtel-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#e11d48;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+            </span>
+            Airtel Money
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.tnmmpamba.co.mw/#/" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--tnm" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <img src="{% static 'img/partners/tnm-logo.svg' %}" alt="" width="24" height="24" style="object-fit:contain;border-radius:5px;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <span style="display:none;align-items:center;justify-content:center;width:24px;height:24px;background:#0ea5e9;border-radius:5px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><line x1="2" y1="12" x2="22" y2="12"/></svg></span>
+            </span>
+            TNM Mpamba
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://www.twilio.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--twilio" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#fff1f2;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="30" r="30" fill="#F22F46"/><circle cx="20" cy="20" r="6" fill="white"/><circle cx="40" cy="20" r="6" fill="white"/><circle cx="20" cy="40" r="6" fill="white"/><circle cx="40" cy="40" r="6" fill="white"/></svg>
+            </span>
+            Twilio
+          </a>
+          <div class="partner-sep" aria-hidden="true"></div>
+          <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" class="partner-logo partner-logo--sendgrid" tabindex="-1">
+            <span class="partner-logo-icon" style="background:#e0f2fe;">
+              <svg width="24" height="24" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="60" height="60" rx="10" fill="#1A82E2"/><path d="M10 10h20v20H10zM30 30h20v20H30z" fill="white"/><path d="M30 10h20v20H30z" fill="rgba(255,255,255,0.4)"/><path d="M10 30h20v20H10z" fill="rgba(255,255,255,0.4)"/></svg>
+            </span>
+            SendGrid
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ============================================================
        FOOTER

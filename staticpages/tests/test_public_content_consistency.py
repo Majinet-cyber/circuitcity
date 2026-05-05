@@ -29,11 +29,14 @@ class HomePageContentTests(TestCase):
     def test_homepage_contains_hero_headline(self):
         """Homepage must contain the hero headline."""
         response = self.client.get(reverse("staticpages:home"))
-        content = response.content.decode("utf-8")
-        # Check for the multi-vertical aware headline
+        content = response.content.decode("utf-8").lower()
+        # Accept both old and new marketing copy variations
         self.assertTrue(
-            "shop, farm, or gym" in content.lower() or "run your" in content.lower(),
-            "Hero headline should mention multiple business types"
+            "shop, farm, or gym" in content
+            or "run your" in content
+            or "stop losing money" in content
+            or "know your real profit" in content,
+            "Hero headline should contain core marketing message"
         )
 
     def test_homepage_contains_how_it_works(self):

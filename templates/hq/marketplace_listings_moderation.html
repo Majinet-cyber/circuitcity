@@ -1,0 +1,284 @@
+{% extends "hq/base.html" %}
+{% load static %}
+
+{% block title %}Marketplace Listing Moderation — HQ{% endblock %}
+
+{% block content %}
+<style>
+  .mod-page { max-width: 1200px; margin: 0 auto; padding: 0 1rem 3rem; }
+  .mod-tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .mod-tab  {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .45rem 1rem; border-radius: 999px; font-size: .82rem; font-weight: 700;
+    text-decoration: none; border: 1.5px solid #e2e8f0; color: #64748b; background: #fff;
+    transition: all .15s;
+  }
+  .mod-tab:hover, .mod-tab.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+  .mod-tab .cnt {
+    background: rgba(255,255,255,.2); border-radius: 99px;
+    padding: 1px 7px; font-size: .72rem;
+  }
+  .mod-tab:not(.active) .cnt { background: #f1f5f9; color: #1e293b; }
+
+  .listing-card {
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 16px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05); overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .listing-card-img {
+    width: 100%; height: 160px; object-fit: cover; background: #f1f5f9;
+    display: flex; align-items: center; justify-content: center;
+    color: #94a3b8; font-size: 2.5rem;
+  }
+  .listing-card-body { padding: 1rem; flex: 1; }
+  .listing-card-footer { padding: .75rem 1rem 1rem; border-top: 1px solid #f1f5f9; }
+
+  .vbadge {
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .2rem .6rem; border-radius: 999px; font-size: .72rem; font-weight: 700;
+  }
+  .vbadge-pending   { background: #fef9c3; color: #854d0e; }
+  .vbadge-verified  { background: #dcfce7; color: #166534; }
+  .vbadge-rejected  { background: #fee2e2; color: #991b1b; }
+  .vbadge-taken_down { background: #fce7f3; color: #9d174d; }
+
+  .action-btn {
+    display: inline-flex; align-items: center; gap: .3rem;
+    padding: .35rem .8rem; border-radius: 8px; font-size: .78rem; font-weight: 700;
+    border: none; cursor: pointer; transition: all .15s;
+  }
+  .btn-verify   { background: #dcfce7; color: #166534; }
+  .btn-verify:hover   { background: #bbf7d0; }
+  .btn-reject   { background: #fee2e2; color: #991b1b; }
+  .btn-reject:hover   { background: #fecaca; }
+  .btn-takedown { background: #fce7f3; color: #9d174d; }
+  .btn-takedown:hover { background: #fbcfe8; }
+  .btn-restore  { background: #f0fdf4; color: #166534; }
+  .btn-restore:hover  { background: #dcfce7; }
+
+  /* Modal */
+  .mod-modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.6);
+    z-index: 9999; display: none; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .mod-modal-overlay.open { display: flex; }
+  .mod-modal {
+    background: #fff; border-radius: 18px; padding: 1.75rem;
+    max-width: 440px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  }
+  .mod-modal h3 { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: .5rem; }
+  .mod-modal p  { font-size: .875rem; color: #64748b; margin-bottom: 1rem; }
+  .mod-modal textarea {
+    width: 100%; border: 1.5px solid #e2e8f0; border-radius: 10px;
+    padding: .75rem; font-size: .875rem; resize: vertical; min-height: 80px;
+    margin-bottom: 1rem; font-family: inherit;
+  }
+  .mod-modal textarea:focus { outline: none; border-color: #2563eb; }
+  .mod-modal-actions { display: flex; gap: .5rem; justify-content: flex-end; }
+</style>
+
+<div class="mod-page">
+  <!-- Header -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
+    <div>
+      <h1 style="font-size:1.6rem;font-weight:900;color:#0f172a;margin:0;">Listing Moderation</h1>
+      <p class="text-muted mb-0" style="font-size:.9rem;">Review and moderate marketplace listings submitted by merchants.</p>
+    </div>
+  </div>
+
+  <!-- Search + Filters -->
+  <form method="get" class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <input type="text" name="q" value="{{ search_q }}" placeholder="Search listing, business…"
+           class="form-control" style="max-width:260px;font-size:.875rem;">
+    <input type="text" name="vertical" value="{{ vertical_filter }}" placeholder="Vertical (phones, gym…)"
+           class="form-control" style="max-width:180px;font-size:.875rem;">
+    <button type="submit" class="btn btn-sm btn-primary" style="font-size:.875rem;">Filter</button>
+    {% if search_q or vertical_filter %}
+    <a href="?status={{ status_filter }}" class="btn btn-sm btn-outline-secondary" style="font-size:.875rem;">Clear</a>
+    {% endif %}
+  </form>
+
+  <!-- Status Tabs -->
+  <div class="mod-tabs">
+    {% for s, label in verification_statuses.choices %}
+    <a href="?status={{ s }}{% if search_q %}&q={{ search_q }}{% endif %}{% if vertical_filter %}&vertical={{ vertical_filter }}{% endif %}"
+       class="mod-tab {% if status_filter == s %}active{% endif %}">
+      {{ label }}
+      <span class="cnt">{{ counts|default:'' }}
+        {% if s == 'pending' %}{{ counts.pending }}{% elif s == 'verified' %}{{ counts.verified }}{% elif s == 'rejected' %}{{ counts.rejected }}{% elif s == 'taken_down' %}{{ counts.taken_down }}{% endif %}
+      </span>
+    </a>
+    {% endfor %}
+    <a href="?status=" class="mod-tab {% if not status_filter %}active{% endif %}">All</a>
+  </div>
+
+  <!-- Listings Grid -->
+  {% if page_obj.object_list %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.25rem;margin-bottom:2rem;">
+    {% for listing in page_obj %}
+    <div class="listing-card">
+      <!-- Image -->
+      {% with img=listing.primary_image %}
+      {% if img and img.image %}
+      <img src="{{ img.image.url }}" alt="{{ listing.title }}" class="listing-card-img">
+      {% elif listing.media_file %}
+      <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-card-img">
+      {% else %}
+      <div class="listing-card-img">🖼️</div>
+      {% endif %}
+      {% endwith %}
+
+      <div class="listing-card-body">
+        <!-- Verification badge -->
+        <div class="mb-2">
+          <span class="vbadge vbadge-{{ listing.verification_status }}">
+            {% if listing.verification_status == 'verified' %}✓{% elif listing.verification_status == 'pending' %}⏳{% elif listing.verification_status == 'rejected' %}✗{% else %}⬇{% endif %}
+            {{ listing.get_verification_status_display }}
+          </span>
+          {% if not listing.is_visible_publicly %}
+          <span class="vbadge ms-1" style="background:#fee2e2;color:#991b1b;">Hidden</span>
+          {% endif %}
+        </div>
+
+        <h3 style="font-size:.95rem;font-weight:800;color:#0f172a;margin-bottom:.25rem;line-height:1.3;">
+          {{ listing.title }}
+        </h3>
+        <p style="font-size:.8rem;color:#64748b;margin-bottom:.5rem;">
+          <strong>{{ listing.business.name }}</strong> &middot; {{ listing.vertical|default:"General" }}
+        </p>
+        {% if listing.price %}
+        <p style="font-size:.85rem;font-weight:700;color:#059669;margin-bottom:.5rem;">
+          {{ listing.price|floatformat:0 }} MWK
+        </p>
+        {% endif %}
+        {% if listing.description %}
+        <p style="font-size:.78rem;color:#94a3b8;line-height:1.4;margin:0;">
+          {{ listing.description|truncatechars:100 }}
+        </p>
+        {% endif %}
+        {% if listing.rejection_reason %}
+        <p style="font-size:.78rem;color:#dc2626;margin-top:.5rem;">
+          <strong>Rejection:</strong> {{ listing.rejection_reason|truncatechars:80 }}
+        </p>
+        {% endif %}
+        {% if listing.takedown_reason %}
+        <p style="font-size:.78rem;color:#9d174d;margin-top:.5rem;">
+          <strong>Takedown:</strong> {{ listing.takedown_reason|truncatechars:80 }}
+        </p>
+        {% endif %}
+        {% if listing.verified_by %}
+        <p style="font-size:.72rem;color:#94a3b8;margin-top:.5rem;">
+          By {{ listing.verified_by.username }} &middot; {{ listing.verified_at|date:"d M Y" }}
+        </p>
+        {% endif %}
+      </div>
+
+      <div class="listing-card-footer">
+        <div class="d-flex flex-wrap gap-1">
+          {% if listing.verification_status != 'verified' %}
+          <form method="post" action="{% url 'hq:marketplace_listing_moderate' listing.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="verify">
+            <button type="submit" class="action-btn btn-verify">✓ Verify</button>
+          </form>
+          {% endif %}
+
+          {% if listing.verification_status not in 'rejected' %}
+          <button type="button" class="action-btn btn-reject"
+                  data-listing-id="{{ listing.pk }}"
+                  data-listing-title="{{ listing.title|escapejs }}"
+                  data-mod-action="reject"
+                  onclick="openModModal(this)">✗ Reject</button>
+          {% endif %}
+
+          {% if listing.verification_status != 'taken_down' %}
+          <button type="button" class="action-btn btn-takedown"
+                  data-listing-id="{{ listing.pk }}"
+                  data-listing-title="{{ listing.title|escapejs }}"
+                  data-mod-action="takedown"
+                  onclick="openModModal(this)">⬇ Takedown</button>
+          {% endif %}
+
+          {% if listing.verification_status in 'rejected,taken_down' or not listing.is_visible_publicly %}
+          <form method="post" action="{% url 'hq:marketplace_listing_moderate' listing.pk %}" style="display:inline;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="restore">
+            <button type="submit" class="action-btn btn-restore">↩ Restore</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="d-flex justify-content-center gap-2 flex-wrap">
+    {% if page_obj.has_previous %}
+    <a href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&q={{ search_q }}&vertical={{ vertical_filter }}"
+       class="btn btn-sm btn-outline-secondary">Previous</a>
+    {% endif %}
+    <span class="btn btn-sm btn-light disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&q={{ search_q }}&vertical={{ vertical_filter }}"
+       class="btn btn-sm btn-outline-secondary">Next</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div style="text-align:center;padding:3.5rem 1rem;color:#64748b;">
+    <div style="font-size:3rem;margin-bottom:.75rem;">📋</div>
+    <h4 style="font-weight:800;margin-bottom:.5rem;">No listings in this queue</h4>
+    <p style="font-size:.9rem;">
+      {% if status_filter == 'pending' %}All marketplace listings have been reviewed.
+      {% elif status_filter == 'verified' %}No verified listings yet.
+      {% elif status_filter == 'rejected' %}No rejected listings.
+      {% elif status_filter == 'taken_down' %}No taken-down listings.
+      {% else %}No listings found with the current filters.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Reason Modal -->
+<div class="mod-modal-overlay" id="modModalOverlay">
+  <div class="mod-modal">
+    <h3 id="modModalTitle">Provide a reason</h3>
+    <p id="modModalDesc">This will be visible to the merchant.</p>
+    <form id="modModalForm" method="post">
+      {% csrf_token %}
+      <input type="hidden" id="modAction" name="action" value="">
+      <textarea id="modReason" name="reason" placeholder="Enter reason…" required></textarea>
+      <div class="mod-modal-actions">
+        <button type="button" onclick="closeModModal()" class="btn btn-sm btn-outline-secondary">Cancel</button>
+        <button type="submit" class="btn btn-sm btn-danger" id="modSubmitBtn">Confirm</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModModal(btn) {
+  var listingId = btn.getAttribute('data-listing-id');
+  var title = btn.getAttribute('data-listing-title');
+  var action = btn.getAttribute('data-mod-action');
+
+  document.getElementById('modAction').value = action;
+  document.getElementById('modModalTitle').textContent = action === 'reject' ? 'Reject Listing' : 'Take Down Listing';
+  document.getElementById('modModalDesc').textContent = '"' + title + '" — reason will be shown to the merchant.';
+  document.getElementById('modModalForm').action = '/hq/marketplace/listings/' + listingId + '/moderate/';
+  document.getElementById('modReason').value = '';
+  document.getElementById('modModalOverlay').classList.add('open');
+}
+function closeModModal() {
+  document.getElementById('modModalOverlay').classList.remove('open');
+}
+document.getElementById('modModalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModModal();
+});
+</script>
+{% endblock %}

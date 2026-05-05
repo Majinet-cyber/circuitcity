@@ -17,6 +17,10 @@ try:
 
     urlpatterns = [
         path("", views.marketplace_home, name="home"),
+        path("stores/<slug:business_slug>/", views.storefront_public_page, name="storefront"),
+        path("checkout/webhook/", views.marketplace_checkout_webhook, name="checkout_webhook"),
+        path("checkout/return/<str:tx_ref>/", views.marketplace_checkout_return, name="checkout_return"),
+        path("<slug:business_slug>/<slug:listing_slug>/checkout/", views.marketplace_checkout_start, name="checkout"),
         path("<slug:business_slug>/", views.business_public_page, name="business"),
         path("<slug:business_slug>/<slug:listing_slug>/", views.listing_detail, name="listing"),
     ]
@@ -28,6 +32,10 @@ except ImportError:
 
     urlpatterns = [
         path("", _placeholder, name="home"),
+        path("stores/<slug:business_slug>/", _placeholder, name="storefront"),
+        path("checkout/webhook/", _placeholder, name="checkout_webhook"),
+        path("checkout/return/<str:tx_ref>/", _placeholder, name="checkout_return"),
+        path("<slug:business_slug>/<slug:listing_slug>/checkout/", _placeholder, name="checkout"),
         path("<slug:business_slug>/", _placeholder, name="business"),
         path("<slug:business_slug>/<slug:listing_slug>/", _placeholder, name="listing"),
     ]

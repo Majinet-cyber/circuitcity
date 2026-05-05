@@ -17,17 +17,26 @@ import tempfile
 from io import BytesIO
 from io import StringIO
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 from PIL import Image
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import OperationalError
 from django.test import override_settings
 from django.test import TestCase, Client
 from django.urls import reverse, resolve, NoReverseMatch
 
-from inventory.models_marketplace import MarketplaceListing, MarketplaceListingImage, ListingStatus
+from inventory.models_marketplace import (
+    MarketplaceListing,
+    MarketplaceListingImage,
+    MarketplaceOrder,
+    MarketplaceOrderStatus,
+    MarketplaceStorefrontProfile,
+    ListingStatus,
+)
 from inventory.services.marketplace_media import listing_media
 from inventory.services.welding_marketplace import create_welding_marketplace_listing
 from tenants.models import Business, Membership
@@ -42,6 +51,12 @@ def _make_biz(slug, kind="phones"):
 
 def _make_listing(biz, title, status):
     return MarketplaceListing.objects.create(business=biz, title=title, status=status)
+
+
+def _png_upload(name, color="blue"):
+    buf = BytesIO()
+    Image.new("RGB", (24, 24), color).save(buf, format="PNG")
+    return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
 
 
 # ---------------------------------------------------------------------------
@@ -937,6 +952,305 @@ class MarketplaceListingMediaRenderingTests(TestCase):
             content = response.content.decode("utf-8")
             self.assertIn("uploaded-primary", content)
             self.assertIn("<img", content)
+
+    def test_seller_can_update_storefront_and_public_page_shows_listing(self):
+        user = User.objects.create_user("storefront_manager", "storefront@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        logo = _png_upload("store-logo.png", "blue")
+        banner = _png_upload("store-banner.png", "green")
+        response = self.client.post(
+            reverse("inventory:marketplace_storefront_settings"),
+            {
+                "store_name": "Premium Storefront",
+                "description": "Trusted local seller.",
+                "phone": "0999000000",
+                "email": "store@example.com",
+                "whatsapp_number": "0999000000",
+                "address": "Lilongwe",
+                "currency": "MWK",
+                "categories": "phones, repairs",
+                "trust_badges": "Verified seller, Fast replies",
+                "facebook": "ctedge",
+                "instagram": "@ctedgeworks",
+                "website": "ctedge.example.com",
+                "logo": logo,
+                "banner_image": banner,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        profile = MarketplaceStorefrontProfile.objects.get(business=self.biz)
+        self.assertEqual(profile.store_name, "Premium Storefront")
+        self.assertEqual(profile.description, "Trusted local seller.")
+        self.assertEqual(profile.phone, "0999000000")
+        self.assertEqual(profile.whatsapp_number, "0999000000")
+        self.assertEqual(profile.address, "Lilongwe")
+        self.assertEqual(profile.currency, "MWK")
+        self.assertEqual(profile.social_links["facebook"], "ctedge")
+        self.assertEqual(profile.social_links["instagram"], "@ctedgeworks")
+        self.assertEqual(profile.social_links["website"], "ctedge.example.com")
+        self.assertEqual(profile.owner, user)
+        self.assertTrue(profile.logo.name)
+        self.assertTrue(profile.banner_image.name)
+        self.assertTrue(profile.logo.storage.exists(profile.logo.name))
+        self.assertTrue(profile.banner_image.storage.exists(profile.banner_image.name))
+        original_logo_name = profile.logo.name
+        original_banner_name = profile.banner_image.name
+
+        update = self.client.post(
+            reverse("inventory:marketplace_storefront_settings"),
+            {
+                "store_name": "Premium Storefront Updated",
+                "description": "Updated description.",
+                "phone": "0888000000",
+                "email": "updated@example.com",
+                "whatsapp_number": "0888000000",
+                "address": "Blantyre",
+                "categories": "phones",
+                "trust_badges": "Verified seller",
+                "facebook": "ctedge",
+                "instagram": "@ctedgeworks",
+                "website": "ctedge.example.com",
+            },
+        )
+        self.assertEqual(update.status_code, 302)
+        profile.refresh_from_db()
+        self.assertEqual(profile.store_name, "Premium Storefront Updated")
+        self.assertEqual(profile.logo.name, original_logo_name)
+        self.assertEqual(profile.banner_image.name, original_banner_name)
+
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Storefront Live Listing",
+            status=ListingStatus.LIVE,
+            price="5000",
+        )
+        public = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+        self.assertEqual(public.status_code, 200)
+        content = public.content.decode("utf-8")
+        self.assertIn("Premium Storefront Updated", content)
+        self.assertIn("Storefront Live Listing", content)
+        self.assertIn("store-logo", content)
+        self.assertIn("store-banner", content)
+        self.assertIn("MWK 5,000", content)
+        self.assertIn("https://facebook.com/ctedge", content)
+        self.assertIn("https://instagram.com/ctedgeworks", content)
+        self.assertIn("https://ctedge.example.com", content)
+        self.assertIn("https://wa.me/0888000000", content)
+        self.assertIn("Verified seller", content)
+
+        manage = self.client.get(reverse("inventory:manage_listings"))
+        self.assertEqual(manage.status_code, 200)
+        manage_html = manage.content.decode("utf-8")
+        self.assertIn("Premium Storefront Updated", manage_html)
+        self.assertIn("store-logo", manage_html)
+
+    def test_storefront_defaults_to_mwk_even_if_business_currency_is_different(self):
+        self.biz.currency = "GBP"
+        self.biz.save(update_fields=["currency"])
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Default MWK Listing",
+            status=ListingStatus.LIVE,
+            price="50000",
+        )
+
+        response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("MWK 50,000", content)
+        self.assertNotIn(">GBP<", content)
+
+    @override_settings(
+        PAYCHANGU_PUBLIC_KEY="pub",
+        PAYCHANGU_SECRET_KEY="sec",
+        PAYCHANGU_WEBHOOK_SECRET="whsec",
+        PAYCHANGU_API_BASE="https://api.paychangu.test",
+    )
+    @patch("inventory.services.marketplace_checkout.paychangu_service.create_checkout")
+    def test_checkout_creates_pending_order_and_calculates_fees(self, mock_checkout):
+        mock_checkout.return_value = {
+            "status": "success",
+            "checkout_url": "https://checkout.paychangu.test/pay/mkt",
+            "raw_response": {"ok": True},
+        }
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Checkout Product",
+            status=ListingStatus.LIVE,
+            price="10000",
+        )
+        response = self.client.post(
+            reverse("marketplace:checkout", args=[self.biz.slug, listing.listing_slug]),
+            {
+                "buyer_name": "Buyer One",
+                "buyer_phone": "0999000000",
+                "buyer_email": "buyer@example.com",
+                "quantity": "2",
+                "delivery_notes": "Area 25",
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("checkout.paychangu.test", response["Location"])
+        order = MarketplaceOrder.objects.get(listing=listing)
+        self.assertEqual(order.payment_status, MarketplaceOrderStatus.PENDING)
+        self.assertEqual(order.total_amount, 20000)
+        self.assertEqual(order.platform_commission_amount, 1000)
+        self.assertEqual(order.seller_net_earnings, 19000)
+
+    def test_mark_order_paid_creates_checkout_lead_and_freezes_earnings(self):
+        from inventory.services.marketplace_checkout import mark_order_paid_from_paychangu
+
+        listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Paid Checkout Product",
+            status=ListingStatus.LIVE,
+            price="20000",
+        )
+        order = MarketplaceOrder.objects.create(
+            listing=listing,
+            seller_business=self.biz,
+            buyer_name="Paid Buyer",
+            buyer_phone="0999000000",
+            quantity=1,
+            unit_price=listing.price,
+            total_amount=listing.price,
+            paychangu_reference="mkt-paid-test",
+        )
+        mark_order_paid_from_paychangu("mkt-paid-test", payload={"status": "successful"})
+        order.refresh_from_db()
+        self.assertEqual(order.payment_status, MarketplaceOrderStatus.PAID)
+        self.assertIsNotNone(order.paid_at)
+        self.assertEqual(order.platform_commission_amount, 1000)
+        self.assertEqual(order.seller_net_earnings, 19000)
+        self.assertTrue(listing.leads.filter(source_type="marketplace_checkout", status="won").exists())
+
+    def test_seller_orders_are_scoped_to_active_business(self):
+        user = User.objects.create_user("orders_manager", "orders@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        other_biz = Business.objects.create(name="Other Order Shop", slug="other-order-shop", business_kind="phones")
+        own_listing = MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Own Order Product",
+            status=ListingStatus.LIVE,
+            price="1000",
+        )
+        other_listing = MarketplaceListing.objects.create(
+            business=other_biz,
+            title="Hidden Order Product",
+            status=ListingStatus.LIVE,
+            price="2000",
+        )
+        MarketplaceOrder.objects.create(
+            listing=own_listing,
+            seller_business=self.biz,
+            buyer_name="Own Buyer",
+            buyer_phone="0999000000",
+            unit_price=own_listing.price,
+            total_amount=own_listing.price,
+            paychangu_reference="mkt-own-order",
+        )
+        MarketplaceOrder.objects.create(
+            listing=other_listing,
+            seller_business=other_biz,
+            buyer_name="Hidden Buyer",
+            buyer_phone="0999111111",
+            unit_price=other_listing.price,
+            total_amount=other_listing.price,
+            paychangu_reference="mkt-hidden-order",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        response = self.client.get(reverse("inventory:marketplace_orders"))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Own Order Product", content)
+        self.assertNotIn("Hidden Order Product", content)
+
+    def test_manage_listings_survives_missing_marketplace_order_table(self):
+        user = User.objects.create_user("gap_manager", "gap@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Visible During Migration Gap",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        with patch("inventory.views_marketplace.MarketplaceOrder.objects.filter", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("inventory:manage_listings"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Visible During Migration Gap", content)
+        self.assertIn("Total Orders", content)
+
+    def test_public_storefront_survives_missing_storefront_profile_table(self):
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Visible Without Store Profile",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+
+        with patch("inventory.views_marketplace.MarketplaceStorefrontProfile.objects.filter", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Visible Without Store Profile", content)
+        self.assertIn(self.biz.name, content)
+
+    def test_public_storefront_missing_logo_uses_fallback_not_broken_media(self):
+        MarketplaceStorefrontProfile.objects.create(
+            business=self.biz,
+            store_name="Fallback Store",
+            logo="marketplace/storefronts/missing-logo.png",
+            banner_image="marketplace/storefronts/missing-banner.png",
+        )
+        MarketplaceListing.objects.create(
+            business=self.biz,
+            title="Fallback Logo Listing",
+            status=ListingStatus.LIVE,
+            price="1500",
+        )
+
+        response = self.client.get(reverse("marketplace:storefront", args=[self.biz.slug]))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Fallback Store", content)
+        self.assertNotIn("missing-logo.png", content)
+        self.assertNotIn("missing-banner.png", content)
+        self.assertIn(self.biz.name[:2].upper(), content)
+
+    def test_storefront_settings_survives_missing_storefront_profile_table(self):
+        user = User.objects.create_user("store_gap_manager", "store-gap@example.com", "testpass123")
+        Membership.objects.create(user=user, business=self.biz, role="manager", status="ACTIVE")
+        self.client.force_login(user)
+        session = self.client.session
+        session["active_business_id"] = self.biz.id
+        session.save()
+
+        with patch("inventory.views_marketplace.MarketplaceStorefrontProfile.objects.get_or_create", side_effect=OperationalError("no such table")):
+            response = self.client.get(reverse("inventory:marketplace_storefront_settings"))
+
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode("utf-8")
+        self.assertIn("Storefront Settings", content)
+        self.assertIn("being prepared", content)
 
     def test_media_diagnostics_is_staff_only_and_reports_storage(self):
         listing = MarketplaceListing.objects.create(

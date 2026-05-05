@@ -130,6 +130,10 @@ if views_marketplace_leads is not None:
         path("marketplace/leads/<int:lead_id>/update/", views_marketplace_leads.marketplace_lead_update, name="marketplace_lead_update"),
         path("marketplace/leads/<int:lead_id>/mark-paid/", views_marketplace_leads.marketplace_lead_mark_paid, name="marketplace_lead_mark_paid"),
         path("marketplace/leads/<int:lead_id>/mark-waived/", views_marketplace_leads.marketplace_lead_mark_waived, name="marketplace_lead_mark_waived"),
+        path("marketplace/leads/<int:lead_id>/initiate-payment/", views_marketplace_leads.marketplace_lead_initiate_payment, name="marketplace_lead_initiate_payment"),
+        # Listing moderation
+        path("marketplace/listings/", views_marketplace_leads.marketplace_listings_moderation, name="marketplace_listings_moderation"),
+        path("marketplace/listings/<int:listing_id>/moderate/", views_marketplace_leads.marketplace_listing_moderate, name="marketplace_listing_moderate"),
     ])
 
 # =========================
@@ -224,6 +228,8 @@ if views_contracts is not None:
             # HQ Staff Tour Guide
             path("staff/tour-guide/", views_contracts.staff_tour_guide, name="staff_tour_guide"),
             path("staff/tour-guide.pdf", views_contracts.staff_tour_guide_pdf, name="staff_tour_guide_pdf"),
+            # Generate per-merchant contract PDF
+            path("contracts/<int:business_id>/generate-pdf/", views_contracts.generate_merchant_contract_pdf, name="generate_merchant_contract_pdf"),
         ]
     )
 

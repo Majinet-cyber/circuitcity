@@ -22,4 +22,7 @@ urlpatterns = [
     path("onboarding/manager/", views.onboarding_manager, name="onboarding_manager"),
     path("onboarding/hq/", views.onboarding_hq, name="onboarding_hq"),
     path("onboarding/hq/pdf/", views.hq_onboarding_pdf, name="hq_onboarding_pdf"),
+    # External credit scoring lander (consent-based, no data exposed)
+    path("credit-score/", views.credit_score_lander, name="credit_score_lander"),
+    path("credit-score/express-interest/", views.credit_score_interest, name="credit_score_interest"),
 ]

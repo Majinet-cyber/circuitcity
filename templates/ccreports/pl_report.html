@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}P&L Report — {{ business.name|default:"Business" }}{% endblock %}
+
+{% block content %}
+<style>
+  .rpt-page { max-width: 1080px; margin: 0 auto; padding: 0 1rem 4rem; }
+  .rpt-header { background: linear-gradient(135deg, #ecfdf5, #fff); border: 1px solid #bbf7d0; border-radius: 20px; padding: 1.75rem 2rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; box-shadow: 0 4px 20px rgba(5,150,105,.08); }
+  .rpt-header h1 { font-size: clamp(1.3rem, 3vw, 1.8rem); font-weight: 900; color: #0f172a; letter-spacing: -.02em; margin: 0; }
+  .rpt-header .meta { font-size: .85rem; color: #64748b; margin-top: .35rem; }
+  .rpt-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .kpi-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.25rem 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+  .kpi-card .kl { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; }
+  .kpi-card .kv { font-size: 1.5rem; font-weight: 900; color: #0f172a; margin-top: .2rem; }
+  .kpi-card.green .kv { color: #059669; }
+  .kpi-card.red .kv { color: #dc2626; }
+  .kpi-card.blue .kv { color: #0891b2; }
+
+  .section-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; margin-bottom: 1.5rem; box-shadow: 0 2px 16px rgba(0,0,0,.05); }
+  .section-head { background: #ecfdf5; border-bottom: 1px solid #bbf7d0; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+  .section-head h3 { font-size: .95rem; font-weight: 800; color: #047857; margin: 0; }
+  .section-body { padding: 1.25rem 1.5rem; }
+
+  .pl-row { display: flex; justify-content: space-between; align-items: center; padding: .7rem 0; border-bottom: 1px solid #f1f5f9; font-size: .95rem; }
+  .pl-row:last-child { border-bottom: none; }
+  .pl-row.total { font-weight: 900; font-size: 1.05rem; border-top: 2px solid #bbf7d0; padding-top: 1rem; margin-top: .5rem; border-bottom: none; }
+  .pl-row .amount { font-weight: 700; }
+  .pl-row .amount.positive { color: #059669; }
+  .pl-row .amount.negative { color: #dc2626; }
+
+  .trend-bar-wrap { display: flex; align-items: flex-end; gap: 4px; height: 80px; margin-top: 1rem; }
+  .trend-bar { flex: 1; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #10b981, #059669); min-width: 8px; position: relative; }
+  .trend-bar .tip { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: .65rem; font-weight: 800; color: #047857; white-space: nowrap; }
+
+  .product-row { display: flex; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid #f1f5f9; font-size: .88rem; }
+  .product-row:last-child { border-bottom: none; }
+
+  .date-filter { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.5rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem 1.25rem; }
+  .date-filter label { font-size: .8rem; font-weight: 700; color: #64748b; }
+
+  @media print {
+    .rpt-actions, .date-filter { display: none; }
+    .rpt-page { max-width: 100%; }
+  }
+</style>
+
+<div class="rpt-page">
+  <!-- Header -->
+  <div class="rpt-header">
+    <div>
+      <h1>📊 Profit & Loss Statement</h1>
+      <div class="meta">{{ business.name|default:"Business" }} · {{ start_date|date:"d M Y" }} — {{ end_date|date:"d M Y" }}</div>
+    </div>
+    <div class="rpt-actions">
+      <a href="{% url 'reports:pl_report_pdf' %}" class="btn btn-success rounded-pill btn-sm">
+        <i class="bi bi-download me-1"></i>Download PDF
+      </a>
+      <button class="btn btn-outline-secondary rounded-pill btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>Print
+      </button>
+      <a href="{% url 'reports:home' %}" class="btn btn-outline-secondary rounded-pill btn-sm">← Reports</a>
+    </div>
+  </div>
+
+  <!-- Date Filter -->
+  <form method="get" class="date-filter">
+    <label>From:</label>
+    <input type="date" name="start" class="form-control form-control-sm" style="width:160px" value="{{ start_date|date:'Y-m-d' }}">
+    <label>To:</label>
+    <input type="date" name="end" class="form-control form-control-sm" style="width:160px" value="{{ end_date|date:'Y-m-d' }}">
+    <button class="btn btn-success btn-sm rounded-pill">Apply</button>
+  </form>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card blue">
+      <div class="kl">Total Revenue</div>
+      <div class="kv">MWK {{ pl.revenue|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Cost of Goods (COGS)</div>
+      <div class="kv">MWK {{ pl.cogs|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kl">Gross Profit</div>
+      <div class="kv">MWK {{ pl.gross_profit|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Gross Margin</div>
+      <div class="kv">{{ gross_margin }}%</div>
+    </div>
+    <div class="kpi-card {% if pl.net_profit >= 0 %}green{% else %}red{% endif %}">
+      <div class="kl">Net Profit</div>
+      <div class="kv">MWK {{ pl.net_profit|floatformat:0 }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kl">Transactions</div>
+      <div class="kv">{{ pl.sales_count }}</div>
+    </div>
+  </div>
+
+  <!-- P&L Statement -->
+  <div class="section-card">
+    <div class="section-head">
+      <h3>Income Statement</h3>
+      <span class="text-muted small">{{ start_date|date:"d M Y" }} – {{ end_date|date:"d M Y" }}</span>
+    </div>
+    <div class="section-body">
+      <div class="pl-row">
+        <div>Revenue (Sales)</div>
+        <div class="amount positive">MWK {{ pl.revenue|floatformat:0 }}</div>
+      </div>
+      <div class="pl-row">
+        <div>(-) Cost of Goods Sold</div>
+        <div class="amount negative">(MWK {{ pl.cogs|floatformat:0 }})</div>
+      </div>
+      <div class="pl-row total">
+        <div>= Gross Profit</div>
+        <div class="amount {% if pl.gross_profit >= 0 %}positive{% else %}negative{% endif %}">MWK {{ pl.gross_profit|floatformat:0 }}</div>
+      </div>
+      <div class="pl-row" style="margin-top:.5rem;">
+        <div>(-) Operating Expenses</div>
+        <div class="amount negative">(MWK {{ pl.expenses|floatformat:0 }})</div>
+      </div>
+      <div class="pl-row total">
+        <div>= Net Profit</div>
+        <div class="amount {% if pl.net_profit >= 0 %}positive{% else %}negative{% endif %}">MWK {{ pl.net_profit|floatformat:0 }}</div>
+      </div>
+      <div class="pl-row" style="margin-top:.5rem;border-top:1px dashed #e2e8f0;padding-top:.7rem;">
+        <div class="text-muted small">Net Margin</div>
+        <div class="text-muted small fw-bold">{{ net_margin }}%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Products -->
+  {% if pl.top_products %}
+  <div class="section-card">
+    <div class="section-head">
+      <h3>Top Products by Revenue</h3>
+    </div>
+    <div class="section-body">
+      {% for product in pl.top_products %}
+      <div class="product-row">
+        <div>
+          <div class="fw-bold" style="font-size:.9rem;">{{ product.item__product__name|default:"Unknown" }}</div>
+          <div class="text-muted" style="font-size:.78rem;">{{ product.item__product__model_number|default:"" }}</div>
+        </div>
+        <div class="text-end">
+          <div class="fw-bold" style="color:#059669;">MWK {{ product.total|floatformat:0 }}</div>
+          <div class="text-muted small">{{ product.units }} units</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Monthly Trend -->
+  {% if pl.monthly_trend %}
+  <div class="section-card">
+    <div class="section-head"><h3>Monthly Revenue Trend</h3></div>
+    <div class="section-body">
+      {% with max_rev=pl.monthly_trend.0.revenue %}
+      <div class="trend-bar-wrap">
+        {% for m in pl.monthly_trend %}
+        {% if max_rev > 0 %}
+        <div class="trend-bar" style="height:{{ m.revenue|floatformat:0 }}px;max-height:80px;min-height:4px;" title="{{ m.month }}: MWK {{ m.revenue|floatformat:0 }}">
+          <span class="tip">{{ m.month|slice:":3" }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+      {% endwith %}
+      <div class="overflow-x-auto mt-3">
+        <table class="table table-sm table-hover" style="font-size:.85rem;">
+          <thead class="table-light"><tr><th>Month</th><th class="text-end">Revenue</th><th class="text-end">COGS</th><th class="text-end">Gross Profit</th><th class="text-end">Sales</th></tr></thead>
+          <tbody>
+            {% for m in pl.monthly_trend %}
+            <tr>
+              <td>{{ m.month }}</td>
+              <td class="text-end text-primary fw-bold">{{ m.revenue|floatformat:0 }}</td>
+              <td class="text-end text-muted">{{ m.cogs|floatformat:0 }}</td>
+              <td class="text-end {% if m.profit >= 0 %}text-success fw-bold{% else %}text-danger{% endif %}">{{ m.profit|floatformat:0 }}</td>
+              <td class="text-end text-muted">{{ m.count }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="text-muted text-center" style="font-size:.78rem;margin-top:2rem;">
+    Generated by Emajinet · {{ business.name|default:"" }} · {{ "now"|date:"d M Y H:i" }}
+  </div>
+</div>
+{% endblock %}

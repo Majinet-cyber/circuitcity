@@ -50,6 +50,7 @@ class MarketplaceLeadSource(models.TextChoices):
     PHONE_CLICK = "phone_click", "Phone Click"
     EMAIL_CLICK = "email_click", "Email Click"
     MARKETPLACE_FORM = "marketplace_form", "Marketplace Form"
+    MARKETPLACE_CHECKOUT = "marketplace_checkout", "Marketplace Checkout"
 
 
 class MarketplaceLeadStatus(models.TextChoices):
@@ -67,6 +68,13 @@ class MarketplaceCommissionStatus(models.TextChoices):
     DUE = "due", "Due"
     PAID = "paid", "Paid"
     WAIVED = "waived", "Waived"
+
+
+class ListingVerificationStatus(models.TextChoices):
+    PENDING = "pending", "Pending Review"
+    VERIFIED = "verified", "Verified"
+    REJECTED = "rejected", "Rejected"
+    TAKEN_DOWN = "taken_down", "Taken Down"
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +128,13 @@ def marketplace_media_upload_path(instance, filename):
         getattr(instance, "listing", None), "business_id", "0"
     )
     return f"marketplace/{business_id}/{now.year}/{now.month:02d}/{filename}"
+
+
+def marketplace_storefront_upload_path(instance, filename):
+    filename = os.path.basename(filename)
+    now = timezone.now()
+    business_id = getattr(instance, "business_id", None) or "0"
+    return f"marketplace/storefronts/{business_id}/{now.year}/{now.month:02d}/{filename}"
 
 
 def _unique_listing_slug(business, base: str, exclude_pk=None) -> str:
@@ -244,6 +259,46 @@ class MarketplaceListing(models.Model):
         null=True,
         blank=True,
         related_name="marketplace_listings_created",
+    )
+
+    # ── HQ Verification / Takedown ──────────────────────────────────────────
+    verification_status = models.CharField(
+        max_length=20,
+        choices=ListingVerificationStatus.choices,
+        default=ListingVerificationStatus.PENDING,
+        db_index=True,
+        help_text="HQ moderation status for this listing.",
+    )
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_listings_verified",
+        help_text="HQ staff who last moderated this listing.",
+    )
+    verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp of last HQ moderation action.",
+    )
+    rejection_reason = models.TextField(
+        blank=True,
+        default="",
+        help_text="Reason shown to merchant when listing is rejected.",
+    )
+    takedown_reason = models.TextField(
+        blank=True,
+        default="",
+        help_text="Internal reason for takedown (also shown to merchant).",
+    )
+    is_visible_publicly = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text=(
+            "Set to False by HQ to immediately hide listing from public marketplace "
+            "without changing the business-facing status."
+        ),
     )
 
     class Meta:
@@ -567,3 +622,253 @@ class MarketplaceLead(models.Model):
             self.commission_amount_overridden = False
             self.commission_status = MarketplaceCommissionStatus.NOT_APPLICABLE
         super().save(*args, **kwargs)
+
+
+class MarketplaceStorefrontProfile(models.Model):
+    """Public-facing marketplace storefront settings for a real seller business."""
+
+    CURRENCY_CHOICES = [
+        ("MWK", "MWK - Malawi Kwacha"),
+        ("USD", "USD - US Dollar"),
+        ("ZAR", "ZAR - South African Rand"),
+        ("GBP", "GBP - British Pound"),
+        ("EUR", "EUR - Euro"),
+        ("TZS", "TZS - Tanzanian Shilling"),
+        ("ZMW", "ZMW - Zambian Kwacha"),
+    ]
+
+    business = models.OneToOneField(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="marketplace_storefront",
+        db_index=True,
+    )
+    owner = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_storefronts_owned",
+    )
+    logo = models.ImageField(
+        upload_to=marketplace_storefront_upload_path,
+        null=True,
+        blank=True,
+        validators=[validate_marketplace_media_size],
+    )
+    banner_image = models.ImageField(
+        upload_to=marketplace_storefront_upload_path,
+        null=True,
+        blank=True,
+        validators=[validate_marketplace_media_size],
+    )
+    store_name = models.CharField(max_length=200, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    phone = models.CharField(max_length=40, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    whatsapp_number = models.CharField(max_length=40, blank=True, default="")
+    address = models.CharField(max_length=255, blank=True, default="")
+    currency = models.CharField(max_length=3, choices=CURRENCY_CHOICES, default="MWK")
+    opening_hours = models.CharField(max_length=255, blank=True, default="")
+    social_links = models.JSONField(default=dict, blank=True)
+    categories = models.CharField(max_length=255, blank=True, default="")
+    trust_badges = models.JSONField(default=list, blank=True)
+    verified_status = models.BooleanField(default=False, db_index=True)
+    featured_status = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_storefront_updates",
+    )
+
+    class Meta:
+        ordering = ["business__name"]
+
+    def __str__(self):
+        return self.display_name
+
+    @property
+    def display_name(self) -> str:
+        return self.store_name or self.business.name
+
+    @property
+    def display_phone(self) -> str:
+        return self.phone or getattr(self.business, "phone", "") or ""
+
+    @property
+    def display_email(self) -> str:
+        return self.email or getattr(self.business, "email", "") or ""
+
+    @property
+    def display_address(self) -> str:
+        return self.address or getattr(self.business, "address", "") or ""
+
+    @property
+    def display_currency(self) -> str:
+        return self.currency or "MWK"
+
+    @property
+    def company_description(self) -> str:
+        return self.description
+
+    @property
+    def phone_number(self) -> str:
+        return self.phone
+
+    @property
+    def physical_address(self) -> str:
+        return self.address
+
+    @property
+    def category_list(self) -> list[str]:
+        return [part.strip() for part in (self.categories or "").split(",") if part.strip()]
+
+    @property
+    def badge_list(self) -> list[str]:
+        if isinstance(self.trust_badges, list):
+            return [str(b).strip() for b in self.trust_badges if str(b).strip()]
+        return []
+
+
+class MarketplaceOrderStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PAID = "paid", "Paid"
+    FAILED = "failed", "Failed"
+    CANCELLED = "cancelled", "Cancelled"
+    REFUNDED = "refunded", "Refunded"
+
+
+class MarketplaceOrder(models.Model):
+    """Marketplace checkout order backed by PayChangu payment confirmation."""
+
+    listing = models.ForeignKey(
+        MarketplaceListing,
+        on_delete=models.PROTECT,
+        related_name="orders",
+        db_index=True,
+    )
+    seller_business = models.ForeignKey(
+        Business,
+        on_delete=models.PROTECT,
+        related_name="marketplace_orders",
+        db_index=True,
+    )
+    lead = models.ForeignKey(
+        MarketplaceLead,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_orders",
+    )
+    buyer_name = models.CharField(max_length=200)
+    buyer_phone = models.CharField(max_length=40)
+    buyer_email = models.EmailField(blank=True, default="")
+    delivery_notes = models.TextField(blank=True, default="")
+    quantity = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    unit_price = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))])
+    total_amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))])
+    platform_commission_percentage = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal("5.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    platform_commission_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    seller_gross_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    seller_net_earnings = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    payment_status = models.CharField(
+        max_length=20,
+        choices=MarketplaceOrderStatus.choices,
+        default=MarketplaceOrderStatus.PENDING,
+        db_index=True,
+    )
+    paychangu_reference = models.CharField(max_length=128, blank=True, default="", unique=True, db_index=True)
+    paychangu_transaction_id = models.CharField(max_length=128, blank=True, default="", db_index=True)
+    checkout_url = models.URLField(max_length=512, blank=True, default="")
+    raw_payment_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    paid_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marketplace_orders_reviewed",
+    )
+    admin_notes = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["seller_business", "payment_status"]),
+            models.Index(fields=["listing", "payment_status"]),
+            models.Index(fields=["payment_status", "-created_at"]),
+            models.Index(fields=["paychangu_reference"]),
+        ]
+
+    def __str__(self):
+        return f"Order #{self.pk} - {self.listing.title}"
+
+    def calculate_amounts(self) -> None:
+        self.total_amount = (Decimal(self.quantity) * Decimal(self.unit_price)).quantize(Decimal("0.01"))
+        self.seller_gross_amount = self.total_amount
+        self.platform_commission_amount = (
+            self.total_amount * Decimal(self.platform_commission_percentage) / Decimal("100")
+        ).quantize(Decimal("0.01"))
+        self.seller_net_earnings = (self.total_amount - self.platform_commission_amount).quantize(Decimal("0.01"))
+
+    def save(self, *args, **kwargs):
+        self.calculate_amounts()
+        if self.payment_status == MarketplaceOrderStatus.PAID and not self.paid_at:
+            self.paid_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    def mark_paid(self, payload=None, transaction_id: str = ""):
+        if self.payment_status == MarketplaceOrderStatus.PAID:
+            return
+        self.payment_status = MarketplaceOrderStatus.PAID
+        self.paid_at = timezone.now()
+        if payload is not None:
+            self.raw_payment_payload = payload
+        if transaction_id:
+            self.paychangu_transaction_id = transaction_id
+        self.save(update_fields=[
+            "payment_status",
+            "paid_at",
+            "raw_payment_payload",
+            "paychangu_transaction_id",
+            "platform_commission_amount",
+            "seller_gross_amount",
+            "seller_net_earnings",
+            "total_amount",
+            "updated_at",
+        ])
+
+    def mark_failed(self, payload=None):
+        if self.payment_status == MarketplaceOrderStatus.PAID:
+            return
+        self.payment_status = MarketplaceOrderStatus.FAILED
+        if payload is not None:
+            self.raw_payment_payload = payload
+        self.save(update_fields=["payment_status", "raw_payment_payload", "updated_at"])

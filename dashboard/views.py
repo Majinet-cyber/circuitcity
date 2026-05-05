@@ -878,8 +878,16 @@ def home(request):
             costs_commissions_panel = get_month_to_date_costs_commissions(biz)
             ctx['costs_commissions_panel'] = costs_commissions_panel
         except Exception:
-            # Gracefully degrade if helper not available
             pass
+
+    # ===== BUSINESS HEALTH SCORE (manager view, lightweight card) =====
+    if is_manager:
+        try:
+            from dashboard.services_health import calculate_business_health_score
+            health_score = calculate_business_health_score(biz)
+            ctx['health_score'] = health_score
+        except Exception:
+            ctx['health_score'] = None
 
     ctx.setdefault("latest_notifications", [])
     
@@ -1750,6 +1758,114 @@ def dashboard_healthz_proxy(request):
 
 
 # ---------------------------------------------------------------------------
+# Business Health Score — dashboard card view + full breakdown + API
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@never_cache
+def business_health_view(request):
+    """
+    Full Business Health Score breakdown page.
+    URL: /dashboard/business-health/
+    Scoped to request.business — no cross-tenant leakage.
+    """
+    from dashboard.services_health import calculate_business_health_score
+
+    business = request.business
+    health = calculate_business_health_score(business)
+
+    return render(request, "dashboard/business_health.html", {
+        "business": business,
+        "health": health,
+    })
+
+
+@login_required
+@require_business
+@require_GET
+def business_health_api(request):
+    """
+    JSON endpoint for Business Health Score.
+    GET /dashboard/api/business-health/
+    Returns the same structure as calculate_business_health_score, serialised.
+    Scoped to request.business.
+    """
+    from dashboard.services_health import calculate_business_health_score
+    from datetime import date as _date
+
+    business = request.business
+    health = calculate_business_health_score(business)
+
+    # Serialise dates for JSON
+    period = health.get("period", {})
+    health_json = {
+        **health,
+        "period": {
+            "start": period["start"].isoformat() if isinstance(period.get("start"), _date) else None,
+            "end": period["end"].isoformat() if isinstance(period.get("end"), _date) else None,
+        },
+    }
+
+    return JsonResponse(health_json)
+
+
+# ---------------------------------------------------------------------------
+# Credit Score Views
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def credit_scores_list(request):
+    """
+    Lists all customers with layby history and their credit score summaries.
+    GET /dashboard/credit-scores/
+    """
+    from dashboard.services_credit import get_all_customers_credit_summary
+    business = request.business
+    customers = get_all_customers_credit_summary(business)
+    return render(request, "dashboard/credit_scores.html", {
+        "business": business,
+        "customers": customers,
+        "total": len(customers),
+    })
+
+
+@login_required
+@require_business
+def credit_score_detail(request, customer_phone: str):
+    """
+    Full credit score breakdown for a single customer.
+    GET /dashboard/credit-score/<customer_phone>/
+    """
+    from dashboard.services_credit import calculate_customer_credit_score
+    business = request.business
+    customer_name = request.GET.get("name", "")
+    score = calculate_customer_credit_score(business, customer_phone, customer_name=customer_name or None)
+    return render(request, "dashboard/credit_score_detail.html", {
+        "business": business,
+        "score": score,
+        "customer_phone": customer_phone,
+        "customer_name": score.get("data_summary", {}).get("customer_name", customer_name),
+    })
+
+
+@login_required
+@require_business
+@require_GET
+def credit_score_api(request, customer_phone: str):
+    """
+    JSON endpoint for customer credit score.
+    GET /dashboard/api/credit-score/<customer_phone>/
+    """
+    from dashboard.services_credit import calculate_customer_credit_score
+    business = request.business
+    customer_name = request.GET.get("name", "")
+    score = calculate_customer_credit_score(business, customer_phone, customer_name=customer_name or None)
+    return JsonResponse(score)
+
+
+# ---------------------------------------------------------------------------
 # Business OS Dashboard — Cross-Vertical Intelligence Layer (Phase 2)
 # ---------------------------------------------------------------------------
 
@@ -1773,3 +1889,171 @@ def business_os_dashboard(request):
         **metrics,
     }
     return render(request, "dashboard/business_os.html", ctx)
+
+
+# ---------------------------------------------------------------------------
+# Recurring Costs — cross-vertical cost management
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+def recurring_costs_list(request):
+    """Show and manage recurring costs for the active business."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.db.models import Sum
+
+    business = request.business
+    costs = RecurringCost.objects.filter(business=business)
+    active = costs.filter(is_active=True)
+    monthly_total = 0.0
+
+    for c in active:
+        amt = float(c.amount)
+        if c.frequency == "monthly":
+            monthly_total += amt
+        elif c.frequency == "weekly":
+            monthly_total += amt * 4.33
+        elif c.frequency == "quarterly":
+            monthly_total += amt / 3
+        elif c.frequency == "annually":
+            monthly_total += amt / 12
+
+    by_category = {}
+    for c in active:
+        by_category[c.category] = by_category.get(c.category, 0) + float(c.amount)
+
+    return render(request, "dashboard/recurring_costs.html", {
+        "business": business,
+        "costs": costs,
+        "active_count": active.count(),
+        "monthly_total": monthly_total,
+        "by_category": by_category,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_add(request):
+    """Add a new recurring cost."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.utils import timezone as _tz
+    import calendar
+
+    business = request.business
+    if request.method == "POST":
+        name = request.POST.get("name", "").strip()
+        category = request.POST.get("category", "other")
+        amount = request.POST.get("amount", "0")
+        frequency = request.POST.get("frequency", "monthly")
+        notes = request.POST.get("notes", "").strip()
+
+        try:
+            from decimal import Decimal
+            amt = Decimal(amount)
+            if not name or amt <= 0:
+                raise ValueError("Name and amount required")
+
+            today = _tz.localdate()
+            year, month = today.year, today.month
+            if month == 12:
+                year, month = year + 1, 1
+            else:
+                month += 1
+            next_run = today.replace(day=1) if today.day > 1 else today
+            next_run = next_run.replace(year=year, month=month, day=1)
+
+            RecurringCost.objects.create(
+                business=business,
+                name=name,
+                category=category,
+                amount=amt,
+                frequency=frequency,
+                notes=notes,
+                is_active=True,
+                next_run_date=next_run,
+                created_by=request.user,
+            )
+            from django.contrib import messages
+            messages.success(request, f"'{name}' added as a recurring cost.")
+            return redirect("dashboard:recurring_costs")
+        except Exception as exc:
+            from django.contrib import messages
+            messages.error(request, f"Could not add cost: {exc}")
+
+    return render(request, "dashboard/recurring_cost_form.html", {
+        "business": business,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+        "editing": False,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_edit(request, pk: int):
+    """Edit an existing recurring cost."""
+    from inventory.models import RecurringCost, RecurringCostCategory, RecurringCostFrequency
+    from django.shortcuts import get_object_or_404
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+
+    if request.method == "POST":
+        try:
+            from decimal import Decimal
+            cost.name = request.POST.get("name", cost.name).strip()
+            cost.category = request.POST.get("category", cost.category)
+            cost.amount = Decimal(request.POST.get("amount", str(cost.amount)))
+            cost.frequency = request.POST.get("frequency", cost.frequency)
+            cost.notes = request.POST.get("notes", cost.notes).strip()
+            cost.save()
+            from django.contrib import messages
+            messages.success(request, f"'{cost.name}' updated.")
+            return redirect("dashboard:recurring_costs")
+        except Exception as exc:
+            from django.contrib import messages
+            messages.error(request, f"Could not update cost: {exc}")
+
+    return render(request, "dashboard/recurring_cost_form.html", {
+        "business": business,
+        "cost": cost,
+        "categories": RecurringCostCategory.choices,
+        "frequencies": RecurringCostFrequency.choices,
+        "editing": True,
+    })
+
+
+@login_required
+@require_business
+def recurring_cost_toggle(request, pk: int):
+    """Toggle active/paused state of a recurring cost."""
+    from inventory.models import RecurringCost
+    from django.shortcuts import get_object_or_404
+    from django.views.decorators.http import require_POST as _require_POST
+    from django.contrib import messages
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+    cost.is_active = not cost.is_active
+    cost.save(update_fields=["is_active"])
+    state = "resumed" if cost.is_active else "paused"
+    messages.success(request, f"'{cost.name}' {state}.")
+    return redirect("dashboard:recurring_costs")
+
+
+@login_required
+@require_business
+def recurring_cost_delete(request, pk: int):
+    """Delete a recurring cost."""
+    from inventory.models import RecurringCost
+    from django.shortcuts import get_object_or_404
+    from django.contrib import messages
+
+    business = request.business
+    cost = get_object_or_404(RecurringCost, pk=pk, business=business)
+    name = cost.name
+    cost.delete()
+    messages.success(request, f"'{name}' deleted.")
+    return redirect("dashboard:recurring_costs")

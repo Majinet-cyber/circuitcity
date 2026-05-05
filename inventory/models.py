@@ -1917,6 +1917,9 @@ try:
         MarketplaceListingImage,
         MarketplaceEnquiry,
         MarketplaceLead,
+        MarketplaceOrder,
+        MarketplaceOrderStatus,
+        MarketplaceStorefrontProfile,
         ListingStatus,
         MarketplaceLeadSource,
         MarketplaceLeadStatus,
@@ -1994,3 +1997,122 @@ try:
     )
 except ImportError:
     pass
+
+
+# ---------------------------------------------------------------------------
+# Recurring Costs (cross-vertical)
+# ---------------------------------------------------------------------------
+
+class RecurringCostCategory(models.TextChoices):
+    RENT = "rent", "Rent"
+    SALARIES = "salaries", "Salaries"
+    UTILITIES = "utilities", "Utilities"
+    TRANSPORT = "transport", "Transport"
+    INTERNET = "internet", "Internet & Communications"
+    MAINTENANCE = "maintenance", "Maintenance & Repairs"
+    LOAN_REPAYMENT = "loan_repayment", "Loan Repayments"
+    SUBSCRIPTION = "subscription", "Subscriptions"
+    FUEL = "fuel", "Fuel"
+    INSURANCE = "insurance", "Insurance"
+    OTHER = "other", "Other"
+
+
+class RecurringCostFrequency(models.TextChoices):
+    WEEKLY = "weekly", "Weekly"
+    MONTHLY = "monthly", "Monthly"
+    QUARTERLY = "quarterly", "Quarterly"
+    ANNUALLY = "annually", "Annually"
+
+
+class RecurringCost(models.Model):
+    """
+    A recurring operating expense for a business.
+
+    Auto-posts to the business cost log at the start of each cycle.
+    Business owners can pause, edit, or delete recurring costs.
+    """
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="recurring_costs",
+        db_index=True,
+    )
+    name = models.CharField(
+        max_length=200,
+        help_text="Short name for this cost (e.g. 'Office Rent', 'ESCOM Bill')",
+    )
+    category = models.CharField(
+        max_length=30,
+        choices=RecurringCostCategory.choices,
+        default=RecurringCostCategory.OTHER,
+        db_index=True,
+    )
+    amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+        help_text="Amount per cycle (in business currency)",
+    )
+    frequency = models.CharField(
+        max_length=20,
+        choices=RecurringCostFrequency.choices,
+        default=RecurringCostFrequency.MONTHLY,
+        db_index=True,
+    )
+    notes = models.TextField(blank=True, default="")
+    is_active = models.BooleanField(
+        default=True,
+        db_index=True,
+        help_text="Paused recurring costs are not auto-posted.",
+    )
+    next_run_date = models.DateField(
+        null=True, blank=True,
+        db_index=True,
+        help_text="Date this cost will next be auto-posted.",
+    )
+    last_posted_date = models.DateField(
+        null=True, blank=True,
+        help_text="Date this cost was last auto-posted.",
+    )
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="recurring_costs_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category", "name"]
+        indexes = [
+            models.Index(fields=["business", "is_active"]),
+            models.Index(fields=["business", "next_run_date"]),
+        ]
+        verbose_name = "Recurring Cost"
+        verbose_name_plural = "Recurring Costs"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_frequency_display()}) — {self.business.name}"
+
+    def compute_next_run_date(self) -> "date":
+        """Compute next run date from today or last_posted_date based on frequency."""
+        from datetime import date, timedelta
+        import calendar
+
+        base = self.last_posted_date or date.today()
+
+        if self.frequency == RecurringCostFrequency.WEEKLY:
+            return base + timedelta(weeks=1)
+        elif self.frequency == RecurringCostFrequency.MONTHLY:
+            year, month = base.year, base.month
+            if month == 12:
+                year, month = year + 1, 1
+            else:
+                month += 1
+            day = min(base.day, calendar.monthrange(year, month)[1])
+            return date(year, month, day)
+        elif self.frequency == RecurringCostFrequency.QUARTERLY:
+            return base + timedelta(days=91)
+        else:
+            return date(base.year + 1, base.month, base.day)

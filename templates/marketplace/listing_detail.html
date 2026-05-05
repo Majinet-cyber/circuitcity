@@ -9,18 +9,21 @@
 {% load marketplace_media %}
 <style>
   :root {
-    --primary: #4f46e5;
-    --primary-dark: #4338ca;
+    --primary: #059669;
+    --primary-dark: #047857;
+    --primary-light: #ecfdf5;
+    --primary-glow: rgba(5,150,105,.15);
     --secondary: #10b981;
-    --text-primary: #1f2937;
-    --text-secondary: #6b7280;
-    --bg-light: #f9fafb;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --bg-light: #f8fafc;
     --white: #ffffff;
-    --border: #e5e7eb;
-    --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.13);
-    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
-    --radius-card: 20px;
+    --border: #e2e8f0;
+    --shadow: 0 4px 20px rgba(0,0,0,.07), 0 1px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 16px 48px rgba(0,0,0,.12), 0 4px 12px rgba(0,0,0,.06);
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.05);
+    --shadow-brand: 0 8px 32px rgba(5,150,105,.2);
+    --radius-card: 18px;
     --radius-btn: 100px;
   }
 
@@ -713,6 +716,9 @@
 
         {% if listing.price %}
           <div class="price-display">{{ business.currency }} {{ listing.price|floatformat:0 }}</div>
+          <a href="{% url 'marketplace:checkout' business.slug listing.listing_slug %}" class="submit-btn" style="margin:.8rem 0 0;text-decoration:none;">
+            Buy Now / Checkout
+          </a>
         {% else %}
           <div class="price-note">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>

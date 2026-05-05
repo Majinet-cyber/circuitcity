@@ -644,3 +644,322 @@ def staff_tour_guide_pdf(request: HttpRequest) -> HttpResponse:
             status=500,
             content_type="text/plain",
         )
+
+
+# ============================================================================
+# Merchant Contract PDF Generator (per-business)
+# ============================================================================
+
+
+@login_required
+@hq_admin_required
+def generate_merchant_contract_pdf(request: HttpRequest, business_id: int) -> HttpResponse:
+    """
+    Generate a PDF merchant contract for a specific business.
+
+    The contract includes:
+    - Merchant / business name and owner
+    - Plan/package selected (from POST or default)
+    - Marketplace terms, payment terms, commission/fees
+    - Verification and suspension clauses
+    - Signature and date placeholders
+
+    POST params (optional): plan, commission_pct, notes
+    """
+    import logging
+    from django.utils import timezone as tz
+
+    logger = logging.getLogger(__name__)
+
+    if not REPORTLAB_AVAILABLE:
+        return HttpResponse(
+            "PDF generation requires reportlab. Please install it: pip install reportlab",
+            status=503, content_type="text/plain",
+        )
+
+    business = get_object_or_404(Business, id=business_id)
+
+    plan_name = request.POST.get("plan", request.GET.get("plan", "Pro Plan"))
+    commission_pct = request.POST.get("commission_pct", request.GET.get("commission_pct", "5"))
+    contract_notes = request.POST.get("notes", request.GET.get("notes", ""))
+
+    # Resolve owner name
+    owner_name = ""
+    try:
+        from tenants.models import Membership
+        owner_membership = (
+            Membership.objects.filter(business=business, role__in=["owner", "manager"])
+            .select_related("user").first()
+        )
+        if owner_membership:
+            u = owner_membership.user
+            owner_name = u.get_full_name() or u.username
+    except Exception:
+        pass
+    if not owner_name:
+        owner_name = "Business Owner"
+
+    today_str = tz.localdate().strftime("%d %B %Y")
+
+    try:
+        buffer = io.BytesIO()
+
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=60,
+            leftMargin=60,
+            topMargin=72,
+            bottomMargin=40,
+        )
+
+        styles = getSampleStyleSheet()
+        brand_blue = colors.HexColor("#2563eb")
+        brand_green = colors.HexColor("#059669")
+        dark = colors.HexColor("#0f172a")
+        muted = colors.HexColor("#64748b")
+
+        title_style = ParagraphStyle(
+            "ContractTitle",
+            parent=styles["Heading1"],
+            fontSize=22,
+            textColor=brand_blue,
+            spaceAfter=8,
+            alignment=TA_CENTER,
+            fontName="Helvetica-Bold",
+        )
+        sub_title_style = ParagraphStyle(
+            "ContractSub",
+            parent=styles["Normal"],
+            fontSize=11,
+            textColor=muted,
+            spaceAfter=20,
+            alignment=TA_CENTER,
+        )
+        section_style = ParagraphStyle(
+            "Section",
+            parent=styles["Heading2"],
+            fontSize=12,
+            textColor=brand_blue,
+            spaceAfter=6,
+            spaceBefore=14,
+            fontName="Helvetica-Bold",
+        )
+        body_style = ParagraphStyle(
+            "Body",
+            parent=styles["BodyText"],
+            fontSize=10,
+            leading=15,
+            spaceAfter=8,
+            textColor=dark,
+        )
+        clause_style = ParagraphStyle(
+            "Clause",
+            parent=body_style,
+            leftIndent=14,
+            spaceAfter=5,
+        )
+        sign_style = ParagraphStyle(
+            "Sign",
+            parent=body_style,
+            fontSize=10,
+            spaceAfter=40,
+        )
+
+        elements = []
+
+        # ── Header ──────────────────────────────────────────────────────────
+        elements.append(Paragraph("EMAJINET MARKETPLACE", title_style))
+        elements.append(Paragraph("Merchant Participation Agreement", sub_title_style))
+        elements.append(Spacer(1, 0.15 * inch))
+
+        # ── Party details ────────────────────────────────────────────────────
+        elements.append(Paragraph("1. Parties", section_style))
+        elements.append(Paragraph(
+            f"This Merchant Participation Agreement (<b>\"Agreement\"</b>) is entered into as of "
+            f"<b>{today_str}</b>, between:",
+            body_style,
+        ))
+        elements.append(Paragraph(
+            f"<b>Platform Provider:</b> Emajinet / Circuit City Ltd., a registered technology "
+            f"company providing business management and marketplace services (<b>\"Emajinet\"</b>).",
+            clause_style,
+        ))
+        elements.append(Paragraph(
+            f"<b>Merchant:</b> <b>{business.name}</b>, registered business operating on the "
+            f"Emajinet platform, represented by <b>{owner_name}</b> (<b>\"Merchant\"</b>).",
+            clause_style,
+        ))
+
+        # ── Plan / Package ───────────────────────────────────────────────────
+        elements.append(Paragraph("2. Subscription Plan", section_style))
+        elements.append(Paragraph(
+            f"The Merchant has enrolled on the <b>{plan_name}</b> subscription package. "
+            f"This plan governs the level of marketplace access, feature limits, and support "
+            f"tier available to the Merchant. Plan details and pricing are as outlined in the "
+            f"Emajinet pricing schedule at the time of agreement.",
+            body_style,
+        ))
+
+        # ── Marketplace Terms ────────────────────────────────────────────────
+        elements.append(Paragraph("3. Marketplace Terms", section_style))
+        marketplace_clauses = [
+            "The Merchant may list products and services on the Emajinet Marketplace subject to "
+            "these terms and the platform's listing guidelines.",
+            "All listings must be accurate, lawful, and represent goods or services the Merchant "
+            "is authorised to sell. Fraudulent or misleading listings are strictly prohibited.",
+            "Emajinet reserves the right to review, reject, or remove any listing that violates "
+            "platform policies or applicable laws.",
+            "The Merchant is solely responsible for fulfilling orders placed through the "
+            "Marketplace and for the quality of goods/services provided.",
+            "Verified listings will receive a Verified Seller badge after satisfactory HQ review.",
+        ]
+        for clause in marketplace_clauses:
+            elements.append(Paragraph(f"• {clause}", clause_style))
+
+        # ── Payment Terms ────────────────────────────────────────────────────
+        elements.append(Paragraph("4. Payment Terms", section_style))
+        elements.append(Paragraph(
+            f"Subscription fees are due on the billing date agreed at sign-up. "
+            f"Marketplace commission of <b>{commission_pct}%</b> of the transaction value applies "
+            f"to sales completed through the Emajinet Marketplace checkout. "
+            f"Commission is deducted before seller net earnings are recorded. "
+            f"Emajinet will not process payouts for transactions flagged as fraudulent.",
+            body_style,
+        ))
+
+        # ── Verification Terms ───────────────────────────────────────────────
+        elements.append(Paragraph("5. Merchant Verification", section_style))
+        elements.append(Paragraph(
+            "Emajinet may require the Merchant to provide business registration documents, "
+            "national identification, or other verification materials. "
+            "Unverified merchants may have limited listing visibility until verification is complete. "
+            "Emajinet may revoke verified status if fraudulent information is discovered.",
+            body_style,
+        ))
+
+        # ── Suspension / Takedown ────────────────────────────────────────────
+        elements.append(Paragraph("6. Suspension and Takedown", section_style))
+        elements.append(Paragraph(
+            "Emajinet may immediately suspend or terminate this Agreement and remove the Merchant's "
+            "listings and storefront from the public Marketplace if the Merchant:",
+            body_style,
+        ))
+        suspension_reasons = [
+            "Provides false, misleading, or fraudulent information;",
+            "Violates consumer protection laws or platform policies;",
+            "Fails to fulfil orders or engages in deceptive practices;",
+            "Fails to maintain subscription payments for more than 30 days after due date;",
+            "Engages in behaviour that damages the reputation or security of the platform.",
+        ]
+        for reason in suspension_reasons:
+            elements.append(Paragraph(f"• {reason}", clause_style))
+        elements.append(Paragraph(
+            "The Merchant may appeal a suspension by contacting HQ support within 14 days.",
+            body_style,
+        ))
+
+        # ── Confidentiality ──────────────────────────────────────────────────
+        elements.append(Paragraph("7. Confidentiality & Data", section_style))
+        elements.append(Paragraph(
+            "Both parties agree to maintain the confidentiality of non-public information shared "
+            "under this Agreement. Emajinet processes Merchant data in accordance with its "
+            "Privacy Policy. The Merchant must not misuse access to customer data obtained "
+            "through the platform.",
+            body_style,
+        ))
+
+        # ── General ──────────────────────────────────────────────────────────
+        elements.append(Paragraph("8. General Provisions", section_style))
+        elements.append(Paragraph(
+            "This Agreement is governed by the laws of the Republic of Malawi. "
+            "Disputes shall be resolved by mutual negotiation; failing which, by mediation "
+            "in accordance with applicable law. This Agreement constitutes the entire understanding "
+            "between the parties regarding marketplace participation.",
+            body_style,
+        ))
+
+        if contract_notes:
+            elements.append(Paragraph("9. Additional Notes", section_style))
+            elements.append(Paragraph(contract_notes, body_style))
+
+        # ── Signatures ───────────────────────────────────────────────────────
+        elements.append(Spacer(1, 0.4 * inch))
+        elements.append(Paragraph("Signatures", section_style))
+
+        elements.append(Paragraph(
+            f"By signing below, both parties agree to the terms of this Agreement.",
+            body_style,
+        ))
+        elements.append(Spacer(1, 0.25 * inch))
+
+        elements.append(Paragraph(
+            f"<b>For Emajinet / Circuit City Ltd.:</b><br/>"
+            f"Signature: ___________________________<br/>"
+            f"Name: ___________________________<br/>"
+            f"Title: ___________________________<br/>"
+            f"Date: ___________________________",
+            sign_style,
+        ))
+
+        elements.append(Paragraph(
+            f"<b>For Merchant ({business.name}):</b><br/>"
+            f"Signature: ___________________________<br/>"
+            f"Name: {owner_name}<br/>"
+            f"Title: ___________________________<br/>"
+            f"Date: ___________________________",
+            sign_style,
+        ))
+
+        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Paragraph(
+            f"<i>Generated by Emajinet HQ on {today_str}. "
+            f"This document is valid only when signed by both parties.</i>",
+            ParagraphStyle("Footer", parent=body_style, fontSize=8, textColor=muted, alignment=TA_CENTER),
+        ))
+
+        doc.build(elements)
+        pdf_data = buffer.getvalue()
+        buffer.close()
+
+        # Store record in MerchantContract
+        try:
+            import os
+            from django.core.files.base import ContentFile
+            slug = getattr(business, "slug", str(business.id))
+            filename = f"{slug}_contract_{tz.localdate().strftime('%Y%m%d')}.pdf"
+            contract = MerchantContract.objects.create(
+                business=business,
+                notes=f"Auto-generated contract. Plan: {plan_name}. Commission: {commission_pct}%.",
+                uploaded_by=request.user,
+            )
+            contract.file.save(filename, ContentFile(pdf_data), save=True)
+        except Exception as exc:
+            logger.warning("Could not store contract record for business %d: %s", business_id, exc)
+
+        # Audit log
+        try:
+            from audit.models import AuditLog
+            AuditLog.objects.create(
+                business=business,
+                user=request.user,
+                action="GENERATE_CONTRACT_PDF",
+                resource_type="MerchantContract",
+                resource_id=business_id,
+                details={"business_name": business.name, "plan": plan_name},
+            )
+        except Exception:
+            pass
+
+        response = HttpResponse(content_type="application/pdf")
+        safe_name = (getattr(business, "slug", None) or str(business.id)).replace(" ", "_")
+        response["Content-Disposition"] = f'attachment; filename="{safe_name}_emajinet_contract.pdf"'
+        response.write(pdf_data)
+        return response
+
+    except Exception as exc:
+        logger.exception("Error generating merchant contract PDF for business %d", business_id)
+        return HttpResponse(
+            f"Unable to generate contract PDF. Error: {exc}",
+            status=500, content_type="text/plain",
+        )

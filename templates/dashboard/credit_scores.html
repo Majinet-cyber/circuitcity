@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Credit Scores — {{ business.name }}{% endblock %}
+
+{% block content %}
+<style>
+  .cs-page { max-width: 1100px; margin: 0 auto; padding: 0 1rem 3rem; }
+  .cs-header { margin-bottom: 1.75rem; }
+  .cs-header h1 { font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 900; color: #0f172a; letter-spacing: -.02em; margin: 0; }
+  .cs-header p  { color: #64748b; margin: .35rem 0 0; }
+
+  .cs-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .cs-stat  { background: #fff; border: 1px solid #bbf7d0; border-radius: 16px; padding: 1rem 1.25rem; box-shadow: 0 4px 18px rgba(5,150,105,.07); }
+  .cs-stat .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; }
+  .cs-stat .value { font-size: 1.6rem; font-weight: 900; color: #0f172a; margin-top: .15rem; }
+
+  .cs-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+  .cs-table { width: 100%; border-collapse: collapse; }
+  .cs-table th, .cs-table td { padding: .85rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; font-size: .9rem; }
+  .cs-table th { background: #ecfdf5; color: #047857; text-transform: uppercase; font-size: .72rem; letter-spacing: .05em; font-weight: 800; }
+  .cs-table tbody tr:hover { background: #f8fafc; }
+  .cs-table tbody tr:last-child td { border-bottom: none; }
+
+  .score-pill { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; font-size: .95rem; font-weight: 900; flex-shrink: 0; }
+  .score-green  { background: #dcfce7; color: #166534; }
+  .score-amber  { background: #fef3c7; color: #92400e; }
+  .score-orange { background: #fed7aa; color: #9a3412; }
+  .score-red    { background: #fee2e2; color: #991b1b; }
+  .score-gray   { background: #f1f5f9; color: #64748b; }
+
+  .risk-badge { display: inline-flex; padding: .25rem .65rem; border-radius: 999px; font-size: .75rem; font-weight: 800; }
+  .risk-green  { background: #dcfce7; color: #166534; }
+  .risk-amber  { background: #fef3c7; color: #92400e; }
+  .risk-orange { background: #fed7aa; color: #9a3412; }
+  .risk-red    { background: #fee2e2; color: #991b1b; }
+  .risk-gray   { background: #f1f5f9; color: #64748b; }
+
+  .empty-state { text-align: center; padding: 3.5rem 1rem; color: #64748b; }
+  .empty-state .icon { font-size: 3rem; margin-bottom: .75rem; }
+  .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+</style>
+
+<div class="cs-page">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0" style="font-size:.85rem;">
+      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+      <li class="breadcrumb-item active">Credit Scores</li>
+    </ol>
+  </nav>
+
+  <div class="cs-header">
+    <h1><i class="bi bi-shield-check text-success me-2"></i>Customer Credit Scores</h1>
+    <p>Emajinet credit engine — evaluate layby repayment behaviour and lending risk for each customer.</p>
+  </div>
+
+  {% if customers %}
+    {% with low_risk=0 high_risk=0 %}
+    <div class="cs-stats">
+      <div class="cs-stat">
+        <div class="label">Total Customers</div>
+        <div class="value">{{ total }}</div>
+      </div>
+      <div class="cs-stat">
+        <div class="label">Low Risk (≥80)</div>
+        <div class="value" style="color:#059669">{{ customers|length }}</div>
+      </div>
+      <div class="cs-stat">
+        <div class="label">With Outstanding Debt</div>
+        <div class="value">{{ customers|length }}</div>
+      </div>
+    </div>
+    {% endwith %}
+
+    <div class="cs-card">
+      <div class="scroll-x">
+        <table class="cs-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Score</th>
+              <th>Customer</th>
+              <th>Phone</th>
+              <th>Risk Level</th>
+              <th>Orders</th>
+              <th>Outstanding (MWK)</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in customers %}
+            <tr>
+              <td class="text-muted small">{{ forloop.counter }}</td>
+              <td>
+                <div class="score-pill score-{{ c.color }}">
+                  {{ c.score|default:"?" }}
+                </div>
+              </td>
+              <td class="fw-bold">{{ c.name }}</td>
+              <td class="text-muted">{{ c.phone }}</td>
+              <td>
+                <span class="risk-badge risk-{{ c.color }}">{{ c.label }}</span>
+              </td>
+              <td>{{ c.orders }}</td>
+              <td class="{% if c.outstanding > 0 %}fw-bold text-danger{% endif %}">
+                {% if c.outstanding > 0 %}{{ c.outstanding|floatformat:0 }}{% else %}—{% endif %}
+              </td>
+              <td>
+                <a href="{% url 'dashboard:credit_score_detail' c.phone %}?name={{ c.name|urlencode }}" class="btn btn-sm btn-outline-success rounded-pill" style="font-size:.78rem;">
+                  View Report
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  {% else %}
+    <div class="cs-card">
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <h5 class="fw-bold">No Credit History Yet</h5>
+        <p>Once you create layby orders for customers, their credit scores will appear here.</p>
+        <a href="{% url 'layby:dashboard' %}" class="btn btn-success rounded-pill mt-2">Go to Layby Orders</a>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
