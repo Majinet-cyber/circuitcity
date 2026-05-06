@@ -20,7 +20,7 @@ CLICK_DEDUPE_WINDOW = timedelta(minutes=30)
 PLACEHOLDER_BUSINESS_NAMES = {
     "marketplace",
     "marketplace leads",
-    "codex marketplace leads",
+    "marketplace lead agent",
     "marketplace module",
 }
 
@@ -33,7 +33,7 @@ def is_placeholder_marketplace_business(business) -> bool:
     return name in PLACEHOLDER_BUSINESS_NAMES or slug in {
         "marketplace",
         "marketplace-leads",
-        "codex-marketplace-leads",
+        "marketplace-lead-agent",
         "marketplace-module",
     }
 

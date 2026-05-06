@@ -639,6 +639,65 @@ def _stock_report_data(business, start_date: date, end_date: date) -> Dict[str, 
         "90+ days": {"bucket": "90+ days", "count": 0, "value": Decimal("0")},
     }
 
+    for item in in_stock:
+        category = getattr(item.product, "brand", "") or "Unbranded"
+        row = category_map[category]
+        row["name"] = category
+        row["count"] += 1
+        row["value"] += item.order_price or Decimal("0")
+
+        age_days = (today - item.received_at).days if item.received_at else 0
+        if age_days <= 30:
+            bucket = age_buckets["0-30 days"]
+        elif age_days <= 60:
+            bucket = age_buckets["31-60 days"]
+        elif age_days <= 90:
+            bucket = age_buckets["61-90 days"]
+        else:
+            bucket = age_buckets["90+ days"]
+        bucket["count"] += 1
+        bucket["value"] += item.order_price or Decimal("0")
+
+    category_breakdown = sorted(category_map.values(), key=lambda r: r["value"], reverse=True)
+    movement_summary = {
+        "stock_in_count": len(received_period),
+        "stock_out_count": len(sold_period),
+        "stock_in_value": sum((item.order_price or Decimal("0")) for item in received_period),
+        "stock_out_value": sum((item.order_price or Decimal("0")) for item in sold_period),
+    }
+
+    return {
+        "summary": {
+            "total_stock_value": total_stock_value,
+            "retail_value": retail_value,
+            "stock_units": len(in_stock),
+            "low_stock_count": len(low_stock),
+            "stock_in_count": movement_summary["stock_in_count"],
+            "stock_out_count": movement_summary["stock_out_count"],
+        },
+        "low_stock": low_stock,
+        "fast_moving": fast_moving,
+        "slow_moving": slow_moving,
+        "movement_summary": movement_summary,
+        "category_breakdown": category_breakdown,
+        "ageing": list(age_buckets.values()),
+        "category_json": json.dumps(
+            [{"name": r["name"], "count": r["count"], "value": float(r["value"])} for r in category_breakdown[:8]],
+            cls=DjangoJSONEncoder,
+        ),
+        "movement_json": json.dumps(
+            [
+                {"name": "Stock In", "count": movement_summary["stock_in_count"], "value": float(movement_summary["stock_in_value"])},
+                {"name": "Stock Out", "count": movement_summary["stock_out_count"], "value": float(movement_summary["stock_out_value"])},
+            ],
+            cls=DjangoJSONEncoder,
+        ),
+        "ageing_json": json.dumps(
+            [{"bucket": r["bucket"], "count": r["count"], "value": float(r["value"])} for r in age_buckets.values()],
+            cls=DjangoJSONEncoder,
+        ),
+    }
+
 
 def _clothing_stock_report_data(business, start_date: date, end_date: date) -> Dict[str, Any]:
     from inventory.models import MerchProduct
@@ -777,64 +836,6 @@ def _clothing_stock_report_data(business, start_date: date, end_date: date) -> D
         ),
         "ageing_json": json.dumps(
             [{"bucket": r["bucket"], "count": r["count"], "value": float(r["value"])} for r in ageing],
-            cls=DjangoJSONEncoder,
-        ),
-    }
-    for item in in_stock:
-        category = getattr(item.product, "brand", "") or "Unbranded"
-        row = category_map[category]
-        row["name"] = category
-        row["count"] += 1
-        row["value"] += item.order_price or Decimal("0")
-
-        age_days = (today - item.received_at).days if item.received_at else 0
-        if age_days <= 30:
-            bucket = age_buckets["0-30 days"]
-        elif age_days <= 60:
-            bucket = age_buckets["31-60 days"]
-        elif age_days <= 90:
-            bucket = age_buckets["61-90 days"]
-        else:
-            bucket = age_buckets["90+ days"]
-        bucket["count"] += 1
-        bucket["value"] += item.order_price or Decimal("0")
-
-    category_breakdown = sorted(category_map.values(), key=lambda r: r["value"], reverse=True)
-    movement_summary = {
-        "stock_in_count": len(received_period),
-        "stock_out_count": len(sold_period),
-        "stock_in_value": sum((item.order_price or Decimal("0")) for item in received_period),
-        "stock_out_value": sum((item.order_price or Decimal("0")) for item in sold_period),
-    }
-
-    return {
-        "summary": {
-            "total_stock_value": total_stock_value,
-            "retail_value": retail_value,
-            "stock_units": len(in_stock),
-            "low_stock_count": len(low_stock),
-            "stock_in_count": movement_summary["stock_in_count"],
-            "stock_out_count": movement_summary["stock_out_count"],
-        },
-        "low_stock": low_stock,
-        "fast_moving": fast_moving,
-        "slow_moving": slow_moving,
-        "movement_summary": movement_summary,
-        "category_breakdown": category_breakdown,
-        "ageing": list(age_buckets.values()),
-        "category_json": json.dumps(
-            [{"name": r["name"], "count": r["count"], "value": float(r["value"])} for r in category_breakdown[:8]],
-            cls=DjangoJSONEncoder,
-        ),
-        "movement_json": json.dumps(
-            [
-                {"name": "Stock In", "count": movement_summary["stock_in_count"], "value": float(movement_summary["stock_in_value"])},
-                {"name": "Stock Out", "count": movement_summary["stock_out_count"], "value": float(movement_summary["stock_out_value"])},
-            ],
-            cls=DjangoJSONEncoder,
-        ),
-        "ageing_json": json.dumps(
-            [{"bucket": r["bucket"], "count": r["count"], "value": float(r["value"])} for r in age_buckets.values()],
             cls=DjangoJSONEncoder,
         ),
     }
@@ -1020,7 +1021,7 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
     """
     business = _require_report_access(request)
     start_date, end_date = _get_period_dates(request)
-    data = _stock_report_data(business, start_date, end_date)
+    data = _stock_report_data(business, start_date, end_date) or {}
     query = _period_query(request, start_date, end_date)
     context: Dict[str, Any] = {
         "title": "Stock Report",
@@ -1125,7 +1126,8 @@ def sales_report_pdf(request: HttpRequest) -> HttpResponse:
 def inventory_report_pdf(request: HttpRequest) -> HttpResponse:
     business = _require_report_access(request)
     start_date, end_date = _get_period_dates(request)
-    data = _stock_report_data(business, start_date, end_date)
+    data = _stock_report_data(business, start_date, end_date) or {}
+    data = apply_default_report_context(data)
     summary = data["summary"]
     rows = [["Low-stock product", "Qty", "Threshold", "Stock Value"]] + [
         [r["name"], r["qty"], r["threshold"], f"MWK {r['value']:,.0f}"]

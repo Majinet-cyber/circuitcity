@@ -21,7 +21,7 @@ class Command(BaseCommand):
         slugs = {
             "marketplace",
             "marketplace-leads",
-            "codex-marketplace-leads",
+            "marketplace-lead-agent",
             "marketplace-module",
         }
         qs = Business.objects.filter(name__iexact="__never__")

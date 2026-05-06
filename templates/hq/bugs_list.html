@@ -518,6 +518,23 @@
       </select>
     </div>
     <div class="bm-filter-group">
+      <label>Priority</label>
+      <select name="priority">
+        <option value="">All Priorities</option>
+        <option value="critical_high" {% if priority_filter == "critical_high" %}selected{% endif %}>Critical + High</option>
+        <option value="production_new" {% if priority_filter == "production_new" %}selected{% endif %}>Production + New</option>
+        <option value="new" {% if priority_filter == "new" %}selected{% endif %}>New Only</option>
+      </select>
+    </div>
+    <div class="bm-filter-group">
+      <label>Environment</label>
+      <select name="environment">
+        <option value="">All</option>
+        <option value="production" {% if environment_filter == "production" %}selected{% endif %}>Production</option>
+        <option value="development" {% if environment_filter == "development" %}selected{% endif %}>Development</option>
+      </select>
+    </div>
+    <div class="bm-filter-group">
       <label>Path contains</label>
       <input type="text" name="path" placeholder="/api/..." value="{{ path_filter }}">
     </div>
@@ -556,6 +573,7 @@
       <option value="mark_investigating">Mark Investigating</option>
       <option value="mark_cleared">Mark Cleared</option>
       <option value="mark_ignored">Ignore Selected</option>
+      <option value="mark_expected_404">Expected 404 / Noise</option>
       {% endif %}
     </select>
     <button type="submit" class="bm-bulk-apply"><i class="bi bi-check-all"></i> Apply</button>

@@ -609,7 +609,7 @@ def api_phone_cost_by_imei(request: HttpRequest) -> JsonResponse:
             "product_name": "Tecno Spark 20"
         }
     """
-    business = get_active_business(request)
+    business = _get_active_business(request)
     if not business:
         return JsonResponse({"ok": False, "error": "No active business"}, status=400)
 

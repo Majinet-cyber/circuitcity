@@ -97,7 +97,7 @@ class BarcodeRegistry(models.Model):
             models.UniqueConstraint(
                 fields=["business", "normalized_code"],
                 condition=models.Q(is_active=True),
-                name="unique_barcode_per_business",
+                name="unique_barcode_registry_per_business",
             )
         ]
 

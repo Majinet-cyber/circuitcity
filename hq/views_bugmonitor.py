@@ -17,6 +17,12 @@ from hq.permissions import hq_admin_required
 
 User = get_user_model()
 
+try:
+    from hq import views_contracts as _views_contracts  # noqa: F401
+    CONTRACTS_ENABLED = True
+except Exception:
+    CONTRACTS_ENABLED = False
+
 
 def _can_view_stack_traces(user) -> bool:
     return user.is_superuser or user.has_perm("hq.can_view_stack_traces")
@@ -44,6 +50,8 @@ def bugs_list(request):
     code_filter     = request.GET.get("status_code", "")
     path_filter     = request.GET.get("path", "")
     recurring_only  = request.GET.get("recurring", "")
+    priority_filter = request.GET.get("priority", "")
+    environment_filter = request.GET.get("environment", "")
     date_from       = request.GET.get("date_from", "")
     date_to         = request.GET.get("date_to", "")
 
@@ -64,6 +72,14 @@ def bugs_list(request):
         qs = qs.filter(path__icontains=path_filter)
     if recurring_only:
         qs = qs.filter(occurrence_count__gt=1)
+    if priority_filter == "critical_high":
+        qs = qs.filter(severity__in=[IssueSeverity.CRITICAL, IssueSeverity.HIGH])
+    elif priority_filter == "new":
+        qs = qs.filter(status=IssueStatus.NEW)
+    elif priority_filter == "production_new":
+        qs = qs.filter(environment__iexact="production", status=IssueStatus.NEW)
+    if environment_filter:
+        qs = qs.filter(environment__iexact=environment_filter)
     if date_from:
         try:
             from datetime import datetime
@@ -99,6 +115,8 @@ def bugs_list(request):
         "code_filter":     code_filter,
         "path_filter":     path_filter,
         "recurring_only":  recurring_only,
+        "priority_filter": priority_filter,
+        "environment_filter": environment_filter,
         "date_from":       date_from,
         "date_to":         date_to,
         # Cards
@@ -111,6 +129,7 @@ def bugs_list(request):
         # Permissions
         "can_manage_bugs": _can_manage_bugs(request.user),
         "can_assign_bugs": _can_assign_bugs(request.user),
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     return render(request, "hq/bugs_list.html", context)
 
@@ -147,6 +166,7 @@ def bug_detail(request, pk):
         "admin_users":   admin_users,
         "status_choices": IssueStatus.choices,
         "severity_choices": IssueSeverity.choices,
+        "contracts_enabled": CONTRACTS_ENABLED,
     }
     return render(request, "hq/bug_detail.html", context)
 
@@ -195,6 +215,23 @@ def bug_action(request, pk):
             target=issue, before={"status": old_status}, after={"status": IssueStatus.IGNORED}, request=request,
         )
         messages.success(request, "Issue ignored.")
+
+    elif action == "mark_expected_404":
+        old = {"status": issue.status, "severity": issue.severity, "notes": issue.notes}
+        issue.status = IssueStatus.IGNORED
+        issue.severity = IssueSeverity.LOW
+        note = "Marked as expected 404/noise."
+        issue.notes = (issue.notes + "\n\n" + note).strip() if issue.notes else note
+        issue.save(update_fields=["status", "severity", "notes", "updated_at"])
+        AdminAuditLog.record(
+            request.user,
+            "bug_expected_404",
+            target=issue,
+            before=old,
+            after={"status": issue.status, "severity": issue.severity, "notes": issue.notes},
+            request=request,
+        )
+        messages.success(request, "Issue marked as expected 404/noise.")
 
     elif action == "assign":
         if not _can_assign_bugs(request.user):
@@ -294,6 +331,17 @@ def bug_bulk_action(request):
     elif action == "mark_ignored":
         issues.update(status=IssueStatus.IGNORED)
         messages.success(request, f"Issues ignored.")
+
+    elif action == "mark_expected_404":
+        count = 0
+        for issue in issues:
+            issue.status = IssueStatus.IGNORED
+            issue.severity = IssueSeverity.LOW
+            note = "Marked as expected 404/noise."
+            issue.notes = (issue.notes + "\n\n" + note).strip() if issue.notes else note
+            issue.save(update_fields=["status", "severity", "notes", "updated_at"])
+            count += 1
+        messages.success(request, f"{count} issue{'' if count == 1 else 's'} marked as expected 404/noise.")
 
     elif action == "mark_investigating":
         issues.update(status=IssueStatus.INVESTIGATING)

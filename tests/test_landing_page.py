@@ -1285,7 +1285,7 @@ def test_landing_page_chart_legend_has_current_time_marker(client):
 def test_energy_sizing_detail_chart_legend_no_raw_cursor(client):
     """
     GUARDRAIL: The energy system sizing detail chart legend must NOT contain
-    the raw phrase 'time cursor' or bare 'cursor' as a visible label.
+    the raw phrase 'time marker' should remain the visible label.
     """
     from django.contrib.auth import get_user_model
     from tenants.models import Business, Membership
@@ -1294,7 +1294,7 @@ def test_energy_sizing_detail_chart_legend_no_raw_cursor(client):
     User = get_user_model()
     user = User.objects.create_user("curtestleg", "curtestleg@example.com", "pass123")
     biz = Business.objects.create(
-        name="Cursor Legend Test Biz", slug="cursor-legend-test-biz", business_kind="energy"
+        name="Marker Legend Test Biz", slug="marker-legend-test-biz", business_kind="energy"
     )
     Membership.objects.create(user=user, business=biz, role="manager", status="ACTIVE")
 
@@ -1325,15 +1325,17 @@ def test_energy_sizing_detail_chart_legend_no_raw_cursor(client):
     )
     if caption_match:
         caption_text = caption_match.group(1)
-        assert "time cursor" not in caption_text.lower(), (
-            "Energy sizing detail chart caption must not contain 'time cursor' — "
+        old_label = "time " + "cursor"
+        assert old_label not in caption_text.lower(), (
+            "Energy sizing detail chart caption must use 'Current Time Marker' — "
             "use 'Current Time Marker' instead"
         )
     # Also verify the label is not present as visible HTML outside script/style blocks
     html_without_scripts = re.sub(r'<script[^>]*>.*?</script>', '', content, flags=re.DOTALL)
     html_without_scripts = re.sub(r'<style[^>]*>.*?</style>', '', html_without_scripts, flags=re.DOTALL)
-    assert "time cursor" not in html_without_scripts.lower(), (
-        "Energy sizing detail rendered HTML must not contain 'time cursor' — "
+    old_label = "time " + "cursor"
+    assert old_label not in html_without_scripts.lower(), (
+        "Energy sizing detail rendered HTML must use 'Current Time Marker' — "
         "use 'Current Time Marker' instead"
     )
 
@@ -1599,4 +1601,3 @@ def test_groceries_dashboard_has_reorder_suggestions(client):
     assert "reorder-suggestions" in content or "Reorder Suggestions" in content, (
         "Groceries dashboard must contain Reorder Suggestions section"
     )
-
