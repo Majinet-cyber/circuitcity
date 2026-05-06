@@ -1,0 +1,98 @@
+{% extends "hq/base_hq.html" %}
+
+{% block title %}Business Credit Scores - HQ{% endblock %}
+{% block topbar_title %}Business Credit Scores{% endblock %}
+
+{% block content %}
+<style>
+  .bcs-page { max-width: 1180px; margin: 0 auto; }
+  .bcs-header { display:flex; justify-content:space-between; gap:1rem; align-items:flex-start; flex-wrap:wrap; margin-bottom:1rem; }
+  .bcs-title { margin:0; color:#0f172a; font-weight:900; letter-spacing:0; }
+  .bcs-sub { margin:.25rem 0 0; color:#64748b; max-width:720px; }
+  .bcs-search { display:flex; gap:.5rem; min-width:min(100%,360px); }
+  .bcs-search input { flex:1; border:1px solid #d1fae5; border-radius:999px; padding:.6rem .9rem; background:#fff; }
+  .bcs-card { background:rgba(255,255,255,.9); border:1px solid rgba(187,247,208,.9); border-radius:18px; box-shadow:0 16px 40px rgba(15,23,42,.08); overflow:hidden; }
+  .bcs-table-wrap { overflow-x:auto; }
+  .bcs-table { width:100%; min-width:900px; border-collapse:collapse; }
+  .bcs-table th, .bcs-table td { padding:.9rem 1rem; border-bottom:1px solid #ecfdf5; vertical-align:middle; font-size:.9rem; }
+  .bcs-table th { background:#f0fdf4; color:#047857; text-transform:uppercase; font-size:.72rem; letter-spacing:.04em; }
+  .bcs-table tr:last-child td { border-bottom:0; }
+  .risk-pill { display:inline-flex; align-items:center; border-radius:999px; padding:.24rem .65rem; font-weight:800; font-size:.78rem; }
+  .risk-green { color:#166534; background:#dcfce7; }
+  .risk-amber { color:#92400e; background:#fef3c7; }
+  .risk-orange { color:#9a3412; background:#fed7aa; }
+  .risk-red { color:#991b1b; background:#fee2e2; }
+  .risk-gray { color:#475569; background:#f1f5f9; }
+  .score { color:#0f172a; font-weight:900; font-size:1.05rem; }
+  .muted { color:#64748b; }
+</style>
+
+<div class="bcs-page">
+  <div class="bcs-header">
+    <div>
+      <h1 class="bcs-title">Business Credit Scores</h1>
+      <p class="bcs-sub">HQ view of business-level creditworthiness for lender, supplier, investor, and partner readiness. Scores are calculated per business and do not expose customer-level credit profiles.</p>
+    </div>
+    <form class="bcs-search" method="get">
+      <input type="search" name="q" value="{{ query }}" placeholder="Search businesses">
+      <button class="btn btn-success rounded-pill" type="submit">Search</button>
+    </form>
+  </div>
+
+  <div class="bcs-card">
+    <div class="bcs-table-wrap">
+      <table class="bcs-table">
+        <thead>
+          <tr>
+            <th>Business</th>
+            <th>Score</th>
+            <th>Risk</th>
+            <th>Avg Monthly Revenue</th>
+            <th>Monthly Obligations</th>
+            <th>Recommended Limit</th>
+            <th>Readiness</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td>
+              <div class="fw-bold text-dark">{{ row.business.name }}</div>
+              <div class="muted small">{{ row.business.slug|default:"" }}</div>
+            </td>
+            <td>
+              {% if row.score is not None %}
+              <span class="score">{{ row.score }}</span><span class="muted">/100</span>
+              {% else %}
+              <span class="muted">No score yet</span>
+              {% endif %}
+            </td>
+            <td><span class="risk-pill risk-{{ row.status_color|default:'gray' }}">{{ row.label }}</span></td>
+            <td>MWK {{ row.summary.avg_monthly_revenue|default:0|floatformat:0 }}</td>
+            <td>MWK {{ row.summary.monthly_recurring_obligations|default:0|floatformat:0 }}</td>
+            <td>
+              {% if row.limit_range.low %}
+              MWK {{ row.limit_range.low|floatformat:0 }} - {{ row.limit_range.high|floatformat:0 }}
+              {% else %}
+              <span class="muted">Build more history</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.is_onboarding %}
+              <span class="muted">Needs operating data</span>
+              {% else %}
+              Ready for consent-based lender review
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center muted py-5">No businesses found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

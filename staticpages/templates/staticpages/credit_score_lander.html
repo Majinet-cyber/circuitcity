@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Emajinet Credit Score — For Lenders &amp; Financial Partners</title>
-<meta name="description" content="Emajinet Credit Score evaluates SME repayment behavior for lenders and financial partners. Consent-based, data-private, Africa-focused.">
+<title>Emajinet Business Credit Score - For Lenders &amp; Financial Partners</title>
+<meta name="description" content="Emajinet Business Credit Score evaluates SME creditworthiness for lenders and financial partners. Consent-based, data-private, Africa-focused.">
 {% load static %}
 <link rel="icon" href="{% static 'favicon.ico' %}">
 <style>
@@ -16,29 +16,23 @@
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; color: var(--text); background:#fff; line-height:1.6; }
-
   .cs-nav { padding: 1.125rem 2rem; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; max-width:1200px; margin:0 auto; }
   .cs-nav-brand { font-weight:900; font-size:1.2rem; color:var(--brand); text-decoration:none; }
   .cs-nav-back { font-size:.875rem; color:var(--muted); text-decoration:none; }
-  .cs-nav-back:hover { color:var(--brand); }
-
   .cs-hero { text-align:center; padding:5rem 2rem 3.5rem; background:linear-gradient(180deg,#f8faff 0%,#fff 100%); border-bottom:1px solid var(--border); }
   .cs-hero-eyebrow { display:inline-flex; align-items:center; gap:.45rem; background:var(--brand-light); color:var(--brand); font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; padding:.3rem .85rem; border-radius:999px; margin-bottom:1.25rem; }
-  .cs-hero h1 { font-size:clamp(2rem,4vw,3rem); font-weight:900; color:var(--text); letter-spacing:-.03em; line-height:1.15; margin-bottom:1rem; }
-  .cs-hero p { font-size:1.05rem; color:var(--muted); max-width:560px; margin:0 auto 2rem; }
+  .cs-hero h1 { font-size:clamp(2rem,4vw,3rem); font-weight:900; color:var(--text); letter-spacing:0; line-height:1.15; margin-bottom:1rem; }
+  .cs-hero p { font-size:1.05rem; color:var(--muted); max-width:620px; margin:0 auto 2rem; }
   .cs-hero-pills { display:flex; flex-wrap:wrap; gap:.5rem; justify-content:center; margin-bottom:2.5rem; }
   .cs-hero-pill { display:inline-flex; align-items:center; gap:.3rem; background:#fff; border:1.5px solid var(--border); border-radius:999px; padding:.35rem .875rem; font-size:.8rem; font-weight:600; color:var(--muted); }
-
   .cs-section { max-width:1100px; margin:0 auto; padding:4rem 2rem; }
-  .cs-section-title { font-size:1.6rem; font-weight:900; color:var(--text); letter-spacing:-.02em; margin-bottom:.5rem; }
-  .cs-section-sub { font-size:.95rem; color:var(--muted); max-width:560px; margin-bottom:2.5rem; }
-
+  .cs-section-title { font-size:1.6rem; font-weight:900; color:var(--text); letter-spacing:0; margin-bottom:.5rem; }
+  .cs-section-sub { font-size:.95rem; color:var(--muted); max-width:660px; margin-bottom:2.5rem; }
   .cs-how-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1.25rem; }
   .cs-how-card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius); padding:1.5rem; box-shadow:var(--shadow); }
   .cs-how-num { font-size:2rem; font-weight:900; color:var(--brand); line-height:1; margin-bottom:.5rem; }
   .cs-how-title { font-size:.95rem; font-weight:800; color:var(--text); margin-bottom:.4rem; }
   .cs-how-desc { font-size:.85rem; color:var(--muted); line-height:1.5; }
-
   .cs-score-demo { background:linear-gradient(135deg,var(--green-light) 0%,#f0fdf4 100%); border:1.5px solid #bbf7d0; border-radius:20px; padding:2.5rem; margin:0 auto 2rem; max-width:900px; display:flex; flex-wrap:wrap; gap:2rem; align-items:center; }
   .cs-score-ring { position:relative; width:130px; height:130px; flex-shrink:0; }
   .cs-score-ring svg { display:block; }
@@ -49,37 +43,29 @@
   .cs-score-details h3 { font-size:1.2rem; font-weight:900; color:var(--text); margin-bottom:.25rem; }
   .cs-score-badge { display:inline-flex; padding:.3rem .85rem; background:var(--green-light); color:var(--green); border-radius:999px; font-size:.8rem; font-weight:800; margin-bottom:.75rem; }
   .cs-comp-row { display:flex; align-items:center; gap:.75rem; margin-bottom:.5rem; }
-  .cs-comp-label { font-size:.82rem; font-weight:600; color:var(--text); width:160px; flex-shrink:0; }
+  .cs-comp-label { font-size:.82rem; font-weight:600; color:var(--text); width:170px; flex-shrink:0; }
   .cs-comp-bar { flex:1; height:7px; background:#d1fae5; border-radius:99px; overflow:hidden; }
   .cs-comp-fill { height:100%; border-radius:99px; background:var(--green); }
   .cs-comp-score { font-size:.8rem; font-weight:800; color:var(--green); width:36px; text-align:right; }
-
   .cs-privacy-box { background:#eff6ff; border:1.5px solid #bfdbfe; border-radius:16px; padding:1.5rem 2rem; margin:2rem auto; max-width:800px; }
   .cs-privacy-box h3 { font-size:1rem; font-weight:800; color:var(--brand); margin-bottom:.5rem; }
   .cs-privacy-box ul { padding-left:1.25rem; font-size:.9rem; color:var(--muted); }
   .cs-privacy-box li { margin-bottom:.3rem; }
-
   .cs-form-card { background:#fff; border:1.5px solid var(--border); border-radius:20px; padding:2.25rem; box-shadow:var(--shadow); max-width:680px; margin:0 auto; }
   .cs-form-card h2 { font-size:1.4rem; font-weight:900; color:var(--text); margin-bottom:.5rem; }
   .cs-form-card p { font-size:.9rem; color:var(--muted); margin-bottom:1.5rem; }
   .cs-form-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
   .cs-form-group { display:flex; flex-direction:column; gap:.35rem; }
   .cs-form-group label { font-size:.82rem; font-weight:700; color:var(--text); }
-  .cs-form-group input,
-  .cs-form-group select,
-  .cs-form-group textarea { border:1.5px solid var(--border); border-radius:10px; padding:.65rem .875rem; font-size:.9rem; font-family:inherit; transition:border-color .15s; }
-  .cs-form-group input:focus,
-  .cs-form-group select:focus,
-  .cs-form-group textarea:focus { outline:none; border-color:var(--brand); }
+  .cs-form-group input, .cs-form-group textarea { border:1.5px solid var(--border); border-radius:10px; padding:.65rem .875rem; font-size:.9rem; font-family:inherit; }
+  .cs-form-group input:focus, .cs-form-group textarea:focus { outline:none; border-color:var(--brand); }
   .cs-form-consent { display:flex; gap:.6rem; align-items:flex-start; margin-bottom:1.25rem; font-size:.84rem; color:var(--muted); }
   .cs-form-consent input { margin-top:3px; flex-shrink:0; }
-  .cs-btn { display:inline-flex; align-items:center; gap:.45rem; background:var(--brand); color:#fff; font-weight:700; font-size:.9rem; padding:.75rem 1.75rem; border-radius:999px; border:none; cursor:pointer; transition:background .15s; text-decoration:none; }
+  .cs-btn { display:inline-flex; align-items:center; gap:.45rem; background:var(--brand); color:#fff; font-weight:700; font-size:.9rem; padding:.75rem 1.75rem; border-radius:999px; border:none; cursor:pointer; text-decoration:none; }
   .cs-btn:hover { background:var(--brand-dark); }
-
   .cs-success { background:var(--green-light); border:1.5px solid #bbf7d0; border-radius:16px; padding:2rem; text-align:center; max-width:680px; margin:0 auto; }
   .cs-success h3 { font-size:1.25rem; font-weight:900; color:var(--green); margin-bottom:.5rem; }
   .cs-success p { font-size:.9rem; color:var(--muted); }
-
   @media (max-width:640px) {
     .cs-score-demo { flex-direction:column; align-items:flex-start; }
     .cs-form-row { grid-template-columns:1fr; }
@@ -92,71 +78,63 @@
 <nav style="border-bottom:1px solid var(--border);">
   <div class="cs-nav">
     <a href="/" class="cs-nav-brand">Emajinet</a>
-    <a href="/" class="cs-nav-back">← Back to Home</a>
+    <a href="/" class="cs-nav-back">Back to Home</a>
   </div>
 </nav>
 
-<!-- Hero -->
 <section class="cs-hero">
-  <div class="cs-hero-eyebrow">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-    For Lenders &amp; Financial Partners
-  </div>
-  <h1>Emajinet Credit Score<br>for African SMEs.</h1>
+  <div class="cs-hero-eyebrow">For Lenders &amp; Financial Partners</div>
+  <h1>Emajinet Business Credit Score<br>for African SMEs.</h1>
   <p>
-    A consent-based, behaviour-driven credit scoring model that evaluates
-    repayment patterns of African small businesses and their customers.
-    Built from real transaction data — not credit bureau guesswork.
+    A consent-based business credit profile that evaluates an SME's creditworthiness for
+    loans, supplier financing, banks, investors, and partners. Built from real operating
+    data, not credit bureau guesswork.
   </p>
   <div class="cs-hero-pills">
-    <span class="cs-hero-pill">🔒 Consent-based only</span>
-    <span class="cs-hero-pill">📊 Behaviour-driven scoring</span>
-    <span class="cs-hero-pill">🌍 Africa-first model</span>
-    <span class="cs-hero-pill">🏦 Lender-ready reports</span>
-    <span class="cs-hero-pill">🔐 No public data exposure</span>
+    <span class="cs-hero-pill">Consent-based only</span>
+    <span class="cs-hero-pill">Operating-data scoring</span>
+    <span class="cs-hero-pill">Africa-first model</span>
+    <span class="cs-hero-pill">Lender-ready reports</span>
+    <span class="cs-hero-pill">No public data exposure</span>
   </div>
 </section>
 
-<!-- How It Works -->
 <section class="cs-section">
-  <div class="cs-section-title">How Emajinet Credit Score works.</div>
-  <p class="cs-section-sub">Built from actual layby repayment behavior inside Emajinet businesses — not credit bureau files.</p>
+  <div class="cs-section-title">How Emajinet Business Credit Score works.</div>
+  <p class="cs-section-sub">Built from consent-based business operating data inside Emajinet: sales, stock, cash flow, costs, obligations, payment discipline, and reporting completeness.</p>
   <div class="cs-how-grid">
     <div class="cs-how-card">
       <div class="cs-how-num">01</div>
-      <div class="cs-how-title">Business records transactions</div>
-      <p class="cs-how-desc">Merchants on Emajinet track every layby order, instalment, and repayment inside their business dashboard.</p>
+      <div class="cs-how-title">Business records operations</div>
+      <p class="cs-how-desc">Merchants track sales, stock, recurring costs, payment activity, and operating history inside their business dashboard.</p>
     </div>
     <div class="cs-how-card">
       <div class="cs-how-num">02</div>
-      <div class="cs-how-title">Score is calculated per customer</div>
-      <p class="cs-how-desc">Our engine scores repayment speed, default behavior, debt exposure, purchase consistency, and relationship duration.</p>
+      <div class="cs-how-title">Score is calculated per business</div>
+      <p class="cs-how-desc">The engine scores revenue consistency, profit trend, cash-flow stability, expense control, stock turnover, payment discipline, recurring obligations, and debt exposure.</p>
     </div>
     <div class="cs-how-card">
       <div class="cs-how-num">03</div>
-      <div class="cs-how-title">Customer gives consent</div>
-      <p class="cs-how-desc">No score is shared without explicit consent from the customer. Data is never exposed publicly or without authorisation.</p>
+      <div class="cs-how-title">Business gives consent</div>
+      <p class="cs-how-desc">No business credit profile is shared without explicit business consent. Data is never exposed publicly or without authorisation.</p>
     </div>
     <div class="cs-how-card">
       <div class="cs-how-num">04</div>
-      <div class="cs-how-title">Lender receives risk summary</div>
-      <p class="cs-how-desc">Partners receive a structured risk summary: score, label, recommendation (approve / limit / cash only / follow up).</p>
+      <div class="cs-how-title">Lender receives summary</div>
+      <p class="cs-how-desc">Partners receive a structured business risk summary: score, label, financing readiness, recommended limit range, reasons, and improvement recommendations.</p>
     </div>
   </div>
 </section>
 
-<!-- Score Demo -->
 <section style="background:#f8fafc; padding:4rem 2rem; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
   <div style="max-width:1100px; margin:0 auto;">
-    <div class="cs-section-title">What a credit score report looks like.</div>
-    <p class="cs-section-sub">This is a sample — no real customer data is shown publicly.</p>
-
+    <div class="cs-section-title">What a business credit score report looks like.</div>
+    <p class="cs-section-sub">This is a sample. No real business profile is shown publicly, and lender access is consent-based.</p>
     <div class="cs-score-demo">
       <div class="cs-score-ring">
         <svg width="130" height="130" viewBox="0 0 130 130" style="transform:rotate(-90deg);" aria-hidden="true">
           <circle cx="65" cy="65" r="56" fill="none" stroke="#d1fae5" stroke-width="11"/>
-          <circle cx="65" cy="65" r="56" fill="none" stroke="#059669" stroke-width="11"
-            stroke-dasharray="247 352" stroke-linecap="round"/>
+          <circle cx="65" cy="65" r="56" fill="none" stroke="#059669" stroke-width="11" stroke-dasharray="275 352" stroke-linecap="round"/>
         </svg>
         <div class="cs-score-ring-text">
           <span class="cs-score-ring-num">78</span>
@@ -164,44 +142,42 @@
         </div>
       </div>
       <div class="cs-score-details">
-        <h3>Customer: J. Banda (sample)</h3>
-        <span class="cs-score-badge">Low Risk — 78/100</span>
-        <div class="cs-comp-row"><span class="cs-comp-label">Repayment behavior</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:85%;"></div></div><span class="cs-comp-score">85</span></div>
-        <div class="cs-comp-row"><span class="cs-comp-label">Repayment speed</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:72%;"></div></div><span class="cs-comp-score">72</span></div>
-        <div class="cs-comp-row"><span class="cs-comp-label">Debt exposure</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:80%;"></div></div><span class="cs-comp-score">80</span></div>
-        <div class="cs-comp-row"><span class="cs-comp-label">Purchase consistency</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:65%;"></div></div><span class="cs-comp-score">65</span></div>
+        <h3>Business: Sample Retailer</h3>
+        <span class="cs-score-badge">Good - 78/100</span>
+        <div class="cs-comp-row"><span class="cs-comp-label">Revenue consistency</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:85%;"></div></div><span class="cs-comp-score">85</span></div>
+        <div class="cs-comp-row"><span class="cs-comp-label">Cash-flow stability</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:72%;"></div></div><span class="cs-comp-score">72</span></div>
+        <div class="cs-comp-row"><span class="cs-comp-label">Expense control</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:80%;"></div></div><span class="cs-comp-score">80</span></div>
+        <div class="cs-comp-row"><span class="cs-comp-label">Stock turnover</span><div class="cs-comp-bar"><div class="cs-comp-fill" style="width:65%;"></div></div><span class="cs-comp-score">65</span></div>
         <div style="margin-top:.75rem; font-size:.85rem; font-weight:700; color:#059669;">
-          ✓ Recommendation: Approve credit up to MWK 80,000
+          Recommendation: Supplier credit range MWK 250,000 - 450,000
         </div>
       </div>
     </div>
 
     <div class="cs-privacy-box">
-      <h3>🔒 Data Privacy Commitment</h3>
+      <h3>Data Privacy Commitment</h3>
       <ul>
-        <li>No customer score or business data is accessible without explicit consent from the business and the customer.</li>
-        <li>Lenders and partners cannot query raw data — only aggregated, consent-authorised summaries.</li>
+        <li>No business credit profile is accessible without explicit consent from the business.</li>
+        <li>Lenders and partners cannot query raw data; they receive only aggregated, consent-authorised summaries.</li>
         <li>All data access is logged in the Emajinet audit trail.</li>
         <li>Emajinet does not sell credit data to third parties.</li>
-        <li>This system is designed to <em>empower</em> African SMEs — not exploit their data.</li>
+        <li>This system is designed to empower African SMEs, not exploit their data.</li>
       </ul>
     </div>
   </div>
 </section>
 
-<!-- Expression of Interest Form -->
 <section class="cs-section">
   {% if submitted %}
   <div class="cs-success">
-    <div style="font-size:2.5rem;margin-bottom:.75rem;">✅</div>
-    <h3>Thank you for your interest!</h3>
-    <p>Our team will review your submission and reach out within 3–5 business days to discuss partnership opportunities.</p>
-    <a href="/" style="display:inline-block;margin-top:1.25rem;font-size:.875rem;color:var(--green);font-weight:600;text-decoration:none;">← Back to Home</a>
+    <h3>Thank you for your interest.</h3>
+    <p>Our team will review your submission and reach out within 3-5 business days to discuss partnership opportunities.</p>
+    <a href="/" style="display:inline-block;margin-top:1.25rem;font-size:.875rem;color:var(--green);font-weight:600;text-decoration:none;">Back to Home</a>
   </div>
   {% else %}
   <div class="cs-form-card">
     <h2>Express Interest</h2>
-    <p>Are you a lender, microfinance institution, or financial partner interested in accessing Emajinet Credit Score data? Let us know — all access is consent-based and audited.</p>
+    <p>Are you a lender, microfinance institution, or financial partner interested in consent-based Emajinet Business Credit Score profiles? Let us know. All access is audited.</p>
 
     {% if messages %}
     {% for msg in messages %}
@@ -226,22 +202,18 @@
         <input type="email" id="cs_email" name="email" required placeholder="you@organisation.com">
       </div>
       <div class="cs-form-group" style="margin-bottom:1.25rem;">
-        <label for="cs_purpose">How you intend to use credit score data</label>
-        <textarea id="cs_purpose" name="purpose" rows="3"
-                  placeholder="e.g. We provide microloans to traders and want to assess repayment risk…"></textarea>
+        <label for="cs_purpose">How you intend to use business credit profiles</label>
+        <textarea id="cs_purpose" name="purpose" rows="3" placeholder="e.g. We provide supplier financing to traders and want to assess business creditworthiness"></textarea>
       </div>
       <div class="cs-form-consent">
         <input type="checkbox" id="cs_consent" name="consent" value="1" required>
         <label for="cs_consent">
-          I understand that Emajinet Credit Score is consent-based and that no customer data will be shared
-          without the explicit consent of the individual or business. I agree to handle any data received
+          I understand that Emajinet Business Credit Score is consent-based and that no business credit profile will be shared
+          without the explicit consent of the business. I agree to handle any data received
           in accordance with applicable data protection laws.
         </label>
       </div>
-      <button type="submit" class="cs-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        Submit Expression of Interest
-      </button>
+      <button type="submit" class="cs-btn">Submit Expression of Interest</button>
     </form>
   </div>
   {% endif %}
@@ -249,7 +221,7 @@
 
 <footer style="background:#f8fafc;border-top:1px solid var(--border);padding:2rem;text-align:center;">
   <p style="font-size:.85rem;color:var(--muted);">
-    &copy; Emajinet &mdash; Africa's Business Operating System.
+    &copy; Emajinet - Africa's Business Operating System.
     <a href="/" style="color:var(--brand);text-decoration:none;margin-left:.5rem;">Home</a>
     <a href="{% url 'staticpages:privacy' %}" style="color:var(--brand);text-decoration:none;margin-left:.5rem;">Privacy</a>
   </p>

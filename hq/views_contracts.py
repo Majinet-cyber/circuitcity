@@ -683,21 +683,34 @@ def generate_merchant_contract_pdf(request: HttpRequest, business_id: int) -> Ht
     commission_pct = request.POST.get("commission_pct", request.GET.get("commission_pct", "5"))
     contract_notes = request.POST.get("notes", request.GET.get("notes", ""))
 
-    # Resolve owner name
+    # Resolve owner/contact from active merchant management membership.
     owner_name = ""
+    owner_contact = ""
     try:
         from tenants.models import Membership
         owner_membership = (
-            Membership.objects.filter(business=business, role__in=["owner", "manager"])
-            .select_related("user").first()
+            Membership.objects.filter(
+                business=business,
+                status="ACTIVE",
+                role__in=["MANAGER", "BAR_MANAGER"],
+            )
+            .select_related("user")
+            .order_by("id")
+            .first()
         )
         if owner_membership:
             u = owner_membership.user
             owner_name = u.get_full_name() or u.username
+            owner_contact = u.email or getattr(u, "phone", "") or ""
     except Exception:
         pass
     if not owner_name:
-        owner_name = "Business Owner"
+        creator = getattr(business, "created_by", None)
+        if creator:
+            owner_name = creator.get_full_name() or creator.username
+            owner_contact = creator.email or getattr(creator, "phone", "") or ""
+    if not owner_name:
+        owner_name = "Merchant Representative"
 
     today_str = tz.localdate().strftime("%d %B %Y")
 
@@ -790,6 +803,8 @@ def generate_merchant_contract_pdf(request: HttpRequest, business_id: int) -> Ht
             f"Emajinet platform, represented by <b>{owner_name}</b> (<b>\"Merchant\"</b>).",
             clause_style,
         ))
+        if owner_contact:
+            elements.append(Paragraph(f"<b>Merchant contact:</b> {owner_contact}", clause_style))
 
         # ── Plan / Package ───────────────────────────────────────────────────
         elements.append(Paragraph("2. Subscription Plan", section_style))
@@ -928,11 +943,30 @@ def generate_merchant_contract_pdf(request: HttpRequest, business_id: int) -> Ht
             from django.core.files.base import ContentFile
             slug = getattr(business, "slug", str(business.id))
             filename = f"{slug}_contract_{tz.localdate().strftime('%Y%m%d')}.pdf"
-            contract = MerchantContract.objects.create(
-                business=business,
-                notes=f"Auto-generated contract. Plan: {plan_name}. Commission: {commission_pct}%.",
-                uploaded_by=request.user,
+            notes = (
+                f"Auto-generated merchant agreement. Plan: {plan_name}. "
+                f"Commission: {commission_pct}%. Owner/contact: {owner_name}"
+                + (f" ({owner_contact})." if owner_contact else ".")
             )
+            if contract_notes:
+                notes = f"{notes}\n\nAdditional notes: {contract_notes}"
+            contract = (
+                MerchantContract.objects.filter(
+                    business=business,
+                    contract_type="generated_merchant_agreement",
+                )
+                .order_by("-uploaded_at")
+                .first()
+            )
+            if contract is None:
+                contract = MerchantContract(
+                    business=business,
+                    contract_type="generated_merchant_agreement",
+                    uploaded_by=request.user,
+                )
+            contract.title = "Emajinet Merchant Participation Agreement"
+            contract.notes = notes
+            contract.uploaded_by = request.user
             contract.file.save(filename, ContentFile(pdf_data), save=True)
         except Exception as exc:
             logger.warning("Could not store contract record for business %d: %s", business_id, exc)

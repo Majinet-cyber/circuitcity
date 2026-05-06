@@ -88,6 +88,13 @@
                     <i class="bi bi-file-pdf text-danger me-2"></i>
                     {{ contract.file.name|default:"contract.pdf" }}
                   </dd>
+
+                  <dt class="text-muted small">Contract Type</dt>
+                  <dd>
+                    <span class="badge bg-success">
+                      {% if contract.contract_type == "generated_merchant_agreement" %}Generated Merchant Agreement{% else %}{{ contract.contract_type|title }}{% endif %}
+                    </span>
+                  </dd>
                   
                   <dt class="text-muted small">Uploaded By</dt>
                   <dd>{{ contract.uploaded_by.get_full_name|default:contract.uploaded_by.username }}</dd>

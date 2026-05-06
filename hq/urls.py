@@ -63,6 +63,7 @@ urlpatterns = [
     path("invoices/", views.invoices, name="invoices"),
     path("agents/", views.agents, name="agents"),
     path("stock-trends/", views.stock_trends, name="stock_trends"),
+    path("business-credit-scores/", views.business_credit_scores, name="business_credit_scores"),
     # =========================
     # Details
     # =========================

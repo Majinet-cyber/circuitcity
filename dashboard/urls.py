@@ -75,8 +75,10 @@ urlpatterns = [
     path("api/business-health/", views.business_health_api, name="business_health_api"),
     # ==== Credit Score Engine ====
     path("credit-scores/", views.credit_scores_list, name="credit_scores"),
+    path("business-credit-score/", views.credit_scores_list, name="business_credit_score"),
     path("credit-score/<str:customer_phone>/", views.credit_score_detail, name="credit_score_detail"),
     path("api/credit-score/<str:customer_phone>/", views.credit_score_api, name="credit_score_api"),
+    path("api/business-credit-score/", views.business_credit_score_api, name="business_credit_score_api"),
     # ==== Recurring Costs ====
     path("recurring-costs/", views.recurring_costs_list, name="recurring_costs"),
     path("recurring-costs/add/", views.recurring_cost_add, name="recurring_cost_add"),

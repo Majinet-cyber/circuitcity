@@ -17,7 +17,9 @@ urlpatterns = [
     ),
     # Existing report pages
     path("sales/", views.sales_report, name="sales"),
+    path("sales/pdf/", views.sales_report_pdf, name="sales_pdf"),
     path("inventory/", views.inventory_report, name="inventory"),
+    path("inventory/pdf/", views.inventory_report_pdf, name="inventory_pdf"),
     # New premium report pages (additive — no existing routes changed)
     path("pl/", views.pl_report, name="pl_report"),
     path("pl/pdf/", views.pl_report_pdf, name="pl_report_pdf"),

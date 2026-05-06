@@ -31,6 +31,26 @@
     </a>
   </div>
 
+  {% if health.summary_cards %}
+  <div class="row g-3 mb-4">
+    {% for card in health.summary_cards %}
+    <div class="col-6 col-lg-3">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3" style="background:rgba(255,255,255,.94);">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <span class="rounded-circle d-inline-flex align-items-center justify-content-center"
+                style="width:34px;height:34px;background:#f0fdf4;color:#059669;">
+            <i class="bi {{ card.icon }}"></i>
+          </span>
+          <span class="text-muted fw-bold text-uppercase" style="font-size:.7rem;letter-spacing:.04em;">{{ card.label }}</span>
+        </div>
+        <div class="fw-black" style="font-size:1.25rem;color:#0f172a;line-height:1.15;">{{ card.value }}</div>
+        <div class="text-muted mt-1" style="font-size:.78rem;">{{ card.detail }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   {% if health.is_onboarding %}
   <!-- ── Onboarding state ── -->
   <div class="card border-0 shadow-sm rounded-4 p-4 text-center mb-4" style="background:linear-gradient(135deg,#f0fdf4,#ecfdf5);">
@@ -110,7 +130,7 @@
 
     {% with c=health.components %}
 
-    <!-- Profit Trend -->
+    <!-- Profitability -->
     {% with comp=c.profit_trend %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
@@ -119,7 +139,7 @@
                 style="width:36px;height:36px;background:#f0fdf4;">
             <i class="bi bi-graph-up-arrow text-success"></i>
           </span>
-          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Profit Trend</span>
+          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Profitability</span>
           <span class="badge ms-auto rounded-pill
             {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% elif comp.score %}bg-danger{% else %}bg-secondary{% endif %}"
             style="font-size:.7rem;">
@@ -140,7 +160,7 @@
     </div>
     {% endwith %}
 
-    <!-- Cash Flow -->
+    <!-- Cash Flow / Collections -->
     {% with comp=c.cash_flow %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
@@ -149,7 +169,7 @@
                 style="width:36px;height:36px;background:#eff6ff;">
             <i class="bi bi-cash-coin" style="color:#2563eb;"></i>
           </span>
-          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Cash Flow</span>
+          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Cash Flow / Collections</span>
           <span class="badge ms-auto rounded-pill
             {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% elif comp.score %}bg-danger{% else %}bg-secondary{% endif %}"
             style="font-size:.7rem;">
@@ -170,7 +190,7 @@
     </div>
     {% endwith %}
 
-    <!-- Stock Risk -->
+    <!-- Stock Health -->
     {% with comp=c.stock_risk %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
@@ -179,7 +199,7 @@
                 style="width:36px;height:36px;background:#fef9c3;">
             <i class="bi bi-box-seam" style="color:#ca8a04;"></i>
           </span>
-          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Stock Risk</span>
+          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Stock Health</span>
           <span class="badge ms-auto rounded-pill
             {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% elif comp.score %}bg-danger{% else %}bg-secondary{% endif %}"
             style="font-size:.7rem;">
@@ -200,7 +220,7 @@
     </div>
     {% endwith %}
 
-    <!-- Sales Consistency -->
+    <!-- Revenue Trend -->
     {% with comp=c.sales_consistency %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
@@ -209,7 +229,7 @@
                 style="width:36px;height:36px;background:#f0fdf4;">
             <i class="bi bi-bar-chart-fill text-success"></i>
           </span>
-          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Sales Consistency</span>
+          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Revenue Trend</span>
           <span class="badge ms-auto rounded-pill
             {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% elif comp.score %}bg-danger{% else %}bg-secondary{% endif %}"
             style="font-size:.7rem;">
@@ -230,7 +250,7 @@
     </div>
     {% endwith %}
 
-    <!-- Expense Control -->
+    <!-- Cost Control -->
     {% with comp=c.expense_control %}
     <div class="col-12 col-sm-6 col-lg-4">
       <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
@@ -239,7 +259,7 @@
                 style="width:36px;height:36px;background:#fef2f2;">
             <i class="bi bi-receipt" style="color:#dc2626;"></i>
           </span>
-          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Expense Control</span>
+          <span class="fw-semibold" style="font-size:.9rem;color:#1e293b;">Cost Control</span>
           <span class="badge ms-auto rounded-pill
             {% if comp.score >= 70 %}bg-success{% elif comp.score >= 50 %}bg-warning text-dark{% elif comp.score %}bg-danger{% else %}bg-secondary{% endif %}"
             style="font-size:.7rem;">

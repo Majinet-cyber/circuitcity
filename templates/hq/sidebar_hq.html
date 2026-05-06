@@ -7,6 +7,7 @@
 
 {% url 'hq:home' as url_hq_home %}
 {% url 'hq:businesses' as url_hq_businesses %}
+{% url 'hq:business_credit_scores' as url_hq_business_credit_scores %}
 {% url 'hq:subscriptions' as url_hq_subscriptions %}
 {% url 'billing:invoices' as url_hq_invoices %}
 {% url 'hq:agents' as url_hq_agents %}
@@ -35,6 +36,9 @@
     </li>
     <li class="{% if '/hq/businesses' in request.path %}active{% endif %}">
       <a href="{{ url_hq_businesses|default:'/hq/businesses/' }}"><i class="bi bi-buildings"></i><span>Businesses</span></a>
+    </li>
+    <li class="{% if '/hq/business-credit-scores' in request.path %}active{% endif %}">
+      <a href="{{ url_hq_business_credit_scores|default:'/hq/business-credit-scores/' }}"><i class="bi bi-shield-check"></i><span>Business Credit</span></a>
     </li>
 
     {% if contracts_enabled|default:False %}

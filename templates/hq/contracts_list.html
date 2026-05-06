@@ -104,7 +104,8 @@
                 <td>
                   {% if item.has_contract %}
                     <span class="badge bg-success">
-                      <i class="bi bi-check-circle me-1"></i>Signed
+                      <i class="bi bi-check-circle me-1"></i>
+                      {% if item.contract.contract_type == "generated_merchant_agreement" %}Generated{% else %}Signed{% endif %}
                     </span>
                   {% else %}
                     <span class="badge bg-danger">
@@ -132,6 +133,11 @@
                 </td>
                 <td>
                   <div class="btn-group btn-group-sm" role="group">
+                    <a href="{% url 'hq:generate_merchant_contract_pdf' item.business.id %}"
+                       class="btn btn-sm btn-outline-success"
+                       title="Generate merchant contract PDF">
+                      <i class="bi bi-file-earmark-pdf"></i>
+                    </a>
                     {% if item.has_contract %}
                       <a href="{% url 'hq:contract_download' item.contract.id %}" 
                          class="btn btn-sm btn-outline-primary"

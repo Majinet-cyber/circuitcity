@@ -121,6 +121,43 @@ def _json_body(request):
         return {}
 
 
+@hq_admin_required
+def business_credit_scores(request):
+    from dashboard.services_credit import calculate_business_credit_score
+
+    query = (request.GET.get("q") or "").strip()
+    businesses = Business.objects.all().order_by("name")
+    if query:
+        businesses = businesses.filter(Q(name__icontains=query) | Q(slug__icontains=query))
+
+    rows = []
+    for business in businesses[:100]:
+        credit = calculate_business_credit_score(business)
+        summary = credit.get("summary", {})
+        limit_range = credit.get("recommended_credit_limit_range") or {"low": None, "high": None}
+        rows.append(
+            {
+                "business": business,
+                "score": credit.get("score"),
+                "label": credit.get("label"),
+                "status_color": credit.get("status_color"),
+                "summary": summary,
+                "limit_range": limit_range,
+                "is_onboarding": credit.get("is_onboarding"),
+            }
+        )
+
+    return render(
+        request,
+        "hq/business_credit_scores.html",
+        {
+            "rows": rows,
+            "query": query,
+            "contracts_enabled": CONTRACTS_ENABLED,
+        },
+    )
+
+
 def _plan_info_from_subscription(sub: Subscription) -> dict:
     """
     Return dict describing the subscription's current plan (code, name, amount, limits).

@@ -1,311 +1,446 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static account_extras %}
 
-{% block title %}Settings · Emajinet{% endblock %}
+{% block title %}Settings - Emajinet{% endblock %}
 
 {% block extra_head %}
 <style>
-  /* Clean white settings shell - SSOT styling */
   .settings-page {
-    background: #ffffff;
     min-height: 100vh;
-    padding-bottom: 2rem;
+    padding: 1.25rem 0 3rem;
+    background:
+      radial-gradient(circle at top left, rgba(16,185,129,.12), transparent 28rem),
+      linear-gradient(180deg, #f8fafc 0%, #ffffff 58%);
+    color: #0f172a;
   }
-  .settings-page .page {
-    background: #ffffff;
+  .settings-shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1rem;
   }
-  .settings-page .card {
-    background: #ffffff !important;
-    border: 1px solid #e5e7eb !important;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+  .settings-hero {
+    background: rgba(255,255,255,.78);
+    border: 1px solid rgba(187,247,208,.85);
+    border-radius: 24px;
+    box-shadow: 0 22px 70px rgba(15,23,42,.08);
+    backdrop-filter: blur(18px);
+    padding: clamp(1.25rem, 3vw, 2rem);
+    margin-bottom: 1rem;
   }
-  .settings-page .panel-soft {
-    background: #f9fafb !important;
-    border: 1px solid #e5e7eb !important;
+  .settings-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem .75rem;
+    border-radius: 999px;
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    color: #047857;
+    font-size: .75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: .05em;
   }
-  /* Override any blue backgrounds in settings */
-  .settings-page .bg-primary,
-  .settings-page .bg-blue-500,
-  .settings-page [style*="background:var(--cc-accent)"] {
-    background: linear-gradient(135deg, #3b82f6, #6366f1) !important;
+  .settings-title {
+    margin: .8rem 0 .35rem;
+    font-size: clamp(1.8rem, 4vw, 2.45rem);
+    line-height: 1.05;
+    font-weight: 900;
+    letter-spacing: 0;
   }
-  /* Clean checkbox styling */
-  .settings-page input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: #3b82f6;
+  .settings-subtitle {
+    max-width: 760px;
+    color: #64748b;
+    margin: 0;
+  }
+  .settings-tabs {
+    display: flex;
+    gap: .55rem;
+    overflow-x: auto;
+    padding: .5rem 0 1rem;
+    margin-bottom: .35rem;
+  }
+  .settings-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: .42rem;
+    flex: 0 0 auto;
+    color: #334155;
+    background: rgba(255,255,255,.82);
+    border: 1px solid rgba(226,232,240,.95);
+    border-radius: 999px;
+    padding: .62rem .9rem;
+    font-size: .84rem;
+    font-weight: 800;
+    text-decoration: none;
+    box-shadow: 0 8px 22px rgba(15,23,42,.04);
+  }
+  .settings-tabs a:hover {
+    border-color: #86efac;
+    color: #047857;
+    background: #f0fdf4;
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr);
+    gap: 1rem;
+    align-items: start;
+  }
+  .settings-stack {
+    display: grid;
+    gap: 1rem;
+  }
+  .glass-card {
+    background: rgba(255,255,255,.78);
+    border: 1px solid rgba(226,232,240,.92);
+    border-radius: 22px;
+    box-shadow: 0 18px 55px rgba(15,23,42,.07);
+    backdrop-filter: blur(16px);
+    padding: clamp(1rem, 2vw, 1.35rem);
+  }
+  .glass-card.soft-green {
+    border-color: rgba(187,247,208,.9);
+    background: linear-gradient(135deg, rgba(240,253,244,.88), rgba(255,255,255,.78));
+  }
+  .section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  .section-head h2 {
+    font-size: 1.05rem;
+    font-weight: 900;
+    margin: 0 0 .2rem;
+  }
+  .section-head p {
+    color: #64748b;
+    font-size: .88rem;
+    margin: 0;
+  }
+  .avatar-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .avatar-wrap {
+    position: relative;
+    width: 104px;
+    height: 104px;
+    flex: 0 0 auto;
+  }
+  .avatar-img,
+  .avatar-fallback {
+    width: 104px;
+    height: 104px;
+    border-radius: 28px;
+    object-fit: cover;
+    box-shadow: 0 14px 32px rgba(15,23,42,.14);
+    border: 3px solid rgba(255,255,255,.9);
+  }
+  .avatar-fallback {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, #059669, #34d399);
+    color: #fff;
+    font-size: 2rem;
+    font-weight: 900;
+  }
+  .avatar-upload {
+    position: absolute;
+    right: -7px;
+    bottom: -7px;
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: #059669;
+    color: #fff;
+    border: 3px solid #fff;
+    box-shadow: 0 10px 24px rgba(5,150,105,.28);
     cursor: pointer;
   }
-  .settings-page .btn-primary {
-    background: #3b82f6;
-    border-color: #3b82f6;
-    color: #fff;
+  .profile-meta h3 {
+    margin: 0;
+    font-size: 1.18rem;
+    font-weight: 900;
   }
-  .settings-page .btn-primary:hover {
-    background: #2563eb;
-    border-color: #2563eb;
+  .profile-meta div {
+    color: #64748b;
+    font-size: .92rem;
+  }
+  .action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .65rem;
+    margin-top: .85rem;
+  }
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    border-radius: 999px;
+    border: 1px solid #d1fae5;
+    background: #ecfdf5;
+    color: #047857;
+    padding: .55rem .85rem;
+    font-weight: 800;
+    font-size: .84rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .pill-btn.secondary {
+    background: #fff;
+    color: #334155;
+    border-color: #e2e8f0;
+  }
+  .quick-grid,
+  .sound-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: .8rem;
+  }
+  .quick-tile,
+  .sound-tile {
+    border: 1px solid rgba(226,232,240,.9);
+    border-radius: 18px;
+    background: rgba(255,255,255,.74);
+    padding: .95rem;
+    text-decoration: none;
+    color: #0f172a;
+  }
+  .quick-tile:hover {
+    border-color: #86efac;
+    box-shadow: 0 12px 30px rgba(5,150,105,.09);
+  }
+  .tile-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: #ecfdf5;
+    color: #059669;
+    margin-bottom: .75rem;
+  }
+  .tile-title {
+    font-weight: 900;
+    margin-bottom: .2rem;
+  }
+  .tile-copy {
+    color: #64748b;
+    font-size: .82rem;
+    line-height: 1.45;
+  }
+  .sound-tile button {
+    border: 1px solid rgba(16,185,129,.26);
+    background: linear-gradient(135deg, rgba(236,253,245,.96), rgba(255,255,255,.92));
+    color: #047857;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    font-weight: 900;
+    padding: .42rem .8rem;
+    line-height: 1;
+    box-shadow: 0 8px 18px rgba(4, 120, 87, .08);
+  }
+  .sound-tile button i { font-size: 1rem; }
+  .check-list {
+    display: grid;
+    gap: .65rem;
+  }
+  .check-row {
+    display: flex;
+    gap: .7rem;
+    align-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    background: rgba(255,255,255,.72);
+    padding: .8rem .9rem;
+    cursor: pointer;
+  }
+  .check-row input {
+    width: 18px;
+    height: 18px;
+    accent-color: #059669;
+    flex: 0 0 auto;
+  }
+  .check-row span {
+    font-weight: 750;
+    color: #334155;
+  }
+  @media (max-width: 900px) {
+    .settings-grid { grid-template-columns: 1fr; }
   }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="settings-page">
-  <div class="page maxw-1200">
-    <h1 style="font-size:var(--fs-32); font-weight:900; line-height:1; margin-bottom:var(--sp-3); color:#111827;">
-      Settings
-    </h1>
-    <p style="font-size:.9375rem;color:#6b7280;margin-bottom:var(--sp-5);">Manage your account, business profile, storefront, and preferences.</p>
+  <div class="settings-shell">
+    <section class="settings-hero">
+      <span class="settings-eyebrow"><i class="bi bi-gear"></i> Workspace settings</span>
+      <h1 class="settings-title">Settings</h1>
+      <p class="settings-subtitle">Manage your profile, security, notifications, storefront, finance tools, and business readiness from one clean workspace.</p>
+    </section>
 
-    <!-- Premium settings navigation -->
-    <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:2rem;padding-bottom:.75rem;border-bottom:1.5px solid #f1f5f9;">
-      <a href="#settings-profile" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        👤 Profile &amp; Security
-      </a>
-      <a href="#settings-sounds" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        🔊 Sounds
-      </a>
-      <a href="#settings-notifications" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        🔔 Notifications
-      </a>
-      <a href="{% url 'inventory:marketplace_storefront_settings' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        🏪 Storefront
-      </a>
-      <a href="{% url 'dashboard:recurring_costs' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        💰 Recurring Costs
-      </a>
-      <a href="{% url 'dashboard:business_health' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        📊 Business Health
-      </a>
-      <a href="{% url 'dashboard:credit_scores' %}" style="display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .875rem;border-radius:999px;background:#f1f5f9;color:#374151;font-size:.82rem;font-weight:700;text-decoration:none;transition:all .15s;" onmouseover="this.style.background='#2563eb';this.style.color='#fff';" onmouseout="this.style.background='#f1f5f9';this.style.color='#374151';">
-        🛡️ Credit Scores
-      </a>
-    </div>
+    <nav class="settings-tabs" aria-label="Settings sections">
+      <a href="#profile-security"><i class="bi bi-person-lock"></i>Profile &amp; Security</a>
+      <a href="#sounds"><i class="bi bi-volume-up"></i>Sounds</a>
+      <a href="#notifications"><i class="bi bi-bell"></i>Notifications</a>
+      <a href="#storefront"><i class="bi bi-shop"></i>Storefront</a>
+      <a href="#recurring-costs"><i class="bi bi-receipt"></i>Recurring Costs</a>
+      <a href="#business-health"><i class="bi bi-activity"></i>Business Health</a>
+      <a href="#credit-score"><i class="bi bi-shield-check"></i>Credit Score</a>
+    </nav>
 
-    <!-- Profile & Security -->
-    <div id="settings-profile">
-    <div class="vstack">
-      <div class="card pad">
-        <div class="hstack" style="align-items:flex-start;">
-          <!-- Avatar: uploaded image OR initials placeholder -->
-          {% if avatar_img_url %}
-            <img src="{{ avatar_img_url }}" alt="Avatar" width="96" height="96"
-                 style="border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.08); object-fit:cover;">
-          {% else %}
-            <div style="width:96px; height:96px; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.08);
-                        background:linear-gradient(135deg, #3b82f6, #6366f1);
-                        color:#fff; display:flex; align-items:center; justify-content:center;
-                        font-size:2.5rem; font-weight:800;">
-              {% load account_extras %}
-              {{ user|initials }}
-            </div>
-          {% endif %}
-
-          <!-- User Info -->
-          <div class="vstack" style="gap:6px; min-width:260px;">
-            <div style="font-weight:800; font-size:var(--fs-20); color:#111827;">{{ user_full_name }}</div>
-            <div class="text-muted" style="color:#6b7280;">@{{ user_username }}</div>
-            <div class="text-muted" style="color:#6b7280;">{{ user_email }}</div>
-
-            <div class="hstack" style="gap:8px; margin-top:6px;">
-              {% if upload_avatar_url %}
-                <!-- POST upload (shows file picker, then auto-submits) -->
-                <form action="{{ upload_avatar_url }}" method="post" enctype="multipart/form-data" style="display:inline;">
-                  {% csrf_token %}
-                  <input type="file" name="avatar" id="id_avatar" style="display:none" accept="image/*" onchange="this.form.submit()">
-                  <label for="id_avatar" class="btn btn-muted btn-icon" style="cursor:pointer;">Change avatar</label>
-                </form>
-              {% else %}
-                <a href="https://gravatar.com" target="_blank" class="btn btn-muted btn-icon">Change avatar</a>
-              {% endif %}
-
-              {% if change_password_url %}
-                <a href="{{ change_password_url }}" class="btn">Change password</a>
-              {% endif %}
+    <div class="settings-grid">
+      <main class="settings-stack">
+        <section class="glass-card soft-green" id="profile-security">
+          <div class="section-head">
+            <div>
+              <h2>Profile &amp; Security</h2>
+              <p>Your identity, avatar, password, and two-factor controls.</p>
             </div>
           </div>
 
-          <!-- Two-Factor Authentication (SMS OTP) -->
-          {% include "accounts/_twofa_sms_card.html" %}
-        </div>
-      </div>
+          <div class="avatar-row">
+            <form action="{{ upload_avatar_url }}" method="post" enctype="multipart/form-data" id="avatarForm">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <input type="file" name="avatar" id="avatarInput" accept="image/*" style="display:none;">
+              <div class="avatar-wrap">
+                {% if avatar_img_url %}
+                  <img src="{{ avatar_img_url }}" alt="Profile picture" class="avatar-img" id="avatarPreview">
+                {% else %}
+                  <div class="avatar-fallback" id="avatarFallback">{{ user|initials }}</div>
+                  <img src="" alt="Profile picture preview" class="avatar-img" id="avatarPreview" style="display:none;">
+                {% endif %}
+                <label for="avatarInput" class="avatar-upload" title="Upload profile picture">
+                  <i class="bi bi-camera-fill"></i>
+                </label>
+              </div>
+            </form>
 
-      <!-- ── Sound Notifications ── -->
-      <div class="card pad" id="settings-sounds">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap;margin-bottom:var(--sp-4);">
-          <div>
-            <h2 style="font-size:var(--fs-24);font-weight:900;color:#111827;margin-bottom:4px;">Sound Notifications</h2>
-            <p style="font-size:var(--fs-14);color:#6b7280;max-width:480px;line-height:1.5;">
-              Premium Web Audio tones play when you record a sale, add stock, or collect a payment.
-              Sounds are synthesized in-browser — no files, no lag. Enabled per device.
-            </p>
+            <div class="profile-meta">
+              <h3>{{ user_full_name }}</h3>
+              <div>@{{ user_username }}</div>
+              <div>{{ user_email }}</div>
+              <div class="action-row">
+                <label for="avatarInput" class="pill-btn"><i class="bi bi-upload"></i>Upload avatar</label>
+                {% if change_password_url %}
+                  <a href="{{ change_password_url }}" class="pill-btn secondary"><i class="bi bi-key"></i>Change password</a>
+                {% endif %}
+              </div>
+            </div>
           </div>
-          <!-- Master toggle -->
-          <div style="flex-shrink:0;">
-            <button type="button" id="soundMasterToggle"
-              onclick="
-                var on = window.CCSounds && window.CCSounds.isEnabled();
-                if (window.CCSounds) window.CCSounds.setEnabled(!on);
-                updateSoundUI();
-                if (!on && window.CCSounds) window.CCSounds.playSuccessSound();
-              "
-              style="display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:10px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-size:0.875rem;font-weight:700;transition:all 0.2s;"
-            >
-              <i id="soundMasterIcon" class="bi bi-volume-up" style="font-size:1.1rem;"></i>
+
+          <div style="margin-top:1rem;">
+            {% include "accounts/_twofa_sms_card.html" %}
+          </div>
+        </section>
+
+        <section class="glass-card" id="sounds">
+          <div class="section-head">
+            <div>
+              <h2>Sounds</h2>
+              <p>Device-specific audio cues for sales, stock, payments, and credit actions.</p>
+            </div>
+            <button type="button" id="soundMasterToggle" class="pill-btn secondary"
+              onclick="var on = window.CCSounds && window.CCSounds.isEnabled(); if (window.CCSounds) window.CCSounds.setEnabled(!on); updateSoundUI(); if (!on && window.CCSounds) window.CCSounds.playSuccessSound();">
+              <i id="soundMasterIcon" class="bi bi-volume-up"></i>
               <span id="soundMasterLabel">App Sounds: On</span>
             </button>
           </div>
-        </div>
-
-        <!-- Sound preview cards -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;margin-bottom:var(--sp-4);">
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:1.25rem;">💰</span>
-                <span style="font-weight:700;font-size:0.85rem;color:#111827;">Sale Complete</span>
-              </div>
-              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playSaleSuccessSound();}" style="background:none;border:none;cursor:pointer;color:#059669;font-size:0.78rem;font-weight:600;">▶ Test</button>
+          <div class="sound-grid">
+            <div class="sound-tile">
+              <div class="tile-title">Sale Complete</div>
+              <p class="tile-copy">Ascending confirmation tone after a successful sale.</p>
+              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playSaleSuccessSound();}"><i class="bi bi-play-fill" aria-hidden="true"></i><span>Test</span></button>
             </div>
-            <p style="font-size:0.75rem;color:#6b7280;margin:0;">Premium ascending chime — plays after every successful sale</p>
-          </div>
-
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:1.25rem;">📦</span>
-                <span style="font-weight:700;font-size:0.85rem;color:#111827;">Stock Added</span>
-              </div>
-              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playStockAddedSound();}" style="background:none;border:none;cursor:pointer;color:#059669;font-size:0.78rem;font-weight:600;">▶ Test</button>
+            <div class="sound-tile">
+              <div class="tile-title">Stock Added</div>
+              <p class="tile-copy">Short double-ping when stock is received.</p>
+              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playStockAddedSound();}"><i class="bi bi-play-fill" aria-hidden="true"></i><span>Test</span></button>
             </div>
-            <p style="font-size:0.75rem;color:#6b7280;margin:0;">Double-ping confirmation — plays when stock is received</p>
-          </div>
-
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:1.25rem;">✅</span>
-                <span style="font-weight:700;font-size:0.85rem;color:#111827;">Payment Received</span>
-              </div>
-              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playPaymentSuccessSound();}" style="background:none;border:none;cursor:pointer;color:#059669;font-size:0.78rem;font-weight:600;">▶ Test</button>
+            <div class="sound-tile">
+              <div class="tile-title">Payment Received</div>
+              <p class="tile-copy">Warm confirmation tone when payment is collected.</p>
+              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playPaymentSuccessSound();}"><i class="bi bi-play-fill" aria-hidden="true"></i><span>Test</span></button>
             </div>
-            <p style="font-size:0.75rem;color:#6b7280;margin:0;">Warm two-note tone — plays when a payment is collected</p>
-          </div>
-
-          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:14px 16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span style="font-size:1.25rem;">📋</span>
-                <span style="font-weight:700;font-size:0.85rem;color:#111827;">Credit Sale</span>
-              </div>
-              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playCreditSaleSound();}" style="background:none;border:none;cursor:pointer;color:#059669;font-size:0.78rem;font-weight:600;">▶ Test</button>
-            </div>
-            <p style="font-size:0.75rem;color:#6b7280;margin:0;">Reserved rising tone — signals a credit/layby tab opened</p>
-          </div>
-        </div>
-
-        <p style="font-size:0.78rem;color:#9ca3af;display:flex;align-items:center;gap:6px;">
-          <i class="bi bi-info-circle"></i>
-          Sounds are device-specific. Enabling here affects this browser only.
-          The toggle in the top navigation bar also controls this setting.
-        </p>
-      </div>
-
-      <!-- Notifications (wired to NotificationPreference model, default-checked) -->
-      <div class="card pad" id="settings-notifications">
-        <h2 style="font-size:var(--fs-24); font-weight:900; margin-bottom:var(--sp-4); color:#111827;">Notification Preferences</h2>
-
-        <form method="post">
-          {% csrf_token %}
-          <input type="hidden" name="save_notifications" value="1">
-
-          <div class="vstack" style="gap:var(--sp-4);">
-            <div class="panel-soft pad round">
-              <div style="font-weight:800; margin-bottom:12px; color:#374151;">Email Notifications</div>
-              
-              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
-                <input type="checkbox" name="instant_sale_email" {% if notif_pref.instant_sale_email|default:True %}checked{% endif %}>
-                <span style="color:#374151;">Instant sale alerts</span>
-              </label>
-
-              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
-                <input type="checkbox" name="daily_summary_email" {% if notif_pref.daily_summary_email|default:True %}checked{% endif %}>
-                <span style="color:#374151;">Daily sales summary</span>
-              </label>
-
-              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
-                <input type="checkbox" name="weekly_digest_enabled" {% if notif_pref.weekly_digest_enabled|default:True %}checked{% endif %}>
-                <span style="color:#374151;">Weekly digest (every Friday)</span>
-              </label>
-
-              <label class="hstack" style="gap:10px; margin-bottom:10px; cursor:pointer;">
-                <input type="checkbox" name="high_sales_alerts" {% if notif_pref.high_sales_alerts|default:True %}checked{% endif %}>
-                <span style="color:#374151;">High sales spike alerts</span>
-              </label>
-
-              <label class="hstack" style="gap:10px; cursor:pointer;">
-                <input type="checkbox" name="important_alerts_email" {% if notif_pref.important_alerts_email|default:True %}checked{% endif %}>
-                <span style="color:#374151;">Important system alerts</span>
-              </label>
-
-              <p class="text-muted" style="margin-top:12px; font-size:var(--fs-14); color:#6b7280;">
-                All notifications default to ON for new users. Uncheck to disable.
-              </p>
+            <div class="sound-tile">
+              <div class="tile-title">Credit Action</div>
+              <p class="tile-copy">Reserved cue for credit or layby actions.</p>
+              <button type="button" onclick="if(window.CCSounds){window.CCSounds.setEnabled(true);window.CCSounds.playCreditSaleSound();}"><i class="bi bi-play-fill" aria-hidden="true"></i><span>Test</span></button>
             </div>
           </div>
+        </section>
 
-          <div class="hstack" style="justify-content:flex-start; margin-top:var(--sp-5); gap:var(--sp-3);">
-            <button type="submit" class="btn btn-primary">Save notification settings</button>
-            <a href="{% url 'inventory:inventory_dashboard' %}" class="btn btn-ghost">Back to dashboard</a>
+        <section class="glass-card" id="notifications">
+          <div class="section-head">
+            <div>
+              <h2>Notifications</h2>
+              <p>Choose which email updates Emajinet should send you.</p>
+            </div>
           </div>
-        </form>
-      </div>
-    </div>
-    </div><!-- /settings-profile -->
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="save_notifications" value="1">
+            <div class="check-list">
+              <label class="check-row"><input type="checkbox" name="instant_sale_email" {% if notif_pref.instant_sale_email|default:True %}checked{% endif %}><span>Instant sale alerts</span></label>
+              <label class="check-row"><input type="checkbox" name="daily_summary_email" {% if notif_pref.daily_summary_email|default:True %}checked{% endif %}><span>Daily sales summary</span></label>
+              <label class="check-row"><input type="checkbox" name="weekly_digest_enabled" {% if notif_pref.weekly_digest_enabled|default:True %}checked{% endif %}><span>Weekly digest</span></label>
+              <label class="check-row"><input type="checkbox" name="high_sales_alerts" {% if notif_pref.high_sales_alerts|default:True %}checked{% endif %}><span>High sales spike alerts</span></label>
+              <label class="check-row"><input type="checkbox" name="important_alerts_email" {% if notif_pref.important_alerts_email|default:True %}checked{% endif %}><span>Important system alerts</span></label>
+            </div>
+            <div class="action-row">
+              <button type="submit" class="pill-btn"><i class="bi bi-check2-circle"></i>Save notification settings</button>
+              <a href="{% url 'inventory:inventory_dashboard' %}" class="pill-btn secondary"><i class="bi bi-arrow-left"></i>Back to dashboard</a>
+            </div>
+          </form>
+        </section>
+      </main>
 
-    <!-- Quick-access tiles for remaining settings sections -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:2rem;">
-      <a href="{% url 'inventory:marketplace_storefront_settings' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#2563eb';this.style.boxShadow='0 4px 16px rgba(37,99,235,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">🏪</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Storefront Settings</div>
-          <div style="font-size:.78rem;color:#64748b;">Logo, banner, contact &amp; marketplace profile</div>
-        </div>
-      </a>
-      <a href="{% url 'dashboard:recurring_costs' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#2563eb';this.style.boxShadow='0 4px 16px rgba(37,99,235,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">💰</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Recurring Costs</div>
-          <div style="font-size:.78rem;color:#64748b;">Rent, salaries, utilities &amp; fixed expenses</div>
-        </div>
-      </a>
-      <a href="{% url 'dashboard:business_health' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#059669';this.style.boxShadow='0 4px 16px rgba(5,150,105,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">📊</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Business Health Score</div>
-          <div style="font-size:.78rem;color:#64748b;">View your real-time business health report</div>
-        </div>
-      </a>
-      <a href="{% url 'dashboard:credit_scores' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#7c3aed';this.style.boxShadow='0 4px 16px rgba(124,58,237,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">🛡️</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Customer Credit Scores</div>
-          <div style="font-size:.78rem;color:#64748b;">Layby repayment risk &amp; lending recommendations</div>
-        </div>
-      </a>
-      <a href="{% url 'inventory:marketplace_leads' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#2563eb';this.style.boxShadow='0 4px 16px rgba(37,99,235,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">📣</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Marketplace Leads</div>
-          <div style="font-size:.78rem;color:#64748b;">View enquiries &amp; conversion leads</div>
-        </div>
-      </a>
-      <a href="{% url 'reports:home' %}" style="background:#fff;border:1.5px solid #e2e8f0;border-radius:16px;padding:1.25rem;text-decoration:none;color:#0f172a;display:flex;align-items:center;gap:.875rem;transition:border-color .15s,box-shadow .15s;" onmouseover="this.style.borderColor='#2563eb';this.style.boxShadow='0 4px 16px rgba(37,99,235,.1)';" onmouseout="this.style.borderColor='#e2e8f0';this.style.boxShadow='none';">
-        <span style="font-size:1.75rem;">📁</span>
-        <div>
-          <div style="font-weight:800;font-size:.9rem;margin-bottom:.15rem;">Reports &amp; Export</div>
-          <div style="font-size:.78rem;color:#64748b;">P&amp;L, executive summary, credit exposure</div>
-        </div>
-      </a>
+      <aside class="settings-stack">
+        <section class="glass-card" id="storefront">
+          <div class="tile-icon"><i class="bi bi-shop"></i></div>
+          <div class="tile-title">Storefront</div>
+          <p class="tile-copy">Logo, banner, contact details, listings, and marketplace profile.</p>
+          <a href="{% url 'inventory:marketplace_storefront_settings' %}" class="pill-btn">Open storefront settings</a>
+        </section>
+
+        <section class="quick-grid">
+          <a href="{% url 'dashboard:recurring_costs' %}" class="quick-tile" id="recurring-costs">
+            <div class="tile-icon"><i class="bi bi-receipt"></i></div>
+            <div class="tile-title">Recurring Costs</div>
+            <div class="tile-copy">Rent, salaries, utilities, subscriptions, and fixed obligations.</div>
+          </a>
+          <a href="{% url 'dashboard:business_health' %}" class="quick-tile" id="business-health">
+            <div class="tile-icon"><i class="bi bi-activity"></i></div>
+            <div class="tile-title">Business Health</div>
+            <div class="tile-copy">Score, breakdown, and operational recommendations.</div>
+          </a>
+          <a href="{% url 'dashboard:credit_scores' %}" class="quick-tile" id="credit-score">
+            <div class="tile-icon"><i class="bi bi-shield-check"></i></div>
+            <div class="tile-title">Business Credit Score</div>
+            <div class="tile-copy">Creditworthiness for lenders, suppliers, banks, and partners.</div>
+          </a>
+          <a href="{% url 'inventory:marketplace_leads' %}" class="quick-tile">
+            <div class="tile-icon"><i class="bi bi-megaphone"></i></div>
+            <div class="tile-title">Marketplace Leads</div>
+            <div class="tile-copy">Review enquiries and conversion opportunities.</div>
+          </a>
+          <a href="{% url 'reports:home' %}" class="quick-tile">
+            <div class="tile-icon"><i class="bi bi-file-earmark-bar-graph"></i></div>
+            <div class="tile-title">Reports &amp; Export</div>
+            <div class="tile-copy">P&amp;L, executive summaries, and export-ready reporting.</div>
+          </a>
+        </section>
+      </aside>
     </div>
   </div>
 </div>
@@ -314,18 +449,31 @@
 {% block extra_js %}
 <script>
 function updateSoundUI() {
-  var on    = window.CCSounds ? window.CCSounds.isEnabled() : true;
-  var icon  = document.getElementById('soundMasterIcon');
+  var on = window.CCSounds ? window.CCSounds.isEnabled() : true;
+  var icon = document.getElementById('soundMasterIcon');
   var label = document.getElementById('soundMasterLabel');
-  var btn   = document.getElementById('soundMasterToggle');
+  var btn = document.getElementById('soundMasterToggle');
   if (!icon || !label || !btn) return;
-  icon.className       = on ? 'bi bi-volume-up' : 'bi bi-volume-mute';
-  icon.style.color     = on ? '#059669' : '#9ca3af';
-  label.textContent    = on ? 'App Sounds: On' : 'App Sounds: Off';
-  btn.style.borderColor = on ? '#059669' : '#e5e7eb';
-  btn.style.color       = on ? '#059669' : '#9ca3af';
+  icon.className = on ? 'bi bi-volume-up' : 'bi bi-volume-mute';
+  label.textContent = on ? 'App Sounds: On' : 'App Sounds: Off';
+  btn.classList.toggle('secondary', !on);
 }
+
 document.addEventListener('DOMContentLoaded', function() {
+  var input = document.getElementById('avatarInput');
+  var preview = document.getElementById('avatarPreview');
+  var fallback = document.getElementById('avatarFallback');
+  var form = document.getElementById('avatarForm');
+  if (input && preview && form) {
+    input.addEventListener('change', function() {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = 'block';
+      if (fallback) fallback.style.display = 'none';
+      form.submit();
+    });
+  }
   setTimeout(updateSoundUI, 80);
 });
 </script>

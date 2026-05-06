@@ -1,428 +1,544 @@
 """
-Credit Score Engine — calculate_customer_credit_score
-Evaluates customer creditworthiness from layby/credit history.
-No new models needed: uses LaybyOrder + LaybyPayment.
+Business Credit Score service.
+
+This score represents the business's creditworthiness for lender, supplier,
+bank, investor, and partner review. It is business-scoped and never uses
+customer-level credit as the primary subject.
 """
 from __future__ import annotations
 
 import logging
+import statistics
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
 
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate
+from django.utils import timezone
+
 log = logging.getLogger(__name__)
 
-
-# ── Weights (must sum to 100) ──────────────────────────────────────────────
-_WEIGHTS = {
-    "default_behavior":     40,
-    "repayment_speed":      20,
-    "debt_size":            20,
-    "purchase_consistency": 10,
-    "relationship_duration": 10,
+WEIGHTS = {
+    "revenue_consistency": 14,
+    "profit_trend": 12,
+    "cash_flow_stability": 12,
+    "expense_control": 10,
+    "stock_turnover": 10,
+    "payment_discipline": 10,
+    "recurring_obligations": 8,
+    "debt_exposure": 8,
+    "business_history": 6,
+    "operational_activity": 6,
+    "reporting_completeness": 4,
 }
 
 
-def _label_and_color(score: int) -> tuple[str, str]:
-    if score >= 80:
-        return "Low Risk", "green"
-    elif score >= 65:
-        return "Moderate Risk", "amber"
-    elif score >= 50:
-        return "Caution", "orange"
-    else:
-        return "High Risk", "red"
+def _clamp(value: float, low: int = 0, high: int = 100) -> int:
+    return int(max(low, min(high, round(value))))
 
 
-def _clamp(val: float, lo: float = 0.0, hi: float = 100.0) -> int:
-    return int(max(lo, min(hi, val)))
+def _empty_component(label: str, explanation: str) -> dict:
+    return {"score": None, "label": label, "explanation": explanation}
 
 
-def _no_data_component(reason: str = "Not enough data") -> dict:
-    return {"score": None, "label": reason, "explanation": reason}
+def _label(score: int) -> tuple[str, str]:
+    if score >= 85:
+        return "Excellent", "green"
+    if score >= 72:
+        return "Good", "green"
+    if score >= 58:
+        return "Moderate", "amber"
+    if score >= 42:
+        return "Watchlist", "orange"
+    return "High Risk", "red"
 
 
-# ── Component scorers ──────────────────────────────────────────────────────
+def _business_user_ids(business) -> list[int]:
+    try:
+        from tenants.models import Membership
 
-def _score_default_behavior(orders) -> dict:
-    """
-    40% weight. Ratio of completed vs total. Cancelled/overdue penalised.
-    """
-    total = len(orders)
-    if total == 0:
-        return _no_data_component()
-
-    completed = sum(1 for o in orders if o.status == "completed")
-    cancelled = sum(1 for o in orders if o.status == "cancelled")
-    # active orders with balance > 0 that are old (>90 days) count as overdue
-    today = date.today()
-    overdue = 0
-    for o in orders:
-        if o.status == "active":
-            age = (today - o.created_at.date()).days
-            if age > 90 and o.balance > 0:
-                overdue += 1
-
-    completion_rate = completed / total
-    # Start from completion rate, deduct for overdue
-    raw = completion_rate * 100 - (overdue * 15)
-    score = _clamp(raw)
-
-    if score >= 80:
-        label, explanation = "Excellent", f"{completed}/{total} orders completed — very reliable borrower."
-    elif score >= 65:
-        label, explanation = "Good", f"{completed}/{total} completed. Some gaps but generally reliable."
-    elif score >= 50:
-        label, explanation = "Fair", f"Only {completed}/{total} completed. {overdue} overdue order(s) noted."
-    else:
-        label, explanation = "Poor", f"Low completion ({completed}/{total}). {cancelled} cancelled, {overdue} overdue."
-
-    return {"score": score, "label": label, "explanation": explanation}
+        return list(
+            Membership.objects.filter(business=business, status="ACTIVE")
+            .values_list("user_id", flat=True)
+        )
+    except Exception:
+        return []
 
 
-def _score_repayment_speed(orders) -> dict:
-    """
-    20% weight. Average days taken to complete installment plans.
-    Faster = higher score.
-    """
-    completed = [o for o in orders if o.status == "completed"]
-    if not completed:
-        return _no_data_component("No completed orders yet")
+def _sales_queryset(business, start: date, end: date):
+    """Prefer canonical Sale rows; fall back to sold inventory rows."""
+    try:
+        from sales.models import Sale
 
-    durations = []
-    for o in completed:
-        last_payment = o.payments.order_by("-received_at").first()
-        if last_payment and o.created_at:
-            days = (last_payment.received_at.date() - o.created_at.date()).days
-            if days >= 0:
-                durations.append(days)
+        qs = Sale.objects.filter(
+            location__business=business,
+            sold_at__gte=start,
+            sold_at__lte=end,
+            is_rolled_back=False,
+        ).select_related("item")
+        if qs.exists():
+            return "sale", qs
+    except Exception as exc:
+        log.debug("Sale queryset unavailable for credit score: %s", exc)
 
-    if not durations:
-        return _no_data_component("Cannot calculate repayment duration")
+    try:
+        from inventory.models import InventoryItem
 
-    avg_days = sum(durations) / len(durations)
-    # Expected: term_months * 30 days is baseline
-    avg_term = sum((o.term_months or 3) * 30 for o in completed) / len(completed)
-
-    ratio = avg_days / avg_term if avg_term > 0 else 1.0
-    # ratio < 1 = paid early, ratio > 1 = paid late
-    if ratio <= 0.75:
-        score, label, explanation = 100, "Excellent", f"Paid on average {avg_days:.0f} days — well ahead of schedule."
-    elif ratio <= 1.0:
-        score, label, explanation = 80, "Good", f"Paid on average {avg_days:.0f} days — on time."
-    elif ratio <= 1.3:
-        score, label, explanation = 60, "Fair", f"Paid on average {avg_days:.0f} days — slightly behind schedule."
-    else:
-        score, label, explanation = 35, "Slow Payer", f"Paid on average {avg_days:.0f} days — significantly behind schedule."
-
-    return {"score": _clamp(score), "label": label, "explanation": explanation}
+        qs = InventoryItem.objects.filter(
+            business=business,
+            status="SOLD",
+            sold_at__date__gte=start,
+            sold_at__date__lte=end,
+            selling_price__isnull=False,
+        )
+        return "inventory", qs
+    except Exception as exc:
+        log.debug("Inventory sales queryset unavailable for credit score: %s", exc)
+        return "none", []
 
 
-def _score_debt_size(orders) -> dict:
-    """
-    20% weight. Total outstanding balance vs total purchase value.
-    Lower outstanding = higher score.
-    """
-    active = [o for o in orders if o.status == "active"]
-    if not active:
-        return {"score": 90, "label": "No Outstanding Debt", "explanation": "No active layby orders — clean slate."}
+def _sales_totals(business, start: date, end: date) -> dict:
+    source, qs = _sales_queryset(business, start, end)
+    if source == "none":
+        return {"source": source, "count": 0, "revenue": Decimal("0"), "cost": Decimal("0"), "days": 0}
 
-    total_value = sum((o.total_price or Decimal("0")) for o in active)
-    total_outstanding = sum((o.balance or Decimal("0")) for o in active)
+    if source == "sale":
+        rows = list(qs)
+        revenue = sum((row.price or Decimal("0")) for row in rows)
+        cost = sum((getattr(row.item, "order_price", None) or Decimal("0")) for row in rows)
+        days = len({row.sold_at for row in rows if row.sold_at})
+        return {"source": source, "count": len(rows), "revenue": revenue, "cost": cost, "days": days}
 
-    if total_value == 0:
-        return _no_data_component()
-
-    outstanding_ratio = float(total_outstanding / total_value)
-
-    if outstanding_ratio <= 0.25:
-        score, label = 90, "Low Debt"
-    elif outstanding_ratio <= 0.5:
-        score, label = 70, "Moderate Debt"
-    elif outstanding_ratio <= 0.75:
-        score, label = 50, "High Debt"
-    else:
-        score, label = 25, "Very High Debt"
-
-    explanation = (
-        f"MWK {total_outstanding:,.0f} outstanding of MWK {total_value:,.0f} total "
-        f"({outstanding_ratio*100:.0f}% unpaid across {len(active)} active order(s))."
+    agg = qs.aggregate(revenue=Sum("selling_price"), cost=Sum("order_price"), count=Count("id"))
+    days = (
+        qs.annotate(day=TruncDate("sold_at"))
+        .values("day")
+        .distinct()
+        .count()
     )
-    return {"score": _clamp(score), "label": label, "explanation": explanation}
-
-
-def _score_purchase_consistency(orders) -> dict:
-    """
-    10% weight. Frequency and recency of orders.
-    """
-    if not orders:
-        return _no_data_component()
-
-    total = len(orders)
-    today = date.today()
-    recent = sum(1 for o in orders if (today - o.created_at.date()).days <= 180)
-
-    if total >= 5 and recent >= 2:
-        score, label = 90, "Highly Consistent"
-        explanation = f"{total} orders total, {recent} in last 6 months — loyal customer."
-    elif total >= 3 or recent >= 1:
-        score, label = 65, "Regular Customer"
-        explanation = f"{total} orders total, {recent} in last 6 months."
-    elif total >= 1:
-        score, label = 45, "Occasional"
-        explanation = f"Only {total} order(s), {recent} in last 6 months — limited history."
-    else:
-        score, label = 20, "Rare"
-        explanation = "Very few orders on record."
-
-    return {"score": _clamp(score), "label": label, "explanation": explanation}
-
-
-def _score_relationship_duration(orders) -> dict:
-    """
-    10% weight. How long the customer has been ordering.
-    """
-    if not orders:
-        return _no_data_component()
-
-    earliest = min(o.created_at.date() for o in orders)
-    months = max(1, (date.today() - earliest).days // 30)
-
-    if months >= 24:
-        score, label = 100, "Long-term Customer"
-        explanation = f"{months} months as a customer — very established relationship."
-    elif months >= 12:
-        score, label = 80, "Established Customer"
-        explanation = f"{months} months as a customer."
-    elif months >= 6:
-        score, label = 60, "Growing Relationship"
-        explanation = f"{months} months — relationship is building."
-    else:
-        score, label = 40, "New Customer"
-        explanation = f"Only {months} month(s) — insufficient history to judge long-term reliability."
-
-    return {"score": _clamp(score), "label": label, "explanation": explanation}
-
-
-# ── Main entry point ───────────────────────────────────────────────────────
-
-def calculate_customer_credit_score(
-    business,
-    customer_phone: str,
-    customer_name: Optional[str] = None,
-) -> dict:
-    """
-    Returns:
-    {
-      "score": 78,
-      "label": "Low Risk",
-      "status_color": "green",
-      "lending_guidance": "...",
-      "components": { "default_behavior": {...}, ... },
-      "recommendations": [...],
-      "data_summary": { "total_orders": N, "completed": N, "active": N, "cancelled": N }
+    return {
+        "source": source,
+        "count": agg.get("count") or 0,
+        "revenue": agg.get("revenue") or Decimal("0"),
+        "cost": agg.get("cost") or Decimal("0"),
+        "days": days,
     }
-    """
+
+
+def _monthly_revenue_series(business, months: int = 6) -> list[float]:
+    today = timezone.localdate()
+    series = []
+    for i in range(months - 1, -1, -1):
+        month_anchor = (today.replace(day=1) - timedelta(days=i * 31)).replace(day=1)
+        next_month = (month_anchor.replace(day=28) + timedelta(days=4)).replace(day=1)
+        totals = _sales_totals(business, month_anchor, next_month - timedelta(days=1))
+        series.append(float(totals["revenue"] or 0))
+    return series
+
+
+def _monthly_recurring_total(business) -> Decimal:
     try:
-        from layby.models import LaybyOrder, LaybyPayment  # noqa: F401
-    except ImportError:
-        log.warning("Layby app not available for credit scoring.")
-        return _empty_score("Layby module not available.")
+        from inventory.models import RecurringCost
 
+        total = Decimal("0")
+        for cost in RecurringCost.objects.filter(business=business, is_active=True):
+            amount = cost.amount or Decimal("0")
+            if cost.frequency == "weekly":
+                total += amount * Decimal("4.33")
+            elif cost.frequency == "quarterly":
+                total += amount / Decimal("3")
+            elif cost.frequency == "annually":
+                total += amount / Decimal("12")
+            else:
+                total += amount
+        return total
+    except Exception:
+        return Decimal("0")
+
+
+def _layby_orders(business, start: Optional[date] = None, end: Optional[date] = None):
     try:
-        # Scope orders to this business via membership
-        Membership = None
-        try:
-            from tenants.models import Membership as M
-            Membership = M
-        except ImportError:
-            pass
+        from layby.models import LaybyOrder
 
-        qs = LaybyOrder.objects.filter(
-            customer_phone=customer_phone
-        ).prefetch_related("payments").order_by("-created_at")
-
-        if Membership is not None:
-            biz_user_ids = Membership.objects.filter(
-                business=business, status="ACTIVE"
-            ).values_list("user_id", flat=True)
-            qs = qs.filter(created_by_id__in=list(biz_user_ids))
+        qs = LaybyOrder.objects.all()
+        user_ids = _business_user_ids(business)
+        if user_ids:
+            qs = qs.filter(created_by_id__in=user_ids)
         else:
-            qs = qs.filter(created_by__isnull=False)
+            qs = qs.none()
+        if start:
+            qs = qs.filter(created_at__date__gte=start)
+        if end:
+            qs = qs.filter(created_at__date__lte=end)
+        return qs
+    except Exception:
+        return []
 
-        orders = list(qs.select_related("created_by"))
 
-        if not orders and customer_name:
-            # Fallback: search by name if phone yields nothing
-            qs2 = LaybyOrder.objects.filter(
-                customer_name__icontains=customer_name
-            ).prefetch_related("payments").order_by("-created_at")
-            if Membership is not None:
-                biz_user_ids = Membership.objects.filter(
-                    business=business, status="ACTIVE"
-                ).values_list("user_id", flat=True)
-                qs2 = qs2.filter(created_by_id__in=list(biz_user_ids))
-            orders = list(qs2.select_related("created_by"))
+def _score_revenue_consistency(business) -> dict:
+    series = _monthly_revenue_series(business)
+    active = [v for v in series if v > 0]
+    if len(active) < 2:
+        return _empty_component("Limited history", "Need at least two revenue months to measure consistency.")
 
-    except Exception as e:
-        log.exception("Error fetching layby orders for credit score: %s", e)
-        return _empty_score(f"Data error: {e}")
+    avg = statistics.mean(active)
+    if avg <= 0:
+        return _empty_component("Limited history", "Revenue history is not yet usable.")
+    cv = statistics.pstdev(active) / avg if len(active) > 1 else 0
+    months_active = len(active)
+    base = 95 if cv <= 0.2 else 82 if cv <= 0.4 else 68 if cv <= 0.65 else 50 if cv <= 1 else 35
+    coverage_bonus = min(8, months_active)
+    score = _clamp(base + coverage_bonus - 6)
+    return {
+        "score": score,
+        "label": "Stable" if score >= 72 else "Variable" if score >= 50 else "Irregular",
+        "explanation": f"Revenue appears in {months_active} of 6 months; variation index is {cv:.2f}.",
+    }
 
+
+def _score_profit_trend(business, start: date, end: date) -> dict:
+    current = _sales_totals(business, start, end)
+    if current["revenue"] <= 0:
+        return _empty_component("No recent revenue", "No sales revenue found in the scoring period.")
+    margin = float((current["revenue"] - current["cost"]) / current["revenue"] * 100)
+    days = max((end - start).days, 1)
+    prior = _sales_totals(business, start - timedelta(days=days), start - timedelta(days=1))
+    prior_margin = (
+        float((prior["revenue"] - prior["cost"]) / prior["revenue"] * 100)
+        if prior["revenue"] > 0
+        else None
+    )
+    base = 92 if margin >= 30 else 78 if margin >= 20 else 64 if margin >= 12 else 48 if margin > 0 else 25
+    if prior_margin is not None:
+        base += max(-10, min(10, (margin - prior_margin) * 0.4))
+    score = _clamp(base)
+    return {
+        "score": score,
+        "label": "Profitable" if margin > 12 else "Thin margin" if margin > 0 else "Loss making",
+        "explanation": f"Gross margin is {margin:.1f}% over the scoring period.",
+    }
+
+
+def _score_cash_flow(business, start: date, end: date) -> dict:
+    totals = _sales_totals(business, start, end)
+    if totals["count"] == 0:
+        return _empty_component("No inflow data", "No sales were found for cash-flow scoring.")
+    period_days = max((end - start).days + 1, 1)
+    coverage = totals["days"] / period_days
+    score = 92 if coverage >= 0.65 else 78 if coverage >= 0.4 else 62 if coverage >= 0.22 else 45 if coverage >= 0.1 else 30
+    return {
+        "score": score,
+        "label": "Stable inflow" if score >= 72 else "Uneven inflow" if score >= 50 else "Sparse inflow",
+        "explanation": f"Recorded sales on {totals['days']} of {period_days} days.",
+    }
+
+
+def _score_expense_control(business, start: date, end: date) -> dict:
+    revenue = _sales_totals(business, start, end)["revenue"]
+    monthly_obligations = _monthly_recurring_total(business)
+    if revenue <= 0 and monthly_obligations <= 0:
+        return _empty_component("No expense baseline", "No revenue or recurring obligation records found.")
+    if revenue <= 0:
+        return {
+            "score": 40,
+            "label": "Unproven",
+            "explanation": f"Recurring obligations are about MWK {monthly_obligations:,.0f}/month, but no recent revenue was found.",
+        }
+    period_months = Decimal(max((end - start).days + 1, 1)) / Decimal("30")
+    obligations_for_period = monthly_obligations * period_months
+    ratio = float(obligations_for_period / revenue) if revenue else 1
+    score = 92 if ratio <= 0.15 else 78 if ratio <= 0.28 else 62 if ratio <= 0.45 else 45 if ratio <= 0.7 else 25
+    return {
+        "score": score,
+        "label": "Controlled" if score >= 72 else "Manageable" if score >= 50 else "Heavy expenses",
+        "explanation": f"Recurring obligations equal about {ratio:.0%} of period revenue.",
+    }
+
+
+def _score_stock_turnover(business, start: date, end: date) -> dict:
+    try:
+        from inventory.models import InventoryItem
+
+        sold = InventoryItem.objects.filter(
+            business=business,
+            status="SOLD",
+            sold_at__date__gte=start,
+            sold_at__date__lte=end,
+        ).count()
+        in_stock = InventoryItem.objects.filter(business=business, is_active=True, status="IN_STOCK").count()
+    except Exception:
+        sold = in_stock = 0
+    total = sold + in_stock
+    if total == 0:
+        return _empty_component("No stock data", "No inventory records found for stock turnover.")
+    turnover = sold / total
+    score = 90 if turnover >= 0.55 else 76 if turnover >= 0.35 else 62 if turnover >= 0.2 else 45 if sold else 35
+    return {
+        "score": score,
+        "label": "Healthy turnover" if score >= 72 else "Slow turnover" if score >= 50 else "Low movement",
+        "explanation": f"{sold} items sold against {in_stock} currently in stock.",
+    }
+
+
+def _score_payment_discipline(business, start: date, end: date) -> dict:
+    orders = list(_layby_orders(business, start, end))
     if not orders:
-        return _empty_score("No credit history found for this customer.")
+        return _empty_component("No repayment data", "No layby or repayment records found for this period.")
+    completed = sum(1 for order in orders if order.status == "completed")
+    cancelled = sum(1 for order in orders if order.status == "cancelled")
+    overdue = 0
+    today = timezone.localdate()
+    for order in orders:
+        if order.status == "active" and (today - order.created_at.date()).days > ((order.term_months or 3) * 35):
+            if order.balance > 0:
+                overdue += 1
+    raw = completed / len(orders) * 100 - cancelled * 8 - overdue * 10
+    score = _clamp(raw)
+    return {
+        "score": score,
+        "label": "Disciplined" if score >= 72 else "Mixed" if score >= 50 else "Needs attention",
+        "explanation": f"{completed}/{len(orders)} layby orders completed; {overdue} overdue active orders.",
+    }
 
-    # ── Compute components ─────────────────────────────────────────────────
+
+def _score_recurring_obligations(business) -> dict:
+    monthly_revenue = Decimal(str(sum(_monthly_revenue_series(business, 3)) / 3))
+    monthly_obligations = _monthly_recurring_total(business)
+    if monthly_revenue <= 0 and monthly_obligations <= 0:
+        return _empty_component("No obligations data", "No recurring obligations have been recorded.")
+    if monthly_revenue <= 0:
+        return {"score": 42, "label": "Unproven", "explanation": f"Monthly obligations are MWK {monthly_obligations:,.0f}; revenue baseline is missing."}
+    ratio = float(monthly_obligations / monthly_revenue)
+    score = 92 if ratio <= 0.12 else 78 if ratio <= 0.25 else 62 if ratio <= 0.4 else 45 if ratio <= 0.65 else 25
+    return {
+        "score": score,
+        "label": "Light obligations" if score >= 72 else "Moderate obligations" if score >= 50 else "Heavy obligations",
+        "explanation": f"Recurring obligations are about {ratio:.0%} of average monthly revenue.",
+    }
+
+
+def _score_debt_exposure(business) -> dict:
+    orders = list(_layby_orders(business))
+    if not orders:
+        return {"score": 78, "label": "No recorded debt exposure", "explanation": "No open layby balances are recorded for this business."}
+    outstanding = sum((order.balance or Decimal("0")) for order in orders if order.status == "active")
+    monthly_revenue = Decimal(str(sum(_monthly_revenue_series(business, 3)) / 3))
+    if outstanding <= 0:
+        return {"score": 90, "label": "Clean exposure", "explanation": "No outstanding active layby balances were found."}
+    if monthly_revenue <= 0:
+        return {"score": 42, "label": "Exposure unbenchmarked", "explanation": f"Outstanding exposure is MWK {outstanding:,.0f}, but revenue baseline is missing."}
+    ratio = float(outstanding / monthly_revenue)
+    score = 90 if ratio <= 0.1 else 76 if ratio <= 0.25 else 60 if ratio <= 0.5 else 42 if ratio <= 0.9 else 25
+    return {
+        "score": score,
+        "label": "Low exposure" if score >= 72 else "Moderate exposure" if score >= 50 else "High exposure",
+        "explanation": f"Open customer balance exposure is {ratio:.0%} of average monthly revenue.",
+    }
+
+
+def _score_business_history(business) -> dict:
+    created = getattr(business, "created_at", None)
+    if not created:
+        return _empty_component("Unknown age", "Business creation date is unavailable.")
+    months = max(1, (timezone.now() - created).days // 30)
+    score = 95 if months >= 24 else 82 if months >= 12 else 66 if months >= 6 else 48 if months >= 3 else 35
+    return {
+        "score": score,
+        "label": "Established" if score >= 72 else "Developing" if score >= 50 else "New",
+        "explanation": f"Business history in Emajinet is approximately {months} month(s).",
+    }
+
+
+def _score_operational_activity(business, start: date, end: date) -> dict:
+    sales = _sales_totals(business, start, end)
+    try:
+        from inventory.models import InventoryItem
+        stock_count = InventoryItem.objects.filter(business=business, is_active=True).count()
+    except Exception:
+        stock_count = 0
+    activity = sales["count"] + min(stock_count, 50)
+    if activity <= 0:
+        return _empty_component("No activity", "No sales or stock activity found.")
+    score = 90 if activity >= 80 else 76 if activity >= 40 else 62 if activity >= 18 else 48 if activity >= 5 else 35
+    return {
+        "score": score,
+        "label": "Active operations" if score >= 72 else "Moderate activity" if score >= 50 else "Light activity",
+        "explanation": f"{sales['count']} sales and {stock_count} active stock records contribute to this score.",
+    }
+
+
+def _score_reporting_completeness(business, start: date, end: date) -> dict:
+    sources = 0
+    labels = []
+    totals = _sales_totals(business, start, end)
+    if totals["count"]:
+        sources += 1
+        labels.append("sales")
+    try:
+        from inventory.models import InventoryItem
+        if InventoryItem.objects.filter(business=business, is_active=True).exists():
+            sources += 1
+            labels.append("inventory")
+    except Exception:
+        pass
+    if _monthly_recurring_total(business) > 0:
+        sources += 1
+        labels.append("recurring costs")
+    if list(_layby_orders(business, start, end)[:1]):
+        sources += 1
+        labels.append("layby")
+    score = _clamp(sources / 4 * 100)
+    if score == 0:
+        return _empty_component("Incomplete", "No reporting sources were found.")
+    return {
+        "score": score,
+        "label": "Complete" if score >= 75 else "Partial",
+        "explanation": "Available reporting sources: " + ", ".join(labels) + ".",
+    }
+
+
+def _financing_summary(score: Optional[int], revenue: Decimal) -> tuple[str, str]:
+    if score is None:
+        return "Not ready yet", "No lender-ready score is available until business activity is recorded."
+    if score >= 85:
+        return "Strong lender-ready profile", "The business shows strong creditworthiness for supplier finance, bank review, or investor diligence."
+    if score >= 72:
+        return "Finance-ready with standard checks", "The business is a good candidate for financing, subject to normal affordability and document checks."
+    if score >= 58:
+        return "Potentially financeable", "The business may qualify for smaller facilities while improving consistency and reporting."
+    if score >= 42:
+        return "Watchlist", "The business should improve cash flow, expense control, and reporting before taking on larger obligations."
+    return "High risk", "The business is not ready for new credit without operational improvements."
+
+
+def _limit_range(score: Optional[int], avg_monthly_revenue: Decimal) -> Optional[dict]:
+    if score is None or avg_monthly_revenue <= 0:
+        return None
+    if score >= 85:
+        low, high = Decimal("0.35"), Decimal("0.60")
+    elif score >= 72:
+        low, high = Decimal("0.20"), Decimal("0.40")
+    elif score >= 58:
+        low, high = Decimal("0.10"), Decimal("0.22")
+    elif score >= 42:
+        low, high = Decimal("0.04"), Decimal("0.10")
+    else:
+        return None
+    return {
+        "low": int(avg_monthly_revenue * low),
+        "high": int(avg_monthly_revenue * high),
+        "basis": "Based on average monthly recorded revenue and current score band.",
+    }
+
+
+def calculate_business_credit_score(
+    business,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> dict:
+    today = timezone.localdate()
+    end = end_date or today
+    start = start_date or (today - timedelta(days=180))
+
     components = {
-        "default_behavior":      _score_default_behavior(orders),
-        "repayment_speed":       _score_repayment_speed(orders),
-        "debt_size":             _score_debt_size(orders),
-        "purchase_consistency":  _score_purchase_consistency(orders),
-        "relationship_duration": _score_relationship_duration(orders),
+        "revenue_consistency": _score_revenue_consistency(business),
+        "profit_trend": _score_profit_trend(business, start, end),
+        "cash_flow_stability": _score_cash_flow(business, start, end),
+        "expense_control": _score_expense_control(business, start, end),
+        "stock_turnover": _score_stock_turnover(business, start, end),
+        "payment_discipline": _score_payment_discipline(business, start, end),
+        "recurring_obligations": _score_recurring_obligations(business),
+        "debt_exposure": _score_debt_exposure(business),
+        "business_history": _score_business_history(business),
+        "operational_activity": _score_operational_activity(business, start, end),
+        "reporting_completeness": _score_reporting_completeness(business, start, end),
     }
 
-    # ── Weighted average (skip None scores) ───────────────────────────────
-    total_weight = 0
-    weighted_sum = 0.0
+    weighted = 0.0
+    available = 0
+    for key, weight in WEIGHTS.items():
+        score = components[key].get("score")
+        if score is not None:
+            weighted += score * weight
+            available += weight
+
+    if available <= 12:
+        overall = None
+        label, color = "No data yet", "gray"
+    else:
+        overall = _clamp(weighted / available)
+        label, color = _label(overall)
+
+    monthly_revenue = Decimal(str(sum(_monthly_revenue_series(business, 3)) / 3))
+    readiness_title, readiness = _financing_summary(overall, monthly_revenue)
+    limit = _limit_range(overall, monthly_revenue)
+
+    reasons = []
+    recommendations = []
     for key, comp in components.items():
-        if comp["score"] is not None:
-            w = _WEIGHTS.get(key, 0)
-            weighted_sum += comp["score"] * w
-            total_weight += w
+        score = comp.get("score")
+        title = key.replace("_", " ").title()
+        if score is not None and score >= 72:
+            reasons.append(f"{title}: {comp['label']}.")
+        elif score is not None and score < 58:
+            recommendations.append(f"Improve {title.lower()}: {comp['explanation']}")
 
-    if total_weight == 0:
-        overall = 50
-    else:
-        overall = _clamp(weighted_sum / total_weight)
+    if not reasons and overall is not None:
+        reasons.append("The score is based on partial but usable operating data.")
+    if not recommendations:
+        recommendations.append("Keep recording sales, stock, costs, and repayment activity consistently.")
+    if overall is None:
+        recommendations = [
+            "Record sales and stock activity to establish a business credit profile.",
+            "Add recurring costs so affordability can be assessed.",
+            "Keep repayment and payment records current.",
+        ]
 
-    label, status_color = _label_and_color(overall)
+    return {
+        "score": overall,
+        "label": label,
+        "status_color": color,
+        "components": components,
+        "reasons": reasons[:6],
+        "recommendations": recommendations[:6],
+        "financing_readiness_title": readiness_title,
+        "financing_readiness": readiness,
+        "recommended_credit_limit_range": limit,
+        "summary": {
+            "avg_monthly_revenue": int(monthly_revenue),
+            "monthly_recurring_obligations": int(_monthly_recurring_total(business)),
+            "sales_count": _sales_totals(business, start, end)["count"],
+            "period_start": start,
+            "period_end": end,
+        },
+        "period": {"start": start, "end": end},
+        "is_onboarding": overall is None,
+    }
 
-    # ── Recommendations ───────────────────────────────────────────────────
-    recs = []
-    db = components["default_behavior"]
-    rs = components["repayment_speed"]
-    ds = components["debt_size"]
-    pc = components["purchase_consistency"]
 
-    if db.get("score") is not None and db["score"] < 65:
-        recs.append("Follow up on incomplete or overdue layby orders before extending new credit.")
-    if rs.get("score") is not None and rs["score"] < 65:
-        recs.append("Customer tends to pay late — consider shorter terms or higher deposit requirements.")
-    if ds.get("score") is not None and ds["score"] < 65:
-        recs.append("Outstanding balance is high — avoid extending additional credit until existing balance is reduced.")
-    if pc.get("score") is not None and pc["score"] < 50:
-        recs.append("Customer history is limited. Start with a small credit limit and build trust.")
-    if overall >= 80:
-        recs.append("Excellent track record — this customer is a strong candidate for premium credit terms.")
-    elif overall >= 65:
-        recs.append("Generally reliable — standard credit terms are appropriate.")
-
-    if not recs:
-        recs.append("Continue monitoring payment behaviour on current orders.")
-
-    # ── Lending guidance ──────────────────────────────────────────────────
-    if overall >= 80:
-        lending_guidance = "✅ Approved for standard layby terms up to 12 months. Low default risk."
-    elif overall >= 65:
-        lending_guidance = "🟡 Approved with caution. Use standard terms. Monitor payments closely."
-    elif overall >= 50:
-        lending_guidance = "🟠 Conditional approval. Require higher deposit (≥40%). Maximum 6-month term."
-    else:
-        lending_guidance = "🔴 High risk. Do not extend new credit until outstanding balances are cleared."
-
-    # ── Data summary ──────────────────────────────────────────────────────
-    data_summary = {
-        "total_orders":   len(orders),
-        "completed":      sum(1 for o in orders if o.status == "completed"),
-        "active":         sum(1 for o in orders if o.status == "active"),
-        "cancelled":      sum(1 for o in orders if o.status == "cancelled"),
-        "total_value":    float(sum((o.total_price or Decimal("0")) for o in orders)),
-        "total_paid":     float(sum((o.amount_paid or Decimal("0")) for o in orders)),
-        "total_outstanding": float(sum((o.balance or Decimal("0")) for o in orders)),
-        "customer_name":  orders[0].customer_name if orders else customer_name or "",
+def calculate_customer_credit_score(business, customer_phone: str = "", customer_name: Optional[str] = None) -> dict:
+    """Backward-compatible wrapper. The product now scores the business."""
+    score = calculate_business_credit_score(business)
+    score["legacy_customer_lookup"] = {
         "customer_phone": customer_phone,
+        "customer_name": customer_name or "",
+        "note": "Customer-level credit scoring has been replaced by business creditworthiness scoring.",
     }
-
-    return {
-        "score":           overall,
-        "label":           label,
-        "status_color":    status_color,
-        "lending_guidance": lending_guidance,
-        "components":      components,
-        "recommendations": recs,
-        "data_summary":    data_summary,
-    }
-
-
-def _empty_score(reason: str) -> dict:
-    return {
-        "score":           None,
-        "label":           "No Data",
-        "status_color":    "gray",
-        "lending_guidance": reason,
-        "components":      {},
-        "recommendations": [reason],
-        "data_summary":    {},
-    }
+    return score
 
 
 def get_all_customers_credit_summary(business) -> list[dict]:
-    """
-    Return a list of all unique customers (by phone) with their credit score summary.
-    Used for the credit scores list view.
-    """
-    try:
-        from layby.models import LaybyOrder
-        Membership = None
-        try:
-            from tenants.models import Membership as M
-            Membership = M
-        except ImportError:
-            pass
-
-        qs = LaybyOrder.objects.all()
-        if Membership is not None:
-            biz_user_ids = Membership.objects.filter(
-                business=business, status="ACTIVE"
-            ).values_list("user_id", flat=True)
-            qs = qs.filter(created_by_id__in=list(biz_user_ids))
-
-        # Get unique customers
-        seen = set()
-        customers = []
-        for order in qs.order_by("-created_at"):
-            key = order.customer_phone or order.customer_name
-            if key and key not in seen:
-                seen.add(key)
-                customers.append({
-                    "name": order.customer_name,
-                    "phone": order.customer_phone,
-                })
-            if len(customers) >= 200:
-                break
-
-        results = []
-        for c in customers:
-            try:
-                score_data = calculate_customer_credit_score(
-                    business,
-                    customer_phone=c["phone"],
-                    customer_name=c["name"],
-                )
-                results.append({
-                    "name":   c["name"],
-                    "phone":  c["phone"],
-                    "score":  score_data["score"],
-                    "label":  score_data["label"],
-                    "color":  score_data["status_color"],
-                    "orders": score_data["data_summary"].get("total_orders", 0),
-                    "outstanding": score_data["data_summary"].get("total_outstanding", 0),
-                })
-            except Exception as e:
-                log.debug("Skip customer %s: %s", c["phone"], e)
-
-        results.sort(key=lambda x: (x["score"] or 0), reverse=True)
-        return results
-
-    except Exception as e:
-        log.exception("Error building credit summary list: %s", e)
-        return []
+    """Backward-compatible API shape; returns a single business-level row."""
+    score = calculate_business_credit_score(business)
+    return [
+        {
+            "name": getattr(business, "name", "Business"),
+            "phone": "",
+            "score": score.get("score"),
+            "label": score.get("label"),
+            "color": score.get("status_color"),
+            "orders": score.get("summary", {}).get("sales_count", 0),
+            "outstanding": score.get("summary", {}).get("monthly_recurring_obligations", 0),
+        }
+    ]

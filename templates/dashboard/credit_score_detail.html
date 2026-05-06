@@ -1,191 +1,25 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}Credit Score — {{ customer_name|default:customer_phone }} — {{ business.name }}{% endblock %}
+{% block title %}Business Credit Score - {{ business.name }}{% endblock %}
 
 {% block content %}
-<style>
-  .cs-detail { max-width: 1000px; margin: 0 auto; padding: 0 1rem 4rem; }
-
-  /* Hero score card */
-  .score-hero { background: #fff; border: 1px solid #bbf7d0; border-radius: 22px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 6px 28px rgba(5,150,105,.1); display: flex; align-items: center; gap: 2rem; flex-wrap: wrap; }
-  .score-gauge { flex-shrink: 0; position: relative; }
-  .score-gauge svg { display: block; }
-  .score-gauge .score-num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
-  .score-gauge .score-num .num { font-size: 2rem; font-weight: 900; color: #0f172a; line-height: 1; }
-  .score-gauge .score-num .denom { font-size: .75rem; color: #64748b; font-weight: 700; }
-  .score-info h2 { font-size: 1.5rem; font-weight: 900; color: #0f172a; margin: 0 0 .35rem; }
-  .score-info .label-pill { display: inline-flex; padding: .35rem .9rem; border-radius: 999px; font-size: .85rem; font-weight: 800; margin-bottom: .75rem; }
-  .label-green  { background: #dcfce7; color: #166534; }
-  .label-amber  { background: #fef3c7; color: #92400e; }
-  .label-orange { background: #fed7aa; color: #9a3412; }
-  .label-red    { background: #fee2e2; color: #991b1b; }
-  .label-gray   { background: #f1f5f9; color: #64748b; }
-  .lending-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: .9rem 1rem; font-size: .9rem; font-weight: 700; }
-
-  /* Summary stats */
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
-  .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: .9rem; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-  .stat-card .s-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 800; }
-  .stat-card .s-value { font-size: 1.3rem; font-weight: 900; color: #0f172a; margin-top: .15rem; }
-
-  /* Components */
-  .comp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-  .comp-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 1.25rem; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
-  .comp-card .comp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
-  .comp-card .comp-title { font-size: .85rem; font-weight: 800; color: #0f172a; }
-  .comp-card .comp-score { font-size: 1.15rem; font-weight: 900; }
-  .comp-card .comp-label { font-size: .8rem; color: #64748b; margin-bottom: .6rem; }
-  .comp-card .comp-exp { font-size: .82rem; color: #475569; }
-  .progress-bar-bg { background: #f1f5f9; border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: .4rem; }
-  .progress-bar-fg { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #059669, #10b981); transition: width .6s ease; }
-  .progress-bar-fg.orange { background: linear-gradient(90deg, #ea580c, #f97316); }
-  .progress-bar-fg.red { background: linear-gradient(90deg, #dc2626, #ef4444); }
-  .progress-bar-fg.amber { background: linear-gradient(90deg, #d97706, #f59e0b); }
-  .progress-bar-fg.gray { background: #cbd5e1; }
-
-  /* Recommendations */
-  .recs-card { background: #fff; border: 1px solid #bbf7d0; border-radius: 16px; padding: 1.5rem; box-shadow: 0 4px 18px rgba(5,150,105,.07); }
-  .rec-item { display: flex; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid #f1f5f9; font-size: .9rem; }
-  .rec-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .rec-icon { flex-shrink: 0; width: 24px; height: 24px; background: #ecfdf5; color: #059669; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .85rem; margin-top: .05rem; }
-</style>
-
-<div class="cs-detail">
-  <nav aria-label="breadcrumb" class="mb-3">
-    <ol class="breadcrumb mb-0" style="font-size:.85rem;">
-      <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
-      <li class="breadcrumb-item"><a href="{% url 'dashboard:credit_scores' %}">Credit Scores</a></li>
-      <li class="breadcrumb-item active">{{ customer_name|default:customer_phone }}</li>
-    </ol>
-  </nav>
-
-  {% if score.score is not None %}
-
-  <!-- Hero Score Card -->
-  <div class="score-hero">
-    <div class="score-gauge">
-      <svg width="140" height="140" viewBox="0 0 140 140">
-        <circle cx="70" cy="70" r="58" fill="none" stroke="#f1f5f9" stroke-width="12"/>
-        <circle id="creditArc" cx="70" cy="70" r="58" fill="none"
-          stroke="{% if score.status_color == 'green' %}#059669{% elif score.status_color == 'amber' %}#f59e0b{% elif score.status_color == 'orange' %}#ea580c{% else %}#ef4444{% endif %}"
-          stroke-width="12"
-          stroke-dasharray="0 365"
-          stroke-linecap="round"
-          transform="rotate(-90 70 70)"
-          data-score="{{ score.score|default:0 }}"/>
-      </svg>
-      <div class="score-num">
-        <span class="num">{{ score.score }}</span>
-        <span class="denom">/100</span>
-      </div>
-    </div>
-    <div class="score-info">
-      <h2>{{ customer_name|default:customer_phone }}</h2>
-      <span class="label-pill label-{{ score.status_color }}">{{ score.label }}</span>
-      <div class="lending-box">{{ score.lending_guidance }}</div>
-      {% if customer_phone %}<div class="text-muted small mt-2">📞 {{ customer_phone }}</div>{% endif %}
-    </div>
+<div class="container py-4">
+  <div class="p-4 rounded-4 border border-success-subtle bg-white shadow-sm">
+    <nav aria-label="breadcrumb" class="mb-3">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'dashboard:credit_scores' %}">Business Credit Score</a></li>
+        <li class="breadcrumb-item active">Legacy link</li>
+      </ol>
+    </nav>
+    <h1 class="h4 fw-bold text-dark mb-2">Business Credit Score</h1>
+    <p class="text-muted mb-3">
+      Credit scoring is now business-level. It evaluates the active business's creditworthiness
+      for financing, supplier terms, lenders, banks, investors, and partners.
+    </p>
+    <a class="btn btn-success rounded-pill" href="{% url 'dashboard:credit_scores' %}">
+      View business credit profile
+    </a>
   </div>
-
-  <!-- Summary Stats -->
-  {% with ds=score.data_summary %}
-  {% if ds %}
-  <div class="stat-row">
-    <div class="stat-card">
-      <div class="s-label">Total Orders</div>
-      <div class="s-value">{{ ds.total_orders|default:0 }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="s-label">Completed</div>
-      <div class="s-value" style="color:#059669">{{ ds.completed|default:0 }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="s-label">Active</div>
-      <div class="s-value" style="color:#d97706">{{ ds.active|default:0 }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="s-label">Cancelled</div>
-      <div class="s-value" style="color:#dc2626">{{ ds.cancelled|default:0 }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="s-label">Total Value</div>
-      <div class="s-value" style="font-size:1rem;">MWK {{ ds.total_value|floatformat:0 }}</div>
-    </div>
-    <div class="stat-card">
-      <div class="s-label">Outstanding</div>
-      <div class="s-value" style="font-size:1rem;color:{% if ds.total_outstanding > 0 %}#dc2626{% else %}#059669{% endif %}">
-        MWK {{ ds.total_outstanding|floatformat:0 }}
-      </div>
-    </div>
-  </div>
-  {% endif %}
-  {% endwith %}
-
-  <!-- Component Breakdown -->
-  <h5 class="fw-bold mb-3 text-dark">Score Breakdown</h5>
-  <div class="comp-grid">
-    {% for key, comp in score.components.items %}
-    <div class="comp-card">
-      <div class="comp-head">
-        <div class="comp-title">
-          {% if key == "default_behavior" %}🎯 Repayment Completion
-          {% elif key == "repayment_speed" %}⚡ Repayment Speed
-          {% elif key == "debt_size" %}💰 Debt Size
-          {% elif key == "purchase_consistency" %}📊 Purchase Consistency
-          {% elif key == "relationship_duration" %}🤝 Relationship Duration
-          {% else %}{{ key|title }}
-          {% endif %}
-        </div>
-        <div class="comp-score" style="color:{% if comp.score is not None %}{% if comp.score >= 65 %}#059669{% elif comp.score >= 50 %}#d97706{% else %}#dc2626{% endif %}{% else %}#94a3b8{% endif %}">
-          {% if comp.score is not None %}{{ comp.score }}/100{% else %}—{% endif %}
-        </div>
-      </div>
-      <div class="comp-label">{{ comp.label }}</div>
-      {% if comp.score is not None %}
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fg {% if comp.score < 50 %}red{% elif comp.score < 65 %}amber{% else %}{% endif %}"
-             style="width: {{ comp.score }}%;"></div>
-      </div>
-      {% else %}
-      <div class="progress-bar-bg"><div class="progress-bar-fg gray" style="width:0%;"></div></div>
-      {% endif %}
-      <div class="comp-exp">{{ comp.explanation }}</div>
-    </div>
-    {% endfor %}
-  </div>
-
-  <!-- Recommendations -->
-  {% if score.recommendations %}
-  <h5 class="fw-bold mb-3 text-dark">Recommendations</h5>
-  <div class="recs-card">
-    {% for rec in score.recommendations %}
-    <div class="rec-item">
-      <div class="rec-icon">→</div>
-      <div>{{ rec }}</div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  {% else %}
-  <!-- No data state -->
-  <div class="score-hero" style="flex-direction:column;text-align:center;padding:3rem;">
-    <div style="font-size:3rem;margin-bottom:1rem;">📭</div>
-    <h4 class="fw-bold">No Credit History Found</h4>
-    <p class="text-muted">{{ score.lending_guidance }}</p>
-    <a href="{% url 'dashboard:credit_scores' %}" class="btn btn-outline-success rounded-pill mt-2">Back to Credit Scores</a>
-  </div>
-  {% endif %}
 </div>
-
-<script>
-(function() {
-  var arc = document.getElementById('creditArc');
-  if (!arc) return;
-  var score = parseInt(arc.getAttribute('data-score') || '0', 10);
-  var circumference = 365;
-  arc.setAttribute('stroke-dasharray', Math.round(score * circumference / 100) + ' ' + circumference);
-})();
-</script>
 {% endblock %}

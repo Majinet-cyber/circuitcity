@@ -1432,6 +1432,7 @@ def settings_unified(request):
         "twofa_manage_url": twofa_manage_url,
         "change_password_url": change_pw_url,
         "upload_avatar_url": upload_avatar_url,
+        "active_tab": "settings",
     }
 
     # Inject SMS 2FA context for _twofa_sms_card.html partial

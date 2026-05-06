@@ -25,10 +25,11 @@ Weights (sum to 100 when all components available):
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
+from django.db.models import Sum
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,310 @@ def _null_component(explanation: str) -> dict:
     }
 
 
+def _business_kind(business) -> str:
+    return (getattr(business, "business_kind", None) or getattr(business, "kind", None) or "").lower()
+
+
+def _exclusive_end(end: date) -> date:
+    return end + timedelta(days=1)
+
+
+def _clothing_metrics(business, start: date, end: date) -> dict:
+    """
+    Reuse the clothing dashboard's own metric helpers so Business Health matches
+    the vertical dashboard numbers for revenue, profit, costs, and stock value.
+    """
+    from inventory.verticals import base as vertical_base
+
+    sales = vertical_base.clothing_sales_metrics(
+        business,
+        start_date=start,
+        end_date=_exclusive_end(end),
+    )
+    inventory = vertical_base.clothing_inventory_metrics(business)
+    days = sum(1 for row in sales.get("sales_trend", []) if row.get("count", 0) > 0)
+
+    return {
+        "revenue": sales.get("revenue") or Decimal("0"),
+        "cost": sales.get("cost_of_goods") or Decimal("0"),
+        "overhead_costs": sales.get("overhead_costs") or Decimal("0"),
+        "profit": sales.get("profit") or Decimal("0"),
+        "count": sales.get("total_sales") or 0,
+        "days": days,
+        "stock_value": inventory.get("inventory_value") or Decimal("0"),
+        "retail_value": inventory.get("retail_value") or Decimal("0"),
+        "expected_margin": inventory.get("expected_margin") or Decimal("0"),
+        "sales_trend": sales.get("sales_trend") or [],
+    }
+
+
+def _sales_totals(business, start: date, end: date) -> dict:
+    """
+    Return business-scoped sales totals from the canonical Sale table when
+    available, falling back to sold InventoryItem rows.
+    """
+    if _business_kind(business) == "clothing":
+        try:
+            metrics = _clothing_metrics(business, start, end)
+            return {
+                "revenue": metrics["revenue"],
+                "cost": metrics["cost"] + metrics["overhead_costs"],
+                "count": metrics["count"],
+                "days": metrics["days"],
+            }
+        except Exception as exc:
+            logger.warning("clothing health sales metrics failed: %s", exc)
+
+    try:
+        from sales.models import Sale
+
+        sales = Sale.objects.filter(
+            location__business=business,
+            sold_at__gte=start,
+            sold_at__lte=end,
+            is_rolled_back=False,
+        ).select_related("item")
+        if sales.exists():
+            rows = list(sales)
+            revenue = sum((row.price or Decimal("0")) for row in rows)
+            cost = sum((getattr(row.item, "order_price", None) or Decimal("0")) for row in rows)
+            days = len({row.sold_at for row in rows if row.sold_at})
+            return {"revenue": revenue, "cost": cost, "count": len(rows), "days": days}
+    except Exception:
+        pass
+
+    try:
+        from inventory.models import InventoryItem
+        from django.db.models import Count, Sum
+        from django.db.models.functions import TruncDate
+
+        qs = InventoryItem.objects.filter(
+            business=business,
+            status="SOLD",
+            sold_at__date__gte=start,
+            sold_at__date__lte=end,
+            selling_price__isnull=False,
+        )
+        agg = qs.aggregate(revenue=Sum("selling_price"), cost=Sum("order_price"), count=Count("id"))
+        days = qs.annotate(day=TruncDate("sold_at")).values("day").distinct().count()
+        return {
+            "revenue": agg.get("revenue") or Decimal("0"),
+            "cost": agg.get("cost") or Decimal("0"),
+            "count": agg.get("count") or 0,
+            "days": days,
+        }
+    except Exception:
+        return {"revenue": Decimal("0"), "cost": Decimal("0"), "count": 0, "days": 0}
+
+
+def _monthly_recurring_costs(business) -> Decimal:
+    try:
+        from inventory.models import RecurringCost
+
+        total = Decimal("0")
+        for cost in RecurringCost.objects.filter(business=business, is_active=True):
+            amount = cost.amount or Decimal("0")
+            if cost.frequency == "weekly":
+                total += amount * Decimal("4.33")
+            elif cost.frequency == "quarterly":
+                total += amount / Decimal("3")
+            elif cost.frequency == "annually":
+                total += amount / Decimal("12")
+            else:
+                total += amount
+        return total
+    except Exception:
+        return Decimal("0")
+
+
+def _business_has_older_data(business, start: date) -> bool:
+    """True when useful business data exists before the current scoring window."""
+    if _business_kind(business) == "clothing":
+        try:
+            from inventory.models import MerchProduct
+            from inventory.models_clothing_barcode import ClothingBarcodeUnit
+            from inventory.models_verticals import ClothingSale
+
+            return (
+                ClothingSale.objects.filter(business=business).exists()
+                or MerchProduct.objects.filter(
+                    business=business,
+                    kind="clothing",
+                    is_active=True,
+                    is_archived=False,
+                    quantity_in_stock__gt=0,
+                ).exists()
+                or ClothingBarcodeUnit.objects.filter(
+                    business=business,
+                    is_active=True,
+                    status="IN_STOCK",
+                ).exists()
+            )
+        except Exception:
+            pass
+
+    try:
+        from sales.models import Sale
+
+        if Sale.objects.filter(
+            location__business=business,
+            sold_at__lt=start,
+            is_rolled_back=False,
+        ).exists():
+            return True
+    except Exception:
+        pass
+
+    try:
+        from inventory.models import InventoryItem, RecurringCost
+
+        if InventoryItem.objects.filter(business=business, is_active=True).exists():
+            return True
+        if InventoryItem.objects.filter(
+            business=business,
+            status="SOLD",
+            sold_at__date__lt=start,
+            selling_price__isnull=False,
+        ).exists():
+            return True
+        if RecurringCost.objects.filter(business=business, is_active=True).exists():
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _cfo_expense_total(business, start: date, end: date) -> Decimal:
+    """
+    Include CFO expenses only when they can be scoped to the active business.
+    Some installations store branch as free text, so avoid global aggregation.
+    """
+    try:
+        from django.apps import apps
+
+        if not apps.is_installed("cfo"):
+            return Decimal("0")
+
+        Expense = apps.get_model("cfo", "Expense")
+        qs = Expense.objects.filter(date__gte=start, date__lte=end)
+        branch_field = Expense._meta.get_field("branch")
+
+        if getattr(branch_field, "remote_field", None) and branch_field.remote_field:
+            related_model = branch_field.remote_field.model
+            related_fields = {field.name for field in related_model._meta.get_fields()}
+            if "business" in related_fields:
+                qs = qs.filter(branch__business=business)
+            else:
+                return Decimal("0")
+        else:
+            branch_values = [str(business.pk), getattr(business, "slug", ""), getattr(business, "name", "")]
+            branch_values = [value for value in branch_values if value]
+            if not branch_values:
+                return Decimal("0")
+            qs = qs.filter(branch__in=branch_values)
+
+        from django.db.models import Sum
+
+        return qs.aggregate(total=Sum("amount")).get("total") or Decimal("0")
+    except Exception:
+        return Decimal("0")
+
+
+def _summary_cards(business, start: date, end: date) -> list[dict]:
+    """Small business-scoped facts for the health page header cards."""
+    if _business_kind(business) == "clothing":
+        metrics = _clothing_metrics(business, start, end)
+        revenue = metrics["revenue"]
+        gross_profit = metrics["profit"]
+        recurring = metrics["cost"] + metrics["overhead_costs"]
+        cost_label = "Costs"
+        cost_detail = "Cost of goods plus overheads"
+        stock_value = metrics["stock_value"]
+        sales_count = metrics["count"]
+        stock_count = 0
+        try:
+            from inventory.models import MerchProduct
+            from inventory.models_clothing_barcode import ClothingBarcodeUnit
+            common_units = (
+                MerchProduct.objects.filter(
+                    business=business,
+                    kind="clothing",
+                    is_active=True,
+                    is_archived=False,
+                    quantity_in_stock__gt=0,
+                ).aggregate(total=Sum("quantity_in_stock")).get("total") or 0
+            )
+            tracked_units = ClothingBarcodeUnit.objects.filter(
+                business=business,
+                is_active=True,
+                status="IN_STOCK",
+            ).count()
+            stock_count = int(common_units or 0) + tracked_units
+        except Exception:
+            pass
+        revenue_delta = None
+    else:
+        sales = _sales_totals(business, start, end)
+        sales_count = sales["count"]
+        prior_days = max((end - start).days, 1)
+        prior_start = start - timedelta(days=prior_days)
+        prior_end = start - timedelta(days=1)
+        prior_sales = _sales_totals(business, prior_start, prior_end)
+
+        revenue = sales["revenue"]
+        gross_profit = revenue - sales["cost"]
+        prior_revenue = prior_sales["revenue"]
+        revenue_delta = None
+        if prior_revenue > 0:
+            revenue_delta = float((revenue - prior_revenue) / prior_revenue * 100)
+
+        stock_count = 0
+        stock_value = Decimal("0")
+        try:
+            from inventory.models import InventoryItem
+            stock = InventoryItem.objects.filter(business=business, is_active=True, status="IN_STOCK")
+            stock_count = stock.count()
+            stock_value = sum((item.order_price or Decimal("0")) for item in stock.only("order_price"))
+        except Exception:
+            pass
+
+        recurring = _monthly_recurring_costs(business)
+        cost_label = "Recurring Costs"
+        cost_detail = "Estimated monthly obligations"
+
+    return [
+        {
+            "label": "Revenue",
+            "value": f"MWK {revenue:,.0f}",
+            "detail": (
+                f"{revenue_delta:+.0f}% vs prior period"
+                if revenue_delta is not None
+                else f"{sales_count} sales in period"
+            ),
+            "icon": "bi-cash-stack",
+        },
+        {
+            "label": "Profit",
+            "value": f"MWK {gross_profit:,.0f}",
+            "detail": "Revenue less cost of goods and overheads",
+            "icon": "bi-graph-up-arrow",
+        },
+        {
+            "label": "Stock On Hand",
+            "value": f"{stock_count:,} units",
+            "detail": f"MWK {stock_value:,.0f} at cost",
+            "icon": "bi-box-seam",
+        },
+        {
+            "label": cost_label,
+            "value": f"MWK {recurring:,.0f}",
+            "detail": cost_detail,
+            "icon": "bi-calendar2-week",
+        },
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Individual component scorers
 # ---------------------------------------------------------------------------
@@ -95,25 +400,9 @@ def _score_profit_trend(business, start: date, end: date) -> dict:
     Uses InventoryItem sold records scoped to the business.
     """
     try:
-        from inventory.models import InventoryItem
-        from django.db.models import Sum
-
-        qs = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__date__gte=start,
-            sold_at__date__lte=end,
-            selling_price__isnull=False,
-            order_price__gt=0,
-        )
-
-        agg = qs.aggregate(
-            revenue=Sum("selling_price"),
-            cost=Sum("order_price"),
-        )
-
-        revenue = agg.get("revenue") or Decimal("0")
-        cost = agg.get("cost") or Decimal("0")
+        totals = _sales_totals(business, start, end)
+        revenue = totals["revenue"]
+        cost = totals["cost"]
 
         if revenue <= 0:
             return _null_component("No sales recorded in this period. Record your first sale to see profit trend.")
@@ -125,20 +414,9 @@ def _score_profit_trend(business, start: date, end: date) -> dict:
         prior_start = start - timedelta(days=days)
         prior_end = start - timedelta(days=1)
 
-        prior_agg = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__date__gte=prior_start,
-            sold_at__date__lte=prior_end,
-            selling_price__isnull=False,
-            order_price__gt=0,
-        ).aggregate(
-            revenue=Sum("selling_price"),
-            cost=Sum("order_price"),
-        )
-
-        prior_rev = prior_agg.get("revenue") or Decimal("0")
-        prior_cost = prior_agg.get("cost") or Decimal("0")
+        prior_totals = _sales_totals(business, prior_start, prior_end)
+        prior_rev = prior_totals["revenue"]
+        prior_cost = prior_totals["cost"]
         prior_margin = float((prior_rev - prior_cost) / prior_rev * 100) if prior_rev > 0 else 0
 
         # Base score: margin quality
@@ -183,33 +461,16 @@ def _score_cash_flow(business, start: date, end: date) -> dict:
     with consistent daily inflows scores better.
     """
     try:
-        from inventory.models import InventoryItem
-        from django.db.models import Sum, Count
-        from django.db.models.functions import TruncDate
-
-        qs = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__date__gte=start,
-            sold_at__date__lte=end,
-            selling_price__isnull=False,
-        )
-
-        agg = qs.aggregate(revenue=Sum("selling_price"), count=Count("id"))
-        revenue = agg.get("revenue") or Decimal("0")
-        count = agg.get("count") or 0
+        totals = _sales_totals(business, start, end)
+        revenue = totals["revenue"]
+        count = totals["count"]
 
         if count == 0:
             return _null_component(
                 "No sales in this period. Cash flow cannot be assessed without recorded revenue."
             )
 
-        days_active = (
-            qs.annotate(day=TruncDate("sold_at"))
-            .values("day")
-            .distinct()
-            .count()
-        )
+        days_active = totals["days"]
 
         total_days = max((end - start).days, 1)
         # Coverage: fraction of days with at least one sale
@@ -245,6 +506,63 @@ def _score_stock_risk(business, *_) -> dict:
     Score based on ratio of in-stock items to potential stockout risk.
     Low risk = good score.
     """
+    if _business_kind(business) == "clothing":
+        try:
+            metrics = _clothing_metrics(business, timezone.localdate().replace(day=1), timezone.localdate())
+            from inventory.models import MerchProduct
+            from inventory.models_clothing_barcode import ClothingBarcodeUnit
+
+            common_units = (
+                MerchProduct.objects.filter(
+                    business=business,
+                    kind="clothing",
+                    is_active=True,
+                    is_archived=False,
+                    quantity_in_stock__gt=0,
+                ).aggregate(total=Sum("quantity_in_stock")).get("total") or 0
+            )
+            tracked_units = ClothingBarcodeUnit.objects.filter(
+                business=business,
+                is_active=True,
+                status="IN_STOCK",
+            ).count()
+            units = int(common_units or 0) + tracked_units
+            stock_value = metrics["stock_value"]
+
+            if units == 0 and stock_value <= 0:
+                return _null_component("No active clothing stock found. Add inventory to see stock health.")
+
+            low_stock_count = MerchProduct.objects.filter(
+                business=business,
+                kind="clothing",
+                is_active=True,
+                is_archived=False,
+                quantity_in_stock__gt=0,
+                quantity_in_stock__lte=5,
+            ).count()
+
+            score = 88
+            if low_stock_count:
+                score = max(45, score - min(35, low_stock_count * 4))
+            if metrics["revenue"] > 0 and stock_value > 0:
+                stock_cover = float(stock_value / metrics["revenue"])
+                if stock_cover < 0.5:
+                    score = min(score, 58)
+                elif stock_cover > 8:
+                    score = min(score, 68)
+
+            thresholds = ((80, "Healthy"), (65, "Good"), (50, "Watch"), (35, "At Risk"), (0, "Critical"))
+            return {
+                "score": score,
+                "label": _component_label(score, thresholds),
+                "explanation": (
+                    f"Current clothing stock value is {float(stock_value):,.0f} MWK across {units:,} units. "
+                    + (f"{low_stock_count} product lines are low on stock." if low_stock_count else "No low-stock pressure detected.")
+                ),
+            }
+        except Exception as exc:
+            logger.warning("clothing stock scorer error: %s", exc)
+
     try:
         from inventory.models import InventoryItem
         from django.db.models import Count
@@ -311,23 +629,52 @@ def _score_sales_consistency(business, start: date, end: date) -> dict:
     Uses coefficient of variation (lower = more consistent = better).
     """
     try:
-        from inventory.models import InventoryItem
         from django.db.models import Count
         from django.db.models.functions import TruncDate
         import statistics
 
-        daily_counts = list(
-            InventoryItem.objects.filter(
-                business=business,
-                status="SOLD",
-                sold_at__date__gte=start,
-                sold_at__date__lte=end,
+        if _business_kind(business) == "clothing":
+            from inventory.models_verticals import ClothingSale
+            daily_counts = list(
+                ClothingSale.objects.filter(
+                    business=business,
+                    sold_at__gte=timezone.make_aware(datetime.combine(start, datetime.min.time())),
+                    sold_at__lt=timezone.make_aware(datetime.combine(_exclusive_end(end), datetime.min.time())),
+                )
+                .annotate(day=TruncDate("sold_at"))
+                .values("day")
+                .annotate(cnt=Count("id"))
+                .values_list("cnt", flat=True)
             )
-            .annotate(day=TruncDate("sold_at"))
-            .values("day")
-            .annotate(cnt=Count("id"))
-            .values_list("cnt", flat=True)
-        )
+        else:
+            try:
+                from sales.models import Sale
+                sale_qs = Sale.objects.filter(
+                    location__business=business,
+                    sold_at__gte=start,
+                    sold_at__lte=end,
+                    is_rolled_back=False,
+                )
+                if sale_qs.exists():
+                    daily_counts = list(
+                        sale_qs.values("sold_at").annotate(cnt=Count("id")).values_list("cnt", flat=True)
+                    )
+                else:
+                    raise ValueError("no Sale rows")
+            except Exception:
+                from inventory.models import InventoryItem
+                daily_counts = list(
+                    InventoryItem.objects.filter(
+                        business=business,
+                        status="SOLD",
+                        sold_at__date__gte=start,
+                        sold_at__date__lte=end,
+                    )
+                    .annotate(day=TruncDate("sold_at"))
+                    .values("day")
+                    .annotate(cnt=Count("id"))
+                    .values_list("cnt", flat=True)
+                )
 
         if len(daily_counts) < 3:
             return _null_component(
@@ -374,41 +721,62 @@ def _score_expense_control(business, start: date, end: date) -> dict:
     Gracefully returns null if expense data is unavailable.
     """
     try:
-        from inventory.models import InventoryItem
-        from django.db.models import Sum
+        if _business_kind(business) == "clothing":
+            metrics = _clothing_metrics(business, start, end)
+            revenue = float(metrics["revenue"] or 0)
+            total_expenses = float(metrics["overhead_costs"] or 0)
+            if revenue <= 0 and total_expenses <= 0:
+                return _null_component("No clothing revenue or cost data found for this period.")
+            if revenue <= 0:
+                return {
+                    "score": 40,
+                    "label": "Unbenchmarked",
+                    "explanation": f"Costs are about {total_expenses:,.0f} MWK, but no revenue was found.",
+                }
+            expense_ratio = total_expenses / revenue
+            if expense_ratio <= 0.15:
+                score = 90
+            elif expense_ratio <= 0.25:
+                score = 75
+            elif expense_ratio <= 0.40:
+                score = 60
+            elif expense_ratio <= 0.60:
+                score = 45
+            else:
+                score = 25
 
-        revenue_agg = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__date__gte=start,
-            sold_at__date__lte=end,
-            selling_price__isnull=False,
-        ).aggregate(revenue=Sum("selling_price"))
+            thresholds = ((80, "Lean"), (65, "Controlled"), (50, "Moderate"), (35, "High"), (0, "Excessive"))
+            return {
+                "score": score,
+                "label": _component_label(score, thresholds),
+                "explanation": (
+                    f"Dashboard overhead costs are {total_expenses:,.0f} MWK against "
+                    f"{revenue:,.0f} MWK revenue ({expense_ratio:.0%})."
+                ),
+            }
 
-        revenue = float(revenue_agg.get("revenue") or 0)
+        revenue = float(_sales_totals(business, start, end)["revenue"] or 0)
+        recurring_monthly = float(_monthly_recurring_costs(business) or 0)
 
-        if revenue <= 0:
-            return _null_component("No revenue data to compare against expenses.")
+        if revenue <= 0 and recurring_monthly <= 0:
+            return _null_component("No revenue or recurring-cost data to compare against expenses.")
 
-        # Try to get expense data from cfo app
-        total_expenses = 0.0
-        try:
-            from django.apps import apps
-            if apps.is_installed("cfo"):
-                Expense = apps.get_model("cfo", "Expense")
-                # cfo.Expense uses branch FK — try to get branch for this business
-                exp_agg = Expense.objects.filter(
-                    date__gte=start,
-                    date__lte=end,
-                ).aggregate(total=Sum("amount"))
-                total_expenses = float(exp_agg.get("total") or 0)
-        except Exception:
-            pass
+        total_expenses = float(_cfo_expense_total(business, start, end))
+
+        period_months = max((end - start).days + 1, 1) / 30
+        total_expenses += recurring_monthly * period_months
 
         if total_expenses == 0:
             return _null_component(
                 "No expense records found. Start recording expenses to see your expense control score."
             )
+
+        if revenue <= 0:
+            return {
+                "score": 40,
+                "label": "Unbenchmarked",
+                "explanation": f"Recurring costs are about {total_expenses:,.0f} MWK for this period, but no revenue was found.",
+            }
 
         expense_ratio = total_expenses / revenue
 
@@ -443,15 +811,7 @@ def _score_credit_exposure(business, start: date, end: date) -> dict:
     High credit exposure = lower score.
     """
     try:
-        from inventory.models import InventoryItem
-        from django.db.models import Count, Sum
-
-        total_sold = InventoryItem.objects.filter(
-            business=business,
-            status="SOLD",
-            sold_at__date__gte=start,
-            sold_at__date__lte=end,
-        ).count()
+        total_sold = _sales_totals(business, start, end)["count"]
 
         if total_sold == 0:
             return _null_component("No sales recorded. Record sales to measure credit exposure.")
@@ -585,6 +945,7 @@ def calculate_business_health_score(
     business,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
+    _allow_extended_period: bool = True,
 ) -> dict:
     """
     Calculate a Business Health Score for *business* over the given date range.
@@ -609,7 +970,7 @@ def calculate_business_health_score(
     if end_date is None:
         end_date = today
     if start_date is None:
-        start_date = today - timedelta(days=30)
+        start_date = today.replace(day=1)
 
     # Run all component scorers
     components: dict = {}
@@ -685,7 +1046,21 @@ def calculate_business_health_score(
         )
 
     if available_weight == 0:
-        # Truly new business — nothing to score yet
+        if _allow_extended_period and _business_has_older_data(business, start_date):
+            business_created = getattr(business, "created_at", None)
+            created_date = business_created.date() if business_created else today - timedelta(days=365)
+            wide_start = min(today - timedelta(days=365), created_date)
+            if wide_start < start_date:
+                result = calculate_business_health_score(
+                    business,
+                    start_date=wide_start,
+                    end_date=end_date,
+                    _allow_extended_period=False,
+                )
+                result["used_extended_period"] = True
+                return result
+
+        # Truly new business: nothing useful exists to score yet.
         return {
             "score": None,
             "label": "No data yet",
@@ -698,6 +1073,8 @@ def calculate_business_health_score(
             ],
             "period": {"start": start_date, "end": end_date},
             "is_onboarding": True,
+            "used_extended_period": False,
+            "summary_cards": _summary_cards(business, start_date, end_date),
         }
 
     # Normalise: re-scale so available weights sum to 100
@@ -767,4 +1144,6 @@ def calculate_business_health_score(
         "recommendations": recommendations,
         "period": {"start": start_date, "end": end_date},
         "is_onboarding": False,
+        "used_extended_period": not _allow_extended_period,
+        "summary_cards": _summary_cards(business, start_date, end_date),
     }

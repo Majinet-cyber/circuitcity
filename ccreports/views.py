@@ -18,6 +18,7 @@ from reports.services.context_defaults import apply_default_report_context
 __all__ = [
     "home", "sales_report", "inventory_report", "which_templates",
     "pl_report", "executive_summary", "credit_exposure_report",
+    "sales_report_pdf", "inventory_report_pdf",
     "pl_report_pdf", "executive_summary_pdf",
 ]
 
@@ -148,6 +149,12 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
     """
     Inventory report view (safe defaults).
     """
+    try:
+        from reports.views import inventory_report as reports_inventory
+        return reports_inventory(request)
+    except ImportError:
+        pass
+
     ctx: Dict[str, Any] = {
         "title": "Reports - Inventory",
         "low_stock": [],
@@ -166,6 +173,24 @@ def inventory_report(request: HttpRequest) -> HttpResponse:
         candidates=("ccreports/inventory.html", "reports/inventory.html"),
         context=ctx,
     )
+
+
+@login_required
+def sales_report_pdf(request: HttpRequest) -> HttpResponse:
+    try:
+        from reports.views import sales_report_pdf as reports_sales_pdf
+        return reports_sales_pdf(request)
+    except ImportError:
+        return HttpResponse("Sales report PDF is not available.", status=503, content_type="text/plain")
+
+
+@login_required
+def inventory_report_pdf(request: HttpRequest) -> HttpResponse:
+    try:
+        from reports.views import inventory_report_pdf as reports_inventory_pdf
+        return reports_inventory_pdf(request)
+    except ImportError:
+        return HttpResponse("Stock report PDF is not available.", status=503, content_type="text/plain")
 
 
 # --------------------------------------------------

@@ -1778,6 +1778,8 @@ def business_health_view(request):
     return render(request, "dashboard/business_health.html", {
         "business": business,
         "health": health,
+        "active_tab": "business_health",
+        "show_search": False,
     })
 
 
@@ -1818,16 +1820,18 @@ def business_health_api(request):
 @require_business
 def credit_scores_list(request):
     """
-    Lists all customers with layby history and their credit score summaries.
+    Shows the active business's creditworthiness score.
     GET /dashboard/credit-scores/
     """
-    from dashboard.services_credit import get_all_customers_credit_summary
+    from dashboard.services_credit import calculate_business_credit_score
+
     business = request.business
-    customers = get_all_customers_credit_summary(business)
+    credit = calculate_business_credit_score(business)
     return render(request, "dashboard/credit_scores.html", {
         "business": business,
-        "customers": customers,
-        "total": len(customers),
+        "credit": credit,
+        "active_tab": "credit_scores",
+        "show_search": False,
     })
 
 
@@ -1835,18 +1839,20 @@ def credit_scores_list(request):
 @require_business
 def credit_score_detail(request, customer_phone: str):
     """
-    Full credit score breakdown for a single customer.
+    Backward-compatible legacy route. Credit scoring is now business-level,
+    so render the same business credit profile for the active business.
     GET /dashboard/credit-score/<customer_phone>/
     """
-    from dashboard.services_credit import calculate_customer_credit_score
+    from dashboard.services_credit import calculate_business_credit_score
+
     business = request.business
-    customer_name = request.GET.get("name", "")
-    score = calculate_customer_credit_score(business, customer_phone, customer_name=customer_name or None)
-    return render(request, "dashboard/credit_score_detail.html", {
+    credit = calculate_business_credit_score(business)
+    return render(request, "dashboard/credit_scores.html", {
         "business": business,
-        "score": score,
-        "customer_phone": customer_phone,
-        "customer_name": score.get("data_summary", {}).get("customer_name", customer_name),
+        "credit": credit,
+        "active_tab": "credit_scores",
+        "show_search": False,
+        "legacy_customer_phone": customer_phone,
     })
 
 
@@ -1855,14 +1861,24 @@ def credit_score_detail(request, customer_phone: str):
 @require_GET
 def credit_score_api(request, customer_phone: str):
     """
-    JSON endpoint for customer credit score.
+    Backward-compatible JSON endpoint. Returns business creditworthiness.
     GET /dashboard/api/credit-score/<customer_phone>/
     """
-    from dashboard.services_credit import calculate_customer_credit_score
+    from dashboard.services_credit import calculate_business_credit_score
+
     business = request.business
-    customer_name = request.GET.get("name", "")
-    score = calculate_customer_credit_score(business, customer_phone, customer_name=customer_name or None)
-    return JsonResponse(score)
+    credit = calculate_business_credit_score(business)
+    credit["legacy_customer_phone"] = customer_phone
+    return JsonResponse(credit)
+
+
+@login_required
+@require_business
+@require_GET
+def business_credit_score_api(request):
+    from dashboard.services_credit import calculate_business_credit_score
+
+    return JsonResponse(calculate_business_credit_score(request.business))
 
 
 # ---------------------------------------------------------------------------
