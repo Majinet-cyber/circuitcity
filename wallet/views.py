@@ -1066,7 +1066,7 @@ def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
         ["Hours worked", attendance.get("hours_worked", "")],
         ["Payment method", p.payment_method_label or "Manual"],
         ["Prepared by", getattr(p.created_by, "get_username", lambda: "")() if p.created_by_id else ""],
-        ["Status", p.get_status_display()],
+        ["Status", p.display_status],
     ]
     earnings_rows = [
         ["Earnings", "Amount"],

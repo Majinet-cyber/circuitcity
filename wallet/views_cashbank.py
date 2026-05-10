@@ -162,6 +162,13 @@ def _summary(request: HttpRequest):
     )
     cash_on_hand = q2(_sum_signed(base.filter(payment_method=CashBankTransaction.PaymentMethod.CASH)))
     expected = _receivables_for_business(business) if business else Decimal("0.00")
+    total_available = q2(cash_on_hand + bank + mobile)
+    cash_in_q = q2(cash_in)
+    cash_out_q = q2(cash_out)
+    flow_base = cash_in_q if cash_in_q > 0 else Decimal("1.00")
+    expense_pressure = min(100, int((cash_out_q / flow_base) * Decimal("100")))
+    collection_strength = min(100, int((closing / (expected or Decimal("1.00"))) * Decimal("100"))) if expected > 0 and closing > 0 else (100 if closing > 0 else 0)
+    cash_flow_score = max(0, min(100, 100 - expense_pressure + (20 if closing > 0 else 0)))
     return {
         "business": business,
         "preset": preset,
@@ -170,15 +177,21 @@ def _summary(request: HttpRequest):
         "rows": filtered.select_related("created_by").order_by("-date", "-id"),
         "summary": {
             "opening_balance": q2(opening),
-            "total_cash_in": q2(cash_in),
-            "total_cash_out": q2(cash_out),
+            "total_cash_in": cash_in_q,
+            "total_cash_out": cash_out_q,
             "closing_balance": closing,
             "cash_on_hand": cash_on_hand,
             "bank_balance": bank,
             "mobile_money_balance": mobile,
-            "total_available_cash": q2(cash_on_hand + bank + mobile),
+            "total_available_cash": total_available,
             "expected_receivables": expected,
             "expected_vs_actual": q2(expected - closing),
+        },
+        "indicators": {
+            "cash_flow_score": cash_flow_score,
+            "expense_pressure": expense_pressure,
+            "collection_strength": collection_strength,
+            "cash_badge": "Cash Healthy" if total_available > 0 and cash_flow_score >= 60 else "Needs Attention",
         },
     }
 

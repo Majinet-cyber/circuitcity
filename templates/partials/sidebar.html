@@ -19,6 +19,7 @@
 
 {# Django admin (always safe) #}
 {% url 'admin:index' as url_admin %}
+{% url 'wallet:cash_statement' as url_cash_bank %}
 
 <!-- =========================
      STYLES (one visual system for all roles)
@@ -140,6 +141,19 @@
 
   <!-- energy-sidebar-simulations:v1 -->
   <!-- ---------- Tenant Business Navigation (Vertical-Aware) ---------- -->
+  {% if request.business %}
+  <div>
+    <div class="cc-section">Money</div>
+    <ul class="cc-nav">
+      <li class="{% if request.path|slice:'0:17' == '/wallet/cash-bank' %}active{% endif %}">
+        <a class="navlink" href="{{ url_cash_bank|default:'/wallet/cash-bank/' }}" data-cy="nav-cash-bank">
+          <i class="bi bi-bank"></i><span>Cash &amp; Bank</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+  {% endif %}
+
   {% if request.business and sidebar_items %}
     {% with vertical=BUSINESS_VERTICAL|default:'phones' %}
     

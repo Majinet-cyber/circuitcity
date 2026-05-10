@@ -32,7 +32,7 @@
   .orders-table tbody tr:hover{background:#f8fafc}
   
   .status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:.85rem;font-weight:700}
-  .s-draft{background:#f1f5f9;color:#475569}
+  .s-draft{background:#ecfdf5;color:#065f46}
   .s-pending{background:#fff7ed;color:#9a3412}
   .s-approved{background:#d1fae5;color:#065f46}
   .s-received{background:#dbeafe;color:#1e40af}
@@ -123,6 +123,12 @@ const statusClass = s => {
   return "s-draft";
 };
 
+const statusLabel = s => {
+  s = String(s || "").toLowerCase();
+  if (!s || s === "draft") return "Prepared";
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
 function setCount(n){ 
   document.getElementById('countBadge').textContent = `${n} order${n===1?"":"s"}`; 
 }
@@ -158,7 +164,7 @@ function renderTable(rows){
             <td><strong>#${o.id ?? "—"}</strong></td>
             <td>${o.reference ?? "—"}</td>
             <td>${o.supplier_name ?? o.customer_name ?? "—"}</td>
-            <td><span class="status ${statusClass(o.status)}">${o.status ?? "Draft"}</span></td>
+            <td><span class="status ${statusClass(o.status)}">${statusLabel(o.status)}</span></td>
             <td><strong>${fmtMoney(o.total)}</strong></td>
             <td>${fmtDate(o.created_at)}</td>
             <td>

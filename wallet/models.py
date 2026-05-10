@@ -338,10 +338,10 @@ def _default_base_salary() -> Decimal:
 
 
 class PayslipStatus(models.TextChoices):
-    DRAFT = "DRAFT", "Draft"
-    SENT = "SENT", "Sent"
+    DRAFT = "DRAFT", "Prepared"
+    SENT = "SENT", "Issued"
     PAID = "PAID", "Paid"
-    FAILED = "FAILED", "Failed"
+    FAILED = "FAILED", "Cancelled"
 
 
 class Payslip(models.Model):
@@ -413,6 +413,18 @@ class Payslip(models.Model):
             full = self.agent.get_full_name()
             return full or self.agent.get_username()
         return "Employee"
+
+    @property
+    def display_status(self) -> str:
+        if self.status == PayslipStatus.DRAFT:
+            return "Prepared"
+        if self.status == PayslipStatus.SENT:
+            return "Issued"
+        if self.status == PayslipStatus.PAID:
+            return "Paid"
+        if self.status == PayslipStatus.FAILED:
+            return "Cancelled"
+        return str(self.status or "Prepared").title()
 
     def _make_reference(self) -> str:
         ts = timezone.now().strftime("%y%m%d%H%M%S")
@@ -512,7 +524,7 @@ class PayoutSchedule(models.Model):
 # Admin Purchase Orders
 # ----------------------------------------------------------------------
 class PurchaseOrderStatus(models.TextChoices):
-    DRAFT = "draft", "Draft"
+    DRAFT = "draft", "Prepared"
     SENT = "sent", "Sent"
     COMPLETED = "completed", "Completed"
     CANCELLED = "cancelled", "Cancelled"

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize static marketplace_media %}
 
-{% block title %}Purchase Order #{{ order.id }} · Emajinet{% endblock %}
+{% block title %}Purchase Order #{{ order.id }} - Emajinet{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -52,7 +52,7 @@
   .invoice-footer{text-align:center;padding-top:20px;border-top:2px solid #e5e7eb;color:#64748b;font-size:.9rem}
   
   .status-badge{display:inline-flex;align-items:center;padding:6px 14px;border-radius:999px;font-size:.9rem;font-weight:700}
-  .status-draft{background:#f1f5f9;color:#475569}
+  .status-draft{background:#ecfdf5;color:#065f46}
   .status-sent{background:#fef3c7;color:#92400e}
   .status-completed{background:#d1fae5;color:#065f46}
   .status-cancelled{background:#fee2e2;color:#991b1b}
@@ -116,7 +116,7 @@
         <p>Date: {{ order.created_at|date:"d M Y" }}</p>
         <p>
           {% if order.status == "draft" %}
-            <span class="status-badge status-draft">Draft</span>
+            <span class="status-badge status-draft">Prepared</span>
           {% elif order.status == "sent" %}
             <span class="status-badge status-sent">Sent</span>
           {% elif order.status == "completed" %}
@@ -133,7 +133,7 @@
     <div class="invoice-parties">
       <div class="party">
         <h3>From:</h3>
-        <p><strong>{{ business.name|default:ACTIVE_BUSINESS.name|default:"Your Business" }}</strong></p>
+        <p><strong>{{ business.name|default:"Your Business" }}</strong></p>
         {% if order.agent_name %}
         <p>Agent: {{ order.agent_name }}</p>
         {% endif %}
@@ -144,7 +144,7 @@
       
       <div class="party">
         <h3>To (Supplier):</h3>
-        <p><strong>{{ order.supplier_name|default:"—" }}</strong></p>
+        <p><strong>{{ order.supplier_name|default:"-" }}</strong></p>
         {% if order.supplier_email %}
         <p>Email: {{ order.supplier_email }}</p>
         {% endif %}
@@ -153,6 +153,12 @@
         {% endif %}
       </div>
     </div>
+    {% if order.expected_delivery_date %}
+    <div class="invoice-notes" style="background:#eff6ff;border-color:#bfdbfe">
+      <h4 style="color:#1e3a8a"><i class="bi bi-truck"></i> Expected Delivery</h4>
+      <p style="color:#1e40af">{{ order.expected_delivery_date|date:"d M Y" }}</p>
+    </div>
+    {% endif %}
 
     <div class="invoice-table">
       <table>
@@ -160,6 +166,8 @@
           <tr>
             <th>#</th>
             <th>Product</th>
+            <th>Model</th>
+            <th>Code/SKU</th>
             <th class="right">Quantity</th>
             <th class="right">Unit Price</th>
             <th class="right">Line Total</th>
@@ -171,6 +179,8 @@
             <tr>
               <td>{{ forloop.counter }}</td>
               <td>{{ item.product.name|default:"Product" }}</td>
+              <td>{{ item.product.model|default:"-" }}</td>
+              <td>{{ item.product.code|default:"-" }}</td>
               <td class="right">{{ item.quantity|intcomma }}</td>
               <td class="right">{{ order.currency|default:"K" }} {{ item.unit_price|floatformat:2|intcomma }}</td>
               <td class="right">{{ order.currency|default:"K" }} {{ item.line_total|floatformat:2|intcomma }}</td>
@@ -178,7 +188,7 @@
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="5" style="text-align:center;padding:40px;color:#64748b">
+              <td colspan="7" style="text-align:center;padding:40px;color:#64748b">
                 <i class="bi bi-inbox" style="font-size:2rem;opacity:.3"></i>
                 <p style="margin:12px 0 0">No items in this order yet</p>
               </td>

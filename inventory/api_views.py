@@ -16,11 +16,13 @@ import math
 # Django / app imports
 # ──────────────────────────────────────────────────────────────────────────────
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.db import transaction, IntegrityError, DatabaseError, models
 from django.db.transaction import TransactionManagementError
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.dateparse import parse_date
@@ -1417,6 +1419,180 @@ def _to_decimal_price(v) -> Optional[Decimal]:
         return None
 
 
+def _product_money(value) -> Decimal:
+    try:
+        from wallet.money import q2
+        return q2(value)
+    except Exception:
+        try:
+            return Decimal(str(value or "0")).quantize(Decimal("0.01"))
+        except Exception:
+            return Decimal("0.00")
+
+
+def _product_label(product) -> str:
+    bits = [getattr(product, "brand", ""), getattr(product, "model", ""), getattr(product, "variant", "")]
+    label = " ".join(str(b).strip() for b in bits if str(b or "").strip())
+    return label or getattr(product, "name", "") or f"Product {getattr(product, 'id', '')}"
+
+
+def _stock_count_for_product(product, business) -> int:
+    if InventoryItem is None:
+        return 0
+    try:
+        qs = InventoryItem.objects.filter(product=product)
+        fields = {f.name for f in InventoryItem._meta.get_fields()}
+        if business is not None and ("business" in fields or "business_id" in fields):
+            qs = qs.filter(business=business)
+        if "status" in fields:
+            qs = qs.exclude(status__iexact="sold")
+        if "sold_at" in fields:
+            qs = qs.filter(sold_at__isnull=True)
+        if "is_sold" in fields:
+            qs = qs.filter(is_sold=False)
+        return qs.count()
+    except Exception:
+        return 0
+
+
+def _seed_demo_products_if_allowed(business) -> None:
+    name = str(getattr(business, "name", "") or "").lower()
+    if not getattr(settings, "DEBUG", False) or not any(token in name for token in ("demo", "test", "codex")):
+        return
+    samples = [
+        ("DEMO-PHONE-001", "Tecno", "Spark Demo", Decimal("85000.00"), Decimal("115000.00")),
+        ("DEMO-PHONE-002", "Itel", "A70 Demo", Decimal("65000.00"), Decimal("90000.00")),
+        ("DEMO-ACC-001", "Generic", "Fast Charger Demo", Decimal("4500.00"), Decimal("8000.00")),
+    ]
+    for code, brand, model_name, cost, sale in samples:
+        try:
+            Product.objects.get_or_create(
+                code=code,
+                defaults={"brand": brand, "model": model_name, "name": model_name, "cost_price": cost, "sale_price": sale},
+            )
+        except Exception:
+            continue
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_stock_models(request: HttpRequest) -> JsonResponse:
+    if Product is None:
+        return _ok({"items": [], "models": []}, count=0)
+    q = (request.GET.get("q") or "").strip()
+    business = get_active_business(request)
+    if not Product.objects.exists():
+        _seed_demo_products_if_allowed(business)
+    qs = Product.objects.all().order_by("brand", "model", "variant", "name")
+    if q:
+        qs = qs.filter(
+            models.Q(brand__icontains=q)
+            | models.Q(model__icontains=q)
+            | models.Q(variant__icontains=q)
+            | models.Q(name__icontains=q)
+            | models.Q(code__icontains=q)
+        )
+    rows = []
+    for product in qs[:120]:
+        cost = _product_money(getattr(product, "cost_price", Decimal("0.00")))
+        sale = _product_money(getattr(product, "sale_price", Decimal("0.00")))
+        row = {
+            "id": product.id,
+            "product_id": product.id,
+            "label": _product_label(product),
+            "product": _product_label(product),
+            "name": getattr(product, "name", "") or _product_label(product),
+            "brand": getattr(product, "brand", "") or "",
+            "model": getattr(product, "model", "") or "",
+            "variant": getattr(product, "variant", "") or "",
+            "code": getattr(product, "code", "") or "",
+            "sku": getattr(product, "code", "") or "",
+            "cost_price": str(cost),
+            "sale_price": str(sale),
+            "default_price": str(cost),
+            "on_hand": _stock_count_for_product(product, business),
+        }
+        rows.append(row)
+    return _ok({"items": rows, "models": rows}, count=len(rows))
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_place_order(request: HttpRequest) -> JsonResponse:
+    try:
+        from wallet.models import AdminPurchaseOrder, AdminPurchaseOrderItem, PurchaseOrderStatus
+    except Exception:
+        return _err("Purchase order module is not available.", status=501)
+    business = get_active_business(request)
+    data = _parse_json_body(request) or request.POST
+    items = data.get("items") or []
+    if not isinstance(items, list) or not items:
+        return _err("Add at least one product before saving the purchase order.")
+
+    supplier_name = (data.get("supplier_name") or "").strip()
+    supplier_email = (data.get("supplier_email") or "").strip()
+    supplier_phone = (data.get("supplier_phone") or "").strip()
+    expected_delivery = parse_date(data.get("expected_delivery_date") or "") if data.get("expected_delivery_date") else None
+    payment_terms = (data.get("payment_terms") or "").strip()
+    notes = (data.get("notes") or "").strip()
+
+    clean_items = []
+    for item in items:
+        try:
+            product_id = int(item.get("product_id") or item.get("id"))
+            quantity = int(item.get("quantity") or item.get("qty") or 1)
+        except (TypeError, ValueError):
+            return _err("Choose valid products and quantities.")
+        if quantity < 1:
+            return _err("Quantity must be at least one.")
+        product = Product.objects.filter(pk=product_id).first() if Product is not None else None
+        if product is None:
+            return _err("One selected product no longer exists. Refresh and try again.", status=404)
+        unit_raw = item.get("unit_price")
+        unit_price = _product_money(unit_raw if unit_raw not in (None, "") else getattr(product, "cost_price", Decimal("0.00")))
+        clean_items.append((product, quantity, unit_price))
+
+    try:
+        with transaction.atomic():
+            po = AdminPurchaseOrder.objects.create(
+                business=business,
+                created_by=request.user,
+                supplier_name=supplier_name,
+                supplier_email=supplier_email,
+                supplier_phone=supplier_phone,
+                agent_name=(data.get("agent_name") or "").strip(),
+                expected_delivery_date=expected_delivery,
+                payment_terms=payment_terms,
+                notes=notes,
+                status=PurchaseOrderStatus.DRAFT,
+            )
+            for product, quantity, unit_price in clean_items:
+                AdminPurchaseOrderItem.objects.create(
+                    po=po,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                )
+            po.recompute_totals(save=True)
+    except IntegrityError:
+        return _err("Could not save the purchase order because one item conflicts with existing data. Refresh products and try again.", status=409)
+    except Exception as exc:
+        return _err(f"Could not save the purchase order: {exc}", status=400)
+
+    invoice_url = reverse("inventory:po_invoice", args=[po.id])
+    download_url = reverse("inventory:po_invoice_download", args=[po.id])
+    return _ok(
+        {
+            "id": po.id,
+            "reference": f"PO-{po.id:05d}",
+            "total": str(po.total),
+            "invoice_url": invoice_url,
+            "download_url": download_url,
+        }
+    )
+
+
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1428,6 +1604,7 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
     model_name = (data.get("model") or data.get("model_name") or "").strip()
     sku = (data.get("sku") or data.get("code") or "").strip()
     price = _to_decimal_price(data.get("price"))
+    sale_price = _to_decimal_price(data.get("sale_price") or data.get("selling_price"))
 
     if Product is None:
         return _ok(
@@ -1446,6 +1623,8 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
     try:
         qs = scoped(_manager(Product).all(), request)
         field_names = {f.name for f in Product._meta.get_fields()}
+        if "code" in field_names and not sku:
+            return _err("Product code is required. If this item already exists, select it from products instead.")
         obj = None
         for field in ("sku", "code"):
             if field in field_names and sku:
@@ -1473,6 +1652,7 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 ("code", sku or None),
                 ("price", price or None),
                 ("cost_price", price or None),
+                ("sale_price", sale_price or None),
                 ("business", get_active_business(request)),
             ):
                 if v is not None and k in field_names:
@@ -1495,6 +1675,12 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                         touched.append(price_field)
                     except Exception:
                         pass
+            if sale_price is not None and "sale_price" in field_names:
+                try:
+                    obj.sale_price = sale_price
+                    touched.append("sale_price")
+                except Exception:
+                    pass
             if brand and "brand" in field_names:
                 try:
                     obj.brand = brand
@@ -1522,6 +1708,7 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 "model": getattr(obj, "model", None),
                 "sku": getattr(obj, "sku", None) or getattr(obj, "code", None),
                 "price": float(getattr(obj, "price", None) or getattr(obj, "cost_price", 0) or 0),
+                "sale_price": float(getattr(obj, "sale_price", 0) or 0),
             }
         )
     except Exception as e:

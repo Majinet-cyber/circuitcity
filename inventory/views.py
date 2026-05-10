@@ -3876,21 +3876,23 @@ def _purchase_order_pdf_response(order, items, business, request: HttpRequest) -
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("POInvoiceTitle", parent=styles["Heading1"], textColor=colors.HexColor("#065f46"), fontSize=18)
     business_name = getattr(business, "name", "") or getattr(getattr(order, "business", None), "name", "") or "Emajinet"
-    rows = [["Item", "Qty", "Unit Cost", "Line Total"]]
+    rows = [["Item", "Model", "Code/SKU", "Qty", "Unit Cost", "Line Total"]]
     for item in items:
         product = getattr(item, "product", None)
         name = getattr(product, "name", None) or str(product or "Item")
+        model = getattr(product, "model", "") or ""
+        code = getattr(product, "code", "") or ""
         qty = getattr(item, "quantity", getattr(item, "qty", ""))
         unit = getattr(item, "unit_price", getattr(item, "unit_cost", 0))
         total = getattr(item, "line_total", getattr(item, "total", 0))
-        rows.append([name, qty, money(unit), money(total)])
+        rows.append([name, model, code, qty, money(unit), money(total)])
     if len(rows) == 1:
-        rows.append(["No items recorded", "", "", ""])
+        rows.append(["No items recorded", "", "", "", "", ""])
     rows.extend([
-        ["", "", "Subtotal", money(getattr(order, "subtotal", 0))],
-        ["", "", "Total", money(getattr(order, "total", 0))],
+        ["", "", "", "", "Subtotal", money(getattr(order, "subtotal", 0))],
+        ["", "", "", "", "Total", money(getattr(order, "total", 0))],
     ])
-    table = Table(rows, repeatRows=1, colWidths=[230, 55, 105, 115])
+    table = Table(rows, repeatRows=1, colWidths=[160, 90, 80, 45, 95, 105])
     table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#065f46")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -3898,7 +3900,7 @@ def _purchase_order_pdf_response(order, items, business, request: HttpRequest) -
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
         ("ROWBACKGROUNDS", (0, 1), (-1, -3), [colors.white, colors.HexColor("#f8fafc")]),
-        ("FONTNAME", (2, -2), (-1, -1), "Helvetica-Bold"),
+        ("FONTNAME", (4, -2), (-1, -1), "Helvetica-Bold"),
         ("PADDING", (0, 0), (-1, -1), 6),
     ]))
     contact = " | ".join(v for v in [getattr(order, "supplier_email", ""), getattr(order, "supplier_phone", "")] if v)
@@ -3913,6 +3915,7 @@ def _purchase_order_pdf_response(order, items, business, request: HttpRequest) -
                 ["Contact", contact or "Not specified"],
                 ["Order date", getattr(order, "created_at", None).strftime("%Y-%m-%d") if getattr(order, "created_at", None) else ""],
                 ["Status", str(getattr(order, "status", "") or "").title()],
+                ["Expected delivery", getattr(order, "expected_delivery_date", "") or "Not specified"],
                 ["Payment terms", getattr(order, "payment_terms", "") or "Not specified"],
                 ["Prepared by", prepared_by],
             ],

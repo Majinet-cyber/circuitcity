@@ -19,7 +19,7 @@
           <tr>
             <td>PO-{{ po.id|stringformat:"05d" }}</td>
             <td>{{ po.supplier_name|default:"Not specified" }}</td>
-            <td><span class="badge text-bg-light">{{ po.get_status_display }}</span></td>
+            <td><span class="badge text-bg-light">{% if po.status == "draft" %}Prepared{% else %}{{ po.get_status_display }}{% endif %}</span></td>
             <td class="text-end">{{ po.currency }} {{ po.total|floatformat:2|intcomma }}</td>
             <td>{{ po.created_at|date:"Y-m-d" }}</td>
             <td class="text-end">

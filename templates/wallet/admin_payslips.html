@@ -68,7 +68,7 @@
               <td class="text-end">MWK {{ p.gross|floatformat:2|intcomma }}</td>
               <td class="text-end">MWK {{ p.deductions|floatformat:2|intcomma }}</td>
               <td class="text-end fw-semibold">MWK {{ p.net|floatformat:2|intcomma }}</td>
-              <td><span class="badge text-bg-light">{{ p.get_status_display }}</span></td>
+              <td><span class="badge text-bg-light">{{ p.display_status }}</span></td>
               <td class="text-end">
                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'wallet:payslip_download_by_id' p.id %}"><i class="bi bi-download"></i> PDF</a>
                 {% if p.status != "SENT" and p.status != "PAID" %}<form method="post" action="{% url 'wallet:payslip_set_status' p.id 'issued' %}" class="d-inline">{% csrf_token %}<button class="btn btn-sm btn-outline-success">Issued</button></form>{% endif %}
