@@ -1066,7 +1066,11 @@ from .models_attendance import TimeLog as _TL_MODEL  # if path differs, adjust
 
 
 def _biz_id(request: HttpRequest) -> Optional[int]:
-    _, bid = get_active_business(request)
+    biz = get_active_business(request)
+    if isinstance(biz, tuple):
+        _, bid = biz
+    else:
+        bid = getattr(biz, "id", None)
     try:
         return int(bid) if bid is not None else None
     except Exception:
@@ -2941,6 +2945,10 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
     lon = data.get("longitude")
     acc = data.get("accuracy_m")
     ctype = (data.get("checkin_type") or "ARRIVAL").upper()
+    if ctype in {"CHECK_IN", "CHECKIN", "START"}:
+        ctype = "ARRIVAL"
+    elif ctype in {"CHECK_OUT", "CHECKOUT", "END"}:
+        ctype = "DEPARTURE"
     location_id = data.get("location_id")
 
     if lat is None or lon is None:
@@ -2968,16 +2976,35 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
             pass
 
     try:
+        start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+        if ctype in {"ARRIVAL", "DEPARTURE"} and _model_has_field(TimeLog, "kind"):
+            latest = (
+                TimeLog.objects.filter(business_id=biz_id, user=request.user, ts__gte=start, ts__lt=end)
+                .order_by("-ts", "-id")
+                .first()
+            )
+            open_shift = bool(latest and getattr(latest, "kind", "") == "ARRIVAL")
+            if ctype == "ARRIVAL" and open_shift:
+                return _err("already_checked_in", status=409)
+            if ctype == "DEPARTURE" and not open_shift:
+                return _err("not_checked_in", status=409)
+
         kwargs = dict(
             user=request.user if _model_has_field(TimeLog, "user") else None,
+            kind=ctype if _model_has_field(TimeLog, "kind") else None,
             checkin_type=ctype if _model_has_field(TimeLog, "checkin_type") else None,
             event=ctype if _model_has_field(TimeLog, "event") else None,
+            ts=timezone.now() if _model_has_field(TimeLog, "ts") else None,
+            lat=lat if _model_has_field(TimeLog, "lat") else None,
+            lon=lon if _model_has_field(TimeLog, "lon") else None,
             latitude=lat if _model_has_field(TimeLog, "latitude") else None,
             longitude=lon if _model_has_field(TimeLog, "longitude") else None,
             accuracy_m=acc if _model_has_field(TimeLog, "accuracy_m") else None,
             distance_m=distance_m if _model_has_field(TimeLog, "distance_m") else None,
             within_geofence=within if _model_has_field(TimeLog, "within_geofence") else None,
             geofence=within if _model_has_field(TimeLog, "geofence") else None,
+            geofence_status=("Inside Zone" if within else "Outside Zone") if _model_has_field(TimeLog, "geofence_status") else None,
             note="" if _model_has_field(TimeLog, "note") else None,
             logged_at=timezone.now() if _model_has_field(TimeLog, "logged_at") else None,
         )
@@ -2994,9 +3021,7 @@ def api_time_checkin(request: HttpRequest) -> JsonResponse:
     return _ok(
         {
             "id": getattr(log, "id", None),
-            "logged_at": getattr(log, "logged_at", timezone.now()).isoformat()
-            if hasattr(log, "logged_at")
-            else timezone.now().isoformat(),
+            "logged_at": getattr(log, "logged_at", getattr(log, "ts", timezone.now())).isoformat(),
             "checkin_type": ctype,
             "location": getattr(loc_obj, "name", "") or "",
             "distance_m": distance_m,

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Cash & Bank Statement · Emajinet{% endblock %}
+{% block header_title %}<i class="bi bi-bank me-2"></i>Cash & Bank Statement{% endblock %}
+
+{% block extra_css %}
+<style>
+  .cash-wrap{max-width:1220px;margin:0 auto;padding:18px}
+  .cash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px}
+  .cash-card{background:#fff;border:1px solid #e3efe7;border-radius:14px;padding:14px 15px;box-shadow:0 8px 22px rgba(15,23,42,.05)}
+  .cash-card small{display:block;color:#64748b;font-weight:700;text-transform:uppercase;font-size:10px;letter-spacing:.5px;margin-bottom:6px}
+  .cash-card strong{display:block;color:#064e3b;font-size:1.25rem;line-height:1.2}
+  .cash-panel{background:#fff;border:1px solid #e3efe7;border-radius:14px;padding:16px;box-shadow:0 8px 22px rgba(15,23,42,.05);margin-bottom:16px}
+  .cash-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;align-items:end}
+  .cash-form label{display:block;color:#64748b;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+  .cash-form input,.cash-form select,.cash-form textarea{width:100%;border:1px solid #d7e6dc;border-radius:10px;padding:9px 10px;background:#fff;color:#0f172a}
+  .cash-form textarea{min-height:42px;resize:vertical}
+  .cash-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .cash-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #d7e6dc;border-radius:10px;background:#fff;color:#065f46;padding:9px 12px;text-decoration:none;font-weight:700}
+  .cash-btn.primary{background:#0f8a5f;color:#fff;border-color:#0f8a5f}
+  .cash-table-wrap{overflow-x:auto}
+  .cash-table{width:100%;border-collapse:collapse;font-size:13px}
+  .cash-table th{padding:10px;color:#64748b;text-align:left;border-bottom:1px solid #e3efe7;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .cash-table td{padding:11px 10px;border-bottom:1px solid #eef6f1;color:#334155;vertical-align:top}
+  .pill{display:inline-flex;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800}
+  .pill.in{background:#dcfce7;color:#166534}.pill.out{background:#fee2e2;color:#991b1b}
+  @media(max-width:700px){
+    .cash-wrap{padding:12px}.cash-grid{grid-template-columns:repeat(2,1fr)}
+    .cash-table thead{display:none}.cash-table,.cash-table tbody,.cash-table tr,.cash-table td{display:block;width:100%}
+    .cash-table tr{border:1px solid #e3efe7;border-radius:12px;margin-bottom:10px;padding:8px}
+    .cash-table td{border:0;display:flex;justify-content:space-between;gap:10px;padding:6px 0}
+    .cash-table td:before{content:attr(data-label);font-weight:800;color:#94a3b8;font-size:11px;text-transform:uppercase}
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="cash-wrap">
+  <div class="cash-grid">
+    <div class="cash-card"><small>Current cash balance</small><strong>MWK {{ summary.cash_on_hand|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Bank balance</small><strong>MWK {{ summary.bank_balance|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Mobile money balance</small><strong>MWK {{ summary.mobile_money_balance|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Total available cash</small><strong>MWK {{ summary.total_available_cash|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Total cash in</small><strong>MWK {{ summary.total_cash_in|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Total cash out</small><strong>MWK {{ summary.total_cash_out|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Opening balance</small><strong>MWK {{ summary.opening_balance|floatformat:0|intcomma }}</strong></div>
+    <div class="cash-card"><small>Closing balance</small><strong>MWK {{ summary.closing_balance|floatformat:0|intcomma }}</strong></div>
+  </div>
+
+  <div class="cash-panel">
+    <form method="get" class="cash-form">
+      <div><label>Period</label><select name="range"><option value="today" {% if preset == "today" %}selected{% endif %}>Today</option><option value="week" {% if preset == "week" %}selected{% endif %}>This week</option><option value="month" {% if preset == "month" %}selected{% endif %}>This month</option><option value="custom" {% if preset == "custom" %}selected{% endif %}>Custom</option></select></div>
+      <div><label>Start</label><input type="date" name="start" value="{{ period_start|date:'Y-m-d' }}"></div>
+      <div><label>End</label><input type="date" name="end" value="{{ period_end|date:'Y-m-d' }}"></div>
+      <div><label>Type</label><select name="direction"><option value="">All</option>{% for val,label in directions %}<option value="{{ val }}" {% if request.GET.direction == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div><label>Method</label><select name="payment_method"><option value="">All</option>{% for val,label in payment_methods %}<option value="{{ val }}" {% if request.GET.payment_method == val %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      <div class="cash-actions"><button class="cash-btn primary" type="submit"><i class="bi bi-funnel"></i>Filter</button><a class="cash-btn" href="{% url 'wallet:cash_statement_pdf' %}?{{ request.GET.urlencode }}"><i class="bi bi-file-pdf"></i>PDF</a><a class="cash-btn" href="{% url 'wallet:cash_statement_csv' %}?{{ request.GET.urlencode }}"><i class="bi bi-download"></i>CSV</a></div>
+    </form>
+  </div>
+
+  {% if can_manage_cash %}
+  <div class="cash-panel">
+    <form method="post" class="cash-form">
+      {% csrf_token %}
+      <div><label>Date</label><input type="date" name="date" value="{{ period_end|date:'Y-m-d' }}"></div>
+      <div><label>Type</label><select name="direction"><option value="cash_in">Cash In</option><option value="cash_out">Cash Out</option></select></div>
+      <div><label>Category</label><select name="category">{% for cat in cash_in_categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}{% for cat in cash_out_categories %}<option value="{{ cat }}">{{ cat }}</option>{% endfor %}</select></div>
+      <div><label>Payment method</label><select name="payment_method">{% for val,label in payment_methods %}<option value="{{ val }}">{{ label }}</option>{% endfor %}</select></div>
+      <div><label>Amount</label><input type="number" min="0.01" step="0.01" name="amount" required></div>
+      <div><label>Related sale/order</label><input type="text" name="related_sale_reference"></div>
+      <div style="grid-column:1/-1"><label>Description / adjustment reason</label><textarea name="description" placeholder="Reason, note, supplier, or cash count adjustment detail"></textarea></div>
+      <div><button class="cash-btn primary" type="submit"><i class="bi bi-plus-circle"></i>Add transaction</button></div>
+    </form>
+  </div>
+  {% endif %}
+
+  <div class="cash-panel">
+    <div class="cash-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+      <div><small>Expected from unpaid balances</small><strong>MWK {{ summary.expected_receivables|floatformat:0|intcomma }}</strong></div>
+      <div><small>Expected vs actual cash</small><strong>MWK {{ summary.expected_vs_actual|floatformat:0|intcomma }}</strong></div>
+    </div>
+    <div class="cash-table-wrap">
+      <table class="cash-table">
+        <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Method</th><th>Amount</th><th>Balance</th><th>Note</th><th>By</th></tr></thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td data-label="Date">{{ row.date }}</td>
+            <td data-label="Type"><span class="pill {% if row.direction == 'cash_in' %}in{% else %}out{% endif %}">{{ row.get_direction_display }}</span></td>
+            <td data-label="Category">{{ row.category }}</td>
+            <td data-label="Method">{{ row.get_payment_method_display }}</td>
+            <td data-label="Amount">MWK {{ row.amount|floatformat:0|intcomma }}</td>
+            <td data-label="Balance">MWK {{ row.balance_after|floatformat:0|intcomma }}</td>
+            <td data-label="Note">{{ row.description|default:"" }}</td>
+            <td data-label="By">{% if row.created_by %}{{ row.created_by.get_username }}{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No cash or bank transactions for this period.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

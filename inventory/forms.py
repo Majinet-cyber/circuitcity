@@ -470,6 +470,8 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
                 "supplier_phone",
                 "agent_name",
                 "notes",
+                "payment_terms",
+                "expected_delivery_date",
                 "currency",
                 "tax",
             ]
@@ -483,6 +485,8 @@ class PurchaseOrderHeaderForm(forms.ModelForm if AdminPurchaseOrder else forms.F
                 "notes": forms.Textarea(
                     attrs={"rows": 3, "class": "input", "placeholder": "Notes for supplier / delivery"}
                 ),
+                "payment_terms": forms.TextInput(attrs={"class": "input", "placeholder": "Payment terms"}),
+                "expected_delivery_date": forms.DateInput(attrs={"class": "input", "type": "date"}),
                 "currency": forms.TextInput(attrs={"class": "input", "placeholder": "MWK"}),
                 "tax": forms.NumberInput(attrs={"step": "0.01", "class": "input"}),
             }

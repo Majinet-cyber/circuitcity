@@ -5,7 +5,7 @@ import csv
 import io
 import json
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Tuple, Any
 
@@ -56,6 +56,7 @@ from .models import (
     Payment,
     PaymentMethod,
     Payslip,
+    PayslipStatus,
     PayoutSchedule,
     PurchaseOrderStatus,
     TxnType,
@@ -369,6 +370,59 @@ def api_add_txn(request: HttpRequest):
     return JsonResponse({"ok": True})
 
 
+def _decimal_post(request: HttpRequest, key: str) -> Decimal | None:
+    if key not in request.POST:
+        return None
+    raw = request.POST.get(key)
+    if raw in (None, ""):
+        return Decimal("0")
+    try:
+        return q2(Decimal(str(raw)))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal("0")
+
+
+def _payslip_components_from_post(request: HttpRequest) -> dict[str, Decimal]:
+    keys = ("base_salary", "allowances", "bonuses", "advances", "penalties", "other_deductions")
+    components: dict[str, Decimal] = {}
+    for key in keys:
+        value = _decimal_post(request, key)
+        if value is not None:
+            components[key] = value
+    return components
+
+
+def _attendance_summary_for_payslip(agent, business, year: int, month: int) -> dict[str, Any]:
+    try:
+        from inventory.models_attendance import TimeLog
+        from inventory.views_time import _pair_work_seconds
+    except Exception:
+        return {}
+    first, last = _month_bounds(year, month)
+    start = timezone.make_aware(datetime.combine(first, datetime.min.time()))
+    end = timezone.make_aware(datetime.combine(last + timedelta(days=1), datetime.min.time()))
+    qs = TimeLog.objects.filter(user=agent, ts__gte=start, ts__lt=end).order_by("ts", "id")
+    if business is not None:
+        qs = qs.filter(business=business)
+    events = list(qs)
+    if not events:
+        return {"days_worked": 0, "hours_worked": "0.00", "open_shifts": 0}
+    grouped: dict[date, list[Any]] = {}
+    for event in events:
+        grouped.setdefault(timezone.localtime(event.ts).date(), []).append(event)
+    total_seconds = 0
+    open_shifts = 0
+    for day_events in grouped.values():
+        worked, open_shift, _ = _pair_work_seconds(day_events, timezone.now())
+        total_seconds += int(worked or 0)
+        open_shifts += 1 if open_shift else 0
+    return {
+        "days_worked": len(grouped),
+        "hours_worked": str(q2(Decimal(total_seconds) / Decimal("3600"))),
+        "open_shifts": open_shifts,
+    }
+
+
 # ---------------------------------------------------------------------
 # Payslip builder (helper)
 # ---------------------------------------------------------------------
@@ -380,6 +434,7 @@ def _create_or_update_payslip_and_txn(
     created_by,
     send_now: bool = False,
     payment_method: str | None = None,
+    components: dict[str, Decimal] | None = None,
 ) -> Payslip:
     """
     Compute totals -> create/update Payslip -> post wallet/company mirror txns (for net)
@@ -388,7 +443,8 @@ def _create_or_update_payslip_and_txn(
     first, last = _month_bounds(year, month)
     breakdown = _compute_breakdown(agent, first, last)
 
-    # Components â€" base salary is computed from wallet transactions
+    components = components or {}
+    # Components - base salary is computed from wallet transactions unless explicitly supplied
     # For Phones agents, this will include the MWK 50,000 base salary transaction
     # For others, falls back to settings default
     from .utils_salary import get_base_salary_for_month
@@ -408,16 +464,24 @@ def _create_or_update_payslip_and_txn(
     
     base_salary = get_base_salary_for_month(biz, agent, year, month) if biz else Decimal("0")
     
+    if "base_salary" in components:
+        base_salary = components["base_salary"]
     # Fallback to settings default if no base salary transaction exists
-    if base_salary == Decimal("0"):
+    elif base_salary == Decimal("0"):
         base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
     
     commission = breakdown["commission"]
-    bonuses_fees = breakdown["bonus"]
-    deductions = -(breakdown["neg_total"])  # convert to positive
+    allowances = components.get("allowances", Decimal("0"))
+    bonuses = components.get("bonuses", breakdown["bonus"])
+    advances = components.get("advances", breakdown["advances"])
+    penalties = components.get("penalties", breakdown["penalties"])
+    other_deductions = components.get("other_deductions", Decimal("0"))
+    bonuses_fees = allowances + bonuses
+    deductions = advances + penalties + other_deductions
 
     gross = base_salary + commission + bonuses_fees
     net = gross - deductions
+    attendance = _attendance_summary_for_payslip(agent, biz, year, month)
 
     # Create / update payslip record
     p, created = Payslip.objects.get_or_create(
@@ -439,7 +503,11 @@ def _create_or_update_payslip_and_txn(
                     "neg_total": str(breakdown["neg_total"]),
                     "advances": str(breakdown["advances"]),
                     "penalties": str(breakdown["penalties"]),
-                }
+                    "allowances": str(allowances),
+                    "bonuses": str(bonuses),
+                    "other_deductions": str(other_deductions),
+                },
+                "attendance": attendance,
             },
         ),
     )
@@ -450,6 +518,18 @@ def _create_or_update_payslip_and_txn(
         p.deductions = deductions
         p.gross = gross
         p.net = net
+        meta = dict(p.meta or {})
+        meta["calc"] = {
+            "pos_total": str(breakdown["pos_total"]),
+            "neg_total": str(breakdown["neg_total"]),
+            "advances": str(advances),
+            "penalties": str(penalties),
+            "allowances": str(allowances),
+            "bonuses": str(bonuses),
+            "other_deductions": str(other_deductions),
+        }
+        meta["attendance"] = attendance
+        p.meta = meta
         if not getattr(p, "email_to", ""):
             p.email_to = getattr(agent, "email", "") or ""
         if not getattr(p, "created_by", None):
@@ -457,7 +537,14 @@ def _create_or_update_payslip_and_txn(
         p.save()
 
     # Post wallet/company transactions only when net != 0 (avoid noise)
-    if net != 0:
+    existing_payout = WalletTransaction.objects.filter(
+        type=TxnType.PAYSLIP,
+        agent=agent,
+        effective_date__gte=first,
+        effective_date__lte=last,
+        meta__payslip_id=p.id,
+    ).exists()
+    if net != 0 and not existing_payout:
         # Agent wallet reduces by net (payment out)
         add_txn(
             agent=agent,
@@ -465,7 +552,7 @@ def _create_or_update_payslip_and_txn(
             type=TxnType.PAYSLIP,
             note=f"Payslip {year}-{month:02d}",
             created_by=created_by,
-            meta={"gross": str(gross), "deductions": str(deductions)},
+            meta={"gross": str(gross), "deductions": str(deductions), "payslip_id": p.id},
         )
         # Company mirror increases by net (payout made)
         WalletTransaction.objects.create(
@@ -475,6 +562,7 @@ def _create_or_update_payslip_and_txn(
             type=TxnType.PAYSLIP,
             note=f"[Agent {agent.id}] Payslip {year}-{month:02d}",
             created_by=created_by,
+            meta={"payslip_id": p.id},
         )
 
     # Optional: record a Payment row (future integrations)
@@ -806,6 +894,88 @@ def payslip_download(request: HttpRequest, year: int, month: int) -> HttpRespons
     resp = HttpResponse(html)
     resp["Content-Disposition"] = f'attachment; filename="payslip-{p.year}-{p.month:02d}.html"'
     return resp
+
+
+def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
+    attendance = (p.meta or {}).get("attendance") or {}
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception:
+        html = render(requester, "wallet/payslip_pdf.html", {"payslip": p, "p": p, "attendance": attendance})
+        html["Content-Disposition"] = f'attachment; filename="payslip-{p.reference or p.id}.html"'
+        return html
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=38, bottomMargin=32)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("PayslipTitle", parent=styles["Heading1"], fontSize=18, textColor=colors.HexColor("#065f46"))
+    agent_name = p.agent.get_full_name() or p.agent.get_username()
+    business_name = getattr(get_active_business(requester), "name", "") or "Emajinet"
+    rows = [
+        ["Business", business_name],
+        ["Employee", agent_name],
+        ["Pay period", f"{p.year}-{p.month:02d}"],
+        ["Issue date", timezone.localtime(p.issued_at).strftime("%Y-%m-%d") if p.issued_at else ""],
+        ["Days worked", attendance.get("days_worked", "")],
+        ["Hours worked", attendance.get("hours_worked", "")],
+        ["Basic salary", f"MWK {p.base_salary:,.2f}"],
+        ["Commission", f"MWK {p.commission:,.2f}"],
+        ["Allowances / bonuses", f"MWK {p.bonuses_fees:,.2f}"],
+        ["Deductions", f"MWK {p.deductions:,.2f}"],
+        ["Gross pay", f"MWK {p.gross:,.2f}"],
+        ["Net pay", f"MWK {p.net:,.2f}"],
+        ["Prepared by", getattr(p.created_by, "get_username", lambda: "")() if p.created_by_id else ""],
+        ["Status", p.get_status_display()],
+    ]
+    table = Table(rows, colWidths=[150, 330])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#064e3b")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+        ("PADDING", (0, 0), (-1, -1), 7),
+    ]))
+    doc.build([Paragraph("Payslip", title_style), Paragraph(f"Reference: {p.reference}", styles["Normal"]), Spacer(1, 14), table])
+    resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="payslip-{p.reference or p.id}.pdf"'
+    return resp
+
+
+@login_required
+def payslip_download_by_id(request: HttpRequest, pk: int) -> HttpResponse:
+    p = get_object_or_404(Payslip.objects.select_related("agent", "created_by"), pk=pk)
+    if not (_staff(request.user) or p.agent_id == request.user.id):
+        return HttpResponse("Not allowed", status=403)
+    if _staff(request.user) and not request.user.is_superuser:
+        biz = get_active_business(request)
+        if not _agent_belongs_to_business(p.agent, biz):
+            return HttpResponse("Not allowed", status=403)
+    return _render_payslip_pdf(p, request)
+
+
+@otp_required
+@require_POST
+def payslip_set_status(request: HttpRequest, pk: int, action: str) -> HttpResponse:
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+    p = get_object_or_404(Payslip.objects.select_related("agent"), pk=pk)
+    if not request.user.is_superuser and not _agent_belongs_to_business(p.agent, get_active_business(request)):
+        return HttpResponse("Not allowed", status=403)
+    if action == "issued":
+        p.status = PayslipStatus.SENT
+        p.sent_at = p.sent_at or timezone.now()
+    elif action == "paid":
+        p.status = PayslipStatus.PAID
+    else:
+        messages.error(request, "Invalid payslip action.")
+        return redirect("wallet:admin_agent", agent_id=p.agent_id)
+    p.save(update_fields=["status", "sent_at"] if action == "issued" else ["status"])
+    messages.success(request, f"Payslip marked as {p.get_status_display()}.")
+    return redirect("wallet:admin_agent", agent_id=p.agent_id)
 
 
 @login_required
@@ -1218,6 +1388,7 @@ def issue_payslip(request, agent_id: int, year: int, month: int):
         created_by=request.user,
         send_now=bool(request.GET.get("send") == "1" or request.POST.get("send_now")),
         payment_method=request.POST.get("method") if request.method == "POST" else None,
+        components=_payslip_components_from_post(request) if request.method == "POST" else None,
     )
     if _json_requested(request):
         return JsonResponse(
@@ -1277,6 +1448,7 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
             created_by=request.user,
             send_now=send_now,
             payment_method=method,
+            components=_payslip_components_from_post(request),
         )
         if _json_requested(request):
             return JsonResponse(
@@ -1349,6 +1521,7 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
                 created_by=request.user,
                 send_now=send_now,
                 payment_method=method,
+                components=_payslip_components_from_post(request),
             )
             results.append({"agent": a.id, "net": float(p.net), "reference": p.reference, "sent": p.sent_to_email})
 
@@ -1516,6 +1689,8 @@ def admin_po_new(request: HttpRequest):
         form = PurchaseOrderHeaderForm(request.POST)
         if form.is_valid():
             po = form.save(commit=False)
+            if hasattr(po, "business"):
+                po.business = get_active_business(request)
             po.created_by = request.user
             po.status = PurchaseOrderStatus.DRAFT
             po.save()
@@ -1555,7 +1730,7 @@ def admin_po_detail(request: HttpRequest, po_id: int):
         action = request.POST.get("action") or "add_item"
 
         if action == "add_item":
-            form = ItemForm(request.POST)
+            form = ItemForm(request.POST, business=biz)
             if form.is_valid():
                 AdminPurchaseOrderItem.objects.create(po=po, **form.to_model_kwargs())
                 po.recompute_totals(save=True)
@@ -1578,13 +1753,90 @@ def admin_po_detail(request: HttpRequest, po_id: int):
             return redirect("wallet:admin_po_detail", po_id=po.id)
 
     # GET or invalid POST -> render page
-    form = ItemForm()
+    form = ItemForm(business=biz)
     items = po.items.select_related("product").all().order_by("id")
     return render(
         request,
         "wallet/admin_po_detail.html",
         {"po": po, "form": form, "items": items, "status_choices": PurchaseOrderStatus.choices},
     )
+
+
+@otp_required
+def admin_po_pdf(request: HttpRequest, po_id: int):
+    if not _staff(request.user):
+        return redirect("wallet:agent_wallet")
+    biz = get_active_business(request)
+    qs = AdminPurchaseOrder.objects.all()
+    if biz is not None and hasattr(AdminPurchaseOrder, "business"):
+        qs = qs.filter(business=biz)
+    elif not request.user.is_superuser:
+        from tenants.models import Membership
+        user_ids = Membership.objects.filter(business=biz, status="ACTIVE").values_list("user_id", flat=True)
+        qs = qs.filter(created_by_id__in=list(user_ids))
+    po = get_object_or_404(qs.select_related("created_by", "business"), id=po_id)
+    po.recompute_totals(save=True)
+    items = list(po.items.select_related("product").all().order_by("id"))
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except Exception:
+        return render(request, "wallet/admin_po_pdf.html", {"po": po, "items": items})
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=38, rightMargin=38, topMargin=36, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("POTitle", parent=styles["Heading1"], textColor=colors.HexColor("#065f46"), fontSize=18)
+    business_name = getattr(getattr(po, "business", None), "name", None) or getattr(biz, "name", None) or "Emajinet"
+    header = [
+        Paragraph("Purchase Order", title_style),
+        Paragraph(f"{business_name} | PO-{po.id:05d} | {timezone.localtime(po.created_at):%Y-%m-%d}", styles["Normal"]),
+        Spacer(1, 12),
+        Table(
+            [
+                ["Supplier", po.supplier_name or "Not specified"],
+                ["Contact", " | ".join([v for v in [po.supplier_email, po.supplier_phone] if v]) or "Not specified"],
+                ["Expected delivery", po.expected_delivery_date or "Not specified"],
+                ["Payment terms", po.payment_terms or "Not specified"],
+                ["Prepared by", getattr(po.created_by, "get_username", lambda: "")() if po.created_by_id else ""],
+            ],
+            colWidths=[140, 360],
+            style=[
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ],
+        ),
+        Spacer(1, 14),
+    ]
+    rows = [["Item", "Qty", "Unit Cost", "Line Total"]]
+    for item in items:
+        rows.append([
+            str(item.product),
+            item.quantity,
+            f"{po.currency} {item.unit_price:,.2f}",
+            f"{po.currency} {item.line_total:,.2f}",
+        ])
+    rows.extend([["", "", "Subtotal", f"{po.currency} {po.subtotal:,.2f}"], ["", "", "Tax", f"{po.currency} {po.tax:,.2f}"], ["", "", "Total", f"{po.currency} {po.total:,.2f}"]])
+    table = Table(rows, repeatRows=1, colWidths=[230, 55, 100, 115])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#065f46")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -4), [colors.white, colors.HexColor("#f8fafc")]),
+        ("FONTNAME", (2, -3), (-1, -1), "Helvetica-Bold"),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    footer = Paragraph("Signature: ____________________________    Date: __________________", styles["Normal"])
+    doc.build(header + [table, Spacer(1, 18), Paragraph(po.notes or "", styles["Normal"]), Spacer(1, 18), footer])
+    resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    resp["Content-Disposition"] = f'attachment; filename="purchase-order-{po.id:05d}.pdf"'
+    return resp
 
 
 # ---------------------------------------------------------------------

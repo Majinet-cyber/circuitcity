@@ -479,6 +479,7 @@ try:
         _time_logs_page as __time_logs_page_raw,
         _time_logs_api,
         _time_logs_export_csv,
+        _time_log_correct,
         time_attendance_action as _time_attendance_action,
         _mgr_time_overview_page as __mgr_time_overview_page_raw,
         _mgr_time_overview_api,
@@ -494,6 +495,7 @@ except Exception:
     _time_logs_page = TemplateView.as_view(template_name="inventory/time_logs.html")
     _time_logs_api = _stub("time_logs_api not implemented")
     _time_logs_export_csv = _stub("time_logs_export_csv not implemented")
+    _time_log_correct = _stub("time_log_correct not implemented")
     _time_attendance_action = _stub("time_attendance_action not implemented")
 
     def _mgr_time_overview_page(request, *a, **k):
@@ -1414,6 +1416,7 @@ urlpatterns += [
 urlpatterns += [
     path("time/check-in/", _need_biz(_ensure_response(_time_checkin_page)), name="time_checkin"),
     path("time/logs/", _need_biz(_ensure_response(_time_logs_page)), name="time_logs"),
+    path("time/logs/<int:log_id>/correct/", _need_biz(_ensure_response(_time_log_correct)), name="time_log_correct"),
     path("time/my/", _need_biz(_ensure_response(_my_time_logs_page)), name="my_time_logs"),
     path("timelogs/", _redirect_to("inventory:time_logs"), name="timelogs_short"),
     path("time/log/", _redirect_to("inventory:time_logs")),

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize marketplace_media %}
 
 {% block title %}{{ vehicle.name }} – Car Hire – {{ business.name }}{% endblock %}
 
@@ -181,14 +181,22 @@
                 <div class="section-body">
                     {% if gallery_images %}
                     <div class="gallery-hero" id="galleryHero">
-                        <img class="thumb" id="galleryMainImg" src="{{ gallery_images.0.image.url }}" alt="{{ vehicle.name }}">
+                        {% with first_url=gallery_images.0.image|safe_media_url %}
+                        {% if first_url %}
+                        <img class="thumb" id="galleryMainImg" src="{{ first_url }}" alt="{{ vehicle.name }}">
+                        {% else %}
+                        <img class="placeholder" id="galleryMainImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23059669' opacity='0.3'%3E%3Cpath d='M21 6.5l-4-4H7L3 6.5v11A1.5 1.5 0 004.5 19h15A1.5 1.5 0 0021 17.5V6.5zm-9 10a4 4 0 110-8 4 4 0 010 8z'/%3E%3C/svg%3E" alt="">
+                        {% endif %}
+                        {% endwith %}
                         <span class="photo-count-badge"><i class="bi bi-images" style="font-size:.55rem;"></i> {{ gallery_images|length }}</span>
                     </div>
                     <div class="gallery-thumb-row">
                         {% for img in gallery_images %}
-                        <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img.image.url }}" onclick="switchGallery(this)">
-                            <img src="{{ img.image.url }}" alt="">
+                        {% with img_url=img.image|safe_media_url %}
+                        <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img_url }}" onclick="switchGallery(this)">
+                            {% if img_url %}<img src="{{ img_url }}" alt="">{% else %}<span class="text-muted small">No image</span>{% endif %}
                         </div>
+                        {% endwith %}
                         {% endfor %}
                     </div>
                     {% else %}
@@ -389,7 +397,9 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.6rem;">
           {% for img in gallery_images %}
           <div class="photo-card {% if img.is_cover %}is-cover{% endif %}">
-            <img src="{{ img.image.url }}" alt="">
+            {% with img_url=img.image|safe_media_url %}
+            {% if img_url %}<img src="{{ img_url }}" alt="">{% else %}<span class="text-muted small">Image unavailable</span>{% endif %}
+            {% endwith %}
             {% if img.is_cover %}<span class="cover-badge">Cover</span>{% endif %}
             <div class="photo-card-actions">
               {% if not img.is_cover %}

@@ -6,6 +6,7 @@ from . import views
 from . import views_export
 from . import views_admin
 from . import views_costs
+from . import views_cashbank
 
 app_name = "wallet"
 
@@ -35,6 +36,9 @@ urlpatterns = [
     # Wallet Admin Pages (canonical: /wallet/admin/...)
     # ------------------------------------------------------------------
     path("admin/", views.AdminWalletHome.as_view(), name="admin_home"),
+    path("cash-bank/", views_cashbank.cash_statement, name="cash_statement"),
+    path("cash-bank/export.csv", views_cashbank.cash_statement_csv, name="cash_statement_csv"),
+    path("cash-bank/export.pdf", views_cashbank.cash_statement_pdf, name="cash_statement_pdf"),
     path("admin/agent/<int:agent_id>/", views.AdminAgentWallet.as_view(), name="admin_agent"),
     path("admin/issue/", views.AdminIssueTxnView.as_view(), name="admin_issue"),
     path("admin/budgets/", views.AdminBudgetsView.as_view(), name="admin_budgets"),
@@ -42,6 +46,8 @@ urlpatterns = [
     # Payslips
     path("admin/payslips/", views.AdminPayslipBulkView.as_view(), name="admin_payslips"),
     path("admin/payslips/single/", views.AdminIssuePayslipView.as_view(), name="admin_issue_payslip"),
+    path("admin/payslips/<int:pk>/download/", views.payslip_download_by_id, name="payslip_download_by_id"),
+    path("admin/payslips/<int:pk>/<str:action>/", views.payslip_set_status, name="payslip_set_status"),
     path("admin/payslip/<int:agent_id>/<int:year>/<int:month>/", views.issue_payslip, name="issue_payslip"),
 
     # Payout Schedules
@@ -52,9 +58,12 @@ urlpatterns = [
     path("admin/pos/", views.AdminPOListView.as_view(), name="admin_pos"),
     path("admin/pos/new/", views.admin_po_new, name="admin_po_new"),
     path("admin/pos/<int:po_id>/", views.admin_po_detail, name="admin_po_detail"),
+    path("admin/pos/<int:po_id>/pdf/", views.admin_po_pdf, name="admin_po_pdf"),
 
     # Cost Management (NEW)
     path("admin/costs/", views_costs.admin_cost_list, name="admin_cost_list"),
+    path("admin/costs/", views_costs.admin_cost_list, name="admin_costs"),
+    path("admin/costs/", views_costs.admin_cost_list, name="admin_costs_list"),
     path("admin/costs/new/", views_costs.admin_cost_create, name="admin_costs_create"),
     path("admin/costs/<int:cost_id>/edit/", views_costs.admin_cost_edit, name="admin_cost_edit"),
     path("admin/costs/<int:cost_id>/delete/", views_costs.admin_cost_delete, name="admin_costs_delete"),

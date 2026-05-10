@@ -1,5 +1,5 @@
 {% extends "hq/base.html" %}
-{% load static %}
+{% load static marketplace_media %}
 
 {% block title %}Marketplace Listing Moderation — HQ{% endblock %}
 
@@ -122,9 +122,13 @@
       <!-- Image -->
       {% with img=listing.primary_image %}
       {% if img and img.image %}
-      <img src="{{ img.image.url }}" alt="{{ listing.title }}" class="listing-card-img">
+      {% with img_url=img.image|safe_media_url %}
+      {% if img_url %}<img src="{{ img_url }}" alt="{{ listing.title }}" class="listing-card-img">{% else %}<div class="listing-card-img">Image unavailable</div>{% endif %}
+      {% endwith %}
       {% elif listing.media_file %}
-      <img src="{{ listing.media_file.url }}" alt="{{ listing.title }}" class="listing-card-img">
+      {% with media_url=listing.media_file|safe_media_url %}
+      {% if media_url %}<img src="{{ media_url }}" alt="{{ listing.title }}" class="listing-card-img">{% else %}<div class="listing-card-img">Image unavailable</div>{% endif %}
+      {% endwith %}
       {% else %}
       <div class="listing-card-img">🖼️</div>
       {% endif %}

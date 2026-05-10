@@ -44,6 +44,7 @@
 {% url 'wallet:admin_payslips'      as url_payslips %}
 {% url 'wallet:admin_schedules'     as url_schedules %}
 {% url 'wallet:admin_cost_list'     as url_costs %}
+{% url 'wallet:cash_statement'      as url_cash_statement %}
 
 <div class="wallet-admin-container">
   {# Mobile-first scroll column #}
@@ -164,6 +165,12 @@
           <a class="cc-btn cc-btn--secondary" href="{{ url_costs }}" style="width: 100%; justify-content: center;">
             <i class="bi bi-receipt"></i>
             <span>View Costs</span>
+          </a>
+        {% endif %}
+        {% if url_cash_statement %}
+          <a class="cc-btn cc-btn--secondary" href="{{ url_cash_statement }}" style="width: 100%; justify-content: center;">
+            <i class="bi bi-bank"></i>
+            <span>Cash &amp; Bank</span>
           </a>
         {% endif %}
       </div>

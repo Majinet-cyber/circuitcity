@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static marketplace_media %}
 
 {% block title %}{{ vehicle.display_name }} – {{ business.name }}{% endblock %}
 
@@ -224,14 +224,18 @@
 
         {% if gallery_images %}
         <div class="gallery-hero" id="galleryHero">
-          <img id="galleryMainImg" src="{{ gallery_images.0.image.url }}" alt="{{ vehicle.display_name }}">
+          {% with first_url=gallery_images.0.image|safe_media_url %}
+          {% if first_url %}<img id="galleryMainImg" src="{{ first_url }}" alt="{{ vehicle.display_name }}">{% else %}<div class="text-muted small">Image unavailable</div>{% endif %}
+          {% endwith %}
           <span class="gallery-photo-count">{{ gallery_images|length }}</span>
         </div>
         <div class="gallery-thumb-row">
           {% for img in gallery_images %}
-          <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img.image.url }}" onclick="switchGalleryImage(this)">
-            <img src="{{ img.image.url }}" alt="">
+          {% with img_url=img.image|safe_media_url %}
+          <div class="gallery-thumb {% if forloop.first %}active{% endif %}" data-url="{{ img_url }}" onclick="switchGalleryImage(this)">
+            {% if img_url %}<img src="{{ img_url }}" alt="">{% else %}<span class="text-muted small">No image</span>{% endif %}
           </div>
+          {% endwith %}
           {% endfor %}
         </div>
         {% else %}
@@ -452,7 +456,9 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.65rem;">
           {% for img in gallery_images %}
           <div class="photo-card {% if img.is_cover %}is-cover{% endif %}">
-            <img src="{{ img.image.url }}" alt="">
+            {% with img_url=img.image|safe_media_url %}
+            {% if img_url %}<img src="{{ img_url }}" alt="">{% else %}<span class="text-muted small">Image unavailable</span>{% endif %}
+            {% endwith %}
             {% if img.is_cover %}<span class="cover-badge">Cover</span>{% endif %}
             <div class="photo-card-actions">
               {% if not img.is_cover %}

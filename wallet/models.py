@@ -162,6 +162,83 @@ class WalletTransaction(models.Model):
         super().save(*args, **kwargs)
 
 
+class CashBankTransaction(models.Model):
+    class Direction(models.TextChoices):
+        CASH_IN = "cash_in", "Cash In"
+        CASH_OUT = "cash_out", "Cash Out"
+
+    class PaymentMethod(models.TextChoices):
+        CASH = "cash", "Cash"
+        BANK = "bank", "Bank"
+        AIRTEL = "airtel_money", "Airtel Money"
+        MPAMBA = "mpamba", "Mpamba"
+        OTHER = "other", "Other"
+
+    business = models.ForeignKey(
+        "tenants.Business",
+        on_delete=models.CASCADE,
+        related_name="cash_bank_transactions",
+    )
+    date = models.DateField(default=timezone.localdate, db_index=True)
+    direction = models.CharField(max_length=12, choices=Direction.choices)
+    category = models.CharField(max_length=80)
+    payment_method = models.CharField(max_length=20, choices=PaymentMethod.choices, default=PaymentMethod.CASH)
+    amount = models.DecimalField(max_digits=14, decimal_places=2, validators=[MinValueValidator(Decimal("0.01"))])
+    description = models.TextField(blank=True, default="")
+    related_sale_reference = models.CharField(max_length=80, blank=True, default="")
+    balance_after = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
+    created_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cash_bank_transactions_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-date", "-id")
+        indexes = [
+            models.Index(fields=["business", "date"]),
+            models.Index(fields=["business", "payment_method", "date"]),
+            models.Index(fields=["business", "direction", "date"]),
+            models.Index(fields=["business", "category", "date"]),
+        ]
+
+    def __str__(self) -> str:
+        sign = "+" if self.direction == self.Direction.CASH_IN else "-"
+        return f"{self.date} {sign}{self.amount} {self.get_payment_method_display()}"
+
+    @property
+    def signed_amount(self) -> Decimal:
+        amount = q2(self.amount)
+        return amount if self.direction == self.Direction.CASH_IN else -amount
+
+    def save(self, *args, **kwargs):
+        self.amount = q2(self.amount)
+        super().save(*args, **kwargs)
+        recalculate_cash_bank_balances(self.business_id)
+
+    def delete(self, *args, **kwargs):
+        business_id = self.business_id
+        result = super().delete(*args, **kwargs)
+        recalculate_cash_bank_balances(business_id)
+        return result
+
+
+def recalculate_cash_bank_balances(business_id: int | None) -> None:
+    if not business_id:
+        return
+    balance = Decimal("0.00")
+    rows = CashBankTransaction.objects.filter(business_id=business_id).order_by("date", "created_at", "id")
+    for row in rows.only("id", "amount", "direction", "balance_after"):
+        balance += row.signed_amount
+        new_balance = q2(balance)
+        if row.balance_after != new_balance:
+            CashBankTransaction.objects.filter(pk=row.pk).update(balance_after=new_balance)
+
+
 # ----------------------------------------------------------------------
 # Sales Targets & Attendance
 # ----------------------------------------------------------------------
@@ -415,6 +492,13 @@ class PurchaseOrderStatus(models.TextChoices):
 
 
 class AdminPurchaseOrder(models.Model):
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="admin_purchase_orders",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="admin_pos_created")
 
@@ -424,6 +508,8 @@ class AdminPurchaseOrder(models.Model):
     agent_name = models.CharField(max_length=120, blank=True)
 
     notes = models.TextField(blank=True)
+    payment_terms = models.CharField(max_length=255, blank=True, default="")
+    expected_delivery_date = models.DateField(null=True, blank=True)
     currency = models.CharField(max_length=8, default="MWK")
 
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
@@ -431,10 +517,12 @@ class AdminPurchaseOrder(models.Model):
     total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"))
 
     status = models.CharField(max_length=20, choices=PurchaseOrderStatus.choices, default=PurchaseOrderStatus.DRAFT)
+    pdf = models.FileField(upload_to="purchase_orders/", null=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
         indexes = [
+            models.Index(fields=["business", "created_at"]),
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["supplier_name"]),
         ]

@@ -172,9 +172,11 @@
 {% block content %}
 <div class="container">
   <div class="business-header">
-    {% if business.logo %}
-      <img src="{{ business.logo.url }}" alt="{{ business.name }}" class="business-logo">
+    {% with logo_url=business.logo|safe_media_url %}
+    {% if logo_url %}
+      <img src="{{ logo_url }}" alt="{{ business.name }}" class="business-logo">
     {% endif %}
+    {% endwith %}
     <h1 class="business-name">{{ business.name }}</h1>
     <p style="color: var(--text-secondary);">Browse our products and services</p>
     <a href="{% url 'inventory:marketplace_public' %}" style="margin-top: 1rem; display: inline-block; color: var(--primary); text-decoration: none;">← Back to Marketplace</a>

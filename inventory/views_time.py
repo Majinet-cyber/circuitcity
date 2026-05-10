@@ -924,7 +924,7 @@ def time_logs_export_csv(request: HttpRequest) -> HttpResponse:
                 str(r.lon or ""),
                 str(r.accuracy_m or ""),
                 str(r.distance_m or ""),
-                (r.geofence_status or r.geo_status or ""),
+                (getattr(r, "geofence_status", "") or getattr(r, "geo_status", "") or ""),
                 (r.note or "").replace("\r", " ").replace("\n", " ").replace(",", ";"),
             ]
             yield ",".join(out) + "\r\n"
@@ -933,6 +933,46 @@ def time_logs_export_csv(request: HttpRequest) -> HttpResponse:
     filename = f"time_logs_{start.date()}_{(end - timedelta(days=1)).date()}.csv"
     resp["Content-Disposition"] = f'attachment; filename="{filename}"'
     return resp
+
+
+@login_required
+@require_http_methods(["POST"])
+def time_log_correct(request: HttpRequest, log_id: int) -> HttpResponse:
+    biz_id = _active_biz_id(request)
+    if not biz_id or not _can_manage_time_logs(request.user, biz_id):
+        return HttpResponse("Not allowed", status=403)
+    try:
+        log = TimeLog.objects.get(pk=log_id, business_id=biz_id)
+    except TimeLog.DoesNotExist:
+        return HttpResponse("Time log not found", status=404)
+
+    reason = str(request.POST.get("reason") or "").strip()
+    if not reason:
+        messages.error(request, "Correction reason is required.")
+        return redirect("inventory:time_logs")
+
+    date_raw = request.POST.get("date") or timezone.localtime(log.ts).date().isoformat()
+    time_raw = request.POST.get("time") or timezone.localtime(log.ts).strftime("%H:%M")
+    kind = str(request.POST.get("kind") or log.kind).upper()
+    if kind not in {"ARRIVAL", "DEPARTURE"}:
+        messages.error(request, "Choose a valid correction type.")
+        return redirect("inventory:time_logs")
+    try:
+        corrected_naive = datetime.strptime(f"{date_raw} {time_raw}", "%Y-%m-%d %H:%M")
+        corrected_ts = timezone.make_aware(corrected_naive, timezone.get_current_timezone())
+    except ValueError:
+        messages.error(request, "Enter a valid correction date and time.")
+        return redirect("inventory:time_logs")
+
+    note = log.note or ""
+    stamp = timezone.localtime().strftime("%Y-%m-%d %H:%M")
+    correction_note = f"Corrected by {request.user.get_username()} at {stamp}: {reason}"
+    log.ts = corrected_ts
+    log.kind = kind
+    log.note = f"{note}\n{correction_note}".strip()
+    log.save(update_fields=["ts", "kind", "note"])
+    messages.success(request, "Time log corrected.")
+    return redirect("inventory:time_logs")
 
 
 # ---------------------------------------------------------------------
@@ -948,6 +988,7 @@ _mgr_time_overview_page = manager_time_overview_page
 _time_logs_api = time_logs_api
 _mgr_time_overview_api = manager_time_overview_api
 _time_logs_export_csv = time_logs_export_csv
+_time_log_correct = time_log_correct
 
 # Optional: a friendlier alias for personal logs page
 my_time_logs_page = my_time_logs

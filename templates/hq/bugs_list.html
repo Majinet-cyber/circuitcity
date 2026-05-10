@@ -401,6 +401,42 @@
   .bm-filter-bar form { flex-direction: column; }
   .bm-filter-group select,
   .bm-filter-group input { width: 100%; }
+  .bm-table-wrap { overflow-x: visible; }
+  .bm-table { min-width: 0; border-collapse: separate; border-spacing: 0 12px; }
+  .bm-table thead { display: none; }
+  .bm-table tbody,
+  .bm-table tr,
+  .bm-table td { display: block; width: 100%; }
+  .bm-table tr {
+    padding: 12px;
+    border: 1px solid #e8ecf2;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15,23,42,0.05);
+  }
+  .bm-table td {
+    border: 0;
+    padding: 7px 0;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .bm-table td::before {
+    content: attr(data-label);
+    flex: 0 0 92px;
+    color: #94a3b8;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .6px;
+    text-transform: uppercase;
+  }
+  .bm-table td:first-child::before,
+  .bm-table td:last-child::before { content: ""; flex-basis: 0; }
+  .bm-table tr:hover td { background: transparent; }
+  .path-pill { max-width: 170px; text-align: right; }
+  .bm-table td > div { max-width: 100% !important; text-align: right; }
+  .bm-table td:last-child { justify-content: flex-end; flex-wrap: wrap; }
 }
 @media (max-width: 480px) {
   .bm-stat-grid { grid-template-columns: repeat(2, 1fr); }
@@ -604,8 +640,8 @@
         <tbody>
           {% for issue in issues %}
           <tr class="{{ issue.status }}">
-            <td><input type="checkbox" name="issue_ids" value="{{ issue.pk }}" class="form-check-input issue-check" style="cursor:pointer;"></td>
-            <td>
+            <td data-label=""><input type="checkbox" name="issue_ids" value="{{ issue.pk }}" class="form-check-input issue-check" style="cursor:pointer;"></td>
+            <td data-label="Severity">
               {% if issue.severity == 'critical' %}
               <span class="sev-badge sev-critical"><i class="bi bi-exclamation-octagon-fill"></i> Critical</span>
               {% elif issue.severity == 'high' %}
@@ -616,7 +652,7 @@
               <span class="sev-badge sev-low"><i class="bi bi-info-circle"></i> Low</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Status">
               {% if issue.status == 'new' %}
               <span class="stat-badge stat-new"><i class="bi bi-dot"></i> New</span>
               {% elif issue.status == 'investigating' %}
@@ -627,7 +663,7 @@
               <span class="stat-badge stat-ignored"><i class="bi bi-eye-slash"></i> Ignored</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Error">
               <div style="max-width:280px;">
                 {% if issue.error_type %}
                 <span style="font-size:11px;font-weight:700;color:#94a3b8;display:block;margin-bottom:2px;">{{ issue.error_type }}</span>
@@ -635,17 +671,17 @@
                 <span style="font-weight:600;color:#0f172a;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ issue.title }}">{{ issue.title|truncatechars:70 }}</span>
               </div>
             </td>
-            <td>
+            <td data-label="Code">
               {% if issue.status_code %}
                 <span class="code-chip c-{{ issue.status_code }}">{{ issue.status_code }}</span>
               {% else %}
                 <span style="color:#cbd5e1;">—</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="Path">
               <span class="path-pill" title="{{ issue.path }}">{{ issue.path|truncatechars:50 }}</span>
             </td>
-            <td>
+            <td data-label="Hits">
               {% if issue.occurrence_count > 5 %}
                 <span class="recur-pill"><i class="bi bi-arrow-repeat"></i> {{ issue.occurrence_count }}</span>
               {% elif issue.occurrence_count > 1 %}
@@ -654,10 +690,10 @@
                 <span style="color:#cbd5e1;font-size:12px;">1</span>
               {% endif %}
             </td>
-            <td style="white-space:nowrap;">
+            <td data-label="Last Seen" style="white-space:nowrap;">
               <span style="font-size:12px;color:#64748b;">{{ issue.last_seen_at|timesince }} ago</span>
             </td>
-            <td>
+            <td data-label="Assigned">
               {% if issue.assigned_to %}
               <span class="assignee-chip">
                 <span class="avatar">{{ issue.assigned_to.username|slice:":1"|upper }}</span>
@@ -667,7 +703,7 @@
               <span style="font-size:12px;color:#cbd5e1;">Unassigned</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="">
               <a href="{% url 'hq:bug_detail' pk=issue.pk %}" style="
                 display:inline-flex;align-items:center;gap:4px;
                 padding:4px 12px;
