@@ -62,6 +62,7 @@ from .models import (
     TxnType,
     WalletTransaction,
 )
+from .money import q2
 from .services import add_txn, agent_wallet_summary, ranking
 
 # Optional: PO forms come from inventory.forms if available
@@ -420,11 +421,21 @@ def _decimal_post(request: HttpRequest, key: str) -> Decimal | None:
         return None
     raw = request.POST.get(key)
     if raw in (None, ""):
-        return Decimal("0")
-    try:
-        return q2(Decimal(str(raw)))
-    except (InvalidOperation, ValueError, TypeError):
-        return Decimal("0")
+        return Decimal("0.00")
+    return q2(raw)
+
+
+def _invalid_decimal_fields(request: HttpRequest, keys: tuple[str, ...]) -> list[str]:
+    invalid: list[str] = []
+    for key in keys:
+        raw = request.POST.get(key)
+        if raw in (None, ""):
+            continue
+        try:
+            Decimal(str(raw).replace(",", "").strip())
+        except (InvalidOperation, ValueError, TypeError):
+            invalid.append(key.replace("_", " "))
+    return invalid
 
 
 def _payslip_components_from_post(request: HttpRequest) -> dict[str, Decimal]:
@@ -1604,6 +1615,13 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
             return redirect("wallet:admin_issue_payslip")
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
+        invalid_money = _invalid_decimal_fields(
+            request,
+            ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions"),
+        )
+        if invalid_money:
+            messages.error(request, f"Enter valid money values for: {', '.join(invalid_money)}.")
+            return redirect("wallet:admin_issue_payslip")
         components = _payslip_components_from_post(request)
         employee_snapshot = _employee_snapshot_from_post(request, agent)
         if not employee_snapshot.get("employee_name"):
@@ -1716,10 +1734,23 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
             messages.error(request, "Select at least one active staff member, or use the single payslip form for manual entry.")
             return redirect("wallet:admin_payslips")
 
-        year = int(request.POST.get("year"))
-        month = int(request.POST.get("month"))
+        try:
+            year = int(request.POST.get("year"))
+            month = int(request.POST.get("month"))
+            if month < 1 or month > 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, "Choose a valid payslip month and year.")
+            return redirect("wallet:admin_payslips")
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
+        invalid_money = _invalid_decimal_fields(
+            request,
+            ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions"),
+        )
+        if invalid_money:
+            messages.error(request, f"Enter valid money values for: {', '.join(invalid_money)}.")
+            return redirect("wallet:admin_payslips")
 
         agents = list(U.objects.filter(id__in=agent_ids, is_active=True))
         # Enforce scope: managers can only act on their business agents
@@ -1982,10 +2013,30 @@ def admin_po_detail(request: HttpRequest, po_id: int):
     # GET or invalid POST -> render page
     form = ItemForm(business=biz)
     items = po.items.select_related("product").all().order_by("id")
+    product_catalog = []
+    try:
+        for product in form.fields["product"].queryset:
+            product_catalog.append(
+                {
+                    "id": product.id,
+                    "code": getattr(product, "code", "") or "",
+                    "model": getattr(product, "model", "") or getattr(product, "name", "") or str(product),
+                    "cost_price": str(q2(getattr(product, "cost_price", Decimal("0.00")))),
+                    "sale_price": str(q2(getattr(product, "sale_price", Decimal("0.00")))),
+                }
+            )
+    except Exception:
+        product_catalog = []
     return render(
         request,
         "wallet/admin_po_detail.html",
-        {"po": po, "form": form, "items": items, "status_choices": PurchaseOrderStatus.choices},
+        {
+            "po": po,
+            "form": form,
+            "items": items,
+            "status_choices": PurchaseOrderStatus.choices,
+            "product_catalog_json": json.dumps(product_catalog, cls=DjangoJSONEncoder),
+        },
     )
 
 

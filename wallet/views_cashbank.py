@@ -14,7 +14,8 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import CashBankTransaction, q2
+from .models import CashBankTransaction
+from .money import q2
 
 try:
     from tenants.utils import get_active_business

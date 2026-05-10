@@ -1445,16 +1445,18 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
 
     try:
         qs = scoped(_manager(Product).all(), request)
+        field_names = {f.name for f in Product._meta.get_fields()}
         obj = None
         for field in ("sku", "code"):
-            if hasattr(Product, field) and sku:
+            if field in field_names and sku:
                 try:
-                    obj = qs.filter(**{field: sku}).first()
+                    lookup_qs = Product.objects.filter(**{field: sku}) if field == "code" else qs.filter(**{field: sku})
+                    obj = lookup_qs.first()
                     if obj:
                         break
                 except Exception:
                     pass
-        if obj is None and hasattr(Product, "name") and name:
+        if obj is None and "name" in field_names and name:
             try:
                 obj = qs.filter(name=name).first()
             except Exception:
@@ -1470,28 +1472,36 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 ("sku", sku or None),
                 ("code", sku or None),
                 ("price", price or None),
+                ("cost_price", price or None),
                 ("business", get_active_business(request)),
             ):
-                if v is not None and hasattr(Product, k):
+                if v is not None and k in field_names:
                     kwargs[k] = v
             obj = Product(**kwargs)  # type: ignore[call-arg]
-            obj.save()
-            created = True
+            try:
+                obj.save()
+                created = True
+            except IntegrityError:
+                if sku and "code" in field_names:
+                    obj = Product.objects.filter(code=sku).first()
+                if obj is None:
+                    raise
         else:
             touched = []
-            if price is not None and hasattr(obj, "price"):
-                try:
-                    obj.price = price
-                    touched.append("price")
-                except Exception:
-                    pass
-            if brand and hasattr(obj, "brand"):
+            for price_field in ("price", "cost_price"):
+                if price is not None and price_field in field_names:
+                    try:
+                        setattr(obj, price_field, price)
+                        touched.append(price_field)
+                    except Exception:
+                        pass
+            if brand and "brand" in field_names:
                 try:
                     obj.brand = brand
                     touched.append("brand")
                 except Exception:
                     pass
-            if model_name and hasattr(obj, "model"):
+            if model_name and "model" in field_names:
                 try:
                     obj.model = model_name
                     touched.append("model")
@@ -1511,7 +1521,7 @@ def api_product_create(request: HttpRequest) -> JsonResponse:
                 "brand": getattr(obj, "brand", None),
                 "model": getattr(obj, "model", None),
                 "sku": getattr(obj, "sku", None) or getattr(obj, "code", None),
-                "price": float(getattr(obj, "price", None)) if getattr(obj, "price", None) is not None else None,
+                "price": float(getattr(obj, "price", None) or getattr(obj, "cost_price", 0) or 0),
             }
         )
     except Exception as e:

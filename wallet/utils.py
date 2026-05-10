@@ -12,16 +12,7 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 
 from .models import WalletTransaction, Ledger, TxnType
-
-
-def q2(x: Optional[Decimal]) -> Decimal:
-    """Quantize to 2 decimal places."""
-    from decimal import ROUND_HALF_UP
-    if x is None:
-        return Decimal("0.00")
-    if not isinstance(x, Decimal):
-        x = Decimal(str(x))
-    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+from .money import q2
 
 
 def compute_business_costs(

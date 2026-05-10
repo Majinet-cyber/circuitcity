@@ -1,6 +1,6 @@
 ﻿from __future__ import annotations
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Optional
 
 from django.conf import settings
@@ -12,19 +12,11 @@ from django.utils import timezone
 # Use AUTH_USER_MODEL string for FKs to avoid import cycles
 User = settings.AUTH_USER_MODEL
 
+from .money import q2
 
 # ----------------------------------------------------------------------
 # Utilities
 # ----------------------------------------------------------------------
-def q2(x: Optional[Decimal]) -> Decimal:
-    """Quantize to 2 dp (HALF_UP)."""
-    if x is None:
-        return Decimal("0.00")
-    if not isinstance(x, Decimal):
-        x = Decimal(str(x))
-    return x.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-
-
 def is_manager_like(user) -> bool:
     """Admins (is_staff) or profile.is_manager."""
     try:
