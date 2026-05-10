@@ -353,15 +353,32 @@ class PayslipStatus(models.TextChoices):
 
 
 class Payslip(models.Model):
-    agent = models.ForeignKey(User, on_delete=models.CASCADE, related_name="payslips")
+    business = models.ForeignKey(
+        "tenants.Business",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="payslips",
+    )
+    agent = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="payslips")
     year = models.IntegerField()
     month = models.IntegerField()  # 1..12
+    period_start = models.DateField(null=True, blank=True)
+    period_end = models.DateField(null=True, blank=True)
+
+    employee_name = models.CharField(max_length=160, blank=True, default="")
+    employee_role = models.CharField(max_length=120, blank=True, default="")
+    employee_phone = models.CharField(max_length=60, blank=True, default="")
+    employee_email = models.EmailField(blank=True, default="")
+    employee_identifier = models.CharField(max_length=80, blank=True, default="")
 
     # Components
     base_salary = models.DecimalField(max_digits=12, decimal_places=2, default=_default_base_salary)
     commission = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     bonuses_fees = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    other_earnings = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
     deductions = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
+    payment_method_label = models.CharField(max_length=80, blank=True, default="")
 
     # Totals
     gross = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
@@ -386,13 +403,24 @@ class Payslip(models.Model):
     class Meta:
         unique_together = [("agent", "year", "month")]
         indexes = [
+            models.Index(fields=["business", "year", "month"]),
             models.Index(fields=["agent", "year", "month"]),
+            models.Index(fields=["employee_name"]),
             models.Index(fields=["status"]),
         ]
         ordering = ("-issued_at",)
 
     def __str__(self) -> str:
-        return f"{self.reference or 'NOREF'} Â· {self.agent_id} Â· {self.year}-{self.month:02d}"
+        return f"{self.reference or 'NOREF'} - {self.display_employee_name} - {self.year}-{self.month:02d}"
+
+    @property
+    def display_employee_name(self) -> str:
+        if self.employee_name:
+            return self.employee_name
+        if self.agent_id:
+            full = self.agent.get_full_name()
+            return full or self.agent.get_username()
+        return "Employee"
 
     def _make_reference(self) -> str:
         ts = timezone.now().strftime("%y%m%d%H%M%S")
@@ -404,10 +432,16 @@ class Payslip(models.Model):
             while Payslip.objects.filter(reference=ref).exists():
                 ref = self._make_reference()
             self.reference = ref
-        if not self.email_to and hasattr(self, "agent") and getattr(self.agent, "email", ""):
+        if not self.email_to and self.employee_email:
+            self.email_to = self.employee_email
+        if not self.employee_name and self.agent_id:
+            self.employee_name = self.agent.get_full_name() or self.agent.get_username()
+        if not self.employee_email and self.agent_id and getattr(self.agent, "email", ""):
+            self.employee_email = self.agent.email
+        if not self.email_to and self.agent_id and getattr(self.agent, "email", ""):
             self.email_to = self.agent.email
 
-        gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0))
+        gross = q2((self.base_salary or 0) + (self.commission or 0) + (self.bonuses_fees or 0) + (self.other_earnings or 0))
         net = q2(gross - (self.deductions or 0))
         self.gross = gross
         self.net = net
@@ -416,6 +450,7 @@ class Payslip(models.Model):
         self.base_salary = q2(self.base_salary)
         self.commission = q2(self.commission)
         self.bonuses_fees = q2(self.bonuses_fees)
+        self.other_earnings = q2(self.other_earnings)
         self.deductions = q2(self.deductions)
         self.gross = q2(self.gross)
         self.net = q2(self.net)

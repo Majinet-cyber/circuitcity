@@ -3738,7 +3738,7 @@ def orders_list(request: HttpRequest) -> HttpResponse:
             {"page_obj": None, "orders": [], "message": "Orders model not available yet."},
         )
 
-    qs = Order.objects.all().order_by("-id")
+    qs = _purchase_order_queryset_for_request(request).order_by("-id")
 
     # optional filters
     status = request.GET.get("status")
@@ -3787,17 +3787,28 @@ def po_invoice(request: HttpRequest, po_id: int) -> HttpResponse:
     Can be printed or downloaded as PDF.
     """
     if Order is None:
-        return HttpResponse("Order model not available", status=501)
+        return render(request, "inventory/order_not_found.html", {"message": "Order model is not available."}, status=501)
 
-    try:
-        order = Order.objects.get(pk=po_id)
-    except Order.DoesNotExist:
-        return HttpResponse("Purchase order not found", status=404)
+    order = _purchase_order_queryset_for_request(request).filter(pk=po_id).first()
+    if order is None:
+        return render(
+            request,
+            "inventory/order_not_found.html",
+            {"message": "Purchase order not found for the current business.", "po_id": po_id},
+            status=404,
+        )
 
     # Get order items if they exist
     items = []
     if hasattr(order, "items"):
-        items = list(order.items.all())
+        try:
+            items = list(order.items.select_related("product").all())
+        except Exception:
+            items = list(order.items.all())
+
+    business = get_active_business(request)
+    if request.path.endswith("/download/") or request.GET.get("format") == "pdf":
+        return _purchase_order_pdf_response(order, items, business, request)
 
     return render(
         request,
@@ -3805,10 +3816,124 @@ def po_invoice(request: HttpRequest, po_id: int) -> HttpResponse:
         {
             "order": order,
             "items": items,
+            "business": business,
             "header_title": f"Purchase Order #{order.id}",
             "active_nav": "orders",
         },
     )
+
+
+def _purchase_order_queryset_for_request(request: HttpRequest):
+    if Order is None:
+        return None
+    qs = Order.objects.all()
+    business = get_active_business(request)
+    if getattr(request.user, "is_superuser", False) and business is None:
+        return qs
+    try:
+        fields = {f.name for f in Order._meta.get_fields()}
+    except Exception:
+        fields = set()
+    if business is not None and ("business" in fields or "business_id" in fields):
+        try:
+            scoped_qs = qs.filter(business=business)
+            if scoped_qs.exists():
+                return scoped_qs
+        except Exception:
+            pass
+    if business is not None and ("created_by" in fields or "created_by_id" in fields):
+        try:
+            from tenants.models import Membership
+            user_ids = list(
+                Membership.objects.filter(business=business, status="ACTIVE").values_list("user_id", flat=True)
+            )
+            return qs.filter(created_by_id__in=user_ids)
+        except Exception:
+            pass
+    return qs.none()
+
+
+def _purchase_order_pdf_response(order, items, business, request: HttpRequest) -> HttpResponse:
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        import io
+    except Exception:
+        response = render(request, "inventory/order_invoice.html", {"order": order, "items": items, "business": business})
+        response["Content-Disposition"] = f'attachment; filename="purchase-order-{order.id}.html"'
+        return response
+
+    def money(value):
+        try:
+            return f"{getattr(order, 'currency', 'MWK') or 'MWK'} {value:,.2f}"
+        except Exception:
+            return str(value or "")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=38, rightMargin=38, topMargin=36, bottomMargin=30)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle("POInvoiceTitle", parent=styles["Heading1"], textColor=colors.HexColor("#065f46"), fontSize=18)
+    business_name = getattr(business, "name", "") or getattr(getattr(order, "business", None), "name", "") or "Emajinet"
+    rows = [["Item", "Qty", "Unit Cost", "Line Total"]]
+    for item in items:
+        product = getattr(item, "product", None)
+        name = getattr(product, "name", None) or str(product or "Item")
+        qty = getattr(item, "quantity", getattr(item, "qty", ""))
+        unit = getattr(item, "unit_price", getattr(item, "unit_cost", 0))
+        total = getattr(item, "line_total", getattr(item, "total", 0))
+        rows.append([name, qty, money(unit), money(total)])
+    if len(rows) == 1:
+        rows.append(["No items recorded", "", "", ""])
+    rows.extend([
+        ["", "", "Subtotal", money(getattr(order, "subtotal", 0))],
+        ["", "", "Total", money(getattr(order, "total", 0))],
+    ])
+    table = Table(rows, repeatRows=1, colWidths=[230, 55, 105, 115])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#065f46")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e2e8f0")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -3), [colors.white, colors.HexColor("#f8fafc")]),
+        ("FONTNAME", (2, -2), (-1, -1), "Helvetica-Bold"),
+        ("PADDING", (0, 0), (-1, -1), 6),
+    ]))
+    contact = " | ".join(v for v in [getattr(order, "supplier_email", ""), getattr(order, "supplier_phone", "")] if v)
+    prepared_by = getattr(getattr(order, "created_by", None), "get_username", lambda: "")()
+    elements = [
+        Paragraph("Purchase Order", title_style),
+        Paragraph(f"{business_name} | PO-{order.id:05d}", styles["Normal"]),
+        Spacer(1, 12),
+        Table(
+            [
+                ["Supplier", getattr(order, "supplier_name", "") or "Not specified"],
+                ["Contact", contact or "Not specified"],
+                ["Order date", getattr(order, "created_at", None).strftime("%Y-%m-%d") if getattr(order, "created_at", None) else ""],
+                ["Status", str(getattr(order, "status", "") or "").title()],
+                ["Payment terms", getattr(order, "payment_terms", "") or "Not specified"],
+                ["Prepared by", prepared_by],
+            ],
+            colWidths=[140, 360],
+            style=[
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ],
+        ),
+        Spacer(1, 14),
+        table,
+        Spacer(1, 16),
+        Paragraph(getattr(order, "notes", "") or "", styles["Normal"]),
+        Spacer(1, 24),
+        Paragraph("Signature: ____________________________    Date: __________________", styles["Normal"]),
+    ]
+    doc.build(elements)
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="purchase-order-{order.id:05d}.pdf"'
+    return response
 
 
 from django.contrib import messages

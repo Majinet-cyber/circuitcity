@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db.models import Sum, QuerySet
+from django.db.models import Q, Sum, QuerySet
 from django.http import HttpRequest, JsonResponse, HttpResponseBadRequest, HttpResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -126,6 +126,19 @@ def business_users_qs(business):
     if not business:
         return U.objects.none()
 
+    try:
+        from tenants.models import Membership
+        member_ids = (
+            Membership.objects.filter(business=business, status="ACTIVE", user__is_active=True)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+        qs = U.objects.filter(id__in=list(member_ids), is_active=True).order_by("first_name", "last_name", "username")
+        if qs.exists():
+            return qs
+    except Exception:
+        pass
+
     # Try the most likely relations first
     candidates = (
         {"profile__business": business},
@@ -200,6 +213,38 @@ def scope_qs_to_user(qs: QuerySet, request: Any) -> QuerySet:
             pass
 
     return qs.none()
+
+
+def _staff_options_for_request(request: HttpRequest):
+    biz = get_active_business(request)
+    qs = business_users_qs(biz)
+    if getattr(request.user, "is_superuser", False) and not qs.exists():
+        qs = get_user_model().objects.filter(is_active=True).order_by("first_name", "last_name", "username")[:200]
+    rows = []
+    for user in qs:
+        try:
+            membership = user.memberships.filter(business=biz, status="ACTIVE").first() if biz else None
+        except Exception:
+            membership = None
+        role = getattr(membership, "role", "") or getattr(getattr(user, "profile", None), "role", "") or ""
+        phone = (
+            getattr(getattr(user, "profile", None), "phone", "")
+            or getattr(getattr(user, "agent_profile", None), "phone", "")
+            or ""
+        )
+        name = user.get_full_name() or user.get_username()
+        rows.append(
+            {
+                "id": user.id,
+                "name": name,
+                "role": role,
+                "email": user.email or "",
+                "phone": phone,
+                "identifier": str(user.id),
+                "label": f"{name} ({role})" if role else name,
+            }
+        )
+    return rows
 
 def _agent_belongs_to_business(agent: Any, business: Any) -> bool:
     """
@@ -383,7 +428,7 @@ def _decimal_post(request: HttpRequest, key: str) -> Decimal | None:
 
 
 def _payslip_components_from_post(request: HttpRequest) -> dict[str, Decimal]:
-    keys = ("base_salary", "allowances", "bonuses", "advances", "penalties", "other_deductions")
+    keys = ("base_salary", "allowances", "bonuses", "commission", "other_earnings", "advances", "penalties", "other_deductions")
     components: dict[str, Decimal] = {}
     for key in keys:
         value = _decimal_post(request, key)
@@ -392,7 +437,50 @@ def _payslip_components_from_post(request: HttpRequest) -> dict[str, Decimal]:
     return components
 
 
+def _employee_snapshot_from_post(request: HttpRequest, agent=None) -> dict[str, str]:
+    full_name = (request.POST.get("employee_name") or "").strip()
+    role = (request.POST.get("employee_role") or "").strip()
+    email = (request.POST.get("employee_email") or "").strip()
+    phone = (request.POST.get("employee_phone") or "").strip()
+    identifier = (request.POST.get("employee_identifier") or "").strip()
+    if agent is not None:
+        full_name = full_name or agent.get_full_name() or agent.get_username()
+        email = email or getattr(agent, "email", "") or ""
+        identifier = identifier or str(agent.id)
+        if not role:
+            try:
+                biz = get_active_business(request)
+                membership = agent.memberships.filter(business=biz, status="ACTIVE").first() if biz else None
+                role = getattr(membership, "role", "") or ""
+            except Exception:
+                role = ""
+    return {
+        "employee_name": full_name,
+        "employee_role": role,
+        "employee_email": email,
+        "employee_phone": phone,
+        "employee_identifier": identifier,
+    }
+
+
+def _period_from_post(request: HttpRequest, year: int, month: int) -> tuple[date, date]:
+    first, last = _month_bounds(year, month)
+    start_raw = request.POST.get("period_start") or ""
+    end_raw = request.POST.get("period_end") or ""
+    try:
+        start = datetime.strptime(start_raw, "%Y-%m-%d").date() if start_raw else first
+    except ValueError:
+        start = first
+    try:
+        end = datetime.strptime(end_raw, "%Y-%m-%d").date() if end_raw else last
+    except ValueError:
+        end = last
+    return start, end
+
+
 def _attendance_summary_for_payslip(agent, business, year: int, month: int) -> dict[str, Any]:
+    if agent is None:
+        return {}
     try:
         from inventory.models_attendance import TimeLog
         from inventory.views_time import _pair_work_seconds
@@ -428,20 +516,31 @@ def _attendance_summary_for_payslip(agent, business, year: int, month: int) -> d
 # ---------------------------------------------------------------------
 def _create_or_update_payslip_and_txn(
     *,
-    agent,
+    agent=None,
     year: int,
     month: int,
     created_by,
     send_now: bool = False,
     payment_method: str | None = None,
     components: dict[str, Decimal] | None = None,
+    business=None,
+    employee_snapshot: dict[str, str] | None = None,
+    period_start: date | None = None,
+    period_end: date | None = None,
 ) -> Payslip:
     """
     Compute totals -> create/update Payslip -> post wallet/company mirror txns (for net)
     -> optionally send email now. Returns the Payslip.
     """
     first, last = _month_bounds(year, month)
-    breakdown = _compute_breakdown(agent, first, last)
+    breakdown = _compute_breakdown(agent, first, last) if agent is not None else {
+        "pos_total": Decimal("0"),
+        "neg_total": Decimal("0"),
+        "commission": Decimal("0"),
+        "bonus": Decimal("0"),
+        "advances": Decimal("0"),
+        "penalties": Decimal("0"),
+    }
 
     components = components or {}
     # Components - base salary is computed from wallet transactions unless explicitly supplied
@@ -453,16 +552,12 @@ def _create_or_update_payslip_and_txn(
     # Try to get business from agent's profile/membership
     try:
         from tenants.models import Membership
-        membership = Membership.objects.filter(
-            user=agent,
-            role="AGENT",
-            status="ACTIVE"
-        ).first()
-        biz = membership.business if membership else None
+        membership = Membership.objects.filter(user=agent, status="ACTIVE").first() if agent is not None else None
+        biz = business or (membership.business if membership else None)
     except Exception:
-        biz = None
+        biz = business
     
-    base_salary = get_base_salary_for_month(biz, agent, year, month) if biz else Decimal("0")
+    base_salary = get_base_salary_for_month(biz, agent, year, month) if biz and agent is not None else Decimal("0")
     
     if "base_salary" in components:
         base_salary = components["base_salary"]
@@ -470,33 +565,39 @@ def _create_or_update_payslip_and_txn(
     elif base_salary == Decimal("0"):
         base_salary = Decimal(getattr(settings, "WALLET_BASE_SALARY", "40000") or "0")
     
-    commission = breakdown["commission"]
+    commission = components.get("commission", breakdown["commission"])
     allowances = components.get("allowances", Decimal("0"))
     bonuses = components.get("bonuses", breakdown["bonus"])
+    other_earnings = components.get("other_earnings", Decimal("0"))
     advances = components.get("advances", breakdown["advances"])
     penalties = components.get("penalties", breakdown["penalties"])
     other_deductions = components.get("other_deductions", Decimal("0"))
     bonuses_fees = allowances + bonuses
     deductions = advances + penalties + other_deductions
 
-    gross = base_salary + commission + bonuses_fees
+    gross = base_salary + commission + bonuses_fees + other_earnings
     net = gross - deductions
     attendance = _attendance_summary_for_payslip(agent, biz, year, month)
+    employee_snapshot = employee_snapshot or {}
+    period_start = period_start or first
+    period_end = period_end or last
 
     # Create / update payslip record
-    p, created = Payslip.objects.get_or_create(
-        agent=agent,
-        year=year,
-        month=month,
-        defaults=dict(
+    defaults = dict(
+            business=biz,
             base_salary=base_salary,
             commission=commission,
             bonuses_fees=bonuses_fees,
+            other_earnings=other_earnings,
             deductions=deductions,
             gross=gross,
             net=net,
             created_by=created_by,
-            email_to=getattr(agent, "email", "") or "",
+            email_to=employee_snapshot.get("employee_email") or getattr(agent, "email", "") if agent is not None else employee_snapshot.get("employee_email", ""),
+            period_start=period_start,
+            period_end=period_end,
+            payment_method_label=payment_method or "",
+            **employee_snapshot,
             meta={
                 "calc": {
                     "pos_total": str(breakdown["pos_total"]),
@@ -505,19 +606,38 @@ def _create_or_update_payslip_and_txn(
                     "penalties": str(breakdown["penalties"]),
                     "allowances": str(allowances),
                     "bonuses": str(bonuses),
+                    "commission": str(commission),
+                    "other_earnings": str(other_earnings),
                     "other_deductions": str(other_deductions),
                 },
                 "attendance": attendance,
             },
-        ),
     )
+    if agent is not None:
+        p, created = Payslip.objects.get_or_create(
+            agent=agent,
+            year=year,
+            month=month,
+            defaults=defaults,
+        )
+    else:
+        p = Payslip.objects.create(agent=None, year=year, month=month, **defaults)
+        created = True
     if not created:
+        p.business = biz or p.business
+        p.period_start = period_start
+        p.period_end = period_end
+        for key, value in employee_snapshot.items():
+            if value:
+                setattr(p, key, value)
         p.base_salary = base_salary
         p.commission = commission
         p.bonuses_fees = bonuses_fees
+        p.other_earnings = other_earnings
         p.deductions = deductions
         p.gross = gross
         p.net = net
+        p.payment_method_label = payment_method or p.payment_method_label
         meta = dict(p.meta or {})
         meta["calc"] = {
             "pos_total": str(breakdown["pos_total"]),
@@ -526,11 +646,15 @@ def _create_or_update_payslip_and_txn(
             "penalties": str(penalties),
             "allowances": str(allowances),
             "bonuses": str(bonuses),
+            "commission": str(commission),
+            "other_earnings": str(other_earnings),
             "other_deductions": str(other_deductions),
         }
         meta["attendance"] = attendance
         p.meta = meta
-        if not getattr(p, "email_to", ""):
+        if employee_snapshot.get("employee_email"):
+            p.email_to = employee_snapshot["employee_email"]
+        if not getattr(p, "email_to", "") and agent is not None:
             p.email_to = getattr(agent, "email", "") or ""
         if not getattr(p, "created_by", None):
             p.created_by = created_by
@@ -544,7 +668,7 @@ def _create_or_update_payslip_and_txn(
         effective_date__lte=last,
         meta__payslip_id=p.id,
     ).exists()
-    if net != 0 and not existing_payout:
+    if agent is not None and net != 0 and not existing_payout:
         # Agent wallet reduces by net (payment out)
         add_txn(
             agent=agent,
@@ -898,6 +1022,7 @@ def payslip_download(request: HttpRequest, year: int, month: int) -> HttpRespons
 
 def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
     attendance = (p.meta or {}).get("attendance") or {}
+    calc = (p.meta or {}).get("calc") or {}
     try:
         from reportlab.lib import colors
         from reportlab.lib.pagesizes import A4
@@ -912,23 +1037,42 @@ def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
     doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=38, bottomMargin=32)
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle("PayslipTitle", parent=styles["Heading1"], fontSize=18, textColor=colors.HexColor("#065f46"))
-    agent_name = p.agent.get_full_name() or p.agent.get_username()
-    business_name = getattr(get_active_business(requester), "name", "") or "Emajinet"
+    employee_name = p.display_employee_name
+    business_name = getattr(p.business, "name", "") or getattr(get_active_business(requester), "name", "") or "Emajinet"
+    period = (
+        f"{p.period_start:%Y-%m-%d} to {p.period_end:%Y-%m-%d}"
+        if p.period_start and p.period_end
+        else f"{p.year}-{p.month:02d}"
+    )
     rows = [
         ["Business", business_name],
-        ["Employee", agent_name],
-        ["Pay period", f"{p.year}-{p.month:02d}"],
+        ["Employee", employee_name],
+        ["Role / position", p.employee_role or ""],
+        ["Employee ID", p.employee_identifier or ""],
+        ["Pay period", period],
         ["Issue date", timezone.localtime(p.issued_at).strftime("%Y-%m-%d") if p.issued_at else ""],
         ["Days worked", attendance.get("days_worked", "")],
         ["Hours worked", attendance.get("hours_worked", "")],
-        ["Basic salary", f"MWK {p.base_salary:,.2f}"],
-        ["Commission", f"MWK {p.commission:,.2f}"],
-        ["Allowances / bonuses", f"MWK {p.bonuses_fees:,.2f}"],
-        ["Deductions", f"MWK {p.deductions:,.2f}"],
-        ["Gross pay", f"MWK {p.gross:,.2f}"],
-        ["Net pay", f"MWK {p.net:,.2f}"],
+        ["Payment method", p.payment_method_label or "Manual"],
         ["Prepared by", getattr(p.created_by, "get_username", lambda: "")() if p.created_by_id else ""],
         ["Status", p.get_status_display()],
+    ]
+    earnings_rows = [
+        ["Earnings", "Amount"],
+        ["Basic salary", f"MWK {p.base_salary:,.2f}"],
+        ["Commission", f"MWK {p.commission:,.2f}"],
+        ["Allowances", f"MWK {Decimal(str(calc.get('allowances') or 0)):,.2f}"],
+        ["Bonuses", f"MWK {Decimal(str(calc.get('bonuses') or 0)):,.2f}"],
+        ["Other earnings", f"MWK {p.other_earnings:,.2f}"],
+        ["Gross pay", f"MWK {p.gross:,.2f}"],
+    ]
+    deduction_rows = [
+        ["Deductions", "Amount"],
+        ["Advances", f"MWK {Decimal(str(calc.get('advances') or 0)):,.2f}"],
+        ["Penalties", f"MWK {Decimal(str(calc.get('penalties') or 0)):,.2f}"],
+        ["Other deductions", f"MWK {Decimal(str(calc.get('other_deductions') or 0)):,.2f}"],
+        ["Total deductions", f"MWK {p.deductions:,.2f}"],
+        ["Net pay", f"MWK {p.net:,.2f}"],
     ]
     table = Table(rows, colWidths=[150, 330])
     table.setStyle(TableStyle([
@@ -939,7 +1083,27 @@ def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
         ("PADDING", (0, 0), (-1, -1), 7),
     ]))
-    doc.build([Paragraph("Payslip", title_style), Paragraph(f"Reference: {p.reference}", styles["Normal"]), Spacer(1, 14), table])
+    earnings = Table(earnings_rows, colWidths=[230, 250])
+    deductions_table = Table(deduction_rows, colWidths=[230, 250])
+    for t in (earnings, deductions_table):
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#ecfdf5")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#d1fae5")),
+            ("PADDING", (0, 0), (-1, -1), 7),
+        ]))
+    doc.build([
+        Paragraph("Payslip", title_style),
+        Paragraph(f"{business_name} | Reference: {p.reference}", styles["Normal"]),
+        Spacer(1, 14),
+        table,
+        Spacer(1, 14),
+        earnings,
+        Spacer(1, 14),
+        deductions_table,
+        Spacer(1, 28),
+        Paragraph("Prepared by: ____________________    Employee signature: ____________________", styles["Normal"]),
+    ])
     resp = HttpResponse(buffer.getvalue(), content_type="application/pdf")
     resp["Content-Disposition"] = f'attachment; filename="payslip-{p.reference or p.id}.pdf"'
     return resp
@@ -947,12 +1111,13 @@ def _render_payslip_pdf(p: Payslip, requester) -> HttpResponse:
 
 @login_required
 def payslip_download_by_id(request: HttpRequest, pk: int) -> HttpResponse:
-    p = get_object_or_404(Payslip.objects.select_related("agent", "created_by"), pk=pk)
+    p = get_object_or_404(Payslip.objects.select_related("agent", "created_by", "business"), pk=pk)
     if not (_staff(request.user) or p.agent_id == request.user.id):
         return HttpResponse("Not allowed", status=403)
     if _staff(request.user) and not request.user.is_superuser:
         biz = get_active_business(request)
-        if not _agent_belongs_to_business(p.agent, biz):
+        same_business = bool(biz and getattr(p, "business_id", None) == getattr(biz, "id", None))
+        if not same_business and (not p.agent_id or not _agent_belongs_to_business(p.agent, biz)):
             return HttpResponse("Not allowed", status=403)
     return _render_payslip_pdf(p, request)
 
@@ -962,8 +1127,10 @@ def payslip_download_by_id(request: HttpRequest, pk: int) -> HttpResponse:
 def payslip_set_status(request: HttpRequest, pk: int, action: str) -> HttpResponse:
     if not _staff(request.user):
         return redirect("wallet:agent_wallet")
-    p = get_object_or_404(Payslip.objects.select_related("agent"), pk=pk)
-    if not request.user.is_superuser and not _agent_belongs_to_business(p.agent, get_active_business(request)):
+    p = get_object_or_404(Payslip.objects.select_related("agent", "business"), pk=pk)
+    biz = get_active_business(request)
+    same_business = bool(biz and getattr(p, "business_id", None) == getattr(biz, "id", None))
+    if not request.user.is_superuser and not same_business and (not p.agent_id or not _agent_belongs_to_business(p.agent, biz)):
         return HttpResponse("Not allowed", status=403)
     if action == "issued":
         p.status = PayslipStatus.SENT
@@ -972,10 +1139,10 @@ def payslip_set_status(request: HttpRequest, pk: int, action: str) -> HttpRespon
         p.status = PayslipStatus.PAID
     else:
         messages.error(request, "Invalid payslip action.")
-        return redirect("wallet:admin_agent", agent_id=p.agent_id)
+        return redirect("wallet:admin_agent", agent_id=p.agent_id) if p.agent_id else redirect("wallet:admin_payslips")
     p.save(update_fields=["status", "sent_at"] if action == "issued" else ["status"])
     messages.success(request, f"Payslip marked as {p.get_status_display()}.")
-    return redirect("wallet:admin_agent", agent_id=p.agent_id)
+    return redirect("wallet:admin_agent", agent_id=p.agent_id) if p.agent_id else redirect("wallet:admin_payslips")
 
 
 @login_required
@@ -1411,19 +1578,9 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        U = get_user_model()
-        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
-        # Managers see only their business agents in the dropdown
-        if not self.request.user.is_superuser:
-            biz = get_active_business(self.request)
-            try:
-                agents_qs = agents_qs.filter(profile__business=biz)
-            except Exception:
-                try:
-                    agents_qs = agents_qs.filter(business=biz)
-                except Exception:
-                    agents_qs = agents_qs.none()
-        ctx["agents"] = agents_qs
+        staff_options = _staff_options_for_request(self.request)
+        ctx["staff_options"] = staff_options
+        ctx["agents"] = [row["id"] for row in staff_options]
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
@@ -1431,15 +1588,61 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
 
     def post(self, request: HttpRequest):
         U = get_user_model()
-        agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        agent_id = (request.POST.get("agent_id") or "").strip()
+        agent = get_object_or_404(U, id=agent_id) if agent_id else None
         # Enforce manager scope
-        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+        if agent is not None and not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
             return HttpResponse("Not allowed for this agent.", status=403)
 
-        year = int(request.POST.get("year"))
-        month = int(request.POST.get("month"))
+        try:
+            year = int(request.POST.get("year"))
+            month = int(request.POST.get("month"))
+            if month < 1 or month > 12:
+                raise ValueError
+        except (TypeError, ValueError):
+            messages.error(request, "Choose a valid payslip month and year.")
+            return redirect("wallet:admin_issue_payslip")
         send_now = request.POST.get("send_now") in ("1", "true", "on", "yes")
         method = request.POST.get("method")  # optional
+        components = _payslip_components_from_post(request)
+        employee_snapshot = _employee_snapshot_from_post(request, agent)
+        if not employee_snapshot.get("employee_name"):
+            messages.error(request, "Employee name is required. Select staff or enter employee details manually.")
+            return redirect("wallet:admin_issue_payslip")
+        provided_earnings = sum(
+            components.get(key, Decimal("0"))
+            for key in ("base_salary", "allowances", "bonuses", "commission", "other_earnings")
+        )
+        if agent is None and provided_earnings <= 0:
+            messages.error(request, "Enter basic salary or another earnings amount before issuing.")
+            return redirect("wallet:admin_issue_payslip")
+        period_start, period_end = _period_from_post(request, year, month)
+        action = (request.POST.get("action") or "issue").lower()
+
+        if action == "preview":
+            preview = Payslip(
+                business=get_active_business(request),
+                agent=agent,
+                year=year,
+                month=month,
+                period_start=period_start,
+                period_end=period_end,
+                base_salary=components.get("base_salary", Decimal("0")),
+                commission=components.get("commission", Decimal("0")),
+                bonuses_fees=components.get("allowances", Decimal("0")) + components.get("bonuses", Decimal("0")),
+                other_earnings=components.get("other_earnings", Decimal("0")),
+                deductions=components.get("advances", Decimal("0")) + components.get("penalties", Decimal("0")) + components.get("other_deductions", Decimal("0")),
+                payment_method_label=method or "Manual",
+                created_by=request.user,
+                meta={"calc": {k: str(v) for k, v in components.items()}},
+                **employee_snapshot,
+            )
+            preview.save = lambda *args, **kwargs: None  # type: ignore[method-assign]
+            preview.gross = q2(preview.base_salary + preview.commission + preview.bonuses_fees + preview.other_earnings)
+            preview.net = q2(preview.gross - preview.deductions)
+            ctx = self.get_context_data()
+            ctx.update({"preview_payslip": preview, "preview_calc": components})
+            return render(request, self.template_name, ctx)
 
         p = _create_or_update_payslip_and_txn(
             agent=agent,
@@ -1448,13 +1651,24 @@ class AdminIssuePayslipView(LoginRequiredMixin, TemplateView):
             created_by=request.user,
             send_now=send_now,
             payment_method=method,
-            components=_payslip_components_from_post(request),
+            components=components,
+            business=get_active_business(request),
+            employee_snapshot=employee_snapshot,
+            period_start=period_start,
+            period_end=period_end,
         )
+        if action == "issue" and p.status != PayslipStatus.SENT:
+            p.status = PayslipStatus.SENT
+            p.sent_at = p.sent_at or timezone.now()
+            p.save(update_fields=["status", "sent_at"])
+        if action in {"generate_pdf", "download_pdf"}:
+            return _render_payslip_pdf(p, request)
         if _json_requested(request):
             return JsonResponse(
-                {"ok": True, "agent": agent.id, "reference": p.reference, "net": float(p.net)}
+                {"ok": True, "agent": getattr(agent, "id", None), "reference": p.reference, "net": float(p.net)}
             )
-        return redirect("wallet:admin_agent", agent_id=agent.id)
+        messages.success(request, f"Payslip {p.reference} issued for {p.display_employee_name}.")
+        return redirect("wallet:admin_agent", agent_id=agent.id) if agent is not None else redirect("wallet:admin_payslips")
 
 
 @method_decorator([otp_required, ensure_csrf_cookie], name="dispatch")
@@ -1472,21 +1686,19 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        U = get_user_model()
-        agents_qs = U.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
-        if not self.request.user.is_superuser:
-            biz = get_active_business(self.request)
-            try:
-                agents_qs = agents_qs.filter(profile__business=biz)
-            except Exception:
-                try:
-                    agents_qs = agents_qs.filter(business=biz)
-                except Exception:
-                    agents_qs = agents_qs.none()
-        ctx["agents"] = agents_qs
+        staff_options = _staff_options_for_request(self.request)
+        ctx["staff_options"] = staff_options
+        ctx["agents"] = [row["id"] for row in staff_options]
         today = timezone.localdate()
         ctx["year"] = int(self.request.GET.get("year", today.year))
         ctx["month"] = int(self.request.GET.get("month", today.month))
+        recent = Payslip.objects.select_related("agent", "created_by", "business")
+        biz = get_active_business(self.request)
+        if biz is not None:
+            recent = recent.filter(Q(business=biz) | Q(agent__in=business_users_qs(biz)))
+        elif not self.request.user.is_superuser:
+            recent = recent.none()
+        ctx["recent_payslips"] = recent.order_by("-issued_at")[:50]
         return ctx
 
     def post(self, request: HttpRequest):
@@ -1500,6 +1712,9 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
 
         if not agent_ids and _json_requested(request):
             return JsonResponse({"ok": False, "error": "No agents selected."}, status=400)
+        if not agent_ids:
+            messages.error(request, "Select at least one active staff member, or use the single payslip form for manual entry.")
+            return redirect("wallet:admin_payslips")
 
         year = int(request.POST.get("year"))
         month = int(request.POST.get("month"))
@@ -1513,7 +1728,10 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
             agents = [a for a in agents if _agent_belongs_to_business(a, biz)]
 
         results = []
+        components = _payslip_components_from_post(request)
+        period_start, period_end = _period_from_post(request, year, month)
         for a in agents:
+            employee_snapshot = _employee_snapshot_from_post(request, a)
             p = _create_or_update_payslip_and_txn(
                 agent=a,
                 year=year,
@@ -1521,13 +1739,22 @@ class AdminPayslipBulkView(LoginRequiredMixin, TemplateView):
                 created_by=request.user,
                 send_now=send_now,
                 payment_method=method,
-                components=_payslip_components_from_post(request),
+                components=components,
+                business=get_active_business(request),
+                employee_snapshot=employee_snapshot,
+                period_start=period_start,
+                period_end=period_end,
             )
+            if p.status != PayslipStatus.SENT:
+                p.status = PayslipStatus.SENT
+                p.sent_at = p.sent_at or timezone.now()
+                p.save(update_fields=["status", "sent_at"])
             results.append({"agent": a.id, "net": float(p.net), "reference": p.reference, "sent": p.sent_to_email})
 
         # JSON if requested; otherwise go home
         if _json_requested(request):
             return JsonResponse({"ok": True, "count": len(results), "results": results})
+        messages.success(request, f"Issued {len(results)} payslip{'' if len(results) == 1 else 's'}.")
         return redirect("wallet:admin_home")
 
 

@@ -1348,6 +1348,28 @@ def orders_list_api(request: HttpRequest) -> JsonResponse:
 
     try:
         qs = scoped(_manager(Order).all(), request)
+        biz = get_active_business(request)
+        if not (getattr(request.user, "is_superuser", False) and biz is None):
+            try:
+                order_fields = {f.name for f in Order._meta.get_fields()}
+            except Exception:
+                order_fields = set()
+            used_business_scope = False
+            if biz is not None and ("business" in order_fields or "business_id" in order_fields):
+                try:
+                    biz_qs = qs.filter(business=biz)
+                    if biz_qs.exists():
+                        qs = biz_qs
+                        used_business_scope = True
+                except Exception:
+                    pass
+            if biz is not None and not used_business_scope and ("created_by" in order_fields or "created_by_id" in order_fields):
+                try:
+                    from tenants.models import Membership
+                    user_ids = list(Membership.objects.filter(business=biz, status="ACTIVE").values_list("user_id", flat=True))
+                    qs = qs.filter(created_by_id__in=user_ids)
+                except Exception:
+                    pass
         try:
             qs = qs.order_by("-id")
         except Exception:

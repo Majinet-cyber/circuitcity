@@ -71,9 +71,6 @@
       <a class="primary" href="{% url 'inventory:place_order' %}">
         <i class="bi bi-plus-circle"></i> New Order
       </a>
-      <button class="ghost" id="demoBtn" title="Seed sample data on screen only">
-        <i class="bi bi-flask"></i> Demo Mode
-      </button>
     </div>
   </header>
 
@@ -95,7 +92,7 @@
       <ul>
         <li>Paste a supplier reference into "New Order" to track shipments</li>
         <li>Use the API at <code>{% url 'inventory:orders_list_api' %}</code> to sync from another system</li>
-        <li>Press <code>N</code> for new order, <code>R</code> to refresh, <code>D</code> for demo data</li>
+        <li>Press <code>N</code> for new order or <code>R</code> to refresh.</li>
       </ul>
     </div>
   </div>
@@ -137,9 +134,6 @@ function renderTable(rows){
       <i class="bi bi-inbox"></i>
       <p>No orders yet</p>
       <p class="sub">Create your first purchase order to get started</p>
-      <button class="hero-actions primary" style="margin-top:16px" onclick="seedDemo()">
-        <i class="bi bi-flask"></i> Fill Demo Data
-      </button>
     </div>`;
     setCount(0);
     return;
@@ -202,31 +196,12 @@ async function loadOrders(){
   }
 }
 
-// Demo data (UI only)
-function seedDemo(){
-  const now = Date.now();
-  const sample = Array.from({length:8}).map((_,i)=>({
-    id: 1000+i,
-    reference: `PO-25-${String(1+i).padStart(4,"0")}`,
-    supplier_name: ["Acme Corp","Tech Supplies","Global Traders","Local Vendor"][i%4],
-    status: ["Draft","Pending","Approved","Received"][i%4],
-    total: 480 + Math.random()*1400,
-    created_at: new Date(now - i*86400000).toISOString()
-  }));
-  renderTable(sample);
-}
-window.seedDemo = seedDemo;
-
 // UX shortcuts
-const demoBtn = document.getElementById('demoBtn');
-if (demoBtn) demoBtn.addEventListener('click', seedDemo);
-
 document.addEventListener('keydown', (e)=>{
   const tag = (e.target.tagName||"").toLowerCase();
   if (tag === "input" || tag === "textarea") return;
   const k = e.key.toLowerCase();
   if (k === "r"){ e.preventDefault(); loadOrders(); }
-  if (k === "d"){ e.preventDefault(); seedDemo(); }
   if (k === "n"){ e.preventDefault(); location.href = "{% url 'inventory:place_order' %}"; }
 });
 
