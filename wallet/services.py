@@ -80,7 +80,16 @@ def add_txn(
     created_by=None,
     meta=None,
     ledger=Ledger.AGENT,
+    business=None,
 ):
+    if business is None and agent is not None:
+        try:
+            from tenants.models import Membership
+
+            membership = Membership.objects.filter(user=agent, status="ACTIVE").select_related("business").first()
+            business = membership.business if membership else None
+        except Exception:
+            business = None
     return WalletTransaction.objects.create(
         ledger=ledger,
         agent=agent,
@@ -91,6 +100,7 @@ def add_txn(
         effective_date=effective_date or timezone.localdate(),
         created_by=created_by,
         meta=meta or {},
+        business=business,
     )
 
 
@@ -316,6 +326,14 @@ def create_and_post_payslip(agent, year: int, month: int, *, created_by=None, po
         raise RuntimeError("Payslip model not available. Run migrations.")
 
     b = compute_monthly_payslip(agent, year, month)
+    business = None
+    try:
+        from tenants.models import Membership
+
+        membership = Membership.objects.filter(user=agent, status="ACTIVE").select_related("business").first()
+        business = membership.business if membership else None
+    except Exception:
+        business = None
 
     # Post payout to ledgers
     if post_wallet_payout and b.net and b.net > 0:
@@ -328,16 +346,18 @@ def create_and_post_payslip(agent, year: int, month: int, *, created_by=None, po
             created_by=created_by,
             effective_date=last_day,
             meta={"gross": str(b.gross), "deductions": str(b.deductions)},
+            business=business,
         )
         WalletTransaction.objects.create(
             ledger=Ledger.COMPANY,
             agent=agent,
-            amount=b.net,
+            amount=-b.net,
             type=TxnType.PAYSLIP,
             note=f"[Agent {agent.id}] Payslip {year}-{month:02d}",
             created_by=created_by,
             effective_date=last_day,
             meta={"gross": str(b.gross), "deductions": str(b.deductions)},
+            business=business,
         )
 
     # Upsert payslip
@@ -345,8 +365,9 @@ def create_and_post_payslip(agent, year: int, month: int, *, created_by=None, po
         agent=agent,
         year=year,
         month=month,
-        defaults={"gross": b.gross, "deductions": b.deductions, "net": b.net},
+        defaults={"business": business, "gross": b.gross, "deductions": b.deductions, "net": b.net},
     )
+    p.business = p.business or business
     p.gross, p.deductions, p.net = b.gross, b.deductions, b.net
     p.save()
 

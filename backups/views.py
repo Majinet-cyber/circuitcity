@@ -25,6 +25,7 @@ from .models import BackupSnapshot, BackupStatus, DataExportLog
 from .helpers import (
     EXPORT_CATEGORY_LABELS,
     build_executive_summary,
+    build_core_data_coverage,
     build_export_summary,
     cleanup_temp_files,
     create_export_xlsx_bytes,
@@ -53,6 +54,7 @@ def manager_backups_list(request: HttpRequest) -> HttpResponse:
     latest_success = snapshots.filter(status=BackupStatus.SUCCESS).first()
     last_export = DataExportLog.objects.filter(business=business, status=BackupStatus.SUCCESS).first()
     export_summary = build_export_summary(business, "all", include_rows=False)
+    data_coverage = build_core_data_coverage(business)
     category_cards = []
     category_icons = {
         "inventory": "bi-box-seam",
@@ -103,6 +105,7 @@ def manager_backups_list(request: HttpRequest) -> HttpResponse:
         "total_records": export_summary["total_records"],
         "section_count": export_summary["section_count"],
         "category_cards": category_cards,
+        "data_coverage": data_coverage,
         "backup_health": backup_health,
         "data_safety_score": data_safety_score,
         "estimate_bytes": estimate_bytes,

@@ -184,6 +184,23 @@ def add_business_cost(
             'cost_name': name,
         }
     )
+    try:
+        from .business_memory import record_cash_bank_transaction
+        from .models import CashBankTransaction
+
+        record_cash_bank_transaction(
+            business=business,
+            amount=amount,
+            direction=CashBankTransaction.Direction.CASH_OUT,
+            category="Business expense",
+            payment_method="cash",
+            tx_date=effective_date,
+            description=full_note,
+            related_sale_reference=f"cost:{txn.pk}",
+            created_by=created_by,
+        )
+    except Exception:
+        pass
     
     return txn
 

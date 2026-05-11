@@ -98,3 +98,48 @@ def create_commission_on_sale(sender, instance, created, **kwargs):
 
     # Schedule commission creation to run only after successful commit
     transaction.on_commit(_create_commission)
+
+
+@receiver(post_save, sender=Sale)
+def create_cash_memory_on_sale(sender, instance, created, **kwargs):
+    """
+    Persist actual collected cash/bank/mobile movement for phone sales.
+
+    Revenue and wallet commission records are not the same as cash collected.
+    This keeps the Cash & Bank ledger, backups, and daily books checks tied to
+    the same committed sale records without changing the selling UI.
+    """
+    if not created:
+        return
+
+    sale_id = instance.id
+    business_id = None
+    try:
+        business_id = instance.location.business_id
+    except Exception:
+        business_id = None
+    if not business_id:
+        return
+
+    def _record_cash():
+        try:
+            from sales.models import Sale as SaleModel
+            from tenants.models import Business
+            from wallet.business_memory import record_sale_cash_memory
+
+            sale = SaleModel.objects.select_related("agent", "location__business").get(pk=sale_id)
+            business = Business.objects.get(pk=business_id)
+            record_sale_cash_memory(
+                sale=sale,
+                business=business,
+                amount=sale.price,
+                payment_method=sale.payment_method,
+                sold_at=sale.sold_at,
+                created_by=sale.agent,
+                reference=f"sale:Sale:{sale.pk}",
+                category="Phone sale payment",
+            )
+        except Exception:
+            logger.exception("Failed to create cash/bank memory for sale_id=%s", sale_id)
+
+    transaction.on_commit(_record_cash)

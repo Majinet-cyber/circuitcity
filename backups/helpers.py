@@ -46,9 +46,11 @@ EXPORT_SECTIONS = [
     {"key": "locations", "category": "inventory", "title": "Locations", "model": "inventory.Location", "filter": "business"},
     {"key": "inventory_items", "category": "inventory", "title": "Inventory Items", "model": "inventory.InventoryItem", "filter": "business"},
     {"key": "products", "category": "inventory", "title": "Products", "model": "inventory.MerchProduct", "filter": "business"},
+    {"key": "clothing_stock_units", "category": "inventory", "title": "Clothing Stock Units", "model": "inventory.ClothingBarcodeUnit", "filter": "business"},
     {"key": "stock_movements", "category": "inventory", "title": "Stock Movements", "model": "inventory.StockMovement", "filter": "business"},
-    {"key": "purchase_orders", "category": "inventory", "title": "Purchase Orders", "model": "inventory.PurchaseOrder", "filter": "business"},
-    {"key": "purchase_order_items", "category": "inventory", "title": "Purchase Order Items", "model": "inventory.PurchaseOrderItem", "filter": "purchase_order__business"},
+    {"key": "clothing_stock_movements", "category": "inventory", "title": "Clothing Stock Movements", "model": "inventory.ClothingProductLog", "filter": "product__business"},
+    {"key": "purchase_orders", "category": "inventory", "title": "Purchase Orders", "model": "wallet.AdminPurchaseOrder", "filter": "business"},
+    {"key": "purchase_order_items", "category": "inventory", "title": "Purchase Order Items", "model": "wallet.AdminPurchaseOrderItem", "filter": "po__business"},
     {"key": "suppliers", "category": "inventory", "title": "Suppliers", "model": "inventory.Supplier", "filter": "business"},
     {"key": "sales", "category": "sales", "title": "Sales", "model": "sales.Sale", "filter": "location__business"},
     {"key": "layby_orders", "category": "sales", "title": "Layby Orders", "model": "layby.LaybyOrder", "filter": "created_by_id__in"},
@@ -56,7 +58,7 @@ EXPORT_SECTIONS = [
     {"key": "cash_bank", "category": "financial", "title": "Cash & Bank", "model": "wallet.CashBankTransaction", "filter": "business"},
     {"key": "wallet_transactions", "category": "wallet", "title": "Wallet Records", "model": "wallet.WalletTransaction", "filter": "wallet_scope"},
     {"key": "payslips", "category": "staff", "title": "Payslips", "model": "wallet.Payslip", "filter": "business_or_member_users"},
-    {"key": "expenses", "category": "financial", "title": "Expenses & Admin Costs", "model": "wallet.WalletTransaction", "filter": "wallet_costs"},
+    {"key": "expenses", "category": "financial", "title": "Expenses, Payroll & Admin Costs", "model": "wallet.WalletTransaction", "filter": "wallet_costs"},
     {"key": "recurring_costs", "category": "financial", "title": "Recurring Costs", "model": "inventory.RecurringCost", "filter": "business"},
     {"key": "time_logs", "category": "staff", "title": "Time Logs", "model": "timelogs.AgentWorkLog", "filter": "business"},
     {"key": "attendance", "category": "staff", "title": "Attendance", "model": "wallet.AttendanceLog", "filter": "agent_id__in"},
@@ -65,8 +67,13 @@ EXPORT_SECTIONS = [
     {"key": "marketplace_orders", "category": "marketplace", "title": "Marketplace Orders", "model": "inventory.MarketplaceOrder", "filter": "seller_business"},
     {"key": "clothing_sales", "category": "sales", "title": "Clothing Sales", "model": "inventory.ClothingSale", "filter": "business"},
     {"key": "liquor_shifts", "category": "sales", "title": "Liquor Shifts", "model": "inventory.LiquorShift", "filter": "business"},
-    {"key": "liquor_sales", "category": "sales", "title": "Liquor Sales", "model": "inventory.LiquorSale", "filter": "shift__business"},
-    {"key": "liquor_credits", "category": "financial", "title": "Credit Customers & Receivables", "model": "inventory.LiquorCredit", "filter": "sale__shift__business"},
+    {"key": "liquor_sales", "category": "sales", "title": "Liquor Sales", "model": "inventory.LiquorSale", "filter": "business"},
+    {"key": "liquor_credits", "category": "financial", "title": "Credit Customers & Receivables", "model": "inventory.LiquorCredit", "filter": "business"},
+    {"key": "liquor_credit_payments", "category": "financial", "title": "Credit Payments", "model": "inventory.LiquorCreditPayment", "filter": "credit__business"},
+    {"key": "grocery_sales", "category": "sales", "title": "Grocery Sales", "model": "inventory.GrocerySale", "filter": "business"},
+    {"key": "cement_sales", "category": "sales", "title": "Cement Sales", "model": "inventory.CementSale", "filter": "business"},
+    {"key": "farm_crop_sales", "category": "sales", "title": "Farm Crop Sales", "model": "inventory.FarmCropSale", "filter": "business"},
+    {"key": "energy_item_sales", "category": "sales", "title": "Energy Item Sales", "model": "inventory.EnergyItemSale", "filter": "business"},
     {"key": "gym_members", "category": "staff", "title": "Gym Members", "model": "inventory.GymMember", "filter": "business"},
     {"key": "pharmacy_batches", "category": "inventory", "title": "Pharmacy Batches", "model": "inventory.PharmacyBatch", "filter": "business"},
     {"key": "pharmacy_sales", "category": "sales", "title": "Pharmacy Sales", "model": "inventory.PharmacySale", "filter": "business"},
@@ -232,9 +239,10 @@ def _filter_model_for_business(model, business, filter_key: str, member_user_ids
         for key in ("agent_id__in", "employee_id__in", "user_id__in", "created_by_id__in"):
             candidates.append({key: member_user_ids})
     elif filter_key == "wallet_costs":
+        cost_types = ["cost_once_off", "cost_recurring", "payslip", "budget"]
         if "business" in fields:
-            candidates.append({"business": business, "type__in": ["cost_once_off", "cost_recurring"]})
-        candidates.append({"agent_id__in": member_user_ids, "type__in": ["cost_once_off", "cost_recurring"]})
+            candidates.append({"business": business, "type__in": cost_types})
+        candidates.append({"agent_id__in": member_user_ids, "type__in": cost_types})
     else:
         candidates.append({filter_key: business})
 
@@ -370,6 +378,110 @@ def build_export_summary(business: Business, category: str = "all", *, include_r
         "records_count": records_count,
         "total_records": sum(records_count.values()),
         "section_count": len(sections),
+    }
+
+
+def build_core_data_coverage(business: Business) -> dict[str, Any]:
+    summary = build_export_summary(business, "all", include_rows=False)
+    counts = summary["records_count"]
+
+    def total_for(*keys: str) -> int:
+        return sum(int(counts.get(key, 0) or 0) for key in keys)
+
+    sales_count = total_for(
+        "sales",
+        "clothing_sales",
+        "liquor_sales",
+        "pharmacy_sales",
+        "grocery_sales",
+        "cement_sales",
+        "farm_crop_sales",
+        "energy_item_sales",
+        "car_hire_trips",
+        "welding_jobs",
+    )
+    inventory_count = total_for(
+        "inventory_items",
+        "products",
+        "clothing_stock_units",
+        "pharmacy_batches",
+    )
+    stock_movement_count = total_for("stock_movements", "clothing_stock_movements")
+    cash_count = total_for("cash_bank")
+    expenses_count = total_for("expenses", "recurring_costs")
+    attendance_count = total_for("time_logs", "attendance")
+    purchase_order_count = total_for("purchase_orders", "purchase_order_items")
+    payslip_count = total_for("payslips")
+    marketplace_count = total_for("marketplace_listings", "marketplace_orders")
+
+    definitions = [
+        ("Inventory", inventory_count, True, "Products, stock units, or phone inventory"),
+        ("Stock Movements", stock_movement_count, sales_count > 0, "Stock in/out audit trail"),
+        ("Sales", sales_count, True, "Persisted sales and vertical orders"),
+        ("Cash Records", cash_count, sales_count > 0, "Cash, bank, and mobile money ledger"),
+        ("Expenses", expenses_count, sales_count > 0, "Admin costs, payroll, and recurring costs"),
+        ("Purchase Orders", purchase_order_count, False, "Supplier ordering records"),
+        ("Payslips", payslip_count, False, "Payroll records"),
+        ("Attendance", attendance_count, False, "Time logs and staff attendance"),
+        ("Marketplace", marketplace_count, False, "Listings and marketplace orders"),
+    ]
+
+    rows = []
+    required_total = 0
+    healthy_total = 0
+    for label, count, required, description in definitions:
+        if count > 0:
+            status = "Healthy"
+            tone = "success"
+            healthy = True
+        elif required:
+            status = "Missing"
+            tone = "warning"
+            healthy = False
+        else:
+            status = "Empty"
+            tone = "muted"
+            healthy = True
+        if required:
+            required_total += 1
+            if healthy:
+                healthy_total += 1
+        rows.append(
+            {
+                "label": label,
+                "count": count,
+                "status": status,
+                "tone": tone,
+                "required": required,
+                "description": description,
+            }
+        )
+
+    prompts = []
+    if sales_count and not expenses_count:
+        prompts.append("You made sales but recorded no expenses.")
+    if sales_count and not cash_count:
+        prompts.append("No cash movement recorded for these sales yet.")
+    if sales_count and not stock_movement_count:
+        prompts.append("Sales exist, but stock movement records are weak.")
+    if cash_count and not expenses_count:
+        prompts.append("Cash is moving, but costs are not being captured.")
+    if not any([sales_count, inventory_count, cash_count, expenses_count, attendance_count, purchase_order_count, payslip_count]):
+        prompts.append("No transactions recorded yet. Starter sample data can help new businesses learn without faking real accounting.")
+    if any(row["required"] and row["count"] == 0 for row in rows):
+        prompts.append("Books cannot balance because some core data is missing.")
+
+    score = 100 if required_total == 0 else round((healthy_total / required_total) * 100)
+    return {
+        "score": score,
+        "rows": rows,
+        "prompts": prompts[:5],
+        "counts": counts,
+        "sales_count": sales_count,
+        "inventory_count": inventory_count,
+        "cash_count": cash_count,
+        "expenses_count": expenses_count,
+        "attendance_count": attendance_count,
     }
 
 

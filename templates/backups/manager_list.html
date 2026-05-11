@@ -78,12 +78,37 @@
   .badge-soft { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px; background:#ecfdf5; color:#047857; font-weight:850; font-size:.78rem; }
   .trust-copy { color:#475569; display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
   .trust-copy span { background:rgba(255,255,255,.75); border:1px solid #dcfce7; border-radius:999px; padding:7px 11px; font-size:.82rem; font-weight:800; color:#047857; }
+  .coverage-panel {
+    display: grid;
+    grid-template-columns: minmax(220px,.8fr) minmax(0,2fr);
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .coverage-score, .coverage-grid, .discipline-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    box-shadow: 0 10px 28px rgba(15,23,42,.06);
+  }
+  .coverage-score { padding: 18px; display: grid; align-content: center; gap: 10px; }
+  .coverage-grid { padding: 12px; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+  .coverage-item { border: 1px solid #edf2f7; border-radius: 16px; padding: 12px; min-width: 0; }
+  .coverage-item strong, .coverage-item span { display: block; overflow-wrap: anywhere; }
+  .coverage-item small { color: #64748b; }
+  .coverage-status { display:inline-flex; align-items:center; border-radius:999px; padding:4px 8px; font-size:.72rem; font-weight:900; margin-top:8px; }
+  .coverage-status.success { background:#dcfce7; color:#047857; }
+  .coverage-status.warning { background:#fef3c7; color:#92400e; }
+  .coverage-status.muted { background:#f1f5f9; color:#475569; }
+  .discipline-card { padding: 16px; margin-top: 14px; }
+  .discipline-card ul { margin: 8px 0 0; padding-left: 18px; color:#475569; }
   @media (max-width: 1050px) {
     .vault-stats { grid-template-columns: repeat(3, minmax(0,1fr)); }
     .export-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .coverage-panel { grid-template-columns: 1fr; }
+    .coverage-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
   }
   @media (max-width: 680px) {
-    .vault-stats, .export-grid { grid-template-columns: 1fr; }
+    .vault-stats, .export-grid, .coverage-grid { grid-template-columns: 1fr; }
     .snapshot-card { grid-template-columns: 1fr; }
     .snapshot-actions { justify-content: stretch; }
     .snapshot-actions .btn, .snapshot-actions form { width: 100%; }
@@ -142,6 +167,41 @@
       <div class="vault-stat"><span>Backup health</span><strong>{{ backup_health }}</strong></div>
       <div class="vault-stat"><span>Last successful export</span><strong>{% if last_export %}{{ last_export.created_at|timesince }} ago{% else %}Never{% endif %}</strong></div>
       <div class="vault-stat"><span>Auto backup status</span><strong>{{ auto_backup_status }}</strong></div>
+    </div>
+  </section>
+
+  <div class="vault-section-title">
+    <h2>Core Data Coverage</h2>
+    <span class="text-muted small">Internal health check for whether this business is storing real operational memory.</span>
+  </div>
+  <section class="coverage-panel">
+    <aside class="coverage-score">
+      <div class="vault-eyebrow">Coverage Score</div>
+      <div class="score-ring"><strong>{{ data_coverage.score }}%</strong></div>
+      <strong class="fs-5">Business memory {% if data_coverage.score >= 80 %}healthy{% elif data_coverage.score >= 50 %}needs attention{% else %}missing{% endif %}</strong>
+      <p class="text-muted small mb-0">This score is based on required records for sales, inventory, cash, costs, and stock movement.</p>
+    </aside>
+    <div>
+      <div class="coverage-grid">
+        {% for row in data_coverage.rows %}
+        <article class="coverage-item">
+          <strong>{{ row.label }}</strong>
+          <span class="fs-5 fw-black">{{ row.count|intcomma }}</span>
+          <small>{{ row.description }}</small>
+          <span class="coverage-status {{ row.tone }}">{{ row.status }}</span>
+        </article>
+        {% endfor %}
+      </div>
+      {% if data_coverage.prompts %}
+      <div class="discipline-card">
+        <strong>Daily Data Discipline</strong>
+        <ul>
+          {% for prompt in data_coverage.prompts %}
+          <li>{{ prompt }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
     </div>
   </section>
 

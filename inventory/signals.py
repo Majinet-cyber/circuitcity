@@ -5,7 +5,9 @@ from datetime import date, datetime
 from typing import Dict, List, Optional, Any
 
 from django.conf import settings
+from django.apps import apps
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.db.models.signals import pre_save, post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
@@ -27,6 +29,17 @@ def _ensure_aware_datetime(val):
     if isinstance(val, datetime) and timezone.is_naive(val):
         val = timezone.make_aware(val, timezone.get_current_timezone())
     return val
+
+
+def _first_attr(obj, names, default=None):
+    for name in names:
+        try:
+            value = getattr(obj, name)
+        except Exception:
+            continue
+        if value not in (None, ""):
+            return value
+    return default
 
 try:
     from .models import InventoryAudit  # optional in some setups
@@ -257,6 +270,102 @@ def _invitem_deleted(sender, instance: InventoryItem, **kwargs):
             pass
 
     _bump_cache()
+
+
+def _record_vertical_sale_cash(sender, instance, created: bool, **kwargs):
+    if not created:
+        return
+    if getattr(instance, "is_deleted", False) or getattr(instance, "is_void", False):
+        return
+    if getattr(instance, "is_reversed", False) or getattr(instance, "is_free", False):
+        return
+
+    business_id = getattr(instance, "business_id", None)
+    sale_id = getattr(instance, "pk", None)
+    if not business_id or not sale_id:
+        return
+    model_label = instance._meta.label
+
+    def _record():
+        try:
+            from wallet.business_memory import record_sale_cash_memory, record_cash_bank_transaction
+            from wallet.models import CashBankTransaction
+
+            sale = sender.objects.get(pk=sale_id)
+            business = getattr(sale, "business", None)
+            if not business:
+                return
+            sold_at = _first_attr(sale, ("sold_at", "date", "created_at"))
+            created_by = _first_attr(sale, ("sold_by", "created_by"))
+            payment_method = _first_attr(sale, ("payment_method",), "cash")
+
+            split_amounts = [
+                ("cash_amount", "cash", "Cash sale payment"),
+                ("bank_amount", "bank", "Bank sale payment"),
+                ("mobile_money_amount", "mobile_money", "Mobile money sale payment"),
+            ]
+            wrote_split = False
+            for field, method, category in split_amounts:
+                amount = _first_attr(sale, (field,), None)
+                if amount and amount > 0:
+                    wrote_split = True
+                    record_cash_bank_transaction(
+                        business=business,
+                        amount=amount,
+                        direction=CashBankTransaction.Direction.CASH_IN,
+                        category=category,
+                        payment_method=method,
+                        tx_date=sold_at,
+                        description=f"Recorded from {model_label} #{sale_id}",
+                        related_sale_reference=f"sale:{model_label}:{sale_id}:{method}",
+                        created_by=created_by,
+                    )
+            if wrote_split:
+                return
+
+            amount = _first_attr(sale, ("total_price", "total_amount", "total_mwk", "amount", "price"), 0)
+            record_sale_cash_memory(
+                sale=sale,
+                business=business,
+                amount=amount,
+                payment_method=payment_method,
+                sold_at=sold_at,
+                created_by=created_by,
+                reference=f"sale:{model_label}:{sale_id}",
+                category="Sale payment",
+            )
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Failed to record cash/bank memory for %s #%s", model_label, sale_id)
+
+    transaction.on_commit(_record)
+
+
+def _connect_business_memory_sale_signals():
+    labels = (
+        ("inventory", "ClothingSale"),
+        ("inventory", "LiquorSale"),
+        ("inventory", "PharmacySale"),
+        ("inventory", "GrocerySale"),
+        ("inventory", "CementSale"),
+        ("inventory", "FarmCropSale"),
+        ("inventory", "EnergyItemSale"),
+    )
+    for app_label, model_name in labels:
+        try:
+            model = apps.get_model(app_label, model_name)
+        except Exception:
+            continue
+        post_save.connect(
+            _record_vertical_sale_cash,
+            sender=model,
+            dispatch_uid=f"business_memory_cash_{app_label}_{model_name}",
+            weak=False,
+        )
+
+
+_connect_business_memory_sale_signals()
 
 
 # ---------------------------------------------------------------------

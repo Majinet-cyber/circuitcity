@@ -63,6 +63,7 @@ from .models import (
     WalletTransaction,
 )
 from .money import q2
+from .business_memory import record_cash_bank_transaction, record_company_expense_once
 from .services import add_txn, agent_wallet_summary, ranking
 
 # Optional: PO forms come from inventory.forms if available
@@ -92,6 +93,27 @@ def _month_bounds(year: int, month: int) -> Tuple[date, date]:
     first = date(year, month, 1)
     last = date(year, month, monthrange(year, month)[1])
     return first, last
+
+
+def _record_purchase_order_payable(po: AdminPurchaseOrder, created_by=None) -> None:
+    if not getattr(po, "business_id", None) or not getattr(po, "total", None):
+        return
+    if po.status not in {PurchaseOrderStatus.SENT, PurchaseOrderStatus.COMPLETED}:
+        return
+    record_company_expense_once(
+        business=po.business,
+        amount=po.total,
+        note=f"Purchase order payable PO-{po.id:05d}",
+        reference=f"PO-{po.id}",
+        created_by=created_by,
+        effective_date=timezone.localdate(),
+        meta={
+            "purchase_order_id": po.id,
+            "supplier_name": po.supplier_name,
+            "payable": True,
+            "status": po.status,
+        },
+    )
 
 
 def _sum(qs, **filters) -> Decimal:
@@ -674,31 +696,50 @@ def _create_or_update_payslip_and_txn(
     # Post wallet/company transactions only when net != 0 (avoid noise)
     existing_payout = WalletTransaction.objects.filter(
         type=TxnType.PAYSLIP,
-        agent=agent,
+        business=biz,
         effective_date__gte=first,
         effective_date__lte=last,
         meta__payslip_id=p.id,
     ).exists()
-    if agent is not None and net != 0 and not existing_payout:
-        # Agent wallet reduces by net (payment out)
-        add_txn(
-            agent=agent,
-            amount=-net,
-            type=TxnType.PAYSLIP,
-            note=f"Payslip {year}-{month:02d}",
-            created_by=created_by,
-            meta={"gross": str(gross), "deductions": str(deductions), "payslip_id": p.id},
-        )
-        # Company mirror increases by net (payout made)
+    if net != 0 and not existing_payout:
+        if agent is not None:
+            # Agent wallet reduces by net (payment out)
+            add_txn(
+                agent=agent,
+                amount=-net,
+                type=TxnType.PAYSLIP,
+                note=f"Payslip {year}-{month:02d}",
+                created_by=created_by,
+                business=biz,
+                meta={"gross": str(gross), "deductions": str(deductions), "payslip_id": p.id},
+            )
+        # Company ledger records payroll as a business expense for backup/health checks.
         WalletTransaction.objects.create(
             ledger=Ledger.COMPANY,
             agent=agent,
-            amount=net,
+            amount=-abs(net),
             type=TxnType.PAYSLIP,
-            note=f"[Agent {agent.id}] Payslip {year}-{month:02d}",
+            note=f"[{p.display_employee_name}] Payslip {year}-{month:02d}",
             created_by=created_by,
-            meta={"payslip_id": p.id},
+            business=biz,
+            reference=f"PAYSLIP-{p.id}",
+            effective_date=period_end,
+            meta={"payslip_id": p.id, "gross": str(gross), "deductions": str(deductions)},
         )
+        if biz:
+            from .models import CashBankTransaction
+
+            record_cash_bank_transaction(
+                business=biz,
+                amount=net,
+                direction=CashBankTransaction.Direction.CASH_OUT,
+                category="Salary",
+                payment_method=payment_method or "cash",
+                tx_date=period_end,
+                description=f"Payslip payment for {p.display_employee_name}",
+                related_sale_reference=f"payslip:{p.id}",
+                created_by=created_by,
+            )
 
     # Optional: record a Payment row (future integrations)
     if payment_method:
@@ -1349,8 +1390,9 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
     def post(self, request):
         U = get_user_model()
         agent = get_object_or_404(U, id=request.POST.get("agent_id"))
+        biz = get_active_business(request)
         # Ensure manager can only issue to agents in their business
-        if not request.user.is_superuser and not _agent_belongs_to_business(agent, get_active_business(request)):
+        if not request.user.is_superuser and not _agent_belongs_to_business(agent, biz):
             return HttpResponse("Not allowed for this agent.", status=403)
 
         amount = Decimal(request.POST.get("amount", "0"))
@@ -1365,6 +1407,7 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
             note=note,
             created_by=request.user,
             ledger=Ledger.AGENT,
+            business=biz,
         )
 
         # Mirror to company ledger for a full business trail
@@ -1375,6 +1418,7 @@ class AdminIssueTxnView(LoginRequiredMixin, TemplateView):
             type=ttype,
             note=f"[Agent {agent.id}] {note}",
             created_by=request.user,
+            business=biz,
         )
         return redirect("wallet:admin_agent", agent_id=agent.id)
 
@@ -1435,6 +1479,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 type=TxnType.BUDGET,
                 note=f"Budget: {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
+                business=biz,
             )
             WalletTransaction.objects.create(
                 ledger=Ledger.COMPANY,
@@ -1443,6 +1488,7 @@ class AdminBudgetsView(LoginRequiredMixin, TemplateView):
                 type=TxnType.BUDGET,
                 note=f"[Agent {b.agent_id}] {getattr(b, 'title', 'Approved budget')}",
                 created_by=request.user,
+                business=biz,
             )
 
         b.decided_by = request.user
@@ -2008,6 +2054,8 @@ def admin_po_detail(request: HttpRequest, po_id: int):
             if new_status in PurchaseOrderStatus.values:
                 po.status = new_status
                 po.save(update_fields=["status"])
+                po.recompute_totals(save=True)
+                _record_purchase_order_payable(po, created_by=request.user)
             return redirect("wallet:admin_po_detail", po_id=po.id)
 
     # GET or invalid POST -> render page
