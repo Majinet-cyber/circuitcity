@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Compare Backups - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width:1000px;margin:0 auto;">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+    <div>
+      <div class="text-uppercase fw-bold text-success" style="font-size:.76rem;letter-spacing:.08em;">Snapshot compare</div>
+      <h1 class="fw-black mb-1" style="color:#0f172a;">Compare Backup</h1>
+      <p class="text-muted mb-0">
+        Current snapshot: {{ snapshot.created_at|date:"M j, Y H:i" }}
+        {% if previous %} · Previous: {{ previous.created_at|date:"M j, Y H:i" }}{% else %} · No previous snapshot{% endif %}
+      </p>
+    </div>
+    <a href="{% url 'backups:manager_list' %}" class="btn btn-outline-secondary rounded-3 fw-bold">Back to Data Vault</a>
+  </div>
+
+  <div class="row g-3">
+    {% for row in comparisons %}
+    <div class="col-md-6">
+      <div class="card border-0 shadow-sm rounded-4 h-100 p-3">
+        <div class="d-flex justify-content-between gap-3">
+          <strong>{{ row.label }}</strong>
+          <span class="badge {% if row.delta > 0 %}text-bg-success{% elif row.delta < 0 %}text-bg-warning{% else %}text-bg-light text-dark border{% endif %}">
+            {% if row.delta > 0 %}+{% endif %}{{ row.delta|intcomma }}
+          </span>
+        </div>
+        <div class="text-muted small mt-2">Current {{ row.current|intcomma }} · Previous {{ row.previous|intcomma }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="text-center py-5 bg-white border rounded-4">No comparable record counts are available.</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

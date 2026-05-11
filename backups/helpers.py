@@ -5,19 +5,133 @@ Helpers for exporting business data to CSV files and ZIP archives.
 from __future__ import annotations
 
 import csv
+import html
+import io
 import os
+import re
 import tempfile
 import zipfile
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List
 
 from django.apps import apps
+from django.conf import settings
 from django.core.files.base import File
-from django.db.models import QuerySet, Model
+from django.core import serializers
+from django.db.models import QuerySet, Model, Sum
+from django.db import transaction
 from django.utils import timezone
 
 from tenants.models import Business
+
+
+EXPORT_CATEGORY_LABELS = {
+    "all": "Everything",
+    "inventory": "Inventory Export",
+    "financial": "Financial Export",
+    "staff": "Staff & HR Export",
+    "sales": "Sales Export",
+    "wallet": "Wallet Export",
+    "reports": "Reports Export",
+    "marketplace": "Marketplace Export",
+}
+
+
+EXPORT_SECTIONS = [
+    {"key": "business_settings", "category": "reports", "title": "Business Settings", "model": "tenants.Business", "filter": "pk"},
+    {"key": "staff_members", "category": "staff", "title": "Staff Records", "model": "tenants.Membership", "filter": "business"},
+    {"key": "users", "category": "staff", "title": "Users", "model": settings.AUTH_USER_MODEL, "filter": "member_users"},
+    {"key": "locations", "category": "inventory", "title": "Locations", "model": "inventory.Location", "filter": "business"},
+    {"key": "inventory_items", "category": "inventory", "title": "Inventory Items", "model": "inventory.InventoryItem", "filter": "business"},
+    {"key": "products", "category": "inventory", "title": "Products", "model": "inventory.MerchProduct", "filter": "business"},
+    {"key": "stock_movements", "category": "inventory", "title": "Stock Movements", "model": "inventory.StockMovement", "filter": "business"},
+    {"key": "purchase_orders", "category": "inventory", "title": "Purchase Orders", "model": "inventory.PurchaseOrder", "filter": "business"},
+    {"key": "purchase_order_items", "category": "inventory", "title": "Purchase Order Items", "model": "inventory.PurchaseOrderItem", "filter": "purchase_order__business"},
+    {"key": "suppliers", "category": "inventory", "title": "Suppliers", "model": "inventory.Supplier", "filter": "business"},
+    {"key": "sales", "category": "sales", "title": "Sales", "model": "sales.Sale", "filter": "location__business"},
+    {"key": "layby_orders", "category": "sales", "title": "Layby Orders", "model": "layby.LaybyOrder", "filter": "created_by_id__in"},
+    {"key": "layby_payments", "category": "sales", "title": "Layby Payments", "model": "layby.LaybyPayment", "filter": "order__created_by_id__in"},
+    {"key": "cash_bank", "category": "financial", "title": "Cash & Bank", "model": "wallet.CashBankTransaction", "filter": "business"},
+    {"key": "wallet_transactions", "category": "wallet", "title": "Wallet Records", "model": "wallet.WalletTransaction", "filter": "wallet_scope"},
+    {"key": "payslips", "category": "staff", "title": "Payslips", "model": "wallet.Payslip", "filter": "business_or_member_users"},
+    {"key": "expenses", "category": "financial", "title": "Expenses & Admin Costs", "model": "wallet.WalletTransaction", "filter": "wallet_costs"},
+    {"key": "recurring_costs", "category": "financial", "title": "Recurring Costs", "model": "inventory.RecurringCost", "filter": "business"},
+    {"key": "time_logs", "category": "staff", "title": "Time Logs", "model": "timelogs.AgentWorkLog", "filter": "business"},
+    {"key": "attendance", "category": "staff", "title": "Attendance", "model": "wallet.AttendanceLog", "filter": "agent_id__in"},
+    {"key": "business_health_checks", "category": "reports", "title": "Business Health Checks", "model": "dashboard.BusinessHealthCheck", "filter": "business"},
+    {"key": "marketplace_listings", "category": "marketplace", "title": "Marketplace Listings", "model": "inventory.MarketplaceListing", "filter": "seller_business"},
+    {"key": "marketplace_orders", "category": "marketplace", "title": "Marketplace Orders", "model": "inventory.MarketplaceOrder", "filter": "seller_business"},
+    {"key": "clothing_sales", "category": "sales", "title": "Clothing Sales", "model": "inventory.ClothingSale", "filter": "business"},
+    {"key": "liquor_shifts", "category": "sales", "title": "Liquor Shifts", "model": "inventory.LiquorShift", "filter": "business"},
+    {"key": "liquor_sales", "category": "sales", "title": "Liquor Sales", "model": "inventory.LiquorSale", "filter": "shift__business"},
+    {"key": "liquor_credits", "category": "financial", "title": "Credit Customers & Receivables", "model": "inventory.LiquorCredit", "filter": "sale__shift__business"},
+    {"key": "gym_members", "category": "staff", "title": "Gym Members", "model": "inventory.GymMember", "filter": "business"},
+    {"key": "pharmacy_batches", "category": "inventory", "title": "Pharmacy Batches", "model": "inventory.PharmacyBatch", "filter": "business"},
+    {"key": "pharmacy_sales", "category": "sales", "title": "Pharmacy Sales", "model": "inventory.PharmacySale", "filter": "business"},
+    {"key": "car_hire_trips", "category": "sales", "title": "Car Hire Trips", "model": "inventory.CarHireTrip", "filter": "business"},
+    {"key": "welding_jobs", "category": "sales", "title": "Welding Jobs", "model": "inventory.WeldingJob", "filter": "business"},
+]
+
+
+FIELD_LABELS = {
+    "id": "Record ID",
+    "pk": "Record ID",
+    "name": "Name",
+    "business": "Business",
+    "business_kind": "Business Type",
+    "created_at": "Created At",
+    "updated_at": "Updated At",
+    "created_by": "Created By",
+    "agent": "Staff Member",
+    "user": "User",
+    "customer_name": "Customer Name",
+    "customer_phone": "Phone",
+    "phone": "Phone",
+    "email": "Email",
+    "amount": "Amount",
+    "total_amount": "Total Amount",
+    "price": "Price",
+    "sell_price": "Selling Price",
+    "selling_price": "Selling Price",
+    "cost": "Cost",
+    "order_price": "Cost Price",
+    "cost_price": "Cost Price",
+    "profit": "Profit",
+    "status": "Status",
+    "payment_method": "Payment Method",
+    "balance_after": "Balance After",
+    "balance_due": "Balance Due",
+    "outstanding_balance": "Outstanding Balance",
+    "remaining_balance": "Remaining Balance",
+    "date": "Date",
+    "sold_at": "Sold At",
+    "effective_date": "Effective Date",
+    "quantity": "Quantity",
+    "quantity_in_stock": "Current Stock",
+    "sku": "SKU",
+    "code": "Code",
+    "model": "Model",
+    "brand": "Brand",
+    "imei": "IMEI",
+    "role": "Role",
+    "status": "Status",
+}
+
+EXCLUDED_FIELD_PATTERNS = (
+    "password",
+    "token",
+    "secret",
+    "raw",
+    "debug",
+    "tmp",
+    "session",
+    "q1",
+    "q2",
+)
+
+RESTORE_EXCLUDED_KEYS = {"business_settings", "users", "staff_members"}
 
 
 def export_queryset_to_csv(queryset: QuerySet, csv_path: Path, fields: List[str] = None) -> int:
@@ -73,6 +187,440 @@ def export_queryset_to_csv(queryset: QuerySet, csv_path: Path, fields: List[str]
     return count
 
 
+def _model_from_path(model_path: str):
+    try:
+        app_label, model_name = model_path.split(".", 1)
+        return apps.get_model(app_label, model_name)
+    except Exception:
+        return None
+
+
+def _member_user_ids(business) -> list[int]:
+    try:
+        from tenants.models import Membership
+
+        return list(Membership.objects.filter(business=business).values_list("user_id", flat=True))
+    except Exception:
+        return []
+
+
+def _model_field_names(model) -> set[str]:
+    return {getattr(field, "name", "") for field in model._meta.get_fields()}
+
+
+def _filter_model_for_business(model, business, filter_key: str, member_user_ids: list[int]):
+    try:
+        qs = model.objects.all()
+    except Exception:
+        return None
+
+    fields = _model_field_names(model)
+    candidates: list[dict[str, Any]] = []
+    if filter_key == "pk":
+        candidates.append({"pk": business.pk})
+    elif filter_key == "member_users":
+        candidates.append({"pk__in": member_user_ids})
+    elif filter_key in {"created_by_id__in", "agent_id__in", "order__created_by_id__in"}:
+        candidates.append({filter_key: member_user_ids})
+    elif filter_key == "wallet_scope":
+        if "business" in fields:
+            candidates.append({"business": business})
+        candidates.append({"agent_id__in": member_user_ids})
+    elif filter_key == "business_or_member_users":
+        if "business" in fields:
+            candidates.append({"business": business})
+        for key in ("agent_id__in", "employee_id__in", "user_id__in", "created_by_id__in"):
+            candidates.append({key: member_user_ids})
+    elif filter_key == "wallet_costs":
+        if "business" in fields:
+            candidates.append({"business": business, "type__in": ["cost_once_off", "cost_recurring"]})
+        candidates.append({"agent_id__in": member_user_ids, "type__in": ["cost_once_off", "cost_recurring"]})
+    else:
+        candidates.append({filter_key: business})
+
+    for candidate in candidates:
+        try:
+            return qs.filter(**candidate)
+        except Exception:
+            continue
+
+    for candidate in (
+        {"business": business},
+        {"seller_business": business},
+        {"location__business": business},
+        {"shift__business": business},
+        {"work_log__business": business},
+        {"member__business": business},
+        {"product__business": business},
+        {"order__business": business},
+        {"purchase_order__business": business},
+    ):
+        try:
+            return qs.filter(**candidate)
+        except Exception:
+            continue
+    return None
+
+
+def _professional_label(field_name: str) -> str:
+    if field_name in FIELD_LABELS:
+        return FIELD_LABELS[field_name]
+    label = re.sub(r"_id$", "", field_name)
+    label = label.replace("_", " ").strip().title()
+    return label or field_name
+
+
+def _safe_filename(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", value or "export").strip("_")
+    return cleaned[:80] or "export"
+
+
+def _exportable_fields(model) -> list:
+    fields = []
+    for field in model._meta.get_fields():
+        if field.many_to_many or field.one_to_many:
+            continue
+        name = getattr(field, "name", "")
+        lowered = name.lower()
+        if any(pattern in lowered for pattern in EXCLUDED_FIELD_PATTERNS):
+            continue
+        if name.endswith("_ptr"):
+            continue
+        fields.append(field)
+    return fields
+
+
+def _format_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, Decimal):
+        return f"{value:.2f}"
+    if hasattr(value, "isoformat"):
+        try:
+            return value.isoformat()
+        except Exception:
+            pass
+    if hasattr(value, "get_full_name") and callable(value.get_full_name):
+        full_name = value.get_full_name()
+        if full_name:
+            return full_name
+    return str(value)
+
+
+def _rows_for_queryset(qs) -> tuple[list[str], list[list[str]]]:
+    fields = _exportable_fields(qs.model)
+    headers = [_professional_label(field.name) for field in fields]
+    rows: list[list[str]] = []
+    for obj in qs.iterator(chunk_size=500):
+        row = []
+        for field in fields:
+            try:
+                value = getattr(obj, field.name)
+            except Exception:
+                value = ""
+            row.append(_format_value(value))
+        rows.append(row)
+    return headers, rows
+
+
+def build_export_sections(business: Business, category: str = "all", *, include_rows: bool = True) -> list[dict[str, Any]]:
+    member_user_ids = _member_user_ids(business)
+    sections: list[dict[str, Any]] = []
+    for item in EXPORT_SECTIONS:
+        if category != "all" and item["category"] != category:
+            continue
+        model = _model_from_path(item["model"])
+        if model is None:
+            continue
+        qs = _filter_model_for_business(model, business, item["filter"], member_user_ids)
+        if qs is None:
+            continue
+        try:
+            qs = qs.order_by("pk")
+        except Exception:
+            pass
+        try:
+            count = qs.count()
+        except Exception:
+            count = 0
+        if include_rows:
+            headers, rows = _rows_for_queryset(qs)
+        else:
+            headers, rows = [], []
+        sections.append(
+            {
+                "key": item["key"],
+                "category": item["category"],
+                "title": item["title"],
+                "filename": f"{item['key']}.csv",
+                "headers": headers,
+                "rows": rows,
+                "count": count,
+                "model": item["model"],
+            }
+        )
+    return sections
+
+
+def build_export_summary(business: Business, category: str = "all", *, include_rows: bool = True) -> dict[str, Any]:
+    sections = build_export_sections(business, category, include_rows=include_rows)
+    records_count = {section["key"]: section["count"] for section in sections}
+    return {
+        "sections": sections,
+        "records_count": records_count,
+        "total_records": sum(records_count.values()),
+        "section_count": len(sections),
+    }
+
+
+def _write_csv(path: Path, headers: list[str], rows: list[list[str]]) -> None:
+    with open(path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(headers)
+        writer.writerows(rows)
+
+
+def create_export_zip_path(business: Business, category: str = "all") -> tuple[Path, Dict[str, int]]:
+    temp_dir = Path(tempfile.mkdtemp(prefix="data_vault_"))
+    summary = build_export_summary(business, category)
+    records_count = summary["records_count"]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{_safe_filename(business.name)}_{category}_data_vault_{timestamp}.zip"
+    zip_path = temp_dir / filename
+
+    try:
+        for section in summary["sections"]:
+            _write_csv(temp_dir / section["filename"], section["headers"], section["rows"])
+
+        readme = temp_dir / "README.txt"
+        with open(readme, "w", encoding="utf-8") as f:
+            f.write("Emajinet Business Data Vault\n")
+            f.write("============================\n\n")
+            f.write("Your data belongs to you.\n")
+            f.write("Download everything anytime. Your business records are always yours.\n\n")
+            f.write(f"Business: {business.name}\n")
+            f.write(f"Category: {EXPORT_CATEGORY_LABELS.get(category, category.title())}\n")
+            f.write(f"Generated: {timezone.now().isoformat()}\n")
+            f.write(f"Total records: {summary['total_records']:,}\n\n")
+            f.write("Files included:\n")
+            for section in summary["sections"]:
+                f.write(f"- {section['filename']}: {section['title']} ({section['count']:,} records)\n")
+
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for csv_file in temp_dir.glob("*.csv"):
+                zipf.write(csv_file, csv_file.name)
+            zipf.write(readme, readme.name)
+            if category == "all":
+                fixture_json = build_restore_fixture_json(business)
+                zipf.writestr("restore/fixture.json", fixture_json)
+                zipf.writestr(
+                    "restore/manifest.txt",
+                    "This fixture is used by Emajinet's guarded restore workflow.\n"
+                    "Business/user/membership records are not overwritten automatically.\n",
+                )
+
+        return zip_path, records_count
+    except Exception:
+        import shutil
+
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise
+
+
+def _restore_sections(business: Business) -> list[tuple[dict[str, Any], Any]]:
+    member_user_ids = _member_user_ids(business)
+    sections = []
+    for item in EXPORT_SECTIONS:
+        if item["key"] in RESTORE_EXCLUDED_KEYS:
+            continue
+        model = _model_from_path(item["model"])
+        if model is None:
+            continue
+        qs = _filter_model_for_business(model, business, item["filter"], member_user_ids)
+        if qs is None:
+            continue
+        try:
+            qs = qs.order_by("pk")
+        except Exception:
+            pass
+        sections.append((item, qs))
+    return sections
+
+
+def build_restore_fixture_json(business: Business) -> str:
+    objects = []
+    for _item, qs in _restore_sections(business):
+        try:
+            objects.extend(list(qs))
+        except Exception:
+            continue
+    return serializers.serialize("json", objects, use_natural_foreign_keys=False, use_natural_primary_keys=False)
+
+
+def snapshot_has_restore_fixture(snapshot) -> bool:
+    try:
+        with snapshot.file.open("rb") as fh:
+            with zipfile.ZipFile(fh) as zf:
+                return "restore/fixture.json" in zf.namelist()
+    except Exception:
+        return False
+
+
+def restore_business_from_snapshot(snapshot, business: Business) -> int:
+    if not snapshot_has_restore_fixture(snapshot):
+        raise ValueError("This snapshot does not contain a restore fixture. Download it manually or create a fresh snapshot first.")
+
+    with snapshot.file.open("rb") as fh:
+        with zipfile.ZipFile(fh) as zf:
+            fixture_json = zf.read("restore/fixture.json").decode("utf-8")
+
+    objects = list(serializers.deserialize("json", fixture_json))
+    sections = _restore_sections(business)
+    restored = 0
+
+    with transaction.atomic():
+        for _item, qs in reversed(sections):
+            try:
+                qs.delete()
+            except Exception:
+                continue
+
+        for obj in objects:
+            model = obj.object.__class__
+            fields = _model_field_names(model)
+            if "business" in fields:
+                setattr(obj.object, "business", business)
+            elif "seller_business" in fields:
+                setattr(obj.object, "seller_business", business)
+            obj.save()
+            restored += 1
+
+    return restored
+
+
+def _xml_cell(value: Any) -> str:
+    text = html.escape(_format_value(value))
+    return f'<c t="inlineStr"><is><t>{text}</t></is></c>'
+
+
+def _sheet_xml(headers: list[str], rows: list[list[str]]) -> str:
+    sheet_rows = []
+    all_rows = [headers] + rows
+    for idx, row in enumerate(all_rows, start=1):
+        cells = "".join(_xml_cell(value) for value in row)
+        sheet_rows.append(f'<row r="{idx}">{cells}</row>')
+    return (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<sheetData>'
+        + "".join(sheet_rows)
+        + "</sheetData></worksheet>"
+    )
+
+
+def create_export_xlsx_bytes(business: Business, category: str = "all") -> tuple[bytes, Dict[str, int]]:
+    summary = build_export_summary(business, category)
+    output = io.BytesIO()
+    sections = summary["sections"] or [
+        {"title": "No Data", "headers": ["Message"], "rows": [["No data for this export."]], "count": 0, "key": "no_data"}
+    ]
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "[Content_Types].xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+            + "".join(
+                f'<Override PartName="/xl/worksheets/sheet{i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+                for i, _section in enumerate(sections, start=1)
+            )
+            + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+            '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+            "</Types>",
+        )
+        zf.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+            '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>'
+            '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>'
+            "</Relationships>",
+        )
+        sheets_xml = []
+        rels_xml = []
+        for i, section in enumerate(sections, start=1):
+            sheet_name = html.escape(section["title"][:31] or f"Sheet {i}")
+            sheets_xml.append(f'<sheet name="{sheet_name}" sheetId="{i}" r:id="rId{i}"/>')
+            rels_xml.append(
+                f'<Relationship Id="rId{i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet{i}.xml"/>'
+            )
+            zf.writestr(f"xl/worksheets/sheet{i}.xml", _sheet_xml(section["headers"], section["rows"]))
+        zf.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'
+            + "".join(sheets_xml)
+            + "</sheets></workbook>",
+        )
+        zf.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + "".join(rels_xml)
+            + "</Relationships>",
+        )
+        zf.writestr("docProps/core.xml", f"<coreProperties><title>{html.escape(business.name)} Data Vault</title></coreProperties>")
+        zf.writestr("docProps/app.xml", "<Properties><Application>Emajinet</Application></Properties>")
+    return output.getvalue(), summary["records_count"]
+
+
+def build_executive_summary(business: Business) -> dict[str, Any]:
+    today = timezone.localdate()
+    month_start = today.replace(day=1)
+    data: dict[str, Any] = {
+        "stock_value": Decimal("0.00"),
+        "total_sales": Decimal("0.00"),
+        "total_profit": Decimal("0.00"),
+        "receivables": Decimal("0.00"),
+        "cash_balance": Decimal("0.00"),
+        "expenses": Decimal("0.00"),
+        "books_balance": None,
+        "health_check": None,
+    }
+    try:
+        from dashboard.services_health import _sales_totals
+
+        totals = _sales_totals(business, month_start, today)
+        data["total_sales"] = totals.get("revenue") or Decimal("0.00")
+        data["total_profit"] = (totals.get("revenue") or Decimal("0.00")) - (totals.get("cost") or Decimal("0.00"))
+    except Exception:
+        pass
+    try:
+        from dashboard.services_books_balance import _current_stock_value, _receivables_for_business, run_daily_books_balance
+
+        data["stock_value"] = _current_stock_value(business)
+        data["receivables"] = _receivables_for_business(business)[0]
+        data["books_balance"] = run_daily_books_balance(business)
+        data["health_check"] = data["books_balance"]
+    except Exception:
+        pass
+    try:
+        from wallet.models import CashBankTransaction
+
+        rows = CashBankTransaction.objects.filter(business=business, date__lte=today)
+        ins = rows.filter(direction=CashBankTransaction.Direction.CASH_IN).aggregate(s=Sum("amount")).get("s") or 0
+        outs = rows.filter(direction=CashBankTransaction.Direction.CASH_OUT).aggregate(s=Sum("amount")).get("s") or 0
+        data["cash_balance"] = Decimal(ins) - Decimal(outs)
+        data["expenses"] = rows.filter(direction=CashBankTransaction.Direction.CASH_OUT, date__gte=month_start).aggregate(s=Sum("amount")).get("s") or Decimal("0.00")
+    except Exception:
+        pass
+    return data
+
+
 def export_business_data_to_zip(business: Business) -> tuple[Path, Dict[str, int]]:
     """
     Export all data for a business to a ZIP file.
@@ -86,6 +634,8 @@ def export_business_data_to_zip(business: Business) -> tuple[Path, Dict[str, int
     Raises:
         Exception: If export fails
     """
+    return create_export_zip_path(business, "all")
+
     # Create temp directory for CSV files
     temp_dir = Path(tempfile.mkdtemp(prefix="backup_"))
     records_count = {}

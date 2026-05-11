@@ -1,6 +1,6 @@
 # backups/admin.py
 from django.contrib import admin
-from .models import BackupSnapshot
+from .models import BackupSnapshot, DataExportLog
 
 
 @admin.register(BackupSnapshot)
@@ -15,3 +15,12 @@ class BackupSnapshotAdmin(admin.ModelAdmin):
         return f"{obj.file_size_mb} MB" if obj.file_size else "—"
 
     file_size_mb.short_description = "File Size"
+
+
+@admin.register(DataExportLog)
+class DataExportLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "business", "category", "export_format", "status", "created_at", "user", "total_records"]
+    list_filter = ["category", "export_format", "status", "created_at"]
+    search_fields = ["business__name", "user__username", "user__email", "label"]
+    readonly_fields = ["created_at", "records_count", "file_size", "snapshot"]
+    date_hierarchy = "created_at"

@@ -1,323 +1,226 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Data Backup & Export - {{ business.name }}{% endblock %}
+{% block title %}Backup & Export Center - {{ business.name }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <!-- Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="bi bi-cloud-download me-2"></i>
-                        Data Backup & Export
-                    </h2>
-                    <p class="text-muted mb-0">
-                        Download complete backups of your {{ PRODUCT_MODE|default:"business" }} data. All records are preserved and exportable as CSV files.
-                    </p>
-                </div>
-                <form method="post" action="{% url 'backups:generate' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-plus-circle me-2"></i>
-                        Generate New Backup
-                    </button>
-                </form>
-            </div>
+<style>
+  .vault-shell { max-width: 1240px; margin: 0 auto; padding: 24px 14px 44px; color: #0f172a; }
+  .vault-hero {
+    border-radius: 28px;
+    padding: clamp(22px, 4vw, 38px);
+    background:
+      radial-gradient(circle at top right, rgba(34,197,94,.18), transparent 36%),
+      linear-gradient(135deg, #f8fafc 0%, #ffffff 48%, #ecfdf5 100%);
+    border: 1px solid rgba(5,150,105,.18);
+    box-shadow: 0 24px 60px rgba(15,23,42,.10);
+    overflow: hidden;
+  }
+  .vault-eyebrow { color: #059669; font-size: .76rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+  .vault-title { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 950; letter-spacing: 0; margin: 4px 0 8px; }
+  .vault-subtitle { color: #475569; max-width: 760px; font-size: 1.02rem; margin: 0; }
+  .vault-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; }
+  .vault-actions .btn { border-radius: 14px; min-height: 44px; font-weight: 850; }
+  .vault-format { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+  .vault-format button { border: 1px solid #bbf7d0; background: #fff; color: #065f46; padding: 9px 12px; border-radius: 12px; font-weight: 850; }
+  .vault-format button:hover { background: #ecfdf5; }
+  .vault-stats { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 12px; margin-top: 22px; }
+  .vault-stat {
+    background: rgba(255,255,255,.78);
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 15px;
+    min-width: 0;
+  }
+  .vault-stat span { display: block; color: #64748b; font-size: .72rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+  .vault-stat strong { display: block; margin-top: 5px; font-size: 1.05rem; overflow-wrap: anywhere; }
+  .vault-section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 30px 0 14px; flex-wrap: wrap; }
+  .vault-section-title h2 { font-size: 1.2rem; margin: 0; font-weight: 900; }
+  .score-card {
+    background: #fff;
+    border: 1px solid #dcfce7;
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 12px 34px rgba(15,23,42,.07);
+  }
+  .score-ring {
+    width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(#059669 {{ data_safety_score }}%, #e2e8f0 0);
+    box-shadow: inset 0 0 0 10px #fff;
+  }
+  .score-ring strong { font-size: 1.7rem; color: #047857; }
+  .export-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+  .export-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 10px 28px rgba(15,23,42,.06);
+  }
+  .export-card-icon {
+    width: 42px; height: 42px; display: inline-grid; place-items: center;
+    border-radius: 14px; background: #ecfdf5; color: #059669; margin-bottom: 12px;
+  }
+  .export-card h3 { font-size: 1rem; font-weight: 900; margin: 0 0 6px; }
+  .export-card p { color: #64748b; margin: 0 0 12px; font-size: .88rem; }
+  .timeline { display: grid; gap: 12px; }
+  .snapshot-card {
+    display: grid;
+    grid-template-columns: minmax(180px,1fr) auto;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 24px rgba(15,23,42,.05);
+  }
+  .snapshot-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+  .badge-soft { display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:6px 10px; background:#ecfdf5; color:#047857; font-weight:850; font-size:.78rem; }
+  .trust-copy { color:#475569; display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .trust-copy span { background:rgba(255,255,255,.75); border:1px solid #dcfce7; border-radius:999px; padding:7px 11px; font-size:.82rem; font-weight:800; color:#047857; }
+  @media (max-width: 1050px) {
+    .vault-stats { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .export-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  }
+  @media (max-width: 680px) {
+    .vault-stats, .export-grid { grid-template-columns: 1fr; }
+    .snapshot-card { grid-template-columns: 1fr; }
+    .snapshot-actions { justify-content: stretch; }
+    .snapshot-actions .btn, .snapshot-actions form { width: 100%; }
+    .snapshot-actions form .btn { width: 100%; }
+  }
+</style>
+
+<div class="vault-shell">
+  <section class="vault-hero">
+    <div class="d-flex align-items-start justify-content-between gap-4 flex-wrap">
+      <div>
+        <div class="vault-eyebrow">Own Your Data</div>
+        <h1 class="vault-title">Your Business Data Vault</h1>
+        <p class="vault-subtitle">Download, protect, and restore your entire business anytime. Your business records are always yours.</p>
+        <div class="trust-copy">
+          <span><i class="bi bi-shield-check"></i> You own your data</span>
+          <span><i class="bi bi-download"></i> Download everything anytime</span>
+          <span><i class="bi bi-lock"></i> Tenant scoped exports</span>
         </div>
+      </div>
+      <div class="score-card">
+        <div class="d-flex align-items-center gap-3">
+          <div class="score-ring"><strong>{{ data_safety_score }}%</strong></div>
+          <div>
+            <div class="vault-eyebrow">Data Safety Score</div>
+            <div class="fw-black fs-5">{{ backup_health }}</div>
+            <div class="text-muted small">Export ready and recovery safe</div>
+            <div class="mt-2">
+              <span class="badge-soft">Protected</span>
+              <span class="badge-soft">Export Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Info Cards -->
-    <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
-                            <i class="bi bi-shield-check fs-4 text-primary"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-0 text-muted">Data Protection</h6>
-                            <p class="mb-0 fw-bold">Never Lost Promise</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
-                            <i class="bi bi-archive fs-4 text-success"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-0 text-muted">Total Backups</h6>
-                            <p class="mb-0 fw-bold">{{ snapshots|length }}</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-0 shadow-sm">
-                <div class="card-body">
-                    <div class="d-flex align-items-center">
-                        <div class="rounded-circle bg-info bg-opacity-10 p-3 me-3">
-                            <i class="bi bi-clock-history fs-4 text-info"></i>
-                        </div>
-                        <div>
-                            <h6 class="mb-0 text-muted">Latest Backup</h6>
-                            <p class="mb-0 fw-bold">
-                                {% if snapshots %}
-                                    {{ snapshots.0.created_at|timesince }} ago
-                                {% else %}
-                                    Never
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="vault-actions">
+      <form method="post" action="{% url 'backups:export_all' %}" class="vault-format">
+        {% csrf_token %}
+        <button type="submit" name="format" value="zip"><i class="bi bi-file-zip me-1"></i>Download Everything ZIP</button>
+        <button type="submit" name="format" value="xlsx"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel</button>
+        <button type="submit" name="format" value="csv"><i class="bi bi-files me-1"></i>CSV Package</button>
+        <button type="submit" name="format" value="pdf"><i class="bi bi-file-pdf me-1"></i>PDF Summary</button>
+      </form>
+      <form method="post" action="{% url 'backups:generate' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success"><i class="bi bi-plus-circle me-1"></i>Create Snapshot</button>
+      </form>
+      <a class="btn btn-outline-success" href="{% url 'backups:executive_report' %}"><i class="bi bi-file-earmark-richtext me-1"></i>Generate Executive Report</a>
     </div>
 
-    <!-- What's Included Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="bi bi-info-circle me-2"></i>
-                        What's Included in Backups
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Inventory Items</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Products & Stock</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Locations</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-3">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Sales Records</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Wallet Transactions</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Time Logs</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-3">
-                            <ul class="list-unstyled">
-                                {% if PRODUCT_MODE == 'phones' or BUSINESS_VERTICAL == 'phones' %}
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>IMEI Records</li>
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Layby Contracts</li>
-                                {% elif PRODUCT_MODE == 'liquor' or BUSINESS_VERTICAL == 'liquor' %}
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Liquor Data</li>
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Shifts & Stock</li>
-                                {% elif PRODUCT_MODE == 'gym' or BUSINESS_VERTICAL == 'gym' %}
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Gym Members</li>
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Memberships</li>
-                                {% elif PRODUCT_MODE == 'clothing' or BUSINESS_VERTICAL == 'clothing' %}
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Clothing Sales</li>
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Size Records</li>
-                                {% else %}
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Order History</li>
-                                    <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Customer Data</li>
-                                {% endif %}
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Team Members</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-3">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Business Settings</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Agent Profiles</li>
-                                <li class="mb-2"><i class="bi bi-check-circle text-success me-2"></i>Commission Data</li>
-                            </ul>
-                        </div>
-                    </div>
-                    <div class="alert alert-info mt-3 mb-0">
-                        <i class="bi bi-info-circle me-2"></i>
-                        <strong>Note:</strong> Backups are generated as ZIP files containing CSV exports of all your {% if PRODUCT_MODE == 'phones' %}phone shop{% elif PRODUCT_MODE == 'liquor' %}liquor store{% elif PRODUCT_MODE == 'gym' %}gym{% elif PRODUCT_MODE == 'clothing' %}clothing store{% else %}business{% endif %} data. 
-                        You can open these files in Excel, import them into other systems, or keep them for your records.
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="vault-stats">
+      <div class="vault-stat"><span>Last backup date</span><strong>{% if latest_success %}{{ latest_success.created_at|date:"M j, Y H:i" }}{% else %}Never{% endif %}</strong></div>
+      <div class="vault-stat"><span>Total records</span><strong>{{ total_records|intcomma }}</strong></div>
+      <div class="vault-stat"><span>Export size estimate</span><strong>{{ estimate_mb }} MB</strong></div>
+      <div class="vault-stat"><span>Backup health</span><strong>{{ backup_health }}</strong></div>
+      <div class="vault-stat"><span>Last successful export</span><strong>{% if last_export %}{{ last_export.created_at|timesince }} ago{% else %}Never{% endif %}</strong></div>
+      <div class="vault-stat"><span>Auto backup status</span><strong>{{ auto_backup_status }}</strong></div>
     </div>
+  </section>
 
-    <!-- Backups List -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-white border-bottom">
-                    <h5 class="mb-0">
-                        <i class="bi bi-list-ul me-2"></i>
-                        Backup History
-                    </h5>
-                </div>
-                <div class="card-body p-0">
-                    {% if snapshots %}
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead class="bg-light">
-                                    <tr>
-                                        <th>Date & Time</th>
-                                        <th>Status</th>
-                                        <th>Size</th>
-                                        <th>Records</th>
-                                        <th>Created By</th>
-                                        <th class="text-end">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for snapshot in snapshots %}
-                                        <tr>
-                                            <td>
-                                                <div class="fw-bold">{{ snapshot.created_at|date:"M d, Y" }}</div>
-                                                <small class="text-muted">{{ snapshot.created_at|time:"g:i A" }}</small>
-                                            </td>
-                                            <td>
-                                                {% if snapshot.status == 'success' %}
-                                                    <span class="badge bg-success">
-                                                        <i class="bi bi-check-circle me-1"></i>
-                                                        Success
-                                                    </span>
-                                                {% elif snapshot.status == 'failed' %}
-                                                    <span class="badge bg-danger" 
-                                                          data-bs-toggle="tooltip" 
-                                                          title="{{ snapshot.error_message }}">
-                                                        <i class="bi bi-x-circle me-1"></i>
-                                                        Failed
-                                                    </span>
-                                                {% elif snapshot.status == 'running' %}
-                                                    <span class="badge bg-primary">
-                                                        <i class="bi bi-arrow-repeat me-1"></i>
-                                                        Running...
-                                                    </span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">
-                                                        <i class="bi bi-hourglass me-1"></i>
-                                                        Pending
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if snapshot.file_size %}
-                                                    <span class="badge bg-light text-dark">
-                                                        {{ snapshot.size_display }}
-                                                    </span>
-                                                {% else %}
-                                                    <span class="text-muted">—</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if snapshot.records_count %}
-                                                    <span class="text-muted">
-                                                        {{ snapshot.records_count|length }} tables, 
-                                                        {% with total=0 %}
-                                                            {% for model, count in snapshot.records_count.items %}
-                                                                {% with total=total|add:count %}{% endwith %}
-                                                            {% endfor %}
-                                                        {% endwith %}
-                                                        records
-                                                    </span>
-                                                {% else %}
-                                                    <span class="text-muted">—</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                {% if snapshot.created_by %}
-                                                    <span class="text-muted">{{ snapshot.created_by.username }}</span>
-                                                {% else %}
-                                                    <span class="text-muted">System</span>
-                                                {% endif %}
-                                            </td>
-                                            <td class="text-end">
-                                                {% if snapshot.status == 'success' %}
-                                                    <a href="{% url 'backups:download' snapshot.id %}" 
-                                                       class="btn btn-sm btn-success me-2"
-                                                       title="Download ZIP file">
-                                                        <i class="bi bi-download me-1"></i>
-                                                        ZIP
-                                                    </a>
-                                                    <a href="{% url 'backups:export_pdf' snapshot.id %}" 
-                                                       class="btn btn-sm btn-primary me-2"
-                                                       title="Download backup summary as PDF">
-                                                        <i class="bi bi-file-pdf me-1"></i>
-                                                        PDF
-                                                    </a>
-                                                    <form method="post" 
-                                                          action="{% url 'backups:resend_pdf' snapshot.id %}" 
-                                                          class="d-inline me-2"
-                                                          title="Resend PDF report via email">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                                                            <i class="bi bi-envelope me-1"></i>
-                                                            Resend PDF
-                                                        </button>
-                                                    </form>
-                                                    <form method="post" 
-                                                          action="{% url 'backups:delete' snapshot.id %}" 
-                                                          class="d-inline"
-                                                          onsubmit="return confirm('Delete this backup? This cannot be undone.');">
-                                                        {% csrf_token %}
-                                                        <button type="submit" class="btn btn-sm btn-outline-danger">
-                                                            <i class="bi bi-trash"></i>
-                                                        </button>
-                                                    </form>
-                                                {% elif snapshot.status == 'failed' %}
-                                                    <button class="btn btn-sm btn-outline-secondary" 
-                                                            data-bs-toggle="tooltip" 
-                                                            title="{{ snapshot.error_message }}">
-                                                        <i class="bi bi-info-circle"></i>
-                                                        Error
-                                                    </button>
-                                                {% else %}
-                                                    <button class="btn btn-sm btn-secondary" disabled>
-                                                        <i class="bi bi-hourglass"></i>
-                                                        Processing...
-                                                    </button>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <i class="bi bi-cloud-download text-muted" style="font-size: 4rem;"></i>
-                            <h5 class="mt-3 text-muted">No Backups Yet</h5>
-                            <p class="text-muted mb-3">
-                                Generate your first backup to protect your business data
-                            </p>
-                            <form method="post" action="{% url 'backups:generate' %}">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-plus-circle me-2"></i>
-                                    Generate First Backup
-                                </button>
-                            </form>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
+  <div class="vault-section-title">
+    <h2>Section Exports</h2>
+    <span class="text-muted small">Clean labels, readable dates, and business-scoped records.</span>
+  </div>
+  <div class="export-grid">
+    {% for card in category_cards %}
+    <article class="export-card">
+      <div class="export-card-icon"><i class="bi {{ card.icon }}"></i></div>
+      <h3>{{ card.label }}</h3>
+      <p>{{ card.record_count|intcomma }} records across {{ card.section_count }} section{{ card.section_count|pluralize }}.</p>
+      <p class="small mb-3">Last export: {% if card.last_export %}{{ card.last_export.created_at|timesince }} ago{% else %}Never{% endif %}</p>
+      <form method="post" action="{% url 'backups:export_category' card.key %}" class="d-grid gap-2">
+        {% csrf_token %}
+        <button name="format" value="zip" class="btn btn-sm btn-success rounded-3 fw-bold"><i class="bi bi-download me-1"></i>Download</button>
+        <div class="btn-group btn-group-sm" role="group">
+          <button name="format" value="xlsx" class="btn btn-outline-success fw-bold">Excel</button>
+          <button name="format" value="csv" class="btn btn-outline-success fw-bold">CSV</button>
+          <button name="format" value="pdf" class="btn btn-outline-success fw-bold">PDF</button>
         </div>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="vault-section-title">
+    <h2>Backup Snapshots</h2>
+    <span class="text-muted small">Daily/manual recovery points for {{ business.name }}.</span>
+  </div>
+  <div class="timeline">
+    {% for snapshot in snapshots %}
+    <article class="snapshot-card">
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <strong>{{ snapshot.created_at|date:"M j, Y H:i" }}</strong>
+          {% if snapshot.status == 'success' %}
+            <span class="badge text-bg-success">Success</span>
+          {% elif snapshot.status == 'failed' %}
+            <span class="badge text-bg-danger">Failed</span>
+          {% elif snapshot.status == 'running' %}
+            <span class="badge text-bg-primary">Running</span>
+          {% else %}
+            <span class="badge text-bg-secondary">Pending</span>
+          {% endif %}
+        </div>
+        <div class="text-muted small mt-1">
+          {{ snapshot.size_display }} · {{ snapshot.total_records|intcomma }} records ·
+          {% if snapshot.created_by %}{{ snapshot.created_by.get_full_name|default:snapshot.created_by.username }}{% else %}System{% endif %}
+        </div>
+        {% if snapshot.error_message %}
+        <div class="text-danger small mt-2">{{ snapshot.error_message }}</div>
+        {% endif %}
+      </div>
+      <div class="snapshot-actions">
+        {% if snapshot.status == 'success' %}
+          <a class="btn btn-sm btn-success" href="{% url 'backups:download' snapshot.id %}"><i class="bi bi-download"></i> ZIP</a>
+          <a class="btn btn-sm btn-outline-success" href="{% url 'backups:export_pdf' snapshot.id %}"><i class="bi bi-file-pdf"></i> PDF</a>
+          <a class="btn btn-sm btn-outline-secondary" href="{% url 'backups:compare' snapshot.id %}"><i class="bi bi-sliders"></i> Compare</a>
+          <a class="btn btn-sm btn-outline-warning" href="{% url 'backups:restore' snapshot.id %}"><i class="bi bi-arrow-counterclockwise"></i> Restore</a>
+        {% endif %}
+        <form method="post" action="{% url 'backups:delete' snapshot.id %}" onsubmit="return confirm('Delete this snapshot? This cannot be undone.');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+        </form>
+      </div>
+    </article>
+    {% empty %}
+    <div class="text-center py-5 bg-white border rounded-4">
+      <i class="bi bi-shield-lock text-success" style="font-size:3rem;"></i>
+      <h3 class="mt-3">No snapshots yet</h3>
+      <p class="text-muted">Create your first snapshot to make this business recovery safe.</p>
+      <form method="post" action="{% url 'backups:generate' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success rounded-3 fw-bold"><i class="bi bi-plus-circle me-1"></i>Create Snapshot</button>
+      </form>
     </div>
+    {% endfor %}
+  </div>
 </div>
-
-<script>
-    // Initialize tooltips
-    document.addEventListener('DOMContentLoaded', function() {
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    });
-</script>
 {% endblock %}
-

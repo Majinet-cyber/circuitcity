@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Restore Backup - {{ business.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4" style="max-width:760px;margin:0 auto;">
+  <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+    <div class="p-4 p-md-5" style="background:linear-gradient(135deg,#fff7ed,#ffffff);border-bottom:1px solid #fed7aa;">
+      <div class="text-uppercase fw-bold mb-2" style="font-size:.76rem;letter-spacing:.08em;color:#c2410c;">Protected restore</div>
+      <h1 class="fw-black mb-2" style="color:#0f172a;">Restore Backup</h1>
+      <p class="text-muted mb-0">This will replace current tenant-scoped business records with the selected backup after confirmation.</p>
+    </div>
+    <div class="p-4 p-md-5">
+      {% if can_restore %}
+      <div class="alert alert-warning rounded-4 border-warning">
+        <strong>This is sensitive.</strong> Confirm carefully before restoring {{ business.name }}.
+      </div>
+      {% else %}
+      <div class="alert alert-info rounded-4">
+        This older snapshot can still be downloaded, but it does not contain the guarded restore fixture. Create a fresh snapshot to enable one-click restore.
+      </div>
+      {% endif %}
+      <div class="row g-3 mb-4">
+        <div class="col-sm-4"><div class="border rounded-4 p-3"><span class="text-muted small">Snapshot</span><strong class="d-block">{{ snapshot.created_at|date:"M j, Y" }}</strong></div></div>
+        <div class="col-sm-4"><div class="border rounded-4 p-3"><span class="text-muted small">Records</span><strong class="d-block">{{ snapshot.total_records|intcomma }}</strong></div></div>
+        <div class="col-sm-4"><div class="border rounded-4 p-3"><span class="text-muted small">Size</span><strong class="d-block">{{ snapshot.size_display }}</strong></div></div>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <label class="form-label fw-bold">Type business name to confirm</label>
+        <input class="form-control form-control-lg rounded-3 mb-3" name="business_name" placeholder="{{ business.name }}" autocomplete="off" required>
+        <label class="form-label fw-bold">Type RESTORE</label>
+        <input class="form-control form-control-lg rounded-3 mb-4" name="confirmation" placeholder="RESTORE" autocomplete="off" required>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-warning rounded-3 fw-bold px-4" type="submit" {% if not can_restore %}disabled{% endif %}><i class="bi bi-arrow-counterclockwise me-1"></i>Restore Backup</button>
+          <a href="{% url 'backups:manager_list' %}" class="btn btn-outline-secondary rounded-3 fw-bold px-4">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

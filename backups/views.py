@@ -21,8 +21,18 @@ from django.views.decorators.http import require_http_methods, require_POST
 from tenants.utils import require_role, manager_required, get_active_business
 from tenants.models import Membership
 
-from .models import BackupSnapshot, BackupStatus
-from .helpers import export_business_data_to_zip, cleanup_temp_files
+from .models import BackupSnapshot, BackupStatus, DataExportLog
+from .helpers import (
+    EXPORT_CATEGORY_LABELS,
+    build_executive_summary,
+    build_export_summary,
+    cleanup_temp_files,
+    create_export_xlsx_bytes,
+    export_business_data_to_zip,
+    create_export_zip_path,
+    restore_business_from_snapshot,
+    snapshot_has_restore_fixture,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +49,68 @@ def manager_backups_list(request: HttpRequest) -> HttpResponse:
         messages.error(request, "No active business selected.")
         return redirect("dashboard:home")
 
-    # Get all backups for this business
     snapshots = BackupSnapshot.objects.filter(business=business).select_related("created_by")
+    latest_success = snapshots.filter(status=BackupStatus.SUCCESS).first()
+    last_export = DataExportLog.objects.filter(business=business, status=BackupStatus.SUCCESS).first()
+    export_summary = build_export_summary(business, "all", include_rows=False)
+    category_cards = []
+    category_icons = {
+        "inventory": "bi-box-seam",
+        "financial": "bi-cash-coin",
+        "staff": "bi-people",
+        "sales": "bi-receipt",
+        "wallet": "bi-wallet2",
+        "reports": "bi-graph-up-arrow",
+        "marketplace": "bi-shop",
+    }
+    for category, label in EXPORT_CATEGORY_LABELS.items():
+        if category == "all":
+            continue
+        summary = build_export_summary(business, category, include_rows=False)
+        category_cards.append(
+            {
+                "key": category,
+                "label": label,
+                "icon": category_icons.get(category, "bi-file-earmark-spreadsheet"),
+                "record_count": summary["total_records"],
+                "section_count": summary["section_count"],
+                "last_export": DataExportLog.objects.filter(
+                    business=business, category=category, status=BackupStatus.SUCCESS
+                ).first(),
+            }
+        )
+
+    now = timezone.now()
+    if latest_success:
+        days_since_backup = (now - latest_success.created_at).days
+        backup_health = "Protected" if days_since_backup <= 1 else "Backup overdue" if days_since_backup >= 7 else "Export ready"
+        data_safety_score = 95 if days_since_backup <= 1 else 82 if days_since_backup < 7 else 62
+    else:
+        days_since_backup = None
+        backup_health = "Backup overdue"
+        data_safety_score = 48
+
+    estimate_bytes = max(export_summary["total_records"] * 220, 4096)
+    if latest_success and latest_success.file_size:
+        estimate_bytes = latest_success.file_size
 
     ctx = {
         "business": business,
         "snapshots": snapshots,
-        "page_title": "Data Backup & Export",
+        "page_title": "Backup & Export Center",
+        "latest_success": latest_success,
+        "last_export": last_export,
+        "total_records": export_summary["total_records"],
+        "section_count": export_summary["section_count"],
+        "category_cards": category_cards,
+        "backup_health": backup_health,
+        "data_safety_score": data_safety_score,
+        "estimate_bytes": estimate_bytes,
+        "estimate_mb": max(round(estimate_bytes / (1024 * 1024), 2), 0.01),
+        "days_since_backup": days_since_backup,
+        "auto_backup_status": "Daily snapshots ready",
+        "active_tab": "data_vault",
+        "show_search": False,
     }
     return render(request, "backups/manager_list.html", ctx)
 
@@ -99,6 +164,18 @@ def generate_backup(request: HttpRequest) -> HttpResponse:
         snapshot.status = BackupStatus.SUCCESS
         snapshot.completed_at = timezone.now()
         snapshot.save()
+
+        DataExportLog.objects.create(
+            business=business,
+            user=request.user,
+            category=DataExportLog.ExportCategory.ALL,
+            export_format=DataExportLog.ExportFormat.ZIP,
+            label="Manual snapshot",
+            records_count=records_count,
+            file_size=zip_size_bytes,
+            status=BackupStatus.SUCCESS,
+            snapshot=snapshot,
+        )
 
         # Generate PDF and send email (don't fail backup if email fails)
         email_sent = False
@@ -290,7 +367,216 @@ def export_backup_pdf(request: HttpRequest, snapshot_id: int) -> HttpResponse:
         return redirect("backups:manager_list")
 
 
-def _generate_backup_pdf_bytes(snapshot: BackupSnapshot, business, request: HttpRequest = None) -> bytes:
+def _log_export_action(
+    *,
+    business,
+    user,
+    category: str,
+    export_format: str,
+    records_count: dict,
+    file_size: int | None = None,
+    label: str = "",
+    snapshot: BackupSnapshot | None = None,
+    status: str = BackupStatus.SUCCESS,
+):
+    try:
+        DataExportLog.objects.create(
+            business=business,
+            user=user,
+            category=category,
+            export_format=export_format,
+            label=label,
+            records_count=records_count or {},
+            file_size=file_size,
+            status=status,
+            snapshot=snapshot,
+        )
+    except Exception:
+        logger.warning("Could not log data export action", exc_info=True)
+
+
+@login_required
+@manager_required
+@require_http_methods(["POST"])
+def export_data(request: HttpRequest, category: str = "all") -> HttpResponse:
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("dashboard:home")
+
+    category = category if category in EXPORT_CATEGORY_LABELS else "all"
+    export_format = (request.POST.get("format") or "zip").lower()
+    business_slug = "".join(c for c in (business.name or "business") if c.isalnum() or c in ("-", "_")).strip() or "business"
+    timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+
+    try:
+        if export_format in {"zip", "csv"}:
+            zip_path, records_count = create_export_zip_path(business, category)
+            file_size = os.path.getsize(zip_path)
+            _log_export_action(
+                business=business,
+                user=request.user,
+                category=category,
+                export_format=DataExportLog.ExportFormat.ZIP if export_format == "zip" else DataExportLog.ExportFormat.CSV,
+                records_count=records_count,
+                file_size=file_size,
+                label=EXPORT_CATEGORY_LABELS.get(category, category.title()),
+            )
+            filename = f"{business_slug}_{category}_{'csv_package' if export_format == 'csv' else 'data_vault'}_{timestamp}.zip"
+            return FileResponse(open(zip_path, "rb"), as_attachment=True, filename=filename)
+
+        if export_format in {"xlsx", "excel"}:
+            xlsx_bytes, records_count = create_export_xlsx_bytes(business, category)
+            _log_export_action(
+                business=business,
+                user=request.user,
+                category=category,
+                export_format=DataExportLog.ExportFormat.XLSX,
+                records_count=records_count,
+                file_size=len(xlsx_bytes),
+                label=EXPORT_CATEGORY_LABELS.get(category, category.title()),
+            )
+            filename = f"{business_slug}_{category}_data_vault_{timestamp}.xlsx"
+            return HttpResponse(
+                xlsx_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        if export_format == "pdf":
+            return executive_report_pdf(request)
+
+        messages.error(request, "Unsupported export format.")
+    except Exception as exc:
+        _log_export_action(
+            business=business,
+            user=request.user,
+            category=category,
+            export_format=export_format[:16],
+            records_count={},
+            label=EXPORT_CATEGORY_LABELS.get(category, category.title()),
+            status=BackupStatus.FAILED,
+        )
+        logger.error("Data export failed: %s", exc, exc_info=True)
+        messages.error(request, f"Export failed: {exc}")
+
+    return redirect("backups:manager_list")
+
+
+@login_required
+@manager_required
+def executive_report_pdf(request: HttpRequest) -> HttpResponse:
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("dashboard:home")
+
+    snapshot = BackupSnapshot.objects.filter(business=business, status=BackupStatus.SUCCESS).first()
+    if snapshot is None:
+        summary = build_export_summary(business, "all", include_rows=False)
+        snapshot = BackupSnapshot(
+            business=business,
+            created_by=request.user,
+            status=BackupStatus.SUCCESS,
+            created_at=timezone.now(),
+            completed_at=timezone.now(),
+            records_count=summary["records_count"],
+        )
+
+    pdf_bytes = _generate_backup_pdf_bytes(snapshot, business, request, executive=True)
+    _log_export_action(
+        business=business,
+        user=request.user,
+        category=DataExportLog.ExportCategory.REPORTS,
+        export_format=DataExportLog.ExportFormat.PDF,
+        records_count=snapshot.records_count,
+        file_size=len(pdf_bytes),
+        label="Business Summary Report",
+        snapshot=snapshot if snapshot.pk else None,
+    )
+    business_slug = "".join(c for c in (business.name or "business") if c.isalnum() or c in ("-", "_")).strip() or "business"
+    filename = f"{business_slug}_business_summary_{timezone.now():%Y%m%d_%H%M%S}.pdf"
+    return HttpResponse(
+        pdf_bytes,
+        content_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@login_required
+@manager_required
+def compare_backup(request: HttpRequest, snapshot_id: int) -> HttpResponse:
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("dashboard:home")
+    snapshot = get_object_or_404(BackupSnapshot, pk=snapshot_id, business=business)
+    previous = BackupSnapshot.objects.filter(
+        business=business,
+        status=BackupStatus.SUCCESS,
+        created_at__lt=snapshot.created_at,
+    ).first()
+    keys = sorted(set((snapshot.records_count or {}).keys()) | set((previous.records_count or {}).keys() if previous else []))
+    comparisons = []
+    for key in keys:
+        current = (snapshot.records_count or {}).get(key, 0)
+        before = (previous.records_count or {}).get(key, 0) if previous else 0
+        comparisons.append({"label": key.replace("_", " ").title(), "current": current, "previous": before, "delta": current - before})
+    return render(
+        request,
+        "backups/compare.html",
+        {"business": business, "snapshot": snapshot, "previous": previous, "comparisons": comparisons},
+    )
+
+
+@login_required
+@manager_required
+@require_http_methods(["GET", "POST"])
+def restore_backup(request: HttpRequest, snapshot_id: int) -> HttpResponse:
+    business = get_active_business(request)
+    if not business:
+        messages.error(request, "No active business selected.")
+        return redirect("dashboard:home")
+    snapshot = get_object_or_404(BackupSnapshot, pk=snapshot_id, business=business)
+
+    if snapshot.status != BackupStatus.SUCCESS or not snapshot.file:
+        messages.error(request, "Only completed snapshots can be restored.")
+        return redirect("backups:manager_list")
+
+    if request.method == "POST":
+        typed_name = (request.POST.get("business_name") or "").strip()
+        confirmation = (request.POST.get("confirmation") or "").strip().upper()
+        if typed_name != business.name or confirmation != "RESTORE":
+            messages.error(request, "Restore confirmation did not match. No data was changed.")
+            return redirect("backups:restore", snapshot_id=snapshot.id)
+
+        _log_export_action(
+            business=business,
+            user=request.user,
+            category=DataExportLog.ExportCategory.RESTORE,
+            export_format=DataExportLog.ExportFormat.ZIP,
+            records_count=snapshot.records_count,
+            file_size=snapshot.file_size,
+            label="Restore package validated",
+            snapshot=snapshot,
+        )
+        try:
+            restored = restore_business_from_snapshot(snapshot, business)
+        except Exception as exc:
+            messages.error(request, f"Restore could not be completed: {exc}")
+            return redirect("backups:restore", snapshot_id=snapshot.id)
+
+        messages.success(request, f"Restore completed safely. {restored:,} business records were restored from the snapshot.")
+        return redirect("backups:manager_list")
+
+    return render(
+        request,
+        "backups/restore_confirm.html",
+        {"business": business, "snapshot": snapshot, "can_restore": snapshot_has_restore_fixture(snapshot)},
+    )
+
+
+def _generate_backup_pdf_bytes(snapshot: BackupSnapshot, business, request: HttpRequest = None, executive: bool = False) -> bytes:
     """
     Generate PDF bytes for a backup snapshot.
 
@@ -302,6 +588,8 @@ def _generate_backup_pdf_bytes(snapshot: BackupSnapshot, business, request: Http
         "business": business,
         "total_records": sum(snapshot.records_count.values()) if snapshot.records_count else 0,
         "as_pdf": True,
+        "executive": executive,
+        "executive_summary": build_executive_summary(business) if executive else None,
     }
 
     # Render HTML template

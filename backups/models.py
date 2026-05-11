@@ -137,3 +137,69 @@ class BackupSnapshot(models.Model):
         if self.completed_at and self.created_at:
             return (self.completed_at - self.created_at).total_seconds()
         return None
+
+    @property
+    def total_records(self):
+        return sum((self.records_count or {}).values())
+
+
+class DataExportLog(models.Model):
+    class ExportFormat(models.TextChoices):
+        ZIP = "zip", "ZIP Package"
+        CSV = "csv", "CSV Package"
+        XLSX = "xlsx", "Excel Workbook"
+        PDF = "pdf", "PDF Summary"
+
+    class ExportCategory(models.TextChoices):
+        ALL = "all", "Everything"
+        INVENTORY = "inventory", "Inventory"
+        FINANCIAL = "financial", "Financial"
+        STAFF = "staff", "Staff & HR"
+        SALES = "sales", "Sales"
+        WALLET = "wallet", "Wallet"
+        REPORTS = "reports", "Reports"
+        MARKETPLACE = "marketplace", "Marketplace"
+        RESTORE = "restore", "Restore"
+
+    business = models.ForeignKey(
+        Business,
+        on_delete=models.CASCADE,
+        related_name="data_export_logs",
+        db_index=True,
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="data_export_logs",
+    )
+    category = models.CharField(max_length=32, choices=ExportCategory.choices, default=ExportCategory.ALL)
+    export_format = models.CharField(max_length=16, choices=ExportFormat.choices, default=ExportFormat.ZIP)
+    label = models.CharField(max_length=120, blank=True, default="")
+    records_count = models.JSONField(default=dict, blank=True)
+    file_size = models.BigIntegerField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=BackupStatus.choices, default=BackupStatus.SUCCESS)
+    snapshot = models.ForeignKey(
+        BackupSnapshot,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="export_logs",
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["business", "-created_at"]),
+            models.Index(fields=["business", "category", "-created_at"]),
+            models.Index(fields=["business", "export_format", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.business_id} {self.category} {self.export_format} {self.created_at:%Y-%m-%d %H:%M}"
+
+    @property
+    def total_records(self):
+        return sum((self.records_count or {}).values())
