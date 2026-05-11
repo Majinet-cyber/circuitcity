@@ -368,6 +368,10 @@
     </div>
   </div>
 
+  {% if books_balance %}
+    {% include "dashboard/partials/books_balance_card.html" %}
+  {% endif %}
+
   <!-- Alerts -->
   {% if low_stock_count > 0 or out_of_stock_count > 0 %}
   <div class="alerts-section">

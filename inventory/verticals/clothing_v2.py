@@ -197,6 +197,13 @@ def dashboard_v2(request):
         }
     )
 
+    try:
+        from dashboard.services_books_balance import run_daily_books_balance
+
+        ctx["books_balance"] = run_daily_books_balance(business)
+    except Exception:
+        ctx["books_balance"] = None
+
     return render(request, "verticals/clothing/dashboard_v2.html", ctx)
 
 

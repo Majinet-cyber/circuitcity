@@ -300,6 +300,13 @@ def dashboard(request):
         }
     )
 
+    try:
+        from dashboard.services_books_balance import run_daily_books_balance
+
+        ctx["books_balance"] = run_daily_books_balance(business)
+    except Exception:
+        ctx["books_balance"] = None
+
     # Inject dashboard enhancements and normalize context
     from core.dashboard_context import normalize_dashboard_context
 

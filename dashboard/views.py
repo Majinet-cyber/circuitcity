@@ -16,7 +16,7 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse, NoReverseMatch
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.cache import never_cache
 
 from tenants.utils import require_business  # ✅ tenant guard
@@ -888,6 +888,12 @@ def home(request):
             ctx['health_score'] = health_score
         except Exception:
             ctx['health_score'] = None
+
+        try:
+            from dashboard.services_books_balance import run_daily_books_balance
+            ctx["books_balance"] = run_daily_books_balance(biz)
+        except Exception:
+            ctx["books_balance"] = None
 
     ctx.setdefault("latest_notifications", [])
     
@@ -1810,6 +1816,69 @@ def business_health_api(request):
     }
 
     return JsonResponse(health_json)
+
+
+# ---------------------------------------------------------------------------
+# Daily Books Balance / Business Health Check
+# ---------------------------------------------------------------------------
+
+@login_required
+@require_business
+@never_cache
+@require_http_methods(["GET", "POST"])
+def books_balance_view(request):
+    from dashboard.services_books_balance import books_balance_history, run_daily_books_balance
+
+    business = request.business
+    if request.method == "POST":
+        check = run_daily_books_balance(business, force=True)
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse(
+                {
+                    "ok": True,
+                    "status": check.status,
+                    "score": check.score,
+                    "variance": str(check.variance),
+                    "recommendation": check.recommendation,
+                }
+            )
+        return redirect("dashboard:books_balance")
+
+    check = run_daily_books_balance(business)
+    history = books_balance_history(business)
+    return render(
+        request,
+        "dashboard/books_balance.html",
+        {
+            "business": business,
+            "books_balance": check,
+            "history": history,
+            "active_tab": "books_balance",
+            "show_search": False,
+        },
+    )
+
+
+@login_required
+@require_business
+@never_cache
+@require_http_methods(["POST"])
+def books_balance_recalculate(request):
+    from dashboard.services_books_balance import run_daily_books_balance
+
+    check = run_daily_books_balance(request.business, force=True)
+    return JsonResponse(
+        {
+            "ok": True,
+            "status": check.status,
+            "status_label": check.status_label,
+            "score": check.score,
+            "expected_value": str(check.expected_value),
+            "actual_value": str(check.actual_value),
+            "variance": str(check.variance),
+            "recommendation": check.recommendation,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------

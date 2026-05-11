@@ -137,6 +137,10 @@
     </article>
   </section>
 
+  {% if books_balance %}
+    {% include "dashboard/partials/books_balance_card.html" %}
+  {% endif %}
+
   {% comment %}Payment Mix Panel{% endcomment %}
   {% if payment_mix_data %}
   <section class="recent-block">
@@ -727,4 +731,3 @@
 </script>
 
 {% endblock %}
-

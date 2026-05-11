@@ -451,6 +451,11 @@
     </div>
   </div>
 
+  {# ========== DAILY BOOKS BALANCE CARD (managers only) ========== #}
+  {% if IS_MANAGER and books_balance %}
+    {% include "dashboard/partials/books_balance_card.html" %}
+  {% endif %}
+
   {# ========== BUSINESS HEALTH SCORE CARD (managers only) ========== #}
   {% if IS_MANAGER and health_score %}
   <div class="chart-card" style="margin-bottom:2rem;border:1.5px solid

@@ -73,6 +73,8 @@ urlpatterns = [
     # ==== Business Health Score ====
     path("business-health/", views.business_health_view, name="business_health"),
     path("api/business-health/", views.business_health_api, name="business_health_api"),
+    path("books-balance/", views.books_balance_view, name="books_balance"),
+    path("api/books-balance/recalculate/", views.books_balance_recalculate, name="books_balance_recalculate"),
     # ==== Credit Score Engine ====
     path("credit-scores/", views.credit_scores_list, name="credit_scores"),
     path("business-credit-score/", views.credit_scores_list, name="business_credit_score"),
