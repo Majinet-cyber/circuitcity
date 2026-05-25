@@ -47,13 +47,13 @@
     </div>
 
     <div class="form-group">
-        <label for="{{ form.next_of_kin_1_name.id_for_label }}">Next of kin 1 name</label>
+        <label for="{{ form.next_of_kin_1_name.id_for_label }}">{{ form.next_of_kin_1_name.label }}</label>
         {{ form.next_of_kin_1_name }}
         {{ form.next_of_kin_1_name.errors }}
     </div>
 
     <div class="form-group">
-        <label for="{{ form.next_of_kin_1_phone.id_for_label }}">Next of kin 1 phone</label>
+        <label for="{{ form.next_of_kin_1_phone.id_for_label }}">{{ form.next_of_kin_1_phone.label }}</label>
         <div class="phone-input">
             <span>+265</span>
             {{ form.next_of_kin_1_phone }}
@@ -62,7 +62,7 @@
     </div>
 
     <div class="form-group">
-        <label for="{{ form.next_of_kin_1_relationship.id_for_label }}">Relationship</label>
+        <label for="{{ form.next_of_kin_1_relationship.id_for_label }}">{{ form.next_of_kin_1_relationship.label }}</label>
         {{ form.next_of_kin_1_relationship }}
         {{ form.next_of_kin_1_relationship.errors }}
     </div>
@@ -73,19 +73,18 @@
     </div>
 </form>
 
+{{ geography_data|json_script:"geography-data" }}
 <script>
     (function () {
-        const districtsByRegion = {
-            Central: ["Lilongwe", "Dedza", "Dowa", "Kasungu", "Mchinji", "Ntcheu", "Nkhotakota", "Ntchisi", "Salima"],
-            Southern: ["Blantyre", "Zomba", "Mangochi", "Mulanje", "Thyolo", "Chiradzulu", "Machinga", "Balaka", "Chikwawa", "Nsanje", "Phalombe", "Mwanza", "Neno"],
-            Northern: ["Mzuzu", "Mzimba", "Rumphi", "Karonga", "Chitipa", "Nkhata Bay", "Likoma"]
-        };
+        const geographyData = JSON.parse(document.getElementById("geography-data").textContent || "{}");
         const region = document.getElementById("id_region");
         const district = document.getElementById("id_district");
+        const traditionalAuthority = document.getElementById("id_traditional_authority");
         const currentDistrict = district.value;
+        const currentTraditionalAuthority = traditionalAuthority.value;
 
         function updateDistricts() {
-            const options = districtsByRegion[region.value] || [];
+            const options = Object.keys(geographyData[region.value] || {});
             district.innerHTML = '<option value="">Select district</option>';
             options.forEach(function (name) {
                 const option = document.createElement("option");
@@ -96,10 +95,34 @@
                 }
                 district.appendChild(option);
             });
+            updateTraditionalAuthorities();
+        }
+
+        function updateTraditionalAuthorities() {
+            const options = (geographyData[region.value] && geographyData[region.value][district.value]) || [];
+            traditionalAuthority.innerHTML = '<option value="">Select traditional authority</option>';
+            options.forEach(function (name) {
+                const option = document.createElement("option");
+                option.value = name;
+                option.textContent = name;
+                if (name === currentTraditionalAuthority) {
+                    option.selected = true;
+                }
+                traditionalAuthority.appendChild(option);
+            });
         }
 
         region.addEventListener("change", updateDistricts);
+        district.addEventListener("change", updateTraditionalAuthorities);
         updateDistricts();
+    })();
+
+    (function () {
+        document.querySelectorAll("[data-phone-input]").forEach(function (input) {
+            input.addEventListener("input", function () {
+                input.value = input.value.replace(/\D/g, "").slice(0, 9);
+            });
+        });
     })();
 </script>
 

@@ -1,0 +1,62 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Contract Terms{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'active_applications' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Contract Terms</h1>
+
+<div class="card detail-card">
+    <div class="detail-row"><span>Customer</span><strong>{{ application.customer_name }}</strong></div>
+    <div class="detail-row"><span>Device/deal</span><strong>{{ contract.deal_name|default:"Not selected" }}</strong></div>
+    <div class="detail-row"><span>Cash price</span><strong>MWK {{ contract.cash_price|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Total loan</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Monthly payment</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Daily payment</span><strong>MWK {{ contract.daily_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>3 month early option</span><strong>MWK {{ application.calculated_3_month_total|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>6 month early option</span><strong>MWK {{ application.calculated_6_month_total|floatformat:0 }}</strong></div>
+</div>
+
+<form method="post" class="card" id="terms-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <h2>Terms and conditions</h2>
+    <ol class="terms-list">
+        <li>Customer agrees to repay the financed phone according to the payment schedule.</li>
+        <li>Losing, damaging, or selling the phone does not cancel the credit obligation.</li>
+        <li>TengaSale does not replace lost phones.</li>
+        <li>TengaSale may assist with repairs or support where possible, but repairs may attract costs.</li>
+        <li>Late payment may lead to device locking and collection follow-up.</li>
+        <li>Deposit must be paid before final activation/completion.</li>
+        <li>Customer confirms the information provided is true.</li>
+        <li>Merchant confirms customer was informed of the costs and consequences.</li>
+    </ol>
+
+    <label class="check-row" for="id_confirmed_terms">
+        {{ form.confirmed_terms }}
+        <span>I confirm I have explained these terms to the customer.</span>
+    </label>
+    {{ form.confirmed_terms.errors }}
+
+    <button type="submit" class="btn primary-button" id="terms-submit" disabled>NEXT</button>
+</form>
+
+<script>
+    (function () {
+        const checkbox = document.getElementById("id_confirmed_terms");
+        const button = document.getElementById("terms-submit");
+        function updateState() {
+            button.disabled = !checkbox.checked;
+        }
+        checkbox.addEventListener("change", updateState);
+        updateState();
+    })();
+</script>
+
+{% endblock %}

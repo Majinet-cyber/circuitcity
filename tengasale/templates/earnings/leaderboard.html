@@ -1,0 +1,40 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Leaderboard{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'earnings_home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Leaderboard</h1>
+
+<div class="card">
+    <p class="text-muted">Period: {{ period_label }}</p>
+    {% if current_user_row %}
+        <h2>Your rank: #{{ current_user_row.rank }}</h2>
+        <p>{{ current_user_row.sales_count }} sales · MWK {{ current_user_row.total_commission }}</p>
+    {% else %}
+        <h2>Your rank</h2>
+        <p>No completed sales yet.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>Top 10 merchants</h2>
+
+    {% for row in leaders %}
+        <div class="leaderboard-row">
+            <strong>#{{ row.rank }}</strong>
+            <span>{{ row.merchant_name }}</span>
+            <span>{{ row.sales_count }} sales</span>
+            <span>MWK {{ row.total_commission }}</span>
+        </div>
+    {% empty %}
+        <p>No approved sales yet.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

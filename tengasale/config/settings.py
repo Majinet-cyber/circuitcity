@@ -40,10 +40,15 @@ INSTALLED_APPS = [
 
     "accounts",
     "merchants",
+    "core",
+    "geography",
     "applications",
     "deals",
     "earnings",
+    "commissions",
+    "rewards",
     "approvals",
+    "contracts",
     "dashboard",
 ]
 

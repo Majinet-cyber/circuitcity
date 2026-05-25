@@ -1,0 +1,47 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Spin & Win{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'earnings_home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Spin & Win</h1>
+
+{% if won_reward %}
+    <div class="card reward-result-card">
+        <h2>You won</h2>
+        <h1 class="text-green">MWK {{ won_reward.amount }}</h1>
+    </div>
+{% endif %}
+
+<div class="card spin-card">
+    <h2>Available spins</h2>
+    <h1>{{ spin_wallet.available_spins }}</h1>
+
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn spin-button" {% if spin_wallet.available_spins == 0 %}disabled{% endif %}>
+            {% if spin_wallet.available_spins == 0 %}No spins available{% else %}SPIN NOW{% endif %}
+        </button>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Latest rewards</h2>
+
+    {% for reward in latest_rewards %}
+        <div style="border-bottom:1px solid #eee; padding:16px 0;">
+            <strong>{{ reward.spin_date|date:"d M Y \a\t H:i" }}</strong>
+            <p>{{ reward.get_reward_tier_display }} reward</p>
+            <h3 class="text-green">MWK {{ reward.amount }}</h3>
+        </div>
+    {% empty %}
+        <p>No rewards yet.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,3 +1,4 @@
+import base64
 from decimal import Decimal
 from importlib import import_module
 import shutil
@@ -26,10 +27,15 @@ GIF_BYTES = (
 
 PNG_BYTES = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00"
-    b"\x00\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe"
-    b"\x02\xfeA\xe2%\x9b\x00\x00\x00\x00IEND\xaeB`\x82"
+    b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00"
+    b"\x00\x0cIDATx\x9cc\xf8\xff\xff?\x00\x05\xfe\x02\xfe"
+    b"\r\xefF\xb8\x00\x00\x00\x00IEND\xaeB`\x82"
 )
+
+
+def valid_signature_data():
+    encoded = base64.b64encode(PNG_BYTES).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
 
 
 def valid_customer_data(**overrides):
@@ -153,6 +159,135 @@ class CustomerValidationTests(TestCase):
         self.assertFalse(work_form.is_valid())
         self.assertIn("next_of_kin_1_phone", location_form.errors)
         self.assertIn("next_of_kin_2_phone", work_form.errors)
+
+
+class NextOfKinAndWorkFormTests(ApplicationTestCase):
+    def location_data(self, **overrides):
+        data = {
+            "region": "Central",
+            "district": "Lilongwe",
+            "traditional_authority": "TA Chadza",
+            "precise_location": "Area 25",
+            "next_of_kin_1_name": "Mary Banda",
+            "next_of_kin_1_phone": "991111111",
+            "next_of_kin_1_relationship": "Family",
+        }
+        data.update(overrides)
+        return data
+
+    def work_data(self, **overrides):
+        data = {
+            "work_description": "Runs a grocery stall",
+            "next_of_kin_2_name": "Peter Phiri",
+            "next_of_kin_2_phone": "992222222",
+            "next_of_kin_2_relationship": "Friend",
+            "proof_of_income_type": "MoMo",
+            "proof_contact_name": "Airtel Agent",
+            "proof_contact_phone": "993333333",
+            "proof_notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_location_page_contains_relationship_dropdown_choices(self):
+        app = self.create_application()
+
+        response = self.client.get(reverse("location_details", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="next_of_kin_1_relationship"')
+        for choice in ["Family", "Friend", "Neighbour", "Other"]:
+            self.assertContains(response, f'>{choice}</option>')
+
+    def test_work_page_contains_relationship_dropdown_choices(self):
+        app = self.create_application()
+
+        response = self.client.get(reverse("work_details", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="next_of_kin_2_relationship"')
+        for choice in ["Family", "Friend", "Neighbour", "Other"]:
+            self.assertContains(response, f'>{choice}</option>')
+
+    def test_relationship_fields_are_required(self):
+        location_form = LocationForm()
+        work_form = WorkForm()
+
+        self.assertTrue(location_form.fields["next_of_kin_1_relationship"].required)
+        self.assertTrue(work_form.fields["next_of_kin_2_relationship"].required)
+
+    def test_next_of_kin_1_phone_same_as_customer_phone_fails(self):
+        app = self.create_application()
+        app.customer_phone = "990870616"
+        form = LocationForm(data=self.location_data(next_of_kin_1_phone="990870616"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Next of kin phone cannot be the same as customer phone.", form.errors["next_of_kin_1_phone"])
+
+    def test_next_of_kin_2_phone_same_as_customer_phone_fails(self):
+        app = self.create_application()
+        app.customer_phone = "990870616"
+        app.next_of_kin_1_phone = "991111111"
+        form = WorkForm(data=self.work_data(next_of_kin_2_phone="990870616"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Next of kin phone cannot be the same as customer phone.", form.errors["next_of_kin_2_phone"])
+
+    def test_next_of_kin_2_phone_same_as_next_of_kin_1_phone_fails(self):
+        app = self.create_application()
+        app.customer_phone = "990870616"
+        app.next_of_kin_1_phone = "991111111"
+        form = WorkForm(data=self.work_data(next_of_kin_2_phone="991111111"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("Next of kin 2 phone cannot be the same as next of kin 1 phone.", form.errors["next_of_kin_2_phone"])
+
+    def test_valid_next_of_kin_phone_passes(self):
+        app = self.create_application()
+        app.customer_phone = "990870616"
+        form = LocationForm(data=self.location_data(next_of_kin_1_phone="991111111"), instance=app)
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_next_of_kin_phone_with_letters_fails(self):
+        app = self.create_application()
+        form = LocationForm(data=self.location_data(next_of_kin_1_phone="991abc111"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("next_of_kin_1_phone", form.errors)
+
+    def test_next_of_kin_phone_shorter_than_9_fails(self):
+        app = self.create_application()
+        form = LocationForm(data=self.location_data(next_of_kin_1_phone="99111111"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("next_of_kin_1_phone", form.errors)
+
+    def test_next_of_kin_phone_longer_than_9_fails(self):
+        app = self.create_application()
+        form = LocationForm(data=self.location_data(next_of_kin_1_phone="9911111110"), instance=app)
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("next_of_kin_1_phone", form.errors)
+
+    def test_work_proof_required_fields(self):
+        required_fields = [
+            "work_description",
+            "next_of_kin_2_name",
+            "next_of_kin_2_phone",
+            "next_of_kin_2_relationship",
+            "proof_of_income_type",
+            "proof_contact_name",
+            "proof_contact_phone",
+        ]
+
+        for field in required_fields:
+            app = self.create_application()
+            app.customer_phone = "990870616"
+            app.next_of_kin_1_phone = "991111111"
+            form = WorkForm(data=self.work_data(**{field: ""}), instance=app)
+            self.assertFalse(form.is_valid(), field)
+            self.assertIn(field, form.errors)
 
 
 class ApplicationUrlTests(ApplicationTestCase):
@@ -457,9 +592,8 @@ class ApplicationFlowTests(ApplicationTestCase):
 
     def test_signature_page_requires_agreed_to_terms_before_submit(self):
         app = self.create_application()
-        upload = SimpleUploadedFile("signature.gif", GIF_BYTES, content_type="image/gif")
 
-        response = self.client.post(reverse("signature", args=[app.id]), {"signature_image": upload})
+        response = self.client.post(reverse("signature", args=[app.id]), {"signature_data": valid_signature_data()})
 
         self.assertEqual(response.status_code, 200)
         app.refresh_from_db()
@@ -467,17 +601,123 @@ class ApplicationFlowTests(ApplicationTestCase):
 
     def test_final_submit_sets_status_submitted(self):
         app = self.create_application()
-        upload = SimpleUploadedFile("signature.gif", GIF_BYTES, content_type="image/gif")
 
         response = self.client.post(
             reverse("signature", args=[app.id]),
-            {"signature_image": upload, "agreed_to_terms": "on"},
+            {"signature_data": valid_signature_data(), "agreed_to_terms": "on"},
         )
 
         app.refresh_from_db()
         self.assertRedirects(response, reverse("active_applications"))
         self.assertEqual(app.status, "submitted")
         self.assertIsNotNone(app.submitted_at)
+
+
+class SignaturePageTests(ApplicationTestCase):
+    def setUp(self):
+        super().setUp()
+        self.media_root = tempfile.mkdtemp()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root)
+        self.settings_override.enable()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        shutil.rmtree(self.media_root, ignore_errors=True)
+        super().tearDown()
+
+    def test_signature_page_contains_live_canvas_controls(self):
+        app = self.create_application()
+
+        response = self.client.get(reverse("signature", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<canvas")
+        self.assertContains(response, "Undo")
+        self.assertContains(response, "Clear / Cancel")
+        self.assertContains(response, "Save Signature")
+        self.assertNotContains(response, 'type="file"')
+
+    def test_submit_without_signature_fails(self):
+        app = self.create_application()
+
+        response = self.client.post(reverse("signature", args=[app.id]), {"agreed_to_terms": "on"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Save the customer signature before submitting.")
+        app.refresh_from_db()
+        self.assertNotEqual(app.status, "submitted")
+
+    def test_submit_without_terms_fails(self):
+        app = self.create_application()
+
+        response = self.client.post(reverse("signature", args=[app.id]), {"signature_data": valid_signature_data()})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "The customer must agree to the terms before submitting.")
+        app.refresh_from_db()
+        self.assertNotEqual(app.status, "submitted")
+
+    def test_submit_with_valid_signature_and_terms_succeeds(self):
+        app = self.create_application()
+
+        response = self.client.post(
+            reverse("signature", args=[app.id]),
+            {"signature_data": valid_signature_data(), "agreed_to_terms": "on"},
+        )
+
+        app.refresh_from_db()
+        self.assertRedirects(response, reverse("active_applications"))
+        self.assertEqual(app.status, "submitted")
+        self.assertTrue(app.signature_image)
+        self.assertTrue(app.agreed_to_terms)
+
+
+class ApplicationDetailDataTests(ApplicationTestCase):
+    def setUp(self):
+        super().setUp()
+        self.media_root = tempfile.mkdtemp()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media_root)
+        self.settings_override.enable()
+
+    def tearDown(self):
+        self.settings_override.disable()
+        shutil.rmtree(self.media_root, ignore_errors=True)
+        super().tearDown()
+
+    def test_detail_page_shows_next_of_kin_proof_and_signature_data(self):
+        app = self.create_application()
+        app.next_of_kin_1_name = "Mary Banda"
+        app.next_of_kin_1_phone = "991111111"
+        app.next_of_kin_1_relationship = "Family"
+        app.next_of_kin_2_name = "Peter Phiri"
+        app.next_of_kin_2_phone = "992222222"
+        app.next_of_kin_2_relationship = "Friend"
+        app.work_description = "Runs a grocery stall"
+        app.proof_of_income_type = "MoMo"
+        app.proof_contact_name = "Airtel Agent"
+        app.proof_contact_phone = "993333333"
+        app.agreed_to_terms = True
+        app.signature_image.save("signature.png", ContentFile(PNG_BYTES), save=False)
+        app.save()
+
+        response = self.client.get(reverse("application_detail", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        for value in [
+            "Mary Banda",
+            "+265 991111111",
+            "Family",
+            "Peter Phiri",
+            "+265 992222222",
+            "Friend",
+            "Runs a grocery stall",
+            "MoMo",
+            "Airtel Agent",
+            "+265 993333333",
+            "Customer signature",
+            "Yes",
+        ]:
+            self.assertContains(response, value)
 
 
 class KYCCaptureTests(ApplicationTestCase):

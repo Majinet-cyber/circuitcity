@@ -1,0 +1,166 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Contract Signature{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'contract_terms' application.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Customer Contract Signature</h1>
+
+<form method="post" class="card" id="signature-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-group">
+        <label>Customer signature *</label>
+        <div class="signature-pad">
+            <canvas class="signature-canvas" id="signature-canvas"></canvas>
+        </div>
+        {{ form.signature_data }}
+        {{ form.signature_data.errors }}
+        <div class="signature-actions">
+            <button type="button" class="btn btn-blue" id="signature-undo">Undo</button>
+            <button type="button" class="btn btn-outline btn-danger-soft" id="signature-clear">Clear / Cancel</button>
+            <button type="button" class="btn" id="signature-save">Save Signature</button>
+        </div>
+        <div class="signature-status" id="signature-status">Signature not saved</div>
+    </div>
+
+    <label class="check-row" for="{{ form.customer_terms_accepted.id_for_label }}">
+        {{ form.customer_terms_accepted }}
+        <span>Customer confirms and agrees to the TengaSale contract terms.</span>
+    </label>
+    {{ form.customer_terms_accepted.errors }}
+
+    <button type="submit" class="btn primary-button" id="signature-submit" disabled>SUBMIT</button>
+</form>
+
+<script>
+    (function () {
+        const canvas = document.getElementById("signature-canvas");
+        const context = canvas.getContext("2d");
+        const hiddenInput = document.getElementById("id_signature_data");
+        const undoButton = document.getElementById("signature-undo");
+        const clearButton = document.getElementById("signature-clear");
+        const saveButton = document.getElementById("signature-save");
+        const submitButton = document.getElementById("signature-submit");
+        const status = document.getElementById("signature-status");
+        const terms = document.getElementById("id_customer_terms_accepted");
+        let strokes = [];
+        let currentStroke = null;
+        let signatureSaved = false;
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const scale = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.floor(rect.width * scale));
+            canvas.height = Math.max(1, Math.floor(rect.height * scale));
+            context.setTransform(scale, 0, 0, scale, 0, 0);
+            redraw();
+        }
+
+        function drawStroke(stroke) {
+            if (stroke.length < 2) return;
+            context.beginPath();
+            context.lineWidth = 3;
+            context.lineCap = "round";
+            context.lineJoin = "round";
+            context.strokeStyle = "#111111";
+            context.moveTo(stroke[0].x, stroke[0].y);
+            stroke.slice(1).forEach(function (point) { context.lineTo(point.x, point.y); });
+            context.stroke();
+        }
+
+        function redraw() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            strokes.forEach(drawStroke);
+            if (currentStroke) drawStroke(currentStroke);
+        }
+
+        function pointFromEvent(event) {
+            const rect = canvas.getBoundingClientRect();
+            const pointer = event.touches ? event.touches[0] : event;
+            return {x: pointer.clientX - rect.left, y: pointer.clientY - rect.top};
+        }
+
+        function updateSubmitState() {
+            submitButton.disabled = !(signatureSaved && terms.checked);
+        }
+
+        function markUnsaved() {
+            if (strokes.length) {
+                signatureSaved = false;
+                hiddenInput.value = "";
+                status.textContent = "Signature not saved";
+                status.classList.remove("saved");
+                updateSubmitState();
+            }
+        }
+
+        function startStroke(event) {
+            event.preventDefault();
+            currentStroke = [pointFromEvent(event)];
+            markUnsaved();
+        }
+
+        function moveStroke(event) {
+            if (!currentStroke) return;
+            event.preventDefault();
+            currentStroke.push(pointFromEvent(event));
+            redraw();
+        }
+
+        function endStroke(event) {
+            if (!currentStroke) return;
+            event.preventDefault();
+            if (currentStroke.length > 1) strokes.push(currentStroke);
+            currentStroke = null;
+            markUnsaved();
+            redraw();
+        }
+
+        undoButton.addEventListener("click", function () {
+            strokes.pop();
+            signatureSaved = false;
+            hiddenInput.value = "";
+            status.textContent = "Signature not saved";
+            status.classList.remove("saved");
+            redraw();
+            updateSubmitState();
+        });
+        clearButton.addEventListener("click", function () {
+            strokes = [];
+            currentStroke = null;
+            signatureSaved = false;
+            hiddenInput.value = "";
+            status.textContent = "Signature not saved";
+            status.classList.remove("saved");
+            redraw();
+            updateSubmitState();
+        });
+        saveButton.addEventListener("click", function () {
+            if (!strokes.length) return;
+            hiddenInput.value = canvas.toDataURL("image/png");
+            signatureSaved = true;
+            status.textContent = "Signature saved";
+            status.classList.add("saved");
+            updateSubmitState();
+        });
+        terms.addEventListener("change", updateSubmitState);
+        canvas.addEventListener("mousedown", startStroke);
+        canvas.addEventListener("mousemove", moveStroke);
+        window.addEventListener("mouseup", endStroke);
+        canvas.addEventListener("touchstart", startStroke, { passive: false });
+        canvas.addEventListener("touchmove", moveStroke, { passive: false });
+        canvas.addEventListener("touchend", endStroke, { passive: false });
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+        updateSubmitState();
+    })();
+</script>
+
+{% endblock %}

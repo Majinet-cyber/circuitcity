@@ -33,4 +33,27 @@
     {% endfor %}
 </div>
 
+<div class="card">
+    <div class="detail-row">
+        <span>Pending queue</span>
+        <strong>{{ pending_count }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Queue rules</span>
+        <strong>Oldest unclaimed pending review application is claimed first.</strong>
+    </div>
+</div>
+
+<div class="menu-list">
+    <h2>Completed Reviews</h2>
+    {% for app in completed_reviews %}
+        <a href="{% url 'application_detail' app.id %}" class="menu-row">
+            <span>{{ app.customer_name|default:app.application_number }}</span>
+            <span class="status-pill">{{ app.get_status_display }}</span>
+        </a>
+    {% empty %}
+        <div class="card">No completed reviews yet.</div>
+    {% endfor %}
+</div>
+
 {% endblock %}

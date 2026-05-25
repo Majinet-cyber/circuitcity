@@ -1,0 +1,36 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Corrections Needed{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'active_applications' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Needs Edit</h1>
+
+<div class="card">
+    <h2>The following fields have been marked for review:</h2>
+    {% if correction_labels %}
+        <ul class="clean-list">
+            {% for label in correction_labels %}
+                <li>{{ label }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No specific fields were selected. Review the application details before resubmitting.</p>
+    {% endif %}
+</div>
+
+{% if app.correction_notes %}
+    <div class="card">
+        <h2>Manager notes</h2>
+        <p>{{ app.correction_notes }}</p>
+    </div>
+{% endif %}
+
+<a href="{{ edit_url }}" class="new-application-button">EDIT APPLICATION</a>
+
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Contract Complete{% endblock %}
+
+{% block content %}
+
+<div class="card complete-card">
+    <div class="complete-check">✓</div>
+    <h1>Contract complete</h1>
+    <p>{{ contract.contract_number }}</p>
+</div>
+
+<div class="card detail-card">
+    <div class="detail-row"><span>Customer</span><strong>{{ contract.customer_name }}</strong></div>
+    <div class="detail-row"><span>IMEI</span><strong>{{ contract.imei_number }}</strong></div>
+    <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Monthly</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Daily</span><strong>MWK {{ contract.daily_payment|floatformat:0 }}</strong></div>
+</div>
+
+<div class="form-actions">
+    <a href="{% url 'home' %}" class="btn">HOME</a>
+    <a href="{% url 'contract_detail' contract.id %}" class="btn btn-outline">VIEW CONTRACT</a>
+</div>
+
+{% endblock %}

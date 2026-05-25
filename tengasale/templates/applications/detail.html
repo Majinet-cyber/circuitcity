@@ -65,6 +65,56 @@
         <strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong>
     </div>
     <div class="detail-row">
+        <span>Work/service description</span>
+        <strong>{{ app.work_description|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 1 name</span>
+        <strong>{{ app.next_of_kin_1_name|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 1 phone</span>
+        <strong>{% if app.next_of_kin_1_phone %}+265 {{ app.next_of_kin_1_phone }}{% else %}Not captured{% endif %}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 1 relationship</span>
+        <strong>{{ app.next_of_kin_1_relationship|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 2 name</span>
+        <strong>{{ app.next_of_kin_2_name|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 2 phone</span>
+        <strong>{% if app.next_of_kin_2_phone %}+265 {{ app.next_of_kin_2_phone }}{% else %}Not captured{% endif %}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Next of kin 2 relationship</span>
+        <strong>{{ app.next_of_kin_2_relationship|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Proof of income type</span>
+        <strong>{{ app.proof_of_income_type|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Proof contact name</span>
+        <strong>{{ app.proof_contact_name|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Proof contact phone</span>
+        <strong>{% if app.proof_contact_phone %}+265 {{ app.proof_contact_phone }}{% else %}Not captured{% endif %}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Agreed to terms</span>
+        <strong>{% if app.agreed_to_terms %}Yes{% else %}No{% endif %}</strong>
+    </div>
+    {% if app.signature_image %}
+        <div class="detail-signature">
+            <span>Customer signature</span>
+            <img src="{{ app.signature_image.url }}" alt="Customer signature">
+        </div>
+    {% endif %}
+    <div class="detail-row">
         <span>Status</span>
         <strong>{{ app.get_status_display }}</strong>
     </div>

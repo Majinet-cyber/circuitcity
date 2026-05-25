@@ -63,18 +63,18 @@
 <form method="post" class="card">
     {% csrf_token %}
 
-    <label class="check-row">
-        <input type="checkbox" name="correction_customer_face_image" {% if app.correction_customer_face_image %}checked{% endif %}>
-        <span>Customer face image needs correction</span>
-    </label>
-    <label class="check-row">
-        <input type="checkbox" name="correction_id_front_image" {% if app.correction_id_front_image %}checked{% endif %}>
-        <span>ID front image needs correction</span>
-    </label>
-    <label class="check-row">
-        <input type="checkbox" name="correction_id_back_image" {% if app.correction_id_back_image %}checked{% endif %}>
-        <span>ID back image needs correction</span>
-    </label>
+    <h2>Fields to correct</h2>
+    {% for section, fields in correction_fields %}
+        <div class="correction-section">
+            <h3>{{ section }}</h3>
+            {% for field in fields %}
+                <label class="check-row">
+                    <input type="checkbox" name="correction_fields" value="{{ field.name }}" {% if field.name in app.correction_fields %}checked{% endif %}>
+                    <span>{{ field.label }}</span>
+                </label>
+            {% endfor %}
+        </div>
+    {% endfor %}
 
     <div class="form-group">
         <label>Correction notes</label>

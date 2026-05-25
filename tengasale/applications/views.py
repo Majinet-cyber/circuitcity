@@ -7,12 +7,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from deals.models import DeviceDeal
+from geography.models import Region
 
-from .forms import CustomerDetailsForm, KYCForm, LocationForm, SignatureForm, WorkForm
+from .forms import CustomerDetailsForm, KYCForm, LocationNextOfKinForm, SignatureForm, WorkProofForm
 from .models import FinancingApplication
 
 
 ACTIVE_STATUSES = [
+    "draft",
     "started",
     "customer_details",
     "device_selection",
@@ -22,9 +24,19 @@ ACTIVE_STATUSES = [
     "work_details",
     "signature",
     "correction_requested",
-    "imei_required",
     "submitted",
+    "pending_review",
+    "resubmitted",
     "under_review",
+    "approved",
+    "contract_terms",
+    "contract_signature",
+    "imei_entry",
+    "contract_creating",
+    "warranty_check",
+    "locking",
+    "deposit_pending",
+    "imei_required",
 ]
 
 
@@ -39,6 +51,16 @@ def user_can_view_application(user, app):
         or user.is_staff
         or user.is_superuser
     )
+
+
+def geography_json_data():
+    data = {}
+    regions = Region.objects.prefetch_related("districts__traditional_authorities").order_by("name")
+    for region in regions:
+        data[region.name] = {}
+        for district in region.districts.all():
+            data[region.name][district.name] = [ta.name for ta in district.traditional_authorities.all()]
+    return data
 
 
 @login_required
@@ -181,7 +203,7 @@ def location_details(request, app_id):
     app = merchant_application(request, app_id)
 
     if request.method == "POST":
-        form = LocationForm(request.POST, request.FILES, instance=app)
+        form = LocationNextOfKinForm(request.POST, request.FILES, instance=app)
         if form.is_valid():
             app = form.save(commit=False)
             app.location = app.precise_location
@@ -189,9 +211,17 @@ def location_details(request, app_id):
             app.save()
             return redirect("work_details", app_id=app.id)
     else:
-        form = LocationForm(instance=app)
+        form = LocationNextOfKinForm(instance=app)
 
-    return render(request, "applications/location.html", {"app": app, "form": form})
+    return render(
+        request,
+        "applications/location.html",
+        {
+            "app": app,
+            "form": form,
+            "geography_data": geography_json_data(),
+        },
+    )
 
 
 @login_required
@@ -199,14 +229,14 @@ def work_details(request, app_id):
     app = merchant_application(request, app_id)
 
     if request.method == "POST":
-        form = WorkForm(request.POST, instance=app)
+        form = WorkProofForm(request.POST, instance=app)
         if form.is_valid():
             app = form.save(commit=False)
             app.status = "work_details"
             app.save()
             return redirect("signature", app_id=app.id)
     else:
-        form = WorkForm(instance=app)
+        form = WorkProofForm(instance=app)
 
     return render(request, "applications/work.html", {"app": app, "form": form})
 
@@ -216,14 +246,14 @@ def signature(request, app_id):
     app = merchant_application(request, app_id)
 
     if request.method == "POST":
-        form = SignatureForm(request.POST, request.FILES, instance=app)
+        form = SignatureForm(request.POST, instance=app)
         if form.is_valid():
             app = form.save(commit=False)
-            app.status = "submitted"
-            app.submitted_at = timezone.now()
-            app.save()
+            if form.signature_file:
+                app.signature_image.save(form.signature_file.name, form.signature_file, save=False)
+            app.submit()
             messages.success(request, "Application submitted.")
-            return redirect("active_applications")
+            return redirect("application_submitted", app_id=app.id)
     else:
         form = SignatureForm(instance=app)
 
@@ -236,6 +266,34 @@ def capture_imei(request, app_id):
 
 
 @login_required
+def application_submitted(request, app_id):
+    app = get_object_or_404(
+        FinancingApplication.objects.select_related("created_by", "claimed_by"),
+        id=app_id,
+        created_by=request.user,
+    )
+    return render(request, "applications/submitted.html", {"app": app})
+
+
+@login_required
+def application_corrections(request, app_id):
+    app = get_object_or_404(
+        FinancingApplication.objects.select_related("created_by", "claimed_by", "reviewed_by"),
+        id=app_id,
+        created_by=request.user,
+    )
+    return render(
+        request,
+        "applications/corrections.html",
+        {
+            "app": app,
+            "correction_labels": app.correction_field_labels(),
+            "edit_url": app.get_correction_start_url(),
+        },
+    )
+
+
+@login_required
 def application_detail(request, app_id):
     app = get_object_or_404(FinancingApplication.objects.select_related("deal", "created_by", "claimed_by"), id=app_id)
 
@@ -243,6 +301,7 @@ def application_detail(request, app_id):
         raise PermissionDenied
 
     incomplete_statuses = [
+        "draft",
         "started",
         "customer_details",
         "device_selection",
@@ -279,7 +338,7 @@ def active_applications(request):
 def completed_applications(request):
     apps = FinancingApplication.objects.filter(
         created_by=request.user,
-        status__in=["approved", "completed"],
+        status__in=["contract_complete", "completed"],
     ).order_by("-created_at")
 
     return render(request, "applications/list.html", {"apps": apps, "title": "Completed"})

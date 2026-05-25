@@ -23,13 +23,19 @@
         <a href="{{ app.get_continue_url }}" class="application-card">
             <div class="application-card-main">
                 <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
-                <p>ID: {{ app.national_id|default:"—" }}</p>
+                <p>ID: {{ app.national_id|default:"-" }}</p>
+                {% if app.imei_number %}<p>IMEI: {{ app.imei_number }}</p>{% endif %}
                 <p>{{ app.application_number }}</p>
                 <p>{{ app.created_at|date:"Y/m/d, H:i" }}</p>
+                {% if app.status == "under_review" and app.claimed_by %}
+                    <p>Reviewer: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
+                {% elif app.status == "pending_review" %}
+                    <p>Waiting</p>
+                {% endif %}
             </div>
 
             <div class="application-card-side">
-                <span class="status-pill">{{ app.get_status_display }}</span>
+                <span class="status-pill status-{{ app.status }}">{{ app.get_status_display }}</span>
                 <span class="soft-card-arrow">&rsaquo;</span>
             </div>
         </a>

@@ -1,0 +1,52 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Contract Progress{% endblock %}
+
+{% block content %}
+
+<h1 class="greeting">Contract Progress</h1>
+
+<div class="card">
+    <div class="progress-step {% if contract.contract_number %}done{% endif %}">
+        <strong>1. Creating contract</strong>
+        <span>{{ contract.contract_number }}</span>
+    </div>
+    <div class="progress-step {% if contract.warranty_checked %}done{% endif %}">
+        <strong>2. Checking warranty</strong>
+        <span>{% if contract.warranty_checked %}Checked{% else %}Pending{% endif %}</span>
+    </div>
+    <div class="progress-step {% if contract.phone_locked %}done{% endif %}">
+        <strong>3. Locking phone</strong>
+        <span>{% if contract.phone_locked %}Locked{% else %}Pending{% endif %}</span>
+    </div>
+    <div class="progress-step {% if contract.deposit_paid %}done{% endif %}">
+        <strong>4. Waiting for deposit</strong>
+        <span>{% if contract.deposit_paid %}Paid{% else %}Pending{% endif %}</span>
+    </div>
+    <div class="progress-step {% if contract.status == 'complete' %}done{% endif %}">
+        <strong>5. Contract complete</strong>
+        <span>{{ contract.get_status_display }}</span>
+    </div>
+</div>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    {% if not contract.warranty_checked %}
+        <button class="btn primary-button" name="action" value="warranty">Mark warranty checked</button>
+    {% elif not contract.phone_locked %}
+        <button class="btn primary-button" name="action" value="locked">Mark phone locked</button>
+    {% elif not contract.deposit_paid %}
+        <p>Deposit due: <strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></p>
+        <button class="btn primary-button" name="action" value="deposit">Mark deposit paid</button>
+    {% else %}
+        <a href="{% url 'contract_complete' contract.id %}" class="btn primary-button">Contract complete</a>
+    {% endif %}
+</form>
+
+<div class="card">
+    <p class="text-muted">TODO: Attach phone code with contract through Upya.</p>
+    <p class="text-muted">TODO: Detect phone locked through Upya.</p>
+    <p class="text-muted">TODO: Verify deposit payment through payment integration.</p>
+</div>
+
+{% endblock %}

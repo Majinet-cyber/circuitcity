@@ -1,6 +1,13 @@
+import base64
+import binascii
+import uuid
 from decimal import Decimal
 
 from django import forms
+from django.core.files.base import ContentFile
+from django.db import OperationalError, ProgrammingError
+
+from geography.models import District, Region, TraditionalAuthority
 
 from .models import FinancingApplication
 
@@ -20,12 +27,41 @@ REGIONS = [
     ("Northern", "Northern"),
 ]
 
+DISTRICTS_BY_REGION = {
+    "Central": ["Lilongwe", "Dedza", "Dowa", "Kasungu", "Mchinji", "Ntcheu", "Nkhotakota", "Ntchisi", "Salima"],
+    "Southern": [
+        "Blantyre",
+        "Zomba",
+        "Mangochi",
+        "Mulanje",
+        "Thyolo",
+        "Chiradzulu",
+        "Machinga",
+        "Balaka",
+        "Chikwawa",
+        "Nsanje",
+        "Phalombe",
+        "Mwanza",
+        "Neno",
+    ],
+    "Northern": ["Mzuzu", "Mzimba", "Rumphi", "Karonga", "Chitipa", "Nkhata Bay", "Likoma"],
+}
+
 PROOF_TYPES = [
     ("", "Select proof type"),
     ("MoMo", "MoMo"),
     ("Bank", "Bank"),
     ("Till", "Till"),
     ("Contact Person", "Contact Person"),
+    ("Other", "Other"),
+]
+
+RELATIONSHIP_CHOICES = [
+    ("", "Select relationship"),
+    ("Family", "Family"),
+    ("Friend", "Friend"),
+    ("Neighbour", "Neighbour"),
+    ("Other", "Other"),
 ]
 
 
@@ -34,6 +70,20 @@ def clean_exact_digits(value, length, field_label):
     if not value.isdigit() or len(value) != length:
         raise forms.ValidationError(f"{field_label} must be exactly {length} digits.")
     return value
+
+
+def local_phone_widget(placeholder="990870616"):
+    return forms.TextInput(
+        attrs={
+            "maxlength": "9",
+            "minlength": "9",
+            "pattern": "[0-9]{9}",
+            "inputmode": "numeric",
+            "autocomplete": "tel",
+            "data-phone-input": "true",
+            "placeholder": placeholder,
+        }
+    )
 
 
 class CustomerDetailsForm(forms.ModelForm):
@@ -160,10 +210,22 @@ class KYCForm(forms.ModelForm):
 KycForm = KYCForm
 
 
-class LocationForm(forms.ModelForm):
-    region = forms.ChoiceField(choices=REGIONS)
-    district = forms.CharField(required=False, widget=forms.Select)
-    next_of_kin_1_phone = forms.CharField(required=True)
+class LocationNextOfKinForm(forms.ModelForm):
+    region = forms.ChoiceField(choices=REGIONS, required=True)
+    district = forms.ChoiceField(choices=[("", "Select district")], required=True)
+    traditional_authority = forms.ChoiceField(choices=[("", "Select traditional authority")], required=True)
+    precise_location = forms.CharField(required=True, strip=True)
+    next_of_kin_1_name = forms.CharField(required=True, label="Next of kin 1 name *")
+    next_of_kin_1_phone = forms.CharField(
+        required=True,
+        label="Next of kin 1 phone *",
+        widget=local_phone_widget(),
+    )
+    next_of_kin_1_relationship = forms.ChoiceField(
+        choices=RELATIONSHIP_CHOICES,
+        required=True,
+        label="Next of kin 1 relationship *",
+    )
 
     class Meta:
         model = FinancingApplication
@@ -180,19 +242,113 @@ class LocationForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        region = self.data.get("region") or self.initial.get("region") or self.instance.region
         district = self.data.get("district") or self.initial.get("district") or self.instance.district
-        choices = [("", "Select district")]
+        traditional_authority = (
+            self.data.get("traditional_authority")
+            or self.initial.get("traditional_authority")
+            or self.instance.traditional_authority
+        )
+
+        self.fields["region"].choices = self.region_choices()
+        self.fields["district"].choices = self.district_choices(region, district)
+        self.fields["traditional_authority"].choices = self.ta_choices(district, traditional_authority)
+
+    def region_choices(self):
+        try:
+            names = list(Region.objects.order_by("name").values_list("name", flat=True))
+        except (OperationalError, ProgrammingError):
+            names = []
+        if not names:
+            return REGIONS
+        return [("", "Select region")] + [(name, name) for name in names]
+
+    def district_choices(self, region, current_district=None):
+        names = []
+        if region:
+            try:
+                names = list(
+                    District.objects.filter(region__name=region).order_by("name").values_list("name", flat=True)
+                )
+            except (OperationalError, ProgrammingError):
+                names = []
+        if not names:
+            names = DISTRICTS_BY_REGION.get(region, [])
+        if current_district and current_district not in names:
+            names.append(current_district)
+        return [("", "Select district")] + [(name, name) for name in names]
+
+    def ta_choices(self, district, current_ta=None):
+        names = []
         if district:
-            choices.append((district, district))
-        self.fields["district"].widget.choices = choices
+            try:
+                names = list(
+                    TraditionalAuthority.objects.filter(district__name=district)
+                    .order_by("name")
+                    .values_list("name", flat=True)
+                )
+            except (OperationalError, ProgrammingError):
+                names = []
+        if current_ta and current_ta not in names:
+            names.append(current_ta)
+        return [("", "Select traditional authority")] + [(name, name) for name in names]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        region = cleaned_data.get("region")
+        district = cleaned_data.get("district")
+        traditional_authority = cleaned_data.get("traditional_authority")
+
+        try:
+            district_record = District.objects.filter(region__name=region, name=district).first()
+            if region and district and Region.objects.filter(name=region).exists() and not district_record:
+                self.add_error("district", "Select a district in the selected region.")
+            if district_record and TraditionalAuthority.objects.filter(district=district_record).exists():
+                if not TraditionalAuthority.objects.filter(
+                    district=district_record,
+                    name=traditional_authority,
+                ).exists():
+                    self.add_error("traditional_authority", "Select a traditional authority in the selected district.")
+        except (OperationalError, ProgrammingError):
+            pass
+
+        return cleaned_data
 
     def clean_next_of_kin_1_phone(self):
-        return clean_exact_digits(self.cleaned_data.get("next_of_kin_1_phone"), 9, "Next of kin 1 phone")
+        value = clean_exact_digits(self.cleaned_data.get("next_of_kin_1_phone"), 9, "Next of kin 1 phone")
+        if value == (self.instance.customer_phone or "").strip():
+            raise forms.ValidationError("Next of kin phone cannot be the same as customer phone.")
+        return value
 
 
-class WorkForm(forms.ModelForm):
-    proof_of_income_type = forms.ChoiceField(choices=PROOF_TYPES, required=False)
-    next_of_kin_2_phone = forms.CharField(required=True)
+class WorkProofForm(forms.ModelForm):
+    work_description = forms.CharField(
+        required=True,
+        label="Work / service description *",
+        widget=forms.Textarea(attrs={"rows": 4}),
+    )
+    next_of_kin_2_name = forms.CharField(required=True, label="Next of kin 2 name *")
+    next_of_kin_2_phone = forms.CharField(
+        required=True,
+        label="Next of kin 2 phone *",
+        widget=local_phone_widget(),
+    )
+    next_of_kin_2_relationship = forms.ChoiceField(
+        choices=RELATIONSHIP_CHOICES,
+        required=True,
+        label="Next of kin 2 relationship *",
+    )
+    proof_of_income_type = forms.ChoiceField(
+        choices=PROOF_TYPES,
+        required=True,
+        label="Proof of income type *",
+    )
+    proof_contact_name = forms.CharField(required=True, label="Proof contact name *")
+    proof_contact_phone = forms.CharField(
+        required=True,
+        label="Proof contact phone *",
+        widget=local_phone_widget(),
+    )
 
     class Meta:
         model = FinancingApplication
@@ -208,28 +364,52 @@ class WorkForm(forms.ModelForm):
         ]
 
     def clean_next_of_kin_2_phone(self):
-        return clean_exact_digits(self.cleaned_data.get("next_of_kin_2_phone"), 9, "Next of kin 2 phone")
+        value = clean_exact_digits(self.cleaned_data.get("next_of_kin_2_phone"), 9, "Next of kin 2 phone")
+        if value == (self.instance.customer_phone or "").strip():
+            raise forms.ValidationError("Next of kin phone cannot be the same as customer phone.")
+        if value == (self.instance.next_of_kin_1_phone or "").strip():
+            raise forms.ValidationError("Next of kin 2 phone cannot be the same as next of kin 1 phone.")
+        return value
 
     def clean_proof_contact_phone(self):
-        value = (self.cleaned_data.get("proof_contact_phone") or "").strip()
-        if not value:
-            return value
-        return clean_exact_digits(value, 9, "Proof contact phone")
+        return clean_exact_digits(self.cleaned_data.get("proof_contact_phone"), 9, "Proof contact phone")
 
 
 class SignatureForm(forms.ModelForm):
+    signature_data = forms.CharField(required=False, widget=forms.HiddenInput)
+
     class Meta:
         model = FinancingApplication
-        fields = ["signature_image", "agreed_to_terms"]
+        fields = ["agreed_to_terms"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.signature_file = None
 
     def clean(self):
         cleaned_data = super().clean()
-        signature = cleaned_data.get("signature_image") or self.instance.signature_image
+        signature_data = (cleaned_data.get("signature_data") or "").strip()
         agreed = cleaned_data.get("agreed_to_terms")
 
-        if not signature:
-            self.add_error("signature_image", "Upload the customer signature before submitting.")
+        if signature_data:
+            prefix = "data:image/png;base64,"
+            if not signature_data.startswith(prefix):
+                self.add_error("signature_data", "Save a valid PNG signature before submitting.")
+            else:
+                try:
+                    decoded = base64.b64decode(signature_data[len(prefix):], validate=True)
+                except (binascii.Error, ValueError):
+                    self.add_error("signature_data", "Save a valid PNG signature before submitting.")
+                else:
+                    self.signature_file = ContentFile(decoded, name=f"signature-{uuid.uuid4().hex}.png")
+
+        if not self.signature_file and not self.instance.signature_image:
+            self.add_error("signature_data", "Save the customer signature before submitting.")
         if not agreed:
             self.add_error("agreed_to_terms", "The customer must agree to the terms before submitting.")
 
         return cleaned_data
+
+
+LocationForm = LocationNextOfKinForm
+WorkForm = WorkProofForm

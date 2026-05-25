@@ -9,17 +9,33 @@
 
 <h1 class="greeting">Signature</h1>
 
-<form method="post" enctype="multipart/form-data" class="card">
+<form method="post" class="card" id="signature-form">
     {% csrf_token %}
     {{ form.non_field_errors }}
 
     <div class="form-group">
-        <label for="{{ form.signature_image.id_for_label }}">Customer signature</label>
+        <label>Customer signature *</label>
         {% if app.signature_image %}
-            <img class="upload-preview" src="{{ app.signature_image.url }}" alt="Customer signature">
+            <div class="signature-preview">
+                <img src="{{ app.signature_image.url }}" alt="Saved customer signature">
+            </div>
         {% endif %}
-        {{ form.signature_image }}
-        {{ form.signature_image.errors }}
+        <div class="signature-pad">
+            <canvas class="signature-canvas" id="signature-canvas"></canvas>
+        </div>
+        {{ form.signature_data }}
+        {{ form.signature_data.errors }}
+        <div class="signature-actions">
+            <button type="button" class="btn btn-blue" id="signature-undo">Undo</button>
+            <button type="button" class="btn btn-outline btn-danger-soft" id="signature-clear">Clear / Cancel</button>
+            <button type="button" class="btn" id="signature-save">Save Signature</button>
+        </div>
+        <div class="signature-status{% if app.signature_image %} saved{% endif %}" id="signature-status">
+            {% if app.signature_image %}Signature saved{% else %}Signature not saved{% endif %}
+        </div>
+        <p class="signature-disabled-note" id="signature-disabled-note">
+            Save the signature and confirm terms before submitting.
+        </p>
     </div>
 
     <label class="check-row" for="{{ form.agreed_to_terms.id_for_label }}">
@@ -41,8 +57,152 @@
 
     <div class="form-actions">
         <a href="{% url 'work_details' app.id %}" class="btn btn-outline">BACK</a>
-        <button type="submit" class="btn">SUBMIT</button>
+        <button type="submit" class="btn" id="signature-submit" disabled>SUBMIT</button>
     </div>
 </form>
+
+<script>
+    (function () {
+        const canvas = document.getElementById("signature-canvas");
+        const context = canvas.getContext("2d");
+        const hiddenInput = document.getElementById("id_signature_data");
+        const undoButton = document.getElementById("signature-undo");
+        const clearButton = document.getElementById("signature-clear");
+        const saveButton = document.getElementById("signature-save");
+        const submitButton = document.getElementById("signature-submit");
+        const status = document.getElementById("signature-status");
+        const terms = document.getElementById("id_agreed_to_terms");
+        let strokes = [];
+        let currentStroke = null;
+        let signatureSaved = {% if app.signature_image %}true{% else %}false{% endif %};
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const scale = window.devicePixelRatio || 1;
+            canvas.width = Math.max(1, Math.floor(rect.width * scale));
+            canvas.height = Math.max(1, Math.floor(rect.height * scale));
+            context.setTransform(scale, 0, 0, scale, 0, 0);
+            redraw();
+        }
+
+        function drawStroke(stroke) {
+            if (stroke.length < 2) {
+                return;
+            }
+            context.beginPath();
+            context.lineWidth = 3;
+            context.lineCap = "round";
+            context.lineJoin = "round";
+            context.strokeStyle = "#111111";
+            context.moveTo(stroke[0].x, stroke[0].y);
+            stroke.slice(1).forEach(function (point) {
+                context.lineTo(point.x, point.y);
+            });
+            context.stroke();
+        }
+
+        function redraw() {
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            strokes.forEach(drawStroke);
+            if (currentStroke) {
+                drawStroke(currentStroke);
+            }
+        }
+
+        function pointFromEvent(event) {
+            const rect = canvas.getBoundingClientRect();
+            const pointer = event.touches ? event.touches[0] : event;
+            return {
+                x: pointer.clientX - rect.left,
+                y: pointer.clientY - rect.top
+            };
+        }
+
+        function markUnsaved() {
+            if (strokes.length) {
+                signatureSaved = false;
+                hiddenInput.value = "";
+                status.textContent = "Signature not saved";
+                status.classList.remove("saved");
+                updateSubmitState();
+            }
+        }
+
+        function startStroke(event) {
+            event.preventDefault();
+            currentStroke = [pointFromEvent(event)];
+            markUnsaved();
+        }
+
+        function moveStroke(event) {
+            if (!currentStroke) {
+                return;
+            }
+            event.preventDefault();
+            currentStroke.push(pointFromEvent(event));
+            redraw();
+        }
+
+        function endStroke(event) {
+            if (!currentStroke) {
+                return;
+            }
+            event.preventDefault();
+            if (currentStroke.length > 1) {
+                strokes.push(currentStroke);
+            }
+            currentStroke = null;
+            markUnsaved();
+            redraw();
+        }
+
+        function updateSubmitState() {
+            submitButton.disabled = !(signatureSaved && terms.checked);
+        }
+
+        undoButton.addEventListener("click", function () {
+            strokes.pop();
+            hiddenInput.value = "";
+            signatureSaved = false;
+            status.textContent = "Signature not saved";
+            status.classList.remove("saved");
+            redraw();
+            updateSubmitState();
+        });
+
+        clearButton.addEventListener("click", function () {
+            strokes = [];
+            currentStroke = null;
+            hiddenInput.value = "";
+            signatureSaved = false;
+            status.textContent = "Signature not saved";
+            status.classList.remove("saved");
+            redraw();
+            updateSubmitState();
+        });
+
+        saveButton.addEventListener("click", function () {
+            if (!strokes.length) {
+                return;
+            }
+            hiddenInput.value = canvas.toDataURL("image/png");
+            signatureSaved = true;
+            status.textContent = "Signature saved";
+            status.classList.add("saved");
+            updateSubmitState();
+        });
+
+        terms.addEventListener("change", updateSubmitState);
+        canvas.addEventListener("mousedown", startStroke);
+        canvas.addEventListener("mousemove", moveStroke);
+        window.addEventListener("mouseup", endStroke);
+        canvas.addEventListener("touchstart", startStroke, { passive: false });
+        canvas.addEventListener("touchmove", moveStroke, { passive: false });
+        canvas.addEventListener("touchend", endStroke, { passive: false });
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+        updateSubmitState();
+    })();
+</script>
 
 {% endblock %}

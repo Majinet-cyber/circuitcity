@@ -1,0 +1,45 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Contract Detail{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'active_applications' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Contract Detail</h1>
+
+<div class="card detail-card">
+    <div class="detail-row"><span>Contract number</span><strong>{{ contract.contract_number }}</strong></div>
+    <div class="detail-row"><span>Application number</span><strong>{{ application.application_number }}</strong></div>
+    <div class="detail-row"><span>Customer</span><strong>{{ contract.customer_name }}</strong></div>
+    <div class="detail-row"><span>Merchant</span><strong>{{ contract.merchant.get_full_name|default:contract.merchant.username }}</strong></div>
+    <div class="detail-row"><span>Device</span><strong>{{ contract.deal_name|default:"Not selected" }}</strong></div>
+    <div class="detail-row"><span>IMEI</span><strong>{{ contract.imei_number|default:"Not captured" }}</strong></div>
+    <div class="detail-row"><span>Cash price</span><strong>MWK {{ contract.cash_price|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Total loan</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Monthly payment</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Daily payment</span><strong>MWK {{ contract.daily_payment|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Status</span><strong>{{ contract.get_status_display }}</strong></div>
+    <div class="detail-row"><span>Created</span><strong>{{ contract.created_at|date:"Y/m/d, H:i" }}</strong></div>
+    <div class="detail-row"><span>Updated</span><strong>{{ contract.updated_at|date:"Y/m/d, H:i" }}</strong></div>
+</div>
+
+{% if application.signature_image %}
+    <div class="detail-signature">
+        <span>Application signature</span>
+        <img src="{{ application.signature_image.url }}" alt="Application signature">
+    </div>
+{% endif %}
+
+{% if contract.customer_contract_signature %}
+    <div class="detail-signature">
+        <span>Contract signature</span>
+        <img src="{{ contract.customer_contract_signature.url }}" alt="Contract signature">
+    </div>
+{% endif %}
+
+{% endblock %}

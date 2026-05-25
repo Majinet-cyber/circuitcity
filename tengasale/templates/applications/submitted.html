@@ -1,0 +1,38 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Application Submitted{% endblock %}
+
+{% block content %}
+
+<h1 class="greeting">Your application is complete!</h1>
+
+<div class="card">
+    <p>Your application has been submitted for review. A TengaSale manager will begin reviewing it soon and contact you if there are any questions.</p>
+
+    <div class="detail-row">
+        <span>Application ID</span>
+        <strong>{{ app.application_number|default:app.id }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Status</span>
+        <strong>{{ app.get_status_display }}</strong>
+    </div>
+    {% if app.claimed_by %}
+        <div class="detail-row">
+            <span>Review</span>
+            <strong>Being reviewed by {{ app.claimed_by.get_full_name|default:app.claimed_by.username }} since {{ app.claimed_at|date:"Y/m/d, H:i" }}</strong>
+        </div>
+    {% else %}
+        <div class="detail-row">
+            <span>Review</span>
+            <strong>Waiting for reviewer</strong>
+        </div>
+    {% endif %}
+</div>
+
+<div class="form-actions">
+    <a href="{% url 'home' %}" class="btn">HOME</a>
+    <a href="mailto:support@tengasale.local" class="btn btn-outline">CONTACT SUPPORT</a>
+</div>
+
+{% endblock %}

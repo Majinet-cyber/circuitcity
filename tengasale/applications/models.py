@@ -17,22 +17,71 @@ class FinancingApplication(models.Model):
     )
 
     STATUS_CHOICES = [
+        ("draft", "Draft"),
         ("started", "Start"),
         ("customer_details", "Customer Details"),
         ("device_selection", "Device Selection"),
         ("kyc", "KYC"),
         ("kyc_capture", "KYC Capture"),
+        ("location", "Location"),
         ("location_details", "Location Details"),
+        ("work", "Work"),
         ("work_details", "Work Details"),
         ("signature", "Signature"),
-        ("correction_requested", "Correction Requested"),
-        ("imei_required", "IMEI Required"),
         ("submitted", "Submitted"),
+        ("pending_review", "Pending Review"),
         ("under_review", "Under Review"),
+        ("correction_requested", "Correction Requested"),
+        ("resubmitted", "Resubmitted"),
         ("approved", "Approved"),
         ("rejected", "Rejected"),
+        ("contract_terms", "Contract Terms"),
+        ("contract_signature", "Contract Signature"),
+        ("imei_entry", "IMEI Entry"),
+        ("contract_creating", "Contract Creating"),
+        ("warranty_check", "Warranty Check"),
+        ("locking", "Locking"),
+        ("deposit_pending", "Deposit Pending"),
+        ("contract_complete", "Contract Complete"),
         ("completed", "Completed"),
+        ("cancelled", "Cancelled"),
+        ("imei_required", "IMEI Required"),
     ]
+
+    CORRECTION_FIELD_LABELS = {
+        "customer_name": "Customer name",
+        "national_id": "National ID",
+        "customer_phone": "Customer phone",
+        "occupation": "Occupation",
+        "income_band": "Income band",
+        "exact_monthly_income": "Exact monthly income",
+        "selected_deal": "Selected deal",
+        "selected_cash_price": "Selected cash price",
+        "calculated_deposit_amount": "Calculated deposit amount",
+        "customer_face_image": "Customer face image",
+        "id_front_image": "ID front image",
+        "id_back_image": "ID back image",
+        "region": "Region",
+        "district": "District",
+        "traditional_authority": "Traditional authority",
+        "precise_location": "Precise location",
+        "map_screenshot": "Map screenshot",
+        "next_of_kin_1_name": "Next of kin 1 name",
+        "next_of_kin_1_phone": "Next of kin 1 phone",
+        "next_of_kin_1_relationship": "Next of kin 1 relationship",
+        "work_description": "Work description",
+        "next_of_kin_2_name": "Next of kin 2 name",
+        "next_of_kin_2_phone": "Next of kin 2 phone",
+        "next_of_kin_2_relationship": "Next of kin 2 relationship",
+        "proof_of_income_type": "Proof of income type",
+        "proof_contact_name": "Proof contact name",
+        "proof_contact_phone": "Proof contact phone",
+        "proof_notes": "Proof notes",
+        "customer_signature": "Customer signature",
+        "agreed_to_terms": "Agreed to terms",
+    }
+
+    CORRECTION_FIELD_ORDER = list(CORRECTION_FIELD_LABELS.keys())
 
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     application_number = models.CharField(max_length=50, unique=True, blank=True)
@@ -105,8 +154,16 @@ class FinancingApplication(models.Model):
     claimed_at = models.DateTimeField(null=True, blank=True)
 
     manager_comment = models.TextField(blank=True)
+    correction_fields = models.JSONField(default=list, blank=True)
 
     submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_applications",
+    )
     reviewed_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -120,19 +177,46 @@ class FinancingApplication(models.Model):
             super().save(update_fields=["application_number"])
 
     def submit(self):
-        self.status = "submitted"
+        self.status = "pending_review"
         self.submitted_at = timezone.now()
-        self.save(update_fields=["status", "submitted_at"])
+        self.claimed_by = None
+        self.claimed_at = None
+        self.correction_fields = []
+        self.save(update_fields=["status", "submitted_at", "claimed_by", "claimed_at", "correction_fields"])
 
     def get_continue_url(self):
+        if self.status == "approved":
+            return reverse("contract_terms", args=[self.id])
+
+        if self.status in ["contract_terms", "contract_signature"]:
+            contract = getattr(self, "contract", None)
+            if contract and self.status == "contract_signature":
+                return reverse("contract_signature", args=[contract.id])
+            return reverse("contract_terms", args=[self.id])
+
+        if self.status == "imei_entry":
+            contract = getattr(self, "contract", None)
+            return reverse("contract_imei", args=[contract.id]) if contract else reverse("contract_terms", args=[self.id])
+
+        if self.status in ["contract_creating", "warranty_check", "locking", "deposit_pending"]:
+            contract = getattr(self, "contract", None)
+            return reverse("contract_progress", args=[contract.id]) if contract else reverse("contract_terms", args=[self.id])
+
+        if self.status in ["contract_complete", "completed"]:
+            contract = getattr(self, "contract", None)
+            return reverse("contract_detail", args=[contract.id]) if contract else reverse("application_detail", args=[self.id])
+
         if self.status in ["started", "customer_details"]:
             return reverse("edit_customer_details", args=[self.id])
 
         if self.status == "device_selection":
             return reverse("choose_device", args=[self.id])
 
-        if self.status in ["kyc", "kyc_capture", "correction_requested"]:
+        if self.status in ["kyc", "kyc_capture"]:
             return reverse("kyc_capture", args=[self.id])
+
+        if self.status == "correction_requested":
+            return reverse("application_corrections", args=[self.id])
 
         if self.status in ["location", "location_details"]:
             return reverse("location_details", args=[self.id])
@@ -147,6 +231,61 @@ class FinancingApplication(models.Model):
             return reverse("capture_imei", args=[self.id])
 
         return reverse("application_detail", args=[self.id])
+
+    def get_correction_start_url(self):
+        page_map = {
+            "customer": {
+                "customer_name",
+                "national_id",
+                "customer_phone",
+                "occupation",
+                "income_band",
+                "exact_monthly_income",
+            },
+            "device": {"selected_deal", "selected_cash_price", "calculated_deposit_amount"},
+            "kyc": {"customer_face_image", "id_front_image", "id_back_image"},
+            "location": {
+                "region",
+                "district",
+                "traditional_authority",
+                "precise_location",
+                "map_screenshot",
+                "next_of_kin_1_name",
+                "next_of_kin_1_phone",
+                "next_of_kin_1_relationship",
+            },
+            "work": {
+                "work_description",
+                "next_of_kin_2_name",
+                "next_of_kin_2_phone",
+                "next_of_kin_2_relationship",
+                "proof_of_income_type",
+                "proof_contact_name",
+                "proof_contact_phone",
+                "proof_notes",
+            },
+            "signature": {"customer_signature", "agreed_to_terms"},
+        }
+        fields = set(self.correction_fields or [])
+        if fields & page_map["customer"]:
+            return reverse("edit_customer_details", args=[self.id])
+        if fields & page_map["device"]:
+            return reverse("choose_device", args=[self.id])
+        if fields & page_map["kyc"]:
+            return reverse("kyc_capture", args=[self.id])
+        if fields & page_map["location"]:
+            return reverse("location_details", args=[self.id])
+        if fields & page_map["work"]:
+            return reverse("work_details", args=[self.id])
+        if fields & page_map["signature"]:
+            return reverse("signature", args=[self.id])
+        return reverse("edit_customer_details", args=[self.id])
+
+    def correction_field_labels(self):
+        return [
+            self.CORRECTION_FIELD_LABELS.get(field_name, field_name.replace("_", " ").title())
+            for field_name in self.correction_fields or []
+        ]
 
     def apply_deal_selection(self, deal, selected_cash_price):
         self.deal = deal

@@ -2,13 +2,82 @@ from decimal import Decimal
 
 from django.core.management.base import BaseCommand
 
+from core.services import get_business_settings
 from deals.models import DeviceBrand, DeviceDeal
+from geography.models import District, Region, TraditionalAuthority
+from rewards.services import get_spin_config
 
 
 class Command(BaseCommand):
-    help = "Seed initial TengaSale device brands and deals."
+    help = "Seed initial TengaSale data."
 
     def handle(self, *args, **options):
+        self.seed_business_settings()
+        self.seed_geography()
+        self.seed_deals()
+
+    def seed_business_settings(self):
+        get_business_settings()
+        get_spin_config()
+        self.stdout.write(self.style.SUCCESS("Seeded business and spin settings."))
+
+    def seed_geography(self):
+        districts_by_region = {
+            "Central": [
+                "Lilongwe",
+                "Dedza",
+                "Dowa",
+                "Kasungu",
+                "Mchinji",
+                "Ntcheu",
+                "Nkhotakota",
+                "Ntchisi",
+                "Salima",
+            ],
+            "Southern": [
+                "Blantyre",
+                "Zomba",
+                "Mangochi",
+                "Mulanje",
+                "Thyolo",
+                "Chiradzulu",
+                "Machinga",
+                "Balaka",
+                "Chikwawa",
+                "Nsanje",
+                "Phalombe",
+                "Mwanza",
+                "Neno",
+            ],
+            "Northern": ["Mzuzu", "Mzimba", "Rumphi", "Karonga", "Chitipa", "Nkhata Bay", "Likoma"],
+        }
+
+        created_regions = 0
+        created_districts = 0
+        created_tas = 0
+        for region_name, district_names in districts_by_region.items():
+            region, was_region_created = Region.objects.get_or_create(name=region_name)
+            created_regions += int(was_region_created)
+            for district_name in district_names:
+                district, was_district_created = District.objects.get_or_create(region=region, name=district_name)
+                created_districts += int(was_district_created)
+
+                # TODO: replace placeholder TA names with verified official Malawi TA data.
+                sample_tas = [f"{district_name} TA {number}" for number in range(1, 4)]
+                for ta_name in sample_tas:
+                    _, was_ta_created = TraditionalAuthority.objects.get_or_create(
+                        district=district,
+                        name=ta_name,
+                    )
+                    created_tas += int(was_ta_created)
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Seeded geography: {created_regions} regions, {created_districts} districts, {created_tas} TAs created."
+            )
+        )
+
+    def seed_deals(self):
         deals = [
             ("TECNO", "Pop 10C", "2+64", 320000, 380000, 350000),
             ("TECNO", "Spark 40", "4+128", 400000, 480000, 450000),
