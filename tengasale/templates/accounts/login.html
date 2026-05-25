@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>TengaSale Login</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<div class="app-shell auth-shell">
+    <div class="auth-brand">
+        <div class="logo-mark">T</div>
+        <h1>Tenga<span>Sale</span></h1>
+        <p>Endless Possibilities</p>
+    </div>
+
+    <form method="post" class="auth-card">
+        {% csrf_token %}
+        {% if next %}
+            <input type="hidden" name="next" value="{{ next }}">
+        {% endif %}
+
+        {{ form.non_field_errors }}
+
+        <label for="{{ form.username.id_for_label }}">Username</label>
+        {{ form.username }}
+
+        <label for="{{ form.password.id_for_label }}">Password</label>
+        {{ form.password }}
+
+        <button type="submit" class="primary-button">Sign In</button>
+
+        <a href="{% url 'password_reset' %}" class="auth-link">Forgot password?</a>
+    </form>
+</div>
+
+</body>
+</html>

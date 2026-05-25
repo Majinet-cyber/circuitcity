@@ -1,0 +1,36 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Manager{% endblock %}
+
+{% block content %}
+
+<h1>Hi, {{ request.user.first_name|default:request.user.username }}</h1>
+
+{% if pending_count > 0 %}
+    <a href="{% url 'claim_next' %}" class="big-button green-button">
+        ☝ CLAIM NEXT
+    </a>
+{% else %}
+    <div class="big-button" style="background:#ddd; color:#888;">
+        ☝ NO APPS PENDING
+    </div>
+{% endif %}
+
+<div class="big-button blue-button" style="margin-top:20px;">
+    MY ACTIVE {{ active_count }} / {{ max_active }}
+</div>
+
+<div class="menu-list">
+    <h2>Applications</h2>
+
+    {% for app in my_active %}
+        <a href="{% url 'review_application' app.id %}" class="menu-row">
+            <span>{{ app.customer_name }}</span>
+            <span class="arrow">→</span>
+        </a>
+    {% empty %}
+        <div class="card">No active applications.</div>
+    {% endfor %}
+</div>
+
+{% endblock %}

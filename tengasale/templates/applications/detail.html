@@ -1,0 +1,81 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Application Detail{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'active_applications' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Application Detail</h1>
+
+{% if is_incomplete %}
+    <a href="{{ app.get_continue_url }}" class="new-application-button">Continue Application</a>
+{% endif %}
+
+<div class="card detail-card">
+    <div class="detail-row">
+        <span>Customer name</span>
+        <strong>{{ app.customer_name|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>National ID</span>
+        <strong>{{ app.national_id|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Phone</span>
+        <strong>{% if app.customer_phone %}+265 {{ app.customer_phone }}{% else %}Not captured{% endif %}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Occupation</span>
+        <strong>{{ app.occupation|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Income band</span>
+        <strong>{{ app.income_band|default:"Not captured" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Exact monthly income</span>
+        <strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Deal selected</span>
+        <strong>{{ app.deal|default:"Not selected" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Selected cash price</span>
+        <strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Total loan</span>
+        <strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Deposit</span>
+        <strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Monthly payment</span>
+        <strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Daily payment</span>
+        <strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Status</span>
+        <strong>{{ app.get_status_display }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Manager comment</span>
+        <strong>{{ app.manager_comment|default:"No comment" }}</strong>
+    </div>
+    <div class="detail-row">
+        <span>Created date</span>
+        <strong>{{ app.created_at|date:"Y/m/d, H:i" }}</strong>
+    </div>
+</div>
+
+{% endblock %}

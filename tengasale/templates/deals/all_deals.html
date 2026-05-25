@@ -1,0 +1,38 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">All Deals</h1>
+
+<div class="card">
+    <p class="text-muted">Current active TengaSale phone financing offers.</p>
+</div>
+
+{% for deal in deals %}
+    <div class="deal-card">
+        <div class="deal-header">
+            <div>
+                <h2>{{ deal.brand.name }} {{ deal.model_name }}</h2>
+                <p class="text-muted">{{ deal.specs }}</p>
+            </div>
+            <span class="status-pill">{{ deal.term_months }} months</span>
+        </div>
+
+        <p class="text-muted">Cash price range</p>
+        <h3>MWK {{ deal.min_cash_price|floatformat:0 }} - {{ deal.max_cash_price|floatformat:0 }}</h3>
+
+        <p class="text-muted">Default pricing</p>
+        <h3>MWK {{ deal.calculated_total_loan|floatformat:0 }} total</h3>
+        <p>MWK {{ deal.deposit_amount|floatformat:0 }} deposit</p>
+        <p>MWK {{ deal.daily_payment|floatformat:0 }} daily or MWK {{ deal.monthly_payment|floatformat:0 }} monthly</p>
+    </div>
+{% empty %}
+    <div class="card">No deals available.</div>
+{% endfor %}
+
+{% endblock %}

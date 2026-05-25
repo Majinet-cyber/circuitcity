@@ -1,0 +1,43 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">{{ title }}</h1>
+
+<div class="card">
+    <input type="text" placeholder="Filter">
+    <p class="text-muted">
+        Filter by customer name, ID number, phone number, or application number.
+    </p>
+</div>
+
+<div class="application-list">
+    {% for app in apps %}
+        <a href="{{ app.get_continue_url }}" class="application-card">
+            <div class="application-card-main">
+                <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                <p>ID: {{ app.national_id|default:"—" }}</p>
+                <p>{{ app.application_number }}</p>
+                <p>{{ app.created_at|date:"Y/m/d, H:i" }}</p>
+            </div>
+
+            <div class="application-card-side">
+                <span class="status-pill">{{ app.get_status_display }}</span>
+                <span class="soft-card-arrow">&rsaquo;</span>
+            </div>
+        </a>
+    {% empty %}
+        <div class="card">
+            No applications found.
+        </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

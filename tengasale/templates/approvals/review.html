@@ -1,0 +1,96 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<h1 class="greeting">Review</h1>
+
+<div class="card">
+    <h2>{{ app.customer_name }}</h2>
+    <p>ID: {{ app.national_id }}</p>
+    <p>Phone: +265 {{ app.customer_phone }}</p>
+    <p>Occupation: {{ app.occupation|default:"Not captured" }}</p>
+    <p>Income: MWK {{ app.exact_monthly_income|floatformat:0 }}</p>
+    <p>Status: <span class="status-pill">{{ app.get_status_display }}</span></p>
+</div>
+
+<div class="card">
+    <h2>Device & Pricing</h2>
+    {% if app.deal %}
+        <p>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</p>
+        <p>Cash price: MWK {{ app.selected_cash_price|floatformat:0 }}</p>
+        <p>Total loan: MWK {{ app.calculated_total_loan|floatformat:0 }}</p>
+        <p>Deposit: MWK {{ app.calculated_deposit_amount|floatformat:0 }}</p>
+        <p>Monthly: MWK {{ app.calculated_monthly_payment|floatformat:0 }}</p>
+        <p>Daily: MWK {{ app.calculated_daily_payment|floatformat:0 }}</p>
+    {% else %}
+        <p>No deal selected.</p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h2>KYC</h2>
+    {% if app.customer_face_image %}<img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face">{% endif %}
+    {% if app.id_front_image %}<img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front">{% endif %}
+    {% if app.id_back_image %}<img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back">{% endif %}
+</div>
+
+<div class="card">
+    <h2>Location & Kin</h2>
+    <p>{{ app.region }} / {{ app.district }}</p>
+    <p>TA: {{ app.traditional_authority }}</p>
+    <p>Location: {{ app.precise_location }}</p>
+    <p>Next of kin 1: {{ app.next_of_kin_1_name }} (+265 {{ app.next_of_kin_1_phone }})</p>
+    <p>Relationship: {{ app.next_of_kin_1_relationship }}</p>
+    {% if app.map_screenshot %}<img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">{% endif %}
+</div>
+
+<div class="card">
+    <h2>Work & Proof</h2>
+    <p>{{ app.work_description }}</p>
+    <p>Next of kin 2: {{ app.next_of_kin_2_name }} (+265 {{ app.next_of_kin_2_phone }})</p>
+    <p>Relationship: {{ app.next_of_kin_2_relationship }}</p>
+    <p>Proof: {{ app.proof_of_income_type }}</p>
+    <p>Contact: {{ app.proof_contact_name }} (+265 {{ app.proof_contact_phone }})</p>
+    <p>{{ app.proof_notes }}</p>
+</div>
+
+<div class="card">
+    <h2>Signature</h2>
+    <p>Terms agreed: {{ app.agreed_to_terms|yesno:"Yes,No" }}</p>
+    {% if app.signature_image %}<img class="upload-preview" src="{{ app.signature_image.url }}" alt="Signature">{% endif %}
+</div>
+
+<form method="post" class="card">
+    {% csrf_token %}
+
+    <label class="check-row">
+        <input type="checkbox" name="correction_customer_face_image" {% if app.correction_customer_face_image %}checked{% endif %}>
+        <span>Customer face image needs correction</span>
+    </label>
+    <label class="check-row">
+        <input type="checkbox" name="correction_id_front_image" {% if app.correction_id_front_image %}checked{% endif %}>
+        <span>ID front image needs correction</span>
+    </label>
+    <label class="check-row">
+        <input type="checkbox" name="correction_id_back_image" {% if app.correction_id_back_image %}checked{% endif %}>
+        <span>ID back image needs correction</span>
+    </label>
+
+    <div class="form-group">
+        <label>Correction notes</label>
+        <textarea name="correction_notes">{{ app.correction_notes }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label>Manager comment</label>
+        <textarea name="manager_comment">{{ app.manager_comment }}</textarea>
+    </div>
+
+    <div class="form-actions stacked-actions">
+        <button name="decision" value="approve" class="btn green-button">APPROVE</button>
+        <button name="decision" value="request_correction" class="btn btn-blue">REQUEST CORRECTION</button>
+        <button name="decision" value="reject" class="btn btn-danger">REJECT</button>
+    </div>
+</form>
+
+{% endblock %}

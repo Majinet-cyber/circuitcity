@@ -1,0 +1,76 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'location_details' app.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Work Details</h1>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-group">
+        <label for="{{ form.work_description.id_for_label }}">Work / service details</label>
+        {{ form.work_description }}
+        {{ form.work_description.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.next_of_kin_2_name.id_for_label }}">Next of kin 2 name</label>
+        {{ form.next_of_kin_2_name }}
+        {{ form.next_of_kin_2_name.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.next_of_kin_2_phone.id_for_label }}">Next of kin 2 phone</label>
+        <div class="phone-input">
+            <span>+265</span>
+            {{ form.next_of_kin_2_phone }}
+        </div>
+        {{ form.next_of_kin_2_phone.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.next_of_kin_2_relationship.id_for_label }}">Relationship</label>
+        {{ form.next_of_kin_2_relationship }}
+        {{ form.next_of_kin_2_relationship.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.proof_of_income_type.id_for_label }}">Proof of income type</label>
+        {{ form.proof_of_income_type }}
+        {{ form.proof_of_income_type.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.proof_contact_name.id_for_label }}">Proof contact name</label>
+        {{ form.proof_contact_name }}
+        {{ form.proof_contact_name.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.proof_contact_phone.id_for_label }}">Proof contact phone</label>
+        <div class="phone-input">
+            <span>+265</span>
+            {{ form.proof_contact_phone }}
+        </div>
+        {{ form.proof_contact_phone.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.proof_notes.id_for_label }}">Proof notes</label>
+        {{ form.proof_notes }}
+        {{ form.proof_notes.errors }}
+    </div>
+
+    <div class="form-actions">
+        <a href="{% url 'location_details' app.id %}" class="btn btn-outline">BACK</a>
+        <button type="submit" class="btn">NEXT</button>
+    </div>
+</form>
+
+{% endblock %}

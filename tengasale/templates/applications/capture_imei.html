@@ -1,0 +1,30 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}IMEI Capture{% endblock %}
+
+{% block content %}
+
+<div class="card">
+    <h2>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</h2>
+    <p>Customer: {{ app.customer_name }}</p>
+</div>
+
+<form method="post" class="card">
+    {% csrf_token %}
+
+    <div class="form-group">
+        <label>IMEI Number *</label>
+        <input type="text" name="imei_number" required>
+    </div>
+
+    <button type="button" class="big-button" style="background:#333;">
+        📷 SCAN IMEI
+    </button>
+
+    <div class="form-actions">
+        <a href="{% url 'choose_device' app.id %}" class="btn btn-outline">← BACK</a>
+        <button type="submit" class="btn">SUBMIT</button>
+    </div>
+</form>
+
+{% endblock %}

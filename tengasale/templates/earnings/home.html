@@ -1,0 +1,53 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Earnings{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<div class="card">
+    <h2>Wallet balance</h2>
+    <h1 class="text-green">MWK {{ wallet.balance }}</h1>
+</div>
+
+<div class="card">
+    <p>Balance</p>
+    <h1>MWK {{ wallet.balance }}</h1>
+
+    <p>Status</p>
+    <h1 class="text-green">{{ wallet.status|title }}</h1>
+
+    <p class="text-muted">Your balance will be paid out daily unless your wallet is locked.</p>
+
+    <h2>Total earned</h2>
+    <h1 class="text-green">MWK {{ wallet.total_earned }}</h1>
+
+    <h2>Total paid</h2>
+    <h1 class="text-green">MWK {{ wallet.total_paid }}</h1>
+</div>
+
+<div class="card">
+    <h2>Transactions breakdown</h2>
+
+    {% for tx in transactions %}
+        <div style="border-bottom:1px solid #eee; padding:16px 0;">
+            <strong>{{ tx.created_at|date:"d M Y \a\t H:i" }}</strong>
+            <p>{{ tx.get_transaction_type_display }}</p>
+            <p class="text-muted">Contract: {{ tx.contract_number|default:"-" }}</p>
+
+            {% if tx.amount < 0 %}
+                <h3 class="text-red">MWK {{ tx.amount }}</h3>
+            {% else %}
+                <h3 class="text-green">MWK {{ tx.amount }}</h3>
+            {% endif %}
+        </div>
+    {% empty %}
+        <p>No transactions yet.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

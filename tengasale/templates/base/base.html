@@ -1,0 +1,64 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TengaSale | Endless Possibilities</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<div class="app-shell">
+    <header class="topbar">
+        <div class="brand-left">
+            <a href="{% url 'home' %}" class="brand-lockup" aria-label="TengaSale home">
+                <span class="ts-logo">T</span>
+                <span class="brand-copy">
+                    <span class="brand-title">TengaSale</span>
+                    <span class="brand-tagline">Endless Possibilities</span>
+                </span>
+            </a>
+        </div>
+
+        {% if request.user.is_authenticated %}
+            <div class="top-actions">
+                <button class="icon-button notification-button" type="button" aria-label="Notifications">
+                    <svg aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                        <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+                    </svg>
+                    <span class="notification-count">0</span>
+                </button>
+                <form method="post" action="{% url 'logout' %}" class="logout-form">
+                    {% csrf_token %}
+                    <button class="icon-button logout-button" type="submit" aria-label="Log out" title="Log out">
+                        <svg aria-hidden="true" viewBox="0 0 24 24">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <path d="M16 17l5-5-5-5"></path>
+                            <path d="M21 12H9"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+    </header>
+
+    <main class="content">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <span>v1.0.0</span>
+        <span>&copy; TengaSale</span>
+    </footer>
+</div>
+
+</body>
+</html>

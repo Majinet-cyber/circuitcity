@@ -1,0 +1,48 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'work_details' app.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Signature</h1>
+
+<form method="post" enctype="multipart/form-data" class="card">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-group">
+        <label for="{{ form.signature_image.id_for_label }}">Customer signature</label>
+        {% if app.signature_image %}
+            <img class="upload-preview" src="{{ app.signature_image.url }}" alt="Customer signature">
+        {% endif %}
+        {{ form.signature_image }}
+        {{ form.signature_image.errors }}
+    </div>
+
+    <label class="check-row" for="{{ form.agreed_to_terms.id_for_label }}">
+        {{ form.agreed_to_terms }}
+        <span>I confirm the customer agrees to the TengaSale financing terms.</span>
+    </label>
+    {{ form.agreed_to_terms.errors }}
+
+    <div class="summary-card">
+        <span>Total loan</span>
+        <strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong>
+        <span>Deposit</span>
+        <strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong>
+        <span>Monthly</span>
+        <strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong>
+        <span>Daily</span>
+        <strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong>
+    </div>
+
+    <div class="form-actions">
+        <a href="{% url 'work_details' app.id %}" class="btn btn-outline">BACK</a>
+        <button type="submit" class="btn">SUBMIT</button>
+    </div>
+</form>
+
+{% endblock %}

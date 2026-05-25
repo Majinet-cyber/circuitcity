@@ -1,0 +1,172 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'choose_device' app.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">KYC Capture</h1>
+
+<div class="card instruction-card">
+    <p>Capture customer face, ID front, and ID back. Preview all images before continuing.</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="kyc-form" data-kyc-form>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <section class="kyc-section" data-kyc-section data-existing="{% if app.customer_face_image %}true{% else %}false{% endif %}">
+        <div class="kyc-section-header">
+            <div>
+                <h2>Customer Face</h2>
+                <p>Use the front camera for a clear live selfie.</p>
+            </div>
+            <span class="capture-status{% if app.customer_face_image %} captured{% endif %}" data-status>
+                {% if app.customer_face_image %}Captured{% else %}Required{% endif %}
+            </span>
+        </div>
+
+        {{ form.customer_face_image }}
+        {{ form.customer_face_image.errors }}
+
+        <button type="button" class="capture-button" data-capture-button>Capture Face</button>
+
+        <div class="kyc-preview{% if app.customer_face_image %} is-visible{% endif %}" data-preview-card>
+            {% if app.customer_face_image %}
+                <img src="{{ app.customer_face_image.url }}" alt="Customer Face preview" data-preview-image>
+            {% else %}
+                <img src="" alt="Customer Face preview" data-preview-image>
+            {% endif %}
+            <div class="kyc-preview-meta">
+                <strong>Customer Face</strong>
+                <span class="capture-status captured">Captured</span>
+            </div>
+            <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
+        </div>
+    </section>
+
+    <section class="kyc-section" data-kyc-section data-existing="{% if app.id_front_image %}true{% else %}false{% endif %}">
+        <div class="kyc-section-header">
+            <div>
+                <h2>ID Front</h2>
+                <p>Use the rear camera and fill the frame with the ID.</p>
+            </div>
+            <span class="capture-status{% if app.id_front_image %} captured{% endif %}" data-status>
+                {% if app.id_front_image %}Captured{% else %}Required{% endif %}
+            </span>
+        </div>
+
+        {{ form.id_front_image }}
+        {{ form.id_front_image.errors }}
+
+        <button type="button" class="capture-button" data-capture-button>Capture ID Front</button>
+
+        <div class="kyc-preview{% if app.id_front_image %} is-visible{% endif %}" data-preview-card>
+            {% if app.id_front_image %}
+                <img src="{{ app.id_front_image.url }}" alt="ID Front preview" data-preview-image>
+            {% else %}
+                <img src="" alt="ID Front preview" data-preview-image>
+            {% endif %}
+            <div class="kyc-preview-meta">
+                <strong>ID Front</strong>
+                <span class="capture-status captured">Captured</span>
+            </div>
+            <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
+        </div>
+    </section>
+
+    <section class="kyc-section" data-kyc-section data-existing="{% if app.id_back_image %}true{% else %}false{% endif %}">
+        <div class="kyc-section-header">
+            <div>
+                <h2>ID Back</h2>
+                <p>Use the rear camera and make all text readable.</p>
+            </div>
+            <span class="capture-status{% if app.id_back_image %} captured{% endif %}" data-status>
+                {% if app.id_back_image %}Captured{% else %}Required{% endif %}
+            </span>
+        </div>
+
+        {{ form.id_back_image }}
+        {{ form.id_back_image.errors }}
+
+        <button type="button" class="capture-button" data-capture-button>Capture ID Back</button>
+
+        <div class="kyc-preview{% if app.id_back_image %} is-visible{% endif %}" data-preview-card>
+            {% if app.id_back_image %}
+                <img src="{{ app.id_back_image.url }}" alt="ID Back preview" data-preview-image>
+            {% else %}
+                <img src="" alt="ID Back preview" data-preview-image>
+            {% endif %}
+            <div class="kyc-preview-meta">
+                <strong>ID Back</strong>
+                <span class="capture-status captured">Captured</span>
+            </div>
+            <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
+        </div>
+    </section>
+
+    <p class="next-disabled-note" data-disabled-note {% if kyc_complete %}hidden{% endif %}>Capture all KYC images to continue.</p>
+    <button type="submit" class="btn kyc-next-button" data-next-button {% if not kyc_complete %}disabled{% endif %}>NEXT</button>
+</form>
+
+<script>
+    (function () {
+        const form = document.querySelector("[data-kyc-form]");
+        if (!form) {
+            return;
+        }
+
+        const sections = Array.from(form.querySelectorAll("[data-kyc-section]"));
+        const nextButton = form.querySelector("[data-next-button]");
+        const disabledNote = form.querySelector("[data-disabled-note]");
+
+        function sectionIsCaptured(section) {
+            const input = section.querySelector("[data-capture-input]");
+            return section.dataset.existing === "true" || (input && input.files && input.files.length > 0);
+        }
+
+        function refreshNextState() {
+            const allCaptured = sections.every(sectionIsCaptured);
+            nextButton.disabled = !allCaptured;
+            disabledNote.hidden = allCaptured;
+        }
+
+        sections.forEach(function (section) {
+            const input = section.querySelector("[data-capture-input]");
+            const captureButton = section.querySelector("[data-capture-button]");
+            const recaptureButton = section.querySelector("[data-recapture-button]");
+            const previewCard = section.querySelector("[data-preview-card]");
+            const previewImage = section.querySelector("[data-preview-image]");
+            const status = section.querySelector("[data-status]");
+
+            captureButton.addEventListener("click", function () {
+                input.click();
+            });
+
+            recaptureButton.addEventListener("click", function () {
+                input.click();
+            });
+
+            input.addEventListener("change", function () {
+                const file = input.files && input.files[0];
+                if (!file) {
+                    refreshNextState();
+                    return;
+                }
+
+                previewImage.src = URL.createObjectURL(file);
+                previewCard.classList.add("is-visible");
+                status.textContent = "Captured";
+                status.classList.add("captured");
+                section.dataset.existing = "true";
+                refreshNextState();
+            });
+        });
+
+        refreshNextState();
+    })();
+</script>
+
+{% endblock %}

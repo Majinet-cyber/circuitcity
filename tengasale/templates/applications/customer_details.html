@@ -1,0 +1,113 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Customer Details</h1>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="form-group">
+        <label for="{{ form.customer_name.id_for_label }}">Customer full name <span class="required-star">*</span></label>
+        {{ form.customer_name }}
+        {% for error in form.customer_name.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.national_id.id_for_label }}">National ID <span class="required-star">*</span></label>
+        {{ form.national_id }}
+        <p class="field-help">8 letters or numbers, e.g. RQXFVZC9</p>
+        {% for error in form.national_id.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.customer_phone.id_for_label }}">Customer phone number <span class="required-star">*</span></label>
+        <div class="input-prefix-group">
+            <span class="input-prefix">+265</span>
+            {{ form.customer_phone }}
+        </div>
+        {% for error in form.customer_phone.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.occupation.id_for_label }}">Occupation <span class="required-star">*</span></label>
+        {{ form.occupation }}
+        {% for error in form.occupation.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.income_band.id_for_label }}">Income band <span class="required-star">*</span></label>
+        {{ form.income_band }}
+        {% for error in form.income_band.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.exact_monthly_income.id_for_label }}">Exact monthly income <span class="required-star">*</span></label>
+        {{ form.exact_monthly_income }}
+        {% for error in form.exact_monthly_income.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
+    <div class="form-actions">
+        <a href="{% url 'home' %}" class="btn btn-outline">BACK</a>
+        <button type="submit" class="btn">NEXT</button>
+    </div>
+</form>
+
+<script>
+    (function () {
+        function clampInput(input, pattern, limit) {
+            if (!input) {
+                return;
+            }
+
+            function clean(value) {
+                return value.replace(pattern, "").slice(0, limit);
+            }
+
+            function applyClean() {
+                input.value = clean(input.value);
+            }
+
+            input.addEventListener("input", applyClean);
+            input.addEventListener("paste", function (event) {
+                event.preventDefault();
+                const pasted = (event.clipboardData || window.clipboardData).getData("text");
+                const start = input.selectionStart || 0;
+                const end = input.selectionEnd || 0;
+                input.value = clean(input.value.slice(0, start) + pasted + input.value.slice(end));
+            });
+        }
+
+        clampInput(document.querySelector("[data-national-id-input]"), /[^A-Z0-9]/gi, 8);
+        const nationalId = document.querySelector("[data-national-id-input]");
+        if (nationalId) {
+            nationalId.addEventListener("input", function () {
+                nationalId.value = nationalId.value.toUpperCase();
+            });
+            nationalId.addEventListener("paste", function () {
+                nationalId.value = nationalId.value.toUpperCase();
+            });
+        }
+        clampInput(document.querySelector("[data-phone-input]"), /[^0-9]/g, 9);
+    })();
+</script>
+
+{% endblock %}
