@@ -384,10 +384,17 @@ class ApplicationContinueUrlTests(ApplicationTestCase):
     def test_get_continue_url_returns_detail_page_for_terminal_statuses(self):
         app = self.create_application()
 
-        for status in ["submitted", "approved", "rejected", "completed"]:
+        for status in ["submitted", "rejected"]:
             app.status = status
             app.save(update_fields=["status"])
             self.assertEqual(app.get_continue_url(), reverse("application_detail", args=[app.id]))
+
+    def test_approved_application_routes_to_contract_terms(self):
+        app = self.create_application()
+        app.status = "approved"
+        app.save(update_fields=["status"])
+
+        self.assertEqual(app.get_continue_url(), reverse("contract_terms", args=[app.id]))
 
 
 class ApplicationDetailTests(ApplicationTestCase):
@@ -599,7 +606,7 @@ class ApplicationFlowTests(ApplicationTestCase):
         app.refresh_from_db()
         self.assertNotEqual(app.status, "submitted")
 
-    def test_final_submit_sets_status_submitted(self):
+    def test_final_submit_sets_status_pending_review(self):
         app = self.create_application()
 
         response = self.client.post(
@@ -608,8 +615,8 @@ class ApplicationFlowTests(ApplicationTestCase):
         )
 
         app.refresh_from_db()
-        self.assertRedirects(response, reverse("active_applications"))
-        self.assertEqual(app.status, "submitted")
+        self.assertRedirects(response, reverse("application_submitted", args=[app.id]))
+        self.assertEqual(app.status, "pending_review")
         self.assertIsNotNone(app.submitted_at)
 
 
@@ -666,8 +673,8 @@ class SignaturePageTests(ApplicationTestCase):
         )
 
         app.refresh_from_db()
-        self.assertRedirects(response, reverse("active_applications"))
-        self.assertEqual(app.status, "submitted")
+        self.assertRedirects(response, reverse("application_submitted", args=[app.id]))
+        self.assertEqual(app.status, "pending_review")
         self.assertTrue(app.signature_image)
         self.assertTrue(app.agreed_to_terms)
 

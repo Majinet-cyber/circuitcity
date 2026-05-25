@@ -251,6 +251,7 @@ def signature(request, app_id):
             app = form.save(commit=False)
             if form.signature_file:
                 app.signature_image.save(form.signature_file.name, form.signature_file, save=False)
+            app.save(update_fields=["signature_image", "agreed_to_terms"])
             app.submit()
             messages.success(request, "Application submitted.")
             return redirect("application_submitted", app_id=app.id)

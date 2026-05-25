@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -25,11 +27,25 @@ def contract_terms(request, app_id):
     if application.status not in ["approved", "contract_terms", "contract_signature"]:
         return redirect(application.get_continue_url())
 
-    contract, _ = Contract.from_application(application)
+    contract = getattr(application, "contract", None)
+    display_contract = contract or Contract(
+        application=application,
+        merchant=application.created_by,
+        customer_name=application.customer_name,
+        customer_phone=application.customer_phone,
+        national_id=application.national_id,
+        deal_name=str(application.deal) if application.deal_id else "",
+        cash_price=application.selected_cash_price or Decimal("0"),
+        total_loan=application.calculated_total_loan or Decimal("0"),
+        deposit_amount=application.calculated_deposit_amount or Decimal("0"),
+        monthly_payment=application.calculated_monthly_payment or Decimal("0"),
+        daily_payment=application.calculated_daily_payment or Decimal("0"),
+    )
 
     if request.method == "POST":
         form = MerchantTermsForm(request.POST)
         if form.is_valid():
+            contract, _ = Contract.from_application(application)
             contract.terms_accepted_by_merchant = True
             contract.status = Contract.STATUS_TERMS_ACCEPTED
             contract.save(update_fields=["terms_accepted_by_merchant", "status", "updated_at"])
@@ -39,7 +55,7 @@ def contract_terms(request, app_id):
     else:
         form = MerchantTermsForm()
 
-    return render(request, "contracts/terms.html", {"application": application, "contract": contract, "form": form})
+    return render(request, "contracts/terms.html", {"application": application, "contract": display_contract, "form": form})
 
 
 @login_required

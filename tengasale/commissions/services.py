@@ -39,6 +39,19 @@ def process_application_approval(application, approved_by):
             "spin_granted": False,
         }
 
+    merchant_amount = calculate_commission_amount(sale_amount, settings.merchant_commission_percent)
+    merchant_commission, _ = Commission.objects.get_or_create(
+        application=application,
+        user=application.created_by,
+        role=Commission.ROLE_MERCHANT,
+        defaults={
+            "commission_percent": settings.merchant_commission_percent,
+            "sale_amount": sale_amount,
+            "amount": merchant_amount,
+            "status": Commission.STATUS_PENDING,
+        },
+    )
+
     manager_commission = None
     if approved_by:
         manager_amount = calculate_commission_amount(sale_amount, settings.manager_commission_percent)
@@ -54,11 +67,18 @@ def process_application_approval(application, approved_by):
             },
         )
 
+    spin_granted = False
+    if settings.spin_enabled:
+        from rewards.services import award_spin_for_application, get_spin_config
+
+        if get_spin_config().is_enabled:
+            spin_granted = award_spin_for_application(application, application.created_by)
+
     return {
         "sale_amount": sale_amount,
-        "merchant_commission": None,
+        "merchant_commission": merchant_commission,
         "manager_commission": manager_commission,
-        "spin_granted": False,
+        "spin_granted": spin_granted,
     }
 
 
@@ -84,9 +104,10 @@ def process_contract_completion(application):
 
     spin_granted = False
     if settings.spin_enabled:
-        from rewards.services import award_spin_for_application
+        from rewards.services import award_spin_for_application, get_spin_config
 
-        spin_granted = award_spin_for_application(application, application.created_by)
+        if get_spin_config().is_enabled:
+            spin_granted = award_spin_for_application(application, application.created_by)
 
     return {
         "sale_amount": sale_amount,
