@@ -2,68 +2,78 @@
 
 {% block content %}
 
+<a href="{% url 'manager_home' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
 <h1 class="greeting">Review</h1>
 
-<div class="card">
-    <h2>{{ app.customer_name }}</h2>
-    <p>ID: {{ app.national_id }}</p>
-    <p>Phone: +265 {{ app.customer_phone }}</p>
-    <p>Occupation: {{ app.occupation|default:"Not captured" }}</p>
-    <p>Income: MWK {{ app.exact_monthly_income|floatformat:0 }}</p>
-    <p>Status: <span class="status-pill">{{ app.get_status_display }}</span></p>
-</div>
-
-<div class="card">
-    <h2>Device & Pricing</h2>
-    {% if app.deal %}
-        <p>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</p>
-        <p>Cash price: MWK {{ app.selected_cash_price|floatformat:0 }}</p>
-        <p>Total loan: MWK {{ app.calculated_total_loan|floatformat:0 }}</p>
-        <p>Deposit: MWK {{ app.calculated_deposit_amount|floatformat:0 }}</p>
-        <p>Monthly: MWK {{ app.calculated_monthly_payment|floatformat:0 }}</p>
-        <p>Daily: MWK {{ app.calculated_daily_payment|floatformat:0 }}</p>
-    {% else %}
-        <p>No deal selected.</p>
+<section class="card">
+    <h2>Customer Details</h2>
+    <div class="detail-row"><span>Customer</span><strong>{{ app.customer_name|default:"Not captured" }}</strong></div>
+    <div class="detail-row"><span>ID</span><strong>{{ app.national_id|default:"Not captured" }}</strong></div>
+    <div class="detail-row"><span>Phone</span><strong>{% if app.customer_phone %}+265 {{ app.customer_phone }}{% else %}Not captured{% endif %}</strong></div>
+    <div class="detail-row"><span>Occupation</span><strong>{{ app.occupation|default:"Not captured" }}</strong></div>
+    <div class="detail-row"><span>Income</span><strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Status</span><strong><span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span></strong></div>
+    {% if app.claimed_by %}
+        <div class="detail-row"><span>Reviewer</span><strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</strong></div>
     {% endif %}
-</div>
+</section>
 
-<div class="card">
+<section class="card">
+    <h2>Deal/Pricing</h2>
+    {% if app.deal %}
+        <div class="detail-row"><span>Phone</span><strong>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</strong></div>
+        <div class="detail-row"><span>Cash price</span><strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>Total loan</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>Monthly</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>Daily</span><strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong></div>
+    {% else %}
+        <p class="empty-state">No deal selected.</p>
+    {% endif %}
+</section>
+
+<section class="card">
     <h2>KYC</h2>
     {% if app.customer_face_image %}<img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face">{% endif %}
     {% if app.id_front_image %}<img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front">{% endif %}
     {% if app.id_back_image %}<img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back">{% endif %}
-</div>
+    {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
+</section>
 
-<div class="card">
-    <h2>Location & Kin</h2>
-    <p>{{ app.region }} / {{ app.district }}</p>
-    <p>TA: {{ app.traditional_authority }}</p>
-    <p>Location: {{ app.precise_location }}</p>
-    <p>Next of kin 1: {{ app.next_of_kin_1_name }} (+265 {{ app.next_of_kin_1_phone }})</p>
-    <p>Relationship: {{ app.next_of_kin_1_relationship }}</p>
+<section class="card">
+    <h2>Location</h2>
+    <div class="detail-row"><span>Region / district</span><strong>{{ app.region|default:"-" }} / {{ app.district|default:"-" }}</strong></div>
+    <div class="detail-row"><span>TA</span><strong>{{ app.traditional_authority|default:"-" }}</strong></div>
+    <div class="detail-row"><span>Precise location</span><strong>{{ app.precise_location|default:"-" }}</strong></div>
+    <div class="detail-row"><span>Next of kin 1</span><strong>{{ app.next_of_kin_1_name|default:"-" }}{% if app.next_of_kin_1_phone %} (+265 {{ app.next_of_kin_1_phone }}){% endif %}</strong></div>
+    <div class="detail-row"><span>Relationship</span><strong>{{ app.next_of_kin_1_relationship|default:"-" }}</strong></div>
     {% if app.map_screenshot %}<img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">{% endif %}
-</div>
+</section>
 
-<div class="card">
-    <h2>Work & Proof</h2>
-    <p>{{ app.work_description }}</p>
-    <p>Next of kin 2: {{ app.next_of_kin_2_name }} (+265 {{ app.next_of_kin_2_phone }})</p>
-    <p>Relationship: {{ app.next_of_kin_2_relationship }}</p>
-    <p>Proof: {{ app.proof_of_income_type }}</p>
-    <p>Contact: {{ app.proof_contact_name }} (+265 {{ app.proof_contact_phone }})</p>
-    <p>{{ app.proof_notes }}</p>
-</div>
+<section class="card">
+    <h2>Work/Proof</h2>
+    <div class="detail-row"><span>Work</span><strong>{{ app.work_description|default:"-" }}</strong></div>
+    <div class="detail-row"><span>Next of kin 2</span><strong>{{ app.next_of_kin_2_name|default:"-" }}{% if app.next_of_kin_2_phone %} (+265 {{ app.next_of_kin_2_phone }}){% endif %}</strong></div>
+    <div class="detail-row"><span>Relationship</span><strong>{{ app.next_of_kin_2_relationship|default:"-" }}</strong></div>
+    <div class="detail-row"><span>Proof</span><strong>{{ app.proof_of_income_type|default:"-" }}</strong></div>
+    <div class="detail-row"><span>Contact</span><strong>{{ app.proof_contact_name|default:"-" }}{% if app.proof_contact_phone %} (+265 {{ app.proof_contact_phone }}){% endif %}</strong></div>
+    <div class="detail-row"><span>Notes</span><strong>{{ app.proof_notes|default:"-" }}</strong></div>
+</section>
 
-<div class="card">
+<section class="card">
     <h2>Signature</h2>
-    <p>Terms agreed: {{ app.agreed_to_terms|yesno:"Yes,No" }}</p>
+    <div class="detail-row"><span>Terms agreed</span><strong>{{ app.agreed_to_terms|yesno:"Yes,No" }}</strong></div>
     {% if app.signature_image %}<img class="upload-preview" src="{{ app.signature_image.url }}" alt="Signature">{% endif %}
-</div>
+</section>
 
 <form method="post" class="card">
     {% csrf_token %}
 
-    <h2>Fields to correct</h2>
+    <h2>Mark fields requiring correction</h2>
     {% for section, fields in correction_fields %}
         <div class="correction-section">
             <h3>{{ section }}</h3>
@@ -87,9 +97,9 @@
     </div>
 
     <div class="form-actions stacked-actions">
-        <button name="decision" value="approve" class="btn green-button">APPROVE</button>
-        <button name="decision" value="request_correction" class="btn btn-blue">REQUEST CORRECTION</button>
-        <button name="decision" value="reject" class="btn btn-danger">REJECT</button>
+        <button name="decision" value="approve" class="btn green-button">Approve</button>
+        <button name="decision" value="request_correction" class="btn btn-blue">Send Back for Edit</button>
+        <button name="decision" value="reject" class="btn btn-danger">Reject</button>
     </div>
 </form>
 

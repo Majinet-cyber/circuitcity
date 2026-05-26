@@ -148,6 +148,36 @@ class ContractFlowTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_contract_detail_requires_permission(self):
+        contract = Contract.from_application(self.app)[0]
+        self.client.login(username="other", password="test-pass-123")
+
+        response = self.client.get(reverse("contract_detail", args=[contract.id]))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_contract_detail_shows_contract_number_and_amounts(self):
+        contract = Contract.from_application(self.app)[0]
+
+        response = self.client.get(reverse("contract_detail", args=[contract.id]))
+
+        self.assertContains(response, contract.contract_number)
+        self.assertContains(response, "Cash price")
+        self.assertContains(response, "Merchant price / financed amount")
+        self.assertContains(response, "Total loan")
+        self.assertContains(response, "MWK 875000")
+
+    def test_view_contract_link_appears_only_when_contract_exists(self):
+        no_contract_app = FinancingApplication.objects.create(created_by=self.merchant, status="completed")
+        contract = Contract.from_application(self.app)[0]
+
+        no_contract_response = self.client.get(reverse("application_detail", args=[no_contract_app.id]))
+        contract_response = self.client.get(reverse("application_detail", args=[self.app.id]))
+
+        self.assertNotContains(no_contract_response, "VIEW CONTRACT")
+        self.assertContains(contract_response, "VIEW CONTRACT")
+        self.assertContains(contract_response, reverse("contract_detail", args=[contract.id]))
+
     def test_contract_complete_page_shows_contract_number(self):
         contract = Contract.from_application(self.app)[0]
         contract.status = Contract.STATUS_COMPLETE

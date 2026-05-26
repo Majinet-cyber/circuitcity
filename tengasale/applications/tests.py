@@ -366,6 +366,7 @@ class ApplicationListTests(ApplicationTestCase):
         response = self.client.get(reverse("completed_applications"))
 
         self.assertContains(response, 'class="application-card"')
+        self.assertContains(response, "Completed")
         self.assertContains(response, f'href="{app.get_continue_url()}"')
         self.assertEqual(app.get_continue_url(), reverse("application_detail", args=[app.id]))
 

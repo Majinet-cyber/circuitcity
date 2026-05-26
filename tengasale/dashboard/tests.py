@@ -20,6 +20,11 @@ class HomePageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f"Hi, {user.username}")
+        self.assertContains(response, "TengaSale")
+        self.assertContains(response, "You are now earning more with TengaSale.")
+        self.assertContains(response, "VIEW ALL EARNINGS")
+        self.assertContains(response, "Spin & Win")
+        self.assertContains(response, "SPIN NOW")
         self.assertContains(response, "NEW APPLICATION")
 
     def test_home_template_uses_post_logout_form(self):

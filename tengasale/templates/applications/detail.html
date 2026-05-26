@@ -45,6 +45,12 @@
 </div>
 
 <div class="card detail-card">
+    {% if app.contract %}
+        <div class="detail-row">
+            <span>Contract</span>
+            <strong><a href="{% url 'contract_detail' app.contract.id %}" class="view-contract-button">VIEW CONTRACT</a></strong>
+        </div>
+    {% endif %}
     <div class="detail-row">
         <span>Customer name</span>
         <strong>{{ app.customer_name|default:"Not captured" }}</strong>

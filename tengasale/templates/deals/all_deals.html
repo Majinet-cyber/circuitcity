@@ -10,29 +10,294 @@
 <h1 class="greeting">All Deals</h1>
 
 <div class="card">
+    <h2>Choose your new phone</h2>
     <p class="text-muted">Current active TengaSale phone financing offers.</p>
 </div>
 
-{% for deal in deals %}
-    <div class="deal-card">
+{{ deal_options|json_script:"all-deals-data" }}
+
+<section class="selection-section">
+    <h2>Choose brand</h2>
+    <div class="brand-card-grid" role="list">
+        {% for brand_name in brand_names %}
+            <button class="brand-card" type="button" data-brand="{{ brand_name }}" role="listitem">
+                <span>{{ brand_name }}</span>
+            </button>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="selection-section" data-model-section hidden>
+    <h2>Choose a model</h2>
+    <select id="model-select" aria-label="Choose a model">
+        <option value="">Select model</option>
+    </select>
+</section>
+
+<section class="selection-section" data-spec-section hidden>
+    <h2>Choose specs</h2>
+    <select id="spec-select" aria-label="Choose specs">
+        <option value="">Select specs</option>
+    </select>
+</section>
+
+<section class="selection-section" data-offer-section hidden>
+    <h2>Selected deal</h2>
+
+    <article class="deal-summary-card deal-card selected-offer-card">
         <div class="deal-header">
             <div>
-                <h2>{{ deal.brand.name }} {{ deal.model_name }}</h2>
-                <p class="text-muted">{{ deal.specs }}</p>
+                <p class="offer-kicker" data-offer-brand></p>
+                <h2 data-offer-model></h2>
+                <p class="text-muted" data-offer-specs></p>
             </div>
-            <span class="status-pill">{{ deal.term_months }} months</span>
+            <span class="status-pill">12 months</span>
         </div>
 
-        <p class="text-muted">Cash price range</p>
-        <h3>MWK {{ deal.min_cash_price|floatformat:0 }} - {{ deal.max_cash_price|floatformat:0 }}</h3>
+        <div class="price-row">
+            <span>Cash price</span>
+            <strong>MWK <span data-cash-output></span></strong>
+        </div>
 
-        <p class="text-muted">Default pricing</p>
-        <h3>MWK {{ deal.calculated_total_loan|floatformat:0 }} total</h3>
-        <p>MWK {{ deal.deposit_amount|floatformat:0 }} deposit</p>
-        <p>MWK {{ deal.daily_payment|floatformat:0 }} daily or MWK {{ deal.monthly_payment|floatformat:0 }} monthly</p>
-    </div>
-{% empty %}
-    <div class="card">No deals available.</div>
-{% endfor %}
+        <input
+            type="range"
+            id="cash-price-slider"
+            step="1000"
+            min="0"
+            max="0"
+            value="0"
+            aria-label="Cash price"
+        >
+
+        <div class="range-meta">
+            <span>Min MWK <span data-min-cash></span></span>
+            <span>Max MWK <span data-max-cash></span></span>
+        </div>
+
+        <div class="pricing-grid offer-grid">
+            <div>
+                <span>Total loan</span>
+                <strong>MWK <span data-total-loan></span></strong>
+            </div>
+            <div>
+                <span>Deposit <span data-deposit-percent></span>%</span>
+                <strong>MWK <span data-deposit></span></strong>
+            </div>
+            <div>
+                <span>Daily payment</span>
+                <strong>MWK <span data-daily></span></strong>
+            </div>
+            <div>
+                <span>Monthly payment</span>
+                <strong>MWK <span data-monthly></span></strong>
+            </div>
+        </div>
+
+        <div class="early-pay-panel">
+            <h3>Pay early, pay less</h3>
+            <div class="early-pay-list">
+                <div class="early-pay-row">
+                    <div>
+                        <strong>3 months</strong>
+                        <span>25% discount</span>
+                    </div>
+                    <div>
+                        <span>MWK <b data-three-total></b></span>
+                        <small>MWK <b data-three-monthly></b> monthly</small>
+                        <small>MWK <b data-three-daily></b> daily</small>
+                    </div>
+                </div>
+                <div class="early-pay-row">
+                    <div>
+                        <strong>6 months</strong>
+                        <span>15% discount</span>
+                    </div>
+                    <div>
+                        <span>MWK <b data-six-total></b></span>
+                        <small>MWK <b data-six-monthly></b> monthly</small>
+                        <small>MWK <b data-six-daily></b> daily</small>
+                    </div>
+                </div>
+                <div class="early-pay-row">
+                    <div>
+                        <strong>12 months</strong>
+                        <span>Normal plan</span>
+                    </div>
+                    <div>
+                        <span>MWK <b data-normal-total></b></span>
+                        <small>MWK <b data-monthly-copy></b> monthly</small>
+                        <small>MWK <b data-daily-copy></b> daily</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </article>
+</section>
+
+<div class="card empty-state" data-no-deal-state {% if deals %}hidden{% endif %}>
+    No deals available. Please ask management to add device deals.
+</div>
+
+<script>
+    (function () {
+        const dataEl = document.getElementById("all-deals-data");
+        const deals = dataEl ? JSON.parse(dataEl.textContent) : [];
+        const formatter = new Intl.NumberFormat("en-MW", { maximumFractionDigits: 0 });
+        const brandButtons = document.querySelectorAll("[data-brand]");
+        const modelSection = document.querySelector("[data-model-section]");
+        const specSection = document.querySelector("[data-spec-section]");
+        const offerSection = document.querySelector("[data-offer-section]");
+        const noDealState = document.querySelector("[data-no-deal-state]");
+        const modelSelect = document.getElementById("model-select");
+        const specSelect = document.getElementById("spec-select");
+        const slider = document.getElementById("cash-price-slider");
+
+        let selectedBrand = "";
+        let selectedModel = "";
+        let selectedDeal = null;
+
+        function money(value) {
+            return formatter.format(Math.round(Number(value)));
+        }
+
+        function unique(values) {
+            return Array.from(new Set(values));
+        }
+
+        function byBrand() {
+            return deals.filter(function (deal) {
+                return deal.brand === selectedBrand;
+            });
+        }
+
+        function byModel() {
+            return byBrand().filter(function (deal) {
+                return deal.model_name === selectedModel;
+            });
+        }
+
+        function resetOffer() {
+            selectedDeal = null;
+            offerSection.hidden = true;
+        }
+
+        function renderModels() {
+            const models = unique(byBrand().map(function (deal) {
+                return deal.model_name;
+            }));
+
+            modelSelect.innerHTML = '<option value="">Select model</option>';
+            models.forEach(function (modelName) {
+                const option = document.createElement("option");
+                option.value = modelName;
+                option.textContent = modelName;
+                modelSelect.appendChild(option);
+            });
+
+            modelSection.hidden = models.length === 0;
+            specSection.hidden = true;
+            specSelect.innerHTML = '<option value="">Select specs</option>';
+            selectedModel = "";
+            resetOffer();
+            noDealState.hidden = models.length !== 0;
+        }
+
+        function renderSpecs() {
+            const modelDeals = byModel();
+            specSelect.innerHTML = '<option value="">Select specs</option>';
+            specSection.hidden = modelDeals.length === 0;
+            resetOffer();
+
+            modelDeals.forEach(function (deal) {
+                const option = document.createElement("option");
+                option.value = String(deal.id);
+                option.textContent = deal.specs;
+                specSelect.appendChild(option);
+            });
+
+            if (modelDeals.length === 1) {
+                specSelect.value = String(modelDeals[0].id);
+                selectDeal(modelDeals[0]);
+            }
+        }
+
+        function selectDeal(deal) {
+            selectedDeal = deal;
+            slider.min = Math.round(Number(deal.min_cash_price));
+            slider.max = Math.round(Number(deal.max_cash_price));
+            slider.value = Math.round(Number(deal.default_cash_price));
+            document.querySelector("[data-offer-brand]").textContent = deal.brand;
+            document.querySelector("[data-offer-model]").textContent = deal.model_name;
+            document.querySelector("[data-offer-specs]").textContent = deal.specs;
+            document.querySelector("[data-min-cash]").textContent = money(deal.min_cash_price);
+            document.querySelector("[data-max-cash]").textContent = money(deal.max_cash_price);
+            document.querySelector("[data-deposit-percent]").textContent = money(deal.deposit_percent);
+            offerSection.hidden = false;
+            updatePricing();
+        }
+
+        function updatePricing() {
+            if (!selectedDeal) {
+                return;
+            }
+
+            const cash = Number(slider.value);
+            const totalLoan = cash * Number(selectedDeal.loan_multiplier);
+            const deposit = totalLoan * Number(selectedDeal.deposit_percent) / 100;
+            const monthly = totalLoan / 12;
+            const daily = totalLoan / 360;
+            const sixTotal = totalLoan * 0.85;
+            const threeTotal = totalLoan * 0.75;
+
+            document.querySelector("[data-cash-output]").textContent = money(cash);
+            document.querySelector("[data-total-loan]").textContent = money(totalLoan);
+            document.querySelector("[data-deposit]").textContent = money(deposit);
+            document.querySelector("[data-monthly]").textContent = money(monthly);
+            document.querySelector("[data-daily]").textContent = money(daily);
+            document.querySelector("[data-monthly-copy]").textContent = money(monthly);
+            document.querySelector("[data-daily-copy]").textContent = money(daily);
+            document.querySelector("[data-normal-total]").textContent = money(totalLoan);
+            document.querySelector("[data-six-total]").textContent = money(sixTotal);
+            document.querySelector("[data-six-monthly]").textContent = money(sixTotal / 6);
+            document.querySelector("[data-six-daily]").textContent = money(sixTotal / 180);
+            document.querySelector("[data-three-total]").textContent = money(threeTotal);
+            document.querySelector("[data-three-monthly]").textContent = money(threeTotal / 3);
+            document.querySelector("[data-three-daily]").textContent = money(threeTotal / 90);
+        }
+
+        brandButtons.forEach(function (button) {
+            button.addEventListener("click", function () {
+                selectedBrand = button.dataset.brand;
+                brandButtons.forEach(function (item) {
+                    item.classList.toggle("active", item === button);
+                });
+                renderModels();
+            });
+        });
+
+        modelSelect.addEventListener("change", function () {
+            selectedModel = modelSelect.value;
+            if (selectedModel) {
+                renderSpecs();
+            } else {
+                specSection.hidden = true;
+                resetOffer();
+            }
+        });
+
+        specSelect.addEventListener("change", function () {
+            const deal = byModel().find(function (item) {
+                return String(item.id) === specSelect.value;
+            });
+            if (deal) {
+                selectDeal(deal);
+            } else {
+                resetOffer();
+            }
+        });
+
+        slider.addEventListener("input", updatePricing);
+    })();
+</script>
 
 {% endblock %}

@@ -2,16 +2,18 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from applications.models import FinancingApplication
 from commissions.models import Commission
+from contracts.models import Contract
 from rewards.models import SpinReward, SpinWallet
 from rewards.services import NoSpinsAvailable, SpinDisabled, perform_spin
 
-from .models import Wallet
+from .models import Wallet, WalletTransaction
 
 
 COMPLETED_STATUSES = ["approved", "completed"]
@@ -21,15 +23,77 @@ COMPLETED_STATUSES = ["approved", "completed"]
 def earnings_home(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
     transactions = wallet.transactions.all()[:20]
-    commissions = Commission.objects.filter(user=request.user)
+    commissions = Commission.objects.filter(user=request.user).select_related("application", "application__contract")
     pending_commissions = commissions.filter(status=Commission.STATUS_PENDING)
     paid_commissions = commissions.filter(status=Commission.STATUS_PAID)
     spin_wallet, _ = SpinWallet.objects.get_or_create(user=request.user)
     latest_rewards = SpinReward.objects.filter(user=request.user)[:5]
+    contract_numbers = [tx.contract_number for tx in transactions if tx.contract_number]
+    contracts_by_number = {
+        contract.contract_number: contract
+        for contract in Contract.objects.filter(contract_number__in=contract_numbers, merchant=request.user)
+    }
+    transaction_rows = []
+
+    tx_type_labels = {
+        "commission": "Payment Commission",
+        "manual_credit": "Manual Credit",
+        "payout": "Wallet Payout",
+        "wallet_payout": "Wallet Payout",
+        "tax": "WHT Deduction",
+        "wht_deduction": "WHT Deduction",
+        "arrears_deduction": "Arrears Deduction",
+        "bonus": "Manual Credit",
+        "spin_reward": "Spin Reward",
+    }
+
+    for commission in commissions[:20]:
+        contract = getattr(commission.application, "contract", None)
+        transaction_rows.append(
+            {
+                "created_at": commission.created_at,
+                "type_label": "Payment Commission",
+                "contract_number": contract.contract_number if contract else "",
+                "contract": contract,
+                "amount": commission.amount,
+                "status": commission.get_status_display(),
+            }
+        )
+
+    for reward in latest_rewards:
+        contract = getattr(reward.application, "contract", None) if reward.application_id else None
+        transaction_rows.append(
+            {
+                "created_at": reward.spin_date,
+                "type_label": "Spin Reward",
+                "contract_number": contract.contract_number if contract else "",
+                "contract": contract,
+                "amount": reward.amount,
+                "status": reward.get_reward_tier_display(),
+            }
+        )
+
+    for tx in transactions:
+        transaction_rows.append(
+            {
+                "created_at": tx.created_at,
+                "type_label": tx_type_labels.get(tx.transaction_type, tx.get_transaction_type_display()),
+                "contract_number": tx.contract_number,
+                "contract": contracts_by_number.get(tx.contract_number),
+                "amount": tx.amount,
+                "status": "",
+            }
+        )
+
+    transaction_rows.sort(key=lambda row: row["created_at"], reverse=True)
+    payout_rows = [row for row in transaction_rows if row["type_label"] == "Wallet Payout"]
+    active_tab = request.GET.get("tab", "earnings")
 
     return render(request, "earnings/home.html", {
         "wallet": wallet,
         "transactions": transactions,
+        "transaction_rows": transaction_rows[:30],
+        "payout_rows": payout_rows,
         "commissions": commissions[:20],
         "pending_commission_total": pending_commissions.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
         "paid_commission_total": paid_commissions.aggregate(total=Sum("amount"))["total"] or Decimal("0.00"),
@@ -39,7 +103,61 @@ def earnings_home(request):
         or Decimal("0.00"),
         "spin_wallet": spin_wallet,
         "latest_rewards": latest_rewards,
+        "active_tab": active_tab,
     })
+
+
+@login_required
+def payments_home(request):
+    query = request.GET.get("q", "").strip()
+    rows_per_page = int(request.GET.get("rows", "10") or 10)
+    if rows_per_page not in [5, 10, 25]:
+        rows_per_page = 10
+
+    contracts = Contract.objects.select_related("application").filter(merchant=request.user).order_by("-created_at")
+    commissions = Commission.objects.select_related("application", "application__contract").filter(user=request.user).order_by(
+        "-created_at"
+    )
+
+    if query:
+        contracts = contracts.filter(contract_number__icontains=query)
+        commissions = commissions.filter(application__application_number__icontains=query)
+
+    device_sales = [
+        {
+            "date": contract.created_at,
+            "status": contract.get_status_display(),
+            "amount": contract.deposit_amount,
+            "institution": "TengaSale",
+            "account": contract.customer_phone or "-",
+            "contract": contract,
+        }
+        for contract in contracts
+    ]
+    commission_rows = [
+        {
+            "date": commission.created_at,
+            "status": commission.get_status_display(),
+            "amount": commission.amount,
+            "contract": getattr(commission.application, "contract", None),
+            "application_number": commission.application.application_number,
+        }
+        for commission in commissions
+    ]
+
+    device_page = Paginator(device_sales, rows_per_page).get_page(request.GET.get("device_page"))
+    commission_page = Paginator(commission_rows, rows_per_page).get_page(request.GET.get("commission_page"))
+
+    return render(
+        request,
+        "earnings/payments.html",
+        {
+            "query": query,
+            "rows_per_page": rows_per_page,
+            "device_page": device_page,
+            "commission_page": commission_page,
+        },
+    )
 
 
 def leaderboard_rows():

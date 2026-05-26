@@ -297,7 +297,7 @@ def application_corrections(request, app_id):
 @login_required
 def application_detail(request, app_id):
     app = get_object_or_404(
-        FinancingApplication.objects.select_related("deal", "created_by", "claimed_by", "reviewed_by"),
+        FinancingApplication.objects.select_related("deal", "contract", "created_by", "claimed_by", "reviewed_by"),
         id=app_id,
     )
 

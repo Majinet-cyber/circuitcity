@@ -9,75 +9,108 @@
     <span>BACK</span>
 </a>
 
-<div class="card">
-    <h2>Total earned</h2>
-    <h1 class="text-green">MWK {{ total_commission_earned }}</h1>
-</div>
+<h1 class="greeting">Earnings</h1>
 
-<div class="card">
-    <p>Pending commissions</p>
-    <h1>MWK {{ pending_commission_total }}</h1>
+<section class="stat-card wallet-balance-card">
+    <span>Wallet balance</span>
+    {% if wallet.balance < 0 %}
+        <strong class="amount-negative">MWK {{ wallet.balance|floatformat:2 }}</strong>
+    {% else %}
+        <strong class="amount-positive">MWK {{ wallet.balance|floatformat:2 }}</strong>
+    {% endif %}
+    <p>You are now earning more with TengaSale.</p>
+</section>
 
-    <p>Paid commissions</p>
-    <h1 class="text-green">MWK {{ paid_commission_total }}</h1>
+<nav class="tab-bar" aria-label="Earnings tabs">
+    <a href="{% url 'earnings_home' %}?tab=earnings" class="tab-button {% if active_tab == 'earnings' %}active{% endif %}">EARNINGS</a>
+    <a href="{% url 'earnings_home' %}?tab=payouts" class="tab-button {% if active_tab == 'payouts' %}active{% endif %}">PAYOUTS</a>
+</nav>
 
-    <p>Available spins</p>
-    <h1 class="text-green">{{ spin_wallet.available_spins }}</h1>
-
-    <div class="form-actions">
-        <a href="{% url 'spin_rewards' %}" class="btn">SPIN & WIN</a>
-        <a href="{% url 'merchant_leaderboard' %}" class="btn btn-outline">LEADERBOARD</a>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Commission transactions</h2>
-
-    {% for commission in commissions %}
-        <div style="border-bottom:1px solid #eee; padding:16px 0;">
-            <strong>{{ commission.created_at|date:"d M Y \a\t H:i" }}</strong>
-            <p>{{ commission.get_role_display }} commission</p>
-            <p class="text-muted">Application: {{ commission.application.application_number|default:"-" }}</p>
-            <p class="text-muted">Status: {{ commission.get_status_display }}</p>
-            <h3 class="text-green">MWK {{ commission.amount }}</h3>
+{% if active_tab == "payouts" %}
+    <section class="card">
+        <h2>Payout batches</h2>
+        {% for row in payout_rows %}
+            <article class="transaction-row">
+                <div>
+                    <strong>{{ row.created_at|date:"d M Y H:i" }}</strong>
+                    <p>Wallet Payout</p>
+                    <p class="text-muted">Status: {{ row.status|default:"Pending" }}</p>
+                </div>
+                <div class="transaction-side">
+                    <span class="amount-negative">MWK {{ row.amount|floatformat:2 }}</span>
+                </div>
+            </article>
+            <div class="payout-breakdown">
+                <div class="detail-row"><span>Gross</span><strong>MWK {{ row.amount|floatformat:2 }}</strong></div>
+                <div class="detail-row"><span>Withholding tax</span><strong>MWK 0.00</strong></div>
+                <div class="detail-row"><span>Net</span><strong>MWK {{ row.amount|floatformat:2 }}</strong></div>
+                <span class="status-pill status-pending_review">Pending</span>
+            </div>
+        {% empty %}
+            <p class="empty-state">No payouts yet.</p>
+            <div class="payout-breakdown">
+                <div class="detail-row"><span>Gross</span><strong>MWK 0.00</strong></div>
+                <div class="detail-row"><span>Withholding tax</span><strong>MWK 0.00</strong></div>
+                <div class="detail-row"><span>Net</span><strong>MWK 0.00</strong></div>
+                <span class="status-pill status-pending_review">Pending</span>
+            </div>
+        {% endfor %}
+    </section>
+{% else %}
+    <section class="card">
+        <div class="metric-grid">
+            <div>
+                <span>Total earned</span>
+                <strong class="amount-positive">MWK {{ total_commission_earned|floatformat:2 }}</strong>
+            </div>
+            <div>
+                <span>Pending commissions</span>
+                <strong>MWK {{ pending_commission_total|floatformat:2 }}</strong>
+            </div>
+            <div>
+                <span>Paid commissions</span>
+                <strong class="amount-positive">MWK {{ paid_commission_total|floatformat:2 }}</strong>
+            </div>
+            <div>
+                <span>Available spins</span>
+                <strong class="amount-positive">{{ spin_wallet.available_spins }}</strong>
+            </div>
         </div>
-    {% empty %}
-        <p>No commissions yet.</p>
-    {% endfor %}
-</div>
-
-<div class="card">
-    <h2>Latest spin rewards</h2>
-
-    {% for reward in latest_rewards %}
-        <div style="border-bottom:1px solid #eee; padding:16px 0;">
-            <strong>{{ reward.spin_date|date:"d M Y \a\t H:i" }}</strong>
-            <p>{{ reward.get_reward_tier_display }} reward</p>
-            <h3 class="text-green">MWK {{ reward.amount }}</h3>
+        <div class="form-actions">
+            <a href="{% url 'spin_rewards' %}" class="btn">SPIN & WIN</a>
+            <a href="{% url 'merchant_leaderboard' %}" class="btn btn-outline">LEADERBOARD</a>
         </div>
-    {% empty %}
-        <p>No spin rewards yet.</p>
-    {% endfor %}
-</div>
+    </section>
 
-<div class="card">
-    <h2>Wallet transactions</h2>
+    <section class="card">
+        <h2>Transaction breakdown</h2>
 
-    {% for tx in transactions %}
-        <div style="border-bottom:1px solid #eee; padding:16px 0;">
-            <strong>{{ tx.created_at|date:"d M Y \a\t H:i" }}</strong>
-            <p>{{ tx.get_transaction_type_display }}</p>
-            <p class="text-muted">Contract: {{ tx.contract_number|default:"-" }}</p>
-
-            {% if tx.amount < 0 %}
-                <h3 class="text-red">MWK {{ tx.amount }}</h3>
-            {% else %}
-                <h3 class="text-green">MWK {{ tx.amount }}</h3>
-            {% endif %}
-        </div>
-    {% empty %}
-        <p>No wallet transactions yet.</p>
-    {% endfor %}
-</div>
+        {% for row in transaction_rows %}
+            <article class="transaction-row">
+                <div>
+                    <strong>{{ row.created_at|date:"d M Y H:i" }}</strong>
+                    <p>{{ row.type_label }}</p>
+                    {% if row.contract_number %}
+                        <p class="text-muted">Contract: {{ row.contract_number }}</p>
+                    {% elif row.status %}
+                        <p class="text-muted">Status: {{ row.status }}</p>
+                    {% endif %}
+                    {% if row.contract %}
+                        <a href="{% url 'contract_detail' row.contract.id %}" class="view-contract-button">VIEW CONTRACT</a>
+                    {% endif %}
+                </div>
+                <div class="transaction-side">
+                    {% if row.amount < 0 %}
+                        <span class="amount-negative">MWK {{ row.amount|floatformat:2 }}</span>
+                    {% else %}
+                        <span class="amount-positive">MWK {{ row.amount|floatformat:2 }}</span>
+                    {% endif %}
+                </div>
+            </article>
+        {% empty %}
+            <p class="empty-state">No earnings transactions yet.</p>
+        {% endfor %}
+    </section>
+{% endif %}
 
 {% endblock %}

@@ -6,7 +6,10 @@ from django.urls import reverse
 
 from applications.models import FinancingApplication
 from commissions.models import Commission
+from contracts.models import Contract
 from rewards.models import SpinWallet
+
+from .models import Wallet, WalletTransaction
 
 
 class EarningsUrlTests(TestCase):
@@ -16,6 +19,7 @@ class EarningsUrlTests(TestCase):
     def test_earnings_extra_url_names_resolve(self):
         self.assertEqual(reverse("merchant_leaderboard"), "/earnings/leaderboard/")
         self.assertEqual(reverse("spin_rewards"), "/earnings/spin/")
+        self.assertEqual(reverse("payments_home"), "/payments/")
 
 
 class EarningsPageTests(TestCase):
@@ -48,6 +52,58 @@ class EarningsPageTests(TestCase):
         self.assertContains(response, "Available spins")
         self.assertContains(response, "SPIN & WIN")
 
+    def test_earnings_page_shows_wallet_tabs_positive_negative_and_contract(self):
+        wallet = Wallet.objects.create(user=self.user, balance=Decimal("5000.00"))
+        contract = Contract.from_application(self.app)[0]
+        WalletTransaction.objects.create(
+            wallet=wallet,
+            transaction_type="commission",
+            amount=Decimal("1500.00"),
+            contract_number=contract.contract_number,
+        )
+        WalletTransaction.objects.create(
+            wallet=wallet,
+            transaction_type="payout",
+            amount=Decimal("-500.00"),
+            contract_number=contract.contract_number,
+        )
+
+        response = self.client.get(reverse("earnings_home"))
+
+        self.assertContains(response, "Wallet balance")
+        self.assertContains(response, "EARNINGS")
+        self.assertContains(response, "PAYOUTS")
+        self.assertContains(response, "amount-positive")
+        self.assertContains(response, "amount-negative")
+        self.assertContains(response, contract.contract_number)
+        self.assertContains(response, "VIEW CONTRACT")
+
+    def test_payouts_tab_renders(self):
+        response = self.client.get(f"{reverse('earnings_home')}?tab=payouts")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Payout batches")
+        self.assertContains(response, "Gross")
+        self.assertContains(response, "Withholding tax")
+        self.assertContains(response, "Net")
+
+    def test_merchant_only_sees_own_transactions_and_commissions(self):
+        other = get_user_model().objects.create_user(username="other", password="test-pass-123")
+        other_app = FinancingApplication.objects.create(created_by=other, status="approved")
+        Commission.objects.create(
+            user=other,
+            application=other_app,
+            role=Commission.ROLE_MERCHANT,
+            commission_percent=Decimal("1.00"),
+            sale_amount=Decimal("1000000.00"),
+            amount=Decimal("99999.00"),
+            status=Commission.STATUS_PENDING,
+        )
+
+        response = self.client.get(reverse("earnings_home"))
+
+        self.assertNotContains(response, "99999.00")
+
 
 class MerchantLeaderboardTests(TestCase):
     def setUp(self):
@@ -70,3 +126,66 @@ class MerchantLeaderboardTests(TestCase):
         self.assertContains(response, "merchant2")
         self.assertNotContains(response, ">merchant1<")
         self.assertContains(response, "Your rank: #12")
+
+
+class PaymentsPageTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(username="merchant", password="test-pass-123")
+        self.other = User.objects.create_user(username="other", password="test-pass-123")
+        self.client.login(username="merchant", password="test-pass-123")
+        self.app = FinancingApplication.objects.create(
+            created_by=self.user,
+            status="contract_complete",
+            customer_name="Jane Banda",
+            customer_phone="990870616",
+            calculated_total_loan=Decimal("1000000.00"),
+            calculated_deposit_amount=Decimal("130000.00"),
+        )
+        self.contract = Contract.from_application(self.app)[0]
+
+    def test_payments_page_loads_with_status_guide_tabs_search_and_pagination(self):
+        response = self.client.get(reverse("payments_home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Payments")
+        for text in ["Pending", "TengaSale Processing", "External Processing", "Paid", "Failed"]:
+            self.assertContains(response, text)
+        self.assertContains(response, "DEVICE SALES")
+        self.assertContains(response, "COMMISSIONS")
+        self.assertContains(response, 'placeholder="Search payments"')
+        self.assertContains(response, "pagination-controls")
+        self.assertContains(response, "Rows per page")
+
+    def test_payments_page_shows_rows_and_view_contract_when_available(self):
+        Commission.objects.create(
+            user=self.user,
+            application=self.app,
+            role=Commission.ROLE_MERCHANT,
+            commission_percent=Decimal("1.00"),
+            sale_amount=Decimal("1000000.00"),
+            amount=Decimal("10000.00"),
+            status=Commission.STATUS_PENDING,
+        )
+
+        response = self.client.get(reverse("payments_home"))
+
+        self.assertContains(response, self.contract.contract_number)
+        self.assertContains(response, "MWK 10000.00")
+        self.assertContains(response, "VIEW CONTRACT")
+
+    def test_payments_page_only_shows_current_users_data(self):
+        other_app = FinancingApplication.objects.create(
+            created_by=self.other,
+            status="contract_complete",
+            customer_name="Other Customer",
+            customer_phone="991111111",
+            calculated_deposit_amount=Decimal("999999.00"),
+        )
+        other_contract = Contract.from_application(other_app)[0]
+
+        response = self.client.get(reverse("payments_home"))
+
+        self.assertContains(response, self.contract.contract_number)
+        self.assertNotContains(response, other_contract.contract_number)
+        self.assertNotContains(response, "Other Customer")

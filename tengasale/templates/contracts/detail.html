@@ -19,6 +19,7 @@
     <div class="detail-row"><span>Device</span><strong>{{ contract.deal_name|default:"Not selected" }}</strong></div>
     <div class="detail-row"><span>IMEI</span><strong>{{ contract.imei_number|default:"Not captured" }}</strong></div>
     <div class="detail-row"><span>Cash price</span><strong>MWK {{ contract.cash_price|floatformat:0 }}</strong></div>
+    <div class="detail-row"><span>Merchant price / financed amount</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
     <div class="detail-row"><span>Total loan</span><strong>MWK {{ contract.total_loan|floatformat:0 }}</strong></div>
     <div class="detail-row"><span>Deposit</span><strong>MWK {{ contract.deposit_amount|floatformat:0 }}</strong></div>
     <div class="detail-row"><span>Monthly payment</span><strong>MWK {{ contract.monthly_payment|floatformat:0 }}</strong></div>

@@ -2,10 +2,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Sum
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 
 from applications.models import FinancingApplication
+from commissions.models import Commission
 from commissions.services import cancel_application_commissions, process_application_approval
 
 
@@ -26,18 +28,30 @@ def manager_home(request):
         status="pending_review",
         claimed_by__isnull=True,
     ).count()
+    pending_queue = FinancingApplication.objects.select_related("created_by").filter(
+        status="pending_review",
+        claimed_by__isnull=True,
+    ).order_by("submitted_at", "id")[:10]
 
     completed_reviews = FinancingApplication.objects.filter(
         reviewed_by=request.user,
         status__in=["approved", "rejected", "correction_requested"],
     ).order_by("-reviewed_at")[:10]
+    manager_earnings = (
+        Commission.objects.filter(user=request.user, role=Commission.ROLE_MANAGER)
+        .exclude(status=Commission.STATUS_CANCELLED)
+        .aggregate(total=Sum("amount"))["total"]
+        or 0
+    )
 
     return render(request, "approvals/home.html", {
         "my_active": my_active,
         "pending_count": pending_count,
+        "pending_queue": pending_queue,
         "completed_reviews": completed_reviews,
         "active_count": my_active.count(),
         "max_active": MAX_ACTIVE,
+        "manager_earnings": manager_earnings,
     })
 
 

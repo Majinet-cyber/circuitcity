@@ -35,6 +35,9 @@ class ApprovalQueueTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Pending queue")
+        self.assertContains(response, "CLAIM NEXT")
+        self.assertContains(response, "Pending Review Queue")
+        self.assertContains(response, "Rep: merchant")
         self.assertContains(response, "1")
 
     def test_manager_can_claim_next_and_second_manager_cannot_claim_same_app(self):
@@ -52,6 +55,16 @@ class ApprovalQueueTests(TestCase):
         response = self.client.get(reverse("review_application", args=[app.id]), follow=True)
 
         self.assertContains(response, "This application is already under review by")
+
+    def test_under_review_manager_dashboard_shows_reviewer(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager, claimed_at=timezone.now())
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("manager_home"))
+
+        self.assertContains(response, "Under Review")
+        self.assertContains(response, "Reviewer: manager")
+        self.assertContains(response, app.application_number)
 
     def test_merchant_submitted_page_shows_reviewer_name_for_under_review(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager, claimed_at=timezone.now())
@@ -86,3 +99,49 @@ class ApprovalQueueTests(TestCase):
         self.assertContains(response, "Income band")
         self.assertContains(response, "Exact monthly income")
         self.assertContains(response, "Check income.")
+
+    def test_review_detail_contains_expected_sections_and_actions(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager)
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("review_application", args=[app.id]))
+
+        for text in ["Customer Details", "Deal/Pricing", "KYC", "Location", "Work/Proof", "Signature"]:
+            self.assertContains(response, text)
+        self.assertContains(response, "Approve")
+        self.assertContains(response, "Reject")
+        self.assertContains(response, "Send Back for Edit")
+
+    def test_manager_can_approve_and_reject(self):
+        approve_app = self.create_pending(status="under_review", claimed_by=self.manager)
+        reject_app = self.create_pending(
+            status="under_review",
+            claimed_by=self.manager,
+            customer_name="Reject Customer",
+            national_id="ABCDEFGH",
+        )
+        self.client.login(username="manager", password="test-pass-123")
+
+        approve_response = self.client.post(reverse("review_application", args=[approve_app.id]), {"decision": "approve"})
+        reject_response = self.client.post(
+            reverse("review_application", args=[reject_app.id]),
+            {"decision": "reject", "manager_comment": "Does not qualify."},
+        )
+        approve_app.refresh_from_db()
+        reject_app.refresh_from_db()
+
+        self.assertRedirects(approve_response, reverse("manager_home"))
+        self.assertRedirects(reject_response, reverse("manager_home"))
+        self.assertEqual(approve_app.status, "approved")
+        self.assertEqual(reject_app.status, "rejected")
+
+    def test_reject_requires_comment(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager)
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.post(reverse("review_application", args=[app.id]), {"decision": "reject"})
+        app.refresh_from_db()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Manager comment is required when rejecting an application.")
+        self.assertEqual(app.status, "under_review")

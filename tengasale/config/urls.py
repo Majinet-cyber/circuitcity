@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
+from earnings.views import payments_home
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -11,6 +12,7 @@ urlpatterns = [
     path("applications/", include("applications.urls")),
     path("deals/", include("deals.urls")),
     path("earnings/", include("earnings.urls")),
+    path("payments/", payments_home, name="payments_home"),
     path("approvals/", include("approvals.urls")),
     path("contracts/", include("contracts.urls")),
 ]

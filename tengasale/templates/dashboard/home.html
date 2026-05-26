@@ -4,10 +4,27 @@
 
 <h1 class="greeting">Hi, {{ request.user.first_name|default:request.user.username }}</h1>
 
-<div class="hero-card">
-    <p>You are now selling smarter with TengaSale.</p>
-    <span class="money-chip">Ready to sell</span>
-</div>
+<section class="stat-card earnings-home-card">
+    <span>TengaSale</span>
+    <h2>You are now earning more with TengaSale.</h2>
+    <strong class="amount-positive">Earnings MWK {{ earnings_total|floatformat:2 }}</strong>
+    <a href="{% url 'earnings_home' %}" class="btn">VIEW ALL EARNINGS</a>
+</section>
+
+<section class="card spin-promo-card">
+    <div>
+        <span class="offer-kicker">Spin & Win</span>
+        <h2>Jackpot rewards are live.</h2>
+        <p class="text-muted">{{ spin_wallet.available_spins }} spins available.</p>
+    </div>
+    <a href="{% url 'spin_rewards' %}" class="btn btn-outline">SPIN NOW</a>
+</section>
+
+<section class="card support-card">
+    <h2>Business hours and support</h2>
+    <p>Support is available during TengaSale business hours.</p>
+    <a href="tel:+265000000000" class="btn btn-blue">Contact Support</a>
+</section>
 
 <a href="{% url 'new_application' %}" class="new-application-button">
     + NEW APPLICATION
@@ -55,7 +72,15 @@
     <a href="{% url 'earnings_home' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-money">E</span>
-            <span>My Earnings</span>
+            <span>Earnings</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+
+    <a href="{% url 'payments_home' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-payments">P</span>
+            <span>Payments</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
@@ -76,13 +101,15 @@
         <span class="arrow" aria-hidden="true">></span>
     </a>
 
-    <a href="{% url 'earnings_home' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-payments">P</span>
-            <span>Payments</span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
+    {% if request.user.is_staff or request.user.is_superuser %}
+        <a href="{% url 'manager_home' %}" class="menu-row">
+            <span class="left">
+                <span class="menu-icon icon-tools">M</span>
+                <span>Manager Queue</span>
+            </span>
+            <span class="arrow" aria-hidden="true">></span>
+        </a>
+    {% endif %}
 </section>
 
 {% endblock %}

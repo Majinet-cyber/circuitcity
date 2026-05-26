@@ -4,56 +4,100 @@
 
 {% block content %}
 
-<h1>Hi, {{ request.user.first_name|default:request.user.username }}</h1>
+<h1 class="greeting">Hi, {{ request.user.first_name|default:request.user.username }}</h1>
 
 {% if pending_count > 0 %}
-    <a href="{% url 'claim_next' %}" class="big-button green-button">
-        ☝ CLAIM NEXT
+    <a href="{% url 'claim_next' %}" class="new-application-button green-button">
+        CLAIM NEXT
     </a>
 {% else %}
-    <div class="big-button" style="background:#ddd; color:#888;">
-        ☝ NO APPS PENDING
+    <div class="new-application-button disabled-button">
+        NO APPS PENDING
     </div>
 {% endif %}
 
-<div class="big-button blue-button" style="margin-top:20px;">
-    MY ACTIVE {{ active_count }} / {{ max_active }}
-</div>
-
-<div class="menu-list">
-    <h2>Applications</h2>
-
-    {% for app in my_active %}
-        <a href="{% url 'review_application' app.id %}" class="menu-row">
-            <span>{{ app.customer_name }}</span>
-            <span class="arrow">→</span>
-        </a>
-    {% empty %}
-        <div class="card">No active applications.</div>
-    {% endfor %}
-</div>
-
-<div class="card">
-    <div class="detail-row">
-        <span>Pending queue</span>
-        <strong>{{ pending_count }}</strong>
+<section class="card">
+    <div class="metric-grid">
+        <div>
+            <span>My Active</span>
+            <strong>{{ active_count }} / {{ max_active }}</strong>
+        </div>
+        <div>
+            <span>Pending queue</span>
+            <strong>{{ pending_count }}</strong>
+        </div>
+        <div>
+            <span>Completed reviews</span>
+            <strong>{{ completed_reviews|length }}</strong>
+        </div>
+        <div>
+            <span>Earnings</span>
+            <strong class="amount-positive">MWK {{ manager_earnings|floatformat:2 }}</strong>
+        </div>
     </div>
-    <div class="detail-row">
-        <span>Queue rules</span>
-        <strong>Oldest unclaimed pending review application is claimed first.</strong>
-    </div>
-</div>
+</section>
 
-<div class="menu-list">
+<section class="menu-list">
+    <h2>My Active / Claimed Reviews</h2>
+    <div class="application-list">
+        {% for app in my_active %}
+            <a href="{% url 'review_application' app.id %}" class="application-card">
+                <div class="application-card-main">
+                    <div class="application-card-header">
+                        <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                        <span class="status-pill status-under_review">Under Review</span>
+                    </div>
+                    <div class="application-meta">
+                        <span>ID: {{ app.national_id|default:"-" }}</span>
+                        <span>App: {{ app.application_number|default:app.id }}</span>
+                        <span>{{ app.created_at|date:"Y/m/d, H:i" }}</span>
+                    </div>
+                    <p class="application-reviewer">Reviewer: {{ request.user.get_full_name|default:request.user.username }}</p>
+                </div>
+                <div class="application-card-side"><span class="soft-card-arrow">&rsaquo;</span></div>
+            </a>
+        {% empty %}
+            <div class="card">No active applications.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="menu-list">
+    <h2>Pending Review Queue</h2>
+    <div class="application-list">
+        {% for app in pending_queue %}
+            <div class="application-card">
+                <div class="application-card-main">
+                    <div class="application-card-header">
+                        <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                        <span class="status-pill status-pending_review">Pending Review</span>
+                    </div>
+                    <div class="application-meta">
+                        <span>ID: {{ app.national_id|default:"-" }}</span>
+                        <span>Rep: {{ app.created_by.get_full_name|default:app.created_by.username }}</span>
+                        <span>{{ app.submitted_at|default:app.created_at|date:"Y/m/d, H:i" }}</span>
+                    </div>
+                </div>
+                <div class="application-card-side">
+                    <a href="{% url 'claim_next' %}" class="view-contract-button">Claim</a>
+                </div>
+            </div>
+        {% empty %}
+            <div class="card">No applications waiting for review.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="menu-list">
     <h2>Completed Reviews</h2>
     {% for app in completed_reviews %}
         <a href="{% url 'application_detail' app.id %}" class="menu-row">
             <span>{{ app.customer_name|default:app.application_number }}</span>
-            <span class="status-pill">{{ app.get_status_display }}</span>
+            <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
         </a>
     {% empty %}
         <div class="card">No completed reviews yet.</div>
     {% endfor %}
-</div>
+</section>
 
 {% endblock %}

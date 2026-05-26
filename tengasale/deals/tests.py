@@ -2,6 +2,7 @@ from decimal import Decimal
 from importlib import import_module
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase
@@ -13,6 +14,41 @@ from .models import DeviceBrand, DeviceDeal
 class DealUrlTests(TestCase):
     def test_all_deals_url_name_resolves(self):
         self.assertEqual(reverse("all_deals"), "/deals/")
+
+
+class AllDealsPageTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="merchant", password="test-pass-123")
+        self.client.login(username="merchant", password="test-pass-123")
+
+    def test_all_deals_page_loads_as_guided_selector(self):
+        response = self.client.get(reverse("all_deals"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "All Deals")
+        self.assertContains(response, "Choose your new phone")
+        self.assertContains(response, "Current active TengaSale phone financing offers.")
+        for brand_name in ["TECNO", "itel", "Redmi"]:
+            self.assertContains(response, brand_name)
+        self.assertContains(response, "Choose a model")
+        self.assertContains(response, "Choose specs")
+        self.assertContains(response, "Pay early, pay less")
+        self.assertContains(response, "3 months")
+        self.assertContains(response, "25% discount")
+        self.assertContains(response, "6 months")
+        self.assertContains(response, "15% discount")
+        self.assertContains(response, "deal-summary-card")
+
+    def test_seeded_deals_render_in_page_data(self):
+        call_command("seed_tengasale")
+
+        response = self.client.get(reverse("all_deals"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "all-deals-data")
+        self.assertContains(response, "loan_multiplier")
+        self.assertContains(response, "deposit_percent")
+        self.assertContains(response, "default_cash_price")
 
 
 class DealAdminImportTests(TestCase):
