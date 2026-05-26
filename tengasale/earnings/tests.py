@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -51,6 +52,11 @@ class EarningsPageTests(TestCase):
         self.assertContains(response, "MWK 10000.00")
         self.assertContains(response, "Available spins")
         self.assertContains(response, "SPIN & WIN")
+        self.assertContains(response, f'href="{settings.TENGASALE_WHATSAPP_LINK}"')
+        self.assertContains(response, 'class="icon-button whatsapp-button"')
+        self.assertContains(response, 'aria-label="WhatsApp support"')
+        self.assertContains(response, "notification-button")
+        self.assertContains(response, "logout-button")
 
     def test_earnings_page_shows_wallet_tabs_positive_negative_and_contract(self):
         wallet = Wallet.objects.create(user=self.user, balance=Decimal("5000.00"))

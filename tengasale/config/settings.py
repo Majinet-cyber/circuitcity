@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
 import sys
 
@@ -75,6 +76,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.tengasale_support",
             ],
         },
     },
@@ -138,6 +140,9 @@ LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+TENGASALE_WHATSAPP_NUMBER = os.environ.get("TENGASALE_WHATSAPP_NUMBER", "265000000000")
+TENGASALE_WHATSAPP_LINK = f"https://wa.me/{''.join(char for char in TENGASALE_WHATSAPP_NUMBER if char.isdigit())}"
 
 if "test" in sys.argv:
     PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

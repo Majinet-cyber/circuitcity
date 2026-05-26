@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
@@ -26,6 +27,15 @@ class HomePageTests(TestCase):
         self.assertContains(response, "Spin & Win")
         self.assertContains(response, "SPIN NOW")
         self.assertContains(response, "NEW APPLICATION")
+        self.assertContains(response, f'href="{settings.TENGASALE_WHATSAPP_LINK}"')
+        self.assertContains(response, 'class="icon-button whatsapp-button"')
+        self.assertContains(response, 'aria-label="WhatsApp support"')
+        self.assertContains(response, "notification-button")
+        self.assertContains(response, "logout-button")
+
+        content = response.content.decode()
+        self.assertLess(content.index("whatsapp-button"), content.index("notification-button"))
+        self.assertLess(content.index("notification-button"), content.index("logout-button"))
 
     def test_home_template_uses_post_logout_form(self):
         get_user_model().objects.create_user(

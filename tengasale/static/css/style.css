@@ -119,6 +119,8 @@ a {
     background: var(--surface);
     color: var(--blue-gray);
     cursor: pointer;
+    text-decoration: none;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
 .icon-button svg {
@@ -154,6 +156,27 @@ a {
 .logout-button:hover,
 .notification-button:hover {
     border-color: var(--blue-gray);
+}
+
+.icon-button:focus-visible {
+    outline: 3px solid rgba(255, 106, 0, 0.18);
+    outline-offset: 2px;
+}
+
+.whatsapp-button {
+    color: var(--green);
+}
+
+.whatsapp-button svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+    stroke: none;
+}
+
+.whatsapp-button:hover {
+    border-color: var(--green);
+    background: var(--green-soft);
 }
 
 .content {

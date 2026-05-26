@@ -3,6 +3,7 @@ from importlib import import_module
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase
@@ -38,6 +39,11 @@ class AllDealsPageTests(TestCase):
         self.assertContains(response, "6 months")
         self.assertContains(response, "15% discount")
         self.assertContains(response, "deal-summary-card")
+        self.assertContains(response, f'href="{settings.TENGASALE_WHATSAPP_LINK}"')
+        self.assertContains(response, 'class="icon-button whatsapp-button"')
+        self.assertContains(response, 'aria-label="WhatsApp support"')
+        self.assertContains(response, "notification-button")
+        self.assertContains(response, "logout-button")
 
     def test_seeded_deals_render_in_page_data(self):
         call_command("seed_tengasale")
