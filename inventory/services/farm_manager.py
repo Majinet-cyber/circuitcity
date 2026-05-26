@@ -30,16 +30,21 @@ from django.utils import timezone
 # ==============================================================================
 
 
-class LedgerEntryData(TypedDict):
-    """Data structure for a ledger entry (extracted from model)."""
+class LedgerEntryData(TypedDict, total=False):
+    """Data structure for a ledger entry (extracted from model).
+
+    `total=False` so optional linkage fields can be absent.
+    """
     id: int
     date: date
-    entry_type: str  # "expense" | "sale" | "other_income"
+    entry_type: str   # "expense" | "sale" | "other_income"
     enterprise_type: str
     category: str
     amount_mwk: Decimal
     quantity: Optional[Decimal]
     unit: str
+    livestock_batch_id: Optional[int]   # FK to FarmLivestockBatch
+    crop_season_id: Optional[int]       # FK to FarmCropSeason
 
 
 class LivestockEventData(TypedDict):
@@ -537,6 +542,8 @@ def ledger_entry_to_data(entry) -> LedgerEntryData:
         amount_mwk=entry.amount_mwk,
         quantity=entry.quantity,
         unit=entry.unit,
+        livestock_batch_id=getattr(entry, "livestock_batch_id", None),
+        crop_season_id=getattr(entry, "crop_season_id", None),
     )
 
 
@@ -864,5 +871,1261 @@ def get_farm_dashboard_snapshot(
         as_of_date=today,
         month_name=calendar.month_name[current_month],
         year=current_year,
+    )
+
+
+# ==============================================================================
+# MORTALITY RISK LEVEL
+# ==============================================================================
+
+
+def compute_mortality_risk_level(mortality_rate: Optional[Decimal]) -> str:
+    """
+    Convert a mortality rate percentage into a risk level string.
+
+    Returns one of: 'critical' | 'high_risk' | 'watch' | 'good' | 'unknown'
+    """
+    if mortality_rate is None:
+        return "unknown"
+    if mortality_rate >= Decimal("20"):
+        return "critical"
+    if mortality_rate >= Decimal("10"):
+        return "high_risk"
+    if mortality_rate >= Decimal("5"):
+        return "watch"
+    return "good"
+
+
+# ==============================================================================
+# LIVESTOCK INTELLIGENCE (EXTENDED SNAPSHOT)
+# ==============================================================================
+
+
+@dataclass
+class LivestockIntelligenceResult:
+    """Rich intelligence result for a single livestock batch."""
+    batch_id: int
+    batch_name: str
+    animal_type: str
+    count_current: int
+    births_total: int
+    deaths_total: int
+    purchases_total: int
+    sales_total: int
+
+    # Rates
+    mortality_rate: Optional[Decimal]
+    survival_rate: Optional[Decimal]
+    mortality_risk_level: str   # critical | high_risk | watch | good | unknown
+
+    # Financial
+    feed_cost_mwk: Decimal
+    medicine_cost_mwk: Decimal
+    labour_cost_mwk: Decimal
+    other_cost_mwk: Decimal
+    total_cost_mwk: Decimal
+    revenue_mwk: Decimal
+    net_profit_mwk: Decimal
+
+    # Per-animal
+    profit_per_animal_mwk: Optional[Decimal]
+    cost_per_surviving_animal_mwk: Optional[Decimal]
+    break_even_price_mwk: Optional[Decimal]
+
+    # Scores
+    batch_health_score: int     # 0–100
+    days_in_cycle: int
+
+    # Estimated value
+    estimated_value: Optional[Decimal]
+
+    # Marketplace
+    has_asking_price: bool
+    has_stock: bool
+
+    # Recommendations
+    recommendations: List[str]
+
+
+def compute_livestock_intelligence(
+    batch: LivestockBatchData,
+    events: List[LivestockEventData],
+    ledger_entries: List[LedgerEntryData],
+    batch_created_date: date,
+    today: Optional[date] = None,
+) -> LivestockIntelligenceResult:
+    """
+    Compute full intelligence for a livestock batch from events and ledger data.
+
+    Args:
+        batch: Batch data dict
+        events: All events for this batch
+        ledger_entries: Ledger entries linked to this batch (pre-filtered)
+        batch_created_date: Date the batch was created
+        today: Current date (defaults to today)
+
+    Returns:
+        LivestockIntelligenceResult with all intelligence fields
+    """
+    if today is None:
+        today = timezone.now().date()
+
+    # --- Counts from events ---
+    batch_events = [e for e in events if e["batch_id"] == batch["id"] and e["date"] <= today]
+    births_total = sum(e["count"] for e in batch_events if e["event_type"] == "birth")
+    deaths_total = sum(e["count"] for e in batch_events if e["event_type"] in ("death", "slaughter"))
+    purchases_total = sum(e["count"] for e in batch_events if e["event_type"] == "purchase")
+    sales_total = sum(e["count"] for e in batch_events if e["event_type"] == "sale")
+    transfers_in = sum(e["count"] for e in batch_events if e["event_type"] == "transfer_in")
+    transfers_out = sum(e["count"] for e in batch_events if e["event_type"] == "transfer_out")
+
+    count_current = max(0, births_total + purchases_total + transfers_in - deaths_total - sales_total - transfers_out)
+
+    total_in = births_total + purchases_total + transfers_in
+    mortality_rate: Optional[Decimal] = None
+    survival_rate: Optional[Decimal] = None
+    if total_in > 0:
+        mortality_rate = Decimal(deaths_total) / Decimal(total_in) * 100
+        survival_rate = Decimal("100") - mortality_rate
+
+    risk_level = compute_mortality_risk_level(mortality_rate)
+
+    # --- Financial from ledger ---
+    feed_cost = Decimal("0")
+    medicine_cost = Decimal("0")
+    labour_cost = Decimal("0")
+    other_cost = Decimal("0")
+    revenue = Decimal("0")
+
+    for entry in ledger_entries:
+        if entry["entry_type"] == "expense":
+            cat = entry["category"]
+            if cat == "feed":
+                feed_cost += entry["amount_mwk"]
+            elif cat == "vet":
+                medicine_cost += entry["amount_mwk"]
+            elif cat == "labour":
+                labour_cost += entry["amount_mwk"]
+            else:
+                other_cost += entry["amount_mwk"]
+        elif entry["entry_type"] in ("sale", "other_income"):
+            revenue += entry["amount_mwk"]
+
+    # Also count sale event revenue
+    for e in batch_events:
+        if e["event_type"] == "sale" and e.get("unit_price_mwk"):
+            revenue += Decimal(e["count"]) * e["unit_price_mwk"]
+
+    total_cost = feed_cost + medicine_cost + labour_cost + other_cost
+    net_profit = revenue - total_cost
+
+    # Per-animal
+    profit_per_animal: Optional[Decimal] = None
+    if count_current > 0 and total_cost > 0:
+        profit_per_animal = net_profit / Decimal(count_current)
+
+    cost_per_surviving: Optional[Decimal] = None
+    if count_current > 0:
+        cost_per_surviving = total_cost / Decimal(count_current)
+
+    break_even: Optional[Decimal] = None
+    if count_current > 0 and total_cost > 0:
+        break_even = total_cost / Decimal(count_current)
+
+    # --- Estimated value ---
+    estimated_value: Optional[Decimal] = None
+    if batch["valuation_enabled"] and count_current > 0:
+        if batch["price_per_animal_mwk"]:
+            estimated_value = Decimal(count_current) * batch["price_per_animal_mwk"]
+        elif batch["price_per_kg_mwk"] and batch["avg_weight_kg"]:
+            estimated_value = Decimal(count_current) * batch["avg_weight_kg"] * batch["price_per_kg_mwk"]
+
+    # --- Days in cycle ---
+    days_in_cycle = max(0, (today - batch_created_date).days)
+
+    # --- Batch health score (0–100) ---
+    health_score = 100
+    if risk_level == "critical":
+        health_score -= 40
+    elif risk_level == "high_risk":
+        health_score -= 25
+    elif risk_level == "watch":
+        health_score -= 10
+    if net_profit < Decimal("0"):
+        health_score -= 20
+    if not batch.get("price_per_animal_mwk") and not batch.get("price_per_kg_mwk"):
+        health_score -= 10
+    if total_cost == Decimal("0"):
+        health_score -= 10
+    health_score = max(0, min(100, health_score))
+
+    # --- Recommendations ---
+    recs: List[str] = []
+    if risk_level in ("critical", "high_risk"):
+        recs.append(f"Mortality is {risk_level.replace('_', ' ')} — review disease and death events immediately.")
+    if not batch.get("price_per_animal_mwk") and not batch.get("expected_sale_price_mwk"):
+        recs.append("Add an expected sale price to unlock profit simulation.")
+    if net_profit < Decimal("0") and revenue > Decimal("0"):
+        recs.append("Batch is running at a loss — review costs and pricing.")
+    if feed_cost > Decimal("0") and count_current > 0:
+        feed_per = feed_cost / Decimal(count_current)
+        if feed_per > Decimal("5000"):
+            recs.append("Feed cost per animal is high — review feed type and waste.")
+    if count_current > 0 and not batch.get("price_per_animal_mwk"):
+        recs.append("Set a target sale price so profit can be estimated.")
+
+    return LivestockIntelligenceResult(
+        batch_id=batch["id"],
+        batch_name=batch["name"],
+        animal_type=batch["animal_type"],
+        count_current=count_current,
+        births_total=births_total,
+        deaths_total=deaths_total,
+        purchases_total=purchases_total,
+        sales_total=sales_total,
+        mortality_rate=mortality_rate,
+        survival_rate=survival_rate,
+        mortality_risk_level=risk_level,
+        feed_cost_mwk=feed_cost,
+        medicine_cost_mwk=medicine_cost,
+        labour_cost_mwk=labour_cost,
+        other_cost_mwk=other_cost,
+        total_cost_mwk=total_cost,
+        revenue_mwk=revenue,
+        net_profit_mwk=net_profit,
+        profit_per_animal_mwk=profit_per_animal,
+        cost_per_surviving_animal_mwk=cost_per_surviving,
+        break_even_price_mwk=break_even,
+        batch_health_score=health_score,
+        days_in_cycle=days_in_cycle,
+        estimated_value=estimated_value,
+        has_asking_price=bool(batch.get("price_per_animal_mwk") or batch.get("expected_sale_price_mwk")),
+        has_stock=(count_current > 0),
+        recommendations=recs,
+    )
+
+
+# ==============================================================================
+# LIVESTOCK SIMULATION
+# ==============================================================================
+
+
+@dataclass
+class LivestockSimulationResult:
+    """Projected profit scenarios for a livestock batch."""
+    batch_id: int
+    batch_name: str
+    count_to_sell: int
+    sale_price_per_head: Decimal
+    total_cost: Decimal
+
+    # Scenarios
+    best_case_revenue: Decimal
+    best_case_profit: Decimal
+    expected_case_revenue: Decimal
+    expected_case_profit: Decimal
+    worst_case_revenue: Decimal
+    worst_case_profit: Decimal
+
+    # Key metrics
+    roi_pct: Optional[Decimal]
+    break_even_price: Optional[Decimal]
+
+    # Human-readable summary
+    summary: str
+
+
+def compute_livestock_simulation(
+    batch: LivestockBatchData,
+    current_costs: Decimal,
+    expected_sale_price: Optional[Decimal],
+    expected_count_to_sell: Optional[int] = None,
+    expected_mortality_pct: Decimal = Decimal("5"),
+) -> LivestockSimulationResult:
+    """
+    Compute best/expected/worst case profit scenarios for a livestock batch.
+
+    Args:
+        batch: Batch data dict
+        current_costs: Total costs incurred so far (MWK)
+        expected_sale_price: Expected sale price per head (MWK). Uses batch price if None.
+        expected_count_to_sell: Animals expected to sell. Defaults to current count.
+        expected_mortality_pct: Expected mortality % for scenario calculations.
+
+    Returns:
+        LivestockSimulationResult with three scenarios
+    """
+    count = expected_count_to_sell or batch["count_current"] or 0
+    price = expected_sale_price or batch.get("price_per_animal_mwk") or Decimal("0")
+
+    # Expected case: sell expected_count at expected_price
+    expected_revenue = Decimal(count) * price
+    expected_profit = expected_revenue - current_costs
+
+    # Best case: +10% price, no extra mortality
+    best_price = price * Decimal("1.10")
+    best_revenue = Decimal(count) * best_price
+    best_profit = best_revenue - current_costs
+
+    # Worst case: mortality eats into sellable count, -10% price
+    extra_deaths = int(count * (expected_mortality_pct / Decimal("100")))
+    worst_count = max(0, count - extra_deaths)
+    worst_price = price * Decimal("0.90")
+    worst_revenue = Decimal(worst_count) * worst_price
+    worst_profit = worst_revenue - current_costs
+
+    # ROI
+    roi_pct: Optional[Decimal] = None
+    if current_costs > Decimal("0"):
+        roi_pct = (expected_profit / current_costs) * Decimal("100")
+
+    # Break-even
+    break_even: Optional[Decimal] = None
+    if count > 0 and current_costs > Decimal("0"):
+        break_even = current_costs / Decimal(count)
+
+    # Summary text
+    if price > Decimal("0") and count > 0:
+        summary = (
+            f"If you sell {count} animals at MWK {price:,.0f} each, "
+            f"projected profit is MWK {expected_profit:,.0f}."
+        )
+        if break_even:
+            summary += f" Break-even is MWK {break_even:,.0f} per animal."
+    else:
+        summary = "Set a sale price and animal count to run this simulation."
+
+    return LivestockSimulationResult(
+        batch_id=batch["id"],
+        batch_name=batch["name"],
+        count_to_sell=count,
+        sale_price_per_head=price,
+        total_cost=current_costs,
+        best_case_revenue=best_revenue,
+        best_case_profit=best_profit,
+        expected_case_revenue=expected_revenue,
+        expected_case_profit=expected_profit,
+        worst_case_revenue=worst_revenue,
+        worst_case_profit=worst_profit,
+        roi_pct=roi_pct,
+        break_even_price=break_even,
+        summary=summary,
+    )
+
+
+# ==============================================================================
+# CROP INTELLIGENCE
+# ==============================================================================
+
+
+@dataclass
+class CropIntelligenceResult:
+    """Rich intelligence result for a single crop season."""
+    season_id: int
+    season_name: str
+    crop_type: str
+    area_value: Decimal
+    area_unit: str
+    status: str
+
+    # Costs
+    input_cost_mwk: Decimal
+    input_cost_per_acre: Optional[Decimal]
+
+    # Projections
+    projected_income_mwk: Optional[Decimal]
+    projected_profit_mwk: Optional[Decimal]
+    yield_per_acre: Optional[Decimal]
+    break_even_price: Optional[Decimal]
+
+    # Actual
+    actual_income_mwk: Optional[Decimal]
+    actual_profit_mwk: Optional[Decimal]
+
+    # Intelligence
+    harvest_readiness: str   # ready | near | growing | planning | harvested | unknown
+    risk_level: str          # good | watch | risky | unknown
+    days_to_harvest: Optional[int]
+    recommendations: List[str]
+
+
+def compute_crop_intelligence(
+    season: CropSeasonData,
+    ledger_entries: List[LedgerEntryData],
+    today: date,
+) -> CropIntelligenceResult:
+    """
+    Compute rich intelligence for a crop season.
+
+    Args:
+        season: Crop season data dict
+        ledger_entries: Ledger entries linked to this season (pre-filtered by season)
+        today: Current date
+
+    Returns:
+        CropIntelligenceResult with harvest readiness, risk level, and recommendations
+    """
+    # Input costs from ledger
+    input_cost = sum(
+        (e["amount_mwk"] for e in ledger_entries if e["entry_type"] == "expense"),
+        Decimal("0"),
+    )
+
+    # Per-acre cost
+    input_cost_per_acre: Optional[Decimal] = None
+    if season["area_value"] and season["area_value"] > 0:
+        input_cost_per_acre = input_cost / season["area_value"]
+
+    # Projected income and profit
+    projected_income: Optional[Decimal] = None
+    projected_profit: Optional[Decimal] = None
+    if season["projected_yield"] and season["projected_price_per_unit_mwk"]:
+        projected_income = season["projected_yield"] * season["projected_price_per_unit_mwk"]
+        projected_profit = projected_income - input_cost
+
+    # Yield per acre
+    yield_per_acre: Optional[Decimal] = None
+    if season["projected_yield"] and season["area_value"] and season["area_value"] > 0:
+        yield_per_acre = season["projected_yield"] / season["area_value"]
+
+    # Break-even price per yield unit
+    break_even: Optional[Decimal] = None
+    if season["projected_yield"] and season["projected_yield"] > 0 and input_cost > 0:
+        break_even = input_cost / season["projected_yield"]
+
+    # Actual income and profit
+    actual_income: Optional[Decimal] = None
+    actual_profit: Optional[Decimal] = None
+    if season["actual_yield"] and season["actual_price_per_unit_mwk"]:
+        actual_income = season["actual_yield"] * season["actual_price_per_unit_mwk"]
+        actual_profit = actual_income - input_cost
+
+    # Harvest readiness
+    harvest_readiness = "unknown"
+    days_to_harvest: Optional[int] = None
+    status = season["status"]
+
+    if status == "harvested" or status == "closed":
+        harvest_readiness = "harvested"
+    elif season["end_date"]:
+        days_remaining = (season["end_date"] - today).days
+        days_to_harvest = days_remaining
+        if days_remaining <= 0:
+            harvest_readiness = "ready"
+        elif days_remaining <= 14:
+            harvest_readiness = "ready"
+        elif days_remaining <= 30:
+            harvest_readiness = "near"
+        elif status == "active":
+            harvest_readiness = "growing"
+        else:
+            harvest_readiness = "planning"
+    elif status == "active":
+        harvest_readiness = "growing"
+    elif status == "planning":
+        harvest_readiness = "planning"
+
+    # Risk level
+    risk_level = "unknown"
+    if projected_income and input_cost > Decimal("0"):
+        if projected_income > input_cost * Decimal("1.5"):
+            risk_level = "good"
+        elif projected_income > input_cost:
+            risk_level = "watch"
+        else:
+            risk_level = "risky"
+    elif input_cost > Decimal("0") and not projected_income:
+        risk_level = "watch"
+
+    # Recommendations
+    recs: List[str] = []
+    if not season["projected_yield"]:
+        recs.append(f"Add expected yield for {season['name']} to unlock profit forecast.")
+    if not season["projected_price_per_unit_mwk"]:
+        recs.append(f"Add expected sale price for {season['name']} to see projected income.")
+    if harvest_readiness == "ready":
+        recs.append(f"{season['name']} is ready to harvest — prepare labour and storage.")
+    elif harvest_readiness == "near":
+        recs.append(f"{season['name']} harvest is approaching — plan logistics now.")
+    if risk_level == "risky":
+        recs.append(f"Input costs for {season['name']} exceed projected income — review costs.")
+    if status == "harvested" and not season["actual_yield"]:
+        recs.append(f"Record actual yield for {season['name']} after harvest.")
+
+    return CropIntelligenceResult(
+        season_id=season["id"],
+        season_name=season["name"],
+        crop_type=season["crop_type"],
+        area_value=season["area_value"],
+        area_unit=season["area_unit"],
+        status=status,
+        input_cost_mwk=input_cost,
+        input_cost_per_acre=input_cost_per_acre,
+        projected_income_mwk=projected_income,
+        projected_profit_mwk=projected_profit,
+        yield_per_acre=yield_per_acre,
+        break_even_price=break_even,
+        actual_income_mwk=actual_income,
+        actual_profit_mwk=actual_profit,
+        harvest_readiness=harvest_readiness,
+        risk_level=risk_level,
+        days_to_harvest=days_to_harvest,
+        recommendations=recs,
+    )
+
+
+# ==============================================================================
+# EGG / POULTRY SUMMARY
+# ==============================================================================
+
+
+@dataclass
+class EggProductionSummary:
+    """Summary of egg production for a poultry batch."""
+    batch_id: int
+    batch_name: str
+    total_eggs_collected: int
+    eggs_today: int
+    eggs_this_week: int
+    eggs_this_month: int
+    spoiled_eggs: int
+    eggs_sold: int
+    eggs_in_stock: int
+    revenue_mwk: Decimal
+    feed_cost_mwk: Decimal
+    feed_cost_per_egg: Optional[Decimal]
+    productivity_rate: Optional[Decimal]   # eggs per bird per day (last 7 days)
+    spoilage_rate: Optional[Decimal]
+    trend: str    # up | down | stable
+
+
+def compute_egg_summary(
+    batch_id: int,
+    batch_name: str,
+    initial_birds: int,
+    current_birds: int,
+    total_eggs: int,
+    total_feed_kg: Decimal,
+    total_cost: Decimal,
+    total_sales: Decimal,
+    daily_records: List[Dict[str, Any]],
+    today: date,
+) -> EggProductionSummary:
+    """
+    Compute egg production intelligence from poultry batch daily records.
+
+    Args:
+        batch_id: Batch primary key
+        batch_name: Batch display name
+        initial_birds: Birds at batch start
+        current_birds: Current birds alive
+        total_eggs: Running total from batch model
+        total_feed_kg: Running total feed kg
+        total_cost: Running total cost from cashbook
+        total_sales: Running total sales from cashbook
+        daily_records: List of dicts with keys: date, eggs_collected, deaths, feed_kg
+        today: Current date
+
+    Returns:
+        EggProductionSummary
+    """
+    # Filter records by period
+    this_week_start = today - timedelta(days=7)
+    this_month_start = today.replace(day=1)
+
+    eggs_today = 0
+    eggs_this_week = 0
+    eggs_this_month = 0
+    spoiled_eggs = 0   # from records with spoilage field if present
+    eggs_sold = 0
+
+    for r in daily_records:
+        rec_date = r.get("date")
+        if not rec_date:
+            continue
+        if isinstance(rec_date, str):
+            from datetime import datetime
+            rec_date = datetime.strptime(rec_date, "%Y-%m-%d").date()
+
+        eggs = r.get("eggs_collected", 0) or 0
+        spoiled = r.get("eggs_spoiled", 0) or 0
+        sold = r.get("eggs_sold", 0) or 0
+
+        if rec_date == today:
+            eggs_today += eggs
+        if rec_date >= this_week_start:
+            eggs_this_week += eggs
+        if rec_date >= this_month_start:
+            eggs_this_month += eggs
+
+        spoiled_eggs += spoiled
+        eggs_sold += sold
+
+    eggs_in_stock = max(0, total_eggs - eggs_sold - spoiled_eggs)
+
+    # Feed cost per egg
+    feed_cost_per_egg: Optional[Decimal] = None
+    if total_eggs > 0 and total_cost > Decimal("0"):
+        feed_cost_per_egg = total_cost / Decimal(total_eggs)
+
+    # Productivity rate: eggs per bird per day over last 7 days
+    productivity_rate: Optional[Decimal] = None
+    week_records = [
+        r for r in daily_records
+        if r.get("date") and (
+            (r["date"] if isinstance(r["date"], date) else date.fromisoformat(r["date"][:10]))
+            >= this_week_start
+        )
+    ]
+    if week_records and current_birds > 0:
+        week_eggs = sum(r.get("eggs_collected", 0) or 0 for r in week_records)
+        productivity_rate = Decimal(week_eggs) / Decimal(current_birds) / Decimal(len(week_records))
+
+    # Spoilage rate
+    spoilage_rate: Optional[Decimal] = None
+    if total_eggs > 0 and spoiled_eggs > 0:
+        spoilage_rate = Decimal(spoiled_eggs) / Decimal(total_eggs) * 100
+
+    # Trend: compare this week to previous week
+    prev_week_start = this_week_start - timedelta(days=7)
+    prev_week_records = [
+        r for r in daily_records
+        if r.get("date") and (
+            prev_week_start <=
+            (r["date"] if isinstance(r["date"], date) else date.fromisoformat(r["date"][:10]))
+            < this_week_start
+        )
+    ]
+    prev_week_eggs = sum(r.get("eggs_collected", 0) or 0 for r in prev_week_records)
+    trend = "stable"
+    if prev_week_eggs > 0:
+        if eggs_this_week > prev_week_eggs * Decimal("1.05"):
+            trend = "up"
+        elif eggs_this_week < prev_week_eggs * Decimal("0.95"):
+            trend = "down"
+
+    return EggProductionSummary(
+        batch_id=batch_id,
+        batch_name=batch_name,
+        total_eggs_collected=total_eggs,
+        eggs_today=eggs_today,
+        eggs_this_week=eggs_this_week,
+        eggs_this_month=eggs_this_month,
+        spoiled_eggs=spoiled_eggs,
+        eggs_sold=eggs_sold,
+        eggs_in_stock=eggs_in_stock,
+        revenue_mwk=total_sales,
+        feed_cost_mwk=total_cost,
+        feed_cost_per_egg=feed_cost_per_egg,
+        productivity_rate=productivity_rate,
+        spoilage_rate=spoilage_rate,
+        trend=trend,
+    )
+
+
+# ==============================================================================
+# FARM SCORE
+# ==============================================================================
+
+
+FARM_RANKS: List[tuple] = [
+    (95, "Model Farm"),
+    (85, "Elite Farm"),
+    (70, "Smart Farm"),
+    (50, "Growing Farm"),
+    (30, "Seedling Farm"),
+    (0,  "Struggling Farm"),
+]
+
+FARM_ACHIEVEMENTS_DEFS: Dict[str, str] = {
+    "books_balanced":      "Books Balanced",
+    "profitable_farm":     "Profitable Farm",
+    "low_mortality":       "Low Mortality",
+    "marketplace_ready":   "Marketplace Ready",
+    "feed_master":         "Feed Master",
+    "clean_records":       "Clean Records",
+    "harvest_ready":       "Harvest Ready",
+    "sales_active":        "Sales Active",
+    "cost_controlled":     "Cost Controlled",
+}
+
+
+@dataclass
+class FarmScoreResult:
+    """Gamified farm score result."""
+    score: int                           # 0–100
+    rank: str                            # "Struggling Farm" etc.
+    xp_points: int                       # score * 10 for display
+    badges: List[str]                    # earned achievement labels
+    weaknesses: List[str]                # areas dragging the score
+    next_action: str                     # single best action to improve score
+    score_components: Dict[str, int]     # component_name → contribution
+
+
+def compute_farm_score(
+    net_profit: Decimal,
+    total_income: Decimal,
+    total_expenses: Decimal,
+    livestock_risk_levels: List[str],
+    active_crop_seasons_count: int,
+    missing_yield_count: int,
+    missing_sale_price_count: int,
+    marketplace_listings_count: int,
+    days_since_last_sale: Optional[int],
+    days_since_last_expense: Optional[int],
+    has_recent_livestock_event: bool,
+) -> FarmScoreResult:
+    """
+    Compute a gamified farm score from 0–100 based on farm health signals.
+
+    All inputs are scalars — no ORM calls inside this function.
+    """
+    components: Dict[str, int] = {}
+    weaknesses: List[str] = []
+    badges: List[str] = []
+
+    # 1. Profitability (20 pts)
+    if net_profit > Decimal("0"):
+        components["profitability"] = 20
+        badges.append(FARM_ACHIEVEMENTS_DEFS["profitable_farm"])
+    elif net_profit == Decimal("0") and total_income == Decimal("0"):
+        components["profitability"] = 5   # no data yet, not penalised
+    else:
+        components["profitability"] = 0
+        weaknesses.append("Farm is not profitable this period")
+
+    # 2. Books activity — sales and expenses in last 30 days (15 pts)
+    recent_sale = days_since_last_sale is not None and days_since_last_sale <= 30
+    recent_expense = days_since_last_expense is not None and days_since_last_expense <= 30
+    if recent_sale and recent_expense:
+        components["records_activity"] = 15
+        badges.append(FARM_ACHIEVEMENTS_DEFS["clean_records"])
+    elif recent_sale or recent_expense:
+        components["records_activity"] = 8
+    else:
+        components["records_activity"] = 0
+        weaknesses.append("No sales or expenses recorded recently")
+
+    # 3. Sales activity (10 pts)
+    if days_since_last_sale is not None and days_since_last_sale <= 14:
+        components["sales_active"] = 10
+        badges.append(FARM_ACHIEVEMENTS_DEFS["sales_active"])
+    elif days_since_last_sale is not None and days_since_last_sale <= 30:
+        components["sales_active"] = 5
+    else:
+        components["sales_active"] = 0
+        weaknesses.append("No recent sales activity")
+
+    # 4. Livestock mortality (15 pts)
+    if not livestock_risk_levels:
+        components["livestock_health"] = 10   # no livestock, not penalised
+    else:
+        critical_count = livestock_risk_levels.count("critical")
+        high_count = livestock_risk_levels.count("high_risk")
+        if critical_count == 0 and high_count == 0:
+            components["livestock_health"] = 15
+            badges.append(FARM_ACHIEVEMENTS_DEFS["low_mortality"])
+        elif critical_count > 0:
+            components["livestock_health"] = 0
+            weaknesses.append(f"{critical_count} batch(es) have critical mortality")
+        else:
+            components["livestock_health"] = 5
+            weaknesses.append(f"{high_count} batch(es) have high mortality risk")
+
+    # 5. Crop yield data completeness (10 pts)
+    if active_crop_seasons_count == 0:
+        components["crop_data"] = 7   # no crops, not penalised
+    elif missing_yield_count == 0:
+        components["crop_data"] = 10
+    else:
+        components["crop_data"] = max(0, 10 - (missing_yield_count * 3))
+        weaknesses.append(f"{missing_yield_count} crop season(s) missing expected yield")
+
+    # 6. Livestock has asking price (10 pts)
+    if missing_sale_price_count == 0 and (livestock_risk_levels or active_crop_seasons_count > 0):
+        components["pricing_data"] = 10
+        badges.append(FARM_ACHIEVEMENTS_DEFS["cost_controlled"])
+    elif missing_sale_price_count > 0:
+        components["pricing_data"] = max(0, 10 - (missing_sale_price_count * 3))
+        weaknesses.append(f"{missing_sale_price_count} batch(es) missing expected sale price")
+    else:
+        components["pricing_data"] = 7
+
+    # 7. Marketplace presence (10 pts)
+    if marketplace_listings_count > 0:
+        components["marketplace"] = 10
+        badges.append(FARM_ACHIEVEMENTS_DEFS["marketplace_ready"])
+    else:
+        components["marketplace"] = 0
+        weaknesses.append("No marketplace listings published")
+
+    # 8. Expense control (10 pts)
+    if total_income > Decimal("0"):
+        expense_ratio = total_expenses / total_income
+        if expense_ratio <= Decimal("0.6"):
+            components["expense_control"] = 10
+        elif expense_ratio <= Decimal("0.8"):
+            components["expense_control"] = 6
+        else:
+            components["expense_control"] = 2
+            weaknesses.append("Expenses are high relative to income")
+    else:
+        components["expense_control"] = 5
+
+    # 9. Harvest readiness bonus (not in main score, just badge)
+    # (Crops with harvest_readiness="ready" earn badge, visible in template context)
+
+    score = sum(components.values())
+    score = max(0, min(100, score))
+
+    # Rank
+    rank = "Struggling Farm"
+    for threshold, label in FARM_RANKS:
+        if score >= threshold:
+            rank = label
+            break
+
+    # XP
+    xp = score * 10
+
+    # Next action (pick the most impactful weakness)
+    next_action = "Keep recording your farm activity to improve your score."
+    if "critical" in livestock_risk_levels:
+        next_action = "Urgently review critical mortality batches."
+    elif not recent_sale and not recent_expense:
+        next_action = "Record a sale or expense to show your farm is active."
+    elif missing_sale_price_count > 0:
+        next_action = "Add expected sale prices to your livestock batches."
+    elif missing_yield_count > 0:
+        next_action = "Add expected yield to your crop seasons."
+    elif marketplace_listings_count == 0:
+        next_action = "Publish a livestock batch or crop to the marketplace."
+    elif net_profit < Decimal("0"):
+        next_action = "Review your highest expense category to improve profit."
+
+    return FarmScoreResult(
+        score=score,
+        rank=rank,
+        xp_points=xp,
+        badges=badges,
+        weaknesses=weaknesses,
+        next_action=next_action,
+        score_components=components,
+    )
+
+
+# ==============================================================================
+# MARKETPLACE READINESS
+# ==============================================================================
+
+
+@dataclass
+class MarketplaceReadinessResult:
+    """Marketplace readiness check for a batch or crop."""
+    is_ready: bool
+    has_stock: bool
+    has_asking_price: bool
+    has_image: bool
+    has_description: bool
+    is_already_published: bool
+    missing_items: List[str]
+    readiness_score: int    # 0–100
+
+
+def compute_livestock_marketplace_readiness(
+    count_current: int,
+    price_per_animal_mwk: Optional[Decimal],
+    expected_sale_price_mwk: Optional[Decimal],
+    has_primary_image: bool,
+    notes: str,
+    is_already_published: bool,
+) -> MarketplaceReadinessResult:
+    """Compute marketplace readiness for a livestock batch."""
+    has_stock = count_current > 0
+    has_asking_price = bool(price_per_animal_mwk or expected_sale_price_mwk)
+    has_image = has_primary_image
+    has_description = bool(notes and len(notes.strip()) > 10)
+
+    missing: List[str] = []
+    if not has_stock:
+        missing.append("No animals in stock")
+    if not has_asking_price:
+        missing.append("No asking price set")
+    if not has_image:
+        missing.append("No photo uploaded")
+    if not has_description:
+        missing.append("No description or notes")
+    if is_already_published:
+        missing.append("Already published")
+
+    score_pts = 0
+    if has_stock:
+        score_pts += 40
+    if has_asking_price:
+        score_pts += 30
+    if has_image:
+        score_pts += 20
+    if has_description:
+        score_pts += 10
+
+    is_ready = has_stock and has_asking_price and not is_already_published
+
+    return MarketplaceReadinessResult(
+        is_ready=is_ready,
+        has_stock=has_stock,
+        has_asking_price=has_asking_price,
+        has_image=has_image,
+        has_description=has_description,
+        is_already_published=is_already_published,
+        missing_items=missing,
+        readiness_score=score_pts,
+    )
+
+
+def compute_crop_marketplace_readiness(
+    quantity_available: Decimal,
+    list_price_per_unit_mwk: Optional[Decimal],
+    has_primary_image: bool,
+    description: str,
+    is_already_published: bool,
+) -> MarketplaceReadinessResult:
+    """Compute marketplace readiness for a crop stock line."""
+    has_stock = quantity_available > Decimal("0")
+    has_asking_price = bool(list_price_per_unit_mwk)
+    has_image = has_primary_image
+    has_description = bool(description and len(description.strip()) > 10)
+
+    missing: List[str] = []
+    if not has_stock:
+        missing.append("No stock available")
+    if not has_asking_price:
+        missing.append("No asking price set")
+    if not has_image:
+        missing.append("No photo uploaded")
+    if not has_description:
+        missing.append("No description")
+    if is_already_published:
+        missing.append("Already published")
+
+    score_pts = 0
+    if has_stock:
+        score_pts += 40
+    if has_asking_price:
+        score_pts += 30
+    if has_image:
+        score_pts += 20
+    if has_description:
+        score_pts += 10
+
+    is_ready = has_stock and has_asking_price and not is_already_published
+
+    return MarketplaceReadinessResult(
+        is_ready=is_ready,
+        has_stock=has_stock,
+        has_asking_price=has_asking_price,
+        has_image=has_image,
+        has_description=has_description,
+        is_already_published=is_already_published,
+        missing_items=missing,
+        readiness_score=score_pts,
+    )
+
+
+# ==============================================================================
+# RECOMMENDATION GENERATOR
+# ==============================================================================
+
+
+def generate_farm_recommendations(
+    net_profit: Decimal,
+    livestock_intelligences: List[LivestockIntelligenceResult],
+    crop_intelligences: List[CropIntelligenceResult],
+    has_marketplace_listings: bool,
+    has_poultry: bool,
+    days_since_egg_record: Optional[int],
+    days_since_last_sale: Optional[int],
+    limit: int = 5,
+) -> List[str]:
+    """
+    Generate a short list of plain-English farm recommendations.
+
+    Returns up to `limit` action strings, highest priority first.
+    All inputs are scalars — no ORM calls inside this function.
+    """
+    recs: List[Dict[str, Any]] = []
+
+    # Priority 1: critical mortality
+    for intel in livestock_intelligences:
+        if intel.mortality_risk_level == "critical":
+            recs.append({
+                "priority": 1,
+                "text": (
+                    f"Mortality is critical in '{intel.batch_name}' "
+                    f"({intel.mortality_rate:.1f}% — {intel.deaths_total} deaths). "
+                    "Review death events and disease records immediately."
+                ),
+            })
+
+    # Priority 2: negative profit
+    if net_profit < Decimal("0"):
+        recs.append({
+            "priority": 2,
+            "text": f"Farm is running at a loss of MWK {abs(net_profit):,.0f}. Review your top expense categories.",
+        })
+
+    # Priority 3: ready to harvest
+    for ci in crop_intelligences:
+        if ci.harvest_readiness == "ready":
+            recs.append({
+                "priority": 3,
+                "text": f"'{ci.season_name}' is ready to harvest. Prepare labour and storage now.",
+            })
+
+    # Priority 4: high mortality (watch/high_risk)
+    for intel in livestock_intelligences:
+        if intel.mortality_risk_level == "high_risk":
+            recs.append({
+                "priority": 4,
+                "text": (
+                    f"Mortality is high in '{intel.batch_name}' "
+                    f"({intel.mortality_rate:.1f}%). Review disease events and feeding records."
+                ),
+            })
+
+    # Priority 5: missing sale price on livestock
+    no_price = [i for i in livestock_intelligences if not i.has_asking_price and i.has_stock]
+    if no_price:
+        names = ", ".join(i.batch_name for i in no_price[:2])
+        recs.append({
+            "priority": 5,
+            "text": f"Add an expected sale price to: {names}. This unlocks profit simulation.",
+        })
+
+    # Priority 6: missing crop yield
+    no_yield = [c for c in crop_intelligences if not c.projected_income_mwk and c.status in ("active", "planning")]
+    if no_yield:
+        names = no_yield[0].season_name
+        recs.append({
+            "priority": 6,
+            "text": f"Add expected yield for '{names}' to unlock crop profit forecast.",
+        })
+
+    # Priority 7: egg collection overdue
+    if has_poultry and days_since_egg_record is not None and days_since_egg_record >= 1:
+        recs.append({
+            "priority": 7,
+            "text": "Record today's egg collection to keep production tracking accurate.",
+        })
+
+    # Priority 8: no marketplace listings
+    if not has_marketplace_listings:
+        recs.append({
+            "priority": 8,
+            "text": "You have no marketplace listings. Publish ready livestock or crop stock to attract buyers.",
+        })
+
+    # Priority 9: no recent sales
+    if days_since_last_sale is not None and days_since_last_sale > 30:
+        recs.append({
+            "priority": 9,
+            "text": f"No sales recorded in {days_since_last_sale} days. Record any recent sales to keep books current.",
+        })
+
+    # Priority 10: near harvest
+    for ci in crop_intelligences:
+        if ci.harvest_readiness == "near":
+            recs.append({
+                "priority": 10,
+                "text": f"'{ci.season_name}' harvest is approaching ({ci.days_to_harvest} days). Plan transport and buyers.",
+            })
+
+    recs.sort(key=lambda x: x["priority"])
+    return [r["text"] for r in recs[:limit]]
+
+
+# ==============================================================================
+# CATEGORIZED ALERTS
+# ==============================================================================
+
+
+@dataclass
+class CategorizedAlerts:
+    """Farm alerts split into critical, warnings, and opportunities."""
+    critical: List[AlertItem]
+    warnings: List[AlertItem]
+    opportunities: List[AlertItem]
+    total_count: int
+
+
+def compute_categorized_alerts(
+    net_profit: Decimal,
+    total_income: Decimal,
+    total_expenses: Decimal,
+    livestock_intelligences: List[LivestockIntelligenceResult],
+    crop_intelligences: List[CropIntelligenceResult],
+    days_since_last_sale: Optional[int],
+    marketplace_listings_count: int,
+) -> CategorizedAlerts:
+    """
+    Generate categorized farm alerts: critical, warnings, and opportunities.
+
+    All inputs are scalars — no ORM calls.
+    """
+    critical: List[AlertItem] = []
+    warnings: List[AlertItem] = []
+    opportunities: List[AlertItem] = []
+
+    # --- CRITICAL ---
+
+    # Negative profit
+    if net_profit < Decimal("0"):
+        critical.append(AlertItem(
+            alert_type="negative_profit",
+            severity="critical",
+            title="Farm Running at a Loss",
+            message=f"Net loss of MWK {abs(net_profit):,.0f} this period. Review expenses immediately.",
+            data={"net_profit": float(net_profit)},
+        ))
+
+    # Critical mortality batches
+    for intel in livestock_intelligences:
+        if intel.mortality_risk_level == "critical":
+            critical.append(AlertItem(
+                alert_type="high_mortality",
+                severity="critical",
+                title=f"Critical Mortality: {intel.batch_name}",
+                message=(
+                    f"Mortality rate is {intel.mortality_rate:.1f}%. "
+                    "Review deaths, disease events, and feed records."
+                ),
+                data={"batch_id": intel.batch_id, "mortality_rate": float(intel.mortality_rate or 0)},
+            ))
+
+    # Expenses > 90% of income
+    if total_income > Decimal("0") and total_expenses > total_income * Decimal("0.9"):
+        critical.append(AlertItem(
+            alert_type="high_expenses",
+            severity="critical",
+            title="Expenses Consuming Almost All Income",
+            message=(
+                f"Expenses are {(total_expenses / total_income * 100):.0f}% of income. "
+                "Profit margin is dangerously thin."
+            ),
+            data={"expense_ratio": float(total_expenses / total_income)},
+        ))
+
+    # --- WARNINGS ---
+
+    # High mortality batches
+    for intel in livestock_intelligences:
+        if intel.mortality_risk_level == "high_risk":
+            warnings.append(AlertItem(
+                alert_type="high_mortality_warning",
+                severity="warning",
+                title=f"High Mortality Risk: {intel.batch_name}",
+                message=(
+                    f"Mortality rate is {intel.mortality_rate:.1f}%. "
+                    "Monitor closely and consult a vet."
+                ),
+                data={"batch_id": intel.batch_id, "mortality_rate": float(intel.mortality_rate or 0)},
+            ))
+
+    # Missing sale price on active livestock
+    for intel in livestock_intelligences:
+        if intel.has_stock and not intel.has_asking_price:
+            warnings.append(AlertItem(
+                alert_type="missing_sale_price",
+                severity="warning",
+                title=f"No Sale Price: {intel.batch_name}",
+                message="Add an expected sale price to enable profit simulation and marketplace readiness.",
+                data={"batch_id": intel.batch_id},
+            ))
+
+    # Missing crop yield projections
+    for ci in crop_intelligences:
+        if not ci.projected_income_mwk and ci.status in ("active", "planning"):
+            warnings.append(AlertItem(
+                alert_type="missing_crop_yield",
+                severity="warning",
+                title=f"Missing Yield Data: {ci.season_name}",
+                message="Add expected yield and price to unlock profit forecast for this season.",
+                data={"season_id": ci.season_id},
+            ))
+
+    # No recent sales
+    if days_since_last_sale is not None and days_since_last_sale > 14:
+        warnings.append(AlertItem(
+            alert_type="no_recent_sales",
+            severity="warning",
+            title="No Recent Sales",
+            message=f"No sales recorded in the last {days_since_last_sale} days. Record any sales to keep books current.",
+            data={"days_since_last_sale": days_since_last_sale},
+        ))
+
+    # No marketplace listings
+    if marketplace_listings_count == 0:
+        warnings.append(AlertItem(
+            alert_type="no_marketplace",
+            severity="warning",
+            title="No Marketplace Listings",
+            message="Publish livestock or crop stock to the marketplace to attract buyers.",
+            data={},
+        ))
+
+    # --- OPPORTUNITIES ---
+
+    # Harvest ready
+    for ci in crop_intelligences:
+        if ci.harvest_readiness == "ready":
+            opportunities.append(AlertItem(
+                alert_type="harvest_ready",
+                severity="info",
+                title=f"Ready to Harvest: {ci.season_name}",
+                message="Harvest time has arrived. Prepare labour, transport, and storage.",
+                data={"season_id": ci.season_id},
+            ))
+
+    # Livestock ready to sell
+    for intel in livestock_intelligences:
+        if intel.has_stock and intel.has_asking_price and intel.mortality_risk_level in ("good", "watch"):
+            opportunities.append(AlertItem(
+                alert_type="livestock_ready",
+                severity="info",
+                title=f"Ready to Sell: {intel.batch_name}",
+                message=(
+                    f"{intel.count_current} animals available at asking price. "
+                    "Consider publishing to marketplace."
+                ),
+                data={"batch_id": intel.batch_id},
+            ))
+
+    # Profitable batch
+    for intel in livestock_intelligences:
+        if intel.net_profit_mwk > Decimal("0"):
+            opportunities.append(AlertItem(
+                alert_type="profitable_batch",
+                severity="info",
+                title=f"Profitable Batch: {intel.batch_name}",
+                message=f"Estimated net profit of MWK {intel.net_profit_mwk:,.0f}. Keep managing well.",
+                data={"batch_id": intel.batch_id, "profit": float(intel.net_profit_mwk)},
+            ))
+
+    # Harvest near
+    for ci in crop_intelligences:
+        if ci.harvest_readiness == "near":
+            opportunities.append(AlertItem(
+                alert_type="harvest_near",
+                severity="info",
+                title=f"Harvest Approaching: {ci.season_name}",
+                message=f"About {ci.days_to_harvest} days to harvest. Line up buyers and logistics.",
+                data={"season_id": ci.season_id, "days_to_harvest": ci.days_to_harvest},
+            ))
+
+    total = len(critical) + len(warnings) + len(opportunities)
+    return CategorizedAlerts(
+        critical=critical,
+        warnings=warnings,
+        opportunities=opportunities,
+        total_count=total,
     )
 

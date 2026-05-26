@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Egg & Poultry Tracking{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <!-- Header -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <h1 style="font-size:1.5rem;font-weight:800;margin:0;">🥚 Egg & Poultry Tracking</h1>
+      <p style="color:#64748b;font-size:.875rem;margin:0;">Track daily egg production, feed, and flock health</p>
+    </div>
+    <a href="{% url 'verticals:farm_egg_record' %}" style="background:#16a34a;color:#fff;border-radius:12px;padding:10px 20px;font-weight:700;font-size:.875rem;text-decoration:none;">
+      <i class="bi bi-plus-circle me-1"></i>Record Today
+    </a>
+  </div>
+
+  {% if not has_poultry %}
+  <div style="text-align:center;padding:4rem 1rem;">
+    <div style="font-size:3rem;margin-bottom:1rem;">🐔</div>
+    <h3 style="font-weight:700;color:#0f172a;">No Poultry Batches Yet</h3>
+    <p style="color:#64748b;">Add a poultry/chicken batch to start tracking egg production.</p>
+    <a href="{% url 'verticals:farm_livestock_create' %}" style="display:inline-block;background:#2563eb;color:#fff;border-radius:12px;padding:10px 24px;font-weight:700;font-size:.875rem;text-decoration:none;">
+      Add Poultry Batch
+    </a>
+  </div>
+  {% else %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;">
+    {% for bs in batch_summaries %}
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.875rem;">
+        <div>
+          <div style="font-size:1rem;font-weight:700;color:#0f172a;">{{ bs.batch.name }}</div>
+          <div style="font-size:.75rem;color:#64748b;">{{ bs.batch.current_birds }} birds alive · started {{ bs.batch.start_date }}</div>
+        </div>
+        <span style="background:{% if bs.summary.trend == 'up' %}#dcfce7{% elif bs.summary.trend == 'down' %}#fee2e2{% else %}#f1f5f9{% endif %};
+          color:{% if bs.summary.trend == 'up' %}#16a34a{% elif bs.summary.trend == 'down' %}#dc2626{% else %}#64748b{% endif %};
+          font-size:.68rem;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid transparent;">
+          {% if bs.summary.trend == 'up' %}↑ Up{% elif bs.summary.trend == 'down' %}↓ Down{% else %}→ Stable{% endif %}
+        </span>
+      </div>
+
+      {% if bs.summary %}
+      <!-- Egg stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;text-align:center;margin-bottom:.875rem;">
+        <div style="background:#fef9c3;border-radius:10px;padding:.625rem .5rem;">
+          <div style="font-size:1.25rem;font-weight:900;color:#92400e;">{{ bs.summary.eggs_today }}</div>
+          <div style="font-size:.65rem;color:#78350f;font-weight:600;">Today</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:10px;padding:.625rem .5rem;">
+          <div style="font-size:1.25rem;font-weight:900;color:#14532d;">{{ bs.summary.eggs_this_week }}</div>
+          <div style="font-size:.65rem;color:#166534;font-weight:600;">This Week</div>
+        </div>
+        <div style="background:#eff6ff;border-radius:10px;padding:.625rem .5rem;">
+          <div style="font-size:1.25rem;font-weight:900;color:#1d4ed8;">{{ bs.summary.eggs_this_month }}</div>
+          <div style="font-size:.65rem;color:#1e40af;font-weight:600;">This Month</div>
+        </div>
+      </div>
+
+      <!-- Productivity & stock -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.72rem;margin-bottom:.75rem;">
+        <div style="background:#f8fafc;border-radius:8px;padding:6px 10px;">
+          <div style="color:#64748b;">In Stock</div>
+          <div style="font-weight:700;color:#0f172a;">{{ bs.summary.eggs_in_stock }} eggs</div>
+        </div>
+        {% if bs.summary.productivity_rate %}
+        <div style="background:#f8fafc;border-radius:8px;padding:6px 10px;">
+          <div style="color:#64748b;">Prod. Rate</div>
+          <div style="font-weight:700;color:#0f172a;">{{ bs.summary.productivity_rate|floatformat:2 }} eggs/bird/day</div>
+        </div>
+        {% endif %}
+        {% if bs.summary.feed_cost_per_egg %}
+        <div style="background:#f8fafc;border-radius:8px;padding:6px 10px;">
+          <div style="color:#64748b;">Feed/Egg</div>
+          <div style="font-weight:700;color:#0f172a;">MWK {{ bs.summary.feed_cost_per_egg|floatformat:2 }}</div>
+        </div>
+        {% endif %}
+        {% if bs.summary.spoilage_rate %}
+        <div style="background:#fef2f2;border-radius:8px;padding:6px 10px;">
+          <div style="color:#64748b;">Spoilage</div>
+          <div style="font-weight:700;color:#dc2626;">{{ bs.summary.spoilage_rate|floatformat:1 }}%</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <a href="{% url 'verticals:farm_egg_record' %}?batch_id={{ bs.batch.pk }}"
+        style="display:block;text-align:center;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px;font-size:.78rem;font-weight:700;color:#2563eb;text-decoration:none;">
+        Record Today's Eggs
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

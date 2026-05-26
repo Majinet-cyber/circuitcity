@@ -514,27 +514,110 @@
 {% block content %}
 <div class="farm-dashboard container-fluid py-3" data-vertical="farm" data-testid="farm-dashboard-container">
     
-    <!-- Premium Blue Hero Card (like Clothing) -->
-    <header class="vertical-hero" data-testid="farm-hero-card" style="background:linear-gradient(135deg,#0ea5e9 0%,#38bdf8 50%,#60a5fa 100%);padding:28px;border-radius:24px;color:#fff;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;box-shadow:0 20px 60px rgba(14,165,233,0.2);position:relative;overflow:hidden;margin-bottom:1.5rem;">
-      <div style="position:relative;z-index:1;">
-        <p style="opacity:0.9;text-transform:uppercase;font-size:0.8rem;letter-spacing:0.15em;margin:0;font-weight:600;">{{ business.name }}</p>
-        <h1 style="margin:6px 0;font-size:clamp(26px,4vw,36px);font-weight:800;text-shadow:0 2px 10px rgba(0,0,0,0.1);color:#fff !important;background:none !important;-webkit-text-fill-color:#fff !important;">🌾 Farm Manager</h1>
-        <p style="margin:0;opacity:0.95;font-size:1rem;">Track profitability, costs, livestock & crops</p>
-      </div>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;z-index:1;position:relative;">
-        <a style="border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);background:#fff;color:#0f172a;" href="{% url 'verticals:farm_crops_list' %}">Crops</a>
-        <a style="border-radius:30px;padding:12px 20px;font-weight:700;text-decoration:none;transition:all 0.3s;box-shadow:0 4px 12px rgba(0,0,0,0.15);border:2px solid rgba(255,255,255,0.9);color:#fff;background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);" href="{% url 'verticals:farm_livestock_list' %}">Livestock</a>
+    <!-- ═══ COMMAND CENTER HERO ═══ -->
+    <header class="vertical-hero" data-testid="farm-hero-card"
+      style="background:linear-gradient(135deg,#0f2027 0%,#0ea5e9 50%,#16a34a 100%);padding:24px 28px;border-radius:24px;color:#fff;box-shadow:0 20px 60px rgba(14,165,233,0.25);position:relative;overflow:hidden;margin-bottom:1.5rem;">
+      <!-- Background pattern -->
+      <div style="position:absolute;inset:0;opacity:0.06;background-image:radial-gradient(circle at 20% 20%,#fff 1px,transparent 1px),radial-gradient(circle at 80% 80%,#fff 1px,transparent 1px);background-size:40px 40px;"></div>
+
+      <div style="position:relative;z-index:1;display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start;justify-content:space-between;">
+
+        <!-- Left: Farm Identity -->
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+            <span style="opacity:0.9;text-transform:uppercase;font-size:0.72rem;letter-spacing:0.18em;font-weight:700;">{{ business.name }}</span>
+            {% if is_demo %}<span style="background:rgba(255,255,255,0.2);font-size:0.65rem;font-weight:700;padding:2px 10px;border-radius:999px;letter-spacing:.06em;">DEMO</span>{% endif %}
+          </div>
+          <h1 style="margin:0 0 6px;font-size:clamp(24px,4vw,34px);font-weight:900;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,0.2);">🌾 Farm Command Center</h1>
+          <p style="margin:0 0 14px;opacity:0.9;font-size:0.95rem;">Intelligence · Livestock · Crops · Market</p>
+
+          <!-- Status Pills -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            {% if farm_score %}
+            <span style="background:rgba(255,255,255,0.18);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.3);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;">
+              🎯 Score: {{ farm_score.score }}/100 · {{ farm_score.rank }}
+            </span>
+            {% endif %}
+            {% if snapshot.net_profit_mwk >= 0 %}
+            <span style="background:rgba(34,197,94,0.25);border:1px solid rgba(34,197,94,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#bbf7d0;">
+              💚 Profit Positive
+            </span>
+            {% else %}
+            <span style="background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#fecaca;">
+              🔴 Profit Negative
+            </span>
+            {% endif %}
+            {% if categorized_alerts.critical %}
+            <span style="background:rgba(239,68,68,0.25);border:1px solid rgba(239,68,68,0.4);border-radius:999px;padding:4px 14px;font-size:0.75rem;font-weight:700;color:#fca5a5;">
+              ⚠ {{ categorized_alerts.critical|length }} Critical Alert{{ categorized_alerts.critical|length|pluralize }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Right: Mode tabs + nav -->
+        <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end;">
+          <!-- Farm Mode Tabs -->
+          <div style="display:flex;background:rgba(0,0,0,0.2);border-radius:12px;padding:4px;gap:2px;">
+            <a href="{% url 'verticals:farm_crops_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.8);transition:all .2s;">🌾 Crops</a>
+            <a href="{% url 'verticals:farm_livestock_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.8);transition:all .2s;">🐄 Livestock</a>
+            <a href="{% url 'verticals:farm_ledger_list' %}" style="text-decoration:none;padding:6px 14px;border-radius:8px;background:rgba(255,255,255,0.2);font-size:0.78rem;font-weight:700;color:#fff;transition:all .2s;">📒 Ledger</a>
+          </div>
+          <!-- Quick action buttons -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+            <a href="{% url 'verticals:farm_livestock_create' %}" style="background:#fff;color:#0f172a;border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);">+ Livestock</a>
+            <a href="{% url 'verticals:farm_crop_create' %}" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">+ Crop</a>
+            <a href="{% url 'verticals:farm_add_expense' %}" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">+ Expense</a>
+            <a href="{% url 'verticals:farm_add_sale' %}" style="background:rgba(34,197,94,0.3);color:#bbf7d0;border:1px solid rgba(34,197,94,0.4);border-radius:20px;padding:8px 16px;font-size:0.78rem;font-weight:700;text-decoration:none;">💰 Record Sale</a>
+          </div>
+        </div>
+
       </div>
     </header>
-    
+
+    <!-- ═══ QUICK ACTIONS ROW ═══ -->
+    <div data-testid="farm-quick-actions" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem;">
+      <a href="{% url 'verticals:farm_crop_create' %}" class="quick-action-btn" style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🌱</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#166534;">Add Crop</div>
+      </a>
+      <a href="{% url 'verticals:farm_livestock_create' %}" class="quick-action-btn" style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🐄</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#1d4ed8;">Add Livestock</div>
+      </a>
+      <a href="{% url 'verticals:farm_add_expense' %}" class="quick-action-btn" style="background:#fef2f2;border:1.5px solid #fecaca;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📋</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#991b1b;">Record Expense</div>
+      </a>
+      <a href="{% url 'verticals:farm_add_sale' %}" class="quick-action-btn" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">💰</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#15803d;">Record Sale</div>
+      </a>
+      <a href="{% url 'verticals:farm_livestock_add_event' %}" class="quick-action-btn" style="background:#fefce8;border:1.5px solid #fde68a;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📝</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#92400e;">Livestock Event</div>
+      </a>
+      <a href="{% url 'verticals:farm_egg_tracking' %}" class="quick-action-btn" style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🥚</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#c2410c;">Egg Tracking</div>
+      </a>
+      <a href="{% url 'verticals:farm_business_health' %}" class="quick-action-btn" style="background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">🏥</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#0369a1;">Farm Health</div>
+      </a>
+      <a href="{% url 'verticals:farm_reports' %}" class="quick-action-btn" style="background:#faf5ff;border:1.5px solid #e9d5ff;border-radius:16px;padding:14px 12px;text-align:center;text-decoration:none;transition:all .2s;display:block;">
+        <div style="font-size:1.6rem;margin-bottom:4px;">📊</div>
+        <div style="font-size:0.78rem;font-weight:700;color:#7c3aed;">Reports</div>
+      </a>
+    </div>
+
     <!-- Page Header with Filter Integration -->
     <div class="farm-header" data-testid="farm-dashboard">
         <div class="farm-header-text">
             <h1><span></span> Dashboard Overview</h1>
-            <p>Your farm at a glance</p>
+            <p>Your farm at a glance · {% now "N j, Y" %}</p>
         </div>
         <div class="farm-header-actions">
-            <!-- Filter Button -->
             {% include "partials/farm_filter_panel.html" with filter_state=filter_state filter_options=filter_options %}
         </div>
     </div>
@@ -553,26 +636,27 @@
     </div>
     {% endif %}
 
-    <!-- Alerts Section (if any) -->
-    {% if alerts %}
-    <div class="alerts-section" data-testid="farm-alerts">
-        {% for alert in alerts|slice:":3" %}
-        <div class="alert-card {{ alert.severity }}">
-            <div class="alert-icon">
-                {% if alert.severity == 'critical' %}
-                <i class="bi bi-exclamation-triangle-fill"></i>
-                {% elif alert.severity == 'warning' %}
-                <i class="bi bi-exclamation-circle-fill"></i>
-                {% else %}
-                <i class="bi bi-info-circle-fill"></i>
-                {% endif %}
-            </div>
-            <div class="alert-content">
-                <p class="alert-title">{{ alert.title }}</p>
-                <p class="alert-message">{{ alert.message }}</p>
-            </div>
-        </div>
-        {% endfor %}
+    <!-- Alert summary strip (counts only; detail shown in categorized alerts section below) -->
+    {% if critical_alerts_count or categorized_alerts.total_count %}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem;" data-testid="farm-alerts-strip">
+      {% if categorized_alerts.critical %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#fef2f2;border:1px solid #fecaca;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#dc2626;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        {{ categorized_alerts.critical|length }} Critical
+      </div>
+      {% endif %}
+      {% if categorized_alerts.warnings %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#fffbeb;border:1px solid #fde68a;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#d97706;">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        {{ categorized_alerts.warnings|length }} Warning{{ categorized_alerts.warnings|length|pluralize }}
+      </div>
+      {% endif %}
+      {% if categorized_alerts.opportunities %}
+      <div style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:5px 14px;font-size:0.78rem;font-weight:700;color:#16a34a;">
+        <i class="bi bi-stars"></i>
+        {{ categorized_alerts.opportunities|length }} Opportunit{{ categorized_alerts.opportunities|length|pluralize:"y,ies" }}
+      </div>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -692,6 +776,141 @@
         {% endfor %}
     </div>
     {% endif %}
+
+    <!-- ===== FARM SCORE + ACHIEVEMENTS + RECOMMENDATIONS ===== -->
+    {% if farm_score %}
+    <div data-testid="farm-score-section" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" class="farm-score-grid">
+
+      <!-- Farm Score Ring -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);display:flex;align-items:center;gap:1.25rem;">
+        <!-- SVG Ring -->
+        <div style="flex-shrink:0;position:relative;width:88px;height:88px;">
+          <svg width="88" height="88" viewBox="0 0 88 88" style="transform:rotate(-90deg);">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="#e2e8f0" stroke-width="8"/>
+            <circle cx="44" cy="44" r="36" fill="none"
+              stroke="{% if farm_score.score >= 85 %}#16a34a{% elif farm_score.score >= 70 %}#2563eb{% elif farm_score.score >= 50 %}#d97706{% elif farm_score.score >= 30 %}#ea580c{% else %}#dc2626{% endif %}"
+              stroke-width="8"
+              stroke-dasharray="226.2"
+              stroke-dashoffset="{{ 226|add:'-'|add:farm_score.score|floatformat:0 }}"
+              stroke-linecap="round"
+              style="transition:stroke-dashoffset 1s ease;stroke-dashoffset:calc(226.2 - (226.2 * {{ farm_score.score }} / 100))"/>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+            <div style="font-size:1.375rem;font-weight:900;color:#0f172a;line-height:1;">{{ farm_score.score }}</div>
+            <div style="font-size:0.6rem;font-weight:600;color:#64748b;text-transform:uppercase;">/ 100</div>
+          </div>
+        </div>
+        <!-- Score details -->
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:4px;">Farm Score</div>
+          <div style="font-size:1.1rem;font-weight:800;color:#0f172a;margin-bottom:4px;">{{ farm_score.rank }}</div>
+          <div style="font-size:0.78rem;color:#64748b;margin-bottom:8px;">{{ farm_score.xp_points }} XP</div>
+          {% if farm_score.next_action %}
+          <div style="font-size:0.75rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:6px 10px;color:#1d4ed8;">
+            <i class="bi bi-arrow-right-circle" style="margin-right:4px;"></i>{{ farm_score.next_action }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Achievements & Weaknesses -->
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.75rem;">Achievements</div>
+        {% if farm_score.badges %}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:0.75rem;">
+          {% for badge in farm_score.badges %}
+          <span style="background:#dcfce7;color:#15803d;font-size:0.7rem;font-weight:700;padding:3px 10px;border-radius:999px;border:1px solid #bbf7d0;">✓ {{ badge }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if farm_score.weaknesses %}
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#64748b;margin-bottom:0.5rem;">Needs Attention</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          {% for w in farm_score.weaknesses|slice:":3" %}
+          <div style="font-size:0.75rem;color:#b45309;background:#fef3c7;border-radius:6px;padding:4px 8px;">⚠ {{ w }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- What Should I Do Next + Categorized Alerts row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;" class="farm-intel-row">
+
+      <!-- Recommendations Panel -->
+      {% if recommendations %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:1.25rem;box-shadow:0 2px 8px rgba(0,0,0,0.05);" data-testid="farm-recommendations">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.875rem;">
+          <div style="background:#eff6ff;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;"><i class="bi bi-compass" style="color:#2563eb;"></i></div>
+          <div style="font-size:0.8rem;font-weight:700;color:#0f172a;">What should I do next?</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          {% for rec in recommendations %}
+          <div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#f8fafc;border-radius:10px;border-left:3px solid #2563eb;">
+            <i class="bi bi-arrow-right-circle-fill" style="color:#2563eb;flex-shrink:0;margin-top:2px;font-size:0.85rem;"></i>
+            <span style="font-size:0.8rem;color:#334155;line-height:1.4;">{{ rec }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Categorized Alerts -->
+      <div data-testid="farm-categorized-alerts">
+        {% if categorized_alerts.critical %}
+        <div style="margin-bottom:0.75rem;">
+          {% for alert in categorized_alerts.critical|slice:":2" %}
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+            <i class="bi bi-exclamation-triangle-fill" style="color:#dc2626;flex-shrink:0;margin-top:2px;"></i>
+            <div>
+              <div style="font-size:0.78rem;font-weight:700;color:#991b1b;">{{ alert.title }}</div>
+              <div style="font-size:0.73rem;color:#b91c1c;margin-top:2px;">{{ alert.message }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if categorized_alerts.warnings %}
+        <div style="margin-bottom:0.75rem;">
+          {% for alert in categorized_alerts.warnings|slice:":2" %}
+          <div style="display:flex;align-items:flex-start;gap:10px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+            <i class="bi bi-exclamation-circle-fill" style="color:#d97706;flex-shrink:0;margin-top:2px;"></i>
+            <div>
+              <div style="font-size:0.78rem;font-weight:700;color:#92400e;">{{ alert.title }}</div>
+              <div style="font-size:0.73rem;color:#b45309;margin-top:2px;">{{ alert.message }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if categorized_alerts.opportunities %}
+        {% for opp in categorized_alerts.opportunities|slice:":2" %}
+        <div style="display:flex;align-items:flex-start;gap:10px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;margin-bottom:6px;">
+          <i class="bi bi-stars" style="color:#16a34a;flex-shrink:0;margin-top:2px;"></i>
+          <div>
+            <div style="font-size:0.78rem;font-weight:700;color:#14532d;">{{ opp.title }}</div>
+            <div style="font-size:0.73rem;color:#166534;margin-top:2px;">{{ opp.message }}</div>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% if not categorized_alerts.critical and not categorized_alerts.warnings and not categorized_alerts.opportunities %}
+        <div style="text-align:center;padding:2rem;color:#64748b;font-size:0.85rem;">
+          <i class="bi bi-check-circle" style="font-size:2rem;color:#16a34a;display:block;margin-bottom:8px;"></i>
+          No alerts. Farm is looking healthy.
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+    {% endif %}
+
+    <!-- Responsive style for score grid on mobile -->
+    <style>
+    @media (max-width: 640px) {
+      .farm-score-grid, .farm-intel-row { grid-template-columns: 1fr !important; }
+    }
+    </style>
 
     <!-- ===== FARM HEALTH PULSE + HARVEST FORECAST ===== -->
     <div data-testid="farm-health-pulse" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:1.5rem;">

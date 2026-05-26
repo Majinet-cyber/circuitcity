@@ -21,6 +21,9 @@ from inventory.authz import require_business_kind
 from inventory.business_kinds import BusinessKind
 from inventory.models_farm import (
     FARM_SUBTYPES_BY_ANIMAL,
+    LIVESTOCK_COUNT_ADDING_EVENTS,
+    LIVESTOCK_COUNT_REMOVING_EVENTS,
+    LIVESTOCK_NON_COUNT_EVENTS,
     FarmAnimalGender,
     FarmAnimalType,
     FarmBatchImage,
@@ -31,6 +34,7 @@ from inventory.models_farm import (
     FarmLedgerEntry,
     FarmLivestockBatch,
     FarmLivestockEvent,
+    FarmLivestockEventType,
     FarmLivestockSubType,
     FarmPaymentMethod,
     FarmSaleAvailability,
@@ -47,10 +51,16 @@ from inventory.services.farm_marketplace import (
 from tenants.utils_roles import is_manager
 from inventory.services.farm_manager import (
     AlertItem,
+    CategorizedAlerts,
     compute_alerts,
+    compute_categorized_alerts,
+    compute_crop_intelligence,
+    compute_farm_score,
+    compute_livestock_intelligence,
     compute_livestock_snapshot,
     compute_monthly_profit,
     crop_season_to_data,
+    generate_farm_recommendations,
     get_farm_dashboard_snapshot,
     ledger_entry_to_data,
     livestock_batch_to_data,
@@ -424,62 +434,173 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         demo_crops_breakdown = crops_breakdown
         demo_livestock_by_type = livestock_by_type
 
+    # =====================================================================
+    # INTELLIGENCE LAYER — farm score, categorized alerts, recommendations
+    # =====================================================================
+    try:
+        # Compute livestock intelligence for each batch
+        livestock_intelligences = []
+        for batch in batches:
+            batch_data = livestock_batch_to_data(batch)
+            # Filter ledger entries linked to this batch
+            batch_ledger = [
+                e for e in ledger_entries
+                if e.get("livestock_batch_id") == batch.id
+            ]
+            # Fallback: if no linked ledger, use enterprise_type match
+            if not batch_ledger:
+                animal_ent = batch.animal_type  # e.g. "pigs", "chickens"
+                batch_ledger = [e for e in ledger_entries if e["enterprise_type"] == animal_ent]
+            intel = compute_livestock_intelligence(
+                batch=batch_data,
+                events=events_data if "events_data" in dir() else [],
+                ledger_entries=batch_ledger,
+                batch_created_date=batch.created_at.date() if hasattr(batch.created_at, "date") else today,
+                today=today,
+            )
+            livestock_intelligences.append(intel)
+
+        # Compute crop intelligence for each active season
+        crop_intelligences = []
+        for season in active_seasons:
+            season_data = crop_season_to_data(season)
+            # Ledger entries linked to this season
+            season_ledger = [
+                e for e in ledger_entries
+                if e.get("crop_season_id") == season.id
+            ]
+            # Fallback: match by crop_type
+            if not season_ledger:
+                season_ledger = [e for e in ledger_entries if e["enterprise_type"] == season.crop_type]
+            ci = compute_crop_intelligence(season_data, season_ledger, today)
+            crop_intelligences.append(ci)
+
+        # Days since last expense
+        last_expense = ledger_qs.filter(entry_type=FarmEntryType.EXPENSE).order_by("-date").first()
+        days_since_last_expense = (today - last_expense.date).days if last_expense else None
+
+        # Days since last livestock event
+        try:
+            last_event = FarmLivestockEvent.objects.filter(
+                batch__business=business
+            ).order_by("-date").first()
+            has_recent_livestock_event = bool(last_event and (today - last_event.date).days <= 7)
+        except Exception:
+            has_recent_livestock_event = False
+
+        # Risk levels list for farm score
+        livestock_risk_levels = [i.mortality_risk_level for i in livestock_intelligences]
+        missing_sale_price_count = sum(1 for i in livestock_intelligences if not i.has_asking_price and i.has_stock)
+        missing_yield_count = sum(1 for c in crop_intelligences if not c.projected_income_mwk and c.status in ("active", "planning"))
+
+        # Farm score
+        farm_score = compute_farm_score(
+            net_profit=snapshot.net_profit_mwk,
+            total_income=snapshot.total_income_mwk,
+            total_expenses=snapshot.total_expenses_mwk,
+            livestock_risk_levels=livestock_risk_levels,
+            active_crop_seasons_count=active_seasons_count,
+            missing_yield_count=missing_yield_count,
+            missing_sale_price_count=missing_sale_price_count,
+            marketplace_listings_count=demo_marketplace_extras.get("marketplace_farm_live_count", 0),
+            days_since_last_sale=days_since_last_sale,
+            days_since_last_expense=days_since_last_expense,
+            has_recent_livestock_event=has_recent_livestock_event,
+        )
+
+        # Categorized alerts
+        categorized_alerts = compute_categorized_alerts(
+            net_profit=snapshot.net_profit_mwk,
+            total_income=snapshot.total_income_mwk,
+            total_expenses=snapshot.total_expenses_mwk,
+            livestock_intelligences=livestock_intelligences,
+            crop_intelligences=crop_intelligences,
+            days_since_last_sale=days_since_last_sale,
+            marketplace_listings_count=demo_marketplace_extras.get("marketplace_farm_live_count", 0),
+        )
+
+        # Recommendations
+        recommendations = generate_farm_recommendations(
+            net_profit=snapshot.net_profit_mwk,
+            livestock_intelligences=livestock_intelligences,
+            crop_intelligences=crop_intelligences,
+            has_marketplace_listings=demo_marketplace_extras.get("marketplace_farm_live_count", 0) > 0,
+            has_poultry=any(b.animal_type == "chickens" for b in batches),
+            days_since_egg_record=None,
+            days_since_last_sale=days_since_last_sale,
+            limit=5,
+        )
+
+    except Exception as e:
+        logger.warning(f"Farm intelligence layer failed gracefully: {e}")
+        livestock_intelligences = []
+        crop_intelligences = []
+        farm_score = None
+        categorized_alerts = CategorizedAlerts(critical=[], warnings=[], opportunities=[], total_count=0)
+        recommendations = []
+
     ctx.update({
         "active_tab": "dashboard",
         "hero_title": "Farm Manager",
-        "hero_blurb": "Track your farm profitability, livestock, and crops in one place.",
-        
+        "hero_blurb": "Know what is growing, costing, earning, and needs your attention.",
+
         # SSOT snapshot (all computed values)
         "snapshot": snapshot,
-        
+
         # Demo mode flag
         "is_demo": is_demo,
-        
+
         # Filter state
         "filter_state": filter_state,
         "filter_options": filter_options,
-        
+
         # Chart data (JSON for Chart.js — demo or real)
         "profit_trend_json": profit_trend_json,
         "expense_breakdown_json": expense_breakdown_json,
-        
+
         # For backwards compatibility with existing template parts
-        # Demo values override zeros when no real data
         "profit_this_month": Decimal("420000") if is_demo else snapshot.net_profit_mwk,
         "income_this_month": Decimal("780000") if is_demo else snapshot.total_income_mwk,
         "expenses_this_month": Decimal("360000") if is_demo else snapshot.total_expenses_mwk,
         "sales_count_this_month": 12 if is_demo else snapshot.sales_count,
         "top_expense_categories": demo_expense_breakdown if is_demo else snapshot.expense_breakdown,
-        
+
         # Livestock display data
         "livestock_batches": batches,
         "livestock_snapshots": livestock_snapshots,
+        "livestock_intelligences": livestock_intelligences,
         "total_livestock_count": 45 if is_demo else snapshot.total_livestock_count,
         "total_livestock_value": Decimal("135000") if is_demo else snapshot.total_livestock_value,
         "livestock_by_type": demo_livestock_by_type,
-        
+
         # Crops
         "active_seasons": active_seasons,
         "crops_breakdown": demo_crops_breakdown,
-        
+        "crop_intelligences": crop_intelligences,
+
         # Assets preview
         "assets_preview": assets_preview,
         "total_assets_value": total_assets_value,
         "assets_count": assets_count,
-        
+
         # AI Insights
         "ai_insights": ai_insights_data,
-        
+
         # Marketplace & operational prompts
         **demo_marketplace_extras,
-        
+
         # Recent activity
         "recent_entries": recent_entries,
-        
-        # Alerts (from SSOT)
+
+        # Alerts (legacy flat list + new categorized)
         "alerts": snapshot.alerts,
         "alerts_count": len(snapshot.alerts),
         "critical_alerts_count": snapshot.critical_alerts_count,
+        "categorized_alerts": categorized_alerts,
+
+        # Intelligence layer (new)
+        "farm_score": farm_score,
+        "recommendations": recommendations,
     })
     
     return render(request, "verticals/farm/dashboard.html", ctx)
@@ -686,21 +807,40 @@ def livestock_list(request: HttpRequest) -> HttpResponse:
     all_events = FarmLivestockEvent.objects.filter(batch__business=business)
     events_data = [livestock_event_to_data(e) for e in all_events]
     
+    today = timezone.now().date()
     batch_snapshots = []
     for batch in batches:
         batch_data = livestock_batch_to_data(batch)
         snapshot = compute_livestock_snapshot(batch_data, events_data)
+        # Build intelligence for each batch
+        batch_ledger = [
+            ledger_entry_to_data(e)
+            for e in FarmLedgerEntry.objects.filter(
+                business=business, livestock_batch=batch
+            )
+        ]
+        try:
+            intel = compute_livestock_intelligence(
+                batch=batch_data,
+                events=events_data,
+                ledger_entries=batch_ledger,
+                batch_created_date=batch.created_at.date() if hasattr(batch.created_at, "date") else today,
+                today=today,
+            )
+        except Exception:
+            intel = None
         batch_snapshots.append({
             "batch": batch,
             "snapshot": snapshot,
+            "intel": intel,
         })
-    
+
     ctx.update({
         "active_tab": "livestock",
         "batch_snapshots": batch_snapshots,
         "total_animals": sum(bs["snapshot"].count_current for bs in batch_snapshots),
     })
-    
+
     return render(request, "verticals/farm/livestock_list.html", ctx)
 
 
@@ -803,17 +943,24 @@ def livestock_add_event(request: HttpRequest) -> HttpResponse:
                 event_type=event_type,
                 date=request.POST.get("date") or timezone.now().date(),
                 count=count,
-                unit_price_mwk=request.POST.get("unit_price") or None,
+                unit_price_mwk=_farm_parse_decimal(request.POST.get("unit_price")),
+                weight_kg=_farm_parse_decimal(request.POST.get("weight_kg")),
+                quantity=_farm_parse_decimal(request.POST.get("quantity")),
+                quantity_unit=request.POST.get("quantity_unit", ""),
+                cost_impact_mwk=_farm_parse_decimal(request.POST.get("cost_impact_mwk")),
+                revenue_impact_mwk=_farm_parse_decimal(request.POST.get("revenue_impact_mwk")),
                 notes=request.POST.get("notes", ""),
                 created_by=request.user,
             )
-            
-            # Update batch count
-            if event_type in ("birth", "purchase", "transfer_in"):
+
+            # Update batch count only for count-changing events
+            if event_type in LIVESTOCK_COUNT_ADDING_EVENTS:
                 batch.count_current += count
-            else:
+                batch.save(update_fields=["count_current"])
+            elif event_type in LIVESTOCK_COUNT_REMOVING_EVENTS:
                 batch.count_current = max(0, batch.count_current - count)
-            batch.save(update_fields=["count_current"])
+                batch.save(update_fields=["count_current"])
+            # Non-count events (vaccination, feeding, etc.) don't change count
             
             messages.success(request, f"Event recorded: {event.get_event_type_display()} x {count}")
             return redirect("/verticals/farm/livestock/")
@@ -836,11 +983,18 @@ def livestock_add_event(request: HttpRequest) -> HttpResponse:
         except FarmLivestockBatch.DoesNotExist:
             pass
     
-    from inventory.models_farm import FarmLivestockEventType
+    # Group event types for the UI
+    count_events = [(v, l) for v, l in FarmLivestockEventType.choices
+                    if v in LIVESTOCK_COUNT_ADDING_EVENTS | LIVESTOCK_COUNT_REMOVING_EVENTS]
+    health_events = [(v, l) for v, l in FarmLivestockEventType.choices
+                     if v in LIVESTOCK_NON_COUNT_EVENTS]
+
     ctx.update({
         "active_tab": "livestock",
         "batches": batches,
         "event_types": FarmLivestockEventType.choices,
+        "count_event_types": count_events,
+        "health_event_types": health_events,
         "entry_types": LIVESTOCK_ENTRY_TYPES,
         "recommended_actions": recommended_actions,
         "preselect_batch_id": preselect_batch_id,
@@ -954,16 +1108,122 @@ def livestock_batch_detail(request: HttpRequest, batch_id: int) -> HttpResponse:
     from inventory.models_marketplace import ListingStatus
 
     listing = getattr(batch, "marketplace_listing", None)
+    today = timezone.now().date()
     all_events = FarmLivestockEvent.objects.filter(batch__business=business)
     events_data = [livestock_event_to_data(e) for e in all_events]
     batch_data = livestock_batch_to_data(batch)
-    snapshot = compute_livestock_snapshot(batch_data, events_data, timezone.now().date())
+    snapshot = compute_livestock_snapshot(batch_data, events_data, today)
+
+    # ── Intelligence layer ──────────────────────────────────────────
+    batch_ledger_entries = list(
+        FarmLedgerEntry.objects.filter(
+            business=business, livestock_batch=batch
+        ).values(
+            "id", "entry_type", "category", "amount_mwk", "date",
+            "enterprise_type", "description", "livestock_batch_id",
+        )
+    )
+    # Convert queryset to list of dicts that match LedgerEntryData
+    def _to_ledger_data(row):
+        return {
+            "id": row["id"],
+            "entry_type": row["entry_type"],
+            "category": row["category"],
+            "amount_mwk": row["amount_mwk"] or Decimal("0"),
+            "date": row["date"],
+            "enterprise_type": row["enterprise_type"] or "",
+            "description": row["description"] or "",
+            "livestock_batch_id": row["livestock_batch_id"],
+            "crop_season_id": None,
+        }
+    batch_ledger_data = [_to_ledger_data(r) for r in batch_ledger_entries]
+
+    intelligence = None
+    try:
+        intelligence = compute_livestock_intelligence(
+            batch=batch_data,
+            events=events_data,
+            ledger_entries=batch_ledger_data,
+            batch_created_date=batch.created_at.date() if hasattr(batch.created_at, "date") else today,
+            today=today,
+        )
+    except Exception as _intel_err:
+        import logging
+        logging.getLogger(__name__).warning("livestock intelligence failed: %s", _intel_err)
+
+    # ── Simulation (GET params for default values) ──────────────────
+    sim_sale_price = request.GET.get("sim_sale_price") or (
+        str(batch.expected_sale_price_mwk) if batch.expected_sale_price_mwk else ""
+    )
+    sim_animals_to_sell = request.GET.get("sim_animals_to_sell") or str(
+        batch.count_current or 0
+    )
+    sim_final_weight = request.GET.get("sim_final_weight") or (
+        str(batch.avg_weight_kg) if batch.avg_weight_kg else ""
+    )
+    sim_extra_feed_cost = request.GET.get("sim_extra_feed_cost") or "0"
+    sim_expected_mortality = request.GET.get("sim_expected_mortality") or "0"
+
+    # Run simple simulation if params provided
+    simulation_result = None
+    try:
+        sp = Decimal(sim_sale_price) if sim_sale_price else None
+        animals = int(sim_animals_to_sell) if sim_animals_to_sell else 0
+        extra_feed = Decimal(sim_extra_feed_cost) if sim_extra_feed_cost else Decimal("0")
+        mortality_sim = Decimal(sim_expected_mortality) if sim_expected_mortality else Decimal("0")
+
+        if sp and animals > 0 and intelligence:
+            sold_after_mortality = max(0, int(animals * (1 - mortality_sim / 100)))
+            extra_cost = intelligence.total_cost_mwk + extra_feed
+            proj_revenue = sp * sold_after_mortality
+            proj_profit = proj_revenue - extra_cost
+            proj_roi = (proj_profit / extra_cost * 100) if extra_cost > 0 else None
+            break_even_sim = (extra_cost / sold_after_mortality) if sold_after_mortality > 0 else None
+
+            # Best/expected/worst cases
+            simulation_result = {
+                "sale_price": sp,
+                "animals_sold": sold_after_mortality,
+                "total_cost": extra_cost,
+                "projected_revenue": proj_revenue,
+                "projected_profit": proj_profit,
+                "roi_pct": proj_roi,
+                "break_even_price": break_even_sim,
+                "best_case_profit": proj_profit + (sp * sold_after_mortality * Decimal("0.1")),
+                "worst_case_profit": proj_profit - (sp * sold_after_mortality * Decimal("0.15")),
+            }
+    except (ValueError, TypeError, Exception):
+        pass
+
+    # ── Housing planner context ─────────────────────────────────────
+    housing_space_estimate = None
+    if batch.count_current and batch.animal_type:
+        space_map = {
+            "pigs": Decimal("1.5"),      # m² per pig
+            "cattle": Decimal("6"),       # m² per cattle
+            "goats": Decimal("2"),        # m² per goat
+            "chickens": Decimal("0.1"),   # m² per chicken
+            "ducks": Decimal("0.15"),
+            "rabbits": Decimal("0.3"),
+            "sheep": Decimal("2"),
+        }
+        m2_per = space_map.get(batch.animal_type)
+        if m2_per:
+            housing_space_estimate = m2_per * batch.count_current
 
     ctx.update(
         {
             "active_tab": "livestock",
             "batch": batch,
             "snapshot": snapshot,
+            "intelligence": intelligence,
+            "simulation_result": simulation_result,
+            "sim_sale_price": sim_sale_price,
+            "sim_animals_to_sell": sim_animals_to_sell,
+            "sim_final_weight": sim_final_weight,
+            "sim_extra_feed_cost": sim_extra_feed_cost,
+            "sim_expected_mortality": sim_expected_mortality,
+            "housing_space_estimate": housing_space_estimate,
             "subtype_choices": subtype_choices_for_animal_type(batch.animal_type),
             "animal_types": FarmAnimalType.choices,
             "health_statuses": FarmHealthStatus.choices,
@@ -986,6 +1246,210 @@ def livestock_batch_detail(request: HttpRequest, batch_id: int) -> HttpResponse:
         }
     )
     return render(request, "verticals/farm/livestock_batch_detail.html", ctx)
+
+
+# ==============================================================================
+# LIVESTOCK SIMULATION
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+def livestock_simulate(request: HttpRequest, batch_id: int) -> HttpResponse:
+    """Profit simulation for a single livestock batch."""
+    from inventory.services.farm_manager import compute_livestock_simulation
+
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    batch = get_object_or_404(FarmLivestockBatch, pk=batch_id, business=business)
+    batch_data = livestock_batch_to_data(batch)
+
+    # Total costs from ledger entries linked to this batch
+    batch_cost = FarmLedgerEntry.objects.filter(
+        business=business,
+        livestock_batch=batch,
+        entry_type=FarmEntryType.EXPENSE,
+    ).aggregate(total=Sum("amount_mwk"))["total"] or Decimal("0")
+
+    # Simulation inputs from GET/POST
+    try:
+        sim_price = Decimal(request.GET.get("sale_price", "") or "") if request.GET.get("sale_price") else batch.expected_sale_price_mwk or batch.price_per_animal_mwk
+    except Exception:
+        sim_price = batch.expected_sale_price_mwk or batch.price_per_animal_mwk
+
+    try:
+        sim_count = int(request.GET.get("count", "") or "") if request.GET.get("count") else batch.count_current
+    except Exception:
+        sim_count = batch.count_current
+
+    simulation = compute_livestock_simulation(
+        batch=batch_data,
+        current_costs=batch_cost,
+        expected_sale_price=sim_price,
+        expected_count_to_sell=sim_count,
+    )
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batch": batch,
+        "simulation": simulation,
+        "batch_cost": batch_cost,
+        "sim_price": sim_price or Decimal("0"),
+        "sim_count": sim_count or 0,
+    })
+    return render(request, "verticals/farm/livestock_simulate.html", ctx)
+
+
+# ==============================================================================
+# HOUSING PLANNER
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+def livestock_housing_planner(request: HttpRequest, batch_id: int) -> HttpResponse:
+    """Simple housing planner for a livestock batch (placeholder for 3D integration)."""
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+
+    batch = get_object_or_404(FarmLivestockBatch, pk=batch_id, business=business)
+
+    # Estimate floor space: 0.5 sqm per pig/goat, 0.1 sqm per chicken, 2 sqm per cow
+    SPACE_PER_ANIMAL = {
+        "pigs": Decimal("0.5"),
+        "cattle": Decimal("2.0"),
+        "goats": Decimal("0.5"),
+        "chickens": Decimal("0.1"),
+        "ducks": Decimal("0.1"),
+        "rabbits": Decimal("0.2"),
+        "sheep": Decimal("0.6"),
+        "fish": Decimal("0.3"),
+    }
+    space_per = SPACE_PER_ANIMAL.get(batch.animal_type, Decimal("0.5"))
+    estimated_sqm = space_per * batch.count_current if batch.count_current else Decimal("0")
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batch": batch,
+        "estimated_sqm": estimated_sqm,
+        "space_per_animal": space_per,
+        "checklist": [
+            ("Adequate floor space", f"{estimated_sqm:.1f} m² recommended for {batch.count_current} animals"),
+            ("Ventilation", "Ensure cross-ventilation to reduce disease risk"),
+            ("Clean water access", "Water points within easy reach of all animals"),
+            ("Feed storage", "Secure, dry feed storage adjacent to pen"),
+            ("Drainage", "Floor slope of 2–5% away from feeding area"),
+            ("Biosecurity barrier", "Footbath at pen entrance; restrict visitor access"),
+            ("Separation pens", "At least one isolation pen for sick animals"),
+        ],
+    })
+    return render(request, "verticals/farm/livestock_housing_plan.html", ctx)
+
+
+# ==============================================================================
+# EGG / POULTRY TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+def egg_tracking_list(request: HttpRequest) -> HttpResponse:
+    """List poultry batches and egg production summaries."""
+    from inventory.models_farm import PoultryBatch
+    from inventory.services.farm_manager import compute_egg_summary
+
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    try:
+        poultry_batches = PoultryBatch.objects.filter(business=business, is_active=True).order_by("-start_date")
+    except Exception:
+        poultry_batches = []
+
+    batch_summaries = []
+    for pb in poultry_batches:
+        try:
+            daily_records = list(
+                pb.daily_records.order_by("-date").values(
+                    "date", "eggs_collected", "deaths", "feed_kg"
+                )[:90]
+            )
+            summary = compute_egg_summary(
+                batch_id=pb.id,
+                batch_name=pb.name,
+                initial_birds=pb.initial_birds,
+                current_birds=pb.current_birds,
+                total_eggs=pb.total_eggs,
+                total_feed_kg=pb.total_feed_kg,
+                total_cost=pb.total_cost,
+                total_sales=pb.total_sales,
+                daily_records=daily_records,
+                today=today,
+            )
+        except Exception:
+            summary = None
+        batch_summaries.append({"batch": pb, "summary": summary})
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batch_summaries": batch_summaries,
+        "has_poultry": len(batch_summaries) > 0,
+    })
+    return render(request, "verticals/farm/poultry_list.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+@require_http_methods(["GET", "POST"])
+def egg_tracking_record(request: HttpRequest) -> HttpResponse:
+    """Record a daily egg/poultry entry."""
+    from inventory.models_farm import PoultryBatch, PoultryDailyRecord
+
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    batches = PoultryBatch.objects.filter(business=business, is_active=True)
+    preselect_id = request.GET.get("batch_id") or request.POST.get("batch_id")
+
+    if request.method == "POST":
+        try:
+            batch_id = int(request.POST.get("batch_id", 0))
+            pb = get_object_or_404(PoultryBatch, pk=batch_id, business=business)
+            record_date = request.POST.get("date") or today
+
+            PoultryDailyRecord.objects.update_or_create(
+                batch=pb,
+                date=record_date,
+                defaults={
+                    "birds_alive": int(request.POST.get("birds_alive", pb.current_birds or 0)),
+                    "deaths": int(request.POST.get("deaths", 0)),
+                    "feed_kg": Decimal(request.POST.get("feed_kg", "0") or "0"),
+                    "eggs_collected": int(request.POST.get("eggs_collected", 0)),
+                    "medication": request.POST.get("medication", ""),
+                    "remarks": request.POST.get("remarks", ""),
+                    "created_by": request.user,
+                },
+            )
+            messages.success(request, f"Egg record saved for {pb.name}.")
+            return redirect("verticals:farm_egg_tracking")
+        except Exception as e:
+            messages.error(request, f"Error saving egg record: {e}")
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batches": batches,
+        "preselect_id": int(preselect_id) if preselect_id else None,
+        "today": today,
+    })
+    return render(request, "verticals/farm/poultry_daily_record.html", ctx)
 
 
 # ==============================================================================
@@ -1157,15 +1621,34 @@ def crop_season_detail(request: HttpRequest, season_id: int) -> HttpResponse:
         float(season.area_value),
     )
     
+    # ── Crop intelligence layer ──────────────────────────────────────
+    actual_profit = totals["total_income"] - totals["total_expenses"]
+    crop_intelligence = None
+    try:
+        season_data = crop_season_to_data(season)
+        ledger_data_list = [ledger_entry_to_data(e) for e in ledger_entries]
+        crop_intelligence = compute_crop_intelligence(season_data, ledger_data_list, today)
+    except Exception as _ci_err:
+        import logging
+        logging.getLogger(__name__).warning("crop intelligence failed: %s", _ci_err)
+
+    # ── Poultry/Egg tracking context (if applicable) ─────────────────
+    egg_summary = None
+    if hasattr(season, "crop_type") and season.crop_type in ("chickens", "poultry"):
+        pass  # Would come from PoultryDailyRecord; skipped if not poultry season
+
     ctx.update({
         "active_tab": "crops",
         "season": season,
         "ledger_entries": ledger_entries,
         "actual_income": totals["total_income"],
         "actual_expenses": totals["total_expenses"],
-        "actual_profit": totals["total_income"] - totals["total_expenses"],
-        
-        # Smart Entry context (NEW)
+        "actual_profit": actual_profit,
+
+        # Crop intelligence
+        "crop_intelligence": crop_intelligence,
+
+        # Smart Entry context
         "recommended_actions": recommended_actions_data,
         "entry_types": entry_types,
         "weeks_since_planting": weeks_since_planting,
@@ -1250,6 +1733,345 @@ def reports(request: HttpRequest) -> HttpResponse:
     })
     
     return render(request, "verticals/farm/reports.html", ctx)
+
+
+# ==============================================================================
+# LIVESTOCK SIMULATION
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+@require_http_methods(["GET", "POST"])
+def livestock_simulate(request: HttpRequest, batch_id: int) -> HttpResponse:
+    """Simulate profit scenarios for a livestock batch."""
+    from inventory.services.farm_intelligence import simulate_livestock_batch
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    batch = get_object_or_404(FarmLivestockBatch, pk=batch_id, business=business)
+
+    simulation = None
+    form_data = {}
+
+    if request.method == "POST" or request.GET.get("run"):
+        try:
+            sale_price = _farm_parse_decimal(request.POST.get("sale_price") or request.GET.get("sale_price"))
+            if sale_price is None:
+                sale_price = batch.expected_sale_price_mwk or Decimal("0")
+
+            # Get total cost from ledger
+            all_events = FarmLivestockEvent.objects.filter(batch=batch)
+            events_data = [livestock_event_to_data(e) for e in all_events]
+            batch_data = livestock_batch_to_data(batch)
+            snapshot = compute_livestock_snapshot(batch_data, events_data)
+
+            ledger_entries = FarmLedgerEntry.objects.filter(
+                business=business, livestock_batch=batch
+            )
+            total_cost = ledger_entries.filter(
+                entry_type=FarmEntryType.EXPENSE
+            ).aggregate(
+                total=Coalesce(Sum("amount_mwk"), Decimal("0"))
+            )["total"]
+
+            form_data = {
+                "sale_price": sale_price,
+                "total_cost": total_cost,
+                "count": batch.count_current,
+            }
+
+            if sale_price > 0:
+                simulation = simulate_livestock_batch(
+                    count_current=batch.count_current,
+                    expected_sale_price_mwk=sale_price,
+                    total_cost_mwk=total_cost,
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Simulation failed: {e}")
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batch": batch,
+        "simulation": simulation,
+        "form_data": form_data,
+        "default_price": batch.expected_sale_price_mwk,
+    })
+    return render(request, "verticals/farm/livestock_simulate.html", ctx)
+
+
+# ==============================================================================
+# LIVESTOCK HOUSING PLANNER
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+def livestock_housing_planner(request: HttpRequest, batch_id: int) -> HttpResponse:
+    """Housing planner for a livestock batch. Placeholder for future 3D integration."""
+    from inventory.services.farm_intelligence import compute_housing_plan
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    batch = get_object_or_404(FarmLivestockBatch, pk=batch_id, business=business)
+
+    plan = None
+    try:
+        plan = compute_housing_plan(
+            animal_type=batch.animal_type,
+            animal_count=max(1, batch.count_current),
+            housing_type=request.GET.get("housing_type", "standard"),
+        )
+    except Exception:
+        pass
+
+    ctx.update({
+        "active_tab": "livestock",
+        "batch": batch,
+        "plan": plan,
+    })
+    return render(request, "verticals/farm/livestock_housing_planner.html", ctx)
+
+
+# ==============================================================================
+# EGG / POULTRY TRACKING
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+@require_http_methods(["GET", "POST"])
+def egg_tracking_list(request: HttpRequest) -> HttpResponse:
+    """Egg production tracking dashboard — lists layer batches and recent records."""
+    from inventory.models_farm import PoultryBatch, PoultryDailyRecord
+    from inventory.services.farm_intelligence import compute_egg_summary
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    try:
+        layer_batches = PoultryBatch.objects.filter(
+            business=business, is_active=True
+        ).order_by("-start_date")
+
+        # Get recent daily records (last 30 days)
+        from datetime import timedelta
+        month_start = today - timedelta(days=30)
+        recent_records = PoultryDailyRecord.objects.filter(
+            batch__business=business,
+            date__gte=month_start,
+        ).order_by("-date").select_related("batch")[:60]
+
+        # Convert to list of dicts for compute_egg_summary
+        records_data = [
+            {
+                "date": r.date,
+                "eggs_collected": r.eggs_collected,
+                "spoiled_eggs": 0,  # field may not exist on legacy records
+                "feed_kg": r.feed_kg,
+                "batch_id": r.batch_id,
+            }
+            for r in recent_records
+        ]
+
+        total_birds = sum(b.current_birds for b in layer_batches)
+        egg_summary = compute_egg_summary(
+            daily_records=records_data,
+            today=today,
+            layer_batches_count=layer_batches.count(),
+            total_layer_birds=total_birds,
+        )
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Egg tracking load failed: {e}")
+        layer_batches = []
+        recent_records = []
+        egg_summary = None
+
+    ctx.update({
+        "active_tab": "livestock",
+        "page_title": "Egg Production Tracking",
+        "layer_batches": layer_batches,
+        "recent_records": recent_records,
+        "egg_summary": egg_summary,
+        "today": today,
+    })
+    return render(request, "verticals/farm/egg_tracking.html", ctx)
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+@require_http_methods(["GET", "POST"])
+def egg_tracking_record(request: HttpRequest) -> HttpResponse:
+    """Record daily egg collection for a poultry batch."""
+    from inventory.models_farm import PoultryBatch, PoultryDailyRecord
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    try:
+        layer_batches = PoultryBatch.objects.filter(business=business, is_active=True)
+    except Exception:
+        layer_batches = []
+
+    if request.method == "POST":
+        try:
+            batch_id = request.POST.get("batch_id")
+            batch = get_object_or_404(PoultryBatch, pk=batch_id, business=business)
+            record_date = request.POST.get("date") or today
+            eggs = int(request.POST.get("eggs_collected", 0))
+            deaths = int(request.POST.get("deaths", 0))
+            feed_kg = _farm_parse_decimal(request.POST.get("feed_kg")) or Decimal("0")
+            medication = request.POST.get("medication", "")
+            remarks = request.POST.get("remarks", "")
+
+            # Update or create daily record
+            record, created = PoultryDailyRecord.objects.update_or_create(
+                batch=batch,
+                date=record_date,
+                defaults={
+                    "birds_alive": max(0, batch.current_birds - deaths),
+                    "deaths": deaths,
+                    "feed_kg": feed_kg,
+                    "eggs_collected": eggs,
+                    "medication": medication,
+                    "remarks": remarks,
+                    "created_by": request.user,
+                }
+            )
+            messages.success(
+                request,
+                f"{'Recorded' if created else 'Updated'} egg collection: {eggs} eggs for {batch.name}."
+            )
+            return redirect("verticals:farm_egg_tracking")
+        except Exception as e:
+            messages.error(request, f"Error recording: {e}")
+
+    ctx.update({
+        "active_tab": "livestock",
+        "page_title": "Record Egg Collection",
+        "layer_batches": layer_batches,
+        "today": today,
+        "preselect_batch": request.GET.get("batch_id"),
+    })
+    return render(request, "verticals/farm/egg_tracking_record.html", ctx)
+
+
+# ==============================================================================
+# FARM BUSINESS HEALTH (farm-specific)
+# ==============================================================================
+
+
+@login_required
+@require_business
+@require_business_kind(BusinessKind.FARM)
+def farm_business_health_view(request: HttpRequest) -> HttpResponse:
+    """Farm-specific business health check with score, badges, and recommendations."""
+    from inventory.services.farm_intelligence import compute_farm_business_health
+    ctx = base.base_context(request)
+    business = ctx.get("business")
+    today = timezone.now().date()
+
+    try:
+        ledger_qs = FarmLedgerEntry.objects.filter(business=business)
+        ledger_entries = [ledger_entry_to_data(e) for e in ledger_qs]
+        batches = FarmLivestockBatch.objects.filter(business=business, is_active=True)
+        active_seasons = FarmCropSeason.objects.filter(
+            business=business,
+            status__in=[FarmSeasonStatus.PLANNING, FarmSeasonStatus.ACTIVE],
+        )
+
+        # Compute financials
+        from django.db.models import Sum as DbSum
+        totals = ledger_qs.aggregate(
+            income=Coalesce(
+                DbSum("amount_mwk", filter=~models.Q(entry_type=FarmEntryType.EXPENSE)),
+                Decimal("0"),
+            ),
+            expenses=Coalesce(
+                DbSum("amount_mwk", filter=models.Q(entry_type=FarmEntryType.EXPENSE)),
+                Decimal("0"),
+            ),
+        )
+        total_income = totals["income"]
+        total_expenses = totals["expenses"]
+        net_profit = total_income - total_expenses
+
+        # Livestock mortality
+        all_events = FarmLivestockEvent.objects.filter(batch__business=business)
+        events_data = [livestock_event_to_data(e) for e in all_events]
+        livestock_snapshots = []
+        for batch in batches:
+            batch_data = livestock_batch_to_data(batch)
+            snapshot = compute_livestock_snapshot(batch_data, events_data, today)
+            livestock_snapshots.append(snapshot)
+
+        # Overall mortality
+        total_in = sum(s.births_total + s.purchases_total for s in livestock_snapshots)
+        total_deaths = sum(s.deaths_total for s in livestock_snapshots)
+        mortality_rate = (
+            Decimal(total_deaths) / Decimal(total_in) * 100
+            if total_in > 0 else None
+        )
+
+        crops_with_yield = sum(
+            1 for s in active_seasons if s.projected_yield is not None
+        )
+
+        from inventory.models_marketplace import ListingStatus, MarketplaceListing
+        mp_count = MarketplaceListing.objects.filter(
+            business=business, vertical="farm", status=ListingStatus.LIVE
+        ).count()
+
+        last_entry = ledger_qs.order_by("-date").first()
+        days_since = (today - last_entry.date).days if last_entry else None
+
+        from inventory.models_farm import FarmAsset
+        assets_val = FarmAsset.objects.filter(
+            business=business, is_active=True
+        ).aggregate(total=Coalesce(DbSum("value_mwk"), Decimal("0")))["total"]
+
+        health = compute_farm_business_health(
+            net_profit_mwk=net_profit,
+            total_income_mwk=total_income,
+            total_expenses_mwk=total_expenses,
+            expected_income_mwk=None,
+            livestock_value_mwk=None,
+            assets_value_mwk=assets_val,
+            mortality_rate_pct=mortality_rate,
+            marketplace_live_count=mp_count,
+            active_batches_count=batches.count(),
+            active_seasons_count=active_seasons.count(),
+            ledger_entries_count=ledger_qs.count(),
+            days_since_last_activity=days_since,
+            crops_with_projected_yield=crops_with_yield,
+        )
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Farm business health failed: {e}")
+        health = None
+        net_profit = Decimal("0")
+        total_income = Decimal("0")
+        total_expenses = Decimal("0")
+
+    ctx.update({
+        "active_tab": "dashboard",
+        "page_title": "Farm Business Health",
+        "health": health,
+        "net_profit": net_profit,
+        "total_income": total_income,
+        "total_expenses": total_expenses,
+        "all_farm_badges": [
+            "Books Balanced", "Profit Strong", "Livestock Stable", "Crops Healthy",
+            "Feed Controlled", "Harvest Ready", "Marketplace Ready", "Records Clean",
+        ],
+    })
+    return render(request, "verticals/farm/business_health.html", ctx)
 
 
 # Required import for aggregation

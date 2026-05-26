@@ -322,6 +322,40 @@ body[data-vertical="phones"] {
 }
 
 /* ========================================================================
+   GLOBAL HEADER OVERLAP FIX (mobile hamburger clearance)
+   On mobile, the sidebar toggle button is position: fixed at top: 12px, left: 12px
+   (56px tall + 12px offset = 68px occupied zone).
+   All farm pages must clear this zone so content isn't hidden under the button.
+   ======================================================================== */
+
+@media (max-width: 991.98px) {
+  /* Push topbar content right to clear the 56px hamburger button + 12px left offset */
+  .cc-header .topbar {
+    padding-left: 72px !important;
+  }
+
+  /* Hero cards on farm pages get top clearance for hamburger button */
+  .vertical-hero,
+  [data-testid="farm-hero-card"],
+  [data-testid="farm-dashboard-container"] .vertical-hero {
+    margin-top: 60px !important;
+  }
+
+  /* Farm-vertical container-fluid pages: push first direct child below hamburger */
+  [data-vertical="farm"] .container-fluid.py-3,
+  [data-vertical="farm"] .container.py-3 {
+    padding-top: 68px !important;
+  }
+}
+
+/* Ensure sticky cc-header sits above page content */
+.cc-header {
+  position: sticky;
+  top: 0;
+  z-index: 1600;
+}
+
+/* ========================================================================
    SAFE UTILITY OVERRIDES (Won't break existing layouts)
    ======================================================================== */
 
