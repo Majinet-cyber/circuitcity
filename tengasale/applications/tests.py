@@ -303,11 +303,21 @@ class ApplicationUrlTests(ApplicationTestCase):
         self.assertEqual(reverse("signature", args=[app.id]), f"/applications/{app.id}/signature/")
         self.assertEqual(reverse("application_detail", args=[app.id]), f"/applications/{app.id}/detail/")
         self.assertEqual(reverse("active_applications"), "/applications/active/")
+        self.assertEqual(reverse("pending_applications"), "/applications/pending/")
+        self.assertEqual(reverse("needs_edit_applications"), "/applications/needs-edit/")
+        self.assertEqual(reverse("approved_applications"), "/applications/approved/")
         self.assertEqual(reverse("completed_applications"), "/applications/completed/")
         self.assertEqual(reverse("rejected_applications"), "/applications/rejected/")
 
     def test_list_pages_return_200_for_logged_in_user(self):
-        for name in ["active_applications", "completed_applications", "rejected_applications"]:
+        for name in [
+            "active_applications",
+            "pending_applications",
+            "needs_edit_applications",
+            "approved_applications",
+            "completed_applications",
+            "rejected_applications",
+        ]:
             response = self.client.get(reverse(name))
             self.assertEqual(response.status_code, 200)
 
@@ -340,7 +350,7 @@ class ApplicationListTests(ApplicationTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Under Review")
-        self.assertContains(response, "Reviewer: manager")
+        self.assertContains(response, "Underwriter: manager")
 
     def test_active_applications_page_contains_clickable_continue_card(self):
         app = self.create_application()
@@ -375,13 +385,25 @@ class ApplicationListTests(ApplicationTestCase):
         app.status = "correction_requested"
         app.save()
 
-        response = self.client.get(reverse("active_applications"))
+        response = self.client.get(reverse("needs_edit_applications"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="application-card"')
         self.assertContains(response, "Needs Edit")
         self.assertNotContains(response, "Correction Requested")
         self.assertContains(response, f'href="{app.get_continue_url()}"')
+
+    def test_application_list_searches_contract_and_imei(self):
+        app = self.create_application()
+        app.customer_name = "Jane Banda"
+        app.imei_number = "123456789012345"
+        app.status = "approved"
+        app.save()
+
+        response = self.client.get(reverse("approved_applications"), {"q": "123456789012345"})
+
+        self.assertContains(response, "Jane Banda")
+        self.assertContains(response, "123456789012345")
 
     def test_rejected_applications_page_contains_clickable_card(self):
         app = self.create_application()
@@ -803,6 +825,7 @@ class KYCCaptureTests(ApplicationTestCase):
         app.customer_face_image.save("face.png", ContentFile(PNG_BYTES), save=False)
         app.id_front_image.save("front.png", ContentFile(PNG_BYTES), save=False)
         app.id_back_image.save("back.png", ContentFile(PNG_BYTES), save=False)
+        app.customer_phone_image.save("phone.png", ContentFile(PNG_BYTES), save=False)
         app.save()
 
     def test_kyc_page_get_shows_live_capture_controls(self):
@@ -814,9 +837,10 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Capture Face")
         self.assertContains(response, "Capture ID Front")
         self.assertContains(response, "Capture ID Back")
+        self.assertContains(response, "Capture Customer Phone")
         self.assertContains(response, 'class="soft-back"')
         self.assertContains(response, 'capture="user"')
-        self.assertContains(response, 'capture="environment"', count=2)
+        self.assertContains(response, 'capture="environment"', count=3)
         self.assertContains(response, 'class="kyc-file-input"')
 
     def test_kyc_post_without_images_stays_on_page_with_errors(self):
@@ -828,6 +852,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Customer face image is required.")
         self.assertContains(response, "ID front image is required.")
         self.assertContains(response, "ID back image is required.")
+        self.assertContains(response, "Customer phone image is required.")
         app.refresh_from_db()
         self.assertNotEqual(app.status, "kyc")
 
@@ -842,6 +867,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ID front image is required.")
         self.assertContains(response, "ID back image is required.")
+        self.assertContains(response, "Customer phone image is required.")
 
     def test_kyc_post_with_face_and_id_front_fails(self):
         app = self.create_application()
@@ -856,6 +882,7 @@ class KYCCaptureTests(ApplicationTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ID back image is required.")
+        self.assertContains(response, "Customer phone image is required.")
 
     def test_kyc_post_with_all_images_succeeds_and_redirects_to_location(self):
         app = self.create_application()
@@ -866,6 +893,7 @@ class KYCCaptureTests(ApplicationTestCase):
                 "customer_face_image": self.image_upload("face.png"),
                 "id_front_image": self.image_upload("front.png"),
                 "id_back_image": self.image_upload("back.png"),
+                "customer_phone_image": self.image_upload("phone.png"),
             },
         )
 
@@ -875,6 +903,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertTrue(app.customer_face_image)
         self.assertTrue(app.id_front_image)
         self.assertTrue(app.id_back_image)
+        self.assertTrue(app.customer_phone_image)
 
     def test_existing_saved_images_show_previews_and_allow_continue(self):
         app = self.create_application()
@@ -885,7 +914,8 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Customer Face preview")
         self.assertContains(response, "ID Front preview")
         self.assertContains(response, "ID Back preview")
-        self.assertContains(response, 'data-existing="true"', count=3)
+        self.assertContains(response, "Customer Phone preview")
+        self.assertContains(response, 'data-existing="true"', count=4)
         self.assertNotContains(response, "data-next-button disabled")
 
         post_response = self.client.post(reverse("kyc_capture", args=[app.id]), {})
@@ -897,7 +927,7 @@ class KYCCaptureTests(ApplicationTestCase):
         original_face_name = app.customer_face_image.name
 
         response = self.client.get(reverse("kyc_capture", args=[app.id]))
-        self.assertContains(response, "Recapture", count=3)
+        self.assertContains(response, "Recapture", count=4)
 
         post_response = self.client.post(
             reverse("kyc_capture", args=[app.id]),
@@ -924,6 +954,7 @@ class KYCCaptureTests(ApplicationTestCase):
                 "customer_face_image": self.image_upload("face.png"),
                 "id_front_image": self.image_upload("front.png"),
                 "id_back_image": self.image_upload("back.png"),
+                "customer_phone_image": self.image_upload("phone.png"),
             },
         )
 

@@ -8,6 +8,7 @@ class FinancingApplicationAdmin(admin.ModelAdmin):
         "application_number",
         "customer_name",
         "customer_phone",
+        "imei_number",
         "deal",
         "selected_cash_price",
         "calculated_total_loan",
@@ -18,6 +19,7 @@ class FinancingApplicationAdmin(admin.ModelAdmin):
     list_filter = ("status", "region", "deal__brand", "created_at")
     search_fields = (
         "application_number",
+        "contract__contract_number",
         "customer_name",
         "customer_phone",
         "national_id",

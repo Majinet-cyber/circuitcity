@@ -51,8 +51,8 @@ PROOF_TYPES = [
     ("", "Select proof type"),
     ("MoMo", "MoMo"),
     ("Bank", "Bank"),
-    ("Till", "Till"),
-    ("Contact Person", "Contact Person"),
+    ("Employer", "Employer"),
+    ("Business Contact", "Business Contact"),
     ("Other", "Other"),
 ]
 
@@ -152,7 +152,7 @@ class KYCForm(forms.ModelForm):
 
     class Meta:
         model = FinancingApplication
-        fields = ["customer_face_image", "id_front_image", "id_back_image"]
+        fields = ["customer_face_image", "id_front_image", "id_back_image", "customer_phone_image"]
         widgets = {
             "customer_face_image": forms.FileInput(
                 attrs={
@@ -178,6 +178,14 @@ class KYCForm(forms.ModelForm):
                     "data-capture-input": "id-back",
                 }
             ),
+            "customer_phone_image": forms.FileInput(
+                attrs={
+                    "accept": "image/*",
+                    "capture": "environment",
+                    "class": "kyc-file-input",
+                    "data-capture-input": "customer-phone",
+                }
+            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -191,6 +199,7 @@ class KYCForm(forms.ModelForm):
             "customer_face_image": "Customer face image",
             "id_front_image": "ID front image",
             "id_back_image": "ID back image",
+            "customer_phone_image": "Customer phone image",
         }
 
         for field_name, label in labels.items():
@@ -234,6 +243,7 @@ class LocationNextOfKinForm(forms.ModelForm):
             "district",
             "traditional_authority",
             "precise_location",
+            "gps_coordinates",
             "map_screenshot",
             "next_of_kin_1_name",
             "next_of_kin_1_phone",
@@ -361,6 +371,7 @@ class WorkProofForm(forms.ModelForm):
             "proof_contact_name",
             "proof_contact_phone",
             "proof_notes",
+            "proof_income_file",
         ]
 
     def clean_next_of_kin_2_phone(self):
@@ -372,7 +383,10 @@ class WorkProofForm(forms.ModelForm):
         return value
 
     def clean_proof_contact_phone(self):
-        return clean_exact_digits(self.cleaned_data.get("proof_contact_phone"), 9, "Proof contact phone")
+        value = clean_exact_digits(self.cleaned_data.get("proof_contact_phone"), 9, "Proof contact phone")
+        if value == (self.instance.customer_phone or "").strip():
+            raise forms.ValidationError("Proof contact phone cannot be the same as customer phone.")
+        return value
 
 
 class SignatureForm(forms.ModelForm):

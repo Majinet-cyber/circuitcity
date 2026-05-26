@@ -22,11 +22,11 @@
             {% if app.claimed_by %}
                 <p>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }} started reviewing it{% if app.claimed_at %} on {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}.</p>
             {% else %}
-                <p>A TengaSale manager is reviewing your application.</p>
+                <p>A TengaSale underwriter is reviewing your application.</p>
             {% endif %}
         {% elif app.merchant_status_key == "pending_review" %}
             <h2>Your application is pending review</h2>
-            <p>A TengaSale manager will begin reviewing it soon.</p>
+            <p>A TengaSale underwriter will begin reviewing it soon.</p>
         {% elif app.merchant_status_key == "needs_edit" %}
             <h2>Your application needs edits</h2>
             <p>Review the requested changes and resubmit the application.</p>
@@ -35,7 +35,7 @@
             <p>Continue to the next step to complete the contract process.</p>
         {% elif app.merchant_status_key == "rejected" %}
             <h2>Your application was rejected</h2>
-            <p>Review the manager comment below for more information.</p>
+            <p>Review the underwriter comment below for more information.</p>
         {% else %}
             <h2>{{ app.merchant_status_label }}</h2>
             <p>Review the application details below.</p>
@@ -155,7 +155,7 @@
     </div>
     {% if app.claimed_by %}
         <div class="detail-row">
-            <span>Reviewer</span>
+            <span>Underwriter</span>
             <strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}{% if app.claimed_at %} since {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
         </div>
     {% endif %}
@@ -176,7 +176,7 @@
         <strong>{{ app.created_at|date:"Y/m/d, H:i" }}</strong>
     </div>
     <div class="detail-row">
-        <span>Manager comment</span>
+        <span>Underwriter comment</span>
         <strong>{{ app.manager_comment|default:"No comment" }}</strong>
     </div>
 </div>

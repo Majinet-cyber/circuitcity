@@ -38,6 +38,13 @@
     </div>
 
     <div class="form-group">
+        <label for="{{ form.gps_coordinates.id_for_label }}">GPS coordinates if available</label>
+        {{ form.gps_coordinates }}
+        {{ form.gps_coordinates.errors }}
+        <button type="button" class="btn btn-outline" data-location-button>USE CURRENT LOCATION</button>
+    </div>
+
+    <div class="form-group">
         <label for="{{ form.map_screenshot.id_for_label }}">Map screenshot</label>
         {% if app.map_screenshot %}
             <img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">
@@ -121,6 +128,19 @@
         document.querySelectorAll("[data-phone-input]").forEach(function (input) {
             input.addEventListener("input", function () {
                 input.value = input.value.replace(/\D/g, "").slice(0, 9);
+            });
+        });
+    })();
+
+    (function () {
+        const button = document.querySelector("[data-location-button]");
+        const input = document.getElementById("id_gps_coordinates");
+        if (!button || !input || !navigator.geolocation) {
+            return;
+        }
+        button.addEventListener("click", function () {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                input.value = position.coords.latitude.toFixed(6) + "," + position.coords.longitude.toFixed(6);
             });
         });
     })();

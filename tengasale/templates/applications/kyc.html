@@ -10,7 +10,7 @@
 <h1 class="greeting">KYC Capture</h1>
 
 <div class="card instruction-card">
-    <p>Capture customer face, ID front, and ID back. Preview all images before continuing.</p>
+    <p>Capture customer face, ID front, ID back, and customer phone image. Preview all images before continuing.</p>
 </div>
 
 <form method="post" enctype="multipart/form-data" class="kyc-form" data-kyc-form>
@@ -32,6 +32,10 @@
         {{ form.customer_face_image.errors }}
 
         <button type="button" class="capture-button" data-capture-button>Capture Face</button>
+        <div class="camera-panel" data-camera-panel hidden>
+            <video playsinline autoplay muted data-camera-video></video>
+            <button type="button" class="btn" data-save-capture>SAVE</button>
+        </div>
 
         <div class="kyc-preview{% if app.customer_face_image %} is-visible{% endif %}" data-preview-card>
             {% if app.customer_face_image %}
@@ -41,6 +45,40 @@
             {% endif %}
             <div class="kyc-preview-meta">
                 <strong>Customer Face</strong>
+                <span class="capture-status captured">Captured</span>
+            </div>
+            <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
+        </div>
+    </section>
+
+    <section class="kyc-section" data-kyc-section data-existing="{% if app.customer_phone_image %}true{% else %}false{% endif %}">
+        <div class="kyc-section-header">
+            <div>
+                <h2>Customer Phone Image</h2>
+                <p>Use the rear camera and capture the actual customer device.</p>
+            </div>
+            <span class="capture-status{% if app.customer_phone_image %} captured{% endif %}" data-status>
+                {% if app.customer_phone_image %}Captured{% else %}Required{% endif %}
+            </span>
+        </div>
+
+        {{ form.customer_phone_image }}
+        {{ form.customer_phone_image.errors }}
+
+        <button type="button" class="capture-button" data-capture-button>Capture Customer Phone</button>
+        <div class="camera-panel" data-camera-panel hidden>
+            <video playsinline autoplay muted data-camera-video></video>
+            <button type="button" class="btn" data-save-capture>SAVE</button>
+        </div>
+
+        <div class="kyc-preview{% if app.customer_phone_image %} is-visible{% endif %}" data-preview-card>
+            {% if app.customer_phone_image %}
+                <img src="{{ app.customer_phone_image.url }}" alt="Customer Phone preview" data-preview-image>
+            {% else %}
+                <img src="" alt="Customer Phone preview" data-preview-image>
+            {% endif %}
+            <div class="kyc-preview-meta">
+                <strong>Customer Phone</strong>
                 <span class="capture-status captured">Captured</span>
             </div>
             <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
@@ -62,6 +100,10 @@
         {{ form.id_front_image.errors }}
 
         <button type="button" class="capture-button" data-capture-button>Capture ID Front</button>
+        <div class="camera-panel" data-camera-panel hidden>
+            <video playsinline autoplay muted data-camera-video></video>
+            <button type="button" class="btn" data-save-capture>SAVE</button>
+        </div>
 
         <div class="kyc-preview{% if app.id_front_image %} is-visible{% endif %}" data-preview-card>
             {% if app.id_front_image %}
@@ -92,6 +134,10 @@
         {{ form.id_back_image.errors }}
 
         <button type="button" class="capture-button" data-capture-button>Capture ID Back</button>
+        <div class="camera-panel" data-camera-panel hidden>
+            <video playsinline autoplay muted data-camera-video></video>
+            <button type="button" class="btn" data-save-capture>SAVE</button>
+        </div>
 
         <div class="kyc-preview{% if app.id_back_image %} is-visible{% endif %}" data-preview-card>
             {% if app.id_back_image %}
@@ -137,16 +183,76 @@
             const input = section.querySelector("[data-capture-input]");
             const captureButton = section.querySelector("[data-capture-button]");
             const recaptureButton = section.querySelector("[data-recapture-button]");
+            const cameraPanel = section.querySelector("[data-camera-panel]");
+            const cameraVideo = section.querySelector("[data-camera-video]");
+            const saveCaptureButton = section.querySelector("[data-save-capture]");
             const previewCard = section.querySelector("[data-preview-card]");
             const previewImage = section.querySelector("[data-preview-image]");
             const status = section.querySelector("[data-status]");
+            let stream = null;
+
+            function stopStream() {
+                if (stream) {
+                    stream.getTracks().forEach(function (track) {
+                        track.stop();
+                    });
+                    stream = null;
+                }
+            }
+
+            function useFileFallback() {
+                stopStream();
+                cameraPanel.hidden = true;
+                input.click();
+            }
+
+            function openCamera() {
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.DataTransfer) {
+                    useFileFallback();
+                    return;
+                }
+
+                const facingMode = input.getAttribute("capture") === "user" ? "user" : "environment";
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: false })
+                    .then(function (mediaStream) {
+                        stream = mediaStream;
+                        cameraVideo.srcObject = stream;
+                        cameraPanel.hidden = false;
+                    })
+                    .catch(useFileFallback);
+            }
 
             captureButton.addEventListener("click", function () {
-                input.click();
+                openCamera();
             });
 
             recaptureButton.addEventListener("click", function () {
-                input.click();
+                openCamera();
+            });
+
+            saveCaptureButton.addEventListener("click", function () {
+                if (!stream || !cameraVideo.videoWidth) {
+                    useFileFallback();
+                    return;
+                }
+
+                const canvas = document.createElement("canvas");
+                canvas.width = cameraVideo.videoWidth;
+                canvas.height = cameraVideo.videoHeight;
+                canvas.getContext("2d").drawImage(cameraVideo, 0, 0);
+                canvas.toBlob(function (blob) {
+                    if (!blob) {
+                        useFileFallback();
+                        return;
+                    }
+                    const file = new File([blob], input.dataset.captureInput + ".png", { type: "image/png" });
+                    const transfer = new DataTransfer();
+                    transfer.items.add(file);
+                    input.files = transfer.files;
+                    input.dispatchEvent(new Event("change", { bubbles: true }));
+                    stopStream();
+                    cameraPanel.hidden = true;
+                }, "image/png");
             });
 
             input.addEventListener("change", function () {

@@ -9,7 +9,7 @@
 
 <h1 class="greeting">Work Details</h1>
 
-<form method="post" class="card">
+<form method="post" enctype="multipart/form-data" class="card">
     {% csrf_token %}
     {{ form.non_field_errors }}
 
@@ -65,6 +65,12 @@
         <label for="{{ form.proof_notes.id_for_label }}">Proof notes</label>
         {{ form.proof_notes }}
         {{ form.proof_notes.errors }}
+    </div>
+
+    <div class="form-group">
+        <label for="{{ form.proof_income_file.id_for_label }}">Proof income file optional</label>
+        {{ form.proof_income_file }}
+        {{ form.proof_income_file.errors }}
     </div>
 
     <div class="form-actions">

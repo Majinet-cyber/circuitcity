@@ -1,0 +1,35 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'underwriter_dashboard' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">{{ title }}</h1>
+
+<div class="application-list">
+    {% for app in apps %}
+        <a href="{% url 'underwriter_review_application' app.id %}" class="application-card">
+            <div class="application-card-main">
+                <div class="application-card-header">
+                    <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+                </div>
+                <div class="application-meta">
+                    <span>ID: {{ app.national_id|default:"-" }}</span>
+                    <span>App: {{ app.application_number|default:app.id }}</span>
+                    <span>{{ app.claimed_at|default:app.reviewed_at|default:app.created_at|date:"Y/m/d, H:i" }}</span>
+                </div>
+            </div>
+            <div class="application-card-side"><span class="soft-card-arrow">&rsaquo;</span></div>
+        </a>
+    {% empty %}
+        <div class="card">No applications found.</div>
+    {% endfor %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'underwriter_review_application' app.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<section class="card complete-card">
+    <h1>Confirm approve</h1>
+    <p>Are you sure you want to approve?</p>
+    <p class="text-muted">{{ app.customer_name|default:"Unnamed Customer" }} · {{ app.application_number }}</p>
+
+    <form method="post" class="form-actions">
+        {% csrf_token %}
+        <button type="submit" class="btn green-button">APPROVE</button>
+        <a href="{% url 'underwriter_review_application' app.id %}" class="btn btn-outline">CANCEL</a>
+    </form>
+</section>
+
+{% endblock %}

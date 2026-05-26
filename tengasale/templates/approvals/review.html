@@ -2,7 +2,7 @@
 
 {% block content %}
 
-<a href="{% url 'manager_home' %}" class="soft-back">
+<a href="{% url 'underwriter_dashboard' %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
     <span>BACK</span>
 </a>
@@ -10,15 +10,22 @@
 <h1 class="greeting">Review</h1>
 
 <section class="card">
+    <h2>Application Review</h2>
+    <div class="detail-row"><span>Application number</span><strong>{{ app.application_number|default:app.id }}</strong></div>
+    <div class="detail-row"><span>Submitted</span><strong>{{ app.submitted_at|date:"Y/m/d, H:i"|default:"Not submitted" }}</strong></div>
+    <div class="detail-row"><span>Sales rep / merchant</span><strong>{{ app.created_by.get_full_name|default:app.created_by.username }}</strong></div>
+</section>
+
+<section class="card">
     <h2>Customer Details</h2>
     <div class="detail-row"><span>Customer</span><strong>{{ app.customer_name|default:"Not captured" }}</strong></div>
     <div class="detail-row"><span>ID</span><strong>{{ app.national_id|default:"Not captured" }}</strong></div>
-    <div class="detail-row"><span>Phone</span><strong>{% if app.customer_phone %}+265 {{ app.customer_phone }}{% else %}Not captured{% endif %}</strong></div>
+    <div class="detail-row"><span>Phone</span><strong>{% if app.customer_phone %}<a href="tel:+265{{ app.customer_phone }}">+265 {{ app.customer_phone }}</a>{% else %}Not captured{% endif %}</strong></div>
     <div class="detail-row"><span>Occupation</span><strong>{{ app.occupation|default:"Not captured" }}</strong></div>
     <div class="detail-row"><span>Income</span><strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong></div>
     <div class="detail-row"><span>Status</span><strong><span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span></strong></div>
     {% if app.claimed_by %}
-        <div class="detail-row"><span>Reviewer</span><strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</strong></div>
+        <div class="detail-row"><span>Underwriter</span><strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</strong></div>
     {% endif %}
 </section>
 
@@ -31,6 +38,8 @@
         <div class="detail-row"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong></div>
         <div class="detail-row"><span>Monthly</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
         <div class="detail-row"><span>Daily</span><strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>3-month settlement</span><strong>MWK {{ app.calculated_3_month_total|floatformat:0 }}</strong></div>
+        <div class="detail-row"><span>6-month settlement</span><strong>MWK {{ app.calculated_6_month_total|floatformat:0 }}</strong></div>
     {% else %}
         <p class="empty-state">No deal selected.</p>
     {% endif %}
@@ -41,7 +50,8 @@
     {% if app.customer_face_image %}<img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face">{% endif %}
     {% if app.id_front_image %}<img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front">{% endif %}
     {% if app.id_back_image %}<img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back">{% endif %}
-    {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
+    {% if app.customer_phone_image %}<img class="upload-preview" src="{{ app.customer_phone_image.url }}" alt="Customer phone">{% endif %}
+    {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image and not app.customer_phone_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
 </section>
 
 <section class="card">
@@ -49,6 +59,7 @@
     <div class="detail-row"><span>Region / district</span><strong>{{ app.region|default:"-" }} / {{ app.district|default:"-" }}</strong></div>
     <div class="detail-row"><span>TA</span><strong>{{ app.traditional_authority|default:"-" }}</strong></div>
     <div class="detail-row"><span>Precise location</span><strong>{{ app.precise_location|default:"-" }}</strong></div>
+    <div class="detail-row"><span>GPS coordinates</span><strong>{{ app.gps_coordinates|default:"-" }}</strong></div>
     <div class="detail-row"><span>Next of kin 1</span><strong>{{ app.next_of_kin_1_name|default:"-" }}{% if app.next_of_kin_1_phone %} (+265 {{ app.next_of_kin_1_phone }}){% endif %}</strong></div>
     <div class="detail-row"><span>Relationship</span><strong>{{ app.next_of_kin_1_relationship|default:"-" }}</strong></div>
     {% if app.map_screenshot %}<img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">{% endif %}
@@ -62,6 +73,7 @@
     <div class="detail-row"><span>Proof</span><strong>{{ app.proof_of_income_type|default:"-" }}</strong></div>
     <div class="detail-row"><span>Contact</span><strong>{{ app.proof_contact_name|default:"-" }}{% if app.proof_contact_phone %} (+265 {{ app.proof_contact_phone }}){% endif %}</strong></div>
     <div class="detail-row"><span>Notes</span><strong>{{ app.proof_notes|default:"-" }}</strong></div>
+    {% if app.proof_income_file %}<div class="detail-row"><span>Proof file</span><strong><a href="{{ app.proof_income_file.url }}">Open proof</a></strong></div>{% endif %}
 </section>
 
 <section class="card">
@@ -92,8 +104,14 @@
     </div>
 
     <div class="form-group">
-        <label>Manager comment</label>
+        <label>Underwriter comment</label>
         <textarea name="manager_comment">{{ app.manager_comment }}</textarea>
+    </div>
+
+    <div class="form-actions stacked-actions">
+        <a href="{% url 'underwriter_address_check' app.id %}" class="btn btn-outline">ADDRESS CHECK</a>
+        <a href="{% url 'underwriter_income_check' app.id %}" class="btn btn-outline">INCOME CHECK</a>
+        <a href="{% url 'underwriter_confirm_approve' app.id %}" class="btn green-button">APPROVE</a>
     </div>
 
     <div class="form-actions stacked-actions">

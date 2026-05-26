@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -194,7 +195,7 @@ def kyc_capture(request, app_id):
     else:
         form = KYCForm(instance=app)
 
-    kyc_complete = bool(app.customer_face_image and app.id_front_image and app.id_back_image)
+    kyc_complete = bool(app.customer_face_image and app.id_front_image and app.id_back_image and app.customer_phone_image)
     return render(request, "applications/kyc.html", {"app": app, "form": form, "kyc_complete": kyc_complete})
 
 
@@ -229,7 +230,7 @@ def work_details(request, app_id):
     app = merchant_application(request, app_id)
 
     if request.method == "POST":
-        form = WorkProofForm(request.POST, instance=app)
+        form = WorkProofForm(request.POST, request.FILES, instance=app)
         if form.is_valid():
             app = form.save(commit=False)
             app.status = "work_details"
@@ -329,30 +330,89 @@ def application_detail(request, app_id):
 
 
 @login_required
-def active_applications(request):
-    apps = FinancingApplication.objects.select_related("claimed_by").filter(
+def filtered_application_queryset(request, statuses):
+    apps = FinancingApplication.objects.select_related("claimed_by", "contract").filter(
         created_by=request.user,
-        status__in=ACTIVE_STATUSES,
-    ).order_by("-created_at")
+        status__in=statuses,
+    )
+    query = (request.GET.get("q") or "").strip()
+    if query:
+        apps = apps.filter(
+            Q(customer_name__icontains=query)
+            | Q(national_id__icontains=query)
+            | Q(customer_phone__icontains=query)
+            | Q(application_number__icontains=query)
+            | Q(imei_number__icontains=query)
+            | Q(contract__contract_number__icontains=query)
+        )
+    return apps.order_by("-created_at"), query
 
-    return render(request, "applications/list.html", {"apps": apps, "title": "Active"})
+
+@login_required
+def application_list(request, title, explanation, statuses):
+    apps, query = filtered_application_queryset(request, statuses)
+    return render(
+        request,
+        "applications/list.html",
+        {"apps": apps, "title": title, "explanation": explanation, "query": query},
+    )
+
+
+@login_required
+def active_applications(request):
+    return application_list(
+        request,
+        "Active",
+        "Applications that can still move through the merchant workflow.",
+        ACTIVE_STATUSES,
+    )
+
+
+@login_required
+def pending_applications(request):
+    return application_list(
+        request,
+        "Pending Review",
+        "Submitted applications waiting for underwriter review.",
+        ["submitted", "pending_review", "resubmitted", "under_review"],
+    )
+
+
+@login_required
+def needs_edit_applications(request):
+    return application_list(
+        request,
+        "Needs Edit",
+        "Applications returned by underwriting for correction.",
+        ["correction_requested"],
+    )
+
+
+@login_required
+def approved_applications(request):
+    return application_list(
+        request,
+        "Approved",
+        "Approved applications ready for contract completion.",
+        ["approved", "contract_terms", "contract_signature", "imei_entry", "contract_creating", "warranty_check", "locking", "deposit_pending"],
+    )
 
 
 @login_required
 def completed_applications(request):
-    apps = FinancingApplication.objects.select_related("claimed_by").filter(
-        created_by=request.user,
-        status__in=["contract_complete", "completed"],
-    ).order_by("-created_at")
-
-    return render(request, "applications/list.html", {"apps": apps, "title": "Completed"})
+    return application_list(
+        request,
+        "Completed",
+        "Completed TengaSale contracts and delivered devices.",
+        ["contract_complete", "completed"],
+    )
 
 
 @login_required
 def rejected_applications(request):
-    apps = FinancingApplication.objects.select_related("claimed_by").filter(
-        created_by=request.user,
-        status="rejected",
-    ).order_by("-created_at")
-
-    return render(request, "applications/list.html", {"apps": apps, "title": "Archived & Rejected"})
+    return application_list(
+        request,
+        "Archived & Rejected",
+        "Applications that were rejected or archived.",
+        ["rejected"],
+    )

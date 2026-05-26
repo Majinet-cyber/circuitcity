@@ -16,10 +16,10 @@
     <div>
         {% if app.merchant_status_key == "under_review" %}
             <h2>Your application is being reviewed</h2>
-            <p>A TengaSale manager has started reviewing this application.</p>
+            <p>A TengaSale underwriter has started reviewing this application.</p>
         {% elif app.merchant_status_key == "pending_review" %}
             <h2>Your application is pending review</h2>
-            <p>A TengaSale manager will begin reviewing it soon and contact you if there are any questions.</p>
+            <p>A TengaSale underwriter will begin reviewing it soon and contact you if there are any questions.</p>
         {% else %}
             <h2>{{ app.merchant_status_label }}</h2>
             <p>Review the latest application status below.</p>
@@ -40,7 +40,7 @@
     {% if app.claimed_by %}
         <div class="detail-row">
             <span>Review</span>
-            <strong>Being reviewed by {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}{% if app.claimed_at %} since {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
+            <strong>Being reviewed by Underwriter {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}{% if app.claimed_at %} since {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
         </div>
     {% else %}
         <div class="detail-row">
@@ -51,7 +51,7 @@
 </div>
 
 <div class="form-actions">
-    <a href="{% url 'home' %}" class="btn">HOME</a>
+    <a href="{% url 'merchant_dashboard' %}" class="btn">HOME</a>
     <a href="mailto:support@tengasale.local" class="btn btn-outline">CONTACT SUPPORT</a>
 </div>
 

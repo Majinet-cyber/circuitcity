@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<a href="{% url 'home' %}" class="soft-back">
+<a href="{% url 'merchant_dashboard' %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
     <span>BACK</span>
 </a>
@@ -12,9 +12,12 @@
 <h1 class="greeting">{{ title }}</h1>
 
 <div class="card application-filter-card">
-    <input type="text" placeholder="Filter">
+    <form method="get" class="compact-form">
+        <input type="text" name="q" value="{{ query }}" placeholder="Search applications">
+        <button type="submit" class="btn btn-outline">FILTER</button>
+    </form>
     <p class="text-muted">
-        Filter by customer name, ID number, phone number, or application number.
+        {{ explanation|default:"Filter by customer name, ID number, phone number, application number, contract number, or IMEI." }}
     </p>
 </div>
 
@@ -33,7 +36,7 @@
                     {% if app.imei_number %}<span>IMEI: {{ app.imei_number }}</span>{% endif %}
                 </div>
                 {% if app.merchant_status_key == "under_review" and app.claimed_by %}
-                    <p class="application-reviewer">Reviewer: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
+                    <p class="application-reviewer">Underwriter: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
                 {% endif %}
             </div>
 

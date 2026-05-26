@@ -70,10 +70,12 @@ class FinancingApplication(models.Model):
         "customer_face_image": "Customer face image",
         "id_front_image": "ID front image",
         "id_back_image": "ID back image",
+        "customer_phone_image": "Customer phone image",
         "region": "Region",
         "district": "District",
         "traditional_authority": "Traditional authority",
         "precise_location": "Precise location",
+        "gps_coordinates": "GPS coordinates",
         "map_screenshot": "Map screenshot",
         "next_of_kin_1_name": "Next of kin 1 name",
         "next_of_kin_1_phone": "Next of kin 1 phone",
@@ -86,6 +88,7 @@ class FinancingApplication(models.Model):
         "proof_contact_name": "Proof contact name",
         "proof_contact_phone": "Proof contact phone",
         "proof_notes": "Proof notes",
+        "proof_income_file": "Proof income file",
         "customer_signature": "Customer signature",
         "agreed_to_terms": "Agreed to terms",
     }
@@ -125,15 +128,18 @@ class FinancingApplication(models.Model):
     customer_face_image = models.ImageField(upload_to="kyc/faces/", blank=True, null=True)
     id_front_image = models.ImageField(upload_to="kyc/id_front/", blank=True, null=True)
     id_back_image = models.ImageField(upload_to="kyc/id_back/", blank=True, null=True)
+    customer_phone_image = models.ImageField(upload_to="kyc/customer_phone/", blank=True, null=True)
     correction_customer_face_image = models.BooleanField(default=False)
     correction_id_front_image = models.BooleanField(default=False)
     correction_id_back_image = models.BooleanField(default=False)
+    correction_customer_phone_image = models.BooleanField(default=False)
     correction_notes = models.TextField(blank=True)
 
     region = models.CharField(max_length=30, blank=True)
     district = models.CharField(max_length=80, blank=True)
     traditional_authority = models.CharField(max_length=120, blank=True)
     precise_location = models.CharField(max_length=200, blank=True)
+    gps_coordinates = models.CharField(max_length=80, blank=True)
     map_screenshot = models.ImageField(upload_to="locations/maps/", blank=True, null=True)
     next_of_kin_1_name = models.CharField(max_length=150, blank=True)
     next_of_kin_1_phone = models.CharField(max_length=9, blank=True, validators=[phone_validator])
@@ -147,6 +153,7 @@ class FinancingApplication(models.Model):
     proof_contact_name = models.CharField(max_length=150, blank=True)
     proof_contact_phone = models.CharField(max_length=9, blank=True, validators=[phone_validator])
     proof_notes = models.TextField(blank=True)
+    proof_income_file = models.FileField(upload_to="proof_income/", blank=True, null=True)
 
     signature_image = models.ImageField(upload_to="signatures/", blank=True, null=True)
     agreed_to_terms = models.BooleanField(default=False)
@@ -164,6 +171,8 @@ class FinancingApplication(models.Model):
 
     manager_comment = models.TextField(blank=True)
     correction_fields = models.JSONField(default=list, blank=True)
+    address_check_answers = models.JSONField(default=dict, blank=True)
+    income_check_answers = models.JSONField(default=dict, blank=True)
 
     submitted_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(

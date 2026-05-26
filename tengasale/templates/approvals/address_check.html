@@ -1,0 +1,41 @@
+{% extends "base/base.html" %}
+
+{% block content %}
+
+<a href="{% url 'underwriter_review_application' app.id %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Address Check</h1>
+
+{% if app.gps_coordinates %}
+    <a class="btn btn-outline" href="https://www.google.com/maps/search/?api=1&query={{ app.gps_coordinates }}" target="_blank" rel="noopener noreferrer">VIEW LOCATION</a>
+{% endif %}
+
+<form method="post" class="card">
+    {% csrf_token %}
+    {% for key, label in questions %}
+        <div class="check-question">
+            <h2>{{ label }}</h2>
+            <div class="yes-no-grid">
+                <label class="choice-no">
+                    <input type="radio" name="{{ key }}" value="no">
+                    <span>No</span>
+                </label>
+                <span class="choice-indicator">?</span>
+                <label class="choice-yes">
+                    <input type="radio" name="{{ key }}" value="yes">
+                    <span>Yes</span>
+                </label>
+            </div>
+        </div>
+    {% endfor %}
+
+    <div class="form-actions">
+        <a href="{% url 'underwriter_review_application' app.id %}" class="btn btn-outline">BACK</a>
+        <button type="submit" class="btn green-button">SUBMIT</button>
+    </div>
+</form>
+
+{% endblock %}

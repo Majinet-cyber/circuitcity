@@ -17,12 +17,17 @@
         <h2>Jackpot rewards are live.</h2>
         <p class="text-muted">{{ spin_wallet.available_spins }} spins available.</p>
     </div>
-    <a href="{% url 'spin_rewards' %}" class="btn btn-outline">SPIN NOW</a>
+    {% if spin_wallet.available_spins %}
+        <a href="{% url 'spin_rewards' %}" class="btn btn-outline">SPIN NOW</a>
+    {% else %}
+        <span class="btn disabled-button">0 SPINS AVAILABLE</span>
+    {% endif %}
 </section>
 
 <section class="card support-card">
     <h2>Business hours and support</h2>
-    <p>Support is available during TengaSale business hours.</p>
+    <p>You are outside TengaSale business hours, application reviews and support may be delayed.</p>
+    <p class="text-muted">Monday-Friday: 9am-6pm<br>Saturday: 9am-5pm</p>
     <a href="tel:+265000000000" class="btn btn-blue">Contact Support</a>
 </section>
 
@@ -37,6 +42,30 @@
         <span class="left">
             <span class="menu-icon icon-active">A</span>
             <span>Active</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+
+    <a href="{% url 'pending_applications' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-active">P</span>
+            <span>Pending Review</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+
+    <a href="{% url 'needs_edit_applications' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-alert">N</span>
+            <span>Needs Edit</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+
+    <a href="{% url 'approved_applications' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-success">A</span>
+            <span>Approved</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
@@ -72,7 +101,7 @@
     <a href="{% url 'earnings_home' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-money">E</span>
-            <span>Earnings</span>
+            <span>My Earnings</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
@@ -87,29 +116,12 @@
 
     <a href="{% url 'merchant_leaderboard' %}" class="menu-row">
         <span class="left">
-            <span class="menu-icon icon-tools">L</span>
-            <span>Leaderboard</span>
+            <span class="menu-icon icon-tools">Q</span>
+            <span>Queue Rules</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
 
-    <a href="{% url 'spin_rewards' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-money">S</span>
-            <span>Spin & Win</span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
-
-    {% if request.user.is_staff or request.user.is_superuser %}
-        <a href="{% url 'manager_home' %}" class="menu-row">
-            <span class="left">
-                <span class="menu-icon icon-tools">M</span>
-                <span>Manager Queue</span>
-            </span>
-            <span class="arrow" aria-hidden="true">></span>
-        </a>
-    {% endif %}
 </section>
 
 {% endblock %}
