@@ -41,12 +41,6 @@
                     <path d="M2.1 12s3.6-6 9.9-6 9.9 6 9.9 6-3.6 6-9.9 6-9.9-6-9.9-6Z"></path>
                     <circle cx="12" cy="12" r="3"></circle>
                 </svg>
-                <svg class="password-toggle-eye-off" aria-hidden="true" viewBox="0 0 24 24" hidden>
-                    <path d="M3 3l18 18"></path>
-                    <path d="M10.6 10.6A2 2 0 0 0 12 14a2 2 0 0 0 1.4-.6"></path>
-                    <path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.3 0 9.9 7 9.9 7a17.8 17.8 0 0 1-3.2 3.9"></path>
-                    <path d="M6.7 6.7A17.2 17.2 0 0 0 2.1 12s3.6 7 9.9 7a10.6 10.6 0 0 0 4.1-.8"></path>
-                </svg>
             </button>
         </div>
 
@@ -57,12 +51,10 @@
 </div>
 
 <script>
-    document.querySelectorAll("[data-password-toggle]").forEach((button) => {
+    document.querySelectorAll(".password-toggle").forEach((button) => {
         button.addEventListener("click", () => {
             const field = button.closest(".password-field");
             const input = field ? field.querySelector("input") : null;
-            const eyeIcon = button.querySelector(".password-toggle-eye");
-            const eyeOffIcon = button.querySelector(".password-toggle-eye-off");
 
             if (!input) {
                 return;
@@ -71,8 +63,6 @@
             const isHidden = input.type === "password";
             input.type = isHidden ? "text" : "password";
             button.setAttribute("aria-label", isHidden ? "Hide password" : "Show password");
-            eyeIcon.hidden = isHidden;
-            eyeOffIcon.hidden = !isHidden;
         });
     });
 </script>

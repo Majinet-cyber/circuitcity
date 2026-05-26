@@ -240,3 +240,8 @@ class DashboardUrlTests(TestCase):
         self.assertEqual(reverse("hq_users"), "/tengasale/hq/users/")
         self.assertEqual(reverse("hq_underwriter_queue"), "/tengasale/hq/underwriter-queue/")
         self.assertEqual(reverse("hq_reports"), "/tengasale/hq/reports/")
+
+    def test_short_portal_urls_redirect_to_tengasale_urls(self):
+        self.assertRedirects(self.client.get("/merchant/"), "/tengasale/merchant/", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/underwriter/"), "/tengasale/underwriter/", fetch_redirect_response=False)
+        self.assertRedirects(self.client.get("/hq/"), "/tengasale/hq/", fetch_redirect_response=False)

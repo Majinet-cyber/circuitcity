@@ -521,6 +521,11 @@ textarea:focus {
     padding-right: 54px;
 }
 
+.password-field input::-ms-reveal,
+.password-field input::-ms-clear {
+    display: none;
+}
+
 .password-toggle {
     width: 42px;
     height: 42px;

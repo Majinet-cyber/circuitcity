@@ -1,11 +1,14 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib import admin
 from django.core.management import call_command
 from django.contrib.staticfiles import finders
 from django.conf import settings
 from django.test import TestCase
 from django.urls import resolve, reverse
 
+from .admin import UserProfileInline
+from .models import UserProfile
 from .utils import assign_role, is_hq, is_merchant, is_underwriter, primary_role
 
 
@@ -26,6 +29,14 @@ class LoginTemplateTests(TestCase):
 
         self.assertContains(response, "Forgot password?")
         self.assertContains(response, reverse("password_reset"))
+
+    def test_login_page_contains_only_one_password_eye_toggle_button(self):
+        response = self.client.get(reverse("login"))
+        content = response.content.decode()
+
+        self.assertEqual(content.count("data-password-toggle"), 1)
+        self.assertEqual(content.count("<svg class=\"password-toggle-eye\""), 1)
+        self.assertNotIn("password-toggle-eye-off", content)
 
 
 class AccountUrlTests(TestCase):
@@ -144,6 +155,139 @@ class LoginRedirectTests(TestCase):
         self.User.objects.create_superuser(username="super-login", password="test-pass-123")
 
         self.assert_login_redirects("super-login", reverse("no_role"))
+
+
+class RoleAccessControlTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        call_command("seed_roles")
+
+    def make_user(self, username, role, **kwargs):
+        user = self.User.objects.create_user(username=username, password="test-pass-123", **kwargs)
+        assign_role(user, role)
+        return user
+
+    def test_merchant_cannot_access_underwriter_portal(self):
+        self.make_user("merchant-underwriter-denied", "merchant")
+        self.client.login(username="merchant-underwriter-denied", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_dashboard"))
+
+        self.assertRedirects(response, reverse("merchant_dashboard"))
+
+    def test_merchant_cannot_access_hq_portal(self):
+        self.make_user("merchant-hq-denied", "merchant")
+        self.client.login(username="merchant-hq-denied", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertRedirects(response, reverse("merchant_dashboard"))
+
+    def test_underwriter_cannot_access_merchant_portal(self):
+        self.make_user("underwriter-merchant-denied", "underwriter")
+        self.client.login(username="underwriter-merchant-denied", password="test-pass-123")
+
+        response = self.client.get(reverse("merchant_dashboard"))
+
+        self.assertRedirects(response, reverse("underwriter_dashboard"))
+
+    def test_underwriter_cannot_access_hq_portal(self):
+        self.make_user("underwriter-hq-denied", "underwriter")
+        self.client.login(username="underwriter-hq-denied", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertRedirects(response, reverse("underwriter_dashboard"))
+
+    def test_hq_cannot_access_merchant_portal(self):
+        self.make_user("hq-merchant-denied", "hq")
+        self.client.login(username="hq-merchant-denied", password="test-pass-123")
+
+        response = self.client.get(reverse("merchant_dashboard"))
+
+        self.assertRedirects(response, reverse("hq_dashboard"))
+
+    def test_hq_user_with_staff_can_access_admin_index(self):
+        self.make_user("hq-staff-admin", "hq", is_staff=True)
+        self.client.login(username="hq-staff-admin", password="test-pass-123")
+
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_user_without_staff_cannot_access_admin_index(self):
+        self.make_user("hq-no-staff-admin", "hq", is_staff=False)
+        self.client.login(username="hq-no-staff-admin", password="test-pass-123")
+
+        response = self.client.get(reverse("admin:index"))
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_superuser_can_access_admin_user_changelist(self):
+        admin_user = self.User.objects.create_superuser(username="admin-access", password="test-pass-123")
+        assign_role(admin_user, "hq")
+        self.client.login(username="admin-access", password="test-pass-123")
+
+        response = self.client.get(reverse("admin:auth_user_changelist"))
+
+        self.assertEqual(response.status_code, 200)
+
+
+class UserProfileAdminTests(TestCase):
+    def setUp(self):
+        self.User = get_user_model()
+        call_command("seed_roles")
+        self.admin_user = self.User.objects.create_superuser(username="profile-admin", password="test-pass-123")
+        assign_role(self.admin_user, "hq")
+        self.client.login(username="profile-admin", password="test-pass-123")
+
+    def test_profile_created_automatically_when_user_is_created(self):
+        user = self.User.objects.create_user(username="auto-profile", password="test-pass-123")
+
+        self.assertTrue(UserProfile.objects.filter(user=user).exists())
+        self.assertIsNone(user.profile.role)
+
+    def test_user_admin_has_profile_inline(self):
+        user_admin = admin.site._registry[self.User]
+
+        self.assertIn(UserProfileInline, user_admin.inlines)
+
+    def test_user_profile_role_can_be_edited_in_django_admin(self):
+        user = self.User.objects.create_user(username="profile-edit", password="test-pass-123")
+        assign_role(user, "merchant")
+
+        response = self.client.post(
+            reverse("admin:accounts_userprofile_change", args=[user.profile.pk]),
+            {
+                "user": user.pk,
+                "role": "underwriter",
+                "phone_number": "",
+            },
+        )
+
+        user.profile.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(user.profile.role, "underwriter")
+
+
+class SeedTengaSaleUsersCommandTests(TestCase):
+    def test_seed_tengasale_users_creates_and_updates_required_users(self):
+        call_command("seed_tengasale_users")
+        call_command("seed_tengasale_users")
+
+        expected_users = {
+            "merchant1": ("merchant", False, False),
+            "underwriter1": ("underwriter", False, False),
+            "hq1": ("hq", True, False),
+            "admin1": ("hq", True, True),
+        }
+        for username, (role, is_staff, is_superuser) in expected_users.items():
+            user = get_user_model().objects.get(username=username)
+            self.assertTrue(user.check_password("Testpass123!"))
+            self.assertTrue(user.is_active)
+            self.assertEqual(user.profile.role, role)
+            self.assertEqual(user.is_staff, is_staff)
+            self.assertEqual(user.is_superuser, is_superuser)
 
 
 class SeedRolesCommandTests(TestCase):

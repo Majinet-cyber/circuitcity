@@ -4,10 +4,10 @@
 
 <section class="card complete-card">
     <h1>No role assigned</h1>
-    <p class="text-muted">Your account does not have a TengaSale portal role. Contact HQ/admin to assign Merchant, Underwriter, or HQ access.</p>
+    <p class="text-muted">Your account does not have a TengaSale portal role. Ask HQ/admin to assign Merchant, Underwriter, or HQ access.</p>
     <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-outline">LOG OUT</button>
+        <button type="submit" class="btn btn-outline">Log out</button>
     </form>
 </section>
 

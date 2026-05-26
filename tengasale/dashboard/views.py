@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.contrib.auth.views import redirect_to_login
 from django.contrib import messages
 from django.db.models import Sum
@@ -76,11 +75,8 @@ def developer_preview_required(view_func):
 @hq_required
 def hq_dashboard(request):
     User = get_user_model()
-    underwriter_group_ids = Group.objects.filter(name="Underwriter").values_list("id", flat=True)
-    merchant_group = Group.objects.filter(name="Merchant").first()
-
-    total_merchants = User.objects.filter(groups=merchant_group).distinct().count() if merchant_group else 0
-    total_underwriters = User.objects.filter(groups__id__in=underwriter_group_ids).distinct().count()
+    total_merchants = User.objects.filter(profile__role="merchant").count()
+    total_underwriters = User.objects.filter(profile__role="underwriter").count()
     total_commissions = (
         Commission.objects.exclude(status=Commission.STATUS_CANCELLED).aggregate(total=Sum("amount"))["total"]
         or 0
@@ -111,7 +107,7 @@ def hq_users(request):
     else:
         form = HQUserForm(creating=True)
 
-    users = User.objects.select_related("userprofile").prefetch_related("groups").order_by("username")
+    users = User.objects.select_related("profile").prefetch_related("groups").order_by("username")
     rows = [{"user": user, "role": primary_role(user) or "unassigned"} for user in users]
     return render(request, "dashboard/hq_users.html", {"form": form, "rows": rows})
 
@@ -119,7 +115,7 @@ def hq_users(request):
 @hq_required
 def hq_user_edit(request, user_id):
     User = get_user_model()
-    user_obj = get_object_or_404(User.objects.select_related("userprofile").prefetch_related("groups"), id=user_id)
+    user_obj = get_object_or_404(User.objects.select_related("profile").prefetch_related("groups"), id=user_id)
     if request.method == "POST":
         form = HQUserForm(request.POST, instance=user_obj)
         if form.is_valid():

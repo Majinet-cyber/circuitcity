@@ -27,7 +27,7 @@ class HQUserForm(forms.ModelForm):
             self.fields["password"].required = True
         if self.instance.pk:
             self.fields["full_name"].initial = self.instance.get_full_name()
-            profile_role = getattr(getattr(self.instance, "userprofile", None), "role", "")
+            profile_role = getattr(getattr(self.instance, "profile", None), "role", "")
             if self.instance.groups.filter(name="HQ").exists() or profile_role == "hq":
                 self.fields["role"].initial = "hq"
             elif self.instance.groups.filter(name="Underwriter").exists() or profile_role == "underwriter":

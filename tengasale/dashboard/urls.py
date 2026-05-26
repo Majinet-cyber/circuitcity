@@ -1,9 +1,14 @@
 from django.urls import path
+from django.views.generic import RedirectView
+
 from . import views
 
 urlpatterns = [
     path("", views.home, name="home"),
     path("home/", views.home, name="home_redirect"),
+    path("merchant/", RedirectView.as_view(pattern_name="merchant_dashboard", permanent=False), name="merchant_shortcut"),
+    path("underwriter/", RedirectView.as_view(pattern_name="underwriter_dashboard", permanent=False), name="underwriter_shortcut"),
+    path("hq/", RedirectView.as_view(pattern_name="hq_dashboard", permanent=False), name="hq_shortcut"),
     path("tengasale/merchant/", views.merchant_dashboard, name="merchant_dashboard"),
     path("tengasale/hq/", views.hq_dashboard, name="hq_dashboard"),
     path("tengasale/hq/users/", views.hq_users, name="hq_users"),

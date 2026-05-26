@@ -14,7 +14,7 @@ def profile_role(user):
     if not user.is_authenticated:
         return None
     try:
-        role = user.userprofile.role
+        role = user.profile.role
     except UserProfile.DoesNotExist:
         return None
     if role == "manager":
@@ -74,3 +74,4 @@ def assign_role(user, role):
     profile, _ = UserProfile.objects.get_or_create(user=user)
     profile.role = role
     profile.save(update_fields=["role"])
+    user._state.fields_cache["profile"] = profile
