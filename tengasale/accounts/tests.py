@@ -9,7 +9,15 @@ from django.urls import resolve, reverse
 
 from .admin import UserProfileInline
 from .models import UserProfile
-from .utils import assign_role, get_user_portal_role, is_hq, is_merchant, is_underwriter, primary_role
+from .utils import (
+    assign_role,
+    get_tengasale_role,
+    get_user_portal_role,
+    is_hq,
+    is_merchant,
+    is_underwriter,
+    primary_role,
+)
 
 
 class LoginTemplateTests(TestCase):
@@ -90,8 +98,25 @@ class RoleHelperTests(TestCase):
 
         self.assertFalse(is_underwriter(user))
         self.assertTrue(is_hq(user))
+        self.assertEqual(get_tengasale_role(user), "hq")
         self.assertEqual(get_user_portal_role(user), "hq")
         self.assertEqual(primary_role(user), "hq")
+
+    def test_staff_user_with_explicit_merchant_role_is_merchant(self):
+        user = self.user_with_role("staff-merchant-role", "merchant", is_staff=True)
+
+        self.assertTrue(is_merchant(user))
+        self.assertFalse(is_hq(user))
+        self.assertEqual(get_tengasale_role(user), "merchant")
+        self.assertEqual(primary_role(user), "merchant")
+
+    def test_staff_user_with_explicit_underwriter_role_is_underwriter(self):
+        user = self.user_with_role("staff-underwriter-role", "underwriter", is_staff=True)
+
+        self.assertTrue(is_underwriter(user))
+        self.assertFalse(is_hq(user))
+        self.assertEqual(get_tengasale_role(user), "underwriter")
+        self.assertEqual(primary_role(user), "underwriter")
 
     def test_hq_profile_user_is_hq(self):
         user = self.user_with_role("hq-role", "hq")
@@ -112,6 +137,20 @@ class RoleHelperTests(TestCase):
 
         self.assertFalse(is_merchant(user))
         self.assertIsNone(primary_role(user))
+
+    def test_normal_user_without_profile_has_no_role(self):
+        user = self.User.objects.create_user(username="no-profile", password="test-pass-123")
+        user.profile.delete()
+
+        self.assertIsNone(get_tengasale_role(user))
+        self.assertIsNone(primary_role(user))
+
+    def test_staff_user_without_profile_is_hq(self):
+        user = self.User.objects.create_user(username="staff-no-profile", password="test-pass-123", is_staff=True)
+        user.profile.delete()
+
+        self.assertEqual(get_tengasale_role(user), "hq")
+        self.assertEqual(primary_role(user), "hq")
 
 
 class LoginRedirectTests(TestCase):
@@ -163,6 +202,13 @@ class LoginRedirectTests(TestCase):
         self.User.objects.create_superuser(username="super-login", password="test-pass-123")
 
         self.assert_login_redirects("super-login", reverse("hq_dashboard"))
+
+    def test_emajinet_style_superuser_staff_without_role_redirects_to_hq(self):
+        user = self.User.objects.create_superuser(username="emajinet-style", password="test-pass-123")
+        user.profile.role = None
+        user.profile.save(update_fields=["role"])
+
+        self.assert_login_redirects("emajinet-style", reverse("hq_dashboard"))
 
     def test_no_role_page_redirects_superuser_to_hq(self):
         self.User.objects.create_superuser(username="super-no-role-page", password="test-pass-123")
@@ -222,6 +268,34 @@ class RoleAccessControlTests(TestCase):
         response = self.client.get(reverse("merchant_dashboard"))
 
         self.assertRedirects(response, reverse("hq_dashboard"))
+
+    def test_hq_can_access_underwriter_portal(self):
+        self.make_user("hq-underwriter-allowed", "hq")
+        self.client.login(username="hq-underwriter-allowed", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_staff_without_profile_role_can_access_hq_portal(self):
+        user = self.User.objects.create_user(username="staff-hq-access", password="test-pass-123", is_staff=True)
+        user.profile.role = None
+        user.profile.save(update_fields=["role"])
+        self.client.login(username="staff-hq-access", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_superuser_without_profile_role_can_access_hq_portal(self):
+        user = self.User.objects.create_superuser(username="super-hq-access", password="test-pass-123")
+        user.profile.role = None
+        user.profile.save(update_fields=["role"])
+        self.client.login(username="super-hq-access", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
 
     def test_hq_user_with_staff_can_access_admin_index(self):
         self.make_user("hq-staff-admin", "hq", is_staff=True)

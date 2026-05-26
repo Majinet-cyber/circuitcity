@@ -178,7 +178,7 @@ class HomePageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_hq_cannot_access_worker_portals_or_developer_preview(self):
+    def test_hq_cannot_access_merchant_portal_but_can_access_underwriter_portal(self):
         self.create_user("hq-normal", "HQ")
         self.client.login(username="hq-normal", password="test-pass-123")
 
@@ -187,7 +187,7 @@ class HomePageTests(TestCase):
         preview_response = self.client.get(reverse("hq_merchant_preview"))
 
         self.assertRedirects(merchant_response, reverse("hq_dashboard"))
-        self.assertRedirects(underwriter_response, reverse("hq_dashboard"))
+        self.assertEqual(underwriter_response.status_code, 200)
         self.assertRedirects(preview_response, reverse("hq_dashboard"))
 
     def test_hq_can_create_user_with_role(self):

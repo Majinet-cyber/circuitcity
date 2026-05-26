@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.contrib.auth.views import redirect_to_login
 from django.shortcuts import redirect
 
-from .utils import is_hq, is_merchant, is_underwriter, role_redirect_url
+from .utils import get_tengasale_role, is_hq, is_merchant, role_redirect_url
 
 
 def role_required(test_func, sensitive=False):
@@ -29,7 +29,10 @@ def merchant_required(view_func=None, *, sensitive=False):
 
 
 def underwriter_required(view_func=None, *, sensitive=False):
-    decorator = role_required(is_underwriter, sensitive=sensitive)
+    decorator = role_required(
+        lambda user: get_tengasale_role(user) in {"underwriter", "hq"},
+        sensitive=sensitive,
+    )
     return decorator(view_func) if view_func else decorator
 
 

@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 
 from .models import UserProfile
@@ -10,24 +11,37 @@ ROLE_GROUPS = {
 }
 
 
+VALID_PORTAL_ROLES = set(ROLE_GROUPS)
+
+
 def profile_role(user):
     if not user.is_authenticated:
         return None
     try:
         role = user.profile.role
-    except UserProfile.DoesNotExist:
+    except ObjectDoesNotExist:
         return None
     if role == "manager":
         return "underwriter"
     return role or None
 
 
-def get_user_portal_role(user):
-    if not user.is_authenticated:
+def get_tengasale_role(user):
+    if not user or not user.is_authenticated:
         return None
+
+    role = profile_role(user)
+    if role in VALID_PORTAL_ROLES:
+        return role
+
     if user.is_superuser or user.is_staff:
         return "hq"
-    return profile_role(user)
+
+    return None
+
+
+def get_user_portal_role(user):
+    return get_tengasale_role(user)
 
 
 def has_role_group(user, role):
