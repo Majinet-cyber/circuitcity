@@ -1,7 +1,7 @@
 from django.contrib.auth.views import LoginView, LogoutView
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
-from .utils import is_hq, is_merchant, is_underwriter, role_redirect_url
+from .utils import get_user_portal_role, is_hq, is_merchant, is_underwriter, role_redirect_url
 
 
 class UserLoginView(LoginView):
@@ -37,4 +37,6 @@ class UserLogoutView(LogoutView):
 
 
 def no_role(request):
+    if get_user_portal_role(request.user):
+        return redirect(role_redirect_url(request.user))
     return render(request, "accounts/no_role.html", status=403)

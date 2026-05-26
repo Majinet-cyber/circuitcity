@@ -22,31 +22,33 @@ def profile_role(user):
     return role or None
 
 
+def get_user_portal_role(user):
+    if not user.is_authenticated:
+        return None
+    if user.is_superuser or user.is_staff:
+        return "hq"
+    return profile_role(user)
+
+
 def has_role_group(user, role):
     group_name = ROLE_GROUPS[role]
     return user.groups.filter(name=group_name).exists()
 
 
 def is_hq(user):
-    return user.is_authenticated and profile_role(user) == "hq"
+    return get_user_portal_role(user) == "hq"
 
 
 def is_underwriter(user):
-    return user.is_authenticated and profile_role(user) == "underwriter"
+    return get_user_portal_role(user) == "underwriter"
 
 
 def is_merchant(user):
-    return user.is_authenticated and profile_role(user) == "merchant"
+    return get_user_portal_role(user) == "merchant"
 
 
 def primary_role(user):
-    if is_hq(user):
-        return "hq"
-    if is_underwriter(user):
-        return "underwriter"
-    if is_merchant(user):
-        return "merchant"
-    return None
+    return get_user_portal_role(user)
 
 
 def role_redirect_url(user):

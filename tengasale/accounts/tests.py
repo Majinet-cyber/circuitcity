@@ -9,7 +9,7 @@ from django.urls import resolve, reverse
 
 from .admin import UserProfileInline
 from .models import UserProfile
-from .utils import assign_role, is_hq, is_merchant, is_underwriter, primary_role
+from .utils import assign_role, get_user_portal_role, is_hq, is_merchant, is_underwriter, primary_role
 
 
 class LoginTemplateTests(TestCase):
@@ -85,11 +85,13 @@ class RoleHelperTests(TestCase):
         self.assertTrue(is_underwriter(user))
         self.assertEqual(primary_role(user), "underwriter")
 
-    def test_staff_non_superuser_is_not_implicitly_underwriter(self):
+    def test_staff_non_superuser_is_hq(self):
         user = self.User.objects.create_user(username="staff-role", password="test-pass-123", is_staff=True)
 
         self.assertFalse(is_underwriter(user))
-        self.assertIsNone(primary_role(user))
+        self.assertTrue(is_hq(user))
+        self.assertEqual(get_user_portal_role(user), "hq")
+        self.assertEqual(primary_role(user), "hq")
 
     def test_hq_profile_user_is_hq(self):
         user = self.user_with_role("hq-role", "hq")
@@ -97,12 +99,13 @@ class RoleHelperTests(TestCase):
         self.assertTrue(is_hq(user))
         self.assertEqual(primary_role(user), "hq")
 
-    def test_superuser_without_profile_role_is_unassigned(self):
+    def test_superuser_without_profile_role_is_hq(self):
         user = self.User.objects.create_superuser(username="super-role", password="test-pass-123")
 
-        self.assertFalse(is_hq(user))
+        self.assertTrue(is_hq(user))
         self.assertFalse(is_merchant(user))
-        self.assertIsNone(primary_role(user))
+        self.assertEqual(get_user_portal_role(user), "hq")
+        self.assertEqual(primary_role(user), "hq")
 
     def test_no_group_user_has_no_primary_role(self):
         user = self.User.objects.create_user(username="no-group", password="test-pass-123")
@@ -141,20 +144,33 @@ class LoginRedirectTests(TestCase):
 
         self.assert_login_redirects("underwriter-login", reverse("underwriter_dashboard"))
 
-    def test_unassigned_login_redirects_to_no_role_page(self):
+    def test_unassigned_normal_user_login_redirects_to_no_role_page(self):
+        self.make_user("normal-login")
+
+        self.assert_login_redirects("normal-login", reverse("no_role"))
+
+    def test_staff_login_redirects_to_hq_portal(self):
         self.make_user("staff-login", is_staff=True)
 
-        self.assert_login_redirects("staff-login", reverse("no_role"))
+        self.assert_login_redirects("staff-login", reverse("hq_dashboard"))
 
     def test_hq_login_redirects_to_hq_portal(self):
         self.make_user("hq-login", "HQ")
 
         self.assert_login_redirects("hq-login", reverse("hq_dashboard"))
 
-    def test_no_role_superuser_login_redirects_to_no_role_page(self):
+    def test_no_role_superuser_login_redirects_to_hq_page(self):
         self.User.objects.create_superuser(username="super-login", password="test-pass-123")
 
-        self.assert_login_redirects("super-login", reverse("no_role"))
+        self.assert_login_redirects("super-login", reverse("hq_dashboard"))
+
+    def test_no_role_page_redirects_superuser_to_hq(self):
+        self.User.objects.create_superuser(username="super-no-role-page", password="test-pass-123")
+        self.client.login(username="super-no-role-page", password="test-pass-123")
+
+        response = self.client.get(reverse("no_role"))
+
+        self.assertRedirects(response, reverse("hq_dashboard"))
 
 
 class RoleAccessControlTests(TestCase):
@@ -251,6 +267,16 @@ class UserProfileAdminTests(TestCase):
         user_admin = admin.site._registry[self.User]
 
         self.assertIn(UserProfileInline, user_admin.inlines)
+
+    def test_user_admin_change_page_exposes_profile_role(self):
+        user = self.User.objects.create_user(username="profile-inline", password="test-pass-123")
+        assign_role(user, "merchant")
+
+        response = self.client.get(reverse("admin:auth_user_change", args=[user.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "User profile")
+        self.assertContains(response, "Role")
 
     def test_user_profile_role_can_be_edited_in_django_admin(self):
         user = self.User.objects.create_user(username="profile-edit", password="test-pass-123")
