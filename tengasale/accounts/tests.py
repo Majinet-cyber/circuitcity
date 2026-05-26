@@ -57,19 +57,19 @@ class RoleHelperTests(TestCase):
         for group_name in ["Merchant", "Underwriter", "HQ"]:
             Group.objects.get_or_create(name=group_name)
 
-    def user_with_group(self, username, group_name, **kwargs):
+    def user_with_role(self, username, role, **kwargs):
         user = self.User.objects.create_user(username=username, password="test-pass-123", **kwargs)
-        user.groups.add(Group.objects.get(name=group_name))
+        assign_role(user, role)
         return user
 
-    def test_merchant_group_user_is_merchant(self):
-        user = self.user_with_group("merchant-role", "Merchant")
+    def test_merchant_profile_user_is_merchant(self):
+        user = self.user_with_role("merchant-role", "merchant")
 
         self.assertTrue(is_merchant(user))
         self.assertEqual(primary_role(user), "merchant")
 
-    def test_underwriter_group_user_is_underwriter(self):
-        user = self.user_with_group("underwriter-role", "Underwriter")
+    def test_underwriter_profile_user_is_underwriter(self):
+        user = self.user_with_role("underwriter-role", "underwriter")
 
         self.assertTrue(is_underwriter(user))
         self.assertEqual(primary_role(user), "underwriter")
@@ -80,17 +80,18 @@ class RoleHelperTests(TestCase):
         self.assertFalse(is_underwriter(user))
         self.assertIsNone(primary_role(user))
 
-    def test_hq_group_user_is_hq(self):
-        user = self.user_with_group("hq-role", "HQ")
+    def test_hq_profile_user_is_hq(self):
+        user = self.user_with_role("hq-role", "hq")
 
         self.assertTrue(is_hq(user))
         self.assertEqual(primary_role(user), "hq")
 
-    def test_superuser_is_hq(self):
+    def test_superuser_without_profile_role_is_unassigned(self):
         user = self.User.objects.create_superuser(username="super-role", password="test-pass-123")
 
-        self.assertTrue(is_hq(user))
-        self.assertEqual(primary_role(user), "hq")
+        self.assertFalse(is_hq(user))
+        self.assertFalse(is_merchant(user))
+        self.assertIsNone(primary_role(user))
 
     def test_no_group_user_has_no_primary_role(self):
         user = self.User.objects.create_user(username="no-group", password="test-pass-123")
@@ -139,10 +140,10 @@ class LoginRedirectTests(TestCase):
 
         self.assert_login_redirects("hq-login", reverse("hq_dashboard"))
 
-    def test_superuser_login_redirects_to_hq_portal(self):
+    def test_no_role_superuser_login_redirects_to_no_role_page(self):
         self.User.objects.create_superuser(username="super-login", password="test-pass-123")
 
-        self.assert_login_redirects("super-login", reverse("hq_dashboard"))
+        self.assert_login_redirects("super-login", reverse("no_role"))
 
 
 class SeedRolesCommandTests(TestCase):

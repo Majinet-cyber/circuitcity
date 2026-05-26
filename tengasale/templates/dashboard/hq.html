@@ -42,62 +42,104 @@
 
 <section class="menu-list">
     <h2>HQ Links</h2>
-    <a href="{% url 'admin:index' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-tools">A</span>
-            <span>Django Admin</span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
+    {% if request.user.is_staff or request.user.is_superuser %}
+        <a href="{% url 'admin:index' %}" class="menu-row">
+            <span class="left">
+                <span class="menu-icon icon-tools">A</span>
+                <span class="menu-row-copy">
+                    <span>Django Admin</span>
+                    <small>Manage Django records and platform configuration.</small>
+                </span>
+            </span>
+            <span class="arrow" aria-hidden="true">></span>
+        </a>
+    {% endif %}
     <a href="{% url 'hq_deals' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-tools">D</span>
-            <span>Deals Management</span>
+            <span class="menu-row-copy">
+                <span>Deals Management</span>
+                <small>Manage device deals and pricing operations.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
     <a href="{% url 'hq_users' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-tools">U</span>
-            <span>Users</span>
+            <span class="menu-row-copy">
+                <span>Users</span>
+                <small>Create users and assign platform roles.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
     <a href="{% url 'hq_applications' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-active">A</span>
-            <span>Applications</span>
+            <span class="menu-row-copy">
+                <span>Applications</span>
+                <small>Review applications across merchants and statuses.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'hq_applications' %}" class="menu-row">
+    <a href="{% url 'hq_underwriter_queue' %}" class="menu-row">
         <span class="left">
-            <span class="menu-icon icon-alert">U</span>
-            <span>Underwriter Queue</span>
+            <span class="menu-icon icon-active">U</span>
+            <span class="menu-row-copy">
+                <span>Underwriter Queue</span>
+                <small>Monitor submitted, claimed, and reviewed applications.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
     <a href="{% url 'hq_commissions' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-money">C</span>
-            <span>Commissions</span>
+            <span class="menu-row-copy">
+                <span>Commissions</span>
+                <small>Track merchant and underwriter commission activity.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'hq_applications' %}" class="menu-row">
+    <a href="{% url 'hq_reports' %}" class="menu-row">
         <span class="left">
-            <span class="menu-icon icon-money">M</span>
-            <span>Merchant Portal Preview</span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
-    <a href="{% url 'hq_applications' %}" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-alert">U</span>
-            <span>Underwriter Portal Preview</span>
+            <span class="menu-icon icon-tools">R</span>
+            <span class="menu-row-copy">
+                <span>Reports / Analytics</span>
+                <small>View platform reporting and performance insights.</small>
+            </span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
 </section>
+
+{% if show_developer_preview %}
+    <section class="menu-list">
+        <h2>Developer Preview</h2>
+        <a href="{% url 'hq_merchant_preview' %}" class="menu-row">
+            <span class="left">
+                <span class="menu-icon icon-tools">M</span>
+                <span class="menu-row-copy">
+                    <span>Merchant Portal Preview</span>
+                    <small>Preview the merchant dashboard in DEBUG mode.</small>
+                </span>
+            </span>
+            <span class="arrow" aria-hidden="true">></span>
+        </a>
+        <a href="{% url 'hq_underwriter_preview' %}" class="menu-row">
+            <span class="left">
+                <span class="menu-icon icon-tools">U</span>
+                <span class="menu-row-copy">
+                    <span>Underwriter Portal Preview</span>
+                    <small>Preview the underwriter dashboard in DEBUG mode.</small>
+                </span>
+            </span>
+            <span class="arrow" aria-hidden="true">></span>
+        </a>
+    </section>
+{% endif %}
 
 {% endblock %}

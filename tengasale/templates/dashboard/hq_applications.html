@@ -1,6 +1,6 @@
 {% extends "base/base.html" %}
 
-{% block page_title %}Applications{% endblock %}
+{% block page_title %}{{ title|default:"Applications" }}{% endblock %}
 
 {% block content %}
 
@@ -9,7 +9,13 @@
     <span>BACK</span>
 </a>
 
-<h1 class="greeting">Applications</h1>
+<h1 class="greeting">{{ title|default:"Applications" }}</h1>
+
+{% if subtitle %}
+    <section class="card instruction-card">
+        <p>{{ subtitle }}</p>
+    </section>
+{% endif %}
 
 <div class="application-list">
     {% for app in apps %}

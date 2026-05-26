@@ -392,6 +392,19 @@ a {
     font-weight: 900;
 }
 
+.menu-row-copy {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.menu-row-copy small {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.25;
+}
+
 .icon-success,
 .icon-money {
     background: var(--green-soft);

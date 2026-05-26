@@ -28,21 +28,15 @@ def has_role_group(user, role):
 
 
 def is_hq(user):
-    return user.is_authenticated and (
-        user.is_superuser or has_role_group(user, "hq") or profile_role(user) == "hq"
-    )
+    return user.is_authenticated and profile_role(user) == "hq"
 
 
 def is_underwriter(user):
-    return user.is_authenticated and not is_hq(user) and (
-        has_role_group(user, "underwriter") or profile_role(user) == "underwriter"
-    )
+    return user.is_authenticated and profile_role(user) == "underwriter"
 
 
 def is_merchant(user):
-    return user.is_authenticated and not is_hq(user) and not is_underwriter(user) and (
-        has_role_group(user, "merchant") or profile_role(user) == "merchant"
-    )
+    return user.is_authenticated and profile_role(user) == "merchant"
 
 
 def primary_role(user):

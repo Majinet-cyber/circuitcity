@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from accounts.utils import assign_role
 
@@ -90,6 +90,61 @@ class HomePageTests(TestCase):
         self.assertContains(hq_response, "HQ")
         self.assertRedirects(merchant_response, reverse("hq_dashboard"))
 
+    def test_hq_dashboard_does_not_show_preview_links_for_normal_hq_user(self):
+        self.create_user("hq", "HQ")
+        self.client.login(username="hq", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Developer Preview")
+        self.assertNotContains(response, "Merchant Portal Preview")
+        self.assertNotContains(response, "Underwriter Portal Preview")
+
+    def test_hq_dashboard_shows_only_hq_links(self):
+        self.create_user("hq-staff", "HQ", is_staff=True)
+        self.client.login(username="hq-staff", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertContains(response, "Django Admin")
+        self.assertContains(response, "Deals Management")
+        self.assertContains(response, "Users")
+        self.assertContains(response, "Applications")
+        self.assertContains(response, "Underwriter Queue")
+        self.assertContains(response, "Monitor submitted, claimed, and reviewed applications.")
+        self.assertContains(response, "Commissions")
+        self.assertContains(response, "Reports / Analytics")
+        self.assertNotContains(response, "New Application")
+        self.assertNotContains(response, "Claim Next")
+        self.assertNotContains(response, "Merchant Portal Preview")
+        self.assertNotContains(response, "Underwriter Portal Preview")
+
+    @override_settings(DEBUG=True)
+    def test_debug_superuser_can_see_developer_preview_section(self):
+        user = get_user_model().objects.create_superuser(username="super-debug", password="test-pass-123")
+        assign_role(user, "hq")
+        self.client.login(username="super-debug", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertContains(response, "Developer Preview")
+        self.assertContains(response, "Merchant Portal Preview")
+        self.assertContains(response, "Underwriter Portal Preview")
+
+    @override_settings(DEBUG=False)
+    def test_superuser_cannot_see_developer_preview_when_debug_is_false(self):
+        user = get_user_model().objects.create_superuser(username="super-prod", password="test-pass-123")
+        assign_role(user, "hq")
+        self.client.login(username="super-prod", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Developer Preview")
+        self.assertNotContains(response, "Merchant Portal Preview")
+        self.assertNotContains(response, "Underwriter Portal Preview")
+
     def test_merchant_cannot_access_hq_dashboard(self):
         self.create_user("merchant", "Merchant")
         self.client.login(username="merchant", password="test-pass-123")
@@ -115,12 +170,25 @@ class HomePageTests(TestCase):
         self.assertRedirects(response, reverse("underwriter_dashboard"))
 
     def test_superuser_can_access_hq_dashboard(self):
-        get_user_model().objects.create_superuser(username="super", password="test-pass-123")
+        user = get_user_model().objects.create_superuser(username="super", password="test-pass-123")
+        assign_role(user, "hq")
         self.client.login(username="super", password="test-pass-123")
 
         response = self.client.get(reverse("hq_dashboard"))
 
         self.assertEqual(response.status_code, 200)
+
+    def test_hq_cannot_access_worker_portals_or_developer_preview(self):
+        self.create_user("hq-normal", "HQ")
+        self.client.login(username="hq-normal", password="test-pass-123")
+
+        merchant_response = self.client.get(reverse("merchant_dashboard"))
+        underwriter_response = self.client.get(reverse("underwriter_dashboard"))
+        preview_response = self.client.get(reverse("hq_merchant_preview"))
+
+        self.assertRedirects(merchant_response, reverse("hq_dashboard"))
+        self.assertRedirects(underwriter_response, reverse("hq_dashboard"))
+        self.assertRedirects(preview_response, reverse("hq_dashboard"))
 
     def test_hq_can_create_user_with_role(self):
         self.create_user("hq", "HQ")
@@ -170,3 +238,5 @@ class DashboardUrlTests(TestCase):
         self.assertEqual(reverse("underwriter_dashboard"), "/tengasale/underwriter/")
         self.assertEqual(reverse("hq_dashboard"), "/tengasale/hq/")
         self.assertEqual(reverse("hq_users"), "/tengasale/hq/users/")
+        self.assertEqual(reverse("hq_underwriter_queue"), "/tengasale/hq/underwriter-queue/")
+        self.assertEqual(reverse("hq_reports"), "/tengasale/hq/reports/")

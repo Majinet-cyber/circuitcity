@@ -34,6 +34,11 @@
     <strong>{{ active_count }} / {{ max_active }}</strong>
 </a>
 
+<section class="stat-card">
+    <span>Earnings</span>
+    <strong class="amount-positive">MWK {{ underwriter_earnings|floatformat:2 }}</strong>
+</section>
+
 <section class="menu-list">
     <h2>Applications</h2>
     <a href="{% url 'underwriter_active_reviews' %}" class="menu-row">
@@ -50,21 +55,14 @@
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'underwriter_completed_reviews' %}?status=rejected" class="menu-row">
-        <span class="left">
-            <span class="menu-icon icon-alert">R</span>
-            <span>Rejected</span>
-        </span>
-        <span class="arrow" aria-hidden="true">></span>
-    </a>
 </section>
 
 <section class="menu-list">
     <h2>Tools</h2>
-    <a href="{% url 'underwriter_dashboard' %}" class="menu-row">
+    <a href="{% url 'underwriter_queue' %}" class="menu-row">
         <span class="left">
-            <span class="menu-icon icon-money">E</span>
-            <span>Earnings</span>
+            <span class="menu-icon icon-active">Q</span>
+            <span>Review Queue</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>

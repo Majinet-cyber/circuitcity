@@ -14,8 +14,10 @@ class UserLoginView(LoginView):
         return role_redirect_url(self.request.user)
 
     def _redirect_matches_role(self, redirect_url):
+        if redirect_url.startswith("/admin/"):
+            return self.request.user.is_staff or self.request.user.is_superuser
         if is_hq(self.request.user):
-            return redirect_url.startswith("/tengasale/hq/") or redirect_url.startswith("/admin/")
+            return redirect_url.startswith("/tengasale/hq/")
         if is_underwriter(self.request.user):
             return redirect_url.startswith("/tengasale/underwriter/")
         if is_merchant(self.request.user):
