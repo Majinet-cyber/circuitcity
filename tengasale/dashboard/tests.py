@@ -17,6 +17,12 @@ class HomePageTests(TestCase):
             assign_role(user, role)
         return user
 
+    def assert_role_forbidden(self, response):
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "accounts/role_forbidden.html")
+        self.assertContains(response, "That area is not available for your role.", status_code=403)
+        self.assertContains(response, "Go to my dashboard", status_code=403)
+
     def test_home_redirects_unauthenticated_users_to_login(self):
         response = self.client.get("/")
 
@@ -77,7 +83,7 @@ class HomePageTests(TestCase):
 
         response = self.client.get(reverse("merchant_dashboard"))
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_hq_can_access_hq_dashboard_only(self):
         self.create_user("hq", "HQ")
@@ -88,7 +94,7 @@ class HomePageTests(TestCase):
 
         self.assertEqual(hq_response.status_code, 200)
         self.assertContains(hq_response, "HQ")
-        self.assertRedirects(merchant_response, reverse("hq_dashboard"))
+        self.assert_role_forbidden(merchant_response)
 
     def test_hq_dashboard_does_not_show_preview_links_for_normal_hq_user(self):
         self.create_user("hq", "HQ")
@@ -151,7 +157,7 @@ class HomePageTests(TestCase):
 
         response = self.client.get(reverse("hq_dashboard"))
 
-        self.assertRedirects(response, reverse("merchant_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_underwriter_cannot_open_merchant_application_creation(self):
         self.create_user("underwriter", "Underwriter")
@@ -159,7 +165,7 @@ class HomePageTests(TestCase):
 
         response = self.client.get(reverse("new_application"))
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_underwriter_cannot_access_hq_dashboard(self):
         self.create_user("underwriter", "Underwriter")
@@ -167,7 +173,7 @@ class HomePageTests(TestCase):
 
         response = self.client.get(reverse("hq_dashboard"))
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_superuser_can_access_hq_dashboard(self):
         user = get_user_model().objects.create_superuser(username="super", password="test-pass-123")
@@ -178,7 +184,7 @@ class HomePageTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
-    def test_hq_cannot_access_merchant_portal_but_can_access_underwriter_portal(self):
+    def test_hq_cannot_access_worker_portals_or_developer_preview(self):
         self.create_user("hq-normal", "HQ")
         self.client.login(username="hq-normal", password="test-pass-123")
 
@@ -186,8 +192,8 @@ class HomePageTests(TestCase):
         underwriter_response = self.client.get(reverse("underwriter_dashboard"))
         preview_response = self.client.get(reverse("hq_merchant_preview"))
 
-        self.assertRedirects(merchant_response, reverse("hq_dashboard"))
-        self.assertEqual(underwriter_response.status_code, 200)
+        self.assert_role_forbidden(merchant_response)
+        self.assert_role_forbidden(underwriter_response)
         self.assertRedirects(preview_response, reverse("hq_dashboard"))
 
     def test_hq_can_create_user_with_role(self):

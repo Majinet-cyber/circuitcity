@@ -229,13 +229,19 @@ class RoleAccessControlTests(TestCase):
         assign_role(user, role)
         return user
 
+    def assert_role_forbidden(self, response):
+        self.assertEqual(response.status_code, 403)
+        self.assertTemplateUsed(response, "accounts/role_forbidden.html")
+        self.assertContains(response, "That area is not available for your role.", status_code=403)
+        self.assertContains(response, "Go to my dashboard", status_code=403)
+
     def test_merchant_cannot_access_underwriter_portal(self):
         self.make_user("merchant-underwriter-denied", "merchant")
         self.client.login(username="merchant-underwriter-denied", password="test-pass-123")
 
         response = self.client.get(reverse("underwriter_dashboard"))
 
-        self.assertRedirects(response, reverse("merchant_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_merchant_cannot_access_hq_portal(self):
         self.make_user("merchant-hq-denied", "merchant")
@@ -243,7 +249,7 @@ class RoleAccessControlTests(TestCase):
 
         response = self.client.get(reverse("hq_dashboard"))
 
-        self.assertRedirects(response, reverse("merchant_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_underwriter_cannot_access_merchant_portal(self):
         self.make_user("underwriter-merchant-denied", "underwriter")
@@ -251,7 +257,7 @@ class RoleAccessControlTests(TestCase):
 
         response = self.client.get(reverse("merchant_dashboard"))
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_underwriter_cannot_access_hq_portal(self):
         self.make_user("underwriter-hq-denied", "underwriter")
@@ -259,7 +265,7 @@ class RoleAccessControlTests(TestCase):
 
         response = self.client.get(reverse("hq_dashboard"))
 
-        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assert_role_forbidden(response)
 
     def test_hq_cannot_access_merchant_portal(self):
         self.make_user("hq-merchant-denied", "hq")
@@ -267,15 +273,15 @@ class RoleAccessControlTests(TestCase):
 
         response = self.client.get(reverse("merchant_dashboard"))
 
-        self.assertRedirects(response, reverse("hq_dashboard"))
+        self.assert_role_forbidden(response)
 
-    def test_hq_can_access_underwriter_portal(self):
-        self.make_user("hq-underwriter-allowed", "hq")
-        self.client.login(username="hq-underwriter-allowed", password="test-pass-123")
+    def test_hq_cannot_access_underwriter_portal(self):
+        self.make_user("hq-underwriter-denied", "hq")
+        self.client.login(username="hq-underwriter-denied", password="test-pass-123")
 
         response = self.client.get(reverse("underwriter_dashboard"))
 
-        self.assertEqual(response.status_code, 200)
+        self.assert_role_forbidden(response)
 
     def test_staff_without_profile_role_can_access_hq_portal(self):
         user = self.User.objects.create_user(username="staff-hq-access", password="test-pass-123", is_staff=True)
@@ -397,6 +403,29 @@ class SeedRolesCommandTests(TestCase):
 
         for group_name in ["Merchant", "Underwriter", "HQ"]:
             self.assertTrue(Group.objects.filter(name=group_name).exists())
+
+    def test_seed_tengasale_roles_creates_profiles_and_defaults_staff_to_hq(self):
+        User = get_user_model()
+        staff = User.objects.create_user(username="seed-staff", password="test-pass-123", is_staff=True)
+        superuser = User.objects.create_superuser(username="seed-super", password="test-pass-123")
+        merchant = User.objects.create_user(username="seed-merchant", password="test-pass-123")
+        normal = User.objects.create_user(username="seed-normal", password="test-pass-123")
+        assign_role(merchant, "merchant")
+        staff.profile.delete()
+        superuser.profile.role = None
+        superuser.profile.save(update_fields=["role"])
+        normal.profile.delete()
+
+        call_command("seed_tengasale_roles")
+
+        staff.refresh_from_db()
+        superuser.refresh_from_db()
+        merchant.refresh_from_db()
+        normal.refresh_from_db()
+        self.assertEqual(staff.profile.role, "hq")
+        self.assertEqual(superuser.profile.role, "hq")
+        self.assertEqual(merchant.profile.role, "merchant")
+        self.assertIsNone(normal.profile.role)
 
 
 class LogoutTests(TestCase):

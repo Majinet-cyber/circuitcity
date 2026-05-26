@@ -208,14 +208,18 @@ class ApprovalQueueTests(TestCase):
 
         response = self.client.get(reverse("underwriter_dashboard"))
 
-        self.assertRedirects(response, reverse("merchant_dashboard"))
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "That area is not available for your role.", status_code=403)
+        self.assertContains(response, "Go to my dashboard", status_code=403)
 
     def test_merchant_cannot_access_underwriter_claim_action(self):
         self.client.login(username="merchant", password="test-pass-123")
 
         response = self.client.get(reverse("underwriter_claim_next"))
 
-        self.assertRedirects(response, reverse("merchant_dashboard"))
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, "That area is not available for your role.", status_code=403)
+        self.assertContains(response, "Go to my dashboard", status_code=403)
 
     def test_old_approvals_urls_redirect_to_underwriter_portal(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
