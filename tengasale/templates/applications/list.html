@@ -38,6 +38,16 @@
                 {% if app.merchant_status_key == "under_review" and app.claimed_by %}
                     <p class="application-reviewer">Underwriter: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
                 {% endif %}
+                {% if app.merchant_status_key == "needs_edit" %}
+                    <p class="application-reviewer"><strong>Review these fields</strong></p>
+                    <div class="application-meta">
+                        {% for label in app.correction_field_labels %}
+                            <span>{{ label }}</span>
+                        {% empty %}
+                            <span>Application details</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="application-card-side">

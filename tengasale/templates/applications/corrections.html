@@ -1,24 +1,35 @@
 {% extends "base/base.html" %}
+{% load static %}
 
-{% block page_title %}Corrections Needed{% endblock %}
+{% block page_title %}Sent Back{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
 
 <a href="{% url 'active_applications' %}" class="soft-back">
     <span class="soft-back-icon">&larr;</span>
     <span>BACK</span>
 </a>
 
-<h1 class="greeting">Needs Edit</h1>
+<h1 class="greeting">Sent Back</h1>
 
 <div class="card">
-    <h2>The following fields have been marked for review:</h2>
-    {% if correction_labels %}
-        <ul class="clean-list">
-            {% for label in correction_labels %}
-                <li>{{ label }}</li>
+    <h2>Review these fields</h2>
+    {% if corrections %}
+        <div class="merchant-correction-list">
+            {% for correction in corrections %}
+                <a class="merchant-correction-item" href="{{ correction.url }}">
+                    <strong>{{ correction.label }}</strong>
+                    {% if correction.note %}<span>{{ correction.note }}</span>{% endif %}
+                </a>
             {% endfor %}
-        </ul>
+        </div>
+    {% elif correction_labels %}
+        <div class="merchant-correction-list">
+            {% for label in correction_labels %}
+                <a class="merchant-correction-item" href="{{ edit_url }}"><strong>{{ label }}</strong></a>
+            {% endfor %}
+        </div>
     {% else %}
         <p>No specific fields were selected. Review the application details before resubmitting.</p>
     {% endif %}

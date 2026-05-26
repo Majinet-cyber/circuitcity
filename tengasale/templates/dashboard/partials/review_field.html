@@ -1,0 +1,26 @@
+<div class="review-field{% if correction %} review-field--needs-correction{% endif %}" data-review-field="{{ field_name }}">
+    <div class="review-field__copy">
+        <span class="review-field__label">{{ label }}</span>
+        <strong class="review-field__value">{{ value|default:"Not captured" }}</strong>
+        {% if correction.note %}
+            <span class="review-field__note">{{ correction.note }}</span>
+        {% endif %}
+    </div>
+    <button
+        type="button"
+        class="review-edit-btn{% if correction %} review-edit-btn--active{% endif %}"
+        aria-label="Mark {{ label }} for correction"
+        data-correction-open
+        data-field-name="{{ field_name }}"
+        data-field-label="{{ label }}"
+        data-field-section="{{ section }}"
+        data-correction-note="{{ correction.note|default:'' }}"
+        data-correction-active="{% if correction %}true{% else %}false{% endif %}"
+    >
+        {% if correction %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10a6 6 0 0 1 0 12h-1"></path></svg>
+        {% else %}
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+        {% endif %}
+    </button>
+</div>

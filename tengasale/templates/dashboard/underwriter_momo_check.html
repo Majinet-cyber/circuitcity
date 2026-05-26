@@ -1,0 +1,31 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+<div class="uw-canvas">
+    <a href="{% url 'underwriter_identity_check' app.id %}" class="soft-back"><span class="soft-back-icon">&larr;</span><span>BACK</span></a>
+    <header class="uw-header"><div><span class="uw-kicker">MoMo Check</span><h1>MoMo Check</h1></div></header>
+
+    <section class="uw-card">
+        <h2>Customer</h2>
+        <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Full Name</span><strong class="review-field__value">{{ app.customer_name|default:"Not captured" }}</strong></div></div>
+        <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Phone</span><strong class="review-field__value">{% if app.customer_phone %}+265 {{ app.customer_phone }}{% else %}Not captured{% endif %}</strong></div></div>
+        <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Secondary Phone</span><strong class="review-field__value">{% if app.next_of_kin_1_phone %}+265 {{ app.next_of_kin_1_phone }}{% else %}Not captured{% endif %}</strong></div></div>
+        <div class="uw-call-row">
+            {% if app.customer_phone %}<a class="btn" href="tel:+265{{ app.customer_phone }}">CALL PRIMARY</a>{% else %}<span class="btn btn-outline disabled">CALL PRIMARY</span>{% endif %}
+            {% if app.next_of_kin_1_phone %}<a class="btn btn-outline" href="tel:+265{{ app.next_of_kin_1_phone }}">CALL SECONDARY</a>{% else %}<span class="btn btn-outline disabled">CALL SECONDARY</span>{% endif %}
+        </div>
+    </section>
+
+    <form method="post" class="uw-card">
+        {% csrf_token %}
+        {% include "dashboard/partials/review_yes_no.html" with name="momo_name_matches" question="Does the number belong to the customer and match the name on MoMo?" value=review.momo_name_matches %}
+        <div class="uw-actions">
+            <a href="{% url 'underwriter_identity_check' app.id %}" class="btn btn-outline">BACK</a>
+            <button type="submit" class="btn">SUBMIT</button>
+        </div>
+    </form>
+</div>
+<script src="{% static 'js/underwriter_review.js' %}"></script>
+{% endblock %}

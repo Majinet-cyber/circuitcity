@@ -1,0 +1,37 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+<div class="uw-canvas">
+    <a href="{% url 'underwriter_income_check' app.id %}" class="soft-back"><span class="soft-back-icon">&larr;</span><span>BACK</span></a>
+    <header class="uw-header"><div><span class="uw-kicker">Address Check</span><h1>Address Check</h1></div></header>
+
+    <section class="uw-card">
+        <h2>Home Address</h2>
+        {% include "dashboard/partials/review_field.html" with field_name="region" section="Location" label="Region" value=app.region correction=corrections.region %}
+        {% include "dashboard/partials/review_field.html" with field_name="district" section="Location" label="District" value=app.district correction=corrections.district %}
+        {% include "dashboard/partials/review_field.html" with field_name="traditional_authority" section="Location" label="Traditional Authority / Area" value=app.traditional_authority correction=corrections.traditional_authority %}
+        {% include "dashboard/partials/review_field.html" with field_name="precise_location" section="Location" label="Precise Location" value=app.precise_location correction=corrections.precise_location %}
+        {% include "dashboard/partials/review_field.html" with field_name="next_of_kin_1_name" section="Location" label="Neighbour Name" value=app.next_of_kin_1_name correction=corrections.next_of_kin_1_name %}
+        {% include "dashboard/partials/review_field.html" with field_name="next_of_kin_1_phone" section="Location" label="Neighbour Phone" value=app.next_of_kin_1_phone correction=corrections.next_of_kin_1_phone %}
+        <div class="uw-call-row">
+            {% if app.next_of_kin_1_phone %}<a class="btn" href="tel:+265{{ app.next_of_kin_1_phone }}">CALL NEIGHBOUR</a>{% else %}<span class="btn btn-outline disabled">CALL NEIGHBOUR</span>{% endif %}
+            {% if app.gps_coordinates %}<a class="btn btn-outline" href="https://www.google.com/maps/search/?api=1&query={{ app.gps_coordinates }}" target="_blank" rel="noopener noreferrer">VIEW LOCATION</a>{% else %}<span class="btn btn-outline disabled">NO GPS LOCATION</span>{% endif %}
+        </div>
+    </section>
+
+    <form method="post" class="uw-card">
+        {% csrf_token %}
+        {% include "dashboard/partials/review_yes_no.html" with name="location_neighbour_spoken" question="Did you speak to the neighbour?" value=review.location_neighbour_spoken %}
+        {% include "dashboard/partials/review_yes_no.html" with name="location_confirmed" question="Did the neighbour confirm the applicant home location?" value=review.location_confirmed %}
+        {% include "dashboard/partials/review_yes_no.html" with name="location_traceable" question="Would you be able to locate the customer if they defaulted on payment?" value=review.location_traceable %}
+        <div class="uw-actions">
+            <a href="{% url 'underwriter_income_check' app.id %}" class="btn btn-outline">BACK</a>
+            <button type="submit" class="btn">SUBMIT</button>
+        </div>
+    </form>
+</div>
+{% include "dashboard/partials/correction_modal.html" %}
+<script src="{% static 'js/underwriter_review.js' %}"></script>
+{% endblock %}

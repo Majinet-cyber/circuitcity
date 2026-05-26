@@ -1,0 +1,14 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+
+<section class="card complete-card approval-success">
+    <h1>Application Approved</h1>
+    <div class="approval-tick">✓</div>
+    <p class="text-muted">{{ app.customer_name|default:"Unnamed Customer" }} · {{ app.application_number }}</p>
+    <a href="{% url 'underwriter_dashboard' %}" class="btn">HOME</a>
+</section>
+
+{% endblock %}

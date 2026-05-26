@@ -1,0 +1,114 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/tengasale.css' %}">
+
+<div class="uw-canvas">
+    <a href="{% url 'underwriter_dashboard' %}" class="soft-back">
+        <span class="soft-back-icon">&larr;</span>
+        <span>BACK</span>
+    </a>
+
+    <header class="uw-header">
+        <div>
+            <span class="uw-kicker">{% if is_hub %}Application Review{% else %}Summary{% endif %}</span>
+            <h1>{% if is_hub %}Application Review{% else %}Summary{% endif %}</h1>
+        </div>
+        <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+    </header>
+
+    <section class="uw-card">
+        <h2>Customer / Deal Summary</h2>
+        <div class="review-field">
+            <div class="review-field__copy">
+                <span class="review-field__label">Customer</span>
+                <strong class="review-field__value">{{ app.customer_name|default:"Unnamed Customer" }}</strong>
+            </div>
+        </div>
+        <div class="review-field">
+            <div class="review-field__copy">
+                <span class="review-field__label">Application</span>
+                <strong class="review-field__value">{{ app.application_number|default:app.id }}</strong>
+            </div>
+        </div>
+        <div class="review-field">
+            <div class="review-field__copy">
+                <span class="review-field__label">Phone</span>
+                <strong class="review-field__value">{{ app.deal|default:"No phone selected" }}</strong>
+            </div>
+        </div>
+    </section>
+
+    {% if is_hub %}
+        <section class="uw-card">
+            <h2>Review Checklist</h2>
+            <div class="uw-step-list">
+                {% for label, url in steps %}
+                    <a class="uw-step" href="{{ url }}"><span>{{ forloop.counter }}</span><strong>{{ label }}</strong><b>&rsaquo;</b></a>
+                {% endfor %}
+            </div>
+        </section>
+    {% else %}
+        <section class="uw-card">
+            <h2>Application Review</h2>
+
+            <h3 class="uw-section-title">Customer</h3>
+            {% include "dashboard/partials/review_field.html" with field_name="customer_name" section="Customer" label="Full Name" value=app.customer_name correction=corrections.customer_name %}
+            {% include "dashboard/partials/review_field.html" with field_name="national_id" section="Customer" label="ID Number" value=app.national_id correction=corrections.national_id %}
+            {% include "dashboard/partials/review_field.html" with field_name="customer_phone" section="Customer" label="Phone" value=app.customer_phone correction=corrections.customer_phone %}
+            {% include "dashboard/partials/review_field.html" with field_name="occupation" section="Customer" label="Occupation" value=app.occupation correction=corrections.occupation %}
+            {% include "dashboard/partials/review_field.html" with field_name="income_band" section="Customer" label="Income" value=app.income_band correction=corrections.income_band %}
+
+            <h3 class="uw-section-title">Sales Rep</h3>
+            <div class="review-field">
+                <div class="review-field__copy"><span class="review-field__label">Merchant</span><strong class="review-field__value">{{ app.created_by.get_full_name|default:app.created_by.username }}</strong></div>
+            </div>
+
+            <h3 class="uw-section-title">Deal</h3>
+            {% include "dashboard/partials/review_field.html" with field_name="selected_deal" section="Deal" label="Phone" value=app.deal correction=corrections.selected_deal %}
+            {% include "dashboard/partials/review_field.html" with field_name="selected_cash_price" section="Deal" label="Cash Price" value=app.selected_cash_price correction=corrections.selected_cash_price %}
+            {% include "dashboard/partials/review_field.html" with field_name="calculated_deposit_amount" section="Deal" label="Deposit" value=app.calculated_deposit_amount correction=corrections.calculated_deposit_amount %}
+            <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Repayment</span><strong class="review-field__value">MWK {{ app.calculated_monthly_payment|floatformat:0 }} / month</strong></div></div>
+            <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Total 12 months</span><strong class="review-field__value">MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div></div>
+            <div class="review-field"><div class="review-field__copy"><span class="review-field__label">Early payment totals</span><strong class="review-field__value">6m MWK {{ app.calculated_6_month_total|floatformat:0 }} · 3m MWK {{ app.calculated_3_month_total|floatformat:0 }}</strong></div></div>
+        </section>
+
+        <section class="uw-card">
+            <h2>Images</h2>
+            <div class="uw-image-grid">
+                <div class="uw-image-block">
+                    {% if app.customer_face_image %}<img src="{{ app.customer_face_image.url }}" alt="Selfie Image">{% endif %}
+                    {% include "dashboard/partials/review_field.html" with field_name="customer_face_image" section="Images" label="Selfie Image" value="Captured" correction=corrections.customer_face_image %}
+                </div>
+                <div class="uw-image-block">
+                    {% if app.id_front_image %}<img src="{{ app.id_front_image.url }}" alt="ID Card Image">{% endif %}
+                    {% include "dashboard/partials/review_field.html" with field_name="id_front_image" section="Images" label="ID Card Image" value="Captured" correction=corrections.id_front_image %}
+                </div>
+                <div class="uw-image-block">
+                    {% if app.id_back_image %}<img src="{{ app.id_back_image.url }}" alt="ID Card Back">{% endif %}
+                    {% include "dashboard/partials/review_field.html" with field_name="id_back_image" section="Images" label="ID Card Back" value="Captured" correction=corrections.id_back_image %}
+                </div>
+                <div class="uw-image-block">
+                    {% if app.signature_image %}<img src="{{ app.signature_image.url }}" alt="Signature">{% endif %}
+                    {% include "dashboard/partials/review_field.html" with field_name="customer_signature" section="Images" label="Signature" value="Captured" correction=corrections.customer_signature %}
+                </div>
+            </div>
+        </section>
+
+        <form method="post" class="uw-card">
+            {% csrf_token %}
+            {% include "dashboard/partials/review_yes_no.html" with name="summary_clear" question="Is everything in this application clear and accurate?" value=review.summary_clear %}
+            <div class="uw-actions">
+                <a href="{% url 'underwriter_review_application' app.id %}" class="btn btn-outline">BACK</a>
+                <button type="submit" class="btn">SUBMIT</button>
+            </div>
+        </form>
+    {% endif %}
+</div>
+
+{% if not is_hub %}
+    {% include "dashboard/partials/correction_modal.html" %}
+{% endif %}
+<script src="{% static 'js/underwriter_review.js' %}"></script>
+{% endblock %}

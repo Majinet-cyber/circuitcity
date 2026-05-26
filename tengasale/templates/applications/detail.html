@@ -28,8 +28,8 @@
             <h2>Your application is pending review</h2>
             <p>A TengaSale underwriter will begin reviewing it soon.</p>
         {% elif app.merchant_status_key == "needs_edit" %}
-            <h2>Your application needs edits</h2>
-            <p>Review the requested changes and resubmit the application.</p>
+            <h2>Sent Back</h2>
+            <p>Review these fields and resubmit the application.</p>
         {% elif app.merchant_status_key == "approved" %}
             <h2>Your application is approved</h2>
             <p>Continue to the next step to complete the contract process.</p>
@@ -41,7 +41,7 @@
             <p>Review the application details below.</p>
         {% endif %}
     </div>
-    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+    <span class="status-pill status-{{ app.merchant_status_key }}"{% if app.merchant_status_key == "needs_edit" %} aria-label="Needs Edit"{% endif %}>{{ app.merchant_status_label }}</span>
 </div>
 
 <div class="card detail-card">

@@ -3,34 +3,87 @@ from decimal import Decimal
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Sum
-from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from accounts.decorators import underwriter_required
-from applications.models import FinancingApplication
+from applications.models import ApplicationCorrection, FinancingApplication
 from commissions.models import Commission
 from commissions.services import cancel_application_commissions, process_application_approval
+
+from .models import UnderwriterReview
 
 
 MAX_ACTIVE = 5
 
 
-@underwriter_required
-def underwriter_dashboard(request):
-    my_active = FinancingApplication.objects.filter(
-        claimed_by=request.user,
-        status="under_review",
+def bool_from_post(request, name):
+    value = request.POST.get(name)
+    if value == "yes":
+        return True
+    if value == "no":
+        return False
+    return None
+
+
+def review_guard(request, app_id):
+    app = get_object_or_404(
+        FinancingApplication.objects.select_related("deal", "claimed_by", "created_by"),
+        id=app_id,
+    )
+    if app.claimed_by_id and app.claimed_by_id != request.user.id:
+        messages.error(request, "This application is assigned to another underwriter.")
+        return app, redirect("underwriter_dashboard")
+    if app.status == "pending_review" and not app.claimed_by_id:
+        messages.info(request, "Claim this application before reviewing it.")
+        return app, redirect("underwriter_dashboard")
+    return app, None
+
+
+def get_review(app, user):
+    review, _created = UnderwriterReview.objects.get_or_create(
+        application=app,
+        defaults={"underwriter": user},
+    )
+    if not review.underwriter_id:
+        review.underwriter = user
+        review.save(update_fields=["underwriter", "updated_at"])
+    return review
+
+
+def correction_context(app):
+    return {
+        "corrections": app.active_correction_map(),
+        "correction_count": app.corrections.filter(resolved=False).count(),
+    }
+
+
+def sync_legacy_corrections(app):
+    app.sync_correction_summary()
+    app.save(
+        update_fields=[
+            "correction_fields",
+            "correction_notes",
+            "correction_customer_face_image",
+            "correction_id_front_image",
+            "correction_id_back_image",
+            "correction_customer_phone_image",
+        ]
     )
 
-    pending_count = FinancingApplication.objects.filter(
-        status="pending_review",
-        claimed_by__isnull=True,
-    ).count()
-    pending_queue = FinancingApplication.objects.select_related("created_by").filter(
-        status="pending_review",
-        claimed_by__isnull=True,
-    ).order_by("submitted_at", "id")[:10]
 
+@underwriter_required
+def underwriter_dashboard(request):
+    my_active = FinancingApplication.objects.filter(claimed_by=request.user, status="under_review")
+    pending_count = FinancingApplication.objects.filter(status="pending_review", claimed_by__isnull=True).count()
+    pending_queue = (
+        FinancingApplication.objects.select_related("created_by")
+        .filter(status="pending_review", claimed_by__isnull=True)
+        .order_by("submitted_at", "id")[:10]
+    )
     completed_reviews = FinancingApplication.objects.filter(
         reviewed_by=request.user,
         status__in=["approved", "completed", "contract_complete"],
@@ -45,7 +98,6 @@ def underwriter_dashboard(request):
         .aggregate(total=Sum("amount"))["total"]
         or 0
     )
-
     return render(request, "approvals/home.html", {
         "my_active": my_active,
         "pending_count": pending_count,
@@ -61,11 +113,7 @@ def underwriter_dashboard(request):
 
 @underwriter_required(sensitive=True)
 def claim_next(request):
-    active_count = FinancingApplication.objects.filter(
-        claimed_by=request.user,
-        status="under_review",
-    ).count()
-
+    active_count = FinancingApplication.objects.filter(claimed_by=request.user, status="under_review").count()
     if active_count >= MAX_ACTIVE:
         messages.error(request, "You can only have 5 active applications.")
         return redirect("underwriter_dashboard")
@@ -77,15 +125,14 @@ def claim_next(request):
             .order_by("submitted_at", "id")
             .first()
         )
-
         if not app:
             messages.info(request, "No apps pending.")
             return redirect("underwriter_dashboard")
-
         app.claimed_by = request.user
         app.claimed_at = timezone.now()
         app.status = "under_review"
-        app.save(update_fields=["claimed_by", "claimed_at", "status"])
+        app.review_status = "under_review"
+        app.save(update_fields=["claimed_by", "claimed_at", "status", "review_status"])
 
     messages.success(request, "Application claimed.")
     return redirect("underwriter_review_application", app_id=app.id)
@@ -93,58 +140,54 @@ def claim_next(request):
 
 @underwriter_required(sensitive=True)
 def review_application(request, app_id):
-    app = get_object_or_404(FinancingApplication.objects.select_related("deal", "claimed_by"), id=app_id)
-    if app.claimed_by_id and app.claimed_by_id != request.user.id:
-        messages.error(request, f"This application is already under review by {app.claimed_by.get_full_name() or app.claimed_by.username}.")
-        return redirect("underwriter_dashboard")
-
-    if app.status == "pending_review" and not app.claimed_by_id:
-        messages.info(request, "Claim this application before reviewing it.")
-        return redirect("underwriter_dashboard")
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
 
     if request.method == "POST":
         decision = request.POST.get("decision")
         app.manager_comment = request.POST.get("manager_comment", "")
-        app.correction_notes = request.POST.get("correction_notes", "")
-        selected_fields = request.POST.getlist("correction_fields")
-        app.correction_fields = [
-            field_name
-            for field_name in FinancingApplication.CORRECTION_FIELD_ORDER
-            if field_name in selected_fields
-        ]
-        app.correction_customer_face_image = "customer_face_image" in app.correction_fields
-        app.correction_id_front_image = "id_front_image" in app.correction_fields
-        app.correction_id_back_image = "id_back_image" in app.correction_fields
         app.reviewed_by = request.user
         app.reviewed_at = timezone.now()
 
         if decision == "approve":
-            app.status = "approved"
-            app.correction_fields = []
-            app.correction_notes = ""
-            messages.success(request, "Application approved.")
-
-        elif decision == "reject":
+            return redirect("underwriter_confirm_approve", app_id=app.id)
+        if decision == "reject":
             if not app.manager_comment.strip():
                 messages.error(request, "Underwriter comment is required when rejecting an application.")
-                return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
+                return redirect("underwriter_final_review", app_id=app.id)
             app.status = "rejected"
+            app.review_status = "rejected"
             cancel_application_commissions(app)
+            app.save(update_fields=["status", "review_status", "manager_comment", "reviewed_by", "reviewed_at"])
             messages.error(request, "Application rejected.")
-
-        elif decision == "request_correction":
-            if not app.correction_fields and not app.correction_notes.strip():
-                messages.error(request, "Select at least one field or add a correction note.")
-                return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
-            app.status = "correction_requested"
+            return redirect("underwriter_dashboard")
+        if decision == "request_correction":
+            if not app.corrections.filter(resolved=False).exists() and not app.manager_comment.strip():
+                messages.error(request, "Mark at least one correction or add an underwriter comment.")
+                return redirect("underwriter_final_review", app_id=app.id)
+            app.status = "sent_back"
+            app.review_status = "sent_back"
+            sync_legacy_corrections(app)
+            app.save(update_fields=["status", "review_status", "manager_comment", "reviewed_by", "reviewed_at"])
             messages.success(request, "Sent back for edit.")
+            return redirect("underwriter_dashboard")
 
-        app.save()
-        if decision == "approve":
-            process_application_approval(app, approved_by=request.user)
-        return redirect("underwriter_dashboard")
-
-    return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
+    review = get_review(app, request.user)
+    steps = [
+        ("Summary Review", reverse("underwriter_review_summary", args=[app.id])),
+        ("Identity Check", reverse("underwriter_identity_check", args=[app.id])),
+        ("MoMo Check", reverse("underwriter_momo_check", args=[app.id])),
+        ("Customer Call", reverse("underwriter_customer_call", args=[app.id])),
+        ("Income Check", reverse("underwriter_income_check", args=[app.id])),
+        ("Location Check", reverse("underwriter_location_check", args=[app.id])),
+        ("Final Decision", reverse("underwriter_final_review", args=[app.id])),
+    ]
+    return render(
+        request,
+        "dashboard/underwriter_review_summary.html",
+        {"app": app, "review": review, "steps": steps, "is_hub": True, **correction_context(app)},
+    )
 
 
 @underwriter_required
@@ -155,10 +198,7 @@ def active_reviews(request):
 
 @underwriter_required
 def queue(request):
-    apps = FinancingApplication.objects.filter(
-        status="pending_review",
-        claimed_by__isnull=True,
-    ).order_by("submitted_at", "id")
+    apps = FinancingApplication.objects.filter(status="pending_review", claimed_by__isnull=True).order_by("submitted_at", "id")
     return render(request, "approvals/list.html", {"title": "Queue", "apps": apps, "claim_mode": True})
 
 
@@ -167,104 +207,204 @@ def completed_reviews(request):
     statuses = ["approved", "completed", "contract_complete"]
     if request.GET.get("status") == "rejected":
         statuses = ["rejected"]
-    apps = FinancingApplication.objects.filter(
-        reviewed_by=request.user,
-        status__in=statuses,
-    ).order_by("-reviewed_at")
+    apps = FinancingApplication.objects.filter(reviewed_by=request.user, status__in=statuses).order_by("-reviewed_at")
     title = "Rejected Reviews" if request.GET.get("status") == "rejected" else "Completed Reviews"
     return render(request, "approvals/list.html", {"title": title, "apps": apps})
 
 
 @underwriter_required(sensitive=True)
-def address_check(request, app_id):
-    app = get_object_or_404(FinancingApplication.objects.select_related("claimed_by"), id=app_id)
-    if app.claimed_by_id and app.claimed_by_id != request.user.id:
-        messages.error(request, "This application is assigned to another underwriter.")
-        return redirect("underwriter_dashboard")
-
-    questions = [
-        ("spoke_to_neighbour", "Did you speak to the neighbour?"),
-        ("neighbour_confirmed_location", "Did the neighbour confirm the applicant home location?"),
-        ("can_locate_if_defaulted", "Would you be able to locate the customer if they defaulted on payment?"),
-    ]
-
+def summary_review(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
     if request.method == "POST":
-        app.address_check_answers = {key: request.POST.get(key) == "yes" for key, _label in questions}
-        app.save(update_fields=["address_check_answers"])
-        messages.success(request, "Address check saved.")
-        return redirect("underwriter_review_application", app_id=app.id)
+        review.summary_clear = bool_from_post(request, "summary_clear")
+        review.save(update_fields=["summary_clear", "updated_at"])
+        messages.success(request, "Summary review saved.")
+        return redirect("underwriter_identity_check", app_id=app.id)
+    return render(request, "dashboard/underwriter_review_summary.html", {"app": app, "review": review, "is_hub": False, **correction_context(app)})
 
-    return render(request, "approvals/address_check.html", {"app": app, "questions": questions})
+
+@underwriter_required(sensitive=True)
+def identity_check(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    if request.method == "POST":
+        review.identity_signature_matches = bool_from_post(request, "identity_signature_matches")
+        review.identity_info_matches = bool_from_post(request, "identity_info_matches")
+        review.save(update_fields=["identity_signature_matches", "identity_info_matches", "updated_at"])
+        messages.success(request, "Identity check saved.")
+        return redirect("underwriter_momo_check", app_id=app.id)
+    return render(request, "dashboard/underwriter_identity_check.html", {"app": app, "review": review, **correction_context(app)})
+
+
+@underwriter_required(sensitive=True)
+def momo_check(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    if request.method == "POST":
+        review.momo_name_matches = bool_from_post(request, "momo_name_matches")
+        review.save(update_fields=["momo_name_matches", "updated_at"])
+        messages.success(request, "MoMo check saved.")
+        return redirect("underwriter_customer_call", app_id=app.id)
+    return render(request, "dashboard/underwriter_momo_check.html", {"app": app, "review": review})
+
+
+@underwriter_required(sensitive=True)
+def customer_call(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    fields = [
+        "customer_spoken",
+        "customer_intro_done",
+        "customer_confirmed_application",
+        "customer_confirmed_device",
+        "customer_confirmed_deposit",
+        "customer_confirmed_repayment",
+        "customer_understands_direct_payment",
+        "customer_understands_nonpayment",
+    ]
+    if request.method == "POST":
+        for field in fields:
+            setattr(review, field, bool_from_post(request, field))
+        review.save(update_fields=[*fields, "updated_at"])
+        messages.success(request, "Customer call saved.")
+        return redirect("underwriter_income_check", app_id=app.id)
+    return render(request, "dashboard/underwriter_customer_call.html", {"app": app, "review": review})
 
 
 @underwriter_required(sensitive=True)
 def income_check(request, app_id):
-    app = get_object_or_404(FinancingApplication.objects.select_related("claimed_by"), id=app_id)
-    if app.claimed_by_id and app.claimed_by_id != request.user.id:
-        messages.error(request, "This application is assigned to another underwriter.")
-        return redirect("underwriter_dashboard")
-
-    questions = [
-        ("understands_income", "Do you clearly understand what the applicant does to earn income?"),
-        ("spoke_to_proof_contact", "Did you speak to the employer/proof contact?"),
-        ("proof_contact_confirmed_work", "Did the employer/proof contact confirm that the customer works for them?"),
-        ("proof_contact_confident", "Is the employer/proof contact confident that the customer would pay the monthly amounts?"),
-    ]
-    income = Decimal(app.exact_monthly_income or app.monthly_income or 0)
-    repayment = Decimal(app.calculated_monthly_payment or 0)
-    repayment_percent = Decimal("0")
-    if income > 0:
-        repayment_percent = (repayment / income * Decimal("100")).quantize(Decimal("0.01"))
-    affordability = "Affordable"
-    if repayment_percent > Decimal("40"):
-        affordability = "Risky"
-    elif repayment_percent > Decimal("25"):
-        affordability = "Caution"
-
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    fields = ["income_understood", "income_contact_spoken", "income_confirmed", "income_source_dependable", "income_contact_confident"]
+    monthly_income = Decimal(app.exact_monthly_income or app.monthly_income or 0)
+    monthly_payment = Decimal(app.calculated_monthly_payment or 0)
+    recommended_income = monthly_payment * Decimal("10")
+    income_multiple = (monthly_income / monthly_payment).quantize(Decimal("0.1")) if monthly_payment else Decimal("0")
     if request.method == "POST":
-        app.income_check_answers = {
-            "answers": {key: request.POST.get(key) == "yes" for key, _label in questions},
-            "monthly_income": str(income),
-            "monthly_repayment": str(repayment),
-            "repayment_percent": str(repayment_percent),
-            "affordability": affordability,
-        }
+        for field in fields:
+            setattr(review, field, bool_from_post(request, field))
+        review.save(update_fields=[*fields, "updated_at"])
+        app.income_check_answers = {field: getattr(review, field) for field in fields}
         app.save(update_fields=["income_check_answers"])
         messages.success(request, "Income check saved.")
-        return redirect("underwriter_review_application", app_id=app.id)
+        return redirect("underwriter_location_check", app_id=app.id)
+    return render(request, "dashboard/underwriter_income_check.html", {
+        "app": app,
+        "review": review,
+        "monthly_income": monthly_income,
+        "monthly_payment": monthly_payment,
+        "recommended_income": recommended_income,
+        "income_multiple": income_multiple,
+        **correction_context(app),
+    })
 
-    return render(
-        request,
-        "approvals/income_check.html",
-        {
-            "app": app,
-            "questions": questions,
-            "income": income,
-            "repayment": repayment,
-            "repayment_percent": repayment_percent,
-            "affordability": affordability,
-        },
-    )
+
+@underwriter_required(sensitive=True)
+def location_check(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    fields = ["location_neighbour_spoken", "location_confirmed", "location_traceable"]
+    if request.method == "POST":
+        for field in fields:
+            setattr(review, field, bool_from_post(request, field))
+        review.save(update_fields=[*fields, "updated_at"])
+        app.address_check_answers = {
+            "spoke_to_neighbour": review.location_neighbour_spoken,
+            "neighbour_confirmed_location": review.location_confirmed,
+            "can_locate_if_defaulted": review.location_traceable,
+        }
+        app.save(update_fields=["address_check_answers"])
+        messages.success(request, "Location check saved.")
+        return redirect("underwriter_final_review", app_id=app.id)
+    return render(request, "dashboard/underwriter_location_check.html", {"app": app, "review": review, **correction_context(app)})
+
+
+@underwriter_required(sensitive=True)
+def final_review(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
+    review = get_review(app, request.user)
+    if request.method == "POST":
+        review.comment = request.POST.get("manager_comment", "")
+        review.save(update_fields=["comment", "updated_at"])
+        app.manager_comment = review.comment
+        app.save(update_fields=["manager_comment"])
+        return review_application(request, app_id)
+
+    score = review.completeness_score()
+    score_class = "score-green" if score >= 80 else "score-orange" if score >= 50 else "score-red"
+    return render(request, "dashboard/underwriter_final_review.html", {"app": app, "review": review, "score": score, "score_class": score_class, **correction_context(app)})
+
+
+@underwriter_required(sensitive=True)
+@require_POST
+def correction_action(request, app_id):
+    app, response = review_guard(request, app_id)
+    if response:
+        return JsonResponse({"ok": False, "error": "Application unavailable."}, status=403)
+    field_name = request.POST.get("field_name", "").strip()
+    label = request.POST.get("label", "").strip() or FinancingApplication.CORRECTION_FIELD_LABELS.get(field_name, field_name)
+    section = request.POST.get("section", "").strip()
+    note = request.POST.get("note", "").strip()
+    action = request.POST.get("action", "mark")
+    if not field_name:
+        return JsonResponse({"ok": False, "error": "Missing field."}, status=400)
+    correction = ApplicationCorrection.objects.filter(application=app, field_name=field_name, resolved=False).first()
+    if action == "remove":
+        if correction:
+            correction.resolved = True
+            correction.save(update_fields=["resolved", "updated_at"])
+        sync_legacy_corrections(app)
+        return JsonResponse({"ok": True, "active": False, "note": ""})
+    if correction:
+        correction.note = note
+        correction.label = label
+        correction.section = section
+        correction.save(update_fields=["note", "label", "section", "updated_at"])
+    else:
+        correction = ApplicationCorrection.objects.create(
+            application=app,
+            field_name=field_name,
+            section=section,
+            label=label,
+            note=note,
+            resolved=False,
+            created_by=request.user,
+        )
+    sync_legacy_corrections(app)
+    return JsonResponse({"ok": True, "active": True, "note": correction.note})
 
 
 @underwriter_required(sensitive=True)
 def confirm_approve(request, app_id):
-    app = get_object_or_404(FinancingApplication.objects.select_related("claimed_by"), id=app_id)
-    if app.claimed_by_id and app.claimed_by_id != request.user.id:
-        messages.error(request, "This application is assigned to another underwriter.")
-        return redirect("underwriter_dashboard")
-
+    app, response = review_guard(request, app_id)
+    if response:
+        return response
     if request.method == "POST":
         app.status = "approved"
+        app.review_status = "approved"
         app.reviewed_by = request.user
         app.reviewed_at = timezone.now()
         app.correction_fields = []
         app.correction_notes = ""
-        app.save(update_fields=["status", "reviewed_by", "reviewed_at", "correction_fields", "correction_notes"])
+        app.save(update_fields=["status", "review_status", "reviewed_by", "reviewed_at", "correction_fields", "correction_notes"])
+        app.corrections.filter(resolved=False).update(resolved=True)
         process_application_approval(app, approved_by=request.user)
-        messages.success(request, "Application approved.")
-        return redirect("underwriter_dashboard")
-
+        return render(request, "approvals/approve_success.html", {"app": app})
     return render(request, "approvals/confirm_approve.html", {"app": app})
 
 
@@ -280,48 +420,9 @@ def legacy_review_application(request, app_id):
     return redirect("underwriter_review_application", app_id=app_id)
 
 
-def correction_field_groups():
-    groups = [
-        ("Customer", ["customer_name", "national_id", "customer_phone", "occupation", "income_band", "exact_monthly_income"]),
-        ("Deal / Pricing", ["selected_deal", "selected_cash_price", "calculated_deposit_amount"]),
-        ("KYC Images", ["customer_face_image", "id_front_image", "id_back_image"]),
-        (
-            "Location + Next of Kin 1",
-            [
-                "region",
-                "district",
-                "traditional_authority",
-                "precise_location",
-                "gps_coordinates",
-                "map_screenshot",
-                "next_of_kin_1_name",
-                "next_of_kin_1_phone",
-                "next_of_kin_1_relationship",
-            ],
-        ),
-        (
-            "Work / Proof + Next of Kin 2",
-            [
-                "work_description",
-                "next_of_kin_2_name",
-                "next_of_kin_2_phone",
-                "next_of_kin_2_relationship",
-                "proof_of_income_type",
-                "proof_contact_name",
-                "proof_contact_phone",
-                "proof_notes",
-                "proof_income_file",
-            ],
-        ),
-        ("Signature / Terms", ["customer_signature", "agreed_to_terms"]),
-    ]
-    return [
-        (
-            section,
-            [
-                {"name": field_name, "label": FinancingApplication.CORRECTION_FIELD_LABELS[field_name]}
-                for field_name in field_names
-            ],
-        )
-        for section, field_names in groups
-    ]
+def legacy_address_check(request, app_id):
+    return redirect("underwriter_location_check", app_id=app_id)
+
+
+def legacy_income_check(request, app_id):
+    return redirect("underwriter_income_check", app_id=app_id)

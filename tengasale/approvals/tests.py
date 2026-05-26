@@ -4,7 +4,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.utils import assign_role
-from applications.models import FinancingApplication
+from applications.models import ApplicationCorrection, FinancingApplication
+from approvals.models import UnderwriterReview
 
 
 class ApprovalQueueTests(TestCase):
@@ -36,7 +37,13 @@ class ApprovalQueueTests(TestCase):
         self.assertEqual(reverse("underwriter_completed_reviews"), "/tengasale/underwriter/completed/")
         app = self.create_pending()
         self.assertEqual(reverse("underwriter_address_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/address-check/")
-        self.assertEqual(reverse("underwriter_income_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/income-check/")
+        self.assertEqual(reverse("underwriter_review_summary", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/summary/")
+        self.assertEqual(reverse("underwriter_identity_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/identity/")
+        self.assertEqual(reverse("underwriter_momo_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/momo/")
+        self.assertEqual(reverse("underwriter_customer_call", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/customer-call/")
+        self.assertEqual(reverse("underwriter_income_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/income/")
+        self.assertEqual(reverse("underwriter_location_check", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/location/")
+        self.assertEqual(reverse("underwriter_final_review", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/final/")
         self.assertEqual(reverse("underwriter_confirm_approve", args=[app.id]), f"/tengasale/underwriter/review/{app.id}/confirm-approve/")
 
     def test_pending_review_with_no_claim_appears_in_queue(self):
@@ -65,7 +72,7 @@ class ApprovalQueueTests(TestCase):
         self.client.login(username="manager2", password="test-pass-123")
         response = self.client.get(reverse("underwriter_review_application", args=[app.id]), follow=True)
 
-        self.assertContains(response, "This application is already under review by")
+        self.assertContains(response, "This application is assigned to another underwriter.")
 
     def test_under_review_underwriter_dashboard_shows_underwriter(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager, claimed_at=timezone.now())
@@ -85,30 +92,36 @@ class ApprovalQueueTests(TestCase):
         self.assertContains(response, "Being reviewed by")
         self.assertContains(response, "manager")
 
-    def test_manager_can_send_back_with_correction_fields(self):
+    def test_field_correction_creates_record_and_send_back_sets_sent_back(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
         self.client.login(username="manager", password="test-pass-123")
 
         response = self.client.post(
-            reverse("underwriter_review_application", args=[app.id]),
+            reverse("underwriter_correction_action", args=[app.id]),
             {
-                "decision": "request_correction",
-                "correction_fields": ["income_band", "exact_monthly_income"],
-                "correction_notes": "Check income.",
+                "field_name": "customer_phone",
+                "section": "Customer",
+                "label": "Customer phone",
+                "note": "Check phone.",
             },
         )
-        app.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(ApplicationCorrection.objects.filter(application=app, field_name="customer_phone", resolved=False).exists())
 
+        response = self.client.post(reverse("underwriter_final_review", args=[app.id]), {"decision": "request_correction"})
+        app.refresh_from_db()
         self.assertRedirects(response, reverse("underwriter_dashboard"))
-        self.assertEqual(app.status, "correction_requested")
-        self.assertEqual(app.correction_fields, ["income_band", "exact_monthly_income"])
+        self.assertEqual(app.status, "sent_back")
+        self.assertEqual(app.review_status, "sent_back")
+        self.assertEqual(app.correction_fields, ["customer_phone"])
 
         self.client.login(username="merchant", password="test-pass-123")
         response = self.client.get(reverse("application_corrections", args=[app.id]))
 
-        self.assertContains(response, "Income band")
-        self.assertContains(response, "Exact monthly income")
-        self.assertContains(response, "Check income.")
+        self.assertContains(response, "Sent Back")
+        self.assertContains(response, "Review these fields")
+        self.assertContains(response, "Customer phone")
+        self.assertContains(response, "Check phone.")
 
     def test_review_detail_contains_expected_sections_and_actions(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
@@ -116,15 +129,53 @@ class ApprovalQueueTests(TestCase):
 
         response = self.client.get(reverse("underwriter_review_application", args=[app.id]))
 
-        for text in ["Customer", "Deal", "KYC images", "Location", "Income/work", "Contacts/next of kin", "Signature"]:
+        for text in ["Application Review", "Customer / Deal Summary", "Review Checklist", "Summary Review", "Identity Check", "MoMo Check", "Customer Call", "Income Check", "Location Check", "Final Decision"]:
             self.assertContains(response, text)
-        self.assertContains(response, "APPROVE")
-        self.assertContains(response, "REJECT")
-        self.assertContains(response, "SEND BACK FOR EDIT")
-        self.assertContains(response, "ADDRESS CHECK")
-        self.assertContains(response, "INCOME CHECK")
 
-    def test_address_and_income_checks_save_answers(self):
+    def test_underwriter_can_open_summary_page(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager)
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_review_summary", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Summary")
+        self.assertContains(response, "review-edit-btn")
+        self.assertNotContains(response, "correction-toggle")
+
+    def test_yes_no_answer_saves_and_renders_selected_green(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager)
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.post(reverse("underwriter_review_summary", args=[app.id]), {"summary_clear": "yes"})
+        self.assertRedirects(response, reverse("underwriter_identity_check", args=[app.id]))
+        review = UnderwriterReview.objects.get(application=app)
+        self.assertTrue(review.summary_clear)
+
+        response = self.client.get(reverse("underwriter_review_summary", args=[app.id]))
+        self.assertContains(response, 'review-choice review-choice--yes is-selected')
+        self.assertContains(response, 'review-choice-tick is-yes')
+
+    def test_corrected_field_renders_orange(self):
+        app = self.create_pending(status="under_review", claimed_by=self.manager)
+        ApplicationCorrection.objects.create(
+            application=app,
+            field_name="customer_phone",
+            section="Customer",
+            label="Customer phone",
+            note="Fix phone.",
+            created_by=self.manager,
+        )
+        app.sync_correction_summary()
+        app.save()
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_review_summary", args=[app.id]))
+
+        self.assertContains(response, "review-field--needs-correction")
+        self.assertContains(response, "Fix phone.")
+
+    def test_location_and_income_checks_save_answers(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
         app.exact_monthly_income = 300000
         app.calculated_monthly_payment = 60000
@@ -132,28 +183,29 @@ class ApprovalQueueTests(TestCase):
         self.client.login(username="manager", password="test-pass-123")
 
         address_response = self.client.post(
-            reverse("underwriter_address_check", args=[app.id]),
+            reverse("underwriter_location_check", args=[app.id]),
             {
-                "spoke_to_neighbour": "yes",
-                "neighbour_confirmed_location": "no",
-                "can_locate_if_defaulted": "yes",
+                "location_neighbour_spoken": "yes",
+                "location_confirmed": "no",
+                "location_traceable": "yes",
             },
         )
         income_response = self.client.post(
             reverse("underwriter_income_check", args=[app.id]),
             {
-                "understands_income": "yes",
-                "spoke_to_proof_contact": "yes",
-                "proof_contact_confirmed_work": "yes",
-                "proof_contact_confident": "no",
+                "income_understood": "yes",
+                "income_contact_spoken": "yes",
+                "income_confirmed": "yes",
+                "income_source_dependable": "yes",
+                "income_contact_confident": "no",
             },
         )
         app.refresh_from_db()
 
-        self.assertRedirects(address_response, reverse("underwriter_review_application", args=[app.id]))
-        self.assertRedirects(income_response, reverse("underwriter_review_application", args=[app.id]))
+        self.assertRedirects(address_response, reverse("underwriter_final_review", args=[app.id]))
+        self.assertRedirects(income_response, reverse("underwriter_location_check", args=[app.id]))
         self.assertTrue(app.address_check_answers["spoke_to_neighbour"])
-        self.assertEqual(app.income_check_answers["affordability"], "Affordable")
+        self.assertTrue(app.income_check_answers["income_understood"])
 
     def test_confirm_approve_requires_post_to_approve(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
@@ -166,7 +218,8 @@ class ApprovalQueueTests(TestCase):
 
         post_response = self.client.post(reverse("underwriter_confirm_approve", args=[app.id]))
         app.refresh_from_db()
-        self.assertRedirects(post_response, reverse("underwriter_dashboard"))
+        self.assertEqual(post_response.status_code, 200)
+        self.assertContains(post_response, "Application Approved")
         self.assertEqual(app.status, "approved")
 
     def test_manager_can_approve_and_reject(self):
@@ -181,27 +234,47 @@ class ApprovalQueueTests(TestCase):
 
         approve_response = self.client.post(reverse("underwriter_review_application", args=[approve_app.id]), {"decision": "approve"})
         reject_response = self.client.post(
-            reverse("underwriter_review_application", args=[reject_app.id]),
+            reverse("underwriter_final_review", args=[reject_app.id]),
             {"decision": "reject", "manager_comment": "Does not qualify."},
         )
         approve_app.refresh_from_db()
         reject_app.refresh_from_db()
 
-        self.assertRedirects(approve_response, reverse("underwriter_dashboard"))
+        self.assertRedirects(approve_response, reverse("underwriter_confirm_approve", args=[approve_app.id]))
         self.assertRedirects(reject_response, reverse("underwriter_dashboard"))
-        self.assertEqual(approve_app.status, "approved")
+        self.assertEqual(approve_app.status, "under_review")
         self.assertEqual(reject_app.status, "rejected")
 
     def test_reject_requires_comment(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
         self.client.login(username="manager", password="test-pass-123")
 
-        response = self.client.post(reverse("underwriter_review_application", args=[app.id]), {"decision": "reject"})
+        response = self.client.post(reverse("underwriter_final_review", args=[app.id]), {"decision": "reject"})
         app.refresh_from_db()
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Underwriter comment is required when rejecting an application.")
+        self.assertRedirects(response, reverse("underwriter_final_review", args=[app.id]))
         self.assertEqual(app.status, "under_review")
+
+    def test_merchant_resubmit_resolves_corrections(self):
+        app = self.create_pending(status="sent_back", claimed_by=self.manager)
+        correction = ApplicationCorrection.objects.create(
+            application=app,
+            field_name="customer_phone",
+            section="Customer",
+            label="Customer phone",
+            note="Fix phone.",
+            created_by=self.manager,
+        )
+        app.sync_correction_summary()
+        app.save()
+
+        app.submit()
+        correction.refresh_from_db()
+        app.refresh_from_db()
+
+        self.assertTrue(correction.resolved)
+        self.assertEqual(app.status, "pending_review")
+        self.assertEqual(app.review_status, "resubmitted")
 
     def test_merchant_cannot_access_underwriter_dashboard(self):
         self.client.login(username="merchant", password="test-pass-123")

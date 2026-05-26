@@ -25,6 +25,7 @@ ACTIVE_STATUSES = [
     "work_details",
     "signature",
     "correction_requested",
+    "sent_back",
     "submitted",
     "pending_review",
     "resubmitted",
@@ -290,12 +291,21 @@ def application_corrections(request, app_id):
         id=app_id,
         created_by=request.user,
     )
+    corrections = [
+        {
+            "label": correction.label,
+            "note": correction.note,
+            "url": app.get_correction_url_for_field(correction.field_name),
+        }
+        for correction in app.active_corrections()
+    ]
     return render(
         request,
         "applications/corrections.html",
         {
             "app": app,
             "correction_labels": app.correction_field_labels(),
+            "corrections": corrections,
             "edit_url": app.get_correction_start_url(),
         },
     )
@@ -322,6 +332,7 @@ def application_detail(request, app_id):
         "work_details",
         "signature",
         "correction_requested",
+        "sent_back",
         "imei_required",
     ]
 
@@ -390,7 +401,7 @@ def needs_edit_applications(request):
         request,
         "Needs Edit",
         "Applications returned by underwriting for correction.",
-        ["correction_requested"],
+        ["correction_requested", "sent_back"],
     )
 
 

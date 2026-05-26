@@ -32,6 +32,7 @@ class FinancingApplication(models.Model):
         ("pending_review", "Pending Review"),
         ("under_review", "Under Review"),
         ("correction_requested", "Correction Requested"),
+        ("sent_back", "Sent Back"),
         ("resubmitted", "Resubmitted"),
         ("approved", "Approved"),
         ("rejected", "Rejected"),
@@ -48,10 +49,20 @@ class FinancingApplication(models.Model):
         ("imei_required", "IMEI Required"),
     ]
 
+    REVIEW_STATUS_CHOICES = [
+        ("", "Not reviewed"),
+        ("pending_review", "Pending Review"),
+        ("under_review", "Under Review"),
+        ("sent_back", "Sent Back"),
+        ("resubmitted", "Resubmitted"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
     MERCHANT_STATUS_LABELS = {
         "pending_review": "Pending Review",
         "under_review": "Under Review",
-        "needs_edit": "Needs Edit",
+        "needs_edit": "Sent Back",
         "approved": "Approved",
         "completed": "Completed",
         "rejected": "Rejected",
@@ -172,6 +183,12 @@ class FinancingApplication(models.Model):
     correction_fields = models.JSONField(default=list, blank=True)
     address_check_answers = models.JSONField(default=dict, blank=True)
     income_check_answers = models.JSONField(default=dict, blank=True)
+    review_status = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        choices=REVIEW_STATUS_CHOICES,
+    )
 
     submitted_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(
@@ -194,12 +211,27 @@ class FinancingApplication(models.Model):
             super().save(update_fields=["application_number"])
 
     def submit(self):
+        was_sent_back = self.status in {"sent_back", "correction_requested"}
         self.status = "pending_review"
+        self.review_status = "resubmitted" if was_sent_back else "pending_review"
         self.submitted_at = timezone.now()
         self.claimed_by = None
         self.claimed_at = None
         self.correction_fields = []
-        self.save(update_fields=["status", "submitted_at", "claimed_by", "claimed_at", "correction_fields"])
+        self.correction_notes = ""
+        self.save(
+            update_fields=[
+                "status",
+                "review_status",
+                "submitted_at",
+                "claimed_by",
+                "claimed_at",
+                "correction_fields",
+                "correction_notes",
+            ]
+        )
+        if was_sent_back:
+            ApplicationCorrection.objects.filter(application=self, resolved=False).update(resolved=True)
 
     @property
     def is_waiting_for_review(self):
@@ -227,7 +259,7 @@ class FinancingApplication(models.Model):
 
     @property
     def merchant_status_key(self):
-        if self.status == "correction_requested":
+        if self.status in {"correction_requested", "sent_back"}:
             return "needs_edit"
 
         if self.status in ["contract_complete", "completed"]:
@@ -279,7 +311,7 @@ class FinancingApplication(models.Model):
         if self.status in ["kyc", "kyc_capture"]:
             return reverse("kyc_capture", args=[self.id])
 
-        if self.status == "correction_requested":
+        if self.status in {"correction_requested", "sent_back"}:
             return reverse("application_corrections", args=[self.id])
 
         if self.status in ["location", "location_details"]:
@@ -345,11 +377,78 @@ class FinancingApplication(models.Model):
             return reverse("signature", args=[self.id])
         return reverse("edit_customer_details", args=[self.id])
 
+    def get_correction_url_for_field(self, field_name):
+        page_map = {
+            "edit_customer_details": {
+                "customer_name",
+                "national_id",
+                "customer_phone",
+                "occupation",
+                "income_band",
+                "exact_monthly_income",
+            },
+            "choose_device": {"selected_deal", "selected_cash_price", "calculated_deposit_amount"},
+            "kyc_capture": {"customer_face_image", "id_front_image", "id_back_image"},
+            "location_details": {
+                "region",
+                "district",
+                "traditional_authority",
+                "precise_location",
+                "gps_coordinates",
+                "map_screenshot",
+                "next_of_kin_1_name",
+                "next_of_kin_1_phone",
+                "next_of_kin_1_relationship",
+            },
+            "work_details": {
+                "work_description",
+                "income_source",
+                "proof_of_income_type",
+                "proof_contact_name",
+                "proof_contact_phone",
+                "proof_notes",
+                "proof_income_file",
+                "next_of_kin_2_name",
+                "next_of_kin_2_phone",
+                "next_of_kin_2_relationship",
+            },
+            "signature": {"customer_signature", "agreed_to_terms"},
+        }
+        for route_name, fields in page_map.items():
+            if field_name in fields:
+                return reverse(route_name, args=[self.id])
+        return self.get_correction_start_url()
+
     def correction_field_labels(self):
         return [
             self.CORRECTION_FIELD_LABELS.get(field_name, field_name.replace("_", " ").title())
             for field_name in self.correction_fields or []
         ]
+
+    def active_corrections(self):
+        return self.corrections.filter(resolved=False).order_by("section", "label", "id")
+
+    def active_correction_map(self):
+        return {correction.field_name: correction for correction in self.active_corrections()}
+
+    def sync_correction_summary(self):
+        active = list(self.active_corrections())
+        self.correction_fields = [
+            field_name
+            for field_name in self.CORRECTION_FIELD_ORDER
+            if any(correction.field_name == field_name for correction in active)
+        ]
+        extra_fields = [
+            correction.field_name
+            for correction in active
+            if correction.field_name not in self.correction_fields
+        ]
+        self.correction_fields.extend(extra_fields)
+        self.correction_notes = "\n".join(correction.note for correction in active if correction.note)
+        self.correction_customer_face_image = "customer_face_image" in self.correction_fields
+        self.correction_id_front_image = "id_front_image" in self.correction_fields
+        self.correction_id_back_image = "id_back_image" in self.correction_fields
+        self.correction_customer_phone_image = "customer_phone_image" in self.correction_fields
 
     def apply_deal_selection(self, deal, selected_cash_price):
         self.deal = deal
@@ -369,3 +468,34 @@ class FinancingApplication(models.Model):
 
     def __str__(self):
         return f"{self.application_number} - {self.customer_name}"
+
+
+class ApplicationCorrection(models.Model):
+    application = models.ForeignKey(
+        FinancingApplication,
+        on_delete=models.CASCADE,
+        related_name="corrections",
+    )
+    field_name = models.CharField(max_length=120)
+    section = models.CharField(max_length=120, blank=True)
+    label = models.CharField(max_length=180)
+    note = models.TextField(blank=True)
+    resolved = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="application_corrections",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["application", "resolved"]),
+            models.Index(fields=["field_name"]),
+        ]
+
+    def __str__(self):
+        return f"{self.application} - {self.label}"
