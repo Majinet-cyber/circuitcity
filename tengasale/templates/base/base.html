@@ -67,7 +67,14 @@
     <main class="content">
         {% if messages %}
             {% for message in messages %}
-                <div class="alert">{{ message }}</div>
+                <div class="alert alert-{{ message.tags|default:'info' }}">
+                    {% if "success" in message.tags %}
+                        <span class="success-tick" aria-hidden="true">✓</span>
+                    {% elif "error" in message.tags %}
+                        <span class="error-mark" aria-hidden="true">!</span>
+                    {% endif %}
+                    <span>{{ message }}</span>
+                </div>
             {% endfor %}
         {% endif %}
 

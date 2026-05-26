@@ -49,6 +49,14 @@
         {% endfor %}
     </div>
 
+    <div class="form-group" data-occupation-other-group hidden>
+        <label for="{{ form.occupation_other.id_for_label }}">Specify occupation <span class="required-star">*</span></label>
+        {{ form.occupation_other }}
+        {% for error in form.occupation_other.errors %}
+            <div class="field-error">{{ error }}</div>
+        {% endfor %}
+    </div>
+
     <div class="form-group">
         <label for="{{ form.income_band.id_for_label }}">Income band <span class="required-star">*</span></label>
         {{ form.income_band }}
@@ -107,6 +115,19 @@
             });
         }
         clampInput(document.querySelector("[data-phone-input]"), /[^0-9]/g, 9);
+    })();
+
+    (function () {
+        const occupation = document.getElementById("id_occupation");
+        const otherGroup = document.querySelector("[data-occupation-other-group]");
+        if (!occupation || !otherGroup) {
+            return;
+        }
+        function syncOccupationOther() {
+            otherGroup.hidden = occupation.value !== "Other";
+        }
+        occupation.addEventListener("change", syncOccupationOther);
+        syncOccupationOther();
     })();
 </script>
 

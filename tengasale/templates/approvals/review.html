@@ -51,9 +51,8 @@
             {% if app.customer_face_image %}<div data-field-row="customer_face_image"><img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face"><button type="button" class="correction-toggle image-correction" data-field="customer_face_image">Customer face</button></div>{% endif %}
             {% if app.id_front_image %}<div data-field-row="id_front_image"><img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front"><button type="button" class="correction-toggle image-correction" data-field="id_front_image">ID front</button></div>{% endif %}
             {% if app.id_back_image %}<div data-field-row="id_back_image"><img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back"><button type="button" class="correction-toggle image-correction" data-field="id_back_image">ID back</button></div>{% endif %}
-            {% if app.customer_phone_image %}<div data-field-row="customer_phone_image"><img class="upload-preview" src="{{ app.customer_phone_image.url }}" alt="Customer phone"><button type="button" class="correction-toggle image-correction" data-field="customer_phone_image">Customer phone</button></div>{% endif %}
         </div>
-        {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image and not app.customer_phone_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
+        {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
     </section>
 
     <section class="review-section">

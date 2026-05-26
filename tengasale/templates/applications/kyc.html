@@ -10,7 +10,7 @@
 <h1 class="greeting">KYC Capture</h1>
 
 <div class="card instruction-card">
-    <p>Capture customer face, ID front, ID back, and customer phone image. Preview all images before continuing.</p>
+    <p>Capture customer face, ID front, and ID back. Preview all images before continuing.</p>
 </div>
 
 <form method="post" enctype="multipart/form-data" class="kyc-form" data-kyc-form>
@@ -45,40 +45,6 @@
             {% endif %}
             <div class="kyc-preview-meta">
                 <strong>Customer Face</strong>
-                <span class="capture-status captured">Captured</span>
-            </div>
-            <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
-        </div>
-    </section>
-
-    <section class="kyc-section" data-kyc-section data-existing="{% if app.customer_phone_image %}true{% else %}false{% endif %}">
-        <div class="kyc-section-header">
-            <div>
-                <h2>Customer Phone Image</h2>
-                <p>Use the rear camera and capture the actual customer device.</p>
-            </div>
-            <span class="capture-status{% if app.customer_phone_image %} captured{% endif %}" data-status>
-                {% if app.customer_phone_image %}Captured{% else %}Required{% endif %}
-            </span>
-        </div>
-
-        {{ form.customer_phone_image }}
-        {{ form.customer_phone_image.errors }}
-
-        <button type="button" class="capture-button" data-capture-button>Capture Customer Phone</button>
-        <div class="camera-panel" data-camera-panel hidden>
-            <video playsinline autoplay muted data-camera-video></video>
-            <button type="button" class="btn" data-save-capture>SAVE</button>
-        </div>
-
-        <div class="kyc-preview{% if app.customer_phone_image %} is-visible{% endif %}" data-preview-card>
-            {% if app.customer_phone_image %}
-                <img src="{{ app.customer_phone_image.url }}" alt="Customer Phone preview" data-preview-image>
-            {% else %}
-                <img src="" alt="Customer Phone preview" data-preview-image>
-            {% endif %}
-            <div class="kyc-preview-meta">
-                <strong>Customer Phone</strong>
                 <span class="capture-status captured">Captured</span>
             </div>
             <button type="button" class="recapture-button" data-recapture-button>Recapture</button>
@@ -153,7 +119,7 @@
         </div>
     </section>
 
-    <p class="next-disabled-note" data-disabled-note {% if kyc_complete %}hidden{% endif %}>Capture all KYC images to continue.</p>
+    <p class="next-disabled-note" data-disabled-note {% if kyc_complete %}hidden{% endif %}>Capture customer face, ID front, and ID back to continue.</p>
     <button type="submit" class="btn kyc-next-button" data-next-button {% if not kyc_complete %}disabled{% endif %}>NEXT</button>
 </form>
 

@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth import get_user_model
 
-from .utils import assign_role
+from .utils import assign_role, profile_role
 
 
 ROLE_CHOICES = [
@@ -27,12 +27,14 @@ class HQUserForm(forms.ModelForm):
             self.fields["password"].required = True
         if self.instance.pk:
             self.fields["full_name"].initial = self.instance.get_full_name()
-            profile_role = getattr(getattr(self.instance, "profile", None), "role", "")
-            if self.instance.groups.filter(name="HQ").exists() or profile_role == "hq":
+            role = profile_role(self.instance)
+            if role in {"merchant", "underwriter", "hq"}:
+                self.fields["role"].initial = role
+            elif self.instance.groups.filter(name="HQ").exists():
                 self.fields["role"].initial = "hq"
-            elif self.instance.groups.filter(name="Underwriter").exists() or profile_role == "underwriter":
+            elif self.instance.groups.filter(name="Underwriter").exists():
                 self.fields["role"].initial = "underwriter"
-            elif self.instance.groups.filter(name="Merchant").exists() or profile_role == "merchant":
+            elif self.instance.groups.filter(name="Merchant").exists():
                 self.fields["role"].initial = "merchant"
 
     def save(self, commit=True):

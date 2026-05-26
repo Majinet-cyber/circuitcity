@@ -30,7 +30,13 @@ def get_tengasale_role(user):
     if not user or not user.is_authenticated:
         return None
 
-    role = profile_role(user)
+    try:
+        profile = getattr(user, "profile", None)
+        role = getattr(profile, "role", None)
+    except ObjectDoesNotExist:
+        role = None
+    if role == "manager":
+        role = "underwriter"
     if role in VALID_PORTAL_ROLES:
         return role
 

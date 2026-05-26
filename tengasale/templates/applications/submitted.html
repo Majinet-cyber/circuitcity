@@ -37,6 +37,17 @@
         <span>Status</span>
         <strong>{{ app.merchant_status_label }}</strong>
     </div>
+    {% if app.queue_position %}
+        <div class="detail-row">
+            <span>Queue position</span>
+            <strong>{{ app.queue_position }}</strong>
+        </div>
+        <div class="detail-row">
+            <span>Applications ahead of you</span>
+            <strong>{{ app.applications_ahead }}</strong>
+        </div>
+        <p class="text-muted">Next available reviewer will claim applications in order of submission.</p>
+    {% endif %}
     {% if app.claimed_by %}
         <div class="detail-row">
             <span>Review</span>
@@ -52,7 +63,7 @@
 
 <div class="form-actions">
     <a href="{% url 'merchant_dashboard' %}" class="btn">HOME</a>
-    <a href="mailto:support@tengasale.local" class="btn btn-outline">CONTACT SUPPORT</a>
+    <a href="{{ tengasale_whatsapp_link }}" class="btn btn-outline">WHATSAPP SUPPORT</a>
 </div>
 
 {% endblock %}

@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
 from accounts.decorators import merchant_required
+from core.business_hours import business_hours_context
 from deals.models import DeviceDeal
 from geography.models import Region
 
@@ -79,6 +80,7 @@ def edit_customer_details(request, app_id):
             app.income_source = app.occupation
             app.status = "customer_details"
             app.save()
+            messages.success(request, "Customer details saved.")
             return redirect("choose_device", app_id=app.id)
     else:
         form = CustomerDetailsForm(instance=app)
@@ -185,11 +187,12 @@ def kyc_capture(request, app_id):
             app = form.save(commit=False)
             app.status = "kyc"
             app.save()
+            messages.success(request, "KYC saved.")
             return redirect("location_details", app_id=app.id)
     else:
         form = KYCForm(instance=app)
 
-    kyc_complete = bool(app.customer_face_image and app.id_front_image and app.id_back_image and app.customer_phone_image)
+    kyc_complete = bool(app.customer_face_image and app.id_front_image and app.id_back_image)
     return render(request, "applications/kyc.html", {"app": app, "form": form, "kyc_complete": kyc_complete})
 
 
@@ -204,6 +207,7 @@ def location_details(request, app_id):
             app.location = app.precise_location
             app.status = "location_details"
             app.save()
+            messages.success(request, "Location saved.")
             return redirect("work_details", app_id=app.id)
     else:
         form = LocationNextOfKinForm(instance=app)
@@ -229,6 +233,7 @@ def work_details(request, app_id):
             app = form.save(commit=False)
             app.status = "work_details"
             app.save()
+            messages.success(request, "Work details saved.")
             return redirect("signature", app_id=app.id)
     else:
         form = WorkProofForm(instance=app)
@@ -268,7 +273,14 @@ def application_submitted(request, app_id):
         id=app_id,
         created_by=request.user,
     )
-    return render(request, "applications/submitted.html", {"app": app})
+    return render(
+        request,
+        "applications/submitted.html",
+        {
+            "app": app,
+            **business_hours_context(),
+        },
+    )
 
 
 @merchant_required

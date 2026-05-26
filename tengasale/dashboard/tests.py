@@ -71,6 +71,7 @@ class HomePageTests(TestCase):
         self.assertContains(response, 'aria-label="WhatsApp support"')
         self.assertContains(response, "notification-button")
         self.assertContains(response, "logout-button")
+        self.assertContains(response, "WhatsApp +265883596135")
         self.assertNotContains(response, "Claim Next")
 
         content = response.content.decode()
@@ -114,29 +115,30 @@ class HomePageTests(TestCase):
         response = self.client.get(reverse("hq_dashboard"))
 
         self.assertContains(response, "Django Admin")
-        self.assertContains(response, "Deals Management")
         self.assertContains(response, "Users")
         self.assertContains(response, "Applications")
-        self.assertContains(response, "Underwriter Queue")
-        self.assertContains(response, "Monitor submitted, claimed, and reviewed applications.")
-        self.assertContains(response, "Commissions")
         self.assertContains(response, "Reports / Analytics")
+        self.assertContains(response, "Total HQ users")
+        self.assertContains(response, "Queue depth")
+        self.assertNotContains(response, "Deals Management")
+        self.assertNotContains(response, "Underwriter Queue")
+        self.assertNotContains(response, "Commissions")
         self.assertNotContains(response, "New Application")
         self.assertNotContains(response, "Claim Next")
         self.assertNotContains(response, "Merchant Portal Preview")
         self.assertNotContains(response, "Underwriter Portal Preview")
 
     @override_settings(DEBUG=True)
-    def test_debug_superuser_can_see_developer_preview_section(self):
+    def test_debug_superuser_does_not_see_preview_in_normal_hq_nav(self):
         user = get_user_model().objects.create_superuser(username="super-debug", password="test-pass-123")
         assign_role(user, "hq")
         self.client.login(username="super-debug", password="test-pass-123")
 
         response = self.client.get(reverse("hq_dashboard"))
 
-        self.assertContains(response, "Developer Preview")
-        self.assertContains(response, "Merchant Portal Preview")
-        self.assertContains(response, "Underwriter Portal Preview")
+        self.assertNotContains(response, "Developer Preview")
+        self.assertNotContains(response, "Merchant Portal Preview")
+        self.assertNotContains(response, "Underwriter Portal Preview")
 
     @override_settings(DEBUG=False)
     def test_superuser_cannot_see_developer_preview_when_debug_is_false(self):
@@ -216,6 +218,31 @@ class HomePageTests(TestCase):
         self.assertRedirects(response, reverse("hq_users"))
         self.assertTrue(created.groups.filter(name="Underwriter").exists())
         self.assertEqual(created.userprofile.role, "underwriter")
+
+    def test_hq_created_merchant_logs_into_merchant_portal(self):
+        self.create_user("hq-create-merchant", "HQ")
+        self.client.login(username="hq-create-merchant", password="test-pass-123")
+
+        response = self.client.post(
+            reverse("hq_users"),
+            {
+                "username": "created-merchant",
+                "email": "merchant@example.com",
+                "password": "test-pass-123",
+                "full_name": "Created Merchant",
+                "role": "merchant",
+                "is_active": "on",
+            },
+        )
+        self.assertRedirects(response, reverse("hq_users"))
+        self.client.logout()
+
+        login_response = self.client.post(
+            reverse("login"),
+            {"username": "created-merchant", "password": "test-pass-123"},
+        )
+
+        self.assertRedirects(login_response, reverse("merchant_dashboard"), fetch_redirect_response=False)
 
     def test_home_path_redirects_to_role_portal(self):
         self.create_user("merchant", "Merchant")

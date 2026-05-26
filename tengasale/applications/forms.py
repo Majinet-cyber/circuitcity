@@ -8,6 +8,7 @@ from django.core.files.base import ContentFile
 from django.db import OperationalError, ProgrammingError
 
 from geography.models import District, Region, TraditionalAuthority
+from geography.data import DISTRICTS_BY_REGION
 
 from .models import FinancingApplication
 
@@ -27,26 +28,6 @@ REGIONS = [
     ("Northern", "Northern"),
 ]
 
-DISTRICTS_BY_REGION = {
-    "Central": ["Lilongwe", "Dedza", "Dowa", "Kasungu", "Mchinji", "Ntcheu", "Nkhotakota", "Ntchisi", "Salima"],
-    "Southern": [
-        "Blantyre",
-        "Zomba",
-        "Mangochi",
-        "Mulanje",
-        "Thyolo",
-        "Chiradzulu",
-        "Machinga",
-        "Balaka",
-        "Chikwawa",
-        "Nsanje",
-        "Phalombe",
-        "Mwanza",
-        "Neno",
-    ],
-    "Northern": ["Mzuzu", "Mzimba", "Rumphi", "Karonga", "Chitipa", "Nkhata Bay", "Likoma"],
-}
-
 PROOF_TYPES = [
     ("", "Select proof type"),
     ("MoMo", "MoMo"),
@@ -55,6 +36,31 @@ PROOF_TYPES = [
     ("Business Contact", "Business Contact"),
     ("Other", "Other"),
 ]
+
+OCCUPATION_CHOICES = [
+    ("", "Select occupation"),
+    ("Self Employed", "Self Employed"),
+    ("Service", "Service"),
+    ("Trade and Commerce", "Trade and Commerce"),
+    ("Farming", "Farming"),
+    ("Civil Servant", "Civil Servant"),
+    ("Private Sector Employee", "Private Sector Employee"),
+    ("Teacher", "Teacher"),
+    ("Health Worker", "Health Worker"),
+    ("Student", "Student"),
+    ("Security Services", "Security Services"),
+    ("Driver / Transport", "Driver / Transport"),
+    ("Construction", "Construction"),
+    ("Domestic Work", "Domestic Work"),
+    ("Artisan / Technician", "Artisan / Technician"),
+    ("Business Owner", "Business Owner"),
+    ("NGO / Development Sector", "NGO / Development Sector"),
+    ("Retired", "Retired"),
+    ("Unemployed", "Unemployed"),
+    ("Other", "Other"),
+]
+
+OCCUPATION_VALUES = {value for value, _label in OCCUPATION_CHOICES if value}
 
 RELATIONSHIP_CHOICES = [
     ("", "Select relationship"),
@@ -119,7 +125,14 @@ class CustomerDetailsForm(forms.ModelForm):
             }
         ),
     )
-    occupation = forms.CharField(required=True, min_length=2, strip=True)
+    occupation = forms.ChoiceField(choices=OCCUPATION_CHOICES, required=True)
+    occupation_other = forms.CharField(
+        required=False,
+        min_length=2,
+        strip=True,
+        label="Specify occupation",
+        widget=forms.TextInput(attrs={"data-occupation-other": "true", "placeholder": "Specify occupation"}),
+    )
     income_band = forms.ChoiceField(choices=INCOME_BANDS, required=True)
     exact_monthly_income = forms.DecimalField(required=True, min_value=Decimal("0.01"))
 
@@ -134,6 +147,13 @@ class CustomerDetailsForm(forms.ModelForm):
             "exact_monthly_income",
         ]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        existing_occupation = self.instance.occupation if self.instance.pk else ""
+        if existing_occupation and existing_occupation not in OCCUPATION_VALUES:
+            self.fields["occupation"].initial = "Other"
+            self.fields["occupation_other"].initial = existing_occupation
+
     def clean_national_id(self):
         value = (self.cleaned_data.get("national_id") or "").strip().upper()
         if len(value) != 8 or not value.isalnum():
@@ -146,13 +166,24 @@ class CustomerDetailsForm(forms.ModelForm):
             raise forms.ValidationError("Phone number must be exactly 9 digits.")
         return value
 
+    def clean(self):
+        cleaned_data = super().clean()
+        occupation = cleaned_data.get("occupation")
+        occupation_other = (cleaned_data.get("occupation_other") or "").strip()
+        if occupation == "Other":
+            if not occupation_other:
+                self.add_error("occupation_other", "Specify the occupation when Other is selected.")
+            else:
+                cleaned_data["occupation"] = occupation_other
+        return cleaned_data
+
 
 class KYCForm(forms.ModelForm):
     allowed_image_types = {"image/jpeg", "image/png", "image/webp"}
 
     class Meta:
         model = FinancingApplication
-        fields = ["customer_face_image", "id_front_image", "id_back_image", "customer_phone_image"]
+        fields = ["customer_face_image", "id_front_image", "id_back_image"]
         widgets = {
             "customer_face_image": forms.FileInput(
                 attrs={
@@ -178,14 +209,6 @@ class KYCForm(forms.ModelForm):
                     "data-capture-input": "id-back",
                 }
             ),
-            "customer_phone_image": forms.FileInput(
-                attrs={
-                    "accept": "image/*",
-                    "capture": "environment",
-                    "class": "kyc-file-input",
-                    "data-capture-input": "customer-phone",
-                }
-            ),
         }
 
     def __init__(self, *args, **kwargs):
@@ -199,7 +222,6 @@ class KYCForm(forms.ModelForm):
             "customer_face_image": "Customer face image",
             "id_front_image": "ID front image",
             "id_back_image": "ID back image",
-            "customer_phone_image": "Customer phone image",
         }
 
         for field_name, label in labels.items():

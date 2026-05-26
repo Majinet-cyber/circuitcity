@@ -26,9 +26,13 @@
 
 <section class="card support-card">
     <h2>Business hours and support</h2>
-    <p>You are outside TengaSale business hours, application reviews and support may be delayed.</p>
-    <p class="text-muted">Monday-Friday: 9am-6pm<br>Saturday: 9am-5pm</p>
-    <a href="tel:+265000000000" class="btn btn-blue">Contact Support</a>
+    {% if is_business_hours %}
+        <p>TengaSale support and application reviews are currently open.</p>
+    {% else %}
+        <p>You are outside TengaSale business hours, application reviews and support may be delayed.</p>
+    {% endif %}
+    <p class="text-muted">{{ business_hours_label }}<br>Current CAT time: {{ business_hours_now|date:"D H:i" }}</p>
+    <a href="{{ tengasale_whatsapp_link }}" class="btn btn-blue">WhatsApp +265883596135</a>
 </section>
 
 <a href="{% url 'new_application' %}" class="new-application-button">

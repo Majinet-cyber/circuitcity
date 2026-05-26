@@ -1,4 +1,5 @@
 import base64
+from datetime import timedelta
 from decimal import Decimal
 from importlib import import_module
 import shutil
@@ -11,6 +12,7 @@ from django.core.management import call_command
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.utils import assign_role
 from deals.models import DeviceBrand, DeviceDeal
@@ -44,7 +46,7 @@ def valid_customer_data(**overrides):
         "customer_name": "Jane Banda",
         "national_id": "RQXFVZC9",
         "customer_phone": "990870616",
-        "occupation": "Trader",
+        "occupation": "Trade and Commerce",
         "income_band": "100,001-300,000",
         "exact_monthly_income": "250000",
     }
@@ -152,6 +154,26 @@ class CustomerValidationTests(TestCase):
         form = CustomerDetailsForm(data=valid_customer_data(customer_phone="990870616"))
 
         self.assertTrue(form.is_valid(), form.errors)
+
+    def test_occupation_options_exist(self):
+        form = CustomerDetailsForm()
+
+        values = [value for value, _label in form.fields["occupation"].choices]
+        self.assertIn("Self Employed", values)
+        self.assertIn("Trade and Commerce", values)
+        self.assertIn("Other", values)
+
+    def test_other_occupation_requires_detail(self):
+        form = CustomerDetailsForm(data=valid_customer_data(occupation="Other", occupation_other=""))
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("occupation_other", form.errors)
+
+    def test_other_occupation_uses_detail_value(self):
+        form = CustomerDetailsForm(data=valid_customer_data(occupation="Other", occupation_other="Tailor"))
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["occupation"], "Tailor")
 
     def test_next_of_kin_phones_must_be_exactly_9_digits(self):
         location_form = LocationForm(data={"region": "Central", "district": "Lilongwe", "next_of_kin_1_phone": "123"})
@@ -354,6 +376,30 @@ class ApplicationListTests(ApplicationTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Under Review")
         self.assertContains(response, "Underwriter: manager")
+
+    def test_queue_position_updates_when_first_application_is_claimed(self):
+        first = self.create_application()
+        first.status = "pending_review"
+        first.submitted_at = timezone.now()
+        first.save()
+        second = self.create_application()
+        second.status = "pending_review"
+        second.submitted_at = first.submitted_at + timedelta(minutes=1)
+        second.save()
+
+        self.assertEqual(first.queue_position, 1)
+        self.assertEqual(second.queue_position, 2)
+        self.assertEqual(second.applications_ahead, 1)
+
+        manager = get_user_model().objects.create_user(username="queue-manager", password="test-pass-123")
+        assign_role(manager, "underwriter")
+        first.claimed_by = manager
+        first.claimed_at = timezone.now()
+        first.status = "under_review"
+        first.save()
+
+        self.assertIsNone(first.queue_position)
+        self.assertEqual(second.queue_position, 1)
 
     def test_active_applications_page_contains_clickable_continue_card(self):
         app = self.create_application()
@@ -829,7 +875,6 @@ class KYCCaptureTests(ApplicationTestCase):
         app.customer_face_image.save("face.png", ContentFile(PNG_BYTES), save=False)
         app.id_front_image.save("front.png", ContentFile(PNG_BYTES), save=False)
         app.id_back_image.save("back.png", ContentFile(PNG_BYTES), save=False)
-        app.customer_phone_image.save("phone.png", ContentFile(PNG_BYTES), save=False)
         app.save()
 
     def test_kyc_page_get_shows_live_capture_controls(self):
@@ -841,10 +886,10 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Capture Face")
         self.assertContains(response, "Capture ID Front")
         self.assertContains(response, "Capture ID Back")
-        self.assertContains(response, "Capture Customer Phone")
+        self.assertNotContains(response, "Capture Customer Phone")
         self.assertContains(response, 'class="soft-back"')
         self.assertContains(response, 'capture="user"')
-        self.assertContains(response, 'capture="environment"', count=3)
+        self.assertContains(response, 'capture="environment"', count=2)
         self.assertContains(response, 'class="kyc-file-input"')
 
     def test_kyc_post_without_images_stays_on_page_with_errors(self):
@@ -856,7 +901,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Customer face image is required.")
         self.assertContains(response, "ID front image is required.")
         self.assertContains(response, "ID back image is required.")
-        self.assertContains(response, "Customer phone image is required.")
+        self.assertNotContains(response, "Customer phone image is required.")
         app.refresh_from_db()
         self.assertNotEqual(app.status, "kyc")
 
@@ -871,7 +916,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ID front image is required.")
         self.assertContains(response, "ID back image is required.")
-        self.assertContains(response, "Customer phone image is required.")
+        self.assertNotContains(response, "Customer phone image is required.")
 
     def test_kyc_post_with_face_and_id_front_fails(self):
         app = self.create_application()
@@ -886,7 +931,7 @@ class KYCCaptureTests(ApplicationTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "ID back image is required.")
-        self.assertContains(response, "Customer phone image is required.")
+        self.assertNotContains(response, "Customer phone image is required.")
 
     def test_kyc_post_with_all_images_succeeds_and_redirects_to_location(self):
         app = self.create_application()
@@ -897,7 +942,6 @@ class KYCCaptureTests(ApplicationTestCase):
                 "customer_face_image": self.image_upload("face.png"),
                 "id_front_image": self.image_upload("front.png"),
                 "id_back_image": self.image_upload("back.png"),
-                "customer_phone_image": self.image_upload("phone.png"),
             },
         )
 
@@ -907,7 +951,7 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertTrue(app.customer_face_image)
         self.assertTrue(app.id_front_image)
         self.assertTrue(app.id_back_image)
-        self.assertTrue(app.customer_phone_image)
+        self.assertFalse(app.customer_phone_image)
 
     def test_existing_saved_images_show_previews_and_allow_continue(self):
         app = self.create_application()
@@ -918,8 +962,8 @@ class KYCCaptureTests(ApplicationTestCase):
         self.assertContains(response, "Customer Face preview")
         self.assertContains(response, "ID Front preview")
         self.assertContains(response, "ID Back preview")
-        self.assertContains(response, "Customer Phone preview")
-        self.assertContains(response, 'data-existing="true"', count=4)
+        self.assertNotContains(response, "Customer Phone preview")
+        self.assertContains(response, 'data-existing="true"', count=3)
         self.assertNotContains(response, "data-next-button disabled")
 
         post_response = self.client.post(reverse("kyc_capture", args=[app.id]), {})
@@ -931,7 +975,7 @@ class KYCCaptureTests(ApplicationTestCase):
         original_face_name = app.customer_face_image.name
 
         response = self.client.get(reverse("kyc_capture", args=[app.id]))
-        self.assertContains(response, "Recapture", count=4)
+        self.assertContains(response, "Recapture", count=3)
 
         post_response = self.client.post(
             reverse("kyc_capture", args=[app.id]),
@@ -959,7 +1003,6 @@ class KYCCaptureTests(ApplicationTestCase):
                 "customer_face_image": self.image_upload("face.png"),
                 "id_front_image": self.image_upload("front.png"),
                 "id_back_image": self.image_upload("back.png"),
-                "customer_phone_image": self.image_upload("phone.png"),
             },
         )
 

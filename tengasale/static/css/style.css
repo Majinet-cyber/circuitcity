@@ -601,6 +601,9 @@ textarea:focus {
 }
 
 .alert {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 16px;
     padding: 12px 14px;
     border-left: 5px solid var(--orange);
@@ -608,6 +611,52 @@ textarea:focus {
     background: #ffffff;
     color: var(--ink-soft);
     font-weight: 700;
+}
+
+.alert-success {
+    border-left-color: var(--green);
+    background: #f4fbf7;
+}
+
+.alert-error {
+    border-left-color: var(--red);
+    background: var(--red-soft);
+}
+
+.success-tick,
+.error-mark {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    color: #ffffff;
+    font-weight: 950;
+    animation: success-pop 0.34s ease-out both;
+}
+
+.success-tick {
+    background: var(--green);
+}
+
+.error-mark {
+    background: var(--red);
+}
+
+@keyframes success-pop {
+    0% {
+        transform: scale(0.58);
+        opacity: 0;
+    }
+    70% {
+        transform: scale(1.08);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .card,
@@ -899,6 +948,45 @@ textarea:focus {
     padding: 12px 8px;
     font-size: 19px;
     font-weight: 950;
+}
+
+.deals-hero-card {
+    border-color: rgba(255, 106, 0, 0.2);
+    background: linear-gradient(180deg, #ffffff, #fff8f2);
+}
+
+.deals-hero-card h2 {
+    margin: 4px 0 6px;
+    font-size: 24px;
+}
+
+.brand-card-premium {
+    gap: 6px;
+    min-height: 112px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+}
+
+.brand-card-logo {
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    background: #111111;
+    color: #ffffff;
+    font-size: 18px;
+}
+
+.brand-card-premium small {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.deal-select {
+    border-color: #d6dde5;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(34, 44, 54, 0.04);
 }
 
 .brand-card.active,

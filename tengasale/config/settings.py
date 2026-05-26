@@ -141,7 +141,7 @@ LOGOUT_REDIRECT_URL = "login"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
-TENGASALE_WHATSAPP_NUMBER = os.environ.get("TENGASALE_WHATSAPP_NUMBER", "265000000000")
+TENGASALE_WHATSAPP_NUMBER = os.environ.get("TENGASALE_WHATSAPP_NUMBER", "+265883596135")
 TENGASALE_WHATSAPP_LINK = f"https://wa.me/{''.join(char for char in TENGASALE_WHATSAPP_NUMBER if char.isdigit())}"
 
 if "test" in sys.argv:

@@ -70,7 +70,6 @@ class FinancingApplication(models.Model):
         "customer_face_image": "Customer face image",
         "id_front_image": "ID front image",
         "id_back_image": "ID back image",
-        "customer_phone_image": "Customer phone image",
         "region": "Region",
         "district": "District",
         "traditional_authority": "Traditional authority",
@@ -201,6 +200,30 @@ class FinancingApplication(models.Model):
         self.claimed_at = None
         self.correction_fields = []
         self.save(update_fields=["status", "submitted_at", "claimed_by", "claimed_at", "correction_fields"])
+
+    @property
+    def is_waiting_for_review(self):
+        return self.status in {"submitted", "pending_review", "resubmitted"} and not self.claimed_by_id
+
+    @property
+    def queue_position(self):
+        if not self.pk or not self.is_waiting_for_review:
+            return None
+
+        submitted_at = self.submitted_at or self.created_at
+        ahead = FinancingApplication.objects.filter(
+            status__in=["submitted", "pending_review", "resubmitted"],
+            claimed_by__isnull=True,
+        ).filter(
+            models.Q(submitted_at__lt=submitted_at)
+            | models.Q(submitted_at=submitted_at, id__lt=self.id)
+        ).count()
+        return ahead + 1
+
+    @property
+    def applications_ahead(self):
+        position = self.queue_position
+        return max(position - 1, 0) if position else None
 
     @property
     def merchant_status_key(self):

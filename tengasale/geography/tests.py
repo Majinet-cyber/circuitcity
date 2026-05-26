@@ -44,7 +44,7 @@ class LocationGeographyTests(TestCase):
         data = {
             "region": "Central",
             "district": "Lilongwe",
-            "traditional_authority": "Lilongwe TA 1",
+            "traditional_authority": "Chitukula",
             "precise_location": "Area 25",
             "next_of_kin_1_name": "Mary Banda",
             "next_of_kin_1_phone": "991111111",
@@ -60,7 +60,8 @@ class LocationGeographyTests(TestCase):
         self.assertContains(response, 'name="district"')
         self.assertContains(response, 'name="traditional_authority"')
         self.assertContains(response, "geography-data")
-        self.assertContains(response, "Lilongwe TA 1")
+        self.assertContains(response, "Chitukula")
+        self.assertContains(response, "Chakhaza")
 
     def test_cannot_submit_location_without_ta(self):
         response = self.client.post(
@@ -80,4 +81,11 @@ class LocationGeographyTests(TestCase):
         self.assertRedirects(response, reverse("work_details", args=[self.app.id]))
         self.assertEqual(self.app.region, "Central")
         self.assertEqual(self.app.district, "Lilongwe")
-        self.assertEqual(self.app.traditional_authority, "Lilongwe TA 1")
+        self.assertEqual(self.app.traditional_authority, "Chitukula")
+
+    def test_district_selection_filters_tas_correctly(self):
+        response = self.client.get(reverse("location_details", args=[self.app.id]))
+        content = response.content.decode()
+
+        self.assertIn('"Lilongwe": ["Chadza", "Chitukula"', content)
+        self.assertIn('"Dowa": ["Chakhaza"', content)

@@ -4,6 +4,7 @@ from django.core.management.base import BaseCommand
 
 from core.services import get_business_settings
 from deals.models import DeviceBrand, DeviceDeal
+from geography.data import MALAWI_TAS_BY_REGION
 from geography.models import District, Region, TraditionalAuthority
 from rewards.services import get_spin_config
 
@@ -22,49 +23,21 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Seeded business and spin settings."))
 
     def seed_geography(self):
-        districts_by_region = {
-            "Central": [
-                "Lilongwe",
-                "Dedza",
-                "Dowa",
-                "Kasungu",
-                "Mchinji",
-                "Ntcheu",
-                "Nkhotakota",
-                "Ntchisi",
-                "Salima",
-            ],
-            "Southern": [
-                "Blantyre",
-                "Zomba",
-                "Mangochi",
-                "Mulanje",
-                "Thyolo",
-                "Chiradzulu",
-                "Machinga",
-                "Balaka",
-                "Chikwawa",
-                "Nsanje",
-                "Phalombe",
-                "Mwanza",
-                "Neno",
-            ],
-            "Northern": ["Mzuzu", "Mzimba", "Rumphi", "Karonga", "Chitipa", "Nkhata Bay", "Likoma"],
-        }
-
         created_regions = 0
         created_districts = 0
         created_tas = 0
-        for region_name, district_names in districts_by_region.items():
+        for region_name, districts in MALAWI_TAS_BY_REGION.items():
             region, was_region_created = Region.objects.get_or_create(name=region_name)
             created_regions += int(was_region_created)
-            for district_name in district_names:
+            for district_name, ta_names in districts.items():
                 district, was_district_created = District.objects.get_or_create(region=region, name=district_name)
                 created_districts += int(was_district_created)
 
-                # TODO: replace placeholder TA names with verified official Malawi TA data.
-                sample_tas = [f"{district_name} TA {number}" for number in range(1, 4)]
-                for ta_name in sample_tas:
+                TraditionalAuthority.objects.filter(
+                    district=district,
+                    name__in=[f"{district_name} TA {number}" for number in range(1, 4)],
+                ).delete()
+                for ta_name in ta_names:
                     _, was_ta_created = TraditionalAuthority.objects.get_or_create(
                         district=district,
                         name=ta_name,

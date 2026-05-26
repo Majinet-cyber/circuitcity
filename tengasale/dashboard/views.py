@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from accounts.decorators import hq_required, merchant_required
 from accounts.forms import HQUserForm
 from accounts.utils import primary_role, role_redirect_url
+from core.business_hours import business_hours_context
 from applications.models import FinancingApplication
 from commissions.models import Commission
 from contracts.models import Contract
@@ -51,6 +52,7 @@ def merchant_dashboard_context(user):
         "active_count": active_count,
         "earnings_total": earnings_total,
         "spin_wallet": spin_wallet,
+        **business_hours_context(),
     }
 
 
@@ -77,6 +79,12 @@ def hq_dashboard(request):
     User = get_user_model()
     total_merchants = User.objects.filter(profile__role="merchant").count()
     total_underwriters = User.objects.filter(profile__role="underwriter").count()
+    total_hq_users = User.objects.filter(profile__role="hq").count()
+    rejected_count = FinancingApplication.objects.filter(status="rejected").count()
+    waiting_count = FinancingApplication.objects.filter(
+        status__in=["submitted", "pending_review", "resubmitted"],
+        claimed_by__isnull=True,
+    ).count()
     total_commissions = (
         Commission.objects.exclude(status=Commission.STATUS_CANCELLED).aggregate(total=Sum("amount"))["total"]
         or 0
@@ -85,10 +93,13 @@ def hq_dashboard(request):
     context = {
         "total_merchants": total_merchants,
         "total_underwriters": total_underwriters,
+        "total_hq_users": total_hq_users,
         "pending_review_count": FinancingApplication.objects.filter(status="pending_review").count(),
         "under_review_count": FinancingApplication.objects.filter(status="under_review").count(),
         "approved_count": FinancingApplication.objects.filter(status="approved").count(),
+        "rejected_count": rejected_count,
         "completed_contracts_count": Contract.objects.filter(status=Contract.STATUS_COMPLETE).count(),
+        "waiting_count": waiting_count,
         "total_commissions": total_commissions,
         "show_developer_preview": settings.DEBUG and request.user.is_superuser,
     }
@@ -102,7 +113,7 @@ def hq_users(request):
         form = HQUserForm(request.POST, creating=True)
         if form.is_valid():
             form.save()
-            messages.success(request, "User created.")
+            messages.success(request, "User created successfully.")
             return redirect("hq_users")
     else:
         form = HQUserForm(creating=True)
@@ -120,7 +131,7 @@ def hq_user_edit(request, user_id):
         form = HQUserForm(request.POST, instance=user_obj)
         if form.is_valid():
             form.save()
-            messages.success(request, "User updated.")
+            messages.success(request, "User updated successfully.")
             return redirect("hq_users")
     else:
         form = HQUserForm(instance=user_obj)

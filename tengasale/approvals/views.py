@@ -87,6 +87,7 @@ def claim_next(request):
         app.status = "under_review"
         app.save(update_fields=["claimed_by", "claimed_at", "status"])
 
+    messages.success(request, "Application claimed.")
     return redirect("underwriter_review_application", app_id=app.id)
 
 
@@ -114,7 +115,6 @@ def review_application(request, app_id):
         app.correction_customer_face_image = "customer_face_image" in app.correction_fields
         app.correction_id_front_image = "id_front_image" in app.correction_fields
         app.correction_id_back_image = "id_back_image" in app.correction_fields
-        app.correction_customer_phone_image = "customer_phone_image" in app.correction_fields
         app.reviewed_by = request.user
         app.reviewed_at = timezone.now()
 
@@ -130,14 +130,14 @@ def review_application(request, app_id):
                 return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
             app.status = "rejected"
             cancel_application_commissions(app)
-            messages.warning(request, "Application rejected.")
+            messages.error(request, "Application rejected.")
 
         elif decision == "request_correction":
             if not app.correction_fields and not app.correction_notes.strip():
                 messages.error(request, "Select at least one field or add a correction note.")
                 return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
             app.status = "correction_requested"
-            messages.info(request, "Correction requested.")
+            messages.success(request, "Sent back for edit.")
 
         app.save()
         if decision == "approve":
@@ -284,7 +284,7 @@ def correction_field_groups():
     groups = [
         ("Customer", ["customer_name", "national_id", "customer_phone", "occupation", "income_band", "exact_monthly_income"]),
         ("Deal / Pricing", ["selected_deal", "selected_cash_price", "calculated_deposit_amount"]),
-        ("KYC Images", ["customer_face_image", "id_front_image", "id_back_image", "customer_phone_image"]),
+        ("KYC Images", ["customer_face_image", "id_front_image", "id_back_image"]),
         (
             "Location + Next of Kin 1",
             [

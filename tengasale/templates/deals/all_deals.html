@@ -9,9 +9,10 @@
 
 <h1 class="greeting">All Deals</h1>
 
-<div class="card">
+<div class="card deals-hero-card">
+    <span class="offer-kicker">TengaSale Deals</span>
     <h2>Choose your new phone</h2>
-    <p class="text-muted">Current active TengaSale phone financing offers.</p>
+    <p class="text-muted">Compare cash price, deposit, repayments, and early settlement options before starting an application.</p>
 </div>
 
 {{ deal_options|json_script:"all-deals-data" }}
@@ -20,8 +21,10 @@
     <h2>Choose brand</h2>
     <div class="brand-card-grid" role="list">
         {% for brand_name in brand_names %}
-            <button class="brand-card" type="button" data-brand="{{ brand_name }}" role="listitem">
+            <button class="brand-card brand-card-premium" type="button" data-brand="{{ brand_name }}" role="listitem">
+                <span class="brand-card-logo">{{ brand_name|slice:":1" }}</span>
                 <span>{{ brand_name }}</span>
+                <small>View offers</small>
             </button>
         {% endfor %}
     </div>
@@ -29,14 +32,14 @@
 
 <section class="selection-section" data-model-section hidden>
     <h2>Choose a model</h2>
-    <select id="model-select" aria-label="Choose a model">
+    <select id="model-select" class="deal-select" aria-label="Choose a model">
         <option value="">Select model</option>
     </select>
 </section>
 
 <section class="selection-section" data-spec-section hidden>
     <h2>Choose specs</h2>
-    <select id="spec-select" aria-label="Choose specs">
+    <select id="spec-select" class="deal-select" aria-label="Choose specs">
         <option value="">Select specs</option>
     </select>
 </section>
@@ -51,7 +54,7 @@
                 <h2 data-offer-model></h2>
                 <p class="text-muted" data-offer-specs></p>
             </div>
-            <span class="status-pill">12 months</span>
+            <span class="status-pill"><span data-term-months>12</span> months</span>
         </div>
 
         <div class="price-row">
@@ -90,6 +93,10 @@
             <div>
                 <span>Monthly payment</span>
                 <strong>MWK <span data-monthly></span></strong>
+            </div>
+            <div>
+                <span>Term</span>
+                <strong><span data-term-copy></span> months</strong>
             </div>
         </div>
 
@@ -232,6 +239,8 @@
             document.querySelector("[data-min-cash]").textContent = money(deal.min_cash_price);
             document.querySelector("[data-max-cash]").textContent = money(deal.max_cash_price);
             document.querySelector("[data-deposit-percent]").textContent = money(deal.deposit_percent);
+            document.querySelector("[data-term-months]").textContent = deal.term_months;
+            document.querySelector("[data-term-copy]").textContent = deal.term_months;
             offerSection.hidden = false;
             updatePricing();
         }
@@ -244,8 +253,9 @@
             const cash = Number(slider.value);
             const totalLoan = cash * Number(selectedDeal.loan_multiplier);
             const deposit = totalLoan * Number(selectedDeal.deposit_percent) / 100;
-            const monthly = totalLoan / 12;
-            const daily = totalLoan / 360;
+            const termMonths = Number(selectedDeal.term_months || 12);
+            const monthly = totalLoan / termMonths;
+            const daily = totalLoan / (termMonths * 30);
             const sixTotal = totalLoan * 0.85;
             const threeTotal = totalLoan * 0.75;
 
