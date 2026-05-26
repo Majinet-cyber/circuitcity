@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.utils import assign_role
 from applications.models import FinancingApplication
 
 
@@ -10,8 +11,11 @@ class ApprovalQueueTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.merchant = User.objects.create_user(username="merchant", password="test-pass-123")
-        self.manager = User.objects.create_user(username="manager", password="test-pass-123", is_staff=True)
-        self.second_manager = User.objects.create_user(username="manager2", password="test-pass-123", is_staff=True)
+        self.manager = User.objects.create_user(username="manager", password="test-pass-123")
+        self.second_manager = User.objects.create_user(username="manager2", password="test-pass-123")
+        assign_role(self.merchant, "merchant")
+        assign_role(self.manager, "underwriter")
+        assign_role(self.second_manager, "underwriter")
 
     def create_pending(self, **overrides):
         data = {
@@ -27,6 +31,7 @@ class ApprovalQueueTests(TestCase):
     def test_underwriter_url_names_resolve(self):
         self.assertEqual(reverse("underwriter_dashboard"), "/tengasale/underwriter/")
         self.assertEqual(reverse("underwriter_claim_next"), "/tengasale/underwriter/claim-next/")
+        self.assertEqual(reverse("underwriter_queue"), "/tengasale/underwriter/queue/")
         self.assertEqual(reverse("underwriter_active_reviews"), "/tengasale/underwriter/active/")
         self.assertEqual(reverse("underwriter_completed_reviews"), "/tengasale/underwriter/completed/")
         app = self.create_pending()
@@ -41,13 +46,10 @@ class ApprovalQueueTests(TestCase):
         response = self.client.get(reverse("underwriter_dashboard"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Underwriter")
+        self.assertContains(response, "Hi, manager")
         self.assertContains(response, "CLAIM NEXT")
-        self.assertContains(response, "Pending Review")
-        self.assertContains(response, "Review Queue")
         self.assertContains(response, "Queue Rules")
-        self.assertContains(response, "Rep: merchant")
-        self.assertContains(response, "1")
+        self.assertContains(response, "MY ACTIVE")
 
     def test_manager_can_claim_next_and_second_manager_cannot_claim_same_app(self):
         app = self.create_pending()
@@ -72,7 +74,6 @@ class ApprovalQueueTests(TestCase):
         response = self.client.get(reverse("underwriter_dashboard"))
 
         self.assertContains(response, "Under Review")
-        self.assertContains(response, "Underwriter: manager")
         self.assertContains(response, app.application_number)
 
     def test_merchant_submitted_page_shows_reviewer_name_for_under_review(self):
@@ -115,11 +116,11 @@ class ApprovalQueueTests(TestCase):
 
         response = self.client.get(reverse("underwriter_review_application", args=[app.id]))
 
-        for text in ["Customer Details", "Deal/Pricing", "KYC", "Location", "Work/Proof", "Signature"]:
+        for text in ["Customer", "Deal", "KYC images", "Location", "Income/work", "Contacts/next of kin", "Signature"]:
             self.assertContains(response, text)
-        self.assertContains(response, "Approve")
-        self.assertContains(response, "Reject")
-        self.assertContains(response, "Send Back for Edit")
+        self.assertContains(response, "APPROVE")
+        self.assertContains(response, "REJECT")
+        self.assertContains(response, "SEND BACK FOR EDIT")
         self.assertContains(response, "ADDRESS CHECK")
         self.assertContains(response, "INCOME CHECK")
 
@@ -214,7 +215,7 @@ class ApprovalQueueTests(TestCase):
 
         response = self.client.get(reverse("underwriter_claim_next"))
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(response, reverse("merchant_dashboard"))
 
     def test_old_approvals_urls_redirect_to_underwriter_portal(self):
         app = self.create_pending(status="under_review", claimed_by=self.manager)
@@ -245,3 +246,30 @@ class ApprovalQueueTests(TestCase):
 
         self.assertContains(active_response, "My Active Reviews")
         self.assertContains(completed_response, "Completed Reviews")
+
+    def test_underwriter_cannot_exceed_five_active_applications(self):
+        for index in range(5):
+            self.create_pending(
+                status="under_review",
+                claimed_by=self.manager,
+                claimed_at=timezone.now(),
+                national_id=f"ABCDE{index:03d}",
+            )
+        pending = self.create_pending(national_id="ZZZZ9999")
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_claim_next"))
+        pending.refresh_from_db()
+
+        self.assertRedirects(response, reverse("underwriter_dashboard"))
+        self.assertIsNone(pending.claimed_by)
+        self.assertEqual(pending.status, "pending_review")
+
+    def test_underwriter_queue_route_returns_200(self):
+        self.create_pending()
+        self.client.login(username="manager", password="test-pass-123")
+
+        response = self.client.get(reverse("underwriter_queue"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Queue")

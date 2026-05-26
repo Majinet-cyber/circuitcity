@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from applications.models import FinancingApplication
+from accounts.utils import assign_role
 
 from .models import SpinConfig, SpinReward, SpinWallet
 from .services import NoSpinsAvailable, award_spin_for_application, perform_spin
@@ -15,6 +16,7 @@ from .services import NoSpinsAvailable, award_spin_for_application, perform_spin
 class SpinRewardTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="merchant", password="test-pass-123")
+        assign_role(self.user, "merchant")
         self.app = FinancingApplication.objects.create(created_by=self.user)
 
     def test_approved_sale_gives_one_spin_once(self):

@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.utils import assign_role
 from applications.models import FinancingApplication
 from commissions.models import Commission
 from deals.models import DeviceBrand, DeviceDeal
@@ -31,6 +32,8 @@ class ContractFlowTests(TestCase):
         User = get_user_model()
         self.merchant = User.objects.create_user(username="merchant", password="test-pass-123")
         self.other = User.objects.create_user(username="other", password="test-pass-123")
+        assign_role(self.merchant, "merchant")
+        assign_role(self.other, "merchant")
         brand = DeviceBrand.objects.create(name="TECNO")
         self.deal = DeviceDeal.objects.create(
             brand=brand,

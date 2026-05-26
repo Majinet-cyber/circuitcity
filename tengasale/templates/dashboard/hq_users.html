@@ -1,0 +1,45 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}HQ Users{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'hq_dashboard' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Users</h1>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    <h2>Add user</h2>
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {{ field.errors }}
+    {% endfor %}
+    <button type="submit" class="btn green-button">CREATE USER</button>
+</form>
+
+<section class="menu-list">
+    <h2>Existing Users</h2>
+    {% for row in rows %}
+        <a href="{% url 'hq_user_edit' row.user.id %}" class="menu-row hq-user-row">
+            <span class="left">
+                <span class="menu-icon icon-tools">{{ row.role|first|upper }}</span>
+                <span>
+                    <strong>{{ row.user.username }}</strong>
+                    <small>{{ row.user.email|default:"No email" }} · {{ row.user.get_full_name|default:"No full name" }}</small>
+                    <small>{{ row.role|title }} · {% if row.user.is_active %}Active{% else %}Inactive{% endif %} · Joined {{ row.user.date_joined|date:"Y/m/d" }}</small>
+                </span>
+            </span>
+            <span class="arrow" aria-hidden="true">></span>
+        </a>
+    {% empty %}
+        <div class="card">No users found.</div>
+    {% endfor %}
+</section>
+
+{% endblock %}

@@ -9,116 +9,129 @@
 
 <h1 class="greeting">Review</h1>
 
-<section class="card">
-    <h2>Application Review</h2>
-    <div class="detail-row"><span>Application number</span><strong>{{ app.application_number|default:app.id }}</strong></div>
-    <div class="detail-row"><span>Submitted</span><strong>{{ app.submitted_at|date:"Y/m/d, H:i"|default:"Not submitted" }}</strong></div>
-    <div class="detail-row"><span>Sales rep / merchant</span><strong>{{ app.created_by.get_full_name|default:app.created_by.username }}</strong></div>
+<section class="review-summary-card">
+    <span class="page-kicker">Application</span>
+    <h2>{{ app.customer_name|default:"Unnamed Customer" }}</h2>
+    <div class="summary-card">
+        <div><span>Application</span><strong>{{ app.application_number|default:app.id }}</strong></div>
+        <div><span>Status</span><strong>{{ app.merchant_status_label }}</strong></div>
+        <div><span>Submitted</span><strong>{{ app.submitted_at|date:"Y/m/d, H:i"|default:"Not submitted" }}</strong></div>
+        <div><span>Merchant</span><strong>{{ app.created_by.get_full_name|default:app.created_by.username }}</strong></div>
+    </div>
 </section>
 
-<section class="card">
-    <h2>Customer Details</h2>
-    <div class="detail-row"><span>Customer</span><strong>{{ app.customer_name|default:"Not captured" }}</strong></div>
-    <div class="detail-row"><span>ID</span><strong>{{ app.national_id|default:"Not captured" }}</strong></div>
-    <div class="detail-row"><span>Phone</span><strong>{% if app.customer_phone %}<a href="tel:+265{{ app.customer_phone }}">+265 {{ app.customer_phone }}</a>{% else %}Not captured{% endif %}</strong></div>
-    <div class="detail-row"><span>Occupation</span><strong>{{ app.occupation|default:"Not captured" }}</strong></div>
-    <div class="detail-row"><span>Income</span><strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong></div>
-    <div class="detail-row"><span>Status</span><strong><span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span></strong></div>
-    {% if app.claimed_by %}
-        <div class="detail-row"><span>Underwriter</span><strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</strong></div>
-    {% endif %}
-</section>
-
-<section class="card">
-    <h2>Deal/Pricing</h2>
-    {% if app.deal %}
-        <div class="detail-row"><span>Phone</span><strong>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</strong></div>
-        <div class="detail-row"><span>Cash price</span><strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>Total loan</span><strong>MWK {{ app.calculated_total_loan|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>Monthly</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>Daily</span><strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>3-month settlement</span><strong>MWK {{ app.calculated_3_month_total|floatformat:0 }}</strong></div>
-        <div class="detail-row"><span>6-month settlement</span><strong>MWK {{ app.calculated_6_month_total|floatformat:0 }}</strong></div>
-    {% else %}
-        <p class="empty-state">No deal selected.</p>
-    {% endif %}
-</section>
-
-<section class="card">
-    <h2>KYC</h2>
-    {% if app.customer_face_image %}<img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face">{% endif %}
-    {% if app.id_front_image %}<img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front">{% endif %}
-    {% if app.id_back_image %}<img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back">{% endif %}
-    {% if app.customer_phone_image %}<img class="upload-preview" src="{{ app.customer_phone_image.url }}" alt="Customer phone">{% endif %}
-    {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image and not app.customer_phone_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
-</section>
-
-<section class="card">
-    <h2>Location</h2>
-    <div class="detail-row"><span>Region / district</span><strong>{{ app.region|default:"-" }} / {{ app.district|default:"-" }}</strong></div>
-    <div class="detail-row"><span>TA</span><strong>{{ app.traditional_authority|default:"-" }}</strong></div>
-    <div class="detail-row"><span>Precise location</span><strong>{{ app.precise_location|default:"-" }}</strong></div>
-    <div class="detail-row"><span>GPS coordinates</span><strong>{{ app.gps_coordinates|default:"-" }}</strong></div>
-    <div class="detail-row"><span>Next of kin 1</span><strong>{{ app.next_of_kin_1_name|default:"-" }}{% if app.next_of_kin_1_phone %} (+265 {{ app.next_of_kin_1_phone }}){% endif %}</strong></div>
-    <div class="detail-row"><span>Relationship</span><strong>{{ app.next_of_kin_1_relationship|default:"-" }}</strong></div>
-    {% if app.map_screenshot %}<img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">{% endif %}
-</section>
-
-<section class="card">
-    <h2>Work/Proof</h2>
-    <div class="detail-row"><span>Work</span><strong>{{ app.work_description|default:"-" }}</strong></div>
-    <div class="detail-row"><span>Next of kin 2</span><strong>{{ app.next_of_kin_2_name|default:"-" }}{% if app.next_of_kin_2_phone %} (+265 {{ app.next_of_kin_2_phone }}){% endif %}</strong></div>
-    <div class="detail-row"><span>Relationship</span><strong>{{ app.next_of_kin_2_relationship|default:"-" }}</strong></div>
-    <div class="detail-row"><span>Proof</span><strong>{{ app.proof_of_income_type|default:"-" }}</strong></div>
-    <div class="detail-row"><span>Contact</span><strong>{{ app.proof_contact_name|default:"-" }}{% if app.proof_contact_phone %} (+265 {{ app.proof_contact_phone }}){% endif %}</strong></div>
-    <div class="detail-row"><span>Notes</span><strong>{{ app.proof_notes|default:"-" }}</strong></div>
-    {% if app.proof_income_file %}<div class="detail-row"><span>Proof file</span><strong><a href="{{ app.proof_income_file.url }}">Open proof</a></strong></div>{% endif %}
-</section>
-
-<section class="card">
-    <h2>Signature</h2>
-    <div class="detail-row"><span>Terms agreed</span><strong>{{ app.agreed_to_terms|yesno:"Yes,No" }}</strong></div>
-    {% if app.signature_image %}<img class="upload-preview" src="{{ app.signature_image.url }}" alt="Signature">{% endif %}
-</section>
-
-<form method="post" class="card">
+<form method="post" class="review-form" data-review-form>
     {% csrf_token %}
 
-    <h2>Mark fields requiring correction</h2>
-    {% for section, fields in correction_fields %}
-        <div class="correction-section">
-            <h3>{{ section }}</h3>
-            {% for field in fields %}
-                <label class="check-row">
-                    <input type="checkbox" name="correction_fields" value="{{ field.name }}" {% if field.name in app.correction_fields %}checked{% endif %}>
-                    <span>{{ field.label }}</span>
-                </label>
+    <section class="review-section">
+        <h2>Customer</h2>
+        <div class="review-row" data-field-row="customer_name"><span>Customer</span><strong>{{ app.customer_name|default:"Not captured" }}</strong><button type="button" class="correction-toggle" data-field="customer_name" aria-label="Mark customer name">!</button></div>
+        <div class="review-row" data-field-row="national_id"><span>ID</span><strong>{{ app.national_id|default:"Not captured" }}</strong><button type="button" class="correction-toggle" data-field="national_id" aria-label="Mark national ID">!</button></div>
+        <div class="review-row" data-field-row="customer_phone"><span>Phone</span><strong>{% if app.customer_phone %}<a href="tel:+265{{ app.customer_phone }}">+265 {{ app.customer_phone }}</a>{% else %}Not captured{% endif %}</strong><button type="button" class="correction-toggle" data-field="customer_phone" aria-label="Mark customer phone">!</button></div>
+        <div class="review-row" data-field-row="occupation"><span>Occupation</span><strong>{{ app.occupation|default:"Not captured" }}</strong><button type="button" class="correction-toggle" data-field="occupation" aria-label="Mark occupation">!</button></div>
+        <div class="review-row" data-field-row="exact_monthly_income"><span>Income</span><strong>MWK {{ app.exact_monthly_income|floatformat:0 }}</strong><button type="button" class="correction-toggle" data-field="exact_monthly_income" aria-label="Mark income">!</button></div>
+    </section>
+
+    <section class="review-section">
+        <h2>Deal</h2>
+        {% if app.deal %}
+            <div class="review-row" data-field-row="selected_deal"><span>Phone</span><strong>{{ app.deal.brand.name }} {{ app.deal.model_name }} {{ app.deal.specs }}</strong><button type="button" class="correction-toggle" data-field="selected_deal" aria-label="Mark deal">!</button></div>
+            <div class="review-row" data-field-row="selected_cash_price"><span>Cash price</span><strong>MWK {{ app.selected_cash_price|floatformat:0 }}</strong><button type="button" class="correction-toggle" data-field="selected_cash_price" aria-label="Mark cash price">!</button></div>
+            <div class="review-row" data-field-row="calculated_deposit_amount"><span>Deposit</span><strong>MWK {{ app.calculated_deposit_amount|floatformat:0 }}</strong><button type="button" class="correction-toggle" data-field="calculated_deposit_amount" aria-label="Mark deposit">!</button></div>
+            <div class="review-row"><span>Monthly</span><strong>MWK {{ app.calculated_monthly_payment|floatformat:0 }}</strong></div>
+            <div class="review-row"><span>Daily</span><strong>MWK {{ app.calculated_daily_payment|floatformat:0 }}</strong></div>
+        {% else %}
+            <p class="empty-state">No deal selected.</p>
+        {% endif %}
+    </section>
+
+    <section class="review-section">
+        <h2>KYC images</h2>
+        <div class="review-image-grid">
+            {% if app.customer_face_image %}<div data-field-row="customer_face_image"><img class="upload-preview" src="{{ app.customer_face_image.url }}" alt="Customer face"><button type="button" class="correction-toggle image-correction" data-field="customer_face_image">Customer face</button></div>{% endif %}
+            {% if app.id_front_image %}<div data-field-row="id_front_image"><img class="upload-preview" src="{{ app.id_front_image.url }}" alt="ID front"><button type="button" class="correction-toggle image-correction" data-field="id_front_image">ID front</button></div>{% endif %}
+            {% if app.id_back_image %}<div data-field-row="id_back_image"><img class="upload-preview" src="{{ app.id_back_image.url }}" alt="ID back"><button type="button" class="correction-toggle image-correction" data-field="id_back_image">ID back</button></div>{% endif %}
+            {% if app.customer_phone_image %}<div data-field-row="customer_phone_image"><img class="upload-preview" src="{{ app.customer_phone_image.url }}" alt="Customer phone"><button type="button" class="correction-toggle image-correction" data-field="customer_phone_image">Customer phone</button></div>{% endif %}
+        </div>
+        {% if not app.customer_face_image and not app.id_front_image and not app.id_back_image and not app.customer_phone_image %}<p class="empty-state">No KYC images captured.</p>{% endif %}
+    </section>
+
+    <section class="review-section">
+        <h2>Location</h2>
+        <div class="review-row" data-field-row="region"><span>Region / district</span><strong>{{ app.region|default:"-" }} / {{ app.district|default:"-" }}</strong><button type="button" class="correction-toggle" data-field="region">!</button></div>
+        <div class="review-row" data-field-row="precise_location"><span>Precise location</span><strong>{{ app.precise_location|default:"-" }}</strong><button type="button" class="correction-toggle" data-field="precise_location">!</button></div>
+        <div class="review-row" data-field-row="gps_coordinates"><span>GPS coordinates</span><strong>{{ app.gps_coordinates|default:"-" }}</strong><button type="button" class="correction-toggle" data-field="gps_coordinates">!</button></div>
+        <div class="review-row" data-field-row="next_of_kin_1_phone"><span>Next of kin 1</span><strong>{{ app.next_of_kin_1_name|default:"-" }}{% if app.next_of_kin_1_phone %} <a href="tel:+265{{ app.next_of_kin_1_phone }}">+265 {{ app.next_of_kin_1_phone }}</a>{% endif %}</strong><button type="button" class="correction-toggle" data-field="next_of_kin_1_phone">!</button></div>
+        {% if app.map_screenshot %}<img class="upload-preview" src="{{ app.map_screenshot.url }}" alt="Map screenshot">{% endif %}
+    </section>
+
+    <section class="review-section">
+        <h2>Income/work</h2>
+        <div class="review-row" data-field-row="work_description"><span>Work</span><strong>{{ app.work_description|default:"-" }}</strong><button type="button" class="correction-toggle" data-field="work_description">!</button></div>
+        <div class="review-row" data-field-row="proof_contact_phone"><span>Proof contact</span><strong>{{ app.proof_contact_name|default:"-" }}{% if app.proof_contact_phone %} <a href="tel:+265{{ app.proof_contact_phone }}">+265 {{ app.proof_contact_phone }}</a>{% endif %}</strong><button type="button" class="correction-toggle" data-field="proof_contact_phone">!</button></div>
+        <div class="review-row" data-field-row="proof_notes"><span>Notes</span><strong>{{ app.proof_notes|default:"-" }}</strong><button type="button" class="correction-toggle" data-field="proof_notes">!</button></div>
+        {% if app.proof_income_file %}<div class="review-row"><span>Proof file</span><strong><a href="{{ app.proof_income_file.url }}">Open proof</a></strong></div>{% endif %}
+    </section>
+
+    <section class="review-section">
+        <h2>Contacts/next of kin</h2>
+        <div class="review-row" data-field-row="next_of_kin_2_phone"><span>Next of kin 2</span><strong>{{ app.next_of_kin_2_name|default:"-" }}{% if app.next_of_kin_2_phone %} <a href="tel:+265{{ app.next_of_kin_2_phone }}">+265 {{ app.next_of_kin_2_phone }}</a>{% endif %}</strong><button type="button" class="correction-toggle" data-field="next_of_kin_2_phone">!</button></div>
+        <div class="review-row"><span>Relationship</span><strong>{{ app.next_of_kin_2_relationship|default:"-" }}</strong></div>
+    </section>
+
+    <section class="review-section">
+        <h2>Signature</h2>
+        <div class="review-row" data-field-row="agreed_to_terms"><span>Terms agreed</span><strong>{{ app.agreed_to_terms|yesno:"Yes,No" }}</strong><button type="button" class="correction-toggle" data-field="agreed_to_terms">!</button></div>
+        {% if app.signature_image %}<div data-field-row="customer_signature"><img class="upload-preview signature-preview-image" src="{{ app.signature_image.url }}" alt="Signature"><button type="button" class="correction-toggle image-correction" data-field="customer_signature">Signature</button></div>{% endif %}
+    </section>
+
+    <section class="review-section">
+        <h2>Review actions</h2>
+        <div class="correction-hidden-list">
+            {% for section, fields in correction_fields %}
+                {% for field in fields %}
+                    <label>
+                        <input type="checkbox" name="correction_fields" value="{{ field.name }}" {% if field.name in app.correction_fields %}checked{% endif %}>
+                        {{ field.label }}
+                    </label>
+                {% endfor %}
             {% endfor %}
         </div>
-    {% endfor %}
 
-    <div class="form-group">
         <label>Correction notes</label>
         <textarea name="correction_notes">{{ app.correction_notes }}</textarea>
-    </div>
 
-    <div class="form-group">
-        <label>Underwriter comment</label>
+        <label>Reject reason / underwriter comment</label>
         <textarea name="manager_comment">{{ app.manager_comment }}</textarea>
-    </div>
 
-    <div class="form-actions stacked-actions">
-        <a href="{% url 'underwriter_address_check' app.id %}" class="btn btn-outline">ADDRESS CHECK</a>
-        <a href="{% url 'underwriter_income_check' app.id %}" class="btn btn-outline">INCOME CHECK</a>
-        <a href="{% url 'underwriter_confirm_approve' app.id %}" class="btn green-button">APPROVE</a>
-    </div>
-
-    <div class="form-actions stacked-actions">
-        <button name="decision" value="approve" class="btn green-button">Approve</button>
-        <button name="decision" value="request_correction" class="btn btn-blue">Send Back for Edit</button>
-        <button name="decision" value="reject" class="btn btn-danger">Reject</button>
-    </div>
+        <div class="form-actions stacked-actions">
+            <a href="{% url 'underwriter_address_check' app.id %}" class="btn btn-outline">ADDRESS CHECK</a>
+            <a href="{% url 'underwriter_income_check' app.id %}" class="btn btn-outline">INCOME CHECK</a>
+            <button name="decision" value="request_correction" class="btn btn-blue">SEND BACK FOR EDIT</button>
+            <button name="decision" value="reject" class="btn btn-danger">REJECT</button>
+            <a href="{% url 'underwriter_confirm_approve' app.id %}" class="btn green-button">APPROVE</a>
+        </div>
+    </section>
 </form>
+
+<script>
+document.querySelectorAll("[data-review-form] .correction-toggle").forEach((button) => {
+    const field = button.dataset.field;
+    const checkbox = document.querySelector(`input[name="correction_fields"][value="${field}"]`);
+    const row = document.querySelector(`[data-field-row="${field}"]`);
+    const sync = () => {
+        const checked = checkbox && checkbox.checked;
+        button.textContent = checked ? "Undo" : (button.classList.contains("image-correction") ? button.dataset.field.replaceAll("_", " ") : "!");
+        button.classList.toggle("selected", checked);
+        if (row) row.classList.toggle("needs-correction", checked);
+    };
+    button.addEventListener("click", () => {
+        if (!checkbox) return;
+        checkbox.checked = !checkbox.checked;
+        sync();
+    });
+    sync();
+});
+</script>
 
 {% endblock %}

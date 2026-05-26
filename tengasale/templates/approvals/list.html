@@ -13,7 +13,7 @@
 
 <div class="application-list">
     {% for app in apps %}
-        <a href="{% url 'underwriter_review_application' app.id %}" class="application-card">
+        <a href="{% if claim_mode %}{% url 'underwriter_claim_next' %}{% else %}{% url 'underwriter_review_application' app.id %}{% endif %}" class="application-card">
             <div class="application-card-main">
                 <div class="application-card-header">
                     <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>

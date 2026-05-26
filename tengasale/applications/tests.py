@@ -12,6 +12,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from accounts.utils import assign_role
 from deals.models import DeviceBrand, DeviceDeal
 
 from .forms import CustomerDetailsForm, LocationForm, WorkForm
@@ -57,6 +58,7 @@ class ApplicationTestCase(TestCase):
             username="merchant",
             password="test-pass-123",
         )
+        assign_role(self.user, "merchant")
         self.client.login(username="merchant", password="test-pass-123")
 
     def create_application(self):
@@ -338,7 +340,8 @@ class ApplicationListTests(ApplicationTestCase):
         self.assertContains(response, f'href="{reverse("application_detail", args=[app.id])}"')
 
     def test_claimed_application_shows_under_review(self):
-        manager = get_user_model().objects.create_user(username="manager", password="test-pass-123", is_staff=True)
+        manager = get_user_model().objects.create_user(username="manager", password="test-pass-123")
+        assign_role(manager, "underwriter")
         app = self.create_application()
         app.customer_name = "Jane Banda"
         app.national_id = "RQXFVZC9"
@@ -488,7 +491,8 @@ class ApplicationDetailTests(ApplicationTestCase):
 
     def test_unrelated_user_gets_403_on_application_detail(self):
         app = self.create_application()
-        get_user_model().objects.create_user(username="other", password="test-pass-123")
+        other = get_user_model().objects.create_user(username="other", password="test-pass-123")
+        assign_role(other, "merchant")
         self.client.login(username="other", password="test-pass-123")
 
         response = self.client.get(reverse("application_detail", args=[app.id]))
@@ -945,6 +949,7 @@ class KYCCaptureTests(ApplicationTestCase):
             username="other-merchant",
             password="test-pass-123",
         )
+        assign_role(other_user, "merchant")
         self.client.login(username=other_user.username, password="test-pass-123")
 
         get_response = self.client.get(reverse("kyc_capture", args=[app.id]))

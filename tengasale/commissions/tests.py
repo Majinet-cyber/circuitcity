@@ -10,6 +10,7 @@ from applications.models import FinancingApplication
 from core.models import BusinessSetting
 from rewards.models import SpinWallet
 
+from accounts.utils import assign_role
 from .models import Commission
 from .services import process_application_approval, process_contract_completion
 
@@ -18,7 +19,9 @@ class CommissionApprovalTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.merchant = User.objects.create_user(username="merchant", password="test-pass-123")
-        self.manager = User.objects.create_user(username="manager", password="test-pass-123", is_staff=True)
+        self.manager = User.objects.create_user(username="manager", password="test-pass-123")
+        assign_role(self.merchant, "merchant")
+        assign_role(self.manager, "underwriter")
 
     def create_application(self, **overrides):
         data = {

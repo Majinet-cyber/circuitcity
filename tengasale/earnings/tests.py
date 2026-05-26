@@ -10,6 +10,7 @@ from commissions.models import Commission
 from contracts.models import Contract
 from rewards.models import SpinWallet
 
+from accounts.utils import assign_role
 from .models import Wallet, WalletTransaction
 
 
@@ -27,6 +28,7 @@ class EarningsPageTests(TestCase):
     def setUp(self):
         User = get_user_model()
         self.user = User.objects.create_user(username="merchant", password="test-pass-123")
+        assign_role(self.user, "merchant")
         self.client.login(username="merchant", password="test-pass-123")
         self.app = FinancingApplication.objects.create(
             created_by=self.user,
@@ -95,6 +97,7 @@ class EarningsPageTests(TestCase):
 
     def test_merchant_only_sees_own_transactions_and_commissions(self):
         other = get_user_model().objects.create_user(username="other", password="test-pass-123")
+        assign_role(other, "merchant")
         other_app = FinancingApplication.objects.create(created_by=other, status="approved")
         Commission.objects.create(
             user=other,
@@ -118,6 +121,8 @@ class MerchantLeaderboardTests(TestCase):
             User.objects.create_user(username=f"merchant{i}", password="test-pass-123")
             for i in range(12)
         ]
+        for user in self.users:
+            assign_role(user, "merchant")
         self.client.login(username="merchant0", password="test-pass-123")
 
     def test_leaderboard_ranks_by_sales_count_and_limits_top_ten(self):
@@ -139,6 +144,8 @@ class PaymentsPageTests(TestCase):
         User = get_user_model()
         self.user = User.objects.create_user(username="merchant", password="test-pass-123")
         self.other = User.objects.create_user(username="other", password="test-pass-123")
+        assign_role(self.user, "merchant")
+        assign_role(self.other, "merchant")
         self.client.login(username="merchant", password="test-pass-123")
         self.app = FinancingApplication.objects.create(
             created_by=self.user,

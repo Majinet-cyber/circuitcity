@@ -1,0 +1,34 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Applications{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'hq_dashboard' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Applications</h1>
+
+<div class="application-list">
+    {% for app in apps %}
+        <div class="application-card">
+            <div class="application-card-main">
+                <div class="application-card-header">
+                    <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+                </div>
+                <div class="application-meta">
+                    <span>App: {{ app.application_number|default:app.id }}</span>
+                    <span>Merchant: {{ app.created_by.get_full_name|default:app.created_by.username }}</span>
+                    <span>Underwriter: {{ app.claimed_by.get_full_name|default:app.claimed_by.username|default:"Unassigned" }}</span>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="card">No applications found.</div>
+    {% endfor %}
+</div>
+
+{% endblock %}

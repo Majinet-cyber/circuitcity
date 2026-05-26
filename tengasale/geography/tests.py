@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from applications.models import FinancingApplication
+from accounts.utils import assign_role
 
 from .models import District, Region, TraditionalAuthority
 
@@ -32,6 +33,7 @@ class LocationGeographyTests(TestCase):
     def setUp(self):
         call_command("seed_tengasale")
         self.user = get_user_model().objects.create_user(username="merchant", password="test-pass-123")
+        assign_role(self.user, "merchant")
         self.client.login(username="merchant", password="test-pass-123")
         self.app = FinancingApplication.objects.create(
             created_by=self.user,

@@ -1,12 +1,11 @@
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 
+from accounts.decorators import merchant_required
 from deals.models import DeviceDeal
 from geography.models import Region
 
@@ -46,12 +45,7 @@ def merchant_application(request, app_id):
 
 
 def user_can_view_application(user, app):
-    return (
-        app.created_by_id == user.id
-        or app.claimed_by_id == user.id
-        or user.is_staff
-        or user.is_superuser
-    )
+    return app.created_by_id == user.id
 
 
 def geography_json_data():
@@ -64,7 +58,7 @@ def geography_json_data():
     return data
 
 
-@login_required
+@merchant_required
 def new_application(request):
     app = FinancingApplication.objects.create(
         created_by=request.user,
@@ -73,7 +67,7 @@ def new_application(request):
     return redirect("edit_customer_details", app_id=app.id)
 
 
-@login_required
+@merchant_required
 def edit_customer_details(request, app_id):
     app = merchant_application(request, app_id)
 
@@ -92,7 +86,7 @@ def edit_customer_details(request, app_id):
     return render(request, "applications/customer_details.html", {"app": app, "form": form})
 
 
-@login_required
+@merchant_required
 def choose_device(request, app_id):
     app = merchant_application(request, app_id)
     deals = DeviceDeal.objects.filter(is_active=True, brand__is_active=True).select_related("brand").order_by(
@@ -181,7 +175,7 @@ def choose_device(request, app_id):
     )
 
 
-@login_required
+@merchant_required
 def kyc_capture(request, app_id):
     app = merchant_application(request, app_id)
 
@@ -199,7 +193,7 @@ def kyc_capture(request, app_id):
     return render(request, "applications/kyc.html", {"app": app, "form": form, "kyc_complete": kyc_complete})
 
 
-@login_required
+@merchant_required
 def location_details(request, app_id):
     app = merchant_application(request, app_id)
 
@@ -225,7 +219,7 @@ def location_details(request, app_id):
     )
 
 
-@login_required
+@merchant_required
 def work_details(request, app_id):
     app = merchant_application(request, app_id)
 
@@ -242,7 +236,7 @@ def work_details(request, app_id):
     return render(request, "applications/work.html", {"app": app, "form": form})
 
 
-@login_required
+@merchant_required
 def signature(request, app_id):
     app = merchant_application(request, app_id)
 
@@ -262,12 +256,12 @@ def signature(request, app_id):
     return render(request, "applications/signature.html", {"app": app, "form": form})
 
 
-@login_required
+@merchant_required
 def capture_imei(request, app_id):
     return redirect("kyc_capture", app_id=app_id)
 
 
-@login_required
+@merchant_required
 def application_submitted(request, app_id):
     app = get_object_or_404(
         FinancingApplication.objects.select_related("created_by", "claimed_by"),
@@ -277,7 +271,7 @@ def application_submitted(request, app_id):
     return render(request, "applications/submitted.html", {"app": app})
 
 
-@login_required
+@merchant_required
 def application_corrections(request, app_id):
     app = get_object_or_404(
         FinancingApplication.objects.select_related("created_by", "claimed_by", "reviewed_by"),
@@ -295,7 +289,7 @@ def application_corrections(request, app_id):
     )
 
 
-@login_required
+@merchant_required
 def application_detail(request, app_id):
     app = get_object_or_404(
         FinancingApplication.objects.select_related("deal", "contract", "created_by", "claimed_by", "reviewed_by"),
@@ -329,7 +323,7 @@ def application_detail(request, app_id):
     )
 
 
-@login_required
+@merchant_required
 def filtered_application_queryset(request, statuses):
     apps = FinancingApplication.objects.select_related("claimed_by", "contract").filter(
         created_by=request.user,
@@ -348,7 +342,7 @@ def filtered_application_queryset(request, statuses):
     return apps.order_by("-created_at"), query
 
 
-@login_required
+@merchant_required
 def application_list(request, title, explanation, statuses):
     apps, query = filtered_application_queryset(request, statuses)
     return render(
@@ -358,7 +352,7 @@ def application_list(request, title, explanation, statuses):
     )
 
 
-@login_required
+@merchant_required
 def active_applications(request):
     return application_list(
         request,
@@ -368,7 +362,7 @@ def active_applications(request):
     )
 
 
-@login_required
+@merchant_required
 def pending_applications(request):
     return application_list(
         request,
@@ -378,7 +372,7 @@ def pending_applications(request):
     )
 
 
-@login_required
+@merchant_required
 def needs_edit_applications(request):
     return application_list(
         request,
@@ -388,7 +382,7 @@ def needs_edit_applications(request):
     )
 
 
-@login_required
+@merchant_required
 def approved_applications(request):
     return application_list(
         request,
@@ -398,7 +392,7 @@ def approved_applications(request):
     )
 
 
-@login_required
+@merchant_required
 def completed_applications(request):
     return application_list(
         request,
@@ -408,7 +402,7 @@ def completed_applications(request):
     )
 
 
-@login_required
+@merchant_required
 def rejected_applications(request):
     return application_list(
         request,

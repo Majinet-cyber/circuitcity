@@ -1,10 +1,10 @@
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.decorators import merchant_required
 from applications.models import FinancingApplication
 from commissions.services import process_contract_completion
 
@@ -13,10 +13,10 @@ from .models import Contract
 
 
 def can_access_contract_flow(user, application):
-    return application.created_by_id == user.id or user.is_staff or user.is_superuser
+    return application.created_by_id == user.id
 
 
-@login_required
+@merchant_required
 def contract_terms(request, app_id):
     application = get_object_or_404(
         FinancingApplication.objects.select_related("created_by", "deal"),
@@ -58,7 +58,7 @@ def contract_terms(request, app_id):
     return render(request, "contracts/terms.html", {"application": application, "contract": display_contract, "form": form})
 
 
-@login_required
+@merchant_required
 def contract_signature(request, contract_id):
     contract = get_object_or_404(Contract.objects.select_related("application", "merchant"), id=contract_id)
     application = contract.application
@@ -82,7 +82,7 @@ def contract_signature(request, contract_id):
     return render(request, "contracts/signature.html", {"contract": contract, "application": application, "form": form})
 
 
-@login_required
+@merchant_required
 def contract_imei(request, contract_id):
     contract = get_object_or_404(Contract.objects.select_related("application"), id=contract_id)
     application = contract.application
@@ -105,7 +105,7 @@ def contract_imei(request, contract_id):
     return render(request, "contracts/imei.html", {"contract": contract, "application": application, "form": form})
 
 
-@login_required
+@merchant_required
 def contract_progress(request, contract_id):
     contract = get_object_or_404(Contract.objects.select_related("application"), id=contract_id)
     application = contract.application
@@ -150,7 +150,7 @@ def contract_progress(request, contract_id):
     return render(request, "contracts/progress.html", {"contract": contract, "application": application})
 
 
-@login_required
+@merchant_required
 def contract_complete(request, contract_id):
     contract = get_object_or_404(Contract.objects.select_related("application"), id=contract_id)
     if not can_access_contract_flow(request.user, contract.application):
@@ -158,7 +158,7 @@ def contract_complete(request, contract_id):
     return render(request, "contracts/complete.html", {"contract": contract, "application": contract.application})
 
 
-@login_required
+@merchant_required
 def contract_detail(request, contract_id):
     contract = get_object_or_404(Contract.objects.select_related("application", "merchant"), id=contract_id)
     if not can_access_contract_flow(request.user, contract.application):

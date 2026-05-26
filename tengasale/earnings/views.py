@@ -1,12 +1,12 @@
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Sum
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from accounts.decorators import merchant_required
 from applications.models import FinancingApplication
 from commissions.models import Commission
 from contracts.models import Contract
@@ -19,7 +19,7 @@ from .models import Wallet, WalletTransaction
 COMPLETED_STATUSES = ["approved", "completed"]
 
 
-@login_required
+@merchant_required
 def earnings_home(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
     transactions = wallet.transactions.all()[:20]
@@ -107,7 +107,7 @@ def earnings_home(request):
     })
 
 
-@login_required
+@merchant_required
 def payments_home(request):
     query = request.GET.get("q", "").strip()
     rows_per_page = int(request.GET.get("rows", "10") or 10)
@@ -183,7 +183,7 @@ def leaderboard_rows():
     return rows
 
 
-@login_required
+@merchant_required
 def merchant_leaderboard(request):
     rows = leaderboard_rows()
     current_user_row = next((row for row in rows if row["created_by"] == request.user.id), None)
@@ -198,7 +198,7 @@ def merchant_leaderboard(request):
     )
 
 
-@login_required
+@merchant_required
 def spin_rewards(request):
     spin_wallet, _ = SpinWallet.objects.get_or_create(user=request.user)
     won_reward = None

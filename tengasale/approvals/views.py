@@ -33,7 +33,11 @@ def underwriter_dashboard(request):
 
     completed_reviews = FinancingApplication.objects.filter(
         reviewed_by=request.user,
-        status__in=["approved", "rejected", "correction_requested"],
+        status__in=["approved", "completed", "contract_complete"],
+    ).order_by("-reviewed_at")[:10]
+    rejected_reviews = FinancingApplication.objects.filter(
+        reviewed_by=request.user,
+        status="rejected",
     ).order_by("-reviewed_at")[:10]
     underwriter_earnings = (
         Commission.objects.filter(user=request.user, role=Commission.ROLE_MANAGER)
@@ -47,9 +51,11 @@ def underwriter_dashboard(request):
         "pending_count": pending_count,
         "pending_queue": pending_queue,
         "completed_reviews": completed_reviews,
+        "rejected_reviews": rejected_reviews,
         "active_count": my_active.count(),
         "max_active": MAX_ACTIVE,
         "underwriter_earnings": underwriter_earnings,
+        "can_claim": pending_count > 0 and my_active.count() < MAX_ACTIVE,
     })
 
 
@@ -127,8 +133,8 @@ def review_application(request, app_id):
             messages.warning(request, "Application rejected.")
 
         elif decision == "request_correction":
-            if not app.correction_fields:
-                messages.error(request, "Select at least one field to send back for correction.")
+            if not app.correction_fields and not app.correction_notes.strip():
+                messages.error(request, "Select at least one field or add a correction note.")
                 return render(request, "approvals/review.html", {"app": app, "correction_fields": correction_field_groups()})
             app.status = "correction_requested"
             messages.info(request, "Correction requested.")
@@ -148,8 +154,17 @@ def active_reviews(request):
 
 
 @underwriter_required
+def queue(request):
+    apps = FinancingApplication.objects.filter(
+        status="pending_review",
+        claimed_by__isnull=True,
+    ).order_by("submitted_at", "id")
+    return render(request, "approvals/list.html", {"title": "Queue", "apps": apps, "claim_mode": True})
+
+
+@underwriter_required
 def completed_reviews(request):
-    statuses = ["approved", "rejected", "correction_requested"]
+    statuses = ["approved", "completed", "contract_complete"]
     if request.GET.get("status") == "rejected":
         statuses = ["rejected"]
     apps = FinancingApplication.objects.filter(

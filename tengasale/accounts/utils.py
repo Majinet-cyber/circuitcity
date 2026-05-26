@@ -1,22 +1,48 @@
 from django.urls import reverse
 
+from .models import UserProfile
+
+
+ROLE_GROUPS = {
+    "merchant": "Merchant",
+    "underwriter": "Underwriter",
+    "hq": "HQ",
+}
+
+
+def profile_role(user):
+    if not user.is_authenticated:
+        return None
+    try:
+        role = user.userprofile.role
+    except UserProfile.DoesNotExist:
+        return None
+    if role == "manager":
+        return "underwriter"
+    return role or None
+
+
+def has_role_group(user, role):
+    group_name = ROLE_GROUPS[role]
+    return user.groups.filter(name=group_name).exists()
+
 
 def is_hq(user):
     return user.is_authenticated and (
-        user.is_superuser or user.groups.filter(name="HQ").exists()
+        user.is_superuser or has_role_group(user, "hq") or profile_role(user) == "hq"
     )
 
 
 def is_underwriter(user):
-    return user.is_authenticated and (
-        user.groups.filter(name="Underwriter").exists()
-        or user.groups.filter(name="Manager").exists()
-        or (user.is_staff and not user.is_superuser)
+    return user.is_authenticated and not is_hq(user) and (
+        has_role_group(user, "underwriter") or profile_role(user) == "underwriter"
     )
 
 
 def is_merchant(user):
-    return user.is_authenticated and user.groups.filter(name="Merchant").exists()
+    return user.is_authenticated and not is_hq(user) and not is_underwriter(user) and (
+        has_role_group(user, "merchant") or profile_role(user) == "merchant"
+    )
 
 
 def primary_role(user):
@@ -26,7 +52,7 @@ def primary_role(user):
         return "underwriter"
     if is_merchant(user):
         return "merchant"
-    return "merchant"
+    return None
 
 
 def role_redirect_url(user):
@@ -35,4 +61,22 @@ def role_redirect_url(user):
         return reverse("hq_dashboard")
     if role == "underwriter":
         return reverse("underwriter_dashboard")
-    return reverse("merchant_dashboard")
+    if role == "merchant":
+        return reverse("merchant_dashboard")
+    return reverse("no_role")
+
+
+def assign_role(user, role):
+    if role not in ROLE_GROUPS:
+        raise ValueError(f"Unknown role: {role}")
+
+    for group_name in ROLE_GROUPS.values():
+        user.groups.remove(*user.groups.filter(name=group_name))
+
+    from django.contrib.auth.models import Group
+
+    group, _ = Group.objects.get_or_create(name=ROLE_GROUPS[role])
+    user.groups.add(group)
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    profile.role = role
+    profile.save(update_fields=["role"])

@@ -49,38 +49,52 @@
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'all_deals' %}" class="menu-row">
+    <a href="{% url 'hq_deals' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-tools">D</span>
             <span>Deals Management</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'admin:auth_user_changelist' %}" class="menu-row">
+    <a href="{% url 'hq_users' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-tools">U</span>
             <span>Users</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'active_applications' %}" class="menu-row">
+    <a href="{% url 'hq_applications' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-active">A</span>
             <span>Applications</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'underwriter_dashboard' %}" class="menu-row">
+    <a href="{% url 'hq_applications' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-alert">U</span>
             <span>Underwriter Queue</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'merchant_dashboard' %}" class="menu-row">
+    <a href="{% url 'hq_commissions' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-money">C</span>
+            <span>Commissions</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'hq_applications' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-money">M</span>
-            <span>Merchant Portal</span>
+            <span>Merchant Portal Preview</span>
+        </span>
+        <span class="arrow" aria-hidden="true">></span>
+    </a>
+    <a href="{% url 'hq_applications' %}" class="menu-row">
+        <span class="left">
+            <span class="menu-icon icon-alert">U</span>
+            <span>Underwriter Portal Preview</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>

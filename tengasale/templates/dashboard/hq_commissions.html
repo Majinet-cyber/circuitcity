@@ -1,0 +1,29 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Commissions{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'hq_dashboard' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Commissions</h1>
+
+<section class="card list-card">
+    {% for commission in commissions %}
+        <div class="transaction-row">
+            <div>
+                <strong>{{ commission.user.get_full_name|default:commission.user.username }}</strong>
+                <p>{{ commission.application.application_number|default:commission.application_id }}</p>
+                <p>{{ commission.get_role_display }} · {{ commission.get_status_display }}</p>
+            </div>
+            <div class="transaction-side">MWK {{ commission.amount|floatformat:2 }}</div>
+        </div>
+    {% empty %}
+        <div class="card">No commissions found.</div>
+    {% endfor %}
+</section>
+
+{% endblock %}

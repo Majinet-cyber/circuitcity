@@ -1,9 +1,9 @@
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
+from accounts.decorators import merchant_required
 from .models import DeviceDeal
 
 
-@login_required
+@merchant_required
 def all_deals(request):
     deals = DeviceDeal.objects.filter(is_active=True, brand__is_active=True).select_related("brand").order_by(
         "brand__name",

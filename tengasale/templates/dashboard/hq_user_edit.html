@@ -1,0 +1,25 @@
+{% extends "base/base.html" %}
+
+{% block page_title %}Edit User{% endblock %}
+
+{% block content %}
+
+<a href="{% url 'hq_users' %}" class="soft-back">
+    <span class="soft-back-icon">&larr;</span>
+    <span>BACK</span>
+</a>
+
+<h1 class="greeting">Edit {{ user_obj.username }}</h1>
+
+<form method="post" class="card">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {{ field.errors }}
+    {% endfor %}
+    <button type="submit" class="btn green-button">SAVE USER</button>
+</form>
+
+{% endblock %}

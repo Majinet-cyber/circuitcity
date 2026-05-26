@@ -1,47 +1,44 @@
 {% extends "base/base.html" %}
 
-{% block page_title %}Underwriter{% endblock %}
+{% block page_title %}Home{% endblock %}
 
 {% block content %}
 
-<h1 class="greeting">Hi, {{ request.user.first_name|default:request.user.username }}</h1>
+<div class="page-title-row">
+    <div>
+        <span class="page-kicker">Home</span>
+        <h1 class="greeting">Hi, {{ request.user.get_full_name|default:request.user.username }}</h1>
+    </div>
+    <span class="flag-chip">MW</span>
+</div>
 
-{% if pending_count > 0 %}
-    <a href="{% url 'underwriter_claim_next' %}" class="new-application-button green-button">
-        CLAIM NEXT
+{% if can_claim %}
+    <a href="{% url 'underwriter_claim_next' %}" class="claim-button claim-button-ready">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 11V5a2 2 0 1 1 4 0v5"></path><path d="M12 10V4a2 2 0 1 1 4 0v8"></path><path d="M16 12V7a2 2 0 1 1 4 0v7a8 8 0 0 1-16 0v-3a2 2 0 1 1 4 0v1"></path></svg>
+        <span>CLAIM NEXT</span>
     </a>
+{% elif active_count >= max_active %}
+    <div class="claim-button claim-button-disabled">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 11V5a2 2 0 1 1 4 0v5"></path><path d="M12 10V4a2 2 0 1 1 4 0v8"></path><path d="M16 12V7a2 2 0 1 1 4 0v7a8 8 0 0 1-16 0v-3a2 2 0 1 1 4 0v1"></path></svg>
+        <span>ACTIVE LIMIT REACHED</span>
+    </div>
 {% else %}
-    <div class="new-application-button disabled-button">
-        NO APPS PENDING
+    <div class="claim-button claim-button-disabled">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 11V5a2 2 0 1 1 4 0v5"></path><path d="M12 10V4a2 2 0 1 1 4 0v8"></path><path d="M16 12V7a2 2 0 1 1 4 0v7a8 8 0 0 1-16 0v-3a2 2 0 1 1 4 0v1"></path></svg>
+        <span>NO APPS PENDING</span>
     </div>
 {% endif %}
 
-<section class="card">
-    <div class="metric-grid">
-        <div>
-            <span>MY ACTIVE</span>
-            <strong>{{ active_count }} / {{ max_active }}</strong>
-        </div>
-        <div>
-            <span>Pending Review</span>
-            <strong>{{ pending_count }}</strong>
-        </div>
-        <div>
-            <span>Completed reviews</span>
-            <strong>{{ completed_reviews|length }}</strong>
-        </div>
-        <div>
-            <span>Queue Rules</span>
-            <strong>{{ max_active }} max active</strong>
-        </div>
-    </div>
-</section>
+<a href="{% url 'underwriter_active_reviews' %}" class="active-review-card">
+    <span>MY ACTIVE</span>
+    <strong>{{ active_count }} / {{ max_active }}</strong>
+</a>
 
 <section class="menu-list">
-    <h2>Underwriter Tools</h2>
+    <h2>Applications</h2>
     <a href="{% url 'underwriter_active_reviews' %}" class="menu-row">
         <span class="left">
-            <span class="menu-icon icon-tools">A</span>
+            <span class="menu-icon icon-active">A</span>
             <span>My Active</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
@@ -60,14 +57,18 @@
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'earnings_home' %}" class="menu-row">
+</section>
+
+<section class="menu-list">
+    <h2>Tools</h2>
+    <a href="{% url 'underwriter_dashboard' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-money">E</span>
             <span>Earnings</span>
         </span>
         <span class="arrow" aria-hidden="true">></span>
     </a>
-    <a href="{% url 'underwriter_dashboard' %}" class="menu-row">
+    <a href="{% url 'underwriter_queue' %}" class="menu-row">
         <span class="left">
             <span class="menu-icon icon-tools">Q</span>
             <span>Queue Rules</span>
@@ -89,9 +90,8 @@
                     <div class="application-meta">
                         <span>ID: {{ app.national_id|default:"-" }}</span>
                         <span>App: {{ app.application_number|default:app.id }}</span>
-                        <span>{{ app.created_at|date:"Y/m/d, H:i" }}</span>
+                        <span>{{ app.claimed_at|default:app.created_at|date:"Y/m/d, H:i" }}</span>
                     </div>
-                    <p class="application-reviewer">Underwriter: {{ request.user.get_full_name|default:request.user.username }}</p>
                 </div>
                 <div class="application-card-side"><span class="soft-card-arrow">&rsaquo;</span></div>
             </a>
@@ -99,44 +99,6 @@
             <div class="card">No active applications.</div>
         {% endfor %}
     </div>
-</section>
-
-<section class="menu-list">
-    <h2>Review Queue</h2>
-    <div class="application-list">
-        {% for app in pending_queue %}
-            <div class="application-card">
-                <div class="application-card-main">
-                    <div class="application-card-header">
-                        <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
-                        <span class="status-pill status-pending_review">Pending Review</span>
-                    </div>
-                    <div class="application-meta">
-                        <span>ID: {{ app.national_id|default:"-" }}</span>
-                        <span>Rep: {{ app.created_by.get_full_name|default:app.created_by.username }}</span>
-                        <span>{{ app.submitted_at|default:app.created_at|date:"Y/m/d, H:i" }}</span>
-                    </div>
-                </div>
-                <div class="application-card-side">
-                    <a href="{% url 'underwriter_claim_next' %}" class="view-contract-button">Claim</a>
-                </div>
-            </div>
-        {% empty %}
-            <div class="card">No applications waiting for review.</div>
-        {% endfor %}
-    </div>
-</section>
-
-<section class="menu-list">
-    <h2>Completed Reviews</h2>
-    {% for app in completed_reviews %}
-        <a href="{% url 'application_detail' app.id %}" class="menu-row">
-            <span>{{ app.customer_name|default:app.application_number }}</span>
-            <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
-        </a>
-    {% empty %}
-        <div class="card">No completed reviews yet.</div>
-    {% endfor %}
 </section>
 
 {% endblock %}

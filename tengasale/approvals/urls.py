@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.underwriter_dashboard, name="manager_home"),
     path("claim-next/", views.claim_next, name="underwriter_claim_next"),
     path("claim-next/", views.claim_next, name="claim_next"),
+    path("queue/", views.queue, name="underwriter_queue"),
     path("review/<int:app_id>/", views.review_application, name="underwriter_review_application"),
     path("review/<int:app_id>/", views.review_application, name="review_application"),
     path("review/<int:app_id>/address-check/", views.address_check, name="underwriter_address_check"),

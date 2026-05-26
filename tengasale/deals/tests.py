@@ -9,6 +9,7 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.utils import assign_role
 from .models import DeviceBrand, DeviceDeal
 
 
@@ -20,6 +21,7 @@ class DealUrlTests(TestCase):
 class AllDealsPageTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="merchant", password="test-pass-123")
+        assign_role(self.user, "merchant")
         self.client.login(username="merchant", password="test-pass-123")
 
     def test_all_deals_page_loads_as_guided_selector(self):

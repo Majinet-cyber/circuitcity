@@ -6,7 +6,7 @@ from django.conf import settings
 from django.test import TestCase
 from django.urls import resolve, reverse
 
-from .utils import is_hq, is_merchant, is_underwriter, primary_role
+from .utils import assign_role, is_hq, is_merchant, is_underwriter, primary_role
 
 
 class LoginTemplateTests(TestCase):
@@ -54,8 +54,8 @@ class AccountUrlTests(TestCase):
 class RoleHelperTests(TestCase):
     def setUp(self):
         self.User = get_user_model()
-        for group_name in ["Merchant", "Underwriter", "Manager", "HQ"]:
-            Group.objects.create(name=group_name)
+        for group_name in ["Merchant", "Underwriter", "HQ"]:
+            Group.objects.get_or_create(name=group_name)
 
     def user_with_group(self, username, group_name, **kwargs):
         user = self.User.objects.create_user(username=username, password="test-pass-123", **kwargs)
@@ -74,17 +74,11 @@ class RoleHelperTests(TestCase):
         self.assertTrue(is_underwriter(user))
         self.assertEqual(primary_role(user), "underwriter")
 
-    def test_manager_group_user_is_underwriter_for_compatibility(self):
-        user = self.user_with_group("manager-role", "Manager")
-
-        self.assertTrue(is_underwriter(user))
-        self.assertEqual(primary_role(user), "underwriter")
-
-    def test_staff_non_superuser_is_underwriter(self):
+    def test_staff_non_superuser_is_not_implicitly_underwriter(self):
         user = self.User.objects.create_user(username="staff-role", password="test-pass-123", is_staff=True)
 
-        self.assertTrue(is_underwriter(user))
-        self.assertEqual(primary_role(user), "underwriter")
+        self.assertFalse(is_underwriter(user))
+        self.assertIsNone(primary_role(user))
 
     def test_hq_group_user_is_hq(self):
         user = self.user_with_group("hq-role", "HQ")
@@ -98,11 +92,11 @@ class RoleHelperTests(TestCase):
         self.assertTrue(is_hq(user))
         self.assertEqual(primary_role(user), "hq")
 
-    def test_no_group_user_defaults_to_merchant_role(self):
+    def test_no_group_user_has_no_primary_role(self):
         user = self.User.objects.create_user(username="no-group", password="test-pass-123")
 
         self.assertFalse(is_merchant(user))
-        self.assertEqual(primary_role(user), "merchant")
+        self.assertIsNone(primary_role(user))
 
 
 class LoginRedirectTests(TestCase):
@@ -113,7 +107,8 @@ class LoginRedirectTests(TestCase):
     def make_user(self, username, group_name=None, **kwargs):
         user = self.User.objects.create_user(username=username, password="test-pass-123", **kwargs)
         if group_name:
-            user.groups.add(Group.objects.get(name=group_name))
+            role = {"Merchant": "merchant", "Underwriter": "underwriter", "HQ": "hq"}[group_name]
+            assign_role(user, role)
         return user
 
     def assert_login_redirects(self, username, expected_url):
@@ -134,10 +129,10 @@ class LoginRedirectTests(TestCase):
 
         self.assert_login_redirects("underwriter-login", reverse("underwriter_dashboard"))
 
-    def test_staff_login_redirects_to_underwriter_portal(self):
+    def test_unassigned_login_redirects_to_no_role_page(self):
         self.make_user("staff-login", is_staff=True)
 
-        self.assert_login_redirects("staff-login", reverse("underwriter_dashboard"))
+        self.assert_login_redirects("staff-login", reverse("no_role"))
 
     def test_hq_login_redirects_to_hq_portal(self):
         self.make_user("hq-login", "HQ")

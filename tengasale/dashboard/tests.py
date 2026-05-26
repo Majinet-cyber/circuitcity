@@ -1,9 +1,9 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.conf import settings
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from accounts.utils import assign_role
 
 
 class HomePageTests(TestCase):
@@ -13,7 +13,8 @@ class HomePageTests(TestCase):
     def create_user(self, username, group_name=None, **kwargs):
         user = get_user_model().objects.create_user(username=username, password="test-pass-123", **kwargs)
         if group_name:
-            user.groups.add(Group.objects.get(name=group_name))
+            role = {"Merchant": "merchant", "Underwriter": "underwriter", "HQ": "hq"}[group_name]
+            assign_role(user, role)
         return user
 
     def test_home_redirects_unauthenticated_users_to_login(self):
@@ -78,7 +79,7 @@ class HomePageTests(TestCase):
 
         self.assertRedirects(response, reverse("underwriter_dashboard"))
 
-    def test_hq_can_access_hq_and_merchant_dashboards(self):
+    def test_hq_can_access_hq_dashboard_only(self):
         self.create_user("hq", "HQ")
         self.client.login(username="hq", password="test-pass-123")
 
@@ -87,7 +88,7 @@ class HomePageTests(TestCase):
 
         self.assertEqual(hq_response.status_code, 200)
         self.assertContains(hq_response, "HQ")
-        self.assertEqual(merchant_response.status_code, 200)
+        self.assertRedirects(merchant_response, reverse("hq_dashboard"))
 
     def test_merchant_cannot_access_hq_dashboard(self):
         self.create_user("merchant", "Merchant")
@@ -96,6 +97,51 @@ class HomePageTests(TestCase):
         response = self.client.get(reverse("hq_dashboard"))
 
         self.assertRedirects(response, reverse("merchant_dashboard"))
+
+    def test_underwriter_cannot_open_merchant_application_creation(self):
+        self.create_user("underwriter", "Underwriter")
+        self.client.login(username="underwriter", password="test-pass-123")
+
+        response = self.client.get(reverse("new_application"))
+
+        self.assertRedirects(response, reverse("underwriter_dashboard"))
+
+    def test_underwriter_cannot_access_hq_dashboard(self):
+        self.create_user("underwriter", "Underwriter")
+        self.client.login(username="underwriter", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertRedirects(response, reverse("underwriter_dashboard"))
+
+    def test_superuser_can_access_hq_dashboard(self):
+        get_user_model().objects.create_superuser(username="super", password="test-pass-123")
+        self.client.login(username="super", password="test-pass-123")
+
+        response = self.client.get(reverse("hq_dashboard"))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_hq_can_create_user_with_role(self):
+        self.create_user("hq", "HQ")
+        self.client.login(username="hq", password="test-pass-123")
+
+        response = self.client.post(
+            reverse("hq_users"),
+            {
+                "username": "new-underwriter",
+                "email": "underwriter@example.com",
+                "password": "test-pass-123",
+                "full_name": "New Underwriter",
+                "role": "underwriter",
+                "is_active": "on",
+            },
+        )
+
+        created = get_user_model().objects.get(username="new-underwriter")
+        self.assertRedirects(response, reverse("hq_users"))
+        self.assertTrue(created.groups.filter(name="Underwriter").exists())
+        self.assertEqual(created.userprofile.role, "underwriter")
 
     def test_home_path_redirects_to_role_portal(self):
         self.create_user("merchant", "Merchant")
@@ -123,3 +169,4 @@ class DashboardUrlTests(TestCase):
         self.assertEqual(reverse("merchant_dashboard"), "/tengasale/merchant/")
         self.assertEqual(reverse("underwriter_dashboard"), "/tengasale/underwriter/")
         self.assertEqual(reverse("hq_dashboard"), "/tengasale/hq/")
+        self.assertEqual(reverse("hq_users"), "/tengasale/hq/users/")
