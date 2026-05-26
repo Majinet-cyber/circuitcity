@@ -94,6 +94,7 @@ class CommissionApprovalTests(TestCase):
         self.assertRedirects(response, reverse("manager_home"))
         self.assertEqual(app.status, "approved")
         self.assertEqual(Commission.objects.filter(application=app).count(), 1)
+        self.assertFalse(Commission.objects.filter(application=app, role=Commission.ROLE_MERCHANT).exists())
         self.assertTrue(Commission.objects.filter(application=app, role=Commission.ROLE_MANAGER).exists())
 
 

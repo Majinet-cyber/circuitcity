@@ -48,6 +48,15 @@ class FinancingApplication(models.Model):
         ("imei_required", "IMEI Required"),
     ]
 
+    MERCHANT_STATUS_LABELS = {
+        "pending_review": "Pending Review",
+        "under_review": "Under Review",
+        "needs_edit": "Needs Edit",
+        "approved": "Approved",
+        "completed": "Completed",
+        "rejected": "Rejected",
+    }
+
     CORRECTION_FIELD_LABELS = {
         "customer_name": "Customer name",
         "national_id": "National ID",
@@ -183,6 +192,29 @@ class FinancingApplication(models.Model):
         self.claimed_at = None
         self.correction_fields = []
         self.save(update_fields=["status", "submitted_at", "claimed_by", "claimed_at", "correction_fields"])
+
+    @property
+    def merchant_status_key(self):
+        if self.status == "correction_requested":
+            return "needs_edit"
+
+        if self.status in ["contract_complete", "completed"]:
+            return "completed"
+
+        if self.status in ["submitted", "pending_review", "resubmitted"]:
+            return "under_review" if self.claimed_by_id else "pending_review"
+
+        if self.status == "under_review":
+            return "under_review"
+
+        if self.status in ["approved", "rejected"]:
+            return self.status
+
+        return self.status
+
+    @property
+    def merchant_status_label(self):
+        return self.MERCHANT_STATUS_LABELS.get(self.merchant_status_key, self.get_status_display())
 
     def get_continue_url(self):
         if self.status == "approved":

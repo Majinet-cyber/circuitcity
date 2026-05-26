@@ -296,7 +296,10 @@ def application_corrections(request, app_id):
 
 @login_required
 def application_detail(request, app_id):
-    app = get_object_or_404(FinancingApplication.objects.select_related("deal", "created_by", "claimed_by"), id=app_id)
+    app = get_object_or_404(
+        FinancingApplication.objects.select_related("deal", "created_by", "claimed_by", "reviewed_by"),
+        id=app_id,
+    )
 
     if not user_can_view_application(request.user, app):
         raise PermissionDenied
@@ -327,7 +330,7 @@ def application_detail(request, app_id):
 
 @login_required
 def active_applications(request):
-    apps = FinancingApplication.objects.filter(
+    apps = FinancingApplication.objects.select_related("claimed_by").filter(
         created_by=request.user,
         status__in=ACTIVE_STATUSES,
     ).order_by("-created_at")
@@ -337,7 +340,7 @@ def active_applications(request):
 
 @login_required
 def completed_applications(request):
-    apps = FinancingApplication.objects.filter(
+    apps = FinancingApplication.objects.select_related("claimed_by").filter(
         created_by=request.user,
         status__in=["contract_complete", "completed"],
     ).order_by("-created_at")
@@ -347,7 +350,7 @@ def completed_applications(request):
 
 @login_required
 def rejected_applications(request):
-    apps = FinancingApplication.objects.filter(
+    apps = FinancingApplication.objects.select_related("claimed_by").filter(
         created_by=request.user,
         status="rejected",
     ).order_by("-created_at")

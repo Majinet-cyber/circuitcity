@@ -4,23 +4,43 @@
 
 {% block content %}
 
-<h1 class="greeting">Your application is complete!</h1>
+{% if app.merchant_status_key == "under_review" %}
+    <h1 class="greeting">Your application is being reviewed</h1>
+{% elif app.merchant_status_key == "pending_review" %}
+    <h1 class="greeting">Pending Review</h1>
+{% else %}
+    <h1 class="greeting">{{ app.merchant_status_label }}</h1>
+{% endif %}
+
+<div class="card application-status-card submitted-status-card">
+    <div>
+        {% if app.merchant_status_key == "under_review" %}
+            <h2>Your application is being reviewed</h2>
+            <p>A TengaSale manager has started reviewing this application.</p>
+        {% elif app.merchant_status_key == "pending_review" %}
+            <h2>Your application is pending review</h2>
+            <p>A TengaSale manager will begin reviewing it soon and contact you if there are any questions.</p>
+        {% else %}
+            <h2>{{ app.merchant_status_label }}</h2>
+            <p>Review the latest application status below.</p>
+        {% endif %}
+    </div>
+    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+</div>
 
 <div class="card">
-    <p>Your application has been submitted for review. A TengaSale manager will begin reviewing it soon and contact you if there are any questions.</p>
-
     <div class="detail-row">
         <span>Application ID</span>
         <strong>{{ app.application_number|default:app.id }}</strong>
     </div>
     <div class="detail-row">
         <span>Status</span>
-        <strong>{{ app.get_status_display }}</strong>
+        <strong>{{ app.merchant_status_label }}</strong>
     </div>
     {% if app.claimed_by %}
         <div class="detail-row">
             <span>Review</span>
-            <strong>Being reviewed by {{ app.claimed_by.get_full_name|default:app.claimed_by.username }} since {{ app.claimed_at|date:"Y/m/d, H:i" }}</strong>
+            <strong>Being reviewed by {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}{% if app.claimed_at %} since {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
         </div>
     {% else %}
         <div class="detail-row">

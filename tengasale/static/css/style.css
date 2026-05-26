@@ -508,6 +508,7 @@ textarea:focus {
 }
 
 .status-correction_requested,
+.status-needs_edit,
 .status-rejected {
     background: var(--red-soft);
     color: var(--red);
@@ -1199,29 +1200,36 @@ textarea:focus {
 }
 
 .application-list {
+    display: grid;
+    gap: 12px;
     margin-bottom: 16px;
+}
+
+.application-filter-card {
+    margin-bottom: 14px;
 }
 
 .application-card {
     display: flex;
     justify-content: space-between;
-    gap: 14px;
-    align-items: center;
+    gap: 12px;
+    align-items: stretch;
     background: #ffffff;
-    border: 1px solid #e5eaf0;
-    border-bottom: 1px solid #e5eaf0;
-    border-radius: 0;
-    padding: 18px 20px;
+    border: 1px solid #e7e3de;
+    border-radius: 18px;
+    padding: 15px 14px 15px 16px;
     color: #111111;
     text-decoration: none;
+    box-shadow: 0 8px 22px rgba(17, 17, 17, 0.04);
+    transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
 }
 
 .application-card:first-child {
-    border-radius: 18px 18px 0 0;
+    border-radius: 18px;
 }
 
 .application-card:last-child {
-    border-radius: 0 0 18px 18px;
+    border-radius: 18px;
 }
 
 .application-card:only-child {
@@ -1229,29 +1237,69 @@ textarea:focus {
 }
 
 .application-card:hover {
-    background: #fff7f2;
+    background: #fffaf6;
+    border-color: #ffd9bd;
+}
+
+.application-card:active {
+    transform: translateY(1px);
+}
+
+.application-card-main {
+    min-width: 0;
+    flex: 1;
+}
+
+.application-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
 }
 
 .application-card h3 {
-    margin: 0 0 6px;
-    font-size: 18px;
-    font-weight: 800;
+    min-width: 0;
+    margin: 0;
+    font-size: 17px;
+    line-height: 1.25;
+    font-weight: 900;
 }
 
 .application-card p {
     margin: 4px 0;
-    color: #6f7b8a;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.application-meta {
+    display: grid;
+    gap: 3px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 750;
+}
+
+.application-reviewer {
+    padding-top: 5px;
 }
 
 .application-card-side {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    min-width: 24px;
 }
 
 .soft-card-arrow {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 100%;
     font-size: 30px;
-    color: #4f7891;
+    line-height: 1;
+    color: var(--orange-dark);
     font-weight: 800;
 }
 
@@ -1266,6 +1314,59 @@ textarea:focus {
     font-size: 12px;
     font-weight: 800;
     white-space: nowrap;
+}
+
+.status-pending_review {
+    background: #fff4cc;
+    color: #8a5a00;
+}
+
+.status-under_review {
+    background: #ffe8cc;
+    color: #ad4f00;
+}
+
+.status-needs_edit,
+.status-correction_requested {
+    background: #fff0e7;
+    color: #c2410c;
+}
+
+.status-rejected {
+    background: var(--red-soft);
+    color: var(--red);
+}
+
+.status-approved,
+.status-contract_complete,
+.status-completed {
+    background: var(--green-soft);
+    color: var(--green);
+}
+
+.application-status-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 14px;
+}
+
+.application-status-card h2 {
+    margin: 0 0 5px;
+    font-size: 18px;
+    line-height: 1.25;
+}
+
+.application-status-card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.submitted-status-card {
+    margin-bottom: 12px;
 }
 
 .detail-card {

@@ -11,7 +11,7 @@
 
 <h1 class="greeting">{{ title }}</h1>
 
-<div class="card">
+<div class="card application-filter-card">
     <input type="text" placeholder="Filter">
     <p class="text-muted">
         Filter by customer name, ID number, phone number, or application number.
@@ -22,20 +22,22 @@
     {% for app in apps %}
         <a href="{{ app.get_continue_url }}" class="application-card">
             <div class="application-card-main">
-                <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
-                <p>ID: {{ app.national_id|default:"-" }}</p>
-                {% if app.imei_number %}<p>IMEI: {{ app.imei_number }}</p>{% endif %}
-                <p>{{ app.application_number }}</p>
-                <p>{{ app.created_at|date:"Y/m/d, H:i" }}</p>
-                {% if app.status == "under_review" and app.claimed_by %}
-                    <p>Reviewer: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
-                {% elif app.status == "pending_review" %}
-                    <p>Waiting</p>
+                <div class="application-card-header">
+                    <h3>{{ app.customer_name|default:"Unnamed Customer" }}</h3>
+                    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+                </div>
+                <div class="application-meta">
+                    <span>ID: {{ app.national_id|default:"-" }}</span>
+                    <span>App: {{ app.application_number|default:app.id }}</span>
+                    <span>{{ app.created_at|date:"Y/m/d, H:i" }}</span>
+                    {% if app.imei_number %}<span>IMEI: {{ app.imei_number }}</span>{% endif %}
+                </div>
+                {% if app.merchant_status_key == "under_review" and app.claimed_by %}
+                    <p class="application-reviewer">Reviewer: {{ app.claimed_by.get_full_name|default:app.claimed_by.username }}</p>
                 {% endif %}
             </div>
 
             <div class="application-card-side">
-                <span class="status-pill status-{{ app.status }}">{{ app.get_status_display }}</span>
                 <span class="soft-card-arrow">&rsaquo;</span>
             </div>
         </a>

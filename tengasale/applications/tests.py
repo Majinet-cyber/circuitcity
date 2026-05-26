@@ -313,6 +313,35 @@ class ApplicationUrlTests(ApplicationTestCase):
 
 
 class ApplicationListTests(ApplicationTestCase):
+    def test_submitted_unclaimed_application_shows_pending_review(self):
+        app = self.create_application()
+        app.customer_name = "Jane Banda"
+        app.national_id = "RQXFVZC9"
+        app.status = "submitted"
+        app.save()
+
+        response = self.client.get(reverse("active_applications"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Pending Review")
+        self.assertNotContains(response, "Submitted")
+        self.assertContains(response, f'href="{reverse("application_detail", args=[app.id])}"')
+
+    def test_claimed_application_shows_under_review(self):
+        manager = get_user_model().objects.create_user(username="manager", password="test-pass-123", is_staff=True)
+        app = self.create_application()
+        app.customer_name = "Jane Banda"
+        app.national_id = "RQXFVZC9"
+        app.status = "under_review"
+        app.claimed_by = manager
+        app.save()
+
+        response = self.client.get(reverse("active_applications"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Under Review")
+        self.assertContains(response, "Reviewer: manager")
+
     def test_active_applications_page_contains_clickable_continue_card(self):
         app = self.create_application()
         app.customer_name = "Jane Banda"
@@ -325,6 +354,9 @@ class ApplicationListTests(ApplicationTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'class="application-card"')
         self.assertContains(response, f'href="{app.get_continue_url()}"')
+        self.assertContains(response, "Jane Banda")
+        self.assertContains(response, "ID: RQXFVZC9")
+        self.assertContains(response, f"App: {app.application_number}")
 
     def test_completed_applications_page_contains_clickable_card(self):
         app = self.create_application()
@@ -337,6 +369,19 @@ class ApplicationListTests(ApplicationTestCase):
         self.assertContains(response, f'href="{app.get_continue_url()}"')
         self.assertEqual(app.get_continue_url(), reverse("application_detail", args=[app.id]))
 
+    def test_needs_edit_application_page_contains_clickable_card(self):
+        app = self.create_application()
+        app.status = "correction_requested"
+        app.save()
+
+        response = self.client.get(reverse("active_applications"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="application-card"')
+        self.assertContains(response, "Needs Edit")
+        self.assertNotContains(response, "Correction Requested")
+        self.assertContains(response, f'href="{app.get_continue_url()}"')
+
     def test_rejected_applications_page_contains_clickable_card(self):
         app = self.create_application()
         app.status = "rejected"
@@ -347,6 +392,17 @@ class ApplicationListTests(ApplicationTestCase):
         self.assertContains(response, 'class="application-card"')
         self.assertContains(response, f'href="{app.get_continue_url()}"')
         self.assertEqual(app.get_continue_url(), reverse("application_detail", args=[app.id]))
+
+    def test_application_detail_uses_merchant_status_label(self):
+        app = self.create_application()
+        app.status = "correction_requested"
+        app.save()
+
+        response = self.client.get(reverse("application_detail", args=[app.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Needs Edit")
+        self.assertNotContains(response, "Correction Requested")
 
     def test_list_customer_and_detail_pages_contain_soft_back(self):
         app = self.create_application()

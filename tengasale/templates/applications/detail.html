@@ -15,6 +15,35 @@
     <a href="{{ app.get_continue_url }}" class="new-application-button">Continue Application</a>
 {% endif %}
 
+<div class="card application-status-card">
+    <div>
+        {% if app.merchant_status_key == "under_review" %}
+            <h2>Your application is being reviewed</h2>
+            {% if app.claimed_by %}
+                <p>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }} started reviewing it{% if app.claimed_at %} on {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}.</p>
+            {% else %}
+                <p>A TengaSale manager is reviewing your application.</p>
+            {% endif %}
+        {% elif app.merchant_status_key == "pending_review" %}
+            <h2>Your application is pending review</h2>
+            <p>A TengaSale manager will begin reviewing it soon.</p>
+        {% elif app.merchant_status_key == "needs_edit" %}
+            <h2>Your application needs edits</h2>
+            <p>Review the requested changes and resubmit the application.</p>
+        {% elif app.merchant_status_key == "approved" %}
+            <h2>Your application is approved</h2>
+            <p>Continue to the next step to complete the contract process.</p>
+        {% elif app.merchant_status_key == "rejected" %}
+            <h2>Your application was rejected</h2>
+            <p>Review the manager comment below for more information.</p>
+        {% else %}
+            <h2>{{ app.merchant_status_label }}</h2>
+            <p>Review the application details below.</p>
+        {% endif %}
+    </div>
+    <span class="status-pill status-{{ app.merchant_status_key }}">{{ app.merchant_status_label }}</span>
+</div>
+
 <div class="card detail-card">
     <div class="detail-row">
         <span>Customer name</span>
@@ -116,15 +145,33 @@
     {% endif %}
     <div class="detail-row">
         <span>Status</span>
-        <strong>{{ app.get_status_display }}</strong>
+        <strong>{{ app.merchant_status_label }}</strong>
+    </div>
+    {% if app.claimed_by %}
+        <div class="detail-row">
+            <span>Reviewer</span>
+            <strong>{{ app.claimed_by.get_full_name|default:app.claimed_by.username }}{% if app.claimed_at %} since {{ app.claimed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
+        </div>
+    {% endif %}
+    {% if app.reviewed_by %}
+        <div class="detail-row">
+            <span>Reviewed by</span>
+            <strong>{{ app.reviewed_by.get_full_name|default:app.reviewed_by.username }}{% if app.reviewed_at %} on {{ app.reviewed_at|date:"Y/m/d, H:i" }}{% endif %}</strong>
+        </div>
+    {% endif %}
+    {% if app.merchant_status_key == "needs_edit" and app.correction_notes %}
+        <div class="detail-row">
+            <span>Correction notes</span>
+            <strong>{{ app.correction_notes }}</strong>
+        </div>
+    {% endif %}
+    <div class="detail-row">
+        <span>Created date</span>
+        <strong>{{ app.created_at|date:"Y/m/d, H:i" }}</strong>
     </div>
     <div class="detail-row">
         <span>Manager comment</span>
         <strong>{{ app.manager_comment|default:"No comment" }}</strong>
-    </div>
-    <div class="detail-row">
-        <span>Created date</span>
-        <strong>{{ app.created_at|date:"Y/m/d, H:i" }}</strong>
     </div>
 </div>
 
